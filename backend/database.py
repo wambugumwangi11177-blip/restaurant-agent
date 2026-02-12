@@ -6,7 +6,11 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 # Fallback to sqlite if no DATABASE_URL
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./restaurant.db")
+DATABASE_URL = os.getenv("DATABASE_URL") or "sqlite:///./restaurant.db"
+
+# Fix for Neon/Render: postgres:// → postgresql:// (SQLAlchemy 2.x requirement)
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # Build engine args based on DB type
 connect_args = {}

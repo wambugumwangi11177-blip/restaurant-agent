@@ -18,9 +18,13 @@ if sentry_dsn:
 app = FastAPI()
 
 # CORS — allow frontend to call backend
+# Configure via CORS_ORIGINS env var (comma-separated) or use defaults
+default_origins = "http://localhost:3000,http://127.0.0.1:3000,http://192.168.100.4:3000"
+cors_origins = os.getenv("CORS_ORIGINS", default_origins).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://192.168.100.4:3000"],
+    allow_origins=[o.strip() for o in cors_origins],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

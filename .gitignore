@@ -5,6 +5,7 @@ __pycache__/
 *$py.class
 venv/
 .env
+.env.local
 
 # NodeJS
 node_modules/
@@ -26,5 +27,6 @@ Thumbs.db
 Desktop.ini
 
 # Project specific
-backend/*.db
-backend/restaurant.db
+*.db
+.tmp/
+

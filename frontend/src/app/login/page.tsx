@@ -29,8 +29,13 @@ export default function LoginPage() {
             }
             router.push("/dashboard");
         } catch (err: unknown) {
-            const message =
-                err instanceof Error ? err.message : "Authentication failed";
+            let message = "Authentication failed";
+            if (err && typeof err === "object" && "response" in err) {
+                const axiosErr = err as { response?: { data?: { detail?: string } }; message?: string };
+                message = axiosErr.response?.data?.detail || axiosErr.message || message;
+            } else if (err instanceof Error) {
+                message = err.message;
+            }
             setError(message);
         } finally {
             setLoading(false);

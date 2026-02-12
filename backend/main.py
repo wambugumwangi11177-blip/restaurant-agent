@@ -17,6 +17,15 @@ if sentry_dsn:
 
 app = FastAPI()
 
+# Create database tables after app starts (not at import time)
+@app.on_event("startup")
+def on_startup():
+    from database import init_db
+    try:
+        init_db()
+    except Exception as e:
+        print(f"Warning: DB init deferred — {e}")
+
 # CORS — allow frontend to call backend
 # Configure via CORS_ORIGINS env var (comma-separated) or use defaults
 default_origins = "http://localhost:3000,http://127.0.0.1:3000,http://192.168.100.4:3000"

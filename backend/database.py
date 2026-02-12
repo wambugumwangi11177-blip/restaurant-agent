@@ -34,7 +34,8 @@ def get_db():
     finally:
         db.close()
 
-# Auto-create tables on import (for production deployment)
-from models import Base
-Base.metadata.create_all(bind=engine)
+# Call this explicitly to create tables (don't run at import time)
+def init_db():
+    from models import Base
+    Base.metadata.create_all(bind=engine)
 

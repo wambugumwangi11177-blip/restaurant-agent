@@ -1,19 +1,19 @@
 import os
-import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import orders, inventory, health, webhooks, auth, menu, analytics
 # from routers import reservations # TODO
-import auth as auth_utils # Keep original import too if used elsewhere, but maybe rename to avoid conflict
+import auth as auth_utils
 from middleware.timing import TimingMiddleware
 
-# Init Sentry
-sentry_dsn = os.getenv("SENTRY_DSN")
-if sentry_dsn:
-    sentry_sdk.init(
-        dsn=sentry_dsn,
-        traces_sample_rate=1.0,
-    )
+# Init Sentry (optional — won't crash if sentry-sdk is missing or DSN is unset)
+try:
+    import sentry_sdk
+    sentry_dsn = os.getenv("SENTRY_DSN")
+    if sentry_dsn:
+        sentry_sdk.init(dsn=sentry_dsn, traces_sample_rate=1.0)
+except Exception:
+    pass
 
 app = FastAPI()
 
@@ -23,8 +23,10 @@ def on_startup():
     from database import init_db
     try:
         init_db()
+        print("[OK] Database tables initialized")
     except Exception as e:
-        print(f"Warning: DB init deferred — {e}")
+        # Log but don't crash — the port must open for Render health checks
+        print(f"[WARN] DB init deferred: {e}")
 
 # CORS — allow frontend to call backend
 # Configure via CORS_ORIGINS env var (comma-separated) or use defaults

@@ -14,6 +14,7 @@ if DATABASE_URL.startswith("postgres://"):
 
 # Build engine args based on DB type
 connect_args = {}
+engine_kwargs = {}
 
 if DATABASE_URL.startswith("sqlite"):
     # SQLite: make path absolute and add thread safety arg
@@ -23,8 +24,11 @@ if DATABASE_URL.startswith("sqlite"):
         db_path = os.path.join(base_dir, db_name)
         DATABASE_URL = f"sqlite:///{db_path}"
     connect_args = {"check_same_thread": False}
+else:
+    # PostgreSQL (Neon/Render): keep connections healthy after idle/sleep
+    engine_kwargs = {"pool_pre_ping": True, "pool_recycle": 300}
 
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
+engine = create_engine(DATABASE_URL, connect_args=connect_args, **engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def get_db():

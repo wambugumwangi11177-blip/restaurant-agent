@@ -3,214 +3,263 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { motion } from "framer-motion";
-import { UtensilsCrossed, Star, TrendingUp, TrendingDown, Minus, ArrowUpRight, AlertTriangle, Lightbulb, BarChart3 } from "lucide-react";
+import { UtensilsCrossed, Plus, X, Loader2, TrendingUp, TrendingDown, Minus } from "lucide-react";
 
-export default function MenuEngineeringPage() {
-    const [data, setData] = useState<any>(null);
+interface MenuItem {
+    id: number;
+    name: string;
+    description: string;
+    price: number;
+    category: string;
+    is_available: boolean;
+}
+
+export default function MenuPage() {
+    const [items, setItems] = useState<MenuItem[]>([]);
+    const [aiData, setAiData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [view, setView] = useState<"matrix" | "recs" | "pareto">("matrix");
+    const [showForm, setShowForm] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [form, setForm] = useState({ name: "", price: "", category: "", description: "" });
 
     useEffect(() => {
-        api.get("/ai/menu-engineering").then(r => { setData(r.data); setLoading(false); }).catch(() => setLoading(false));
+        Promise.all([
+            api.get("/menu/").catch(() => ({ data: [] })),
+            api.get("/ai/menu-engineering").catch(() => ({ data: null })),
+        ]).then(([menuRes, aiRes]) => {
+            setItems(menuRes.data || []);
+            setAiData(aiRes.data);
+            setLoading(false);
+        });
     }, []);
 
-    if (loading) return <div className="space-y-4 animate-pulse">{[...Array(4)].map((_, i) => <div key={i} className="glass rounded-xl h-20" />)}</div>;
-    if (!data) return <p className="text-gray-500">Failed to load menu data.</p>;
+    const fetchMenu = () => {
+        api.get("/menu/").then((r) => setItems(r.data)).catch(() => { });
+    };
 
-    const { matrix, summary, category_performance, pareto, recommendations, upsell_pairs } = data;
-    const s = summary || {};
+    const handleAdd = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+            await api.post("/menu/", {
+                name: form.name,
+                price: Math.round(parseFloat(form.price) * 100),
+                category: form.category,
+                description: form.description,
+            });
+            setForm({ name: "", price: "", category: "", description: "" });
+            setShowForm(false);
+            fetchMenu();
+        } catch { }
+        setSaving(false);
+    };
 
-    return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="glass rounded-2xl p-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-                <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                        <UtensilsCrossed className="w-5 h-5 text-indigo-400" />
-                        <span className="text-sm text-indigo-400 font-medium">Menu Engineering AI</span>
-                    </div>
-                    <h1 className="text-2xl font-bold mb-4">Menu Performance Matrix</h1>
+    const toggleAvailability = async (item: MenuItem) => {
+        try {
+            await api.put(`/menu/${item.id}`, { is_available: !item.is_available });
+            fetchMenu();
+        } catch { }
+    };
 
-                    {/* Summary Stats */}
-                    <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-                        <MiniStat label="Items" value={s.total_items} />
-                        <MiniStat label="Stars" value={s.stars} color="text-yellow-400" icon="★" />
-                        <MiniStat label="Plowhorses" value={s.plowhorses} color="text-blue-400" icon="🐴" />
-                        <MiniStat label="Puzzles" value={s.puzzles} color="text-purple-400" icon="🧩" />
-                        <MiniStat label="Dogs" value={s.dogs} color="text-red-400" icon="🐕" />
-                        <MiniStat label="Menu Score" value={`${s.menu_optimization_score}/100`} color={s.menu_optimization_score >= 70 ? "text-emerald-400" : "text-amber-400"} />
-                    </div>
-                </div>
-            </div>
+    const categories = [...new Set(items.map((i) => i.category).filter(Boolean))];
+    const matrix = aiData?.matrix || [];
+    const recommendations = aiData?.recommendations || [];
+    const summary = aiData?.summary || {};
 
-            {/* Tab Navigation */}
-            <div className="flex gap-2">
-                {(["matrix", "recs", "pareto"] as const).map(t => (
-                    <button key={t} onClick={() => setView(t)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${view === t ? "bg-indigo-600 text-white" : "glass text-gray-400 hover:text-white"}`}>
-                        {t === "matrix" ? "Item Matrix" : t === "recs" ? `Recommendations (${(recommendations || []).length})` : "Pareto Analysis"}
-                    </button>
+    // Friendly classification labels
+    const classLabel = (c: string) => {
+        const map: Record<string, string> = {
+            Star: "Top Seller",
+            Plowhorse: "Popular",
+            Puzzle: "Hidden Gem",
+            Dog: "Slow Mover",
+        };
+        return map[c] || c;
+    };
+
+    const classColor = (c: string) => {
+        const map: Record<string, string> = {
+            Star: "bg-[#22c55e]/10 text-[#22c55e]",
+            Plowhorse: "bg-[#eab308]/10 text-[#eab308]",
+            Puzzle: "bg-[#3b82f6]/10 text-[#3b82f6]",
+            Dog: "bg-[#ef4444]/10 text-[#ef4444]",
+        };
+        return map[c] || "bg-[#737373]/10 text-[#737373]";
+    };
+
+    if (loading) {
+        return (
+            <div className="space-y-3">
+                {[...Array(4)].map((_, i) => (
+                    <div key={i} className="bg-[#141414] rounded-xl h-16 animate-pulse" />
                 ))}
             </div>
+        );
+    }
 
-            {/* Matrix View */}
-            {view === "matrix" && (
-                <div className="glass rounded-2xl overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-gray-700/50">
-                                    <th className="text-left p-4 text-gray-400 font-medium">Item</th>
-                                    <th className="text-left p-4 text-gray-400 font-medium">Category</th>
-                                    <th className="text-center p-4 text-gray-400 font-medium">Class</th>
-                                    <th className="text-right p-4 text-gray-400 font-medium">Sold</th>
-                                    <th className="text-right p-4 text-gray-400 font-medium">Revenue</th>
-                                    <th className="text-right p-4 text-gray-400 font-medium">Margin %</th>
-                                    <th className="text-right p-4 text-gray-400 font-medium">Food Cost %</th>
-                                    <th className="text-center p-4 text-gray-400 font-medium">Trend</th>
-                                    <th className="text-center p-4 text-gray-400 font-medium">Peak</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(matrix || []).map((item: any, i: number) => (
-                                    <motion.tr key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
-                                        className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
-                                        <td className="p-4 font-medium">{item.name}</td>
-                                        <td className="p-4 text-gray-400">{item.category}</td>
-                                        <td className="p-4 text-center"><ClassBadge cls={item.classification} /></td>
-                                        <td className="p-4 text-right">{item.qty_sold}</td>
-                                        <td className="p-4 text-right text-emerald-400">{formatKES(item.revenue)}</td>
-                                        <td className="p-4 text-right">{item.margin_pct}%</td>
-                                        <td className="p-4 text-right"><CostBadge pct={item.food_cost_pct} /></td>
-                                        <td className="p-4 text-center"><TrendIcon trend={item.trend} pct={item.trend_pct} /></td>
-                                        <td className="p-4 text-center"><span className="text-xs text-gray-400">{item.peak_period}</span></td>
-                                    </motion.tr>
-                                ))}
-                            </tbody>
-                        </table>
+    return (
+        <div className="space-y-5">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-xl font-bold text-[#e5e5e5]">Your Menu</h1>
+                    <p className="text-sm text-[#525252] mt-0.5">
+                        {items.length} item{items.length !== 1 ? "s" : ""} · synced with your POS
+                    </p>
+                </div>
+                <button onClick={() => setShowForm(!showForm)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#d4a853] hover:bg-[#e0b96a] text-[#0a0a0a] text-sm font-medium transition-colors">
+                    {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                    {showForm ? "Cancel" : "Add Item"}
+                </button>
+            </div>
+
+            {/* What we found about your menu */}
+            {(summary.stars > 0 || summary.dogs > 0 || recommendations.length > 0) && (
+                <div className="bg-[#141414] border border-[#262626] rounded-xl">
+                    <div className="px-4 py-3 border-b border-[#1a1a1a]">
+                        <p className="text-xs font-semibold text-[#e5e5e5]">What we found about your menu</p>
                     </div>
+                    {/* Performance summary */}
+                    <div className="px-4 py-3 flex flex-wrap gap-2">
+                        {summary.stars > 0 && (
+                            <span className="text-[10px] px-2 py-1 rounded-full bg-[#22c55e]/10 text-[#22c55e] flex items-center gap-1">
+                                <TrendingUp className="w-3 h-3" /> {summary.stars} top seller{summary.stars > 1 ? "s" : ""}
+                            </span>
+                        )}
+                        {summary.puzzles > 0 && (
+                            <span className="text-[10px] px-2 py-1 rounded-full bg-[#3b82f6]/10 text-[#3b82f6]">
+                                {summary.puzzles} hidden gem{summary.puzzles > 1 ? "s" : ""} — profitable but not selling enough
+                            </span>
+                        )}
+                        {summary.plowhorses > 0 && (
+                            <span className="text-[10px] px-2 py-1 rounded-full bg-[#eab308]/10 text-[#eab308]">
+                                {summary.plowhorses} popular but thin margin
+                            </span>
+                        )}
+                        {summary.dogs > 0 && (
+                            <span className="text-[10px] px-2 py-1 rounded-full bg-[#ef4444]/10 text-[#ef4444] flex items-center gap-1">
+                                <TrendingDown className="w-3 h-3" /> {summary.dogs} slow mover{summary.dogs > 1 ? "s" : ""} — think about removing
+                            </span>
+                        )}
+                        {summary.avg_food_cost_pct > 0 && (
+                            <span className="text-[10px] px-2 py-1 rounded-full bg-[#737373]/10 text-[#737373]">
+                                Food costs around {summary.avg_food_cost_pct.toFixed(0)}% of your prices
+                            </span>
+                        )}
+                    </div>
+                    {/* Suggestions */}
+                    {recommendations.length > 0 && (
+                        <div className="px-4 pb-3 space-y-2">
+                            <p className="text-[10px] text-[#525252] uppercase tracking-wider">Suggestions</p>
+                            {recommendations.slice(0, 3).map((rec: any, i: number) => (
+                                <div key={i} className="flex items-start gap-2 text-xs">
+                                    <span className="text-[#d4a853] mt-0.5">💡</span>
+                                    <div>
+                                        <p className="text-[#e5e5e5]">{friendlyRec(rec.reason || rec.message)}</p>
+                                        {rec.action && <p className="text-[#525252] mt-0.5">{rec.action}</p>}
+                                        {rec.estimated_impact && (
+                                            <p className="text-[10px] text-[#22c55e] mt-0.5">Could mean {rec.estimated_impact}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 
-            {/* Recommendations View */}
-            {view === "recs" && (
-                <div className="space-y-3">
-                    {(recommendations || []).map((r: any, i: number) => (
-                        <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-                            className="glass rounded-xl p-4 flex items-start gap-3">
-                            <span className={`mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${r.priority === "high" ? "bg-red-600/30 text-red-400" : r.priority === "medium" ? "bg-amber-600/30 text-amber-400" : "bg-gray-600/30 text-gray-400"}`}>{r.priority}</span>
-                            <div className="flex-1">
-                                <p className="text-sm font-medium">{r.item}: <span className="text-indigo-400">{r.action}</span></p>
-                                <p className="text-xs text-gray-400 mt-1">{r.reason}</p>
-                                {r.impact && <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1"><Lightbulb className="w-3 h-3" />{r.impact}</p>}
+            {/* Add Form */}
+            {showForm && (
+                <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+                    onSubmit={handleAdd}
+                    className="bg-[#141414] border border-[#262626] rounded-xl p-5 space-y-3">
+                    <p className="text-sm text-[#e5e5e5] font-medium">New Menu Item</p>
+                    <div className="grid grid-cols-2 gap-3">
+                        <input type="text" placeholder="Name (e.g. Nyama Choma)" value={form.name}
+                            onChange={(e) => setForm({ ...form, name: e.target.value })}
+                            className="px-3 py-2 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-sm text-[#e5e5e5] placeholder-[#525252]" required />
+                        <input type="number" placeholder="Price in KES" value={form.price}
+                            onChange={(e) => setForm({ ...form, price: e.target.value })}
+                            className="px-3 py-2 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-sm text-[#e5e5e5] placeholder-[#525252]" required />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <input type="text" placeholder="Category (e.g. Mains, Drinks)" value={form.category}
+                            onChange={(e) => setForm({ ...form, category: e.target.value })}
+                            className="px-3 py-2 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-sm text-[#e5e5e5] placeholder-[#525252]" />
+                        <input type="text" placeholder="Short description" value={form.description}
+                            onChange={(e) => setForm({ ...form, description: e.target.value })}
+                            className="px-3 py-2 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-sm text-[#e5e5e5] placeholder-[#525252]" />
+                    </div>
+                    <button type="submit" disabled={saving}
+                        className="px-4 py-2 rounded-lg bg-[#d4a853] hover:bg-[#e0b96a] text-[#0a0a0a] text-sm font-medium disabled:opacity-50 flex items-center gap-2 transition-colors">
+                        {saving && <Loader2 className="w-3 h-3 animate-spin" />} Add to Menu
+                    </button>
+                </motion.form>
+            )}
+
+            {/* Menu Items by Category */}
+            {items.length === 0 ? (
+                <div className="bg-[#141414] border border-[#262626] rounded-xl p-8 text-center">
+                    <UtensilsCrossed className="w-8 h-8 text-[#333] mx-auto mb-3" />
+                    <p className="text-sm text-[#525252]">Your menu is empty. Add your first item above.</p>
+                </div>
+            ) : (
+                <div className="space-y-5">
+                    {categories.map((cat) => (
+                        <div key={cat}>
+                            <h3 className="text-xs font-semibold text-[#525252] uppercase tracking-wider mb-2 px-1">{cat}</h3>
+                            <div className="space-y-1">
+                                {items.filter((i) => i.category === cat).map((item, idx) => {
+                                    const aiItem = matrix.find((m: any) => m.item_id === item.id);
+                                    return (
+                                        <motion.div key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                            transition={{ delay: idx * 0.03 }}
+                                            className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3 flex items-center justify-between hover:border-[#333] transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                {aiItem && (
+                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${classColor(aiItem.classification)}`}>
+                                                        {classLabel(aiItem.classification)}
+                                                    </span>
+                                                )}
+                                                <div>
+                                                    <p className={`text-sm font-medium ${item.is_available ? "text-[#e5e5e5]" : "text-[#525252] line-through"}`}>
+                                                        {item.name}
+                                                    </p>
+                                                    {item.description && (
+                                                        <p className="text-xs text-[#525252] mt-0.5">{item.description}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                {aiItem?.margin_pct !== undefined && (
+                                                    <span className={`text-[10px] ${aiItem.margin_pct >= 60 ? "text-[#22c55e]" : aiItem.margin_pct >= 30 ? "text-[#737373]" : "text-[#ef4444]"
+                                                        }`}>{aiItem.margin_pct.toFixed(0)}% profit</span>
+                                                )}
+                                                <span className="text-sm font-semibold text-[#d4a853]">
+                                                    KES {(item.price / 100).toLocaleString()}
+                                                </span>
+                                                <button onClick={() => toggleAvailability(item)}
+                                                    className={`w-8 h-5 rounded-full relative transition-colors ${item.is_available ? "bg-[#22c55e]" : "bg-[#333]"}`}>
+                                                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${item.is_available ? "left-3.5" : "left-0.5"}`} />
+                                                </button>
+                                            </div>
+                                        </motion.div>
+                                    );
+                                })}
                             </div>
-                        </motion.div>
+                        </div>
                     ))}
                 </div>
             )}
-
-            {/* Pareto View */}
-            {view === "pareto" && pareto && (
-                <div className="glass rounded-2xl p-6">
-                    <div className="flex items-center gap-2 mb-4">
-                        <BarChart3 className="w-5 h-5 text-cyan-400" />
-                        <h2 className="font-semibold">Revenue Concentration (80/20 Rule)</h2>
-                    </div>
-                    <p className="text-sm text-gray-400 mb-4">
-                        <span className="text-white font-bold">{pareto.items_for_80_pct}</span> items ({pareto.concentration_ratio}% of menu) generate <span className="text-emerald-400 font-bold">80%</span> of total revenue.
-                    </p>
-                    <div className="space-y-2">
-                        {(pareto.items || []).map((p: any) => (
-                            <div key={p.rank} className="flex items-center gap-3">
-                                <span className="w-6 text-xs text-gray-500 text-right">{p.rank}.</span>
-                                <div className="flex-1 flex items-center gap-2">
-                                    <span className="text-sm">{p.name}</span>
-                                    <div className="flex-1 bg-gray-800 rounded-full h-2 overflow-hidden">
-                                        <motion.div initial={{ width: 0 }} animate={{ width: `${p.cumulative_pct}%` }}
-                                            transition={{ duration: 0.5, delay: p.rank * 0.05 }}
-                                            className={`h-full rounded-full ${p.cumulative_pct <= 80 ? "bg-indigo-500" : "bg-gray-600"}`} />
-                                    </div>
-                                    <span className="text-xs text-gray-400 w-12 text-right">{p.cumulative_pct}%</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Category Performance + Upsell Pairs */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="glass rounded-2xl p-6">
-                    <h3 className="font-semibold mb-4">Category Performance</h3>
-                    <div className="space-y-3">
-                        {(category_performance || []).map((c: any) => (
-                            <div key={c.category} className="flex items-center justify-between p-3 rounded-lg bg-gray-800/30">
-                                <div>
-                                    <p className="text-sm font-medium">{c.category}</p>
-                                    <p className="text-xs text-gray-400">{c.item_count} items • {c.total_qty_sold} sold</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-sm text-emerald-400 font-medium">{c.revenue_share_pct}% rev</p>
-                                    <p className="text-xs text-gray-400">{c.avg_food_cost_pct}% cost</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="glass rounded-2xl p-6">
-                    <h3 className="font-semibold mb-4">Upsell Pairs (Co-occurrence)</h3>
-                    <div className="space-y-3">
-                        {(upsell_pairs || []).map((u: any, i: number) => (
-                            <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-gray-800/30">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-sm">{u.item_a}</span>
-                                    <span className="text-gray-500">+</span>
-                                    <span className="text-sm">{u.item_b}</span>
-                                </div>
-                                <div className="text-right">
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${u.strength === "strong" ? "bg-emerald-600/30 text-emerald-400" : u.strength === "moderate" ? "bg-cyan-600/30 text-cyan-400" : "bg-gray-600/30 text-gray-400"}`}>{u.lift}x lift</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
         </div>
     );
 }
 
-/* ─── Subcomponents ─── */
-function MiniStat({ label, value, color, icon }: { label: string; value: any; color?: string; icon?: string }) {
-    return (
-        <div className="p-3 rounded-lg bg-gray-800/40 border border-gray-700/50">
-            <p className="text-xs text-gray-400">{label}</p>
-            <p className={`text-lg font-bold ${color || "text-white"}`}>{icon ? `${icon} ${value}` : value}</p>
-        </div>
-    );
-}
-
-function ClassBadge({ cls }: { cls: string }) {
-    const m: Record<string, string> = {
-        Star: "bg-yellow-600/30 text-yellow-400", Plowhorse: "bg-blue-600/30 text-blue-400",
-        Puzzle: "bg-purple-600/30 text-purple-400", Dog: "bg-red-600/30 text-red-400",
-    };
-    return <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${m[cls] || ""}`}>{cls}</span>;
-}
-
-function CostBadge({ pct }: { pct: number }) {
-    const c = pct > 35 ? "text-red-400" : pct > 30 ? "text-amber-400" : "text-emerald-400";
-    return <span className={c}>{pct}%</span>;
-}
-
-function TrendIcon({ trend, pct }: { trend: string; pct: number }) {
-    if (trend === "rising") return <span className="text-emerald-400 flex items-center gap-0.5 justify-center text-xs"><TrendingUp className="w-3 h-3" />{pct > 0 ? `+${pct}%` : ""}</span>;
-    if (trend === "falling") return <span className="text-red-400 flex items-center gap-0.5 justify-center text-xs"><TrendingDown className="w-3 h-3" />{pct}%</span>;
-    return <span className="text-gray-500 flex items-center justify-center"><Minus className="w-3 h-3" /></span>;
-}
-
-function formatKES(cents: number) {
-    if (!cents) return "KES 0";
-    return `KES ${(cents / 100).toLocaleString("en-KE", { maximumFractionDigits: 0 })}`;
+function friendlyRec(text: string) {
+    return text
+        .replace(/Star/g, "top seller")
+        .replace(/Plowhorse/g, "popular item")
+        .replace(/Puzzle/g, "hidden gem")
+        .replace(/Dog/g, "slow mover");
 }

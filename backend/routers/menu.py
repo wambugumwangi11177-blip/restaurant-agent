@@ -9,9 +9,17 @@ import auth
 router = APIRouter(prefix="/menu", tags=["menu"])
 
 @router.get("/", response_model=List[schemas.MenuItem])
-async def read_menu_items(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    # Currently checks all, eventually filter by tenant/restaurant
-    items = db.query(models.MenuItem).offset(skip).limit(limit).all()
+async def read_menu_items(
+    skip: int = 0, 
+    limit: int = 100, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    restaurant = db.query(models.Restaurant).filter(models.Restaurant.tenant_id == current_user.tenant_id).first()
+    if not restaurant:
+        return []
+        
+    items = db.query(models.MenuItem).filter(models.MenuItem.restaurant_id == restaurant.id).offset(skip).limit(limit).all()
     return items
 
 @router.post("/", response_model=schemas.MenuItem)
@@ -79,3 +87,19 @@ async def delete_menu_item(
     db.delete(db_item)
     db.commit()
     return {"message": "Item deleted successfully"}
+
+
+# ── Public endpoint (no auth) for customer ordering ──
+
+@router.get("/public/{restaurant_id}", response_model=List[schemas.MenuItem])
+async def get_public_menu(
+    restaurant_id: int,
+    db: Session = Depends(get_db),
+):
+    """Public menu for customer ordering — no login required."""
+    items = db.query(models.MenuItem).filter(
+        models.MenuItem.restaurant_id == restaurant_id,
+        models.MenuItem.is_available == True,
+    ).all()
+    return items
+

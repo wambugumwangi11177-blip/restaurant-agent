@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Outfit } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const inter = Inter({
-  variable: "--font-inter",
+const outfit = Outfit({
+  variable: "--font-outfit",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "AI Restaurant OS",
-  description: "Unified AI Operating System for Restaurants",
+  title: "Chakula — Restaurant Manager",
+  description: "Simple restaurant management for Kenyan restaurants",
 };
 
 export default function RootLayout({
@@ -20,7 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.variable} font-sans antialiased bg-gray-950 text-gray-100`}>
+      <body className={`${outfit.variable} font-sans antialiased bg-[#0a0a0a] text-[#e5e5e5]`}>
         <Providers>{children}</Providers>
       </body>
     </html>

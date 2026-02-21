@@ -42,6 +42,19 @@ class StockMovementType(enum.Enum):
     OUT = "out"      # Usage / waste
     ADJUST = "adjust" # Manual adjustment
 
+class DeliveryChannel(enum.Enum):
+    WALK_IN = "walk_in"
+    APP = "app"           # Ordered through customer app
+    UBER_EATS = "uber_eats"
+    BOLT_FOOD = "bolt_food"
+    GLOVO = "glovo"
+
+class PaymentMethod(enum.Enum):
+    CASH = "cash"
+    MPESA = "mpesa"
+    CARD = "card"
+    PENDING = "pending"   # Not yet paid
+
 # ──────────────────────────────────────────────
 # TENANT & USER
 # ──────────────────────────────────────────────
@@ -123,14 +136,19 @@ class Order(Base):
     restaurant_id = Column(Integer, ForeignKey("restaurants.id"))
     status = Column(SqEnum(OrderStatus), default=OrderStatus.PENDING)
     order_type = Column(SqEnum(OrderType), default=OrderType.DINE_IN)
+    delivery_channel = Column(SqEnum(DeliveryChannel), default=DeliveryChannel.WALK_IN)
+    payment_method = Column(SqEnum(PaymentMethod), default=PaymentMethod.PENDING)
+    is_paid = Column(Boolean, default=False)
     table_number = Column(Integer, nullable=True)
     customer_name = Column(String, default="")
+    customer_phone = Column(String, default="")
     total = Column(Integer)  # In cents
+    notes = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
     
     restaurant = relationship("Restaurant", back_populates="orders")
-    items = relationship("OrderItem", back_populates="order")
+    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
 
 class OrderItem(Base):
     """Links orders to menu items — critical for menu performance analysis."""

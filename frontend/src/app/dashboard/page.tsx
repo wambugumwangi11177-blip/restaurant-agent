@@ -1,225 +1,325 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { motion } from "framer-motion";
 import {
-    Brain, TrendingUp, TrendingDown, AlertTriangle, ShieldAlert,
-    Zap, Package, UtensilsCrossed, CalendarRange, ChefHat,
-    ArrowUpRight, ArrowDownRight, Activity,
+    TrendingUp,
+    ShoppingBag,
+    AlertTriangle,
+    Activity,
+    Zap,
+    Shield,
+    Wifi,
+    Monitor,
+    Smartphone,
 } from "lucide-react";
 
-interface HealthBreakdown {
-    category: string; score: number; weight: number; detail: string;
-}
-interface Risk { risk: string; severity: string; detail: string; }
-interface Opportunity { opportunity: string; potential: string; detail: string; }
-interface Alert { source: string; item: string; message: string; severity: string; action: string; }
-
 export default function DashboardPage() {
+    const { user } = useAuth();
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.get("/ai/dashboard").then(r => { setData(r.data); setLoading(false); }).catch(() => setLoading(false));
+        api.get("/ai/dashboard")
+            .then((r) => setData(r.data))
+            .catch(() => { })
+            .finally(() => setLoading(false));
     }, []);
 
-    if (loading) return <LoadingSkeleton />;
-    if (!data) return <p className="text-gray-500">Failed to load dashboard data.</p>;
+    const getGreeting = () => {
+        const h = new Date().getHours();
+        if (h < 12) return "Good morning";
+        if (h < 17) return "Good afternoon";
+        return "Good evening";
+    };
 
-    const { health_score, health_breakdown, quick_stats, alerts, risks, opportunities } = data;
-    const qs = quick_stats || {};
-
-    return (
-        <div className="space-y-6">
-            {/* Hero: Health Score */}
-            <div className="glass rounded-2xl p-8 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-                <div className="relative flex flex-col lg:flex-row lg:items-center gap-8">
-                    <div className="flex-shrink-0">
-                        <HealthRing score={health_score} />
-                    </div>
-                    <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Brain className="w-5 h-5 text-indigo-400" />
-                            <span className="text-sm text-indigo-400 font-medium">AI Operations Manager</span>
-                        </div>
-                        <h1 className="text-2xl font-bold mb-4">Restaurant Health Score</h1>
-                        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                            {(health_breakdown || []).map((b: HealthBreakdown) => (
-                                <div key={b.category} className="p-3 rounded-lg bg-gray-800/40 border border-gray-700/50">
-                                    <p className="text-xs text-gray-400 mb-1">{b.category}</p>
-                                    <p className={`text-lg font-bold ${scoreColor(b.score)}`}>{b.score}/100</p>
-                                    <p className="text-[10px] text-gray-500 mt-1 line-clamp-2">{b.detail}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard icon={TrendingUp} label="30-Day Revenue" value={formatKES(qs.total_revenue_30d)} color="emerald" />
-                <StatCard icon={UtensilsCrossed} label="Today Orders" value={qs.today_orders || 0} color="indigo"
-                    sub={qs.day_over_day_change ? `${qs.day_over_day_change > 0 ? '+' : ''}${qs.day_over_day_change}% vs yesterday` : undefined}
-                    subUp={qs.day_over_day_change > 0}
-                />
-                <StatCard icon={Activity} label="Avg Order Value" value={formatKES(qs.avg_order_value)} color="cyan" />
-                <StatCard icon={AlertTriangle} label="Active Alerts" value={qs.active_alerts || 0} color={qs.active_alerts > 5 ? "red" : "amber"} />
-            </div>
-
-            {/* Two-column: Risks + Opportunities */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Risks */}
-                <div className="glass rounded-2xl p-6">
-                    <div className="flex items-center gap-2 mb-4">
-                        <ShieldAlert className="w-5 h-5 text-red-400" />
-                        <h2 className="font-semibold">Risk Matrix</h2>
-                    </div>
-                    {(risks || []).length === 0 ? (
-                        <p className="text-gray-500 text-sm">No active risks detected.</p>
-                    ) : (
-                        <div className="space-y-3">
-                            {(risks as Risk[]).map((r, i) => (
-                                <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}
-                                    className="flex items-start gap-3 p-3 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                    <span className={`mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${severityBadge(r.severity)}`}>{r.severity}</span>
-                                    <div>
-                                        <p className="text-sm font-medium">{r.risk}</p>
-                                        <p className="text-xs text-gray-400 mt-0.5">{r.detail}</p>
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Opportunities */}
-                <div className="glass rounded-2xl p-6">
-                    <div className="flex items-center gap-2 mb-4">
-                        <Zap className="w-5 h-5 text-amber-400" />
-                        <h2 className="font-semibold">Opportunity Radar</h2>
-                    </div>
-                    {(opportunities || []).length === 0 ? (
-                        <p className="text-gray-500 text-sm">No opportunities identified yet.</p>
-                    ) : (
-                        <div className="space-y-3">
-                            {(opportunities as Opportunity[]).map((o, i) => (
-                                <motion.div key={i} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}
-                                    className="flex items-start gap-3 p-3 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                    <span className={`mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${potentialBadge(o.potential)}`}>{o.potential}</span>
-                                    <div>
-                                        <p className="text-sm font-medium">{o.opportunity}</p>
-                                        <p className="text-xs text-gray-400 mt-0.5">{o.detail}</p>
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Alerts Feed */}
-            <div className="glass rounded-2xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                    <AlertTriangle className="w-5 h-5 text-amber-400" />
-                    <h2 className="font-semibold">Cross-System Alerts</h2>
-                    <span className="ml-auto text-xs text-gray-500">{(alerts || []).length} alerts</span>
-                </div>
-                <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
-                    {(alerts as Alert[] || []).map((a, i) => (
-                        <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-gray-800/20 border border-gray-700/30">
-                            <SourceIcon source={a.source} />
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-0.5">
-                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${severityBadge(a.severity)}`}>{a.severity}</span>
-                                    <span className="text-[10px] text-gray-500 uppercase">{a.source}</span>
-                                    {a.item && <span className="text-[10px] text-gray-400">• {a.item}</span>}
-                                </div>
-                                <p className="text-sm text-gray-300 truncate">{a.message}</p>
-                            </div>
-                        </div>
+    if (loading) {
+        return (
+            <div className="space-y-4">
+                <div className="bg-[#141414] rounded-xl h-24 animate-pulse" />
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    {[...Array(4)].map((_, i) => (
+                        <div key={i} className="bg-[#141414] rounded-xl h-24 animate-pulse" />
                     ))}
                 </div>
             </div>
+        );
+    }
+
+    const qs = data?.quick_stats || {};
+    const healthScore = data?.health_score ?? 0;
+    const breakdown = data?.health_breakdown || [];
+    const alerts = data?.alerts || [];
+    const risks = data?.risks || [];
+    const opportunities = data?.opportunities || [];
+
+    const healthLabel = healthScore >= 80 ? "Looking great" : healthScore >= 60 ? "Doing okay" : healthScore >= 40 ? "Needs attention" : "Let's fix a few things";
+
+    return (
+        <div className="space-y-5">
+            {/* Greeting */}
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-xl font-bold text-[#e5e5e5]">
+                        {getGreeting()} 👋
+                    </h1>
+                    <p className="text-sm text-[#525252] mt-1">
+                        Here&apos;s how your restaurant is doing right now
+                    </p>
+                </div>
+                {/* Health Score */}
+                <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="flex items-center gap-3 bg-[#141414] border border-[#262626] rounded-xl px-4 py-3"
+                >
+                    <div className="relative w-14 h-14">
+                        <svg viewBox="0 0 36 36" className="w-14 h-14 -rotate-90">
+                            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#262626" strokeWidth="2.5" />
+                            <circle
+                                cx="18" cy="18" r="15.9" fill="none"
+                                stroke={healthScore >= 70 ? "#22c55e" : healthScore >= 40 ? "#eab308" : "#ef4444"}
+                                strokeWidth="2.5"
+                                strokeDasharray={`${healthScore} ${100 - healthScore}`}
+                                strokeLinecap="round"
+                            />
+                        </svg>
+                        <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-[#e5e5e5]">
+                            {healthScore}
+                        </span>
+                    </div>
+                    <div>
+                        <p className="text-sm font-semibold text-[#e5e5e5]">Overall Health</p>
+                        <p className="text-xs text-[#525252]">{healthLabel}</p>
+                    </div>
+                </motion.div>
+            </div>
+
+            {/* Connected Systems */}
+            <div className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3">
+                <div className="flex items-center gap-2 mb-2">
+                    <span className="flex h-2 w-2">
+                        <span className="animate-ping absolute h-2 w-2 rounded-full bg-[#22c55e] opacity-75" />
+                        <span className="relative rounded-full h-2 w-2 bg-[#22c55e]" />
+                    </span>
+                    <span className="text-xs font-medium text-[#22c55e]">Systems Connected</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    <SystemStatus icon={Monitor} label="POS" status="connected" />
+                    <SystemStatus icon={Smartphone} label="KDS" status="connected" />
+                    <SystemStatus icon={ShoppingBag} label="Orders" status="connected" />
+                    <SystemStatus icon={Activity} label="Inventory" status="connected" />
+                    <SystemStatus icon={Wifi} label="Payments" status="connected" />
+                </div>
+            </div>
+
+            {/* What's happening at a glance */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <StatCard
+                    label="Today's Sales"
+                    value={formatKES(qs.today_revenue)}
+                    sub={qs.day_over_day_change ? `${qs.day_over_day_change > 0 ? "Up" : "Down"} ${Math.abs(qs.day_over_day_change)}% from yesterday` : "No data from yesterday"}
+                    color={qs.day_over_day_change >= 0 ? "#22c55e" : "#ef4444"}
+                />
+                <StatCard
+                    label="Orders Today"
+                    value={qs.today_orders || 0}
+                    sub={qs.pending_orders ? `${qs.pending_orders} still being prepared` : "All caught up"}
+                    color="#d4a853"
+                />
+                <StatCard
+                    label="Average Spend"
+                    value={formatKES(qs.avg_order_value)}
+                    sub={`Across ${qs.menu_items || 0} menu items`}
+                    color="#3b82f6"
+                />
+                <StatCard
+                    label="Things to Check"
+                    value={qs.active_alerts || 0}
+                    sub={qs.active_alerts === 0 ? "Nothing urgent" : "We've flagged a few things"}
+                    color={qs.active_alerts > 3 ? "#ef4444" : "#737373"}
+                />
+            </div>
+
+            {/* Breakdown — how each area is doing */}
+            <div className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3">
+                <p className="text-xs font-semibold text-[#e5e5e5] mb-3">How each area is doing</p>
+                <div className="space-y-2">
+                    {breakdown.map((b: any, i: number) => {
+                        const friendlyNames: Record<string, string> = {
+                            "Menu Health": "Your Menu",
+                            "Revenue Trend": "Sales Trend",
+                            "Kitchen Efficiency": "Kitchen Speed",
+                            "Inventory Status": "Stock Levels",
+                            "Reservation Reliability": "Bookings",
+                        };
+                        return (
+                            <div key={i} className="flex items-center gap-3">
+                                <span className="text-xs text-[#737373] w-28 flex-shrink-0">
+                                    {friendlyNames[b.category] || b.category}
+                                </span>
+                                <div className="flex-1 h-2 bg-[#1a1a1a] rounded-full overflow-hidden">
+                                    <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${b.score}%` }}
+                                        transition={{ delay: i * 0.1, duration: 0.5 }}
+                                        className={`h-full rounded-full ${b.score >= 70 ? "bg-[#22c55e]" : b.score >= 40 ? "bg-[#eab308]" : "bg-[#ef4444]"
+                                            }`}
+                                    />
+                                </div>
+                                <span className={`text-xs font-medium w-10 text-right ${b.score >= 70 ? "text-[#22c55e]" : b.score >= 40 ? "text-[#eab308]" : "text-[#ef4444]"
+                                    }`}>{b.score}%</span>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Risks & Opportunities side by side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {/* Watch out for */}
+                <div className="bg-[#141414] border border-[#262626] rounded-xl">
+                    <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center gap-2">
+                        <Shield className="w-3.5 h-3.5 text-[#ef4444]" />
+                        <h2 className="text-sm font-semibold text-[#e5e5e5]">Watch Out For</h2>
+                    </div>
+                    {risks.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-xs text-[#525252]">Everything looks good right now ✓</div>
+                    ) : (
+                        <div className="divide-y divide-[#1a1a1a]">
+                            {risks.map((r: any, i: number) => (
+                                <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                    transition={{ delay: i * 0.05 }} className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${r.severity === "critical" ? "bg-[#ef4444]/10 text-[#ef4444]"
+                                                : r.severity === "high" ? "bg-[#eab308]/10 text-[#eab308]"
+                                                    : "bg-[#3b82f6]/10 text-[#3b82f6]"
+                                            }`}>{r.severity === "critical" ? "urgent" : r.severity}</span>
+                                        <p className="text-sm text-[#e5e5e5]">{friendlyRisk(r.risk)}</p>
+                                    </div>
+                                    <p className="text-xs text-[#525252] mt-1">{friendlyDetail(r.detail)}</p>
+                                </motion.div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Ways to earn more */}
+                <div className="bg-[#141414] border border-[#262626] rounded-xl">
+                    <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center gap-2">
+                        <Zap className="w-3.5 h-3.5 text-[#d4a853]" />
+                        <h2 className="text-sm font-semibold text-[#e5e5e5]">Ways to Earn More</h2>
+                    </div>
+                    {opportunities.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-xs text-[#525252]">We&apos;re looking for opportunities...</div>
+                    ) : (
+                        <div className="divide-y divide-[#1a1a1a]">
+                            {opportunities.map((o: any, i: number) => (
+                                <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                    transition={{ delay: i * 0.05 }} className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                        <Zap className="w-3 h-3 text-[#d4a853]" />
+                                        <p className="text-sm text-[#e5e5e5]">{friendlyOpportunity(o.opportunity)}</p>
+                                    </div>
+                                    <p className="text-xs text-[#525252] mt-1">{friendlyDetail(o.detail)}</p>
+                                </motion.div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Alerts */}
+            {alerts.length > 0 && (
+                <div className="bg-[#141414] border border-[#262626] rounded-xl">
+                    <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center gap-2">
+                        <AlertTriangle className="w-3.5 h-3.5 text-[#eab308]" />
+                        <h2 className="text-sm font-semibold text-[#e5e5e5]">Alerts From Your Systems</h2>
+                        <span className="text-[10px] text-[#525252] ml-auto">{alerts.length} active</span>
+                    </div>
+                    <div className="divide-y divide-[#1a1a1a] max-h-64 overflow-y-auto">
+                        {alerts.map((a: any, i: number) => {
+                            const sourceLabels: Record<string, string> = {
+                                inventory: "Stock", kitchen: "Kitchen", menu: "Menu", reservations: "Bookings",
+                            };
+                            return (
+                                <div key={i} className="px-4 py-3 flex items-start gap-3">
+                                    <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded mt-0.5 flex-shrink-0 ${a.source === "inventory" ? "bg-[#ef4444]/10 text-[#ef4444]"
+                                            : a.source === "kitchen" ? "bg-[#eab308]/10 text-[#eab308]"
+                                                : a.source === "menu" ? "bg-[#3b82f6]/10 text-[#3b82f6]"
+                                                    : "bg-[#8b5cf6]/10 text-[#8b5cf6]"
+                                        }`}>{sourceLabels[a.source] || a.source}</span>
+                                    <div>
+                                        <p className="text-sm text-[#e5e5e5]">{a.message}</p>
+                                        {a.action && (
+                                            <p className="text-xs text-[#d4a853] mt-1">💡 {a.action}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
-/* ─── Components ─── */
-function HealthRing({ score }: { score: number }) {
-    const radius = 54;
-    const circ = 2 * Math.PI * radius;
-    const offset = circ - (score / 100) * circ;
-    const color = score >= 80 ? "#10b981" : score >= 60 ? "#f59e0b" : "#ef4444";
+/* Helper Components */
+function SystemStatus({ icon: Icon, label, status }: { icon: any; label: string; status: string }) {
     return (
-        <div className="relative w-36 h-36">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r={radius} fill="none" stroke="#1f2937" strokeWidth="8" />
-                <motion.circle cx="60" cy="60" r={radius} fill="none" stroke={color} strokeWidth="8"
-                    strokeLinecap="round" strokeDasharray={circ} initial={{ strokeDashoffset: circ }}
-                    animate={{ strokeDashoffset: offset }} transition={{ duration: 1.2, ease: "easeOut" }} />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold" style={{ color }}>{score}</span>
-                <span className="text-[10px] text-gray-400">/ 100</span>
-            </div>
+        <div className="flex items-center gap-2">
+            <Icon className="w-3 h-3 text-[#525252]" />
+            <span className="text-xs text-[#737373]">{label}</span>
+            <span className={`w-1.5 h-1.5 rounded-full ml-auto ${status === "connected" ? "bg-[#22c55e]" : "bg-[#ef4444]"
+                }`} />
         </div>
     );
 }
 
-function StatCard({ icon: Icon, label, value, color, sub, subUp }: {
-    icon: any; label: string; value: any; color: string; sub?: string; subUp?: boolean;
-}) {
-    const bg: Record<string, string> = {
-        emerald: "bg-emerald-600/20 border-emerald-500/30 text-emerald-400",
-        indigo: "bg-indigo-600/20 border-indigo-500/30 text-indigo-400",
-        cyan: "bg-cyan-600/20 border-cyan-500/30 text-cyan-400",
-        amber: "bg-amber-600/20 border-amber-500/30 text-amber-400",
-        red: "bg-red-600/20 border-red-500/30 text-red-400",
-    };
+function StatCard({ label, value, sub, color }: { label: string; value: any; sub?: string; color: string; }) {
     return (
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-                <div className={`w-9 h-9 rounded-lg border flex items-center justify-center ${bg[color]}`}><Icon className="w-4 h-4" /></div>
-            </div>
-            <p className="text-xl font-bold">{value}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{label}</p>
-            {sub && <p className={`text-[10px] mt-1 flex items-center gap-0.5 ${subUp ? 'text-emerald-400' : 'text-red-400'}`}>
-                {subUp ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}{sub}
-            </p>}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-[#141414] border border-[#262626] rounded-xl p-4">
+            <p className="text-lg font-bold text-[#e5e5e5]">{value}</p>
+            <p className="text-xs text-[#525252] mt-0.5">{label}</p>
+            {sub && <p className="text-[10px] mt-1" style={{ color }}>{sub}</p>}
         </motion.div>
     );
 }
 
-function SourceIcon({ source }: { source: string }) {
-    const icons: Record<string, any> = { inventory: Package, kitchen: ChefHat, menu: UtensilsCrossed, reservations: CalendarRange };
-    const Icon = icons[source] || AlertTriangle;
-    return <Icon className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />;
-}
-
-function LoadingSkeleton() {
-    return (
-        <div className="space-y-6 animate-pulse">
-            <div className="glass rounded-2xl h-48" />
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{[...Array(4)].map((_, i) => <div key={i} className="glass rounded-xl h-28" />)}</div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">{[...Array(2)].map((_, i) => <div key={i} className="glass rounded-2xl h-48" />)}</div>
-        </div>
-    );
-}
-
-/* ─── Helpers ─── */
 function formatKES(cents: number) {
     if (!cents) return "KES 0";
     return `KES ${(cents / 100).toLocaleString("en-KE", { maximumFractionDigits: 0 })}`;
 }
-function scoreColor(s: number) { return s >= 80 ? "text-emerald-400" : s >= 60 ? "text-amber-400" : "text-red-400"; }
-function severityBadge(s: string) {
-    const m: Record<string, string> = { critical: "bg-red-600/30 text-red-400", high: "bg-orange-600/30 text-orange-400", warning: "bg-amber-600/30 text-amber-400", medium: "bg-yellow-600/30 text-yellow-400", info: "bg-blue-600/30 text-blue-400", low: "bg-gray-600/30 text-gray-400" };
-    return m[s] || m.info;
+
+/* Friendly language helpers */
+function friendlyRisk(risk: string) {
+    const map: Record<string, string> = {
+        "Stock-out risk": "Some items might run out",
+        "High no-show rate": "Too many no-shows on bookings",
+        "Kitchen bottleneck": "Kitchen is getting backed up",
+        "Menu dead weight": "Some menu items aren't selling",
+    };
+    return map[risk] || risk;
 }
-function potentialBadge(p: string) {
-    const m: Record<string, string> = { high: "bg-emerald-600/30 text-emerald-400", medium: "bg-cyan-600/30 text-cyan-400", low: "bg-gray-600/30 text-gray-400" };
-    return m[p] || m.medium;
+
+function friendlyOpportunity(opp: string) {
+    const map: Record<string, string> = {
+        "Promote high-margin items": "Push your most profitable items",
+        "Recover no-show revenue": "Start collecting deposits on bookings",
+        "Implement controlled overbooking": "Safely take a few extra bookings",
+        "Capitalize on growth momentum": "Sales are growing — keep the momentum",
+    };
+    return map[opp] || opp;
+}
+
+function friendlyDetail(detail: string) {
+    return detail
+        .replace(/Puzzle items/g, "profitable items that don't sell much")
+        .replace(/Dog items/g, "items that aren't popular or profitable")
+        .replace(/Stars/g, "top sellers")
+        .replace(/Plowhorses/g, "popular items with thin margins");
 }

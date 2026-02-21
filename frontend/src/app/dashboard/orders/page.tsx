@@ -3,189 +3,201 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { motion } from "framer-motion";
-import { TrendingUp, TrendingDown, DollarSign, Clock, Calendar, AlertTriangle, BarChart3, Zap } from "lucide-react";
+import { ShoppingBag, Clock, TrendingUp } from "lucide-react";
 
-export default function RevenueOrdersPage() {
-    const [data, setData] = useState<any>(null);
+export default function OrdersPage() {
+    const [orders, setOrders] = useState<any[]>([]);
+    const [aiData, setAiData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.get("/ai/revenue-forecast").then(r => { setData(r.data); setLoading(false); }).catch(() => setLoading(false));
+        Promise.all([
+            api.get("/orders/").catch(() => ({ data: [] })),
+            api.get("/ai/revenue-forecast").catch(() => ({ data: null })),
+        ]).then(([ordersRes, aiRes]) => {
+            setOrders(Array.isArray(ordersRes.data) ? ordersRes.data : []);
+            setAiData(aiRes.data);
+            setLoading(false);
+        });
     }, []);
 
-    if (loading) return <div className="space-y-4 animate-pulse">{[...Array(4)].map((_, i) => <div key={i} className="glass rounded-xl h-24" />)}</div>;
-    if (!data) return <p className="text-gray-500">Failed to load revenue data.</p>;
+    if (loading) {
+        return (
+            <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                    <div key={i} className="bg-[#141414] rounded-xl h-16 animate-pulse" />
+                ))}
+            </div>
+        );
+    }
 
-    const { trends, daily_revenue, hourly_pattern, weekly_pattern, revenue_by_type, revenue_by_category, check_analysis, anomalies, forecast } = data;
-    const t = trends || {};
+    const today = new Date().toISOString().split("T")[0];
+    const todayOrders = orders.filter((o) => o.created_at?.startsWith(today));
+    const pendingCount = orders.filter((o) => o.status === "pending" || o.status === "prep").length;
+    const todayRevenue = todayOrders.reduce((s: number, o: any) => s + (o.total || 0), 0);
+
+    const trends = aiData?.trends || {};
+    const forecast = aiData?.forecast || [];
+    const anomalies = aiData?.anomalies || [];
+    const peakHour = trends.peak_hour;
+    const peakDay = trends.peak_day;
+    const wowGrowth = trends.week_over_week_growth;
 
     return (
-        <div className="space-y-6">
-            {/* Header Stats */}
-            <div className="glass rounded-2xl p-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-600/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-                <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                        <TrendingUp className="w-5 h-5 text-emerald-400" />
-                        <span className="text-sm text-emerald-400 font-medium">Revenue Intelligence</span>
-                    </div>
-                    <h1 className="text-2xl font-bold mb-4">Revenue & Order Analytics</h1>
-                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                        <QuickStat label="30-Day Revenue" value={formatKES(t.total_revenue)} />
-                        <QuickStat label="Avg Daily" value={formatKES(t.avg_daily_revenue)} />
-                        <QuickStat label="WoW Growth" value={`${t.week_over_week_growth > 0 ? "+" : ""}${t.week_over_week_growth}%`} color={t.week_over_week_growth >= 0 ? "text-emerald-400" : "text-red-400"} />
-                        <QuickStat label="Avg Order" value={formatKES(t.avg_order_value)} />
-                        <QuickStat label="Peak Day" value={t.peak_day} />
-                    </div>
+        <div className="space-y-5">
+            <div>
+                <h1 className="text-xl font-bold text-[#e5e5e5]">Orders</h1>
+                <p className="text-sm text-[#525252] mt-0.5">
+                    Live from your POS &amp; KDS
+                </p>
+            </div>
+
+            {/* Today at a glance */}
+            <div className="grid grid-cols-3 gap-3">
+                <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
+                    <p className="text-xs text-[#525252]">Today&apos;s Sales</p>
+                    <p className="text-lg font-bold text-[#22c55e] mt-1">{formatKES(todayRevenue)}</p>
+                </div>
+                <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
+                    <p className="text-xs text-[#525252]">Orders</p>
+                    <p className="text-lg font-bold text-[#e5e5e5] mt-1">{todayOrders.length}</p>
+                </div>
+                <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
+                    <p className="text-xs text-[#525252]">In the Kitchen</p>
+                    <p className="text-lg font-bold text-[#d4a853] mt-1">{pendingCount}</p>
                 </div>
             </div>
 
-            {/* Revenue Time Series */}
-            <div className="glass rounded-2xl p-6">
-                <h2 className="font-semibold mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-indigo-400" />Daily Revenue (30 Days)</h2>
-                <div className="flex items-end gap-1 h-40">
-                    {(daily_revenue || []).map((d: any, i: number) => {
-                        const max = Math.max(...(daily_revenue || []).map((x: any) => x.revenue));
-                        const pct = max > 0 ? (d.revenue / max) * 100 : 0;
-                        return (
-                            <motion.div key={d.date}
-                                initial={{ height: 0 }} animate={{ height: `${pct}%` }} transition={{ delay: i * 0.02, duration: 0.3 }}
-                                className="flex-1 bg-indigo-500/60 hover:bg-indigo-400/80 rounded-t transition-colors relative group cursor-pointer min-w-[4px]">
-                                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 hidden group-hover:block bg-gray-800 border border-gray-700 rounded-lg p-2 text-xs whitespace-nowrap z-10">
-                                    <p className="font-medium">{d.date}</p>
-                                    <p className="text-emerald-400">{formatKES(d.revenue)}</p>
-                                    <p className="text-gray-400">{d.orders} orders</p>
+            {/* What we're seeing with your sales */}
+            {(trends.total_revenue || forecast.length > 0) && (
+                <div className="bg-[#141414] border border-[#262626] rounded-xl">
+                    <div className="px-4 py-3 border-b border-[#1a1a1a]">
+                        <p className="text-xs font-semibold text-[#e5e5e5]">What we&apos;re seeing</p>
+                    </div>
+                    <div className="px-4 py-3 space-y-3">
+                        {/* Natural language insights */}
+                        <div className="space-y-2">
+                            {trends.total_revenue > 0 && (
+                                <p className="text-xs text-[#737373]">
+                                    You&apos;ve made <span className="text-[#e5e5e5] font-semibold">{formatKES(trends.total_revenue)}</span> in the last 30 days
+                                </p>
+                            )}
+                            {trends.avg_order_value > 0 && (
+                                <p className="text-xs text-[#737373]">
+                                    Customers spend about <span className="text-[#e5e5e5] font-semibold">{formatKES(trends.avg_order_value)}</span> per order on average
+                                </p>
+                            )}
+                            {wowGrowth !== undefined && wowGrowth !== 0 && (
+                                <p className="text-xs text-[#737373]">
+                                    Compared to last week, sales are{" "}
+                                    <span className={`font-semibold ${wowGrowth >= 0 ? "text-[#22c55e]" : "text-[#ef4444]"}`}>
+                                        {wowGrowth > 0 ? "up" : "down"} {Math.abs(wowGrowth).toFixed(1)}%
+                                    </span>
+                                </p>
+                            )}
+                            {peakDay && (
+                                <p className="text-xs text-[#737373]">
+                                    Your busiest day is usually <span className="text-[#d4a853] font-semibold">{peakDay}</span>
+                                    {peakHour !== undefined && (
+                                        <>, and the rush comes around <span className="text-[#d4a853] font-semibold">{formatHour(peakHour)}</span></>
+                                    )}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Next 7 days forecast */}
+                        {forecast.length > 0 && (
+                            <div>
+                                <p className="text-[10px] text-[#525252] mb-2">Expected sales this coming week</p>
+                                <div className="flex gap-1 items-end h-14">
+                                    {forecast.map((f: any, i: number) => {
+                                        const max = Math.max(...forecast.map((ff: any) => ff.predicted || ff.amount || 0));
+                                        const val = f.predicted || f.amount || 0;
+                                        const pct = max > 0 ? (val / max) * 100 : 0;
+                                        return (
+                                            <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                                                <div className="w-full rounded-sm relative overflow-hidden" style={{ height: `${Math.max(pct, 8)}%` }}>
+                                                    <div className="absolute inset-0 bg-[#d4a853]/30 rounded-sm" />
+                                                </div>
+                                                <span className="text-[8px] text-[#525252]">{f.day_name?.slice(0, 3) || `Day ${i + 1}`}</span>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                            </motion.div>
-                        );
-                    })}
-                </div>
-                <div className="flex justify-between mt-2 text-[10px] text-gray-500">
-                    <span>{daily_revenue?.[0]?.date}</span>
-                    <span>{daily_revenue?.[daily_revenue.length - 1]?.date}</span>
-                </div>
-            </div>
+                            </div>
+                        )}
 
-            {/* Two-column: Weekly + By Type */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Weekly Pattern */}
-                <div className="glass rounded-2xl p-6">
-                    <h3 className="font-semibold mb-4 flex items-center gap-2"><Calendar className="w-4 h-4 text-cyan-400" />Weekly Pattern</h3>
-                    <div className="space-y-2">
-                        {(weekly_pattern || []).map((w: any) => {
-                            const maxRev = Math.max(...(weekly_pattern || []).map((x: any) => x.avg_revenue));
-                            const pct = maxRev > 0 ? (w.avg_revenue / maxRev) * 100 : 0;
+                        {/* Unusual days */}
+                        {anomalies.length > 0 && (
+                            <div className="space-y-1 pt-2 border-t border-[#1a1a1a]">
+                                <p className="text-[10px] text-[#525252] uppercase tracking-wider">Unusual days we noticed</p>
+                                {anomalies.slice(0, 2).map((a: any, i: number) => (
+                                    <p key={i} className="text-xs text-[#737373]">
+                                        {a.date}: sales were{" "}
+                                        <span className={a.type === "high" ? "text-[#22c55e]" : "text-[#ef4444]"}>
+                                            {a.type === "high" ? "higher than normal" : "lower than usual"}
+                                        </span>
+                                        {" "}at {formatKES(a.revenue)}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Order List */}
+            <div className="bg-[#141414] border border-[#262626] rounded-xl">
+                <div className="px-4 py-3 border-b border-[#1a1a1a]">
+                    <h2 className="text-sm font-semibold text-[#e5e5e5]">Recent Orders</h2>
+                </div>
+                {orders.length === 0 ? (
+                    <div className="px-5 py-10 text-center">
+                        <ShoppingBag className="w-8 h-8 text-[#333] mx-auto mb-3" />
+                        <p className="text-sm text-[#525252]">No orders yet — they&apos;ll show up here from your POS</p>
+                    </div>
+                ) : (
+                    <div className="divide-y divide-[#1a1a1a]">
+                        {orders.map((order, i) => {
+                            const statusLabels: Record<string, string> = {
+                                pending: "Waiting",
+                                prep: "Cooking",
+                                ready: "Ready",
+                                served: "Served",
+                                cancelled: "Cancelled",
+                            };
+                            const statusStyles: Record<string, string> = {
+                                pending: "bg-[#eab308]/10 text-[#eab308]",
+                                prep: "bg-[#3b82f6]/10 text-[#3b82f6]",
+                                ready: "bg-[#22c55e]/10 text-[#22c55e]",
+                                served: "bg-[#737373]/10 text-[#737373]",
+                                cancelled: "bg-[#ef4444]/10 text-[#ef4444]",
+                            };
                             return (
-                                <div key={w.day} className="flex items-center gap-3">
-                                    <span className="w-12 text-xs text-gray-400">{w.day.slice(0, 3)}</span>
-                                    <div className="flex-1 bg-gray-800 rounded-full h-3 overflow-hidden">
-                                        <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }}
-                                            className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500" />
+                                <motion.div key={order.id || i} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                    transition={{ delay: i * 0.03 }}
+                                    className="px-4 py-3 flex items-center justify-between hover:bg-[#1a1a1a] transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-sm font-mono text-[#525252]">#{order.id}</span>
+                                        <div>
+                                            <p className="text-sm text-[#e5e5e5]">{order.customer_name || "Walk-in"}</p>
+                                            <p className="text-xs text-[#525252] mt-0.5">
+                                                {friendlyOrderType(order.order_type)}{order.table_number ? ` · Table ${order.table_number}` : ""}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <span className="text-xs text-gray-300 w-24 text-right">{formatKES(w.avg_revenue)}</span>
-                                </div>
+                                    <div className="text-right">
+                                        <p className="text-sm font-medium text-[#d4a853]">{formatKES(order.total)}</p>
+                                        <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-medium ${statusStyles[order.status] || statusStyles.pending}`}>
+                                            {statusLabels[order.status] || order.status}
+                                        </span>
+                                    </div>
+                                </motion.div>
                             );
                         })}
                     </div>
-                </div>
-
-                {/* Revenue by Order Type */}
-                <div className="glass rounded-2xl p-6">
-                    <h3 className="font-semibold mb-4 flex items-center gap-2"><DollarSign className="w-4 h-4 text-emerald-400" />Revenue by Order Type</h3>
-                    <div className="space-y-3">
-                        {(revenue_by_type || []).map((rt: any) => (
-                            <div key={rt.type} className="p-3 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-sm font-medium capitalize">{rt.type.replace("_", " ")}</span>
-                                    <span className="text-sm text-emerald-400">{rt.share_pct}%</span>
-                                </div>
-                                <div className="bg-gray-800 rounded-full h-2 overflow-hidden">
-                                    <motion.div initial={{ width: 0 }} animate={{ width: `${rt.share_pct}%` }}
-                                        className="h-full rounded-full bg-emerald-500" />
-                                </div>
-                                <div className="flex justify-between mt-1 text-[10px] text-gray-500">
-                                    <span>{rt.orders} orders</span>
-                                    <span>Avg check: {formatKES(rt.avg_check)}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                )}
             </div>
-
-            {/* Hourly Heatmap */}
-            <div className="glass rounded-2xl p-6">
-                <h3 className="font-semibold mb-4 flex items-center gap-2"><Clock className="w-4 h-4 text-amber-400" />Hourly Revenue Heatmap</h3>
-                <div className="grid grid-cols-12 lg:grid-cols-24 gap-1">
-                    {(hourly_pattern || []).map((h: any) => {
-                        const maxRev = Math.max(...(hourly_pattern || []).map((x: any) => x.avg_revenue));
-                        const intensity = maxRev > 0 ? h.avg_revenue / maxRev : 0;
-                        const bg = intensity > 0.7 ? "bg-indigo-500" : intensity > 0.4 ? "bg-indigo-600/70" : intensity > 0.1 ? "bg-indigo-800/50" : "bg-gray-800/30";
-                        return (
-                            <div key={h.hour} className={`${bg} rounded p-2 text-center relative group cursor-pointer transition-all hover:ring-1 hover:ring-indigo-400`}>
-                                <span className="text-[9px] text-gray-400">{h.label.slice(0, 2)}</span>
-                                {h.is_peak && <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-400 rounded-full" />}
-                                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 hidden group-hover:block bg-gray-800 border border-gray-700 rounded-lg p-2 text-xs whitespace-nowrap z-10">
-                                    <p className="font-medium">{h.label} ({h.period})</p>
-                                    <p className="text-emerald-400">{formatKES(h.avg_revenue)} avg</p>
-                                    <p className="text-gray-400">{h.avg_orders} orders/day</p>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-                <p className="text-[10px] text-gray-500 mt-2">🟡 = peak hours</p>
-            </div>
-
-            {/* 7-Day Forecast + Anomalies */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="glass rounded-2xl p-6">
-                    <h3 className="font-semibold mb-4 flex items-center gap-2"><Zap className="w-4 h-4 text-amber-400" />7-Day Revenue Forecast</h3>
-                    <div className="space-y-2">
-                        {(forecast || []).map((f: any) => (
-                            <div key={f.date} className="flex items-center gap-3 p-2 rounded-lg bg-gray-800/20">
-                                <span className="w-8 text-xs text-gray-400 font-medium">{f.day.slice(0, 3)}</span>
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-1 text-sm">
-                                        <span className="text-emerald-400 font-medium">{formatKES(f.predicted_revenue)}</span>
-                                        <span className="text-[10px] text-gray-500">({formatKES(f.confidence_low)} - {formatKES(f.confidence_high)})</span>
-                                    </div>
-                                </div>
-                                <span className="text-xs text-indigo-400">{f.confidence_pct}%</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="glass rounded-2xl p-6">
-                    <h3 className="font-semibold mb-4 flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-red-400" />Revenue Anomalies</h3>
-                    {(anomalies || []).length === 0 ? (
-                        <p className="text-gray-500 text-sm">No anomalies detected in the period.</p>
-                    ) : (
-                        <div className="space-y-3">
-                            {(anomalies || []).map((a: any, i: number) => (
-                                <div key={i} className="p-3 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-sm font-medium">{a.date}</span>
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${a.type === "spike" ? "bg-emerald-600/30 text-emerald-400" : "bg-red-600/30 text-red-400"}`}>{a.type}</span>
-                                    </div>
-                                    <p className="text-xs text-gray-400">Revenue: {formatKES(a.revenue)} ({a.deviation_pct > 0 ? "+" : ""}{a.deviation_pct}% vs expected {formatKES(a.expected)})</p>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-/* ─── Helpers ─── */
-function QuickStat({ label, value, color }: { label: string; value: any; color?: string }) {
-    return (
-        <div className="p-3 rounded-lg bg-gray-800/40 border border-gray-700/50">
-            <p className="text-xs text-gray-400">{label}</p>
-            <p className={`text-lg font-bold ${color || "text-white"}`}>{value}</p>
         </div>
     );
 }
@@ -193,4 +205,19 @@ function QuickStat({ label, value, color }: { label: string; value: any; color?:
 function formatKES(cents: number) {
     if (!cents) return "KES 0";
     return `KES ${(cents / 100).toLocaleString("en-KE", { maximumFractionDigits: 0 })}`;
+}
+
+function formatHour(hour: number) {
+    if (hour === 0) return "12 midnight";
+    if (hour === 12) return "12 noon";
+    return hour > 12 ? `${hour - 12}pm` : `${hour}am`;
+}
+
+function friendlyOrderType(type: string) {
+    const map: Record<string, string> = {
+        dine_in: "Dine in",
+        takeout: "Takeaway",
+        delivery: "Delivery",
+    };
+    return map[type] || type || "Dine in";
 }

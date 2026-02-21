@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { Brain, Loader2 } from "lucide-react";
 
 export default function HomePage() {
   const { user, isLoading } = useAuth();
@@ -20,9 +19,8 @@ export default function HomePage() {
   }, [user, isLoading, router]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <Brain className="w-12 h-12 text-indigo-400 animate-pulse" />
-      <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="w-5 h-5 border-2 border-[#d4a853] border-t-transparent rounded-full animate-spin" />
     </div>
   );
 }

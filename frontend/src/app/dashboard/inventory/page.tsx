@@ -2,204 +2,366 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { motion } from "framer-motion";
-import { Box, AlertTriangle, TrendingDown, TrendingUp, Minus, Zap, BarChart3 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+    Package,
+    AlertTriangle,
+    Plus,
+    TruckIcon,
+    Minus,
+    X,
+    Check,
+} from "lucide-react";
 
-export default function InventoryIntelPage() {
-    const [data, setData] = useState<any>(null);
+export default function InventoryPage() {
+    const [items, setItems] = useState<any[]>([]);
+    const [aiData, setAiData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [view, setView] = useState<"heatmap" | "items" | "alerts">("heatmap");
+    const [showAddForm, setShowAddForm] = useState(false);
+    const [showReceiveForm, setShowReceiveForm] = useState<number | null>(null);
+    const [showAdjustForm, setShowAdjustForm] = useState<number | null>(null);
 
-    useEffect(() => {
-        api.get("/ai/inventory-predictions").then(r => { setData(r.data); setLoading(false); }).catch(() => setLoading(false));
-    }, []);
+    // Add form
+    const [newName, setNewName] = useState("");
+    const [newUnit, setNewUnit] = useState("kg");
+    const [newQty, setNewQty] = useState("");
+    const [newCost, setNewCost] = useState("");
+    const [newThreshold, setNewThreshold] = useState("10");
 
-    if (loading) return <div className="space-y-4 animate-pulse">{[...Array(3)].map((_, i) => <div key={i} className="glass rounded-xl h-24" />)}</div>;
-    if (!data) return <p className="text-gray-500">Failed to load inventory data.</p>;
+    // Receive form
+    const [receiveQty, setReceiveQty] = useState("");
+    const [receiveCost, setReceiveCost] = useState("");
+    const [receiveSupplier, setReceiveSupplier] = useState("");
 
-    const { summary, items, heatmap, alerts } = data;
-    const s = summary || {};
+    // Adjust form
+    const [adjustQty, setAdjustQty] = useState("");
+    const [adjustReason, setAdjustReason] = useState("");
 
-    return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="glass rounded-2xl p-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-600/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-                <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Box className="w-5 h-5 text-cyan-400" />
-                        <span className="text-sm text-cyan-400 font-medium">Inventory Intelligence</span>
-                    </div>
-                    <h1 className="text-2xl font-bold mb-4">Stock Health & Predictions</h1>
-                    <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-                        <MiniStat label="Items" value={s.total_items} />
-                        <MiniStat label="Value" value={`KES ${(s.total_inventory_value || 0).toLocaleString()}`} color="text-emerald-400" />
-                        <MiniStat label="Monthly Spend" value={`KES ${(s.total_monthly_spend || 0).toLocaleString()}`} />
-                        <MiniStat label="Critical" value={s.critical_items || 0} color={s.critical_items > 0 ? "text-red-400" : "text-emerald-400"} />
-                        <MiniStat label="Low Stock" value={s.low_stock_items || 0} color={s.low_stock_items > 0 ? "text-amber-400" : "text-emerald-400"} />
-                        <MiniStat label="Reorder" value={s.reorder_items || 0} color="text-cyan-400" />
-                    </div>
-                    {/* ABC Summary */}
-                    <div className="flex items-center gap-4 mt-3">
-                        <span className="text-xs text-gray-400">ABC Classification:</span>
-                        {Object.entries(s.abc_breakdown || {}).map(([cls, count]) => (
-                            <span key={cls} className={`px-2 py-0.5 rounded text-[10px] font-bold ${cls === "A" ? "bg-emerald-600/30 text-emerald-400" : cls === "B" ? "bg-cyan-600/30 text-cyan-400" : "bg-gray-600/30 text-gray-400"}`}>
-                                {cls}: {count as number}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-            </div>
+    const [submitting, setSubmitting] = useState(false);
+    const [toast, setToast] = useState("");
 
-            {/* Tabs */}
-            <div className="flex gap-2">
-                {(["heatmap", "items", "alerts"] as const).map(t => (
-                    <button key={t} onClick={() => setView(t)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${view === t ? "bg-indigo-600 text-white" : "glass text-gray-400 hover:text-white"}`}>
-                        {t === "heatmap" ? "Health Heatmap" : t === "items" ? "Item Detail" : `Alerts (${(alerts || []).length})`}
-                    </button>
+    const fetchData = async () => {
+        const [invRes, aiRes] = await Promise.all([
+            api.get("/inventory/").catch(() => ({ data: [] })),
+            api.get("/ai/inventory-predictions").catch(() => ({ data: null })),
+        ]);
+        setItems(Array.isArray(invRes.data) ? invRes.data : []);
+        setAiData(aiRes.data);
+        setLoading(false);
+    };
+
+    useEffect(() => { fetchData(); }, []);
+
+    const showToast = (msg: string) => {
+        setToast(msg);
+        setTimeout(() => setToast(""), 3000);
+    };
+
+    const handleAddItem = async () => {
+        if (!newName) return;
+        setSubmitting(true);
+        try {
+            await api.post("/inventory/", {
+                item_name: newName,
+                quantity: parseFloat(newQty) || 0,
+                unit: newUnit,
+                cost_per_unit: parseFloat(newCost) || 0,
+                low_stock_threshold: parseInt(newThreshold) || 10,
+            });
+            showToast(`Added ${newName}`);
+            setShowAddForm(false);
+            setNewName(""); setNewQty(""); setNewCost("");
+            await fetchData();
+        } catch (err) { console.error(err); }
+        setSubmitting(false);
+    };
+
+    const handleReceive = async (itemId: number) => {
+        if (!receiveQty) return;
+        setSubmitting(true);
+        try {
+            const res = await api.post(`/inventory/${itemId}/receive`, {
+                quantity: parseFloat(receiveQty),
+                cost_per_unit: receiveCost ? parseFloat(receiveCost) : null,
+                supplier: receiveSupplier,
+            });
+            showToast(res.data.message);
+            setShowReceiveForm(null);
+            setReceiveQty(""); setReceiveCost(""); setReceiveSupplier("");
+            await fetchData();
+        } catch (err) { console.error(err); }
+        setSubmitting(false);
+    };
+
+    const handleAdjust = async (itemId: number) => {
+        if (!adjustQty) return;
+        setSubmitting(true);
+        try {
+            const res = await api.post(`/inventory/${itemId}/adjust`, {
+                quantity: -Math.abs(parseFloat(adjustQty)),
+                reason: adjustReason,
+            });
+            showToast(res.data.message);
+            setShowAdjustForm(null);
+            setAdjustQty(""); setAdjustReason("");
+            await fetchData();
+        } catch (err) { console.error(err); }
+        setSubmitting(false);
+    };
+
+    if (loading) {
+        return (
+            <div className="space-y-3">
+                {[...Array(4)].map((_, i) => (
+                    <div key={i} className="bg-[#141414] rounded-xl h-14 animate-pulse" />
                 ))}
             </div>
+        );
+    }
 
-            {/* Heatmap View */}
-            {view === "heatmap" && (
-                <div className="glass rounded-2xl p-6">
-                    <h3 className="font-semibold mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-cyan-400" />Stock Health Scores</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                        {(heatmap || []).map((h: any, i: number) => (
-                            <motion.div key={h.name} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.04 }}
-                                className={`p-4 rounded-xl border ${healthBorder(h.health)} relative group cursor-pointer hover:ring-1 hover:ring-indigo-400 transition-all`}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${h.abc_class === "A" ? "bg-emerald-600/30 text-emerald-400" : h.abc_class === "B" ? "bg-cyan-600/30 text-cyan-400" : "bg-gray-600/30 text-gray-400"}`}>{h.abc_class}</span>
-                                    <StatusDot status={h.status} />
+    const summary = aiData?.summary || {};
+    const predictions = aiData?.predictions || [];
+    const alerts = aiData?.alerts || [];
+
+    const priorityLabel = (c: string) => {
+        const map: Record<string, string> = { A: "High use", B: "Medium", C: "Low use" };
+        return map[c] || c;
+    };
+    const priorityColor = (c: string) => {
+        const map: Record<string, string> = {
+            A: "bg-[#22c55e]/10 text-[#22c55e]",
+            B: "bg-[#eab308]/10 text-[#eab308]",
+            C: "bg-[#737373]/10 text-[#737373]",
+        };
+        return map[c] || "bg-[#737373]/10 text-[#737373]";
+    };
+
+    const getPrediction = (name: string) => predictions.find((p: any) =>
+        p.item_name?.toLowerCase() === name?.toLowerCase()
+    );
+
+    return (
+        <div className="space-y-5">
+            {/* Toast */}
+            <AnimatePresence>
+                {toast && (
+                    <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+                        className="fixed top-4 right-4 z-50 bg-[#22c55e]/10 border border-[#22c55e]/30 rounded-xl px-5 py-3 flex items-center gap-2">
+                        <Check className="w-4 h-4 text-[#22c55e]" />
+                        <span className="text-sm text-[#22c55e]">{toast}</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-xl font-bold text-[#e5e5e5]">Stock</h1>
+                    <p className="text-sm text-[#525252] mt-0.5">
+                        {items.length} item{items.length !== 1 ? "s" : ""} tracked from your store
+                    </p>
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={() => setShowAddForm(!showAddForm)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#d4a853]/10 border border-[#d4a853]/30 rounded-lg text-xs text-[#d4a853] hover:bg-[#d4a853]/20 transition-all">
+                        <Plus className="w-3 h-3" />
+                        Add Item
+                    </button>
+                </div>
+            </div>
+
+            {/* Add item form */}
+            <AnimatePresence>
+                {showAddForm && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                        className="bg-[#141414] border border-[#d4a853]/20 rounded-xl overflow-hidden">
+                        <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
+                            <span className="text-xs font-semibold text-[#e5e5e5]">New Stock Item</span>
+                            <button onClick={() => setShowAddForm(false)}><X className="w-4 h-4 text-[#525252]" /></button>
+                        </div>
+                        <div className="p-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
+                            <input placeholder="Item name" value={newName} onChange={(e) => setNewName(e.target.value)}
+                                className="col-span-2 bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none" />
+                            <input placeholder="Quantity" value={newQty} onChange={(e) => setNewQty(e.target.value)} type="number"
+                                className="bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none" />
+                            <select value={newUnit} onChange={(e) => setNewUnit(e.target.value)}
+                                className="bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] focus:border-[#d4a853]/50 focus:outline-none">
+                                <option value="kg">kg</option>
+                                <option value="liters">liters</option>
+                                <option value="pieces">pieces</option>
+                                <option value="bags">bags</option>
+                                <option value="crates">crates</option>
+                                <option value="bottles">bottles</option>
+                            </select>
+                            <button onClick={handleAddItem} disabled={!newName || submitting}
+                                className="bg-[#d4a853] text-black rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                                {submitting ? "Adding..." : "Add"}
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* AI overview */}
+            {(summary.total_items > 0 || predictions.length > 0) && (
+                <div className="bg-[#141414] border border-[#262626] rounded-xl">
+                    <div className="px-4 py-3 border-b border-[#1a1a1a]">
+                        <p className="text-xs font-semibold text-[#e5e5e5]">Stock overview</p>
+                    </div>
+                    <div className="px-4 py-3 space-y-2">
+                        {summary.critical_items > 0 && (
+                            <p className="text-xs text-[#ef4444]">
+                                ⚠️ {summary.critical_items} item{summary.critical_items > 1 ? "s have" : " has"} run out — restock now
+                            </p>
+                        )}
+                        {summary.low_stock_items > 0 && (
+                            <p className="text-xs text-[#eab308]">
+                                📦 {summary.low_stock_items} item{summary.low_stock_items > 1 ? "s are" : " is"} running low
+                            </p>
+                        )}
+                        {summary.high_spoilage_items > 0 && (
+                            <p className="text-xs text-[#737373]">
+                                🗑️ {summary.high_spoilage_items} item{summary.high_spoilage_items > 1 ? "s" : ""} might spoil soon
+                            </p>
+                        )}
+                        {summary.monthly_spend > 0 && (
+                            <p className="text-xs text-[#737373]">
+                                💰 Spending about KES {(summary.monthly_spend / 100).toLocaleString("en-KE")}/month on stock
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Stock items */}
+            <div className="bg-[#141414] border border-[#262626] rounded-xl">
+                <div className="px-4 py-3 border-b border-[#1a1a1a]">
+                    <p className="text-xs font-semibold text-[#e5e5e5]">All items</p>
+                </div>
+                <div className="divide-y divide-[#1a1a1a]">
+                    {items.length === 0 ? (
+                        <p className="text-xs text-[#525252] text-center py-8">No stock items yet — add your first one</p>
+                    ) : (
+                        items.map((item) => {
+                            const pred = getPrediction(item.item_name);
+                            const isLow = item.quantity <= item.low_stock_threshold;
+                            const isOut = item.quantity <= 0;
+                            const isReceiving = showReceiveForm === item.id;
+                            const isAdjusting = showAdjustForm === item.id;
+
+                            return (
+                                <div key={item.id} className="px-4 py-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3 flex-1">
+                                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isOut ? "bg-[#ef4444]" : isLow ? "bg-[#eab308]" : "bg-[#22c55e]"
+                                                }`} />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm text-[#e5e5e5]">{item.item_name}</p>
+                                                    {pred?.abc_class && (
+                                                        <span className={`text-[9px] px-1.5 py-0.5 rounded ${priorityColor(pred.abc_class)}`}>
+                                                            {priorityLabel(pred.abc_class)}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-3 mt-0.5">
+                                                    <span className={`text-xs ${isLow ? "text-[#eab308]" : "text-[#737373]"}`}>
+                                                        {item.quantity} {item.unit}
+                                                    </span>
+                                                    {pred?.days_until_stockout != null && pred.days_until_stockout <= 14 && (
+                                                        <span className="text-[10px] text-[#eab308]">
+                                                            {pred.days_until_stockout <= 0 ? "Out of stock!" : `~${pred.days_until_stockout} days left`}
+                                                        </span>
+                                                    )}
+                                                    {item.cost_per_unit > 0 && (
+                                                        <span className="text-[10px] text-[#525252]">
+                                                            KES {item.cost_per_unit}/{item.unit}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <button onClick={() => { setShowReceiveForm(isReceiving ? null : item.id); setShowAdjustForm(null); }}
+                                                className={`text-[10px] px-2 py-1 rounded transition-all ${isReceiving ? "bg-[#22c55e]/10 text-[#22c55e]" : "bg-[#1a1a1a] text-[#737373] hover:text-[#22c55e]"
+                                                    }`}>
+                                                <TruckIcon className="w-3 h-3 inline mr-0.5" />
+                                                Receive
+                                            </button>
+                                            <button onClick={() => { setShowAdjustForm(isAdjusting ? null : item.id); setShowReceiveForm(null); }}
+                                                className={`text-[10px] px-2 py-1 rounded transition-all ${isAdjusting ? "bg-[#ef4444]/10 text-[#ef4444]" : "bg-[#1a1a1a] text-[#737373] hover:text-[#eab308]"
+                                                    }`}>
+                                                <Minus className="w-3 h-3 inline mr-0.5" />
+                                                Adjust
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Receive stock form */}
+                                    <AnimatePresence>
+                                        {isReceiving && (
+                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                                                className="mt-2 flex gap-2 items-center">
+                                                <input placeholder="Quantity" value={receiveQty} onChange={(e) => setReceiveQty(e.target.value)}
+                                                    type="number" className="w-20 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
+                                                <input placeholder="Supplier (optional)" value={receiveSupplier} onChange={(e) => setReceiveSupplier(e.target.value)}
+                                                    className="flex-1 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
+                                                <button onClick={() => handleReceive(item.id)} disabled={!receiveQty || submitting}
+                                                    className="bg-[#22c55e] text-black rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
+                                                    {submitting ? "..." : "Receive"}
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+
+                                    {/* Adjust stock form */}
+                                    <AnimatePresence>
+                                        {isAdjusting && (
+                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                                                className="mt-2 flex gap-2 items-center">
+                                                <input placeholder="Qty to remove" value={adjustQty} onChange={(e) => setAdjustQty(e.target.value)}
+                                                    type="number" className="w-24 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
+                                                <select value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)}
+                                                    className="flex-1 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] focus:outline-none">
+                                                    <option value="">Reason</option>
+                                                    <option value="waste">Waste / spoilage</option>
+                                                    <option value="breakage">Breakage</option>
+                                                    <option value="theft">Theft / loss</option>
+                                                    <option value="correction">Correction</option>
+                                                </select>
+                                                <button onClick={() => handleAdjust(item.id)} disabled={!adjustQty || submitting}
+                                                    className="bg-[#ef4444] text-white rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
+                                                    {submitting ? "..." : "Remove"}
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
-                                <p className="text-sm font-medium truncate">{h.name}</p>
-                                <p className={`text-2xl font-bold mt-1 ${healthColor(h.health)}`}>{h.health}</p>
-                                <p className="text-[10px] text-gray-500">{h.status}</p>
-                                {/* Tooltip */}
-                                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 hidden group-hover:block bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs whitespace-nowrap z-10">
-                                    <p className="font-medium mb-1">{h.name}</p>
-                                    <p>Stock: {h.current_qty} {h.unit}</p>
-                                    <p>Daily Usage: {h.daily_usage}/day</p>
-                                    <p>Days Left: {h.days_until_depletion}</p>
-                                    <p>Waste: {h.waste_pct}%</p>
-                                </div>
-                            </motion.div>
+                            );
+                        })
+                    )}
+                </div>
+            </div>
+
+            {/* AI alerts */}
+            {alerts.length > 0 && (
+                <div className="bg-[#141414] border border-[#262626] rounded-xl">
+                    <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center gap-2">
+                        <AlertTriangle className="w-3.5 h-3.5 text-[#eab308]" />
+                        <p className="text-xs font-semibold text-[#e5e5e5]">What to do</p>
+                    </div>
+                    <div className="divide-y divide-[#1a1a1a]">
+                        {alerts.map((alert: any, i: number) => (
+                            <div key={i} className="px-4 py-2.5">
+                                <p className="text-xs text-[#e5e5e5]">{alert.message}</p>
+                                {alert.action && (
+                                    <p className="text-[10px] text-[#d4a853] mt-0.5">→ {alert.action}</p>
+                                )}
+                            </div>
                         ))}
                     </div>
                 </div>
             )}
-
-            {/* Items Detail View */}
-            {view === "items" && (
-                <div className="glass rounded-2xl overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-gray-700/50">
-                                    <th className="text-left p-4 text-gray-400 font-medium">Item</th>
-                                    <th className="text-center p-4 text-gray-400 font-medium">ABC</th>
-                                    <th className="text-right p-4 text-gray-400 font-medium">Stock</th>
-                                    <th className="text-right p-4 text-gray-400 font-medium">Daily Use</th>
-                                    <th className="text-right p-4 text-gray-400 font-medium">Days Left</th>
-                                    <th className="text-right p-4 text-gray-400 font-medium">EOQ</th>
-                                    <th className="text-right p-4 text-gray-400 font-medium">Reorder At</th>
-                                    <th className="text-right p-4 text-gray-400 font-medium">Waste %</th>
-                                    <th className="text-center p-4 text-gray-400 font-medium">Trend</th>
-                                    <th className="text-center p-4 text-gray-400 font-medium">Spoilage</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(items || []).map((item: any, i: number) => (
-                                    <motion.tr key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.04 }}
-                                        className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
-                                        <td className="p-4 font-medium">{item.name}</td>
-                                        <td className="p-4 text-center"><ABCBadge cls={item.abc_class} /></td>
-                                        <td className="p-4 text-right">{item.current_qty} {item.unit}</td>
-                                        <td className="p-4 text-right">{item.avg_daily_usage}</td>
-                                        <td className="p-4 text-right"><DaysLeftBadge days={item.days_until_depletion} /></td>
-                                        <td className="p-4 text-right">{item.eoq}</td>
-                                        <td className="p-4 text-right">{item.reorder_point}</td>
-                                        <td className="p-4 text-right"><WasteBadge pct={item.waste_pct} /></td>
-                                        <td className="p-4 text-center"><TrendIcon trend={item.consumption_trend} /></td>
-                                        <td className="p-4 text-center">
-                                            {item.spoilage_risk_score > 50 ? (
-                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-600/30 text-red-400">{item.spoilage_risk_score}%</span>
-                                            ) : (
-                                                <span className="text-xs text-gray-500">{item.spoilage_risk_score}%</span>
-                                            )}
-                                        </td>
-                                    </motion.tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
-
-            {/* Alerts View */}
-            {view === "alerts" && (
-                <div className="space-y-3">
-                    {(alerts || []).length === 0 ? (
-                        <div className="glass rounded-xl p-6 text-center">
-                            <p className="text-gray-500">No inventory alerts at this time. All items healthy.</p>
-                        </div>
-                    ) : (
-                        (alerts || []).map((a: any, i: number) => (
-                            <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-                                className="glass rounded-xl p-4 flex items-start gap-3">
-                                <span className={`mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${a.severity === "critical" ? "bg-red-600/30 text-red-400" : a.severity === "high" ? "bg-orange-600/30 text-orange-400" : "bg-amber-600/30 text-amber-400"}`}>{a.severity}</span>
-                                <div className="flex-1">
-                                    <p className="text-sm font-medium">{a.item}</p>
-                                    <p className="text-xs text-gray-400 mt-0.5">{a.message}</p>
-                                    <p className="text-xs text-indigo-400 mt-1">{a.action}</p>
-                                </div>
-                            </motion.div>
-                        ))
-                    )}
-                </div>
-            )}
         </div>
     );
 }
-
-/* ─── Subcomponents ─── */
-function MiniStat({ label, value, color }: { label: string; value: any; color?: string }) {
-    return (
-        <div className="p-3 rounded-lg bg-gray-800/40 border border-gray-700/50">
-            <p className="text-xs text-gray-400">{label}</p>
-            <p className={`text-lg font-bold ${color || "text-white"}`}>{value}</p>
-        </div>
-    );
-}
-
-function ABCBadge({ cls }: { cls: string }) {
-    const m: Record<string, string> = { A: "bg-emerald-600/30 text-emerald-400", B: "bg-cyan-600/30 text-cyan-400", C: "bg-gray-600/30 text-gray-400" };
-    return <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${m[cls] || ""}`}>{cls}</span>;
-}
-
-function DaysLeftBadge({ days }: { days: number }) {
-    if (days <= 3) return <span className="text-red-400 font-bold">{days}d</span>;
-    if (days <= 7) return <span className="text-amber-400">{days}d</span>;
-    return <span className="text-gray-300">{days}d</span>;
-}
-
-function WasteBadge({ pct }: { pct: number }) {
-    if (pct > 10) return <span className="text-red-400 font-bold">{pct}%</span>;
-    if (pct > 5) return <span className="text-amber-400">{pct}%</span>;
-    return <span className="text-gray-400">{pct}%</span>;
-}
-
-function TrendIcon({ trend }: { trend: string }) {
-    if (trend === "increasing") return <TrendingUp className="w-4 h-4 text-red-400 mx-auto" />;
-    if (trend === "decreasing") return <TrendingDown className="w-4 h-4 text-emerald-400 mx-auto" />;
-    return <Minus className="w-4 h-4 text-gray-500 mx-auto" />;
-}
-
-function StatusDot({ status }: { status: string }) {
-    const c = status === "critical" ? "bg-red-400" : status === "low" ? "bg-amber-400" : status === "reorder" ? "bg-cyan-400" : "bg-emerald-400";
-    return <span className={`w-2 h-2 rounded-full ${c}`} />;
-}
-
-function healthColor(h: number) { return h >= 80 ? "text-emerald-400" : h >= 60 ? "text-amber-400" : "text-red-400"; }
-function healthBorder(h: number) { return h >= 80 ? "border-emerald-500/20 bg-emerald-900/10" : h >= 60 ? "border-amber-500/20 bg-amber-900/10" : "border-red-500/20 bg-red-900/10"; }

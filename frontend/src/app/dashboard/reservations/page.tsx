@@ -3,202 +3,183 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { motion } from "framer-motion";
-import { CalendarRange, AlertTriangle, Users, Clock, DollarSign, TrendingUp, Lightbulb, BarChart3 } from "lucide-react";
+import { CalendarDays, DollarSign } from "lucide-react";
 
 export default function ReservationsPage() {
-    const [data, setData] = useState<any>(null);
+    const [reservations, setReservations] = useState<any[]>([]);
+    const [aiData, setAiData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.get("/ai/reservation-insights").then(r => { setData(r.data); setLoading(false); }).catch(() => setLoading(false));
+        Promise.all([
+            api.get("/reservations/").catch(() => ({ data: [] })),
+            api.get("/ai/reservation-insights").catch(() => ({ data: null })),
+        ]).then(([resRes, aiRes]) => {
+            setReservations(Array.isArray(resRes.data) ? resRes.data : []);
+            setAiData(aiRes.data);
+            setLoading(false);
+        });
     }, []);
 
-    if (loading) return <div className="space-y-4 animate-pulse">{[...Array(3)].map((_, i) => <div key={i} className="glass rounded-xl h-24" />)}</div>;
-    if (!data) return <p className="text-gray-500">Failed to load reservation data.</p>;
+    if (loading) {
+        return (
+            <div className="space-y-3">
+                {[...Array(4)].map((_, i) => (
+                    <div key={i} className="bg-[#141414] rounded-xl h-16 animate-pulse" />
+                ))}
+            </div>
+        );
+    }
 
-    const { no_show_analysis, revenue_impact, table_utilization, lead_time_analysis, overbooking, peak_windows, party_size, recommendations, revpash } = data;
-    const ns = no_show_analysis || {};
-    const dep = ns.deposit_analysis || {};
-    const ri = revenue_impact || {};
-    const lt = lead_time_analysis || {};
-    const ob = overbooking || {};
-    const rv = revpash || {};
+    const today = new Date().toISOString().split("T")[0];
+    const todayBookings = reservations.filter((r) => r.reservation_date === today);
+    const upcoming = reservations.filter((r) => r.reservation_date >= today && r.status === "confirmed");
+
+    const noShow = aiData?.no_show_analysis || {};
+    const revenue = aiData?.revenue_impact || {};
+    const deposit = aiData?.deposit_effectiveness || {};
+    const tables = aiData?.table_utilization || {};
+    const recommendations = aiData?.recommendations || [];
+    const overbooking = aiData?.overbooking || {};
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="glass rounded-2xl p-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-amber-600/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-                <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                        <CalendarRange className="w-5 h-5 text-amber-400" />
-                        <span className="text-sm text-amber-400 font-medium">Reservation Intelligence</span>
-                    </div>
-                    <h1 className="text-2xl font-bold mb-4">Reservations & No-Show Analytics</h1>
-                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                        <QS label="Total Reservations" value={ns.total_reservations} />
-                        <QS label="No-Show Rate" value={`${ns.no_show_rate}%`} color={ns.no_show_rate > 15 ? "text-red-400" : "text-amber-400"} />
-                        <QS label="Completion Rate" value={`${ns.completion_rate}%`} color="text-emerald-400" />
-                        <QS label="RevPASH" value={`KES ${rv.revpash?.toLocaleString() || 0}`} color="text-cyan-400" />
-                        <QS label="Rev Lost (No-Shows)" value={formatKES(ri.estimated_revenue_lost)} color="text-red-400" />
-                    </div>
+        <div className="space-y-5">
+            <div>
+                <h1 className="text-xl font-bold text-[#e5e5e5]">Bookings</h1>
+                <p className="text-sm text-[#525252] mt-0.5">
+                    {todayBookings.length} today · {upcoming.length} coming up
+                </p>
+            </div>
+
+            {/* Today at a glance */}
+            <div className="grid grid-cols-3 gap-3">
+                <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
+                    <p className="text-xs text-[#525252]">Today</p>
+                    <p className="text-lg font-bold text-[#d4a853] mt-1">{todayBookings.length}</p>
+                </div>
+                <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
+                    <p className="text-xs text-[#525252]">Coming Up</p>
+                    <p className="text-lg font-bold text-[#e5e5e5] mt-1">{upcoming.length}</p>
+                </div>
+                <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
+                    <p className="text-xs text-[#525252]">Total</p>
+                    <p className="text-lg font-bold text-[#737373] mt-1">{reservations.length}</p>
                 </div>
             </div>
 
-            {/* Two-column: No-Show Analysis + Deposit Impact */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* No-Show Breakdown */}
-                <div className="glass rounded-2xl p-6">
-                    <h3 className="font-semibold mb-4 flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-red-400" />No-Show by Day</h3>
-                    <div className="space-y-2">
-                        {(ns.by_day || []).map((d: any) => {
-                            const maxR = Math.max(...(ns.by_day || []).map((x: any) => x.no_show_rate || 0));
-                            const pct = maxR > 0 ? (d.no_show_rate / maxR) * 100 : 0;
-                            return (
-                                <div key={d.day} className="flex items-center gap-3">
-                                    <span className="w-12 text-xs text-gray-400">{d.day.slice(0, 3)}</span>
-                                    <div className="flex-1 bg-gray-800 rounded-full h-3 overflow-hidden">
-                                        <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }}
-                                            className="h-full rounded-full bg-gradient-to-r from-red-500 to-amber-500" />
-                                    </div>
-                                    <span className="w-20 text-xs text-right">
-                                        <span className={d.no_show_rate > 20 ? "text-red-400 font-bold" : "text-gray-300"}>{d.no_show_rate}%</span>
-                                        <span className="text-gray-500 ml-1">({d.total})</span>
-                                    </span>
-                                </div>
-                            );
-                        })}
+            {/* What we're seeing about bookings */}
+            {(noShow.no_show_rate > 0 || revenue.estimated_revenue_lost > 0 || recommendations.length > 0) && (
+                <div className="bg-[#141414] border border-[#262626] rounded-xl">
+                    <div className="px-4 py-3 border-b border-[#1a1a1a]">
+                        <p className="text-xs font-semibold text-[#e5e5e5]">What we&apos;re noticing</p>
                     </div>
-                </div>
+                    <div className="px-4 py-3 space-y-3">
+                        {/* Natural language insights */}
+                        <div className="space-y-2">
+                            {noShow.no_show_rate > 0 && (
+                                <p className="text-xs text-[#737373]">
+                                    About <span className="text-[#ef4444] font-semibold">{noShow.no_show_rate?.toFixed(0)}% of people who book don&apos;t show up</span>
+                                </p>
+                            )}
+                            {revenue.estimated_revenue_lost > 0 && (
+                                <p className="text-xs text-[#737373]">
+                                    That&apos;s costing you roughly <span className="text-[#ef4444] font-semibold">{formatKES(revenue.estimated_revenue_lost)}</span> in lost sales
+                                </p>
+                            )}
+                            {tables.avg_utilization > 0 && (
+                                <p className="text-xs text-[#737373]">
+                                    Your tables are being used about <span className="text-[#e5e5e5] font-semibold">{tables.avg_utilization?.toFixed(0)}% of the time</span>
+                                </p>
+                            )}
+                            {deposit.with_deposit_no_show_rate !== undefined && deposit.without_deposit_no_show_rate !== undefined && (
+                                <p className="text-xs text-[#737373]">
+                                    When you collect a deposit, only <span className="text-[#22c55e] font-semibold">{deposit.with_deposit_no_show_rate?.toFixed(0)}% skip</span> compared to <span className="text-[#ef4444] font-semibold">{deposit.without_deposit_no_show_rate?.toFixed(0)}% without one</span>
+                                </p>
+                            )}
+                        </div>
 
-                {/* Deposit Impact */}
-                <div className="glass rounded-2xl p-6">
-                    <h3 className="font-semibold mb-4 flex items-center gap-2"><DollarSign className="w-4 h-4 text-emerald-400" />Deposit Effectiveness</h3>
-                    {dep.with_deposit && (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="p-4 rounded-xl bg-emerald-900/10 border border-emerald-500/20 text-center">
-                                    <p className="text-xs text-gray-400 mb-1">With Deposit</p>
-                                    <p className="text-2xl font-bold text-emerald-400">{dep.with_deposit.no_show_rate}%</p>
-                                    <p className="text-[10px] text-gray-500">{dep.with_deposit.count} bookings</p>
-                                </div>
-                                <div className="p-4 rounded-xl bg-red-900/10 border border-red-500/20 text-center">
-                                    <p className="text-xs text-gray-400 mb-1">Without Deposit</p>
-                                    <p className="text-2xl font-bold text-red-400">{dep.without_deposit?.no_show_rate}%</p>
-                                    <p className="text-[10px] text-gray-500">{dep.without_deposit?.count} bookings</p>
-                                </div>
+                        {/* Overbooking opportunity */}
+                        {overbooking.recommended_rate > 0 && (
+                            <div className="bg-[#d4a853]/5 border border-[#d4a853]/10 rounded-lg px-3 py-2">
+                                <p className="text-xs text-[#e5e5e5] flex items-center gap-2">
+                                    <DollarSign className="w-3 h-3 text-[#d4a853]" />
+                                    You can safely take <span className="font-bold text-[#d4a853]">{overbooking.recommended_rate}% more bookings</span> to make up for no-shows — that&apos;s about <span className="font-bold text-[#d4a853]">{formatKES(overbooking.potential_monthly_recovery || 0)} extra per month</span>
+                                </p>
                             </div>
-                            <p className="text-sm text-center text-gray-400">
-                                Deposits reduce no-shows by <span className="text-emerald-400 font-bold">{dep.deposit_effectiveness?.toFixed(1)}%</span>
-                            </p>
-                        </div>
-                    )}
+                        )}
 
-                    {/* Overbooking Recommendation */}
-                    <div className="mt-6 p-4 rounded-xl bg-gray-800/30 border border-gray-700/50">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium">Overbooking Recommendation</span>
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ob.risk_level === "high" ? "bg-red-600/30 text-red-400" : ob.risk_level === "medium" ? "bg-amber-600/30 text-amber-400" : "bg-emerald-600/30 text-emerald-400"}`}>{ob.risk_level} risk</span>
-                        </div>
-                        <p className="text-2xl font-bold text-indigo-400">{ob.recommended_rate}%</p>
-                        <p className="text-xs text-gray-400 mt-1">Based on {ns.no_show_rate}% no-show rate with {ob.safety_margin} safety margin</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Peak Windows + Party Size */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Peak Demand Windows */}
-                <div className="glass rounded-2xl p-6">
-                    <h3 className="font-semibold mb-4 flex items-center gap-2"><Clock className="w-4 h-4 text-cyan-400" />Peak Demand Windows</h3>
-                    <div className="space-y-2">
-                        {(peak_windows || []).map((pw: any, i: number) => (
-                            <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}
-                                className="flex items-center justify-between p-3 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                <div>
-                                    <p className="text-sm font-medium">{pw.day} — {pw.slot}</p>
-                                    <p className="text-xs text-gray-400">{pw.count} reservations</p>
-                                </div>
-                                <span className="text-sm text-cyan-400 font-medium">Avg party: {pw.avg_party_size}</span>
-                            </motion.div>
-                        ))}
-                        {(!peak_windows || peak_windows.length === 0) && <p className="text-gray-500 text-sm">No peak windows identified yet.</p>}
-                    </div>
-                </div>
-
-                {/* Party Size Distribution */}
-                <div className="glass rounded-2xl p-6">
-                    <h3 className="font-semibold mb-4 flex items-center gap-2"><Users className="w-4 h-4 text-indigo-400" />Party Size Distribution</h3>
-                    <div className="space-y-2">
-                        {(party_size || []).map((ps: any) => {
-                            const maxC = Math.max(...(party_size || []).map((x: any) => x.count || 0));
-                            const pct = maxC > 0 ? (ps.count / maxC) * 100 : 0;
-                            return (
-                                <div key={ps.size} className="flex items-center gap-3">
-                                    <span className="w-16 text-xs text-gray-400">{ps.size} guests</span>
-                                    <div className="flex-1 bg-gray-800 rounded-full h-3 overflow-hidden">
-                                        <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }}
-                                            className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500" />
+                        {/* Suggestions */}
+                        {recommendations.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-[#1a1a1a]">
+                                <p className="text-[10px] text-[#525252] uppercase tracking-wider">Suggestions</p>
+                                {recommendations.slice(0, 3).map((rec: any, i: number) => (
+                                    <div key={i} className="flex items-start gap-2 text-xs">
+                                        <span className="text-[#d4a853] mt-0.5">💡</span>
+                                        <div>
+                                            <p className="text-[#e5e5e5]">{rec.message}</p>
+                                            {rec.action && <p className="text-[#525252] mt-0.5">{rec.action}</p>}
+                                            {rec.estimated_impact && (
+                                                <p className="text-[10px] text-[#22c55e] mt-0.5">Could save you {rec.estimated_impact}</p>
+                                            )}
+                                        </div>
                                     </div>
-                                    <span className="w-16 text-xs text-right text-gray-300">{ps.count} ({ps.share_pct}%)</span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            </div>
-
-            {/* Table Utilization */}
-            {table_utilization && (
-                <div className="glass rounded-2xl p-6">
-                    <h3 className="font-semibold mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-emerald-400" />Table Utilization</h3>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <Stat label="Total Capacity" value={`${table_utilization.total_seats} seats`} />
-                        <Stat label="Avg Covers/Day" value={rv.avg_covers_per_day} />
-                        <Stat label="Avg Turnover" value={`${table_utilization.avg_turnover_rate}x/day`} />
-                        <Stat label="Utilization" value={`${table_utilization.utilization_pct}%`} color={table_utilization.utilization_pct >= 70 ? "text-emerald-400" : "text-amber-400"} />
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
 
-            {/* Recommendations */}
-            <div className="glass rounded-2xl p-6">
-                <h3 className="font-semibold mb-4 flex items-center gap-2"><Lightbulb className="w-4 h-4 text-amber-400" />AI Recommendations</h3>
-                <div className="space-y-3">
-                    {(recommendations || []).map((r: any, i: number) => (
-                        <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
-                            className="p-4 rounded-xl bg-gray-800/30 border border-gray-700/50">
-                            <div className="flex items-start gap-3">
-                                <span className={`mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${r.priority === "high" ? "bg-red-600/30 text-red-400" : r.priority === "medium" ? "bg-amber-600/30 text-amber-400" : "bg-gray-600/30 text-gray-400"}`}>{r.priority}</span>
-                                <div>
-                                    <p className="text-sm font-medium">{r.message}</p>
-                                    <p className="text-xs text-indigo-400 mt-1">{r.action}</p>
-                                    <p className="text-xs text-gray-500 mt-0.5">{r.impact}</p>
-                                </div>
-                            </div>
-                        </motion.div>
-                    ))}
-                </div>
+            {/* Bookings List */}
+            <div className="bg-[#141414] border border-[#262626] rounded-xl">
+                {reservations.length === 0 ? (
+                    <div className="px-5 py-10 text-center">
+                        <CalendarDays className="w-8 h-8 text-[#333] mx-auto mb-3" />
+                        <p className="text-sm text-[#525252]">No bookings yet — they&apos;ll come in from your booking system</p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="px-4 py-3 border-b border-[#1a1a1a]">
+                            <h2 className="text-sm font-semibold text-[#e5e5e5]">All Bookings</h2>
+                        </div>
+                        <div className="divide-y divide-[#1a1a1a]">
+                            {reservations.map((res, i) => {
+                                const statusLabels: Record<string, string> = {
+                                    confirmed: "Confirmed",
+                                    cancelled: "Cancelled",
+                                    completed: "Done",
+                                    no_show: "Didn't show",
+                                };
+                                const statusStyles: Record<string, string> = {
+                                    confirmed: "bg-[#22c55e]/10 text-[#22c55e]",
+                                    cancelled: "bg-[#ef4444]/10 text-[#ef4444]",
+                                    completed: "bg-[#737373]/10 text-[#737373]",
+                                    no_show: "bg-[#eab308]/10 text-[#eab308]",
+                                };
+                                return (
+                                    <motion.div key={res.id || i} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                        transition={{ delay: i * 0.03 }}
+                                        className="px-4 py-3 flex items-center justify-between hover:bg-[#1a1a1a] transition-colors">
+                                        <div>
+                                            <p className="text-sm text-[#e5e5e5]">{res.customer_name}</p>
+                                            <p className="text-xs text-[#525252] mt-0.5">
+                                                {res.party_size} guest{res.party_size !== 1 ? "s" : ""}{res.customer_phone && ` · ${res.customer_phone}`}
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm text-[#737373]">{res.reservation_date}</p>
+                                            <p className="text-xs text-[#525252] mt-0.5">{res.reservation_time}</p>
+                                            <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-medium ${statusStyles[res.status] || statusStyles.confirmed}`}>
+                                                {statusLabels[res.status] || res.status}
+                                            </span>
+                                        </div>
+                                    </motion.div>
+                                );
+                            })}
+                        </div>
+                    </>
+                )}
             </div>
-        </div>
-    );
-}
-
-/* ─── Helpers ─── */
-function QS({ label, value, color }: { label: string; value: any; color?: string }) {
-    return (
-        <div className="p-3 rounded-lg bg-gray-800/40 border border-gray-700/50">
-            <p className="text-xs text-gray-400">{label}</p>
-            <p className={`text-lg font-bold ${color || "text-white"}`}>{value}</p>
-        </div>
-    );
-}
-
-function Stat({ label, value, color }: { label: string; value: any; color?: string }) {
-    return (
-        <div className="p-4 rounded-xl bg-gray-800/30 border border-gray-700/50 text-center">
-            <p className="text-xs text-gray-400 mb-1">{label}</p>
-            <p className={`text-xl font-bold ${color || "text-white"}`}>{value}</p>
         </div>
     );
 }

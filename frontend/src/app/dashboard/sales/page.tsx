@@ -25,7 +25,7 @@ interface Order {
     is_paid: boolean;
     total: number;
     created_at: string;
-    items: { item_name: string; quantity: number; unit_price: number }[];
+    items: { item_name: string; quantity: number; unit_price: number; menu_item_id?: number }[];
 }
 
 export default function SalesPage() {

@@ -1,0 +1,66 @@
+{
+    "name": "Chakula — Restaurant Manager",
+    "short_name": "Chakula",
+    "description": "Restaurant management for ordering, POS, kitchen display, inventory & analytics",
+    "start_url": "/dashboard",
+    "display": "standalone",
+    "background_color": "#0a0a0a",
+    "theme_color": "#0a0a0a",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": [
+        "business",
+        "food"
+    ],
+    "shortcuts": [
+        {
+            "name": "POS",
+            "short_name": "POS",
+            "url": "/dashboard/pos",
+            "description": "Point of Sale",
+            "icons": [
+                {
+                    "src": "/icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "Kitchen Display",
+            "short_name": "KDS",
+            "url": "/dashboard/kitchen",
+            "description": "Kitchen Display System",
+            "icons": [
+                {
+                    "src": "/icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "Orders",
+            "short_name": "Orders",
+            "url": "/dashboard/orders",
+            "description": "Order management",
+            "icons": [
+                {
+                    "src": "/icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        }
+    ]
+}

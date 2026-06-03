@@ -11,7 +11,7 @@ const handler = NextAuth({
       },
       async authorize(credentials, req) {
         // Post to backend login endpoint
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/login`, {
           method: 'POST',
           body: new URLSearchParams({
             'username': credentials?.username || '',

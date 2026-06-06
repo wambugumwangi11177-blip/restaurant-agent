@@ -29,6 +29,11 @@ def populate():
             print("[WARN] Tenant 'Leviii Client Demo' already exists. Skipping creation to avoid duplicates.")
             return
 
+        existing_user = db.query(User).filter(User.email == "client@leviii.ai").first()
+        if existing_user:
+            db.delete(existing_user)
+            db.flush()
+
         # -- TENANT & USER --
         print("[INFO] Creating 'Leviii Client Demo' tenant and admin user...")
         tenant = Tenant(name="Leviii Client Demo", plan="premium")

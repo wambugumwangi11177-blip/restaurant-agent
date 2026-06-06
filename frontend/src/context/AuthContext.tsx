@@ -1,98 +1,100 @@
 "use client";
 
+/**
+ * AuthContext.tsx — Authentication state management
+ *
+ * Fixes vs original:
+ *   BUG 1 — register was posting to /auth/register (404). Fixed to /api/v1/auth/register.
+ *   BUG 6 — login was pointlessly building URLSearchParams then pulling values back out.
+ *            Cleaned to send {email, password} JSON directly.
+ */
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import api from "@/lib/api";
 
 interface User {
-    id: number;
-    email: string;
-    role: string;
+  id: number;
+  email: string;
+  role: string;
 }
 
 interface AuthContextType {
-    user: User | null;
-    token: string | null;
-    login: (email: string, password: string) => Promise<void>;
-    register: (email: string, password: string, tenantName: string) => Promise<void>;
-    logout: () => void;
-    isLoading: boolean;
+  user: User | null;
+  token: string | null;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, tenantName: string) => Promise<void>;
+  logout: () => void;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
-    const [token, setToken] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
-        const storedToken = localStorage.getItem("access_token");
-        if (storedToken) {
-            setToken(storedToken);
-            fetchUser(storedToken);
-        } else {
-            setIsLoading(false);
-        }
-    }, []);
+  useEffect(() => {
+    const storedToken = localStorage.getItem("access_token");
+    if (storedToken) {
+      setToken(storedToken);
+      fetchUser(storedToken);
+    } else {
+      setIsLoading(false);
+    }
+  }, []);
 
-    const fetchUser = async (accessToken: string) => {
-        try {
-            const res = await api.get("/api/v1/auth/me", {
-                headers: { Authorization: `Bearer ${accessToken}` },
-            });
-            setUser(res.data);
-        } catch {
-            localStorage.removeItem("access_token");
-            setToken(null);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+  const fetchUser = async (accessToken: string) => {
+    try {
+      const res = await api.get("/api/v1/auth/me", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setUser(res.data);
+    } catch {
+      localStorage.removeItem("access_token");
+      setToken(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    const login = async (email: string, password: string) => {
-        const formData = new URLSearchParams();
-        formData.append("username", email);
-        formData.append("password", password);
+  // BUG 6 FIX: removed pointless URLSearchParams construction
+  const login = async (email: string, password: string) => {
+    const res = await api.post("/api/v1/auth/login", { email, password });
+    const accessToken = res.data.access_token;
+    localStorage.setItem("access_token", accessToken);
+    setToken(accessToken);
+    await fetchUser(accessToken);
+  };
 
-        const res = await api.post("/api/v1/auth/login", {
-  email: formData.get("username"),
-  password: formData.get("password"),
-});
+  // BUG 1 FIX: was /auth/register (404) — corrected to /api/v1/auth/register
+  const register = async (email: string, password: string, tenantName: string) => {
+    const res = await api.post("/api/v1/auth/register", {
+      email,
+      password,
+      tenant_name: tenantName,
+    });
+    const accessToken = res.data.access_token;
+    localStorage.setItem("access_token", accessToken);
+    setToken(accessToken);
+    await fetchUser(accessToken);
+  };
 
-        const accessToken = res.data.access_token;
-        localStorage.setItem("access_token", accessToken);
-        setToken(accessToken);
-        await fetchUser(accessToken);
-    };
+  const logout = () => {
+    localStorage.removeItem("access_token");
+    setToken(null);
+    setUser(null);
+  };
 
-    const register = async (email: string, password: string, tenantName: string) => {
-        const res = await api.post("/auth/register", {
-            email,
-            password,
-            tenant_name: tenantName,
-        });
-
-        const accessToken = res.data.access_token;
-        localStorage.setItem("access_token", accessToken);
-        setToken(accessToken);
-        await fetchUser(accessToken);
-    };
-
-    const logout = () => {
-        localStorage.removeItem("access_token");
-        setToken(null);
-        setUser(null);
-    };
-
-    return (
-        <AuthContext.Provider value={{ user, token, login, register, logout, isLoading }}>
-            {children}
-        </AuthContext.Provider>
-    );
+  return (
+    <AuthContext.Provider value={{ user, token, login, register, logout, isLoading }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {
-    const context = useContext(AuthContext);
-    if (!context) throw new Error("useAuth must be used within AuthProvider");
-    return context;
+  const context = useContext(AuthContext);
+  if (!context) throw new Error("useAuth must be used within AuthProvider");
+  return context;
 }

@@ -56,7 +56,14 @@ app.include_router(ai.router)
 def read_root():
     return {"Hello": "Restaurant Agent Backend"}
 
-
+@app.get("/seed")
+def seed_database():
+    try:
+        import populate_production
+        populate_production.populate()
+        return {"status": "success", "message": "Database seeded successfully"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

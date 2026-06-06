@@ -58,15 +58,9 @@ def read_root():
 
 @app.get("/seed")
 def seed_database():
-    import sys
-    import os
-    # Add execution dir to path
-    exec_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "execution")
-    if exec_dir not in sys.path:
-        sys.path.append(exec_dir)
     try:
-        from populate_production import populate
-        populate()
+        import populate_production
+        populate_production.populate()
         return {"status": "success", "message": "Database seeded successfully"}
     except Exception as e:
         return {"status": "error", "message": str(e)}

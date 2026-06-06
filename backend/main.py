@@ -56,6 +56,21 @@ app.include_router(ai.router)
 def read_root():
     return {"Hello": "Restaurant Agent Backend"}
 
+@app.get("/seed")
+def seed_database():
+    import sys
+    import os
+    # Add execution dir to path
+    exec_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "execution")
+    if exec_dir not in sys.path:
+        sys.path.append(exec_dir)
+    try:
+        from populate_production import populate
+        populate()
+        return {"status": "success", "message": "Database seeded successfully"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))

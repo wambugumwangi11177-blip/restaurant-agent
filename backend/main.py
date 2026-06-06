@@ -1,7 +1,7 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations
+from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai
 import auth as auth_utils
 from middleware.timing import TimingMiddleware
 
@@ -50,6 +50,7 @@ app.include_router(health.router)
 app.include_router(webhooks.router)
 app.include_router(analytics.router)
 app.include_router(reservations.router)
+app.include_router(ai.router)
 
 @app.get("/")
 def read_root():

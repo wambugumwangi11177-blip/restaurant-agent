@@ -91,6 +91,8 @@ async def create_order(
 @router.get("/", response_model=List[schemas.OrderOut])
 async def list_orders(
     status_filter: Optional[str] = Query(None, alias="status"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
@@ -105,7 +107,11 @@ async def list_orders(
         except ValueError:
             pass
 
-    orders = q.order_by(models.Order.created_at.desc()).limit(200).all()
+    total = q.count()  # Get total count for pagination metadata (optional)
+    orders = q.order_by(models.Order.created_at.desc()).offset(offset).limit(limit).all()
+    # We could return total and offset/limit in a wrapper object, but for simplicity we just return the list.
+    # The client can use the Link header or we can return a paginated response model.
+    # For now, we just return the list and the client can use offset and limit for pagination.
     return [_order_to_dict(o) for o in orders]
 
 

@@ -567,3 +567,33 @@ class AgentAuditLog(Base):
         Index("ix_audit_log_restaurant_created", "restaurant_id", "created_at"),
         Index("ix_audit_log_action_type",        "action_type"),
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LAYER 16: SECURITY AUDIT LOG
+# ─────────────────────────────────────────────────────────────────────────────
+
+class SecurityAuditLog(Base):
+    """
+    Audit trail for security-related events: authentication, authorization,
+    and other security-relevant actions. Essential for SOC 2 compliance.
+    """
+    __tablename__ = "security_audit_log"
+
+    id             = Column(Integer, primary_key=True, index=True)
+    tenant_id      = Column(Integer, ForeignKey("tenants.id"), nullable=True)
+    user_email     = Column(String, nullable=True)
+    event_type     = Column(String, nullable=False)  # e.g., login_attempt, permission_change, etc.
+    ip_address     = Column(String, nullable=True)
+    user_agent     = Column(String, nullable=True)
+    success        = Column(Boolean, nullable=False)
+    failure_reason = Column(String, nullable=True)
+    details        = Column(Text, default="{}")      # JSON blob for additional context
+    timestamp      = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        Index("ix_security_audit_tenant_created", "tenant_id", "timestamp"),
+        Index("ix_security_audit_event_type",     "event_type"),
+        Index("ix_security_audit_user_email",     "user_email"),
+        Index("ix_security_audit_success",        "success"),
+    )

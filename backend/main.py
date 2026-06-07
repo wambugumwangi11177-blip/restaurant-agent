@@ -9,14 +9,18 @@ FIXES:
     never activated — events fired into the void.
   - Added APScheduler for the WhatsApp morning briefing cron job.
   - Rate limiting middleware added (slowapi).
+  - Added Proactive Executive Agent initialization for agentic capabilities.
 """
 
 import os
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai
 from middleware.timing import TimingMiddleware
+from middleware.security import SecurityHeadersMiddleware, RequestSizeLimitMiddleware
+from sqlalchemy.orm import Session
+from database import SessionLocal, get_db
 
 logger = logging.getLogger(__name__)
 
@@ -34,13 +38,21 @@ try:
     from slowapi import Limiter, _rate_limit_exceeded_handler
     from slowapi.util import get_remote_address
     from slowapi.errors import RateLimitExceeded
-    limiter = Limiter(key_func=get_remote_address)
+    from middleware.rate_limit_enhanced import (
+        get_rate_limit_key, custom_rate_limit_exceeded_handler
+    )
+    limiter = Limiter(
+        key_func=get_rate_limit_key,
+        default_limits=["100 per hour"]
+    )
     _slowapi_available = True
+    # Set custom exception handler for logging
+    _rate_limit_exceeded_handler = custom_rate_limit_exceeded_handler
 except ImportError:
     _slowapi_available = False
     logger.warning("[Startup] slowapi not installed — rate limiting disabled. Run: pip install slowapi")
 
-app = FastAPI(title="Restaurant Agent API", version="2.0.0")
+app = FastAPI(title="Restaurant Agent API", version="2.1.0")  # Version bump for agentic features
 
 if _slowapi_available:
     app.state.limiter = limiter
@@ -69,7 +81,19 @@ def on_startup():
     except Exception as e:
         print(f"[WARN] Orchestrator registration failed: {e}")
 
-    # 3. Schedule morning WhatsApp briefing (07:00 EAT = 04:00 UTC)
+    # 3. Initialize Proactive Executive Agent for agentic capabilities
+    try:
+        db = SessionLocal()
+        try:
+            from ai.orchestrator.proactive_executive import initialize_proactive_executive
+            initialize_proactive_executive(db)
+            print("[OK] Proactive Executive Agent initialized")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"[WARN] Proactive Executive initialization failed: {e}")
+
+    # 4. Schedule morning WhatsApp briefing (07:00 EAT = 04:00 UTC)
     _start_scheduler()
 
 
@@ -170,7 +194,101 @@ def _check_late_purchase_orders():
         logger.error(f"[PO Check] Failed: {exc}")
 
 
-# ── CORS ──────────────────────────────────────────────────────────────────────
+# ── Proactive Executive Endpoints ────────────────────────────────────────────
+
+@app.get("/agentic/goals", tags=["Agentic"])
+def get_active_goals(db: Session = Depends(get_db)):
+    """Get all active goals from the Proactive Executive Agent"""
+    try:
+        from ai.orchestrator.proactive_executive import get_proactive_executive
+        executive = get_proactive_executive()
+        goals = executive.get_active_goals()
+        return {"goals": goals, "count": len(goals)}
+    except Exception as e:
+        logger.error(f"Failed to get active goals: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/agentic/goals", tags=["Agentic"])
+def propose_goal(
+    goal_type: str,
+    description: str,
+    success_criteria: dict,
+    priority: int = 1,
+    db: Session = Depends(get_db)
+):
+    """Propose a new goal for the Proactive Executive Agent to pursue"""
+    try:
+        from ai.orchestrator.proactive_executive import get_proactive_executive, GoalType
+        executive = get_proactive_executive()
+
+        # Validate goal type
+        try:
+            goal_type_enum = GoalType(goal_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid goal type. Valid types: {[gt.value for gt in GoalType]}")
+
+        goal_id = executive.propose_goal(
+            goal_type=goal_type_enum,
+            description=description,
+            success_criteria=success_criteria,
+            priority=priority
+        )
+        return {"goal_id": goal_id, "status": "proposed", "message": "Goal proposed successfully"}
+    except Exception as e:
+        logger.error(f"Failed to propose goal: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/agentic/goals/{goal_id}/activate", tags=["Agentic"])
+def activate_goal(goal_id: str, db: Session = Depends(get_db)):
+    """Activate a proposed goal"""
+    try:
+        from ai.orchestrator.proactive_executive import get_proactive_executive
+        executive = get_proactive_executive()
+        success = executive.activate_goal(goal_id)
+        if success:
+            return {"goal_id": goal_id, "status": "activated", "message": "Goal activated successfully"}
+        else:
+            raise HTTPException(status_code=400, detail="Failed to activate goal - may not exist or already active")
+    except Exception as e:
+        logger.error(f"Failed to activate goal: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/agentic/goals/{goal_id}", tags=["Agentic"])
+def get_goal_details(goal_id: str, db: Session = Depends(get_db)):
+    """Get detailed information about a specific goal"""
+    try:
+        from ai.orchestrator.proactive_executive import get_proactive_executive
+        executive = get_proactive_executive()
+        details = executive.get_goal_details(goal_id)
+        if details:
+            return details
+        else:
+            raise HTTPException(status_code=404, detail="Goal not found")
+    except Exception as e:
+        logger.error(f"Failed to get goal details: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/agentic/agents", tags=["Agentic"])
+def get_registered_agents(db: Session = Depends(get_db)):
+    """Get all registered agents in the system"""
+    try:
+        from ai.orchestrator.proactive_executive import get_proactive_executive
+        executive = get_proactive_executive()
+        if executive.communication_hub:
+            # This is a simplified version - in reality we'd query the agent registry directly
+            return {"message": "Agent registry query not yet implemented in this endpoint"}
+        else:
+            return {"message": "Communication hub not initialized"}
+    except Exception as e:
+        logger.error(f"Failed to get registered agents: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── CORS ────────────────────────────────────────────────────────────────────
 
 default_origins = "http://localhost:3000,http://127.0.0.1:3000,http://192.168.100.4:3000"
 cors_origins = os.getenv("CORS_ORIGINS", default_origins).split(",")
@@ -183,9 +301,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add security middleware
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestSizeLimitMiddleware, max_size=5 * 1024 * 1024)  # 5MB limit
+
 app.add_middleware(TimingMiddleware)
 
-# ── Routers ───────────────────────────────────────────────────────────────────
+# ── Routers ─────────────────────────────────────────────────────────────────
 
 app.include_router(auth.router)
 app.include_router(menu.router)
@@ -200,7 +322,7 @@ app.include_router(ai.router)
 
 @app.get("/")
 def read_root():
-    return {"service": "Restaurant Agent API", "version": "2.0.0", "status": "ok"}
+    return {"service": "Restaurant Agent API", "version": "2.1.0", "status": "ok"}
 
 
 if __name__ == "__main__":

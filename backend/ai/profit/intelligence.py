@@ -21,6 +21,12 @@ from collections import defaultdict, Counter
 from datetime import datetime, timedelta
 import math
 import models
+from functools import lru_cache
+import time
+
+# Simple cache for profit intelligence to avoid recomputing for same restaurant within short time
+_PROFIT_INTELLIGENCE_CACHE = {}
+_CACHE_TTL = 60  # seconds
 
 # ── Benchmarks ────────────────────────────────────────────────────────────────
 HEALTHY_FOOD_COST_MAX = 35.0
@@ -43,10 +49,18 @@ def _item_cost(item_map: dict, mid: int) -> int:
 def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
     """Complete profit intelligence — UTC-correct, AttributeError-safe."""
 
+    # Check cache
+    cache_key = restaurant_id
+    now = time.time()
+    if cache_key in _PROFIT_INTELLIGENCE_CACHE:
+        cached_time, cached_result = _PROFIT_INTELLIGENCE_CACHE[cache_key]
+        if now - cached_time < _CACHE_TTL:
+            return cached_result
+
     # BUG-04 FIX: use UTC for all DB range filters
-    now             = datetime.utcnow()
-    thirty_days_ago = now - timedelta(days=30)
-    sixty_days_ago  = now - timedelta(days=60)
+    now_dt             = datetime.utcnow()
+    thirty_days_ago = now_dt - timedelta(days=30)
+    sixty_days_ago  = now_dt - timedelta(days=60)
 
     items    = db.query(models.MenuItem).filter(models.MenuItem.restaurant_id == restaurant_id).all()
     item_map = {i.id: i for i in items}
@@ -105,10 +119,10 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
 
     contribution_margins = _build_contribution_margins(items, item_profit)
     profit_leaks         = _detect_profit_leaks(contribution_margins)
-    portion_drift        = _detect_portion_drift(db, restaurant_id, item_map, now)
+    portion_drift        = _detect_portion_drift(db, restaurant_id, item_map, now_dt)
     daypart_analysis     = _daypart_profitability(orders_30d, item_map)
     channel_analysis     = _channel_profitability(orders_30d, item_map)
-    customer_intel       = _customer_intelligence(orders_30d, total_revenue, now)
+    customer_intel       = _customer_intelligence(orders_30d, total_revenue, now_dt)
     upsell_uplift        = _upsell_lift(orders_30d, item_map)
     profit_forecast      = _profit_forecast(orders_30d, total_food_cost, total_revenue)
 
@@ -125,7 +139,7 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
     stars = [cm for cm in contribution_margins if cm["status"] == "STAR"]
     dogs  = [cm for cm in contribution_margins if cm["status"] == "LEAK"]
 
-    return {
+    result = {
         "summary": {
             "total_revenue_30d":      total_revenue,
             "total_food_cost_30d":    total_food_cost,
@@ -154,6 +168,10 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
         "dogs":                  [cm["item_name"] for cm in dogs[:5]],
         "recommendations":       recommendations,
     }
+
+    # Store in cache
+    _PROFIT_INTELLIGENCE_CACHE[cache_key] = (now, result)
+    return result
 
 
 # ── Sub-analyses ──────────────────────────────────────────────────────────────

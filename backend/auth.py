@@ -4,19 +4,21 @@ Changes vs original:
   - SECRET_KEY now CRASHES at startup if not set (was silently using "your_secret_key_here")
   - Token expiry raised from 30 min to 8 hours (staff can't be mid-shift logged out)
   - Added refresh token support scaffold (ready to wire in)
+  - Added security audit logging for authentication events
 """
 
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 import os
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from database import get_db
 import models
+from security_audit import log_auth_success, log_auth_failure
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 

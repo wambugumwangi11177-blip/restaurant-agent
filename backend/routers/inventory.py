@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime
@@ -28,13 +28,15 @@ def _get_restaurant(db: Session, user: models.User):
 
 @router.get("/", response_model=List[schemas.InventoryItemOut])
 async def get_inventory(
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
     restaurant = _get_restaurant(db, current_user)
     return db.query(models.InventoryItem).filter(
         models.InventoryItem.restaurant_id == restaurant.id
-    ).order_by(models.InventoryItem.item_name).all()
+    ).order_by(models.InventoryItem.item_name).offset(offset).limit(limit).all()
 
 
 @router.post("/", response_model=schemas.InventoryItemOut)

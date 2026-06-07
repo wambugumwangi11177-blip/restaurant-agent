@@ -1,14 +1,37 @@
+# Core
 fastapi==0.128.8
 uvicorn==0.40.0
+gunicorn==23.0.0
+
+# Database
 sqlalchemy==2.0.46
-python-dotenv==1.2.1
+alembic==1.18.4
+psycopg2-binary==2.9.11
+
+# Auth
 python-jose==3.5.0
 passlib==1.7.4
 argon2-cffi==25.1.0
 python-multipart==0.0.22
-alembic==1.18.4
-psycopg2-binary==2.9.11
-sentry-sdk==2.52.0
-requests==2.32.5
+
+# Config
+python-dotenv==1.2.1
 pydantic==2.12.5
-gunicorn==23.0.0
+
+# HTTP
+requests==2.32.5
+
+# AI — Phase 3 (uncomment when client has paid and API keys are set)
+# anthropic==0.40.0
+
+# Monitoring
+sentry-sdk==2.52.0
+
+# Rate limiting — Phase 2
+slowapi==0.1.9
+
+# Scheduling (WhatsApp morning briefing cron)
+apscheduler==3.10.4
+
+# WhatsApp / Twilio
+twilio==9.3.5

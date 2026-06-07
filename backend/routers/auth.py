@@ -13,10 +13,11 @@ FIXES:
     from the onboarding wizard.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from database import get_db
 import models, auth
+from security_audit import log_auth_success, log_auth_failure
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])

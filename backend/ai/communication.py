@@ -240,7 +240,7 @@ class CommunicationHub:
         Returns the message ID
         """
         try:
-            message = AgentMessage(
+            message = AgentCommunicationMessage(
                 tenant_id=self.tenant_id,
                 sender_agent=sender_agent,
                 recipient_agent=recipient_agent,
@@ -279,16 +279,16 @@ class CommunicationHub:
         Returns list of message dictionaries
         """
         try:
-            query = self.db.query(AgentMessage).filter(
-                AgentMessage.tenant_id == self.tenant_id,
-                AgentMessage.recipient_agent.in_([agent_id, None]),  # Messages to this agent or broadcasts
-                AgentMessage.is_processed == False,
-                AgentMessage.expires_at > datetime.utcnow()  # Not expired
-            ).order_by(AgentMessage.timestamp.desc())
+            query = self.db.query(AgentCommunicationMessage).filter(
+                AgentCommunicationMessage.tenant_id == self.tenant_id,
+                AgentCommunicationMessage.recipient_agent.in_([agent_id, None]),  # Messages to this agent or broadcasts
+                AgentCommunicationMessage.is_processed == False,
+                AgentCommunicationMessage.expires_at > datetime.utcnow()  # Not expired
+            ).order_by(AgentCommunicationMessage.timestamp.desc())
 
             if message_types:
                 type_values = [mt.value for mt in message_types]
-                query = query.filter(AgentMessage.message_type.in_(type_values))
+                query = query.filter(AgentCommunicationMessage.message_type.in_(type_values))
 
             messages = query.limit(limit).all()
 
@@ -340,7 +340,7 @@ class CommunicationHub:
         self._local_handlers[key].append(handler)
         logger.debug(f"[CommunicationHub] Local subscription to {key}")
 
-    def _notify_local_handlers(self, message: AgentMessage):
+    def _notify_local_handlers(self, message: AgentCommunicationMessage):
         """Notify local in-process handlers"""
         try:
             # Check for specific message type handlers
@@ -415,10 +415,10 @@ class CommunicationHub:
     def get_conversation_thread(self, correlation_id: str) -> List[Dict]:
         """Get all messages in a conversation thread"""
         try:
-            messages = self.db.query(AgentMessage).filter(
-                AgentMessage.tenant_id == self.tenant_id,
-                AgentMessage.correlation_id == correlation_id
-            ).order_by(AgentMessage.timestamp.asc()).all()
+            messages = self.db.query(AgentCommunicationMessage).filter(
+                AgentCommunicationMessage.tenant_id == self.tenant_id,
+                AgentCommunicationMessage.correlation_id == correlation_id
+            ).order_by(AgentCommunicationMessage.timestamp.asc()).all()
 
             return [
                 {
@@ -453,10 +453,10 @@ def cleanup_expired_messages(db_session: Session, tenant_id: str, older_than_hou
     """Cleanup expired messages (maintenance task)"""
     try:
         cutoff = datetime.utcnow() - timedelta(hours=older_than_hours)
-        deleted = db_session.query(AgentMessage).filter(
-            AgentMessage.tenant_id == tenant_id,
-            AgentMessage.timestamp < cutoff,
-            AgentMessage.is_processed == True
+        deleted = db_session.query(AgentCommunicationMessage).filter(
+            AgentCommunicationMessage.tenant_id == tenant_id,
+            AgentCommunicationMessage.timestamp < cutoff,
+            AgentCommunicationMessage.is_processed == True
         ).delete()
 
         db_session.commit()

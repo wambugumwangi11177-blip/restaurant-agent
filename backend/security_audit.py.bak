@@ -5,7 +5,6 @@ Security audit logging for authentication and authorization events.
 """
 
 import logging
-import json
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -39,7 +38,7 @@ def log_auth_event(
             user_agent=user_agent,
             success=success,
             failure_reason=failure_reason,
-            details=json.dumps(details or {}),
+            details=details or {},
             timestamp=datetime.utcnow(),
         )
         db.add(audit_log)

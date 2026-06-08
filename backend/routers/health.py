@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 import os
 
 router = APIRouter(
-    prefix="/health",
+    prefix="/api/v1/health",
     tags=["health"],
     responses={404: {"description": "Not found"}},
 )

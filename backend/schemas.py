@@ -12,6 +12,16 @@ class UserCreate(UserBase):
     password: str
     tenant_name: str
 
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate_password_strength
+
+    @classmethod
+    def validate_password_strength(cls, password):
+        if len(password) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        return password
+
 class User(UserBase):
     id: int
     is_active: bool = True
@@ -60,6 +70,16 @@ class MenuItem(MenuItemBase):
 class OrderItemCreate(BaseModel):
     menu_item_id: int
     quantity: int = 1
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate_quantity_ge_1
+
+    @classmethod
+    def validate_quantity_ge_1(cls, quantity):
+        if quantity < 1:
+            raise ValueError('Quantity must be at least 1')
+        return quantity
 
 class OrderCreate(BaseModel):
     items: List[OrderItemCreate]
@@ -118,6 +138,16 @@ class InventoryItemCreate(BaseModel):
     low_stock_threshold: int = 10
     expiry_days: int = 30
 
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate_quantity_ge_1
+
+    @classmethod
+    def validate_quantity_ge_1(cls, quantity):
+        if quantity < 1:
+            raise ValueError('Quantity must be at least 1')
+        return quantity
+
 class InventoryItemUpdate(BaseModel):
     item_name: Optional[str] = None
     quantity: Optional[float] = None
@@ -125,6 +155,16 @@ class InventoryItemUpdate(BaseModel):
     cost_per_unit: Optional[float] = None
     low_stock_threshold: Optional[int] = None
     expiry_days: Optional[int] = None
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate_quantity_ge_1_if_present
+
+    @classmethod
+    def validate_quantity_ge_1_if_present(cls, quantity):
+        if quantity is not None and quantity < 1:
+            raise ValueError('Quantity must be at least 1')
+        return quantity
 
 class InventoryItemOut(BaseModel):
     id: int
@@ -142,6 +182,16 @@ class StockReceive(BaseModel):
     quantity: float
     cost_per_unit: Optional[float] = None
     supplier: str = ""
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate_quantity_ge_1
+
+    @classmethod
+    def validate_quantity_ge_1(cls, quantity):
+        if quantity < 1:
+            raise ValueError('Quantity must be at least 1')
+        return quantity
 
 class StockAdjust(BaseModel):
     quantity: float     # Positive = add, negative = remove
@@ -161,6 +211,16 @@ class ReservationCreate(BaseModel):
     table_id: Optional[int] = None
     deposit_paid: bool = False
     notes: str = ""
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate_party_size_ge_1
+
+    @classmethod
+    def validate_party_size_ge_1(cls, party_size):
+        if party_size < 1:
+            raise ValueError('Party size must be at least 1')
+        return party_size
 
 class ReservationOut(BaseModel):
     id: int

@@ -13,12 +13,13 @@ FIXES:
     from the onboarding wizard.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session
 from database import get_db
 import models, auth
 from security_audit import log_auth_success, log_auth_failure
 from pydantic import BaseModel
+from middleware.rate_limit_enhanced import limiter
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -29,6 +30,16 @@ class UserCreate(BaseModel):
     email: str
     password: str
     tenant_name: str   # used as restaurant name on signup
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate_password_strength
+
+    @classmethod
+    def validate_password_strength(cls, password):
+        if len(password) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        return password
 
 
 class Token(BaseModel):
@@ -97,10 +108,27 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     db.commit()
 
     access_token = auth.create_access_token(data={"sub": new_user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+
+    # Set httpOnly cookie
+    response = Response(
+        content='{"success": true}',
+        media_type="application/json"
+    )
+    # Set cookie - 8 hours expiration to match token expiry
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        max_age=28800,  # 8 hours in seconds
+        path="/",
+        # secure=True,  # Enable in production
+        samesite="lax"
+    )
+    return response
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login")
+@limiter.limit("5/minute")
 async def login(login_data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == login_data.email).first()
     if not user or not auth.verify_password(login_data.password, user.hashed_password):
@@ -129,7 +157,23 @@ async def login(login_data: LoginRequest, request: Request, db: Session = Depend
         details={"user_id": user.id, "role": user.role.value},
     )
     access_token = auth.create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+
+    # Set httpOnly cookie
+    response = Response(
+        content='{"success": true}',
+        media_type="application/json"
+    )
+    # Set cookie - 8 hours expiration to match token expiry
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        max_age=28800,  # 8 hours in seconds
+        path="/",
+        # secure=True,  # Would enable in production
+        samesite="lax"
+    )
+    return response
 
 
 @router.get("/me")
@@ -174,3 +218,11 @@ async def update_restaurant(
     db.commit()
     db.refresh(restaurant)
     return {"id": restaurant.id, "name": restaurant.name, "address": restaurant.address}
+
+
+@router.post("/logout")
+async def logout():
+    """Clear the authentication cookie."""
+    response = Response(content='{"success": true}', media_type="application/json")
+    response.delete_cookie(key="access_token", path="/")
+    return response

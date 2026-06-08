@@ -6,7 +6,7 @@ import models
 import schemas
 import auth
 
-router = APIRouter(prefix="/menu", tags=["menu"])
+router = APIRouter(prefix="/api/v1/menu", tags=["menu"])
 
 @router.get("/", response_model=List[schemas.MenuItem])
 async def read_menu_items(
@@ -41,7 +41,7 @@ async def create_menu_item(
         db.commit()
         db.refresh(restaurant)
         
-    db_item = models.MenuItem(**item.dict(), restaurant_id=restaurant.id)
+    db_item = models.MenuItem(**item.model_dump(), restaurant_id=restaurant.id)
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
@@ -64,7 +64,7 @@ async def update_menu_item(
     if db_item.restaurant.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=403, detail="Not authorized to update this item")
     
-    for key, value in item_update.dict(exclude_unset=True).items():
+    for key, value in item_update.model_dump(exclude_unset=True).items():
         setattr(db_item, key, value)
         
     db.commit()

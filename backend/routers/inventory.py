@@ -7,23 +7,9 @@ from database import get_db
 import models
 import schemas
 import auth
+from dependencies import get_restaurant
 
-router = APIRouter(prefix="/inventory", tags=["inventory"])
-
-
-def _get_restaurant(db: Session, user: models.User):
-    rest = db.query(models.Restaurant).filter(
-        models.Restaurant.tenant_id == user.tenant_id
-    ).first()
-    if not rest:
-        rest = models.Restaurant(
-            name=f"{user.tenant.name}'s Restaurant",
-            tenant_id=user.tenant_id,
-        )
-        db.add(rest)
-        db.commit()
-        db.refresh(rest)
-    return rest
+router = APIRouter(prefix="/api/v1/inventory", tags=["inventory"])
 
 
 @router.get("/", response_model=List[schemas.InventoryItemOut])
@@ -33,7 +19,7 @@ async def get_inventory(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_restaurant(db=db, current_user=current_user)
     return db.query(models.InventoryItem).filter(
         models.InventoryItem.restaurant_id == restaurant.id
     ).order_by(models.InventoryItem.item_name).offset(offset).limit(limit).all()
@@ -45,7 +31,7 @@ async def create_inventory_item(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_restaurant(db=db, current_user=current_user)
     db_item = models.InventoryItem(
         restaurant_id=restaurant.id,
         item_name=item.item_name,
@@ -74,6 +60,11 @@ async def update_inventory_item(
     if not db_item:
         raise HTTPException(status_code=404, detail="Item not found")
 
+    # Check ownership: ensure inventory item belongs to current user's restaurant
+    restaurant = get_restaurant(db=db, current_user=current_user)
+    if db_item.restaurant_id != restaurant.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this item")
+
     for key, value in item_update.dict(exclude_unset=True).items():
         setattr(db_item, key, value)
 
@@ -95,6 +86,11 @@ async def receive_stock(
     ).first()
     if not db_item:
         raise HTTPException(status_code=404, detail="Item not found")
+
+    # Check ownership: ensure inventory item belongs to current user's restaurant
+    restaurant = get_restaurant(db=db, current_user=current_user)
+    if db_item.restaurant_id != restaurant.id:
+        raise HTTPException(status_code=403, detail="Not authorized to modify this item")
 
     db_item.quantity += receive.quantity
     if receive.cost_per_unit is not None:
@@ -126,6 +122,11 @@ async def adjust_stock(
     if not db_item:
         raise HTTPException(status_code=404, detail="Item not found")
 
+    # Check ownership: ensure inventory item belongs to current user's restaurant
+    restaurant = get_restaurant(db=db, current_user=current_user)
+    if db_item.restaurant_id != restaurant.id:
+        raise HTTPException(status_code=403, detail="Not authorized to modify this item")
+
     db_item.quantity += adjust.quantity  # Can be negative
 
     movement = models.StockMovement(
@@ -151,6 +152,11 @@ async def delete_inventory_item(
     ).first()
     if not db_item:
         raise HTTPException(status_code=404, detail="Item not found")
+
+    # Check ownership: ensure inventory item belongs to current user's restaurant
+    restaurant = get_restaurant(db=db, current_user=current_user)
+    if db_item.restaurant_id != restaurant.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this item")
 
     db.delete(db_item)
     db.commit()

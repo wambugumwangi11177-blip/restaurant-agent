@@ -7,23 +7,9 @@ from database import get_db
 import models
 import schemas
 import auth
+from dependencies import get_restaurant
 
-router = APIRouter(prefix="/reservations", tags=["reservations"])
-
-
-def _get_restaurant(db: Session, user: models.User):
-    rest = db.query(models.Restaurant).filter(
-        models.Restaurant.tenant_id == user.tenant_id
-    ).first()
-    if not rest:
-        rest = models.Restaurant(
-            name=f"{user.tenant.name}'s Restaurant",
-            tenant_id=user.tenant_id,
-        )
-        db.add(rest)
-        db.commit()
-        db.refresh(rest)
-    return rest
+router = APIRouter(prefix="/api/v1/reservations", tags=["reservations"])
 
 
 @router.get("/", response_model=List[schemas.ReservationOut])
@@ -32,7 +18,7 @@ async def get_reservations(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_restaurant(db=db, current_user=current_user)
     q = db.query(models.Reservation).filter(
         models.Reservation.restaurant_id == restaurant.id
     )
@@ -53,7 +39,7 @@ async def create_reservation(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_restaurant(db=db, current_user=current_user)
 
     db_res = models.Reservation(
         restaurant_id=restaurant.id,
@@ -87,6 +73,11 @@ async def update_reservation_status(
     if not reservation:
         raise HTTPException(status_code=404, detail="Reservation not found")
 
+    # Check ownership: ensure reservation belongs to current user's restaurant
+    restaurant = get_restaurant(db=db, current_user=current_user)
+    if reservation.restaurant_id != restaurant.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this reservation")
+
     try:
         reservation.status = models.ReservationStatus(update.status)
     except ValueError:
@@ -108,6 +99,11 @@ async def delete_reservation(
     ).first()
     if not reservation:
         raise HTTPException(status_code=404, detail="Reservation not found")
+
+    # Check ownership: ensure reservation belongs to current user's restaurant
+    restaurant = get_restaurant(db=db, current_user=current_user)
+    if reservation.restaurant_id != restaurant.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this reservation")
 
     db.delete(reservation)
     db.commit()

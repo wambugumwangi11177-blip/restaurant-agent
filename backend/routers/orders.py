@@ -7,24 +7,9 @@ from database import get_db
 import models
 import schemas
 import auth
+from dependencies import get_restaurant
 
-router = APIRouter(prefix="/orders", tags=["orders"])
-
-
-def _get_restaurant(db: Session, user: models.User):
-    """Get the restaurant for the current user's tenant."""
-    rest = db.query(models.Restaurant).filter(
-        models.Restaurant.tenant_id == user.tenant_id
-    ).first()
-    if not rest:
-        rest = models.Restaurant(
-            name=f"{user.tenant.name}'s Restaurant",
-            tenant_id=user.tenant_id,
-        )
-        db.add(rest)
-        db.commit()
-        db.refresh(rest)
-    return rest
+router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
 
 
 @router.post("/", response_model=schemas.OrderOut)
@@ -33,7 +18,7 @@ async def create_order(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_restaurant(db=db, current_user=current_user)
 
     # Look up menu items and calculate total
     total = 0
@@ -96,7 +81,7 @@ async def list_orders(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_restaurant(db=db, current_user=current_user)
     q = db.query(models.Order).options(
         joinedload(models.Order.items).joinedload(models.OrderItem.menu_item)
     ).filter(models.Order.restaurant_id == restaurant.id)
@@ -121,7 +106,7 @@ async def active_orders(
     current_user: models.User = Depends(auth.get_current_user),
 ):
     """Orders for the KDS — pending, cooking, or ready."""
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_restaurant(db=db, current_user=current_user)
     active_statuses = [models.OrderStatus.PENDING, models.OrderStatus.PREP, models.OrderStatus.READY]
     orders = db.query(models.Order).options(
         joinedload(models.Order.items).joinedload(models.OrderItem.menu_item)
@@ -142,6 +127,11 @@ async def update_order_status(
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    # Check ownership: ensure order belongs to current user's restaurant
+    restaurant = get_restaurant(db=db, current_user=current_user)
+    if order.restaurant_id != restaurant.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this order")
 
     try:
         new_status = models.OrderStatus(update.status)
@@ -167,6 +157,11 @@ async def update_order_payment(
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    # Check ownership: ensure order belongs to current user's restaurant
+    restaurant = get_restaurant(db=db, current_user=current_user)
+    if order.restaurant_id != restaurant.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this order")
 
     try:
         order.payment_method = models.PaymentMethod(update.payment_method)

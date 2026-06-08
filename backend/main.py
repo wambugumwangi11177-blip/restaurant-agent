@@ -15,6 +15,7 @@ FIXES:
 import os
 import logging
 import json
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Body
 from fastapi.middleware.cors import CORSMiddleware
 from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai
@@ -53,17 +54,19 @@ except ImportError:
     _slowapi_available = False
     logger.warning("[Startup] slowapi not installed — rate limiting disabled. Run: pip install slowapi")
 
-app = FastAPI(title="Restaurant Agent API", version="2.1.0")  # Version bump for agentic features
+app = FastAPI(title="Restaurant Agent API", version="2.1.0", lifespan=lifespan)  # Version bump for agentic features
 
 if _slowapi_available:
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
-# ── Startup ───────────────────────────────────────────────────────────────────
+# Define a global scheduler variable for access in shutdown
+scheduler = None
 
-@app.on_event("startup")
-def on_startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic
     # 1. Init DB tables
     from database import init_db
     try:
@@ -95,11 +98,7 @@ def on_startup():
         print(f"[WARN] Proactive Executive initialization failed: {e}")
 
     # 4. Schedule morning WhatsApp briefing (07:00 EAT = 04:00 UTC)
-    _start_scheduler()
-
-
-def _start_scheduler():
-    """Start APScheduler for the morning briefing cron job."""
+    global scheduler
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.triggers.cron import CronTrigger
@@ -126,8 +125,20 @@ def _start_scheduler():
         print("[OK] Scheduler started (morning briefing: 07:00 EAT)")
     except ImportError:
         print("[WARN] APScheduler not installed — scheduled jobs disabled. Run: pip install apscheduler")
+        scheduler = None
     except Exception as e:
         print(f"[WARN] Scheduler failed to start: {e}")
+        scheduler = None
+
+    yield  # Application runs here
+
+    # Shutdown logic
+    if scheduler:
+        try:
+            scheduler.shutdown()
+            print("[OK] Scheduler shut down")
+        except Exception as e:
+            print(f"[WARN] Scheduler shutdown failed: {e}")
 
 
 def _send_all_morning_briefings():

@@ -10,7 +10,7 @@ from auth import get_current_user
 import models
 from ai import menu_engineer, revenue_forecaster, kds_intelligence, inventory_predictor, reservation_optimizer, ops_manager
 
-router = APIRouter(prefix="/ai", tags=["AI Intelligence"])
+router = APIRouter(prefix="/api/v1/ai-analytics", tags=["AI Intelligence"])
 
 
 def _get_restaurant_id(db: Session, user: models.User) -> int:

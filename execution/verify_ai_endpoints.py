@@ -43,12 +43,12 @@ def verify():
         print(f"Got token: {token[:20]}...\n")
 
         endpoints = [
-            "/ai/dashboard",
-            "/ai/menu-engineering",
-            "/ai/revenue-forecast",
-            "/ai/kds-intelligence",
-            "/ai/inventory-predictions",
-            "/ai/reservation-insights",
+            "/api/v1/ai-analytics/dashboard",
+            "/api/v1/ai-analytics/menu-engineering",
+            "/api/v1/ai-analytics/revenue-forecast",
+            "/api/v1/ai-analytics/kds-intelligence",
+            "/api/v1/ai-analytics/inventory-predictions",
+            "/api/v1/ai-analytics/reservation-insights",
         ]
 
         results = {}
@@ -90,7 +90,7 @@ def verify():
 
 
 def _print_endpoint_summary(ep, data):
-    if ep == "/ai/dashboard":
+    if ep == "/api/v1/ai-analytics/dashboard":
         print(f"  Health Score: {data.get('health_score')}/100")
         breakdown = data.get("health_breakdown", [])
         for b in breakdown:
@@ -108,7 +108,7 @@ def _print_endpoint_summary(ep, data):
         for o in opps:
             print(f"    [{o['potential']}] {o['opportunity']}")
 
-    elif ep == "/ai/menu-engineering":
+    elif ep == "/api/v1/ai-analytics/menu-engineering":
         s = data.get("summary", {})
         print(f"  Items: {s.get('total_items')} | Stars: {s.get('stars')} | Plowhorses: {s.get('plowhorses')} | Puzzles: {s.get('puzzles')} | Dogs: {s.get('dogs')}")
         print(f"  Avg Food Cost: {s.get('avg_food_cost_pct')}% | Avg Margin: {s.get('avg_margin_pct')}%")
@@ -125,7 +125,7 @@ def _print_endpoint_summary(ep, data):
         for u in ups[:3]:
             print(f"    {u['item_a']} + {u['item_b']}: lift={u['lift']} ({u['strength']})")
 
-    elif ep == "/ai/revenue-forecast":
+    elif ep == "/api/v1/ai-analytics/revenue-forecast":
         t = data.get("trends", {})
         print(f"  Total Revenue (30d): {t.get('total_revenue')}")
         print(f"  Avg Daily: {t.get('avg_daily_revenue')} | Avg Order: {t.get('avg_order_value')}")
@@ -143,7 +143,7 @@ def _print_endpoint_summary(ep, data):
         for f in fc:
             print(f"    {f['day'][:3]} {f['date']}: {f['predicted_revenue']} ({f['confidence_low']}-{f['confidence_high']}) conf={f['confidence_pct']}%")
 
-    elif ep == "/ai/kds-intelligence":
+    elif ep == "/api/v1/ai-analytics/kds-intelligence":
         tp = data.get("throughput", {})
         print(f"  Orders/Day: {tp.get('orders_per_day')} | Avg Prep: {tp.get('avg_prep_minutes')} min")
         print(f"  Completion Rate: {tp.get('completion_rate')}%")
@@ -159,7 +159,7 @@ def _print_endpoint_summary(ep, data):
             print(f"    Station {e['station']}: {e['rating']} ({e['efficiency_pct']}%)")
         print(f"  Recommendations: {len(data.get('recommendations', []))}")
 
-    elif ep == "/ai/inventory-predictions":
+    elif ep == "/api/v1/ai-analytics/inventory-predictions":
         s = data.get("summary", {})
         print(f"  Items: {s.get('total_items')} | Value: {s.get('total_inventory_value')}")
         print(f"  Monthly Spend: {s.get('total_monthly_spend')}")
@@ -177,7 +177,7 @@ def _print_endpoint_summary(ep, data):
         for h in hm[:3]:
             print(f"    {h['name']}: health={h['health']} status={h['status']} abc={h['abc_class']}")
 
-    elif ep == "/ai/reservation-insights":
+    elif ep == "/api/v1/ai-analytics/reservation-insights":
         ns = data.get("no_show_analysis", {})
         print(f"  Total Reservations: {ns.get('total_reservations')}")
         print(f"  No-Show Rate: {ns.get('no_show_rate')}% | Cancel Rate: {ns.get('cancel_rate')}% | Completion: {ns.get('completion_rate')}%")

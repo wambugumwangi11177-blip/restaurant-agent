@@ -22,27 +22,16 @@ from sqlalchemy import func
 from database import get_db
 from auth import get_current_user
 import models
+from dependencies import get_restaurant_required
 
 logger = logging.getLogger("ai.router")
 
-router = APIRouter(prefix="/ai", tags=["ai"])
+router = APIRouter(prefix="/api/v1/ai", tags=["ai"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
-
-def _get_restaurant(db: Session, user: models.User) -> models.Restaurant:
-    """Get the restaurant for the current user's tenant."""
-    restaurant = (
-        db.query(models.Restaurant)
-        .filter(models.Restaurant.tenant_id == user.tenant_id)
-        .first()
-    )
-    if not restaurant:
-        raise HTTPException(status_code=404, detail="No restaurant found for this account")
-    return restaurant
-
 
 def _safe_run(fn, *args, **kwargs):
     """Run an AI function; return error dict on failure instead of crashing."""
@@ -66,7 +55,7 @@ async def ai_dashboard(
     System health score + quick stats + active risks + opportunities.
     Aggregates data from multiple agents for the Command Center page.
     """
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_restaurant_required(db=db, current_user=current_user)
     rid = restaurant.id
     now = datetime.utcnow()
     thirty_days_ago = now - timedelta(days=30)
@@ -116,7 +105,7 @@ async def ai_dashboard(
         db.query(func.count(models.Order.id))
         .filter(
             models.Order.restaurant_id == rid,
-            models.Order.status.in_([models.OrderStatus.PENDING, models.OrderStatus.PREPARING]),
+            models.Order.status.in_([models.OrderStatus.PENDING, models.OrderStatus.PREP]),
         )
         .scalar() or 0
     )
@@ -295,7 +284,7 @@ async def ai_pricing(
     db: Session = Depends(get_db),
 ):
     """Pricing intelligence: SURGE, REPRICE, STIMULATE recommendations."""
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_restaurant_required(db=db, current_user=current_user)
 
     from ai.pricing.recommendations import get_pricing_intelligence
     result = _safe_run(get_pricing_intelligence, db, restaurant.id)
@@ -309,7 +298,7 @@ async def approve_pricing_rec(
     db: Session = Depends(get_db),
 ):
     """Approve a pricing recommendation — updates menu item price immediately."""
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_restaurant_required(db=db, current_user=current_user)
     from ai.pricing.recommendations import approve_recommendation
     return approve_recommendation(db, rec_id, restaurant.id)
 
@@ -322,7 +311,7 @@ async def reject_pricing_rec(
     db: Session = Depends(get_db),
 ):
     """Reject a pricing recommendation."""
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_restaurant_required(db=db, current_user=current_user)
     from ai.pricing.recommendations import reject_recommendation
     reason = (body or {}).get("reason", "")
     return reject_recommendation(db, rec_id, restaurant.id, reason)
@@ -338,7 +327,7 @@ async def ai_labor(
     db: Session = Depends(get_db),
 ):
     """Labor cost analytics, overtime analysis, and staffing recommendations."""
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_restaurant_required(db=db, current_user=current_user)
 
     from ai.labor.intelligence import get_labor_intelligence
     result = _safe_run(get_labor_intelligence, db, restaurant.id)
@@ -355,7 +344,7 @@ async def ai_revenue_forecast(
     db: Session = Depends(get_db),
 ):
     """30-day revenue trends + 7-day forward forecast with confidence intervals."""
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_restaurant_required(db=db, current_user=current_user)
 
     from ai.revenue_forecaster import get_revenue_forecast
     result = _safe_run(get_revenue_forecast, db, restaurant.id)
@@ -372,7 +361,7 @@ async def ai_menu_engineering(
     db: Session = Depends(get_db),
 ):
     """Menu matrix analysis: Stars, Plowhorses, Puzzles, Dogs."""
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_restaurant_required(db=db, current_user=current_user)
 
     from ai.menu_engineer import get_menu_intelligence
     result = _safe_run(get_menu_intelligence, db, restaurant.id)
@@ -389,7 +378,7 @@ async def ai_inventory(
     db: Session = Depends(get_db),
 ):
     """Inventory health, usage velocity, ABC classification, restock predictions."""
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_restaurant_required(db=db, current_user=current_user)
 
     from ai.inventory_predictor import get_inventory_intelligence
     result = _safe_run(get_inventory_intelligence, db, restaurant.id)
@@ -406,7 +395,7 @@ async def ai_reservation_insights(
     db: Session = Depends(get_db),
 ):
     """No-show analysis, RevPASH, overbooking recommendations."""
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_restaurant_required(db=db, current_user=current_user)
 
     from ai.reservation_optimizer import get_reservation_insights
     result = _safe_run(get_reservation_insights, db, restaurant.id)

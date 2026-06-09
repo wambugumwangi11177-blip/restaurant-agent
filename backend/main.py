@@ -54,16 +54,6 @@ except ImportError:
     _slowapi_available = False
     logger.warning("[Startup] slowapi not installed — rate limiting disabled. Run: pip install slowapi")
 
-app = FastAPI(title="Restaurant Agent API", version="2.1.0", lifespan=lifespan)  # Version bump for agentic features
-
-if _slowapi_available:
-    app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-
-# Define a global scheduler variable for access in shutdown
-scheduler = None
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
@@ -140,6 +130,17 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[WARN] Scheduler shutdown failed: {e}")
 
+
+
+app = FastAPI(title="Restaurant Agent API", version="2.1.0", lifespan=lifespan)  # Version bump for agentic features
+
+if _slowapi_available:
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+# Define a global scheduler variable for access in shutdown
+scheduler = None
 
 def _send_all_morning_briefings():
     """Send WhatsApp morning briefing to every active restaurant owner."""
@@ -259,6 +260,7 @@ def propose_goal(
         logger.error(f"Failed to propose goal: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/agentic/goals/{goal_id}/activate", tags=["Agentic"])
 def activate_goal(goal_id: str, db: Session = Depends(get_db)):
     """Activate a proposed goal"""
     try:

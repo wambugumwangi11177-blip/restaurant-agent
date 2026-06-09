@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Dict, List, Optional, Any, Callable
 from sqlalchemy.orm import Session
-from sqlalchemy import Column, String, DateTime, Text, Integer, Boolean, ForeignKey, Index
+from sqlalchemy import Column, String, DateTime, Text, Integer, Boolean, ForeignKey, Index, UniqueConstraint
 import logging
 
 logger = logging.getLogger("ai.communication")
@@ -125,12 +125,16 @@ class AgentInfo(Base):
     Registry of agents in the system
     """
     __tablename__ = 'agent_registry'
+    __table_args__ = (
+        UniqueConstraint('tenant_id', 'agent_id', name='uix_tenant_agent_id'),
+        Index('idx_agent_registry_tenant_active', 'tenant_id', 'is_active')
+    )
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     tenant_id = Column(String, nullable=False, index=True)
 
     # Agent identification
-    agent_id = Column(String, nullable=False, unique=True, index=True)  # e.g., "pricing_intelligence_v1"
+    agent_id = Column(String, nullable=False, index=True)  # e.g., "pricing_intelligence_v1"
     agent_name = Column(String, nullable=False)
     agent_version = Column(String, nullable=False)
 
@@ -146,10 +150,6 @@ class AgentInfo(Base):
 
     # Configuration
     config = Column(Text, nullable=True)  # JSON configuration for the agent
-
-    __table_args__ = (
-        Index('idx_agent_registry_tenant_active', 'tenant_id', 'is_active'),
-    )
 
 
 class CommunicationHub:

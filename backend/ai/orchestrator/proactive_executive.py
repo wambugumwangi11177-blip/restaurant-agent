@@ -32,6 +32,7 @@ from ai.communication import (
     Priority,
     AgentCapability
 )
+from ai.profit.intelligence import get_profit_intelligence
 
 logger = logging.getLogger("ai.proactive_executive")
 
@@ -68,6 +69,13 @@ class ProactiveExecutive:
         self.active_goals: Dict[str, Dict] = {}
         self.goal_history: List[Dict] = []
         self.reasoning_cycles: Dict[str, List] = {}  # Track reasoning for each goal
+        self.pending_responses: Dict[str, Dict] = {}  # Store responses by correlation_id
+        self.pending_queries: Dict[str, Dict] = {}    # Store pending queries by correlation_id
+        self.config = {
+            "reasoning_cycle_limit": 5,  # Max OODA loops per goal
+            "goal_timeout_hours": 24,
+            "collaboration_timeout_minutes": 10
+        }
 
     def initialize(self, db: Session):
         """Initialize the proactive executive with database connection"""
@@ -95,8 +103,43 @@ class ProactiveExecutive:
         # Subscribe to relevant events for reactive behavior (maintains backward compatibility)
         self._register_reactive_handlers()
 
+        # Subscribe to response messages for agent communication
+        self.communication_hub.subscribe_local(MessageType.RESPONSE, self._handle_response)
+
         # Start background goal processing
         self._start_goal_processor()
+
+    def _get_tenant_id_for_query(self, db: Session) -> Optional[int]:
+        """Resolve tenant identifier to actual database tenant ID for queries."""
+        try:
+            # If already an integer, use it directly
+            if isinstance(self.tenant_id, int):
+                return self.tenant_id
+
+            # If string, try to look up tenant by name
+            if isinstance(self.tenant_id, str):
+                tenant = db.query(models.Tenant).filter(models.Tenant.name == self.tenant_id).first()
+                if tenant:
+                    return tenant.id
+
+                # If not found by name, try to see if it's a string representation of an integer
+                try:
+                    tenant_id_int = int(self.tenant_id)
+                    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id_int).first()
+                    if tenant:
+                        return tenant.id
+                except ValueError:
+                    pass
+
+            # Fallback: use first tenant in system
+            first_tenant = db.query(models.Tenant).first()
+            if first_tenant:
+                return first_tenant.id
+
+            return None
+        except Exception as e:
+            logger.error(f"[ProactiveExecutive] Failed to resolve tenant ID: {e}")
+            return None
 
     def _register_reactive_handlers(self):
         """Register existing reactive handlers for backward compatibility"""
@@ -269,7 +312,7 @@ class ProactiveExecutive:
         # Check if goal is complete
         if self._is_goal_complete(goal_id):
             self._complete_goal(goal_id)
-        elif cycle_number >= self.communication_hub.config.get("reasoning_cycle_limit", 5):
+        elif cycle_number >= self.config.get("reasoning_cycle_limit", 5):
             # Max cycles reached
             logger.info(f"[ProactiveExecutive] Max reasoning cycles reached for goal {goal_id}")
             self._complete_goal(goal_id, success=False)
@@ -277,6 +320,16 @@ class ProactiveExecutive:
             # Schedule next cycle (in reality, this would be event-driven or timed)
             # For now, we'll rely on events triggering new observations
             pass
+
+    def _handle_response(self, message: Dict):
+        """Handle incoming response messages"""
+        try:
+            correlation_id = message.get('correlation_id')
+            if correlation_id:
+                self.pending_responses[correlation_id] = message
+                logger.debug(f"[ProactiveExecutive] Stored response for correlation_id: {correlation_id}")
+        except Exception as e:
+            logger.error(f"[ProactiveExecutive] Failed to handle response: {e}")
 
     def _observe_goal_state(self, goal_id: str) -> Dict[str, Any]:
         """Gather current state relevant to the goal from various agents"""
@@ -292,12 +345,24 @@ class ProactiveExecutive:
 
         # Based on goal type, query relevant agents
         if goal['type'] == GoalType.OPTIMIZE_PROFITABILITY.value:
-            # Query profit intelligence, pricing, inventory, etc.
-            observation['data_sources']['profit'] = self._query_agent_capability(
-                'profit_intelligence_v1',
-                AgentCapability.PROFIT_ANALYSIS,
-                {'analysis_type': 'current_margins'}
-            )
+            # Query profit intelligence directly (since it's a local function)
+            db = SessionLocal()
+            try:
+                # Resolve the tenant ID to actual database ID
+                tenant_id_resolved = self._get_tenant_id_for_query(db)
+                if tenant_id_resolved is None:
+                    observation['data_sources']['profit'] = {'error': 'tenant_not_found'}
+                else:
+                    restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == tenant_id_resolved).first()
+                    if restaurant:
+                        profit_data = get_profit_intelligence(db, restaurant.id)
+                        observation['data_sources']['profit'] = profit_data
+                    else:
+                        observation['data_sources']['profit'] = {'error': 'restaurant_not_found'}
+            finally:
+                db.close()
+            # Also query pricing and inventory agents via communication hub (for demonstration)
+            # We'll leave these as is for now, but note that we don't wait for responses
             observation['data_sources']['pricing'] = self._query_agent_capability(
                 'pricing_intelligence_v1',
                 AgentCapability.PRICING_ANALYSIS,
@@ -323,6 +388,18 @@ class ProactiveExecutive:
 
         # Add more goal types as needed...
 
+        # Include any pending responses for this goal
+        goal_responses = []
+        for corr_id, response in list(self.pending_responses.items()):
+            # Check if this response is for this goal (by checking if the correlation_id is related to the goal)
+            # For simplicity, we'll assume that any response with a correlation_id that contains the goal_id is for this goal
+            if goal_id in corr_id:
+                goal_responses.append(response)
+                # Remove the response from pending to avoid duplicate processing
+                del self.pending_responses[corr_id]
+        if goal_responses:
+            observation['data_sources']['responses'] = goal_responses
+
         return observation
 
     def _orient_goal_state(self, goal_id: str, observation: Dict[str, Any]) -> Dict[str, Any]:
@@ -340,7 +417,7 @@ class ProactiveExecutive:
         # Simple alignment calculation (would be more sophisticated in practice)
         if goal['type'] == GoalType.OPTIMIZE_PROFITABILITY.value:
             profit_data = observation.get('data_sources', {}).get('profit', {})
-            if profit_data:
+            if profit_data and 'error' not in profit_data:
                 current_margin = profit_data.get('gross_margin_pct', 0)
                 target_margin = goal['success_criteria'].get('target_margin_pct', 70)
 
@@ -354,6 +431,9 @@ class ProactiveExecutive:
                         orientation['gaps'].append(f"Margin at {current_margin:.1f}% below target {target_margin}%")
 
                     orientation['confidence'] = 0.8  # Based on data quality
+            else:
+                orientation['gaps'].append("Failed to retrieve profit data")
+                orientation['confidence'] = 0.0
 
         # Add more goal-type specific orientation logic...
 
@@ -516,7 +596,7 @@ class ProactiveExecutive:
                                query_params: Dict[str, Any]) -> Dict[str, Any]:
         """Query another agent for specific information"""
         if not self.communication_hub:
-            return {}
+            return {'error': 'communication_hub_not_available'}
 
         # Find agent with this capability
         agents = self.communication_hub.find_agents_by_capability(capability)
@@ -552,6 +632,14 @@ class ProactiveExecutive:
                 priority=Priority.MEDIUM,
                 ttl_minutes=5  # Short timeout for queries
             )
+
+            # Store the pending query so we can match the response later
+            self.pending_queries[correlation_id] = {
+                'timestamp': datetime.utcnow(),
+                'goal_id': None,  # We don't have the goal_id here, but we can store it if needed
+                'agent_id': agent_id,
+                'capability': capability.value
+            }
 
             # In a real implementation, we'd wait for the response via callback or polling
             # For now, we'll return a placeholder indicating the query was sent

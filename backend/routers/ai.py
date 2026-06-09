@@ -386,6 +386,22 @@ async def ai_inventory(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# PROFIT INTELLIGENCE
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/profit-intelligence")
+async def ai_profit_intelligence(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Complete profit intelligence — margins, leakage, forecasts, alerts."""
+    restaurant = get_restaurant_required(db=db, current_user=current_user)
+    from ai.profit.intelligence import get_profit_intelligence
+    result = _safe_run(get_profit_intelligence, db, restaurant.id)
+    return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # RESERVATION INSIGHTS
 # ─────────────────────────────────────────────────────────────────────────────
 

@@ -92,6 +92,41 @@ notification-failure-must-not-break-the-core-transaction principle established i
 M-Pesa atomicity fix). No further masked-bug pattern found beyond the one already fixed
 (the dashboard's `except Exception: pass`).
 
+## Orphaned modules wired + broken event/scheduler orchestration fixed (2026-07-07)
+User asked to check "the others" (profit intelligence, orchestration between modules,
+memory) after the real-data verification pass above. Audited every `ai/*` module for
+actual reachability and every subscribed event type for whether anything ever emits it —
+both were more incomplete than the earlier pass suggested.
+
+**Newly wired routes** (real, complete modules, verified against real production data,
+zero route ever exposed them): `GET /ai/profit`, `GET /ai/supply-chain`.
+`ai/pricing/analysis.py` and `ai/memory/store.py` turned out to already be wired
+indirectly (analysis.py imported by the live `recommendations.py`; memory/store.py called
+by executive.py's event handlers) — correcting an earlier overly-broad "orphaned" claim.
+
+**Event/scheduler orchestration — 5 of 7 subscribed event types were never emitted by
+anything, 2 of 3 documented scheduler jobs were never registered.** Subscribers and job
+functions existed; nothing ever triggered them:
+- `main.py`: registered `run_stock_check` + `run_slow_day_check` (previously only
+  `morning_briefing`/`po_late_check` ran); de-duplicated `_send_all_morning_briefings`
+  (was a near-copy of `brain.run_morning_briefing` instead of calling it).
+- `brain.run_stock_check` now emits `STOCK_CRITICAL`/`STOCK_DEPLETED`.
+- `reservations.py` emits `RESERVATION_NO_SHOW` on the actual status transition.
+- `pricing/recommendations.py`'s `approve_recommendation()` now emits
+  `RECOMMENDATION_APPROVED` with real approver identity.
+- `routers/ai.py`'s `_safe_run()` emits `AGENT_FAILED` on any caught exception.
+
+3 new tests (`tests/test_event_orchestration.py`) prove emit → handler actually fires,
+not just that the emit call exists. Full suite 48 → 51, all passing. Verified live: all
+11 `/ai/*` endpoints (9 original + 2 new) return 200 against the real Lavy dataset.
+
+**Flagged, not auto-wired**: `ai/marketing/campaigns.py`'s `run_daily_campaigns()` has a
+real side effect — it attempts to send actual WhatsApp winback messages to real customers.
+Discovered this only *after* calling it to verify it works (nothing sent, Twilio isn't
+configured — that was luck, not a check made beforehand). Deliberately not scheduled or
+wired to its events (`CAMPAIGN_LAUNCHED`/`WINBACK_TRIGGERED` exist but have no subscriber)
+until there's an explicit decision on cadence/opt-in for customer-facing messages.
+
 ## Deployment platform is Railway, not Render — critical findings (2026-07-07)
 `render.yaml` was dead config all along; the user deploys on **Railway**
 (`restaurant-agent-production-ffd3.up.railway.app`), which uses `backend/railway.json`

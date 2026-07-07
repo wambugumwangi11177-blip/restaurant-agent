@@ -17,8 +17,8 @@ Full-depth menu analytics including:
 ================================================================================
 """
 
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, extract
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 import models
@@ -90,16 +90,23 @@ def get_menu_engineering(db: Session, restaurant_id: int) -> dict:
     )
     older_counts = {r[0]: int(r[1]) for r in older_data}
 
-    # Hour-of-day data for time-of-day analysis
+    # Hour-of-day data for time-of-day analysis.
+    # Uses SQLAlchemy's cross-dialect extract() — NOT func.strftime(), which
+    # is SQLite-only syntax that raises psycopg2.errors.UndefinedFunction on
+    # real Postgres (found 2026-07-07 testing against production data: this
+    # was never caught by the SQLite-based local test suite). extract()
+    # compiles to EXTRACT(HOUR FROM ...) on Postgres and the SQLite-native
+    # equivalent automatically, so it's correct on both.
+    hour_expr = extract("hour", models.Order.created_at)
     hourly_data = (
         db.query(
             models.OrderItem.menu_item_id,
-            func.strftime("%H", models.Order.created_at).label("hour"),
+            hour_expr.label("hour"),
             func.sum(models.OrderItem.quantity).label("qty"),
         )
         .join(models.Order)
         .filter(models.Order.restaurant_id == restaurant_id, models.Order.status != models.OrderStatus.CANCELLED)
-        .group_by(models.OrderItem.menu_item_id, "hour")
+        .group_by(models.OrderItem.menu_item_id, hour_expr)
         .all()
     )
     hourly_map = defaultdict(lambda: defaultdict(int))
@@ -234,10 +241,26 @@ def get_menu_engineering(db: Session, restaurant_id: int) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 def get_upsell_pairs(db: Session, restaurant_id: int, top_n: int = 10) -> list:
     """Find items frequently ordered together, with lift score for strength."""
-    orders = db.query(models.Order).filter(
-        models.Order.restaurant_id == restaurant_id,
-        models.Order.status != models.OrderStatus.CANCELLED,
-    ).all()
+    # Fix found 2026-07-07 against real production data (107,700 orders):
+    # this had the same N+1 as get_revenue_forecast (order.items accessed
+    # below with zero eager loading) PLUS no date bound at all PLUS an O(n^2)
+    # pair-generation loop per order — combined, this made /ai/menu-engineering
+    # time out past 30s+ even after get_menu_engineering() itself (which
+    # already used proper SQL aggregation) ran fine at ~5s. Co-occurrence
+    # patterns for upsell suggestions don't need 2+ years of history —
+    # bounded to the last 30 days, matching the same window used elsewhere
+    # in this file (get_menu_engineering's own recent/older comparison).
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    orders = (
+        db.query(models.Order)
+        .options(joinedload(models.Order.items))
+        .filter(
+            models.Order.restaurant_id == restaurant_id,
+            models.Order.status != models.OrderStatus.CANCELLED,
+            models.Order.created_at >= thirty_days_ago,
+        )
+        .all()
+    )
 
     if not orders:
         return []

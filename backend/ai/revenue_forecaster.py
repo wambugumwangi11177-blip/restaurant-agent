@@ -18,7 +18,7 @@ Full-depth revenue analytics including:
 ================================================================================
 """
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -31,16 +31,31 @@ import models
 # ─────────────────────────────────────────────────────────────────────────────
 def get_revenue_forecast(db: Session, restaurant_id: int) -> dict:
     """Exhaustive revenue intelligence."""
-    orders = db.query(models.Order).filter(
-        models.Order.restaurant_id == restaurant_id,
-        models.Order.status != models.OrderStatus.CANCELLED,
-    ).all()
+    now = datetime.utcnow()
+    thirty_days_ago = now - timedelta(days=30)
+
+    # Severe N+1 fix (found 2026-07-07 against real production data — a
+    # restaurant with 107,700 orders made this endpoint hang past 90s):
+    # this function's own downstream logic only ever needs up to 28 days of
+    # daily aggregates (WoW needs 14, MoM needs 28 — see _compute_trends),
+    # so thirty_days_ago (previously computed but never applied to the query)
+    # is the correct bound, not the entire order history. joinedload
+    # eliminates the N+1 lazy-load on order.items / oi.menu_item accessed
+    # inside the loop below — without it, each order and each order item
+    # triggers a separate query (100k+ orders -> 100k+ queries).
+    orders = (
+        db.query(models.Order)
+        .options(joinedload(models.Order.items).joinedload(models.OrderItem.menu_item))
+        .filter(
+            models.Order.restaurant_id == restaurant_id,
+            models.Order.status != models.OrderStatus.CANCELLED,
+            models.Order.created_at >= thirty_days_ago,
+        )
+        .all()
+    )
 
     if not orders:
         return _empty_response()
-
-    now = datetime.utcnow()
-    thirty_days_ago = now - timedelta(days=30)
 
     # ── Build Time Series ──
     daily = defaultdict(lambda: {"revenue": 0, "orders": 0, "items": 0})

@@ -119,6 +119,13 @@ async def ai_inventory(
     """Inventory health, usage velocity, ABC classification, restock predictions."""
     restaurant = get_or_create_restaurant(db, current_user)
 
-    from ai.inventory_predictor import get_inventory_intelligence
-    result = _safe_run(get_inventory_intelligence, db, restaurant.id)
+    # Bug found 2026-07-07 testing against real production data: this
+    # imported a function name (get_inventory_intelligence) that doesn't
+    # exist — the real name is get_inventory_predictions. _safe_run() only
+    # catches exceptions from calling the function, not from resolving the
+    # import itself, so this was a hard 500 (ImportError), not a graceful
+    # {"error": ...} response — nothing had ever exercised this route with a
+    # real request before to catch it.
+    from ai.inventory_predictor import get_inventory_predictions
+    result = _safe_run(get_inventory_predictions, db, restaurant.id)
     return result

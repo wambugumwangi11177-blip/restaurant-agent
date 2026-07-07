@@ -17,7 +17,7 @@ Full-depth kitchen analytics including:
 ================================================================================
 """
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -30,18 +30,33 @@ import models
 # ─────────────────────────────────────────────────────────────────────────────
 def get_kds_intelligence(db: Session, restaurant_id: int) -> dict:
     """Exhaustive kitchen performance intelligence."""
+    now = datetime.utcnow()
+    thirty_days_ago = now - timedelta(days=30)
+
+    # Two fixes found 2026-07-07 against real production data (a restaurant
+    # with 107,700 orders — this endpoint took 35s+ even after the N+1 fix
+    # below, because it still loaded every PrepTime row ever):
+    # (1) joinedload eliminates the N+1 on pt.order_item.menu_item, which was
+    #     lazy-loading two extra queries per row with no eager loading at all;
+    # (2) bounded to the last 30 days — kitchen prep-time performance from
+    #     2+ years ago isn't operationally meaningful for a "how's the
+    #     kitchen doing" dashboard, matching the same 30-day window already
+    #     used by revenue_forecaster/menu_engineer elsewhere in this file set.
     prep_times = (
         db.query(models.PrepTime)
+        .options(joinedload(models.PrepTime.order_item).joinedload(models.OrderItem.menu_item))
         .join(models.OrderItem)
         .join(models.Order)
-        .filter(models.Order.restaurant_id == restaurant_id)
+        .filter(
+            models.Order.restaurant_id == restaurant_id,
+            models.Order.created_at >= thirty_days_ago,
+        )
         .all()
     )
 
     if not prep_times:
         return _empty_response()
 
-    now = datetime.utcnow()
     seven_days_ago = now - timedelta(days=7)
 
     # ── Station Performance (Deep) ──

@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 import models, auth
 from pydantic import BaseModel
+from routers.deps import get_restaurant_or_none
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -119,11 +120,7 @@ async def read_users_me(
     db: Session = Depends(get_db),
 ):
     """Returns user info + restaurant name for personalisation."""
-    restaurant = (
-        db.query(models.Restaurant)
-        .filter(models.Restaurant.tenant_id == current_user.tenant_id)
-        .first()
-    )
+    restaurant = get_restaurant_or_none(db, current_user)
     return {
         "id": current_user.id,
         "email": current_user.email,
@@ -140,11 +137,7 @@ async def update_restaurant(
     db: Session = Depends(get_db),
 ):
     """Onboarding wizard uses this to save restaurant profile."""
-    restaurant = (
-        db.query(models.Restaurant)
-        .filter(models.Restaurant.tenant_id == current_user.tenant_id)
-        .first()
-    )
+    restaurant = get_restaurant_or_none(db, current_user)
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
 

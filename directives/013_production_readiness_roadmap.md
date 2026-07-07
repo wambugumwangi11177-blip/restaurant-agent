@@ -54,12 +54,43 @@ column path with env cleared.
   read env at import time. The clean fix is a lazy config object, but that's an app-wide
   refactor whose main payoff is test elegance on code that's already working and fully
   tested — blast radius outweighs benefit. Deferred as a deliberate future task.
-- **Duplicate `/ai` router routes.** `analytics.py` and `ai.py` both mount `/ai/dashboard`,
-  `/ai/menu-engineering`, `/ai/revenue-forecast`, `/ai/reservation-insights`; `analytics.py`
-  wins (registered first in `main.py`), so `ai.py`'s versions of those 4 are dead code with
-  *different* implementations. Consolidating to one router per endpoint needs per-endpoint
-  frontend-shape verification (the menu/orders/reservations pages depend on the currently
-  served shapes), so it's its own careful task — flagged, not ripped out mid-hardening.
+
+## Design principles pass — DRY + SSOT fixes (2026-07-07)
+Prompted by an explicit design-principles review. Two concrete violations found and fixed,
+both verified (not just asserted):
+
+**DRY — the restaurant-lookup pattern had drifted into 8 near-duplicate implementations**
+across `ai.py`, `inventory.py`, `orders.py`, `reservations.py`, `menu.py` (×2 inline),
+`auth.py` (×2 inline), and `analytics.py` — with 3 *different* behaviors mixed in (some
+auto-created a missing restaurant, one raised 404, one silently returned 0). Consolidated
+into `routers/deps.py` with two functions, deliberately kept separate rather than merged
+into one:
+- `get_or_create_restaurant()` — the majority/safe pattern, used by all write-capable
+  endpoints and GETs that reasonably expect a restaurant to exist.
+- `get_restaurant_or_none()` — read-only, no side effects, used by `auth.py`'s `/me` and
+  `analytics.py`'s dashboard helpers specifically because auto-creating data as a side
+  effect of a GET request would violate command-query separation.
+4 new unit tests in `tests/test_deps.py` covering both functions directly (create-when-missing,
+return-existing-without-duplicating, no-side-effect-on-none, return-existing). Full suite
+44 → 48, all passing.
+
+**Single Source of Truth — the duplicate `/ai` router routes (flagged earlier this session,
+now resolved).** `ai.py`'s shadowed, unreachable copies of `/ai/dashboard`,
+`/ai/menu-engineering`, `/ai/revenue-forecast`, `/ai/reservation-insights` (dead code that
+was still being read/edited as if live — see the earlier "recent actions" bug fix, which
+initially targeted the wrong copy) are deleted. `ai.py` now only contains its genuinely
+unique routes (`/ai/pricing` + approve/reject, `/ai/labor`, `/ai/inventory`), which never
+overlapped with `analytics.py`. Verified via a live route-registration check: each
+previously-duplicated path now has exactly one route object registered, not two.
+
+**`except Exception` audit** (the design-principles review flagged this as worth checking):
+scanned the highest-stakes paths (`webhooks.py`, `mpesa_client.py`, `twilio_client.py`,
+`auth.py`). Both remaining broad excepts in `webhooks.py` log and re-raise as an HTTP error
+(legitimate); `twilio_client.py`'s is a fire-and-forget outbound send whose failure status
+is returned to and logged by the caller (legitimate, matches the same
+notification-failure-must-not-break-the-core-transaction principle established in the
+M-Pesa atomicity fix). No further masked-bug pattern found beyond the one already fixed
+(the dashboard's `except Exception: pass`).
 
 ## Deployment platform is Railway, not Render — critical findings (2026-07-07)
 `render.yaml` was dead config all along; the user deploys on **Railway**

@@ -11,15 +11,14 @@ from database import get_db
 from auth import get_current_user
 import models
 from ai import menu_engineer, revenue_forecaster, kds_intelligence, inventory_predictor, reservation_optimizer, ops_manager
+from routers.deps import get_restaurant_or_none
 
 router = APIRouter(prefix="/ai", tags=["Analytics"])
 
 
 def _get_restaurant_id(db: Session, user: models.User) -> int:
-    """Get the restaurant ID for the current user's tenant."""
-    restaurant = db.query(models.Restaurant).filter(
-        models.Restaurant.tenant_id == user.tenant_id
-    ).first()
+    """Get the restaurant ID for the current user's tenant (0 if none — read-only, no auto-create)."""
+    restaurant = get_restaurant_or_none(db, user)
     return restaurant.id if restaurant else 0
 
 

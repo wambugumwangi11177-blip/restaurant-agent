@@ -7,23 +7,9 @@ from database import get_db
 import models
 import schemas
 import auth
+from routers.deps import get_or_create_restaurant
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
-
-
-def _get_restaurant(db: Session, user: models.User):
-    rest = db.query(models.Restaurant).filter(
-        models.Restaurant.tenant_id == user.tenant_id
-    ).first()
-    if not rest:
-        rest = models.Restaurant(
-            name=f"{user.tenant.name}'s Restaurant",
-            tenant_id=user.tenant_id,
-        )
-        db.add(rest)
-        db.commit()
-        db.refresh(rest)
-    return rest
 
 
 @router.get("/", response_model=List[schemas.InventoryItemOut])
@@ -31,7 +17,7 @@ async def get_inventory(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_or_create_restaurant(db, current_user)
     return db.query(models.InventoryItem).filter(
         models.InventoryItem.restaurant_id == restaurant.id
     ).order_by(models.InventoryItem.item_name).all()
@@ -43,7 +29,7 @@ async def create_inventory_item(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_or_create_restaurant(db, current_user)
     db_item = models.InventoryItem(
         restaurant_id=restaurant.id,
         item_name=item.item_name,
@@ -66,7 +52,7 @@ async def update_inventory_item(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_or_create_restaurant(db, current_user)
     db_item = db.query(models.InventoryItem).filter(
         models.InventoryItem.id == item_id,
         models.InventoryItem.restaurant_id == restaurant.id,
@@ -90,7 +76,7 @@ async def receive_stock(
     current_user: models.User = Depends(auth.get_current_user),
 ):
     """Record stock received from supplier — increases quantity."""
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_or_create_restaurant(db, current_user)
     db_item = db.query(models.InventoryItem).filter(
         models.InventoryItem.id == item_id,
         models.InventoryItem.restaurant_id == restaurant.id,
@@ -122,7 +108,7 @@ async def adjust_stock(
     current_user: models.User = Depends(auth.get_current_user),
 ):
     """Adjust stock for waste, breakage, or corrections."""
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_or_create_restaurant(db, current_user)
     db_item = db.query(models.InventoryItem).filter(
         models.InventoryItem.id == item_id,
         models.InventoryItem.restaurant_id == restaurant.id,
@@ -150,7 +136,7 @@ async def delete_inventory_item(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    restaurant = _get_restaurant(db, current_user)
+    restaurant = get_or_create_restaurant(db, current_user)
     db_item = db.query(models.InventoryItem).filter(
         models.InventoryItem.id == item_id,
         models.InventoryItem.restaurant_id == restaurant.id,

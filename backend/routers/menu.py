@@ -5,42 +5,28 @@ from database import get_db
 import models
 import schemas
 import auth
+from routers.deps import get_or_create_restaurant
 
 router = APIRouter(prefix="/menu", tags=["menu"])
 
 @router.get("/", response_model=List[schemas.MenuItem])
 async def read_menu_items(
-    skip: int = 0, 
-    limit: int = 100, 
+    skip: int = 0,
+    limit: int = 100,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    restaurant = db.query(models.Restaurant).filter(models.Restaurant.tenant_id == current_user.tenant_id).first()
-    if not restaurant:
-        return []
-        
+    restaurant = get_or_create_restaurant(db, current_user)
     items = db.query(models.MenuItem).filter(models.MenuItem.restaurant_id == restaurant.id).offset(skip).limit(limit).all()
     return items
 
 @router.post("/", response_model=schemas.MenuItem)
 async def create_menu_item(
-    item: schemas.MenuItemCreate, 
-    db: Session = Depends(get_db), 
+    item: schemas.MenuItemCreate,
+    db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    # Ensure user has a restaurant (or tenant context)
-    # For MVP, we assign to the first restaurant of the tenant or create one if missing?
-    # Better: User -> Tenant -> Restaurant.
-    # We need to find the restaurant associated with the user's tenant.
-    
-    restaurant = db.query(models.Restaurant).filter(models.Restaurant.tenant_id == current_user.tenant_id).first()
-    if not restaurant:
-        # Auto-create a restaurant for the tenant if none exists (for MVP speed)
-        restaurant = models.Restaurant(name=f"{current_user.tenant.name}'s Restaurant", tenant_id=current_user.tenant_id)
-        db.add(restaurant)
-        db.commit()
-        db.refresh(restaurant)
-        
+    restaurant = get_or_create_restaurant(db, current_user)
     db_item = models.MenuItem(**item.dict(), restaurant_id=restaurant.id)
     db.add(db_item)
     db.commit()

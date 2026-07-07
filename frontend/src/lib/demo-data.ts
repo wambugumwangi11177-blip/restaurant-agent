@@ -136,11 +136,20 @@ export const demoData = {
   },
 };
 
-/** Returns true when real dashboard data is absent or has no activity */
+/**
+ * Returns true only for a genuinely empty/new restaurant — no menu set up
+ * and no revenue in the last 30 days. Previously checked `today_orders === 0`,
+ * which meant ANY day with no live order flow (a quiet day, or — as found
+ * 2026-07-07 for a real restaurant whose bulk-imported historical data
+ * simply doesn't extend into "today" — every day after the dataset's last
+ * date) permanently masked real health score/alerts/revenue history behind
+ * the same hardcoded demo numbers. That's what "dashboard shows the same
+ * data for months" was: not a caching bug, a wrong emptiness heuristic.
+ */
 export function isDashboardEmpty(data: any): boolean {
   if (!data) return true;
   const qs = data.quick_stats || {};
-  return !qs.today_orders || qs.today_orders === 0;
+  return !qs.menu_items && !qs.total_revenue_30d;
 }
 
 /** Returns true when real orders list is empty */

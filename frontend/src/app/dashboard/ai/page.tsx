@@ -22,22 +22,35 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+// Mirrors the actual shape returned by ai/ops_manager.get_operations_dashboard
+// (served via GET /ai/dashboard) — this page previously assumed field names
+// (revenue_today_kes, total_revenue_30d_kes, restaurant.name, etc.) that the
+// backend never returned, which threw a TypeError on `data!.restaurant.name`
+// the instant the page rendered. Found 2026-07-07 from a user report ("AI
+// page brings an error message").
 interface DashboardData {
     health_score: number;
     health_breakdown: { category: string; score: number; weight: number; detail: string }[];
     quick_stats: {
         today_orders: number;
-        revenue_today_kes: string;
-        total_revenue_30d_kes: string;
-        avg_daily_revenue_kes: string;
+        today_revenue: number;
+        yesterday_revenue: number;
+        day_over_day_change: number;
         pending_orders: number;
+        menu_items: number;
+        total_revenue_30d: number;
+        avg_order_value: number;
         active_alerts: number;
-        week_over_week_growth: number;
     };
     risks: { severity: string; risk: string; detail: string }[];
-    opportunities: { opportunity: string; potential: string; agent: string }[];
+    opportunities: { opportunity: string; potential: string; detail: string }[];
+    ai_modules: { revenue?: { week_over_week_growth?: number } };
     recent_ai_actions: { action: string; agent: string; time: string }[];
-    restaurant: { name: string };
+}
+
+function formatKES(cents: number) {
+    if (!cents) return "KES 0";
+    return `KES ${(cents / 100).toLocaleString("en-KE", { maximumFractionDigits: 0 })}`;
 }
 
 const healthColor = (score: number) =>
@@ -144,8 +157,12 @@ export default function AiDashboard() {
         );
     }
 
-    // No data or genuinely empty restaurant → helpful onboarding empty state
-    const isNewRestaurant = !data || data.quick_stats.today_orders === 0 && data.risks.length === 0;
+    // No data or genuinely empty restaurant → helpful onboarding empty state.
+    // Was keyed on today_orders === 0, which is wrong for any restaurant whose
+    // live order flow has gone quiet (or whose historical data doesn't extend
+    // into "today") — same class of bug as the main dashboard's demo-data
+    // fallback. Use actual setup/activity signals instead.
+    const isNewRestaurant = !data || (!data.quick_stats.menu_items && !data.quick_stats.total_revenue_30d);
     if (isNewRestaurant && !error) {
         return <EmptyState restaurantName={restaurantName} />;
     }
@@ -168,6 +185,7 @@ export default function AiDashboard() {
 
     const hs = data!.health_score;
     const qs = data!.quick_stats;
+    const wowGrowth = data!.ai_modules?.revenue?.week_over_week_growth ?? qs.day_over_day_change;
 
     return (
         <div className="space-y-6">
@@ -176,7 +194,7 @@ export default function AiDashboard() {
                 <div>
                     <h1 className="text-2xl font-bold text-[#e5e5e5]">AI Command Center</h1>
                     <p className="text-[#525252] mt-1 text-sm">
-                        {data!.restaurant.name} — Real-time intelligence
+                        {restaurantName} — Real-time intelligence
                     </p>
                 </div>
                 <button
@@ -196,9 +214,9 @@ export default function AiDashboard() {
                         <p className={`text-6xl font-black ${healthColor(hs)}`}>{hs}</p>
                         <p className="text-[#525252] text-xs mt-2">
                             WoW Revenue:{" "}
-                            <span className={qs.week_over_week_growth >= 0 ? "text-emerald-400" : "text-red-400"}>
-                                {qs.week_over_week_growth >= 0 ? "+" : ""}
-                                {qs.week_over_week_growth}%
+                            <span className={wowGrowth >= 0 ? "text-emerald-400" : "text-red-400"}>
+                                {wowGrowth >= 0 ? "+" : ""}
+                                {wowGrowth}%
                             </span>
                         </p>
                     </div>
@@ -224,10 +242,10 @@ export default function AiDashboard() {
             {/* Quick stats */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
-                    { label: "Today's Revenue", value: qs.revenue_today_kes },
+                    { label: "Today's Revenue", value: formatKES(qs.today_revenue) },
                     { label: "Orders Today", value: String(qs.today_orders) },
                     { label: "Active Alerts", value: String(qs.active_alerts) },
-                    { label: "30-Day Revenue", value: qs.total_revenue_30d_kes },
+                    { label: "30-Day Revenue", value: formatKES(qs.total_revenue_30d) },
                 ].map((stat) => (
                     <div key={stat.label} className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-4">
                         <p className="text-xs text-[#525252] mb-1">{stat.label}</p>
@@ -297,7 +315,7 @@ export default function AiDashboard() {
                                 <div key={i} className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
                                     <p className="text-sm font-medium text-[#e5e5e5]">{o.opportunity}</p>
                                     <p className="text-emerald-400 text-xs font-medium mt-0.5">{o.potential}</p>
-                                    <p className="text-[#525252] text-xs">{o.agent}</p>
+                                    <p className="text-[#525252] text-xs">{o.detail}</p>
                                 </div>
                             ))}
                         </div>

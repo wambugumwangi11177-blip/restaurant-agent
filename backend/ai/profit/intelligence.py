@@ -104,7 +104,16 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
     food_cost_pct      = (total_food_cost / max(total_revenue, 1)) * 100
     gross_margin_pct   = (total_gross_profit / max(total_revenue, 1)) * 100
     prev_revenue       = sum(o.total or 0 for o in orders_prev)
-    revenue_mom        = round(((total_revenue - prev_revenue) / max(prev_revenue, 1)) * 100, 1)
+    # Guard against a near-empty prior month: `/ max(prev_revenue, 1)` avoids a
+    # ZeroDivisionError but, when prev_revenue is a few cents (e.g. a straggler
+    # order), turns MoM growth into a garbage figure in the billions of percent.
+    # A month-over-month comparison is only meaningful with a real prior month;
+    # otherwise report 0. (Found 2026-07-07 — profit page showed 49,771,000,000%.)
+    MIN_PREV_FOR_MOM = 100_000  # KES 1,000 — below this, no meaningful baseline
+    if prev_revenue >= MIN_PREV_FOR_MOM:
+        revenue_mom = round(((total_revenue - prev_revenue) / prev_revenue) * 100, 1)
+    else:
+        revenue_mom = 0.0
 
     contribution_margins = _build_contribution_margins(items, item_profit)
     profit_leaks         = _detect_profit_leaks(contribution_margins)

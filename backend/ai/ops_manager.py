@@ -135,7 +135,7 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
         "today_orders": today_orders,
         "today_revenue": today_revenue,
         "yesterday_revenue": yesterday_revenue,
-        "day_over_day_change": round(((today_revenue - yesterday_revenue) / max(yesterday_revenue, 1)) * 100, 1) if yesterday_revenue else 0,
+        "day_over_day_change": round(((today_revenue - yesterday_revenue) / yesterday_revenue) * 100, 1) if yesterday_revenue >= 100_000 else 0,
         "pending_orders": pending_orders,
         "menu_items": menu_data.get("summary", {}).get("total_items", 0),
         "total_revenue_30d": revenue_data.get("trends", {}).get("total_revenue", 0),

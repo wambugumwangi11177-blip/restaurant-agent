@@ -248,11 +248,16 @@ def _compute_trends(sorted_daily, orders, hourly_pattern, weekly_pattern, check_
     total_orders = len(orders)
     avg_daily = total_revenue / max(len(sorted_daily), 1)
 
+    # Growth % is only meaningful against a non-trivial prior period; comparing
+    # against a near-empty baseline (`/ max(x, 1)`) produces garbage figures in
+    # the millions/billions of percent (found 2026-07-07). Report 0 in that case.
+    MIN_BASELINE = 100_000  # KES 1,000
+
     # WoW growth
     if len(revs) >= 14:
         recent_7 = sum(revs[-7:])
         previous_7 = sum(revs[-14:-7])
-        wow_growth = round(((recent_7 - previous_7) / max(previous_7, 1)) * 100, 1)
+        wow_growth = round(((recent_7 - previous_7) / previous_7) * 100, 1) if previous_7 >= MIN_BASELINE else 0
     elif len(revs) >= 7:
         recent_7 = sum(revs[-7:])
         wow_growth = 0
@@ -264,7 +269,7 @@ def _compute_trends(sorted_daily, orders, hourly_pattern, weekly_pattern, check_
     if len(revs) >= 28:
         recent_14 = sum(revs[-14:])
         previous_14 = sum(revs[-28:-14])
-        mom_growth = round(((recent_14 - previous_14) / max(previous_14, 1)) * 100, 1)
+        mom_growth = round(((recent_14 - previous_14) / previous_14) * 100, 1) if previous_14 >= MIN_BASELINE else 0
     else:
         mom_growth = None
 

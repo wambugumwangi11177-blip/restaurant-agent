@@ -59,18 +59,28 @@ def main():
         pop = [random.random() ** 2 for _ in menu]  # skewed → a few big sellers
 
         # ── 1. Clear the recent window (prep_times → order_items → orders) ──
-        old_orders = db.query(models.Order.id).filter(
-            models.Order.restaurant_id == RID, models.Order.created_at >= window_start
-        ).all()
-        old_ids = [o.id for o in old_orders]
-        print(f"Clearing {len(old_ids)} existing orders in the last {WINDOW_DAYS} days...")
-        if old_ids:
-            oi_ids = [r.id for r in db.query(models.OrderItem.id).filter(models.OrderItem.order_id.in_(old_ids)).all()]
-            if oi_ids:
-                db.query(models.PrepTime).filter(models.PrepTime.order_item_id.in_(oi_ids)).delete(synchronize_session=False)
-            db.query(models.OrderItem).filter(models.OrderItem.order_id.in_(old_ids)).delete(synchronize_session=False)
-            db.query(models.Order).filter(models.Order.id.in_(old_ids)).delete(synchronize_session=False)
-            db.flush()
+        # Done with server-side subquery DELETEs, NOT by materialising tens of
+        # thousands of ids into Python and back into a giant IN (...) clause —
+        # that generated a pathologically large SQL statement that hung against
+        # Neon. `text()` with a correlated subquery lets Postgres do it in three
+        # fast statements. (SQLite understands the same subquery SQL for tests.)
+        from sqlalchemy import text
+        print(f"Clearing existing orders in the last {WINDOW_DAYS} days (server-side)...")
+        params = {"rid": RID, "ws": window_start}
+        db.execute(text(
+            "DELETE FROM prep_times WHERE order_item_id IN ("
+            "  SELECT oi.id FROM order_items oi JOIN orders o ON o.id = oi.order_id"
+            "  WHERE o.restaurant_id = :rid AND o.created_at >= :ws)"
+        ), params)
+        db.execute(text(
+            "DELETE FROM order_items WHERE order_id IN ("
+            "  SELECT id FROM orders WHERE restaurant_id = :rid AND created_at >= :ws)"
+        ), params)
+        deleted = db.execute(text(
+            "DELETE FROM orders WHERE restaurant_id = :rid AND created_at >= :ws"
+        ), params)
+        db.flush()
+        print(f"Cleared {deleted.rowcount} orders.")
 
         # ── 2. Regenerate a clean, healthy pattern ──
         order_rows = []

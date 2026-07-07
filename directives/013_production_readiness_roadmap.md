@@ -120,6 +120,41 @@ M-Pesa atomicity fix). No further masked-bug pattern found beyond the one alread
 only the user can make) resolves the 502 for real — that's the next thing to check once
 the setting is changed and Railway redeploys.
 
+## Real-data verification against the actual 107,700-order dataset (2026-07-07)
+User asked to verify the agentic software actually works against their real historical
+data (restaurant "Lavy", tenant_id=3, 107,700 orders spanning Apr 2024 - Jun 2026 — by far
+the largest of the 5 restaurants in production). Created one new STAFF-role test user
+(`claude-test@lavy.co.ke`) under Lavy's existing tenant rather than touching any of the
+6 real Lavy accounts. Found and fixed 5 real bugs, none of which the SQLite-based local
+test suite could ever have caught (small test datasets never trigger N+1 pain; SQLite
+silently accepts SQLite-only SQL functions that don't exist on Postgres):
+
+1. **`func.strftime()` — SQLite-only syntax, crashed `/ai/dashboard` outright (500) on
+   real Postgres** (`ai/menu_engineer.py`). Fixed with SQLAlchemy's cross-dialect `extract()`.
+2. **Severe N+1 in `get_revenue_forecast`** — no eager loading, no date bound (despite an
+   unused `thirty_days_ago` variable proving that was the original intent) — a 90+ second
+   hang with zero response. Fixed: 30-day bound (sufficient for the function's own WoW/MoM
+   math) + `joinedload`.
+3. **Same N+1 pattern in `get_kds_intelligence`** (`pt.order_item.menu_item` chain) —
+   completed but took 35s+ even after eliminating the N+1, since it was still unbounded by
+   date. Fixed: `joinedload` + 30-day bound.
+4. **Same N+1 in `get_upsell_pairs`, plus an O(n²) per-order pairing loop, plus no date
+   bound** — made `/ai/menu-engineering` (which also calls this) time out past 30s. Fixed
+   the same way.
+5. **`routers/ai.py`'s `/ai/inventory` imported a function name that doesn't exist**
+   (`get_inventory_intelligence` vs the real `get_inventory_predictions`) — a hard 500 that
+   `_safe_run()`'s error handling couldn't catch (it wraps the function *call*, not the
+   *import statement*). Nothing had ever exercised this route with a real authenticated
+   request before to catch it.
+
+**Verified twice** — once against an isolated Neon branch (to get full tracebacks safely),
+once against live production after deploying the fix: all 9 `/ai/*` endpoints now return
+200 (previously: 2 hard 500s, 2 timeouts past 30-90s). `/ai/dashboard` end-to-end:
+4.95s on production (down from a complete, unbounded hang). The LLM orchestrator (Groq)
+verified working end-to-end against the same real data via direct function calls — genuine
+tool-calling round-trips producing correct natural-language answers about real sales/stock/
+pricing state. Full local suite still 48/48 passing throughout.
+
 ## Production database wired (2026-07-07)
 The real backend is now connected to its production Neon Postgres (project "restaurant
 agent", branch "production", pg17) — the database already held **108,436 orders, 5

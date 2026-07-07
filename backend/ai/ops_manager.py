@@ -213,6 +213,31 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
             "detail": f"{growth}% WoW growth — ensure inventory and staffing scale accordingly",
         })
 
+    # Recent AI actions — real outbound messages only (exclude internal
+    # metering rows, which have no recipient). The frontend dashboard requires
+    # this key; it was previously absent from this (the actually-served)
+    # dashboard, so the panel had no data to render.
+    recent_ai_actions = []
+    try:
+        msgs = (
+            db.query(models.AgentMessage)
+            .filter(
+                models.AgentMessage.restaurant_id == restaurant_id,
+                models.AgentMessage.recipient != "",
+            )
+            .order_by(models.AgentMessage.created_at.desc())
+            .limit(5)
+            .all()
+        )
+        for m in msgs:
+            recent_ai_actions.append({
+                "action": m.message_type or "Agent action",
+                "agent": "AI System",
+                "time": m.created_at.strftime("%d %b, %H:%M") if m.created_at else "",
+            })
+    except Exception:
+        recent_ai_actions = []
+
     return {
         "health_score": overall_health,
         "health_breakdown": scores,
@@ -221,6 +246,7 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
         "risks": risks,
         "opportunities": opportunities,
         "ai_modules": ai_modules,
+        "recent_ai_actions": recent_ai_actions,
     }
 
 

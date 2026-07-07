@@ -45,6 +45,7 @@ class RestaurantUpdate(BaseModel):
     address: str | None = None
     currency: str | None = None
     timezone: str | None = None
+    owner_phone: str | None = None   # E.164, e.g. +2547...; used for WhatsApp owner routing
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -151,6 +152,13 @@ async def update_restaurant(
         restaurant.name = data.name
     if data.address is not None:
         restaurant.address = data.address
+    if data.owner_phone is not None:
+        restaurant.owner_phone = data.owner_phone
     db.commit()
     db.refresh(restaurant)
-    return {"id": restaurant.id, "name": restaurant.name, "address": restaurant.address}
+    return {
+        "id": restaurant.id,
+        "name": restaurant.name,
+        "address": restaurant.address,
+        "owner_phone": restaurant.owner_phone,
+    }

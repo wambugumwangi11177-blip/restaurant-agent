@@ -1,6 +1,8 @@
 """
-AI Analytics Router
-Exposes all AI intelligence services as API endpoints.
+Analytics Router
+Exposes the deterministic analytics/recommendation modules as API endpoints.
+Rule-based statistics and thresholds, not LLM-backed — see
+directives/012_agentic_roadmap.md's standing rule on labeling honestly.
 """
 
 from fastapi import APIRouter, Depends
@@ -10,7 +12,7 @@ from auth import get_current_user
 import models
 from ai import menu_engineer, revenue_forecaster, kds_intelligence, inventory_predictor, reservation_optimizer, ops_manager
 
-router = APIRouter(prefix="/ai", tags=["AI Intelligence"])
+router = APIRouter(prefix="/ai", tags=["Analytics"])
 
 
 def _get_restaurant_id(db: Session, user: models.User) -> int:

@@ -115,9 +115,10 @@ def _send_all_morning_briefings():
 
         db = SessionLocal()
         try:
+            from ai.whatsapp.brain import owner_phone_for
             restaurants = db.query(models.Restaurant).all()
             for restaurant in restaurants:
-                owner_phone = os.getenv(f"OWNER_PHONE_{restaurant.id}", os.getenv("OWNER_PHONE", ""))
+                owner_phone = owner_phone_for(restaurant)
                 if not owner_phone:
                     continue
                 try:

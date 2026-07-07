@@ -21,8 +21,16 @@ pydantic==2.12.5
 # HTTP
 requests==2.32.5
 
-# AI — Phase 3 (uncomment when client has paid and API keys are set)
-# anthropic==0.40.0
+# AI — Phase 2 orchestrator (see ai/llm_client.py)
+# Groq is the provider actually configured today (GROQ_API_KEY in .env) — its
+# API is OpenAI-compatible, so the openai SDK is reused rather than adding a
+# second HTTP client dependency.
+openai==1.58.1
+
+# Anthropic — drop-in upgrade path, gated behind a real business decision:
+# uncomment when client has paid and ANTHROPIC_API_KEY is set.
+# anthropic==0.116.0
+# headroom-ai==0.28.0   # context compression proxy/lib in front of Claude — see ai/llm_client.py
 
 # Monitoring
 sentry-sdk==2.52.0
@@ -35,3 +43,7 @@ apscheduler==3.10.4
 
 # WhatsApp / Twilio
 twilio==9.3.5
+
+# Testing
+pytest==8.4.2
+httpx==0.28.1

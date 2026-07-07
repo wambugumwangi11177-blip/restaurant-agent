@@ -70,6 +70,7 @@ class OrderCreate(BaseModel):
     customer_phone: str = ""
     table_number: Optional[int] = None
     notes: str = ""
+    consent: bool = False   # required True on the public (customer-facing) endpoint only
 
 class OrderItemOut(BaseModel):
     id: int

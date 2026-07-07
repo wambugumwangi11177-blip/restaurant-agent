@@ -66,8 +66,10 @@ async def update_inventory_item(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
+    restaurant = _get_restaurant(db, current_user)
     db_item = db.query(models.InventoryItem).filter(
-        models.InventoryItem.id == item_id
+        models.InventoryItem.id == item_id,
+        models.InventoryItem.restaurant_id == restaurant.id,
     ).first()
     if not db_item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -88,8 +90,10 @@ async def receive_stock(
     current_user: models.User = Depends(auth.get_current_user),
 ):
     """Record stock received from supplier — increases quantity."""
+    restaurant = _get_restaurant(db, current_user)
     db_item = db.query(models.InventoryItem).filter(
-        models.InventoryItem.id == item_id
+        models.InventoryItem.id == item_id,
+        models.InventoryItem.restaurant_id == restaurant.id,
     ).first()
     if not db_item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -118,8 +122,10 @@ async def adjust_stock(
     current_user: models.User = Depends(auth.get_current_user),
 ):
     """Adjust stock for waste, breakage, or corrections."""
+    restaurant = _get_restaurant(db, current_user)
     db_item = db.query(models.InventoryItem).filter(
-        models.InventoryItem.id == item_id
+        models.InventoryItem.id == item_id,
+        models.InventoryItem.restaurant_id == restaurant.id,
     ).first()
     if not db_item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -144,8 +150,10 @@ async def delete_inventory_item(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
+    restaurant = _get_restaurant(db, current_user)
     db_item = db.query(models.InventoryItem).filter(
-        models.InventoryItem.id == item_id
+        models.InventoryItem.id == item_id,
+        models.InventoryItem.restaurant_id == restaurant.id,
     ).first()
     if not db_item:
         raise HTTPException(status_code=404, detail="Item not found")

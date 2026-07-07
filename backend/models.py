@@ -87,7 +87,8 @@ class Restaurant(Base):
     tenant_id = Column(Integer, ForeignKey("tenants.id"))
     name = Column(String)
     address = Column(String)
-    
+    owner_phone = Column(String, nullable=True)   # WhatsApp owner routing (was OWNER_PHONE_{id} env var)
+
     tenant = relationship("Tenant", back_populates="restaurants")
     menu_items = relationship("MenuItem", back_populates="restaurant")
     orders = relationship("Order", back_populates="restaurant")
@@ -139,6 +140,8 @@ class Order(Base):
     delivery_channel = Column(SqEnum(DeliveryChannel), default=DeliveryChannel.WALK_IN)
     payment_method = Column(SqEnum(PaymentMethod), default=PaymentMethod.PENDING)
     is_paid = Column(Boolean, default=False)
+    mpesa_checkout_request_id = Column(String, unique=True, nullable=True)
+    mpesa_receipt = Column(String, nullable=True)
     table_number = Column(Integer, nullable=True)
     customer_name = Column(String, default="")
     customer_phone = Column(String, default="")
@@ -268,6 +271,9 @@ class AgentMessage(Base):
     message_type  = Column(String, nullable=False)
     status        = Column(String, nullable=False)
     twilio_sid    = Column(String, default="")
+    llm_model     = Column(String, nullable=True)
+    input_tokens  = Column(Integer, nullable=True)
+    output_tokens = Column(Integer, nullable=True)
     created_at    = Column(DateTime, default=datetime.datetime.utcnow)
     restaurant    = relationship("Restaurant")
     __table_args__ = (
@@ -566,4 +572,53 @@ class AgentAuditLog(Base):
     __table_args__ = (
         Index("ix_audit_log_restaurant_created", "restaurant_id", "created_at"),
         Index("ix_audit_log_action_type",        "action_type"),
+    )
+
+
+class CustomerConsent(Base):
+    """
+    Minimal consent record for customer-facing data collection (public order
+    checkout today; any future customer-facing flow — e.g. WhatsApp reservation
+    booking — must record consent the same way before processing PII).
+    Append-only by convention (never update/delete a row) — matches
+    AgentAuditLog's pattern. Deliberately NOT the abandoned restaurant-agent/
+    tree's full DPA vault/ZKP/tokenization system — that was unbuilt/
+    non-functional theater (directives/012_agentic_roadmap.md); this is the
+    real legal minimum: what was agreed to, by whom, when, for what purpose.
+    """
+    __tablename__ = "customer_consents"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
+    customer_phone = Column(String, nullable=False)
+    purpose       = Column(String, nullable=False)   # e.g. "order_checkout", "reservation_booking"
+    consented_at  = Column(DateTime, default=datetime.datetime.utcnow)
+
+    restaurant = relationship("Restaurant")
+
+    __table_args__ = (
+        Index("ix_customer_consents_restaurant_phone", "restaurant_id", "customer_phone"),
+    )
+
+
+class TokenUsage(Base):
+    """
+    Per-tenant LLM token metering (Phase 2 orchestrator). Its own table rather
+    than sentinel rows in agent_messages — agent_messages is the outbound
+    WhatsApp log and the dashboard's 'recent actions' feed, which metering rows
+    would pollute. One row per LLM turn.
+    """
+    __tablename__ = "token_usage"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
+    llm_model     = Column(String, nullable=True)
+    input_tokens  = Column(Integer, nullable=True)
+    output_tokens = Column(Integer, nullable=True)
+    created_at    = Column(DateTime, default=datetime.datetime.utcnow)
+
+    restaurant = relationship("Restaurant")
+
+    __table_args__ = (
+        Index("ix_token_usage_restaurant_created", "restaurant_id", "created_at"),
     )

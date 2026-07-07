@@ -428,3 +428,80 @@ def _empty_response():
         "peak_windows": [], "overbooking": {},
         "recommendations": [],
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AVAILABILITY CHECK (Phase 2 — directives/012_agentic_roadmap.md)
+#
+# Real conflict/capacity logic. Deliberately kept separate from the analytics
+# above: this is Layer 3 deterministic logic that a booking flow (LLM-driven
+# or not) must call rather than letting a model guess at availability.
+#
+# Concurrency note: this checks-then-suggests only. Whatever calls
+# book_table() must re-run this check inside the same transaction that
+# inserts the Reservation row, to avoid a race between two bookings for the
+# same table/slot (see the PENDING-pricing partial-unique-index pattern in
+# alembic/versions/001_add_agent_tables.py for the kind of DB-level guard
+# this still needs before it's safe under concurrent writers).
+# ─────────────────────────────────────────────────────────────────────────────
+
+def find_available_tables(
+    db: Session,
+    restaurant_id: int,
+    party_size: int,
+    reservation_date,
+    reservation_time,
+    duration_minutes: int = 90,
+) -> list[dict]:
+    """
+    Returns tables with enough capacity and no overlapping CONFIRMED
+    reservation for the requested date/time/duration, smallest-capacity-first
+    (best fit, avoids wasting a large table on a small party).
+    """
+    requested_start = datetime.combine(reservation_date, reservation_time)
+    requested_end = requested_start + timedelta(minutes=duration_minutes)
+
+    tables = (
+        db.query(models.Table)
+        .filter(
+            models.Table.restaurant_id == restaurant_id,
+            models.Table.capacity >= party_size,
+        )
+        .order_by(models.Table.capacity.asc())
+        .all()
+    )
+    if not tables:
+        return []
+
+    same_day_reservations = (
+        db.query(models.Reservation)
+        .filter(
+            models.Reservation.restaurant_id == restaurant_id,
+            models.Reservation.reservation_date == reservation_date,
+            models.Reservation.status == models.ReservationStatus.CONFIRMED,
+            models.Reservation.table_id.isnot(None),
+        )
+        .all()
+    )
+
+    booked_intervals_by_table: dict[int, list[tuple[datetime, datetime]]] = defaultdict(list)
+    for res in same_day_reservations:
+        res_start = datetime.combine(res.reservation_date, res.reservation_time)
+        res_end = res_start + timedelta(minutes=res.duration_minutes or 90)
+        booked_intervals_by_table[res.table_id].append((res_start, res_end))
+
+    def overlaps(a_start, a_end, b_start, b_end) -> bool:
+        return a_start < b_end and b_start < a_end
+
+    available = []
+    for table in tables:
+        conflicts = booked_intervals_by_table.get(table.id, [])
+        if any(overlaps(requested_start, requested_end, s, e) for s, e in conflicts):
+            continue
+        available.append({
+            "table_id": table.id,
+            "table_number": table.table_number,
+            "capacity": table.capacity,
+        })
+
+    return available

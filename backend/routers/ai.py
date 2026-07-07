@@ -1,7 +1,11 @@
 """
 backend/routers/ai.py
 ──────────────────────
-AI Intelligence Router — exposes all AI agents via REST endpoints.
+Analytics & Recommendations Router — exposes the deterministic analytics/
+recommendation modules in ai/ via REST endpoints. These are rule-based
+statistics and thresholds, not LLM-backed — see directives/012_agentic_roadmap.md's
+standing rule on labeling AI-vs-deterministic honestly. The only LLM-backed
+code in this project is ai/whatsapp/orchestrator.py (Phase 2).
 
 Endpoints:
   GET /ai/dashboard          → system health + quick stats + risks + opportunities
@@ -243,11 +247,16 @@ async def ai_dashboard(
         })
 
     # ── Recent AI Actions (from AgentMessage log) ─────────────────────────────
+    # Only real outbound messages — exclude internal metering rows, which live
+    # in their own table now but were historically written here too.
     recent_actions = []
     try:
         msgs = (
             db.query(models.AgentMessage)
-            .filter(models.AgentMessage.restaurant_id == rid)
+            .filter(
+                models.AgentMessage.restaurant_id == rid,
+                models.AgentMessage.recipient != "",
+            )
             .order_by(models.AgentMessage.created_at.desc())
             .limit(5)
             .all()
@@ -255,11 +264,11 @@ async def ai_dashboard(
         for m in msgs:
             recent_actions.append({
                 "action": m.message_type or "Agent action",
-                "agent": m.direction or "AI System",
+                "agent": "AI System",
                 "time": m.created_at.strftime("%d %b, %H:%M") if m.created_at else "",
             })
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(f"[AI Dashboard] recent actions unavailable: {exc}")
 
     return {
         "health_score": health_score,

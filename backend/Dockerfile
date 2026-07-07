@@ -9,8 +9,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy app code
 COPY . .
 
-# Railway injects PORT at runtime
-ENV PORT=8000
+# Railway injects PORT at runtime as a container env var — do NOT hardcode it
+# here with ENV, since that shadows Railway's actual value and causes the
+# app to listen on the wrong port relative to what Railway's edge proxy
+# routes to (a real 502 cause, found 2026-07-07). $PORT is read at CMD time
+# from whatever the platform actually injects.
 EXPOSE 8000
 
-CMD ["sh", "-c", "gunicorn main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT"]
+# railway.json uses the DOCKERFILE builder, which does NOT read Procfile's
+# release phase (that's a Nixpacks/Heroku-only convention) — so migrations
+# must run here, as part of container startup, or they silently never run
+# on this deploy path (found 2026-07-07 — Procfile's release: line was dead
+# code for this specific Railway configuration).
+CMD ["sh", "-c", "python -c 'from database import init_db; init_db()' && alembic upgrade head && gunicorn main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT"]

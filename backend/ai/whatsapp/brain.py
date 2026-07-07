@@ -31,6 +31,17 @@ SLOW_DAY_THRESHOLD   = 20    # % below average to trigger alert
 STOCK_CRITICAL_HOURS = 6
 
 
+def owner_phone_for(restaurant) -> str:
+    """
+    Resolve a restaurant's owner WhatsApp number. Prefers the DB column
+    (models.Restaurant.owner_phone); falls back to the legacy
+    OWNER_PHONE_{id} / OWNER_PHONE env vars for backward compatibility.
+    """
+    if getattr(restaurant, "owner_phone", None):
+        return restaurant.owner_phone
+    return os.getenv(f"OWNER_PHONE_{restaurant.id}", os.getenv("OWNER_PHONE", ""))
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # MORNING BRIEFING
 # ─────────────────────────────────────────────────────────────────────────────
@@ -437,7 +448,11 @@ def handle_owner_command(db: Session, restaurant_id: int, message: str) -> str:
         except (ValueError, IndexError):
             return "❌ Invalid format. Try: REJECT 3"
 
-    return "I didn't understand that. Reply HELP to see all commands."
+    # Free-form text falls through to the LLM orchestrator (Phase 2 —
+    # directives/012_agentic_roadmap.md). Known commands above never reach
+    # here, so this only spends tokens on messages that actually need them.
+    from .orchestrator import handle_natural_language
+    return handle_natural_language(db, restaurant_id, message)
 
 
 def _cmd_sales_today(db: Session, restaurant_id: int) -> str:
@@ -568,7 +583,7 @@ def run_morning_briefing(SessionLocal) -> None:
     db = SessionLocal()
     try:
         for restaurant in db.query(models.Restaurant).all():
-            owner_phone = os.getenv(f"OWNER_PHONE_{restaurant.id}", os.getenv("OWNER_PHONE", ""))
+            owner_phone = owner_phone_for(restaurant)
             if not owner_phone:
                 print(f"[WhatsApp Brain] No owner phone for restaurant {restaurant.id}")
                 continue
@@ -586,7 +601,7 @@ def run_slow_day_check(SessionLocal) -> None:
         for restaurant in db.query(models.Restaurant).all():
             alert = compose_slow_day_alert(db, restaurant.id)
             if alert:
-                owner_phone = os.getenv(f"OWNER_PHONE_{restaurant.id}", os.getenv("OWNER_PHONE", ""))
+                owner_phone = owner_phone_for(restaurant)
                 if owner_phone:
                     send_whatsapp_message(owner_phone, alert, db=db, restaurant_id=restaurant.id, message_type="slow_day_alert")
     finally:
@@ -600,7 +615,7 @@ def run_stock_check(SessionLocal) -> None:
         for restaurant in db.query(models.Restaurant).all():
             urgent = [a for a in get_critical_stock_alerts(db, restaurant.id) if a["severity"] == "URGENT"]
             if urgent:
-                owner_phone = os.getenv(f"OWNER_PHONE_{restaurant.id}", os.getenv("OWNER_PHONE", ""))
+                owner_phone = owner_phone_for(restaurant)
                 if owner_phone:
                     send_whatsapp_message(owner_phone, compose_stock_alert(urgent[0]), db=db, restaurant_id=restaurant.id, message_type="stock_alert")
     finally:

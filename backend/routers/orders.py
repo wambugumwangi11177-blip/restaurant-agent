@@ -133,7 +133,11 @@ async def update_order_status(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    restaurant = _get_restaurant(db, current_user)
+    order = db.query(models.Order).filter(
+        models.Order.id == order_id,
+        models.Order.restaurant_id == restaurant.id,
+    ).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -158,7 +162,11 @@ async def update_order_payment(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    restaurant = _get_restaurant(db, current_user)
+    order = db.query(models.Order).filter(
+        models.Order.id == order_id,
+        models.Order.restaurant_id == restaurant.id,
+    ).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -188,6 +196,21 @@ async def create_public_order(
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
 
+    # Consent gate: only meaningful when actual PII (a phone number) is being
+    # collected — an anonymous walk-in-style public order with no contact
+    # info has nothing to consent to.
+    if order.customer_phone and not order.consent:
+        raise HTTPException(
+            status_code=400,
+            detail="Consent is required to place an order with contact details.",
+        )
+    if order.customer_phone:
+        db.add(models.CustomerConsent(
+            restaurant_id=restaurant.id,
+            customer_phone=order.customer_phone,
+            purpose="order_checkout",
+        ))
+
     total = 0
     order_items = []
     for oi in order.items:
@@ -210,12 +233,16 @@ async def create_public_order(
         order_type = models.OrderType(order.order_type)
     except ValueError:
         order_type = models.OrderType.TAKEOUT
+    try:
+        payment_method = models.PaymentMethod(order.payment_method)
+    except ValueError:
+        payment_method = models.PaymentMethod.PENDING
 
     db_order = models.Order(
         restaurant_id=restaurant.id,
         order_type=order_type,
         delivery_channel=models.DeliveryChannel.APP,
-        payment_method=models.PaymentMethod.PENDING,
+        payment_method=payment_method,
         is_paid=False,
         customer_name=order.customer_name,
         customer_phone=order.customer_phone,
@@ -226,7 +253,34 @@ async def create_public_order(
     db.add(db_order)
     db.commit()
     db.refresh(db_order)
+
+    if payment_method == models.PaymentMethod.MPESA:
+        _trigger_mpesa_stk_push(db, db_order)
+
     return _order_to_dict(db_order)
+
+
+def _trigger_mpesa_stk_push(db: Session, order: models.Order) -> None:
+    """
+    Best-effort: a failed/unconfigured STK push should never break order
+    creation. The customer/staff can retry payment through other means
+    (cash, card, or a manual STK retry) — the order itself is already valid.
+    """
+    from payments import mpesa_client
+
+    phone = mpesa_client.normalize_phone(order.customer_phone or "")
+    if not phone:
+        return
+
+    result = mpesa_client.initiate_stk_push(
+        phone_number=phone,
+        amount_cents=order.total or 0,
+        account_reference=f"ORDER-{order.id}",
+        description=f"Order #{order.id}",
+    )
+    if result["status"] == "initiated":
+        order.mpesa_checkout_request_id = result["checkout_request_id"]
+        db.commit()
 
 
 def _order_to_dict(order: models.Order) -> dict:

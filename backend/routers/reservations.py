@@ -81,8 +81,10 @@ async def update_reservation_status(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
+    restaurant = _get_restaurant(db, current_user)
     reservation = db.query(models.Reservation).filter(
-        models.Reservation.id == reservation_id
+        models.Reservation.id == reservation_id,
+        models.Reservation.restaurant_id == restaurant.id,
     ).first()
     if not reservation:
         raise HTTPException(status_code=404, detail="Reservation not found")
@@ -103,8 +105,10 @@ async def delete_reservation(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
+    restaurant = _get_restaurant(db, current_user)
     reservation = db.query(models.Reservation).filter(
-        models.Reservation.id == reservation_id
+        models.Reservation.id == reservation_id,
+        models.Reservation.restaurant_id == restaurant.id,
     ).first()
     if not reservation:
         raise HTTPException(status_code=404, detail="Reservation not found")

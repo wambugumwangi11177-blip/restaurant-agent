@@ -203,8 +203,11 @@ def on_recommendation_approved(payload: dict) -> None:
 
 def on_order_paid_mpesa(payload: dict) -> None:
     """
-    M-Pesa payment confirmed — mark order paid + send WhatsApp receipt.
-    This completes BUG 11: M-Pesa webhook finally does something.
+    Reacts to an ORDER_PAID event (past tense — the order is ALREADY settled
+    atomically by the M-Pesa webhook before this fires). This handler does the
+    pure side-effects only: send the WhatsApp receipt + write the audit log.
+    It deliberately does NOT mutate is_paid — settlement is the emitter's job,
+    so a failure here can never leave the order in a half-paid state.
     """
     restaurant_id  = payload.get("restaurant_id")
     order_id       = payload.get("order_id")
@@ -214,19 +217,6 @@ def on_order_paid_mpesa(payload: dict) -> None:
 
     db = SessionLocal()
     try:
-        order = db.query(models.Order).filter(
-            models.Order.id            == order_id,
-            models.Order.restaurant_id == restaurant_id,
-        ).first()
-        if not order:
-            logger.warning(f"[Orchestrator] M-Pesa: order {order_id} not found")
-            return
-
-        # Mark paid
-        order.is_paid = True
-        order.payment_method = models.PaymentMethod.MPESA
-        db.commit()
-
         # Send WhatsApp receipt to customer (if phone available)
         if customer_phone:
             from ai.whatsapp import send_whatsapp_message

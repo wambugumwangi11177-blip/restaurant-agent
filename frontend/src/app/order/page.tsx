@@ -40,6 +40,7 @@ export default function CustomerOrderPage() {
     const [customerPhone, setCustomerPhone] = useState("");
     const [orderType, setOrderType] = useState("takeout");
     const [notes, setNotes] = useState("");
+    const [consentGiven, setConsentGiven] = useState(false);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [orderId, setOrderId] = useState<number | null>(null);
@@ -75,7 +76,7 @@ export default function CustomerOrderPage() {
     const formatKES = (cents: number) => `KES ${(cents / 100).toLocaleString("en-KE")}`;
 
     const handleSubmit = async () => {
-        if (cart.length === 0 || !customerName || !customerPhone) return;
+        if (cart.length === 0 || !customerName || !customerPhone || !consentGiven) return;
         setSubmitting(true);
         try {
             const res = await fetch(`${API_URL}/orders/public?restaurant_id=${RESTAURANT_ID}`, {
@@ -89,6 +90,7 @@ export default function CustomerOrderPage() {
                     customer_name: customerName,
                     customer_phone: customerPhone,
                     notes,
+                    consent: consentGiven,
                 }),
             });
             const data = await res.json();
@@ -272,11 +274,25 @@ export default function CustomerOrderPage() {
                                 </div>
                             </div>
 
+                            {/* Consent */}
+                            <label className="flex items-start gap-2.5 mb-4 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={consentGiven}
+                                    onChange={(e) => setConsentGiven(e.target.checked)}
+                                    className="mt-0.5 w-4 h-4 rounded border-[#262626] bg-[#141414] accent-[#d4a853]"
+                                />
+                                <span className="text-xs text-[#737373]">
+                                    I agree to be contacted about this order via phone or WhatsApp,
+                                    including for order updates and payment confirmation.
+                                </span>
+                            </label>
+
                             {/* Submit */}
                             <button
                                 onClick={handleSubmit}
-                                disabled={!customerName || !customerPhone || submitting}
-                                className={`w-full py-3.5 rounded-xl text-sm font-semibold transition-all ${customerName && customerPhone && !submitting
+                                disabled={!customerName || !customerPhone || !consentGiven || submitting}
+                                className={`w-full py-3.5 rounded-xl text-sm font-semibold transition-all ${customerName && customerPhone && consentGiven && !submitting
                                         ? "bg-[#d4a853] text-black hover:bg-[#c49843]"
                                         : "bg-[#262626] text-[#525252] cursor-not-allowed"
                                     }`}

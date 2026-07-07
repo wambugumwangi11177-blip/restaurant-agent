@@ -21,6 +21,7 @@ from collections import defaultdict, Counter
 from datetime import datetime, timedelta
 import math
 import models
+from ai.analysis_clock import analysis_anchor
 
 # ── Benchmarks ────────────────────────────────────────────────────────────────
 HEALTHY_FOOD_COST_MAX = 35.0
@@ -43,8 +44,10 @@ def _item_cost(item_map: dict, mid: int) -> int:
 def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
     """Complete profit intelligence — UTC-correct, AttributeError-safe."""
 
-    # BUG-04 FIX: use UTC for all DB range filters
-    now             = datetime.utcnow()
+    # BUG-04 FIX: use UTC for all DB range filters. Anchored to the
+    # restaurant's most recent order, not wall-clock time (2026-07-07) — see
+    # ai/analysis_clock.py.
+    now             = analysis_anchor(db, restaurant_id)
     thirty_days_ago = now - timedelta(days=30)
     sixty_days_ago  = now - timedelta(days=60)
 

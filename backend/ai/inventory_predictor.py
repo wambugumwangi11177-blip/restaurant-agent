@@ -21,9 +21,10 @@ Full-depth inventory analytics including:
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import timedelta
 import math
 import models
+from ai.analysis_clock import analysis_anchor
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -38,7 +39,9 @@ def get_inventory_predictions(db: Session, restaurant_id: int) -> dict:
     if not items:
         return _empty_response()
 
-    now = datetime.utcnow()
+    # Anchored to the restaurant's most recent order, not wall-clock time —
+    # see ai/analysis_clock.py.
+    now = analysis_anchor(db, restaurant_id)
     thirty_days_ago = now - timedelta(days=30)
     seven_days_ago = now - timedelta(days=7)
 

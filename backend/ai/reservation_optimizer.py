@@ -42,7 +42,14 @@ def get_reservation_insights(db: Session, restaurant_id: int) -> dict:
     if not reservations:
         return _empty_response()
 
-    now = datetime.utcnow()
+    # Anchored to the restaurant's own most recent reservation, not
+    # wall-clock time — see ai/analysis_clock.py's docstring for why (this
+    # module isn't order-based, so it anchors to its own data directly
+    # rather than importing the order-based helper). Otherwise days_span
+    # below counts every day since the restaurant's first reservation up to
+    # today as "elapsed," even the days after historical data stops, which
+    # dilutes RevPASH and other per-day averages toward zero.
+    now = datetime.combine(max(r.reservation_date for r in reservations), datetime.min.time())
 
     # ── Core Counts ──
     total = len(reservations)

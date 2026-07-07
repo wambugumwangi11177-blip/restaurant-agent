@@ -20,8 +20,9 @@ Full-depth menu analytics including:
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, extract
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta
+from datetime import timedelta
 import models
+from ai.analysis_clock import analysis_anchor
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -36,7 +37,10 @@ def get_menu_engineering(db: Session, restaurant_id: int) -> dict:
     if not items:
         return _empty_response()
 
-    now = datetime.utcnow()
+    # Anchored to the restaurant's most recent order, not wall-clock time —
+    # see ai/analysis_clock.py. Historical/imported data that doesn't extend
+    # to today would otherwise make every window below empty.
+    now = analysis_anchor(db, restaurant_id)
     seven_days_ago = now - timedelta(days=7)
     thirty_days_ago = now - timedelta(days=30)
 
@@ -250,7 +254,7 @@ def get_upsell_pairs(db: Session, restaurant_id: int, top_n: int = 10) -> list:
     # patterns for upsell suggestions don't need 2+ years of history —
     # bounded to the last 30 days, matching the same window used elsewhere
     # in this file (get_menu_engineering's own recent/older comparison).
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    thirty_days_ago = analysis_anchor(db, restaurant_id) - timedelta(days=30)
     orders = (
         db.query(models.Order)
         .options(joinedload(models.Order.items))

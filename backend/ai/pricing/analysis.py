@@ -25,6 +25,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import NamedTuple
 import models
+from ai.analysis_clock import analysis_anchor
 
 # ── Constants ────────────────────────────────────────────────────────────────
 SURGE_THRESHOLD         = 1.30
@@ -71,7 +72,11 @@ def fetch_item_velocities(
         prior_daily   = qty in days 8-30 / 23
         ewm = 0.7 * recent_daily + 0.3 * prior_daily
     """
-    now             = datetime.utcnow()       # BUG-03 FIX: UTC, not EAT
+    # Anchored to the restaurant's most recent order, not wall-clock time —
+    # see ai/analysis_clock.py. Still UTC (BUG-03 fix preserved): orders are
+    # stored as naive UTC, so the anchor and the comparison below must stay
+    # in the same timezone-naive UTC space.
+    now             = analysis_anchor(db, restaurant_id)
     thirty_days_ago = now - timedelta(days=30)
     seven_days_ago  = now - timedelta(days=7)
     alpha           = 0.7

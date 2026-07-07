@@ -20,9 +20,10 @@ Full-depth kitchen analytics including:
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import timedelta
 import math
 import models
+from ai.analysis_clock import analysis_anchor
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -30,7 +31,9 @@ import models
 # ─────────────────────────────────────────────────────────────────────────────
 def get_kds_intelligence(db: Session, restaurant_id: int) -> dict:
     """Exhaustive kitchen performance intelligence."""
-    now = datetime.utcnow()
+    # Anchored to the restaurant's most recent order, not wall-clock time —
+    # see ai/analysis_clock.py.
+    now = analysis_anchor(db, restaurant_id)
     thirty_days_ago = now - timedelta(days=30)
 
     # Two fixes found 2026-07-07 against real production data (a restaurant

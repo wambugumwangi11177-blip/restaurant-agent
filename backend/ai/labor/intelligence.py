@@ -21,6 +21,7 @@ from collections import defaultdict
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 import models
+from ai.analysis_clock import analysis_anchor
 
 HEALTHY_LABOR_PCT_MAX = 30.0   # Labor cost % of revenue target
 OVERTIME_HOURS_DAILY  = 8.0    # Hours after which overtime applies
@@ -28,7 +29,9 @@ OVERTIME_HOURS_DAILY  = 8.0    # Hours after which overtime applies
 
 def get_labor_intelligence(db: Session, restaurant_id: int) -> dict:
     """Complete labor analytics for the last 30 days."""
-    now              = datetime.utcnow()
+    # Anchored to the restaurant's most recent order, not wall-clock time —
+    # see ai/analysis_clock.py.
+    now              = analysis_anchor(db, restaurant_id)
     thirty_days_ago  = now - timedelta(days=30)
 
     shifts = db.query(models.LaborShift).filter(

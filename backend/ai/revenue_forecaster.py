@@ -24,6 +24,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 import math
 import models
+from ai.analysis_clock import analysis_anchor
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -31,7 +32,10 @@ import models
 # ─────────────────────────────────────────────────────────────────────────────
 def get_revenue_forecast(db: Session, restaurant_id: int) -> dict:
     """Exhaustive revenue intelligence."""
-    now = datetime.utcnow()
+    # Anchored to the restaurant's most recent order, not wall-clock time —
+    # see ai/analysis_clock.py. Historical/imported data that doesn't extend
+    # to today would otherwise make this "last 30 days" window empty.
+    now = analysis_anchor(db, restaurant_id)
     thirty_days_ago = now - timedelta(days=30)
 
     # Severe N+1 fix (found 2026-07-07 against real production data — a

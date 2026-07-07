@@ -22,16 +22,23 @@ import os
 import sys
 from dotenv import load_dotenv
 
-# Add the project root to sys.path so we can import backend.models
-# env.py is in backend/alembic/env.py
-# abspath(__file__) -> .../backend/alembic/env.py
-# dirname -> .../backend/alembic
-# dirname -> .../backend
-# dirname -> .../Restaurant Agent
-root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append(root_dir)
+# Add the backend/ directory to sys.path so we can import models directly —
+# matching the plain `import models` convention used everywhere else in this
+# codebase (main.py, routers/*.py, etc.), NOT `from backend.models import`.
+#
+# The previous version assumed a wrapping repo_root/backend/ layout (3 levels
+# up from this file) and did `from backend.models import Base`. That works
+# when running locally with cwd inside backend/ (there's a real repo root
+# above it), but breaks inside the deployed Docker container: the Dockerfile's
+# build context IS backend/, so WORKDIR /app contains models.py directly —
+# there is no wrapping "backend" package at all in the container, causing
+# `ModuleNotFoundError: No module named 'backend'` on every real deploy
+# (found 2026-07-07, Railway crash log). Only 2 levels up (env.py -> alembic
+# -> backend/, or /app in the container) is correct in both environments.
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(backend_dir)
 
-from backend.models import Base
+from models import Base
 target_metadata = Base.metadata
 
 load_dotenv()

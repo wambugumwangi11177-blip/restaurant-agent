@@ -254,27 +254,15 @@ export default function AiDashboard() {
                 ))}
             </div>
 
-            {/* AI pages links */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {[
-                    { href: "/dashboard/ai/pricing", label: "Pricing Intelligence", icon: TrendingUp, desc: "Surge, reprice, stimulate" },
-                    { href: "/dashboard/ai/labor",   label: "Labor Optimization",   icon: Activity,   desc: "Staffing & cost analysis" },
-                    { href: "/dashboard/ai/menu",    label: "Menu Engineering",      icon: Brain,      desc: "Stars, dogs, margin leaks" },
-                ].map((link) => (
-                    <Link
-                        key={link.href}
-                        href={link.href}
-                        className="flex items-center gap-3 rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-4 hover:border-[#d4a853]/40 hover:bg-[#141414] transition-colors group"
-                    >
-                        <link.icon className="w-5 h-5 text-[#d4a853]" />
-                        <div>
-                            <p className="text-sm font-medium text-[#e5e5e5]">{link.label}</p>
-                            <p className="text-xs text-[#525252]">{link.desc}</p>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-[#525252] ml-auto group-hover:text-[#d4a853] transition-colors" />
-                    </Link>
-                ))}
-            </div>
+            {/* AI modules — inline, not separate pages. These used to link to
+                /dashboard/ai/pricing, /dashboard/ai/labor, /dashboard/ai/menu,
+                none of which exist (a 404 on every click) — found 2026-07-07
+                from a user report. Each section fetches and renders itself
+                independently, so one module erroring doesn't take down the
+                others or force a page navigation to see what's wrong. */}
+            <PricingSection />
+            <LaborSection />
+            <MenuEngineeringSection />
 
             {/* Risks + Opportunities */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -345,6 +333,183 @@ export default function AiDashboard() {
                     </div>
                 )}
             </div>
+        </div>
+    );
+}
+
+/* ── Inline AI module sections ─────────────────────────────────────────── */
+
+function ModuleShell({
+    icon: Icon, title, loading, error, onRetry, children,
+}: {
+    icon: any; title: string; loading: boolean; error: string; onRetry: () => void; children: React.ReactNode;
+}) {
+    return (
+        <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
+            <h2 className="text-sm font-semibold text-[#e5e5e5] mb-4 flex items-center gap-2">
+                <Icon className="w-4 h-4 text-[#d4a853]" />
+                {title}
+            </h2>
+            {loading ? (
+                <div className="space-y-2">
+                    <div className="bg-[#141414] rounded-lg h-16 animate-pulse" />
+                </div>
+            ) : error ? (
+                <div className="flex items-center justify-between gap-3 py-2">
+                    <p className="text-[#525252] text-sm">{error}</p>
+                    <button onClick={onRetry} className="text-xs text-[#d4a853] hover:underline flex-shrink-0">Retry</button>
+                </div>
+            ) : (
+                children
+            )}
+        </div>
+    );
+}
+
+function useAiModule<T>(endpoint: string) {
+    const [data, setData] = useState<T | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    const fetchData = async () => {
+        setLoading(true);
+        setError("");
+        try {
+            const res = await api.get(endpoint);
+            // _safe_run on the backend returns 200 with {error, available:false}
+            // on internal failure rather than an HTTP error status — surface
+            // that as a real error here instead of rendering undefined fields.
+            if (res.data && res.data.available === false) {
+                setError(res.data.error || "This module hit an error analysing your data");
+            } else {
+                setData(res.data);
+            }
+        } catch (e: any) {
+            setError(e?.response?.data?.detail || e?.message || "Could not load this module");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchData(); }, [endpoint]);
+
+    return { data, loading, error, retry: fetchData };
+}
+
+function PricingSection() {
+    interface PricingData {
+        summary: { surge_opportunities: number; reprice_needed: number; stimulate_candidates: number; total_revenue_opportunity_cents: number; items_analysed: number };
+        recommendations: { item_id: number; item_name: string; type: string; current_price: number; suggested_price: number; monthly_impact_cents: number; reason: string }[];
+    }
+    const { data, loading, error, retry } = useAiModule<PricingData>("/ai/pricing");
+
+    return (
+        <ModuleShell icon={TrendingUp} title="Pricing Intelligence" loading={loading} error={error} onRetry={retry}>
+            {data && (
+                <>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                        <MiniStat label="Surge" value={data.summary.surge_opportunities} />
+                        <MiniStat label="Reprice" value={data.summary.reprice_needed} />
+                        <MiniStat label="Stimulate" value={data.summary.stimulate_candidates} />
+                        <MiniStat label="Opportunity" value={formatKES(data.summary.total_revenue_opportunity_cents)} />
+                    </div>
+                    {data.recommendations.length === 0 ? (
+                        <p className="text-[#525252] text-sm">No pricing changes recommended right now — {data.summary.items_analysed} items analysed.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {data.recommendations.slice(0, 5).map((r) => (
+                                <div key={r.item_id} className="flex items-center justify-between py-2 border-b border-[#1a1a1a] last:border-0 text-sm">
+                                    <div>
+                                        <p className="text-[#e5e5e5]">{r.item_name}</p>
+                                        <p className="text-xs text-[#525252]">{r.reason}</p>
+                                    </div>
+                                    <span className="text-emerald-400 text-xs font-medium whitespace-nowrap">+{formatKES(r.monthly_impact_cents)}/mo</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </>
+            )}
+        </ModuleShell>
+    );
+}
+
+function LaborSection() {
+    interface LaborData {
+        summary: { total_labor_cost_30d: number; labor_pct: number; labor_status: string; sales_per_hour: number; overtime_cost_30d: number };
+        recommendations: { priority: string; message: string; action: string }[];
+    }
+    const { data, loading, error, retry } = useAiModule<LaborData>("/ai/labor");
+
+    return (
+        <ModuleShell icon={Activity} title="Labor Optimization" loading={loading} error={error} onRetry={retry}>
+            {data && (
+                <>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                        <MiniStat label="Labor Cost (30d)" value={formatKES(data.summary.total_labor_cost_30d)} />
+                        <MiniStat label="Labor %" value={`${data.summary.labor_pct}%`} tone={data.summary.labor_status === "HIGH" ? "warn" : "ok"} />
+                        <MiniStat label="Sales/Hour" value={formatKES(data.summary.sales_per_hour)} />
+                        <MiniStat label="Overtime Cost" value={formatKES(data.summary.overtime_cost_30d)} />
+                    </div>
+                    {data.recommendations.length === 0 ? (
+                        <p className="text-[#525252] text-sm">Staffing looks well balanced.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {data.recommendations.slice(0, 4).map((r, i) => (
+                                <div key={i} className="p-3 rounded-lg bg-[#141414] border border-[#1a1a1a] text-sm">
+                                    <p className="text-[#e5e5e5]">{r.message}</p>
+                                    {r.action && <p className="text-xs text-[#d4a853] mt-1">💡 {r.action}</p>}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </>
+            )}
+        </ModuleShell>
+    );
+}
+
+function MenuEngineeringSection() {
+    interface MenuData {
+        summary: { total_items: number; stars: number; plowhorses: number; puzzles: number; dogs: number; avg_food_cost_pct: number };
+        recommendations: { item: string; action: string; reason: string; priority: string; impact: string }[];
+    }
+    const { data, loading, error, retry } = useAiModule<MenuData>("/ai/menu-engineering");
+
+    return (
+        <ModuleShell icon={Brain} title="Menu Engineering" loading={loading} error={error} onRetry={retry}>
+            {data && (
+                <>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                        <MiniStat label="Stars" value={data.summary.stars} tone="ok" />
+                        <MiniStat label="Plowhorses" value={data.summary.plowhorses} />
+                        <MiniStat label="Puzzles" value={data.summary.puzzles} />
+                        <MiniStat label="Dogs" value={data.summary.dogs} tone={data.summary.dogs > 3 ? "warn" : undefined} />
+                    </div>
+                    {(!data.recommendations || data.recommendations.length === 0) ? (
+                        <p className="text-[#525252] text-sm">{data.summary.total_items} menu items analysed — no urgent changes flagged.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {data.recommendations.slice(0, 4).map((r, i) => (
+                                <div key={i} className="p-3 rounded-lg bg-[#141414] border border-[#1a1a1a] text-sm">
+                                    <p className="text-[#e5e5e5]">{r.item} — {r.action}</p>
+                                    <p className="text-xs text-[#525252] mt-0.5">{r.reason}</p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </>
+            )}
+        </ModuleShell>
+    );
+}
+
+function MiniStat({ label, value, tone }: { label: string; value: string | number; tone?: "ok" | "warn" }) {
+    const color = tone === "warn" ? "text-red-400" : tone === "ok" ? "text-emerald-400" : "text-[#e5e5e5]";
+    return (
+        <div className="rounded-lg bg-[#141414] border border-[#1a1a1a] p-3">
+            <p className="text-xs text-[#525252] mb-1">{label}</p>
+            <p className={`text-sm font-bold ${color}`}>{value}</p>
         </div>
     );
 }

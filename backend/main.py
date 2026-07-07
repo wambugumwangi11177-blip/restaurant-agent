@@ -172,13 +172,23 @@ def _check_late_purchase_orders():
 
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
-
-default_origins = "http://localhost:3000,http://127.0.0.1:3000,http://192.168.100.4:3000"
-cors_origins = os.getenv("CORS_ORIGINS", default_origins).split(",")
+# Real Vercel production domain is included as a fallback default (not just
+# localhost) — found 2026-07-07 that a misconfigured/placeholder CORS_ORIGINS
+# on Railway silently breaks frontend login with a browser-side "network
+# error" (CORS preflight is rejected before the request body is ever sent,
+# so the backend logs show nothing — this is invisible without checking the
+# preflight response directly). CORS_ORIGINS env var still takes priority
+# when set correctly; this is a safety net, not a replacement for setting it.
+default_origins = (
+    "http://localhost:3000,http://127.0.0.1:3000,http://192.168.100.4:3000,"
+    "https://restaurant-agent-o38i.vercel.app"
+)
+cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", default_origins).split(",")]
+logger.info(f"[CORS] Allowed origins: {cors_origins}")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in cors_origins],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

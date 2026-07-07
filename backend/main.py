@@ -17,6 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai
 from middleware.timing import TimingMiddleware
+from middleware.security_headers import SecurityHeadersMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -29,20 +30,17 @@ try:
 except Exception:
     pass
 
-# ── Rate limiting (optional — gracefully skipped if slowapi not installed) ────
-try:
-    from slowapi import Limiter, _rate_limit_exceeded_handler
-    from slowapi.util import get_remote_address
-    from slowapi.errors import RateLimitExceeded
-    limiter = Limiter(key_func=get_remote_address)
-    _slowapi_available = True
-except ImportError:
-    _slowapi_available = False
-    logger.warning("[Startup] slowapi not installed — rate limiting disabled. Run: pip install slowapi")
+# ── Rate limiting ───────────────────────────────────────────────────────────
+# limiter now lives in rate_limit.py so routers can import it too — see that
+# file's docstring for why (it was configured here but never applied to any
+# endpoint, since routers importing from main.py would be circular).
+from rate_limit import limiter, SLOWAPI_AVAILABLE
 
 app = FastAPI(title="Restaurant Agent API", version="2.0.0")
 
-if _slowapi_available:
+if SLOWAPI_AVAILABLE:
+    from slowapi import _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -213,6 +211,7 @@ app.add_middleware(
 )
 
 app.add_middleware(TimingMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 

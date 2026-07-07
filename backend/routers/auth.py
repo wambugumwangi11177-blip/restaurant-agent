@@ -13,14 +13,24 @@ FIXES:
     from the onboarding wizard.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timedelta
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from database import get_db
 import models, auth
 from pydantic import BaseModel
 from routers.deps import get_restaurant_or_none
+from rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+
+# Security hardening pass (2026-07-07): login had zero brute-force protection
+# — no rate limiting was ever actually applied anywhere (slowapi was
+# configured but no route used it), and no failed-attempt tracking existed
+# at all. Both fixed together: rate limiting is the first line of defense
+# (per-IP), lockout is the second (per-account, survives IP rotation).
+MAX_FAILED_ATTEMPTS = 5
+LOCKOUT_MINUTES = 15
 
 
 # ── Request / Response schemas ────────────────────────────────────────────────
@@ -52,7 +62,8 @@ class RestaurantUpdate(BaseModel):
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=Token)
-async def register(user_data: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/hour")
+async def register(request: Request, user_data: UserCreate, db: Session = Depends(get_db)):
     # Guard: duplicate email
     if db.query(models.User).filter(models.User.email == user_data.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -102,14 +113,37 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(request: Request, login_data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == login_data.email).first()
+
+    # Lockout check FIRST, before touching the password at all — rejects
+    # locked accounts without a password-verification timing signal.
+    if user and user.locked_until and user.locked_until > datetime.utcnow():
+        remaining = int((user.locked_until - datetime.utcnow()).total_seconds() / 60) + 1
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Account temporarily locked due to repeated failed logins. Try again in {remaining} minute(s).",
+        )
+
     if not user or not auth.verify_password(login_data.password, user.hashed_password):
+        if user:
+            user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+            if user.failed_login_attempts >= MAX_FAILED_ATTEMPTS:
+                user.locked_until = datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+            db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # Successful login — reset the counter.
+    if user.failed_login_attempts or user.locked_until:
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        db.commit()
+
     access_token = auth.create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
 

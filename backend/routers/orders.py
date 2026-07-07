@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from rate_limit import limiter
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from datetime import datetime
@@ -169,12 +170,19 @@ async def update_order_payment(
 # ── Public endpoint (no auth) for customer ordering ──
 
 @router.post("/public", response_model=schemas.OrderOut)
+@limiter.limit("20/minute")
 async def create_public_order(
+    request: Request,
     order: schemas.OrderCreate,
     restaurant_id: int = Query(...),
     db: Session = Depends(get_db),
 ):
-    """Customer-facing order endpoint — no login required."""
+    """
+    Customer-facing order endpoint — no login required. Rate limited
+    (security pass 2026-07-07): unauthenticated, and a real M-Pesa STK push
+    can be triggered per request — unlimited requests here means both order-
+    spam/DB-bloat risk and a real cost/abuse vector once M-Pesa is live.
+    """
     restaurant = db.query(models.Restaurant).filter(
         models.Restaurant.id == restaurant_id
     ).first()

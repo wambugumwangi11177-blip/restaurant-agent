@@ -7,6 +7,77 @@ run on this system, with an explicit verification method for each item — not j
 but "checked." Update this file's checkboxes as work lands; don't let it drift into
 aspirational copy the way the original sprint plan did.
 
+## Auth/perimeter security hardening pass (2026-07-07, second pass)
+Prompted by an explicit "check the security, protect it from hacking in all the ways
+possible" request. Scope: authentication abuse, response hardening, and a systematic
+audit of the classic web attack surface (SQLi, XSS, verbose errors, dependency CVEs).
+Every fix below is verified — either with a new passing test or a direct grep/build check,
+not just "should be fine."
+
+**Login had zero brute-force protection (was: no failed-attempt tracking, and slowapi was
+configured in `main.py` but never actually applied to any route — a circular-import
+problem, since routers importing from `main.py` would be circular).** Fixed with two
+complementary layers: (1) extracted the shared `Limiter` into new `rate_limit.py` so both
+`main.py` and router files can import it; applied `@limiter.limit("10/minute")` to
+`/api/v1/auth/login`, `@limiter.limit("5/hour")` to `/api/v1/auth/register`, and
+`@limiter.limit("20/minute")` to the unauthenticated `/orders/public` (real M-Pesa STK-push
+cost/abuse vector). (2) Added per-account lockout — `User.failed_login_attempts` /
+`User.locked_until` columns (migration `007_add_login_lockout_fields.py`, idempotent via
+the established inspector-check pattern), 5 failed attempts locks the account for 15
+minutes. Lockout is checked *before* password verification, so a locked account never
+leaks a password-verification timing signal. Rate limiting defends per-IP (defeated by
+proxy rotation); lockout defends per-account (survives IP rotation) — deliberately layered,
+neither alone is sufficient. Tests: `test_auth_security.py` (4 tests — account actually
+locks at the threshold, correct login resets the counter, both rate limits actually return
+429 rather than just having the decorator present).
+  - Test-isolation hazard found while writing these tests: slowapi's `Limiter` is a
+    process-wide in-memory singleton keyed by IP, same class of hazard as the existing
+    `database.py`/`executive.py`/`events/bus.py` singletons documented in `conftest.py`.
+    Without resetting it, an earlier test's counters bleed into a later, unrelated test.
+    Fixed: `limiter.reset()` added to the `db_env` fixture, documented as hazard #4.
+
+**No security response headers anywhere (was: every response, including the JSON API
+responses served to the frontend, was missing browser-enforced defenses).** New
+`middleware/security_headers.py`: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+`Referrer-Policy: strict-origin-when-cross-origin`, a restrictive `Permissions-Policy`, and
+HSTS (safe unconditionally — Railway terminates TLS in front of this app). No CSP set here
+deliberately: this is a JSON API, CSP is the frontend's (Vercel/Next.js) responsibility for
+the pages it actually renders.
+
+**SQLi / XSS / verbose-error audit (systematic grep, not spot-check).** SQL injection:
+grepped for `execute(`, `text(`, and raw string-formatted SQL across `backend/`— the only
+raw `execute()` calls found are static strings (`SELECT 1` health check, static DDL in
+migration `001`); everything else goes through the SQLAlchemy ORM/query-builder. No
+finding. XSS: grepped frontend for `dangerouslySetInnerHTML`/`eval(` — one use in
+`layout.tsx`, but it's a hardcoded static service-worker-registration script with no user
+input flowing into it. No finding. Verbose errors: grepped for `HTTPException(status_code=500`
+and `detail=str(e)` patterns — none found; the one `exc_info=True` in `routers/ai.py` is a
+server-side log call, not returned to the client. No finding.
+
+**Frontend dependency CVEs (`npm audit`: 14 findings — 1 low, 7 moderate, 6 high).** Ran
+`npm audit fix` (non-breaking): resolved 10 of 14, down to 4 remaining (3 moderate, 1 high
+— Next.js DoS/cache-poisoning/SSRF advisories, and a `uuid` bounds-check issue pulled in via
+`next-auth`). Verified `npm run build` still succeeds after the fix. The remaining 4 only
+resolve via `npm audit fix --force`, which bumps Next.js to `16.2.10` (major version, outside
+the current dependency range) and downgrades `next-auth` to `3.29.10` (breaking change to
+the actual login flow). Deliberately deferred rather than bundled into this pass — none of
+the 4 are critical/RCE, and stacking a breaking auth-library downgrade on top of changes to
+the login endpoint's own security logic is exactly the kind of compounded risk that deserves
+its own dedicated test window, not a same-pass bundle.
+
+### Deliberately NOT done (real, currently-outstanding — flagged, not fixed)
+- **Neon production DB password rotation.** The current password has been pasted into chat
+  multiple times this session while debugging migrations — anyone with access to that
+  conversation history has it. User explicitly asked to skip rotating it in this pass.
+  **This is a live exposure, not a theoretical one — rotate via the Neon dashboard + update
+  the Railway `DATABASE_URL` env var as soon as convenient.**
+- **JWT stored in frontend `localStorage`.** Vulnerable to exfiltration via any XSS that
+  does land (defense-in-depth gap, not an active hole given the XSS audit above found
+  nothing exploitable today). Migrating to an httpOnly cookie is a real frontend+backend
+  change (CSRF handling needed once you're off a Bearer header), not done in this pass.
+- **`npm audit --force` (Next.js 16.2.10 + next-auth 3.29.10).** See above — real fix,
+  deliberately deferred pending a dedicated test window for the login flow.
+
 ## Security + engineering hardening pass (2026-07-07)
 A dedicated security review and engineering-quality review of the session's changes ran,
 and every actioned finding was fixed with a regression test proving it. Suite grew 40 → 44.

@@ -24,6 +24,14 @@ Two hazards specific to this codebase, handled explicitly below:
    accumulates duplicate subscriptions — a later test would see each event
    handler fire multiple times (e.g. duplicate WhatsApp sends, duplicate
    audit log writes) with no error raised. Must `clear_handlers()` first.
+
+4. `rate_limit.py`'s `limiter` is also a process-wide singleton (in-memory
+   request counters keyed by IP). Without resetting it, a rate-limit test
+   earlier in the run leaves counters that make a LATER, unrelated test hit
+   429s it shouldn't — or a lockout test's failed-login attempts get cut
+   short by the rate limiter before reaching the lockout threshold. Reset
+   before every test, not just rate-limit tests, since any test hitting
+   auth/order endpoints shares the same counters.
 """
 
 import importlib
@@ -57,6 +65,10 @@ def db_env(tmp_path, monkeypatch):
 
     from events.bus import clear_handlers
     clear_handlers()
+
+    from rate_limit import limiter, SLOWAPI_AVAILABLE
+    if SLOWAPI_AVAILABLE:
+        limiter.reset()
 
     yield db_path
 

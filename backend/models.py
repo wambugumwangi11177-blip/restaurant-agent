@@ -75,7 +75,9 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     role = Column(SqEnum(Role), default=Role.STAFF)
-    
+    failed_login_attempts = Column(Integer, default=0)   # brute-force lockout (2026-07-07 security pass)
+    locked_until = Column(DateTime, nullable=True)         # None = not locked
+
     tenant = relationship("Tenant", back_populates="users")
 
 # ──────────────────────────────────────────────

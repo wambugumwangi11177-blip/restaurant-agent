@@ -76,12 +76,28 @@ async def update_reservation_status(
         raise HTTPException(status_code=404, detail="Reservation not found")
 
     try:
-        reservation.status = models.ReservationStatus(update.status)
+        new_status = models.ReservationStatus(update.status)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid status: {update.status}")
 
+    was_no_show = reservation.status == models.ReservationStatus.NO_SHOW
+    reservation.status = new_status
     db.commit()
     db.refresh(reservation)
+
+    # RESERVATION_NO_SHOW was subscribed to by executive.py (records into
+    # ai/memory/store.py, triggers winback logic) but nothing ever emitted
+    # it — found 2026-07-07 auditing the event orchestration end to end.
+    # Only fire on the actual transition into NO_SHOW, not every PATCH.
+    if new_status == models.ReservationStatus.NO_SHOW and not was_no_show:
+        from events.bus import emit_async, EventType
+        emit_async(EventType.RESERVATION_NO_SHOW, {
+            "restaurant_id": restaurant.id,
+            "customer_name": reservation.customer_name or "",
+            "customer_phone": reservation.customer_phone or "",
+            "party_size": reservation.party_size or 0,
+        })
+
     return _res_to_dict(reservation)
 
 

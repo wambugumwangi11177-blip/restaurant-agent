@@ -156,7 +156,7 @@ def get_pending_recommendations(db: Session, restaurant_id: int) -> list[dict]:
     ]
 
 
-def approve_recommendation(db: Session, rec_id: int, restaurant_id: int) -> dict:
+def approve_recommendation(db: Session, rec_id: int, restaurant_id: int, approved_by: str = "unknown") -> dict:
     """
     Approve a recommendation. Updates MenuItem price, marks APPROVED.
     Cross-tenant guard: validates item belongs to this restaurant.
@@ -189,6 +189,20 @@ def approve_recommendation(db: Session, rec_id: int, restaurant_id: int) -> dict
     rec.status      = "APPROVED"
     rec.actioned_at = datetime.utcnow()
     db.commit()
+
+    # RECOMMENDATION_APPROVED was subscribed to by executive.py (records into
+    # ai/memory/store.py, schedules day-7/day-14 outcome evaluation) but
+    # nothing ever emitted it — found 2026-07-07 auditing the event
+    # orchestration end to end.
+    from events.bus import emit_async, EventType
+    emit_async(EventType.RECOMMENDATION_APPROVED, {
+        "restaurant_id": restaurant_id,
+        "recommendation_id": rec.id,
+        "item_name": item.name,
+        "old_price": old_price,
+        "new_price": rec.suggested_price,
+        "approved_by": approved_by,
+    })
 
     return {
         "success":    True,

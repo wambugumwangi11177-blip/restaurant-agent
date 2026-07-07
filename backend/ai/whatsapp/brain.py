@@ -191,6 +191,7 @@ def get_critical_stock_alerts(db: Session, restaurant_id: int) -> list[dict]:
         severity = "URGENT" if hours_remaining <= STOCK_CRITICAL_HOURS else "WARNING"
         action   = f"Reorder now — ~{int(hours_remaining)}h remaining" if hours_remaining < 24 else "Reorder today"
         alerts.append({
+            "inventory_item_id": item.id,
             "item_name":       item.item_name,
             "current_qty":     item.quantity,
             "unit":            item.unit,
@@ -555,7 +556,7 @@ def _cmd_help(db: Session, restaurant_id: int) -> str:
 
 def _cmd_approve(db: Session, restaurant_id: int, rec_id: int) -> str:
     from ai.pricing import approve_recommendation
-    result = approve_recommendation(db, rec_id, restaurant_id)
+    result = approve_recommendation(db, rec_id, restaurant_id, approved_by="whatsapp_owner")
     if result.get("error"):
         return f"❌ {result['error']}"
     return compose_pricing_approved_message(result["item_name"], result["old_price"], result["new_price"])
@@ -609,11 +610,40 @@ def run_slow_day_check(SessionLocal) -> None:
 
 
 def run_stock_check(SessionLocal) -> None:
-    """Called by APScheduler every 2 hours during service (08:00–22:00 EAT)."""
+    """
+    Called by APScheduler every 2 hours during service (08:00-22:00 EAT).
+
+    Emits STOCK_CRITICAL / STOCK_DEPLETED — found 2026-07-07 auditing the
+    event orchestration end to end: ai/orchestrator/executive.py has
+    subscribed handlers for both (which record into ai/memory/store.py) but
+    this was the only place that could plausibly emit them, and it never did
+    — this scheduled job itself was also never registered until the same
+    audit. Both gaps had to be fixed together for either to matter.
+    """
+    from events.bus import emit_async, EventType
+
     db = SessionLocal()
     try:
         for restaurant in db.query(models.Restaurant).all():
-            urgent = [a for a in get_critical_stock_alerts(db, restaurant.id) if a["severity"] == "URGENT"]
+            alerts = get_critical_stock_alerts(db, restaurant.id)
+            urgent = [a for a in alerts if a["severity"] == "URGENT"]
+            depleted = [a for a in alerts if a["current_qty"] <= 0]
+
+            for item in depleted:
+                emit_async(EventType.STOCK_DEPLETED, {
+                    "restaurant_id": restaurant.id,
+                    "item_name": item["item_name"],
+                    "inventory_item_id": item["inventory_item_id"],
+                })
+            for item in urgent:
+                if item["current_qty"] > 0:  # avoid double-emitting depleted items as also "critical"
+                    emit_async(EventType.STOCK_CRITICAL, {
+                        "restaurant_id": restaurant.id,
+                        "item_name": item["item_name"],
+                        "hours_remaining": item["hours_remaining"],
+                        "inventory_item_id": item["inventory_item_id"],
+                    })
+
             if urgent:
                 owner_phone = owner_phone_for(restaurant)
                 if owner_phone:

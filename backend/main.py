@@ -97,6 +97,25 @@ def _start_scheduler():
             replace_existing=True,
         )
 
+        # ai/whatsapp/brain.py defines run_stock_check and run_slow_day_check
+        # with docstrings describing exactly this schedule, but neither was
+        # ever actually registered — found 2026-07-07 auditing the event/
+        # scheduler orchestration end to end. Both are real, already-tested
+        # functions (run_stock_check wraps get_critical_stock_alerts, already
+        # exercised via the WhatsApp STOCK command this session).
+        scheduler.add_job(
+            _run_stock_check_job,
+            CronTrigger(hour="8-22/2"),  # every 2 hours, 08:00-22:00 EAT window
+            id="stock_check",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _run_slow_day_check_job,
+            CronTrigger(hour=11, minute=0),  # 14:00 EAT — matches the function's own gate (only fires after 14:00 EAT)
+            id="slow_day_check",
+            replace_existing=True,
+        )
+
         scheduler.start()
         print("[OK] Scheduler started (morning briefing: 07:00 EAT)")
     except ImportError:
@@ -107,32 +126,13 @@ def _start_scheduler():
 
 def _send_all_morning_briefings():
     """Send WhatsApp morning briefing to every active restaurant owner."""
+    # Was a near-exact duplicate of ai.whatsapp.brain.run_morning_briefing —
+    # same DRY pattern already fixed elsewhere this session (routers/deps.py).
+    # Delegates to the real implementation instead of maintaining two copies.
     try:
         from database import SessionLocal
-        from ai.whatsapp.brain import compose_morning_briefing
-        from ai.whatsapp import send_whatsapp_message
-        import models
-
-        db = SessionLocal()
-        try:
-            from ai.whatsapp.brain import owner_phone_for
-            restaurants = db.query(models.Restaurant).all()
-            for restaurant in restaurants:
-                owner_phone = owner_phone_for(restaurant)
-                if not owner_phone:
-                    continue
-                try:
-                    msg = compose_morning_briefing(db, restaurant.id)
-                    send_whatsapp_message(
-                        owner_phone, msg, db=db,
-                        restaurant_id=restaurant.id,
-                        message_type="morning_briefing",
-                    )
-                    logger.info(f"[Briefing] Sent to restaurant {restaurant.id}")
-                except Exception as exc:
-                    logger.error(f"[Briefing] Failed for restaurant {restaurant.id}: {exc}")
-        finally:
-            db.close()
+        from ai.whatsapp.brain import run_morning_briefing
+        run_morning_briefing(SessionLocal)
     except Exception as exc:
         logger.error(f"[Briefing] Scheduler job failed: {exc}")
 
@@ -169,6 +169,24 @@ def _check_late_purchase_orders():
             db.close()
     except Exception as exc:
         logger.error(f"[PO Check] Failed: {exc}")
+
+
+def _run_stock_check_job():
+    try:
+        from database import SessionLocal
+        from ai.whatsapp.brain import run_stock_check
+        run_stock_check(SessionLocal)
+    except Exception as exc:
+        logger.error(f"[Stock Check] Scheduler job failed: {exc}")
+
+
+def _run_slow_day_check_job():
+    try:
+        from database import SessionLocal
+        from ai.whatsapp.brain import run_slow_day_check
+        run_slow_day_check(SessionLocal)
+    except Exception as exc:
+        logger.error(f"[Slow Day Check] Scheduler job failed: {exc}")
 
 
 # ── CORS ──────────────────────────────────────────────────────────────────────

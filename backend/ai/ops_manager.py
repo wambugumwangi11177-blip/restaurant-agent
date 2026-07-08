@@ -147,7 +147,12 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
         "today_orders": today_orders,
         "today_revenue": today_revenue,
         "yesterday_revenue": yesterday_revenue,
-        "day_over_day_change": round(((today_revenue - yesterday_revenue) / yesterday_revenue) * 100, 1) if yesterday_revenue >= 100_000 else 0,
+        # Guard against divide-by-zero only. The old guard was
+        # `yesterday_revenue >= 100_000` (KES 1,000 in cents), which silently
+        # reported a flat 0% for any day under a thousand shillings — the UI
+        # renders that 0 as a real figure, so a low-volume venue whose takings
+        # doubled saw "0.0%". A zero denominator is undefined; KES 900 is not.
+        "day_over_day_change": round(((today_revenue - yesterday_revenue) / yesterday_revenue) * 100, 1) if yesterday_revenue > 0 else 0,
         "pending_orders": pending_orders,
         "menu_items": menu_data.get("summary", {}).get("total_items", 0),
         "total_revenue_30d": revenue_data.get("trends", {}).get("total_revenue", 0),

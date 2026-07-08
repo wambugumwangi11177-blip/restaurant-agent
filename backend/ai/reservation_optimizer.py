@@ -24,6 +24,7 @@ from sqlalchemy import func
 from collections import defaultdict
 from datetime import datetime, timedelta
 import models
+from ai.analysis_clock import analysis_anchor
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -159,13 +160,52 @@ def get_reservation_insights(db: Session, restaurant_id: int) -> dict:
     # ─────────────────────────────────────────────
     # 2. REVENUE IMPACT
     # ─────────────────────────────────────────────
-    dine_in_orders = db.query(models.Order).filter(
-        models.Order.restaurant_id == restaurant_id,
-        models.Order.order_type == models.OrderType.DINE_IN,
-        models.Order.status != models.OrderStatus.CANCELLED,
-    ).all()
-    total_dine_revenue = sum(o.total or 0 for o in dine_in_orders)
-    avg_spend_per_guest = int(total_dine_revenue / max(sum(r.party_size for r in completed), 1))
+    # Two bugs fixed here 2026-07-08, both on the AI-dashboard hot path
+    # (ops_manager.get_operations_dashboard -> here):
+    #
+    #  1. PERF. This used `.all()` over every DINE_IN order the restaurant has
+    #     ever taken (~107k rows in prod) and summed them in Python, just to
+    #     produce one integer. It's a SQL aggregate — no rows need to cross the
+    #     wire. Every other hot module was bounded to 30 days; this was missed.
+    #
+    #  2. CORRECTNESS. `avg_spend_per_guest` is a *rate* (revenue per seated
+    #     guest) and it feeds three downstream money estimates
+    #     (revenue_lost_to_no_shows, per-table revenue, overbooking recovery).
+    #     Bounding the numerator to 30 days without bounding the denominator
+    #     would divide one month of revenue by every guest ever seated, driving
+    #     the rate — and everything derived from it — toward zero. Both sides
+    #     move to the same window.
+    #
+    # The window anchors to order activity (analysis_clock.analysis_anchor), not
+    # to `now` above, because `now` is the last *reservation* date and the two
+    # datasets need not end together. If that window is degenerate on either
+    # side (imported data whose orders and reservations don't overlap), fall
+    # back to the all-time ratio — the behaviour before this change.
+    order_anchor = analysis_anchor(db, restaurant_id)
+    revenue_window_start = order_anchor - timedelta(days=30)
+
+    def _dine_in_revenue(since=None) -> int:
+        q = db.query(func.coalesce(func.sum(models.Order.total), 0)).filter(
+            models.Order.restaurant_id == restaurant_id,
+            models.Order.order_type == models.OrderType.DINE_IN,
+            models.Order.status != models.OrderStatus.CANCELLED,
+        )
+        if since is not None:
+            q = q.filter(models.Order.created_at >= since)
+        return int(q.scalar() or 0)
+
+    windowed_revenue = _dine_in_revenue(since=revenue_window_start)
+    windowed_guests = sum(
+        r.party_size for r in completed
+        if r.reservation_date >= revenue_window_start.date()
+    )
+
+    if windowed_revenue and windowed_guests:
+        total_dine_revenue = windowed_revenue
+        avg_spend_per_guest = int(windowed_revenue / windowed_guests)
+    else:
+        total_dine_revenue = _dine_in_revenue()
+        avg_spend_per_guest = int(total_dine_revenue / max(sum(r.party_size for r in completed), 1))
 
     # Revenue lost to no-shows
     no_show_seats_lost = sum(r.party_size for r in no_shows)

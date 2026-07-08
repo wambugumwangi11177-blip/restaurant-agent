@@ -51,6 +51,7 @@ def register_all_handlers() -> None:
     subscribe(EventType.STOCK_DEPLETED,          on_stock_depleted)
     subscribe(EventType.RECOMMENDATION_APPROVED, on_recommendation_approved)
     subscribe(EventType.ORDER_PAID,              on_order_paid_mpesa)
+    subscribe(EventType.MPESA_PAYMENT_FAILED,    on_mpesa_payment_failed)
     subscribe(EventType.RESERVATION_NO_SHOW,     on_reservation_no_show)
     subscribe(EventType.PURCHASE_ORDER_LATE,     on_purchase_order_late)
     subscribe(EventType.AGENT_FAILED,            on_agent_failed)
@@ -114,8 +115,7 @@ def on_stock_critical(payload: dict) -> None:
         reasoning = " ".join(reasoning_parts)
 
         # Decision: compose WhatsApp alert
-        from ai.whatsapp import compose_stock_alert, send_whatsapp_message
-        import os
+        from ai.whatsapp import send_whatsapp_message
 
         msg = _compose_orchestrated_stock_alert(
             item_name     = item_name,
@@ -125,7 +125,9 @@ def on_stock_critical(payload: dict) -> None:
             past_stockouts = len(past_stockouts),
         )
 
-        owner_phone = os.getenv(f"OWNER_PHONE_{restaurant_id}", os.getenv("OWNER_PHONE", ""))
+        # Was env-var only, so a restaurant onboarded via the owner_phone column
+        # (migration 006) got no critical-stock alerts at all.
+        owner_phone = _owner_phone(restaurant)
         if owner_phone:
             send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
                                   message_type="orchestrated_stock_critical")
@@ -149,15 +151,42 @@ def on_stock_critical(payload: dict) -> None:
 
 
 def on_stock_depleted(payload: dict) -> None:
-    """Stock hit zero — auto-record in memory."""
+    """
+    Stock hit zero — auto-record in memory and tell the owner.
+
+    The WhatsApp send was added 2026-07-08 alongside removing brain.run_stock_check's
+    duplicate direct send. A depleted item whose recent usage is zero scores
+    WARNING (hours_remaining defaults to 999), so it never entered the `urgent`
+    list and never emitted STOCK_CRITICAL — the only handler that notified. Such
+    an item could sit at zero indefinitely and the owner would never be told.
+    Being out of stock is strictly more urgent than being nearly out.
+    """
     restaurant_id = payload.get("restaurant_id")
     item_name     = payload.get("item_name")
-    if restaurant_id and item_name:
-        db = SessionLocal()
-        try:
-            memory.auto_record_stockout(db, restaurant_id, item_name)
-        finally:
-            db.close()
+    if not (restaurant_id and item_name):
+        return
+
+    db = SessionLocal()
+    try:
+        memory.auto_record_stockout(db, restaurant_id, item_name)
+
+        restaurant = db.query(models.Restaurant).filter(
+            models.Restaurant.id == restaurant_id
+        ).first()
+        owner_phone = _owner_phone(restaurant)
+        if owner_phone:
+            from ai.whatsapp import send_whatsapp_message
+            msg = (
+                f"🚨 *Out of Stock*\n\n"
+                f"{item_name} has hit zero.\n"
+                f"Dishes using it cannot be served until it's restocked."
+            )
+            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+                                  message_type="stock_depleted")
+    except Exception as exc:
+        logger.error(f"[Orchestrator] on_stock_depleted failed: {exc}")
+    finally:
+        db.close()
 
 
 def on_recommendation_approved(payload: dict) -> None:
@@ -244,6 +273,77 @@ def on_order_paid_mpesa(payload: dict) -> None:
 
     except Exception as exc:
         logger.error(f"[Orchestrator] on_order_paid_mpesa failed: {exc}")
+    finally:
+        db.close()
+
+
+def _owner_phone(restaurant) -> str:
+    """
+    The owner's WhatsApp number, or "" if none is configured. Delegates to
+    `brain.owner_phone_for` (DB column first, legacy OWNER_PHONE_{id} /
+    OWNER_PHONE env vars as fallback) rather than re-implementing that
+    precedence — it must stay identical to the inbound resolution in
+    `routers/webhooks._resolve_restaurant_by_phone`, or an owner who can reply
+    to the bot can't be reached by it.
+    """
+    if restaurant is None:
+        return ""
+    from ai.whatsapp.brain import owner_phone_for
+    return owner_phone_for(restaurant)
+
+
+def on_mpesa_payment_failed(payload: dict) -> None:
+    """
+    An STK push was cancelled, timed out, or hit insufficient funds.
+
+    Until 2026-07-08 the M-Pesa webhook emitted MPESA_PAYMENT_FAILED and nothing
+    subscribed to it: the event went into the void, the order silently stayed
+    unpaid, and nobody — owner or customer — was told. Staff would find out when
+    the guest walked out on an unsettled tab.
+
+    The owner is the right recipient (not the customer): the customer already saw
+    the STK prompt fail on their handset, and messaging them again on a failed
+    payment is the kind of unsolicited traffic the opt-out policy exists to
+    prevent. Sends through `send_whatsapp_message`, the choke point that honours
+    opt-out, and writes an audit row either way so the failure is recoverable
+    even when no owner number is configured.
+    """
+    restaurant_id = payload.get("restaurant_id")
+    order_id      = payload.get("order_id")
+    reason        = (payload.get("reason") or "").strip() or "no reason given"
+
+    db = SessionLocal()
+    try:
+        restaurant = db.query(models.Restaurant).filter(
+            models.Restaurant.id == restaurant_id
+        ).first()
+
+        owner_phone = _owner_phone(restaurant)
+        if owner_phone:
+            from ai.whatsapp import send_whatsapp_message
+            msg = (
+                f"⚠️ *Payment Failed*\n\n"
+                f"M-Pesa payment for order #{order_id} did not go through.\n"
+                f"Reason: {reason}\n\n"
+                f"_The order is still marked unpaid._"
+            )
+            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+                                  message_type="mpesa_payment_failed")
+        else:
+            logger.warning(
+                f"[Orchestrator] M-Pesa payment failed for order {order_id} but no "
+                f"owner phone is configured for restaurant {restaurant_id} — nobody notified"
+            )
+
+        write_audit_log(
+            db, restaurant_id, "mpesa_payment_failed", "executive_orchestrator",
+            entity_type = "order",
+            entity_id   = order_id,
+            reasoning   = f"M-Pesa STK push failed: {reason}. Order left unpaid.",
+        )
+
+    except Exception as exc:
+        logger.error(f"[Orchestrator] on_mpesa_payment_failed failed: {exc}")
     finally:
         db.close()
 

@@ -22,6 +22,15 @@ Design choices, and why:
     PLUS common derivations (÷100 for cents→currency, ×100 for ratio→percent)
     and rounded forms. Matching is within a small relative tolerance so
     "58%" grounds against 58.3 but "23%" does NOT ground against 25.
+  • Sign is a representation choice too. A payload `revenue_mom_pct: -15.0` is
+    correctly rendered as "down 15%", "-15%", or "fell 15%" — so a number
+    grounds against the magnitude of a payload value as well as its signed
+    form. Before this (2026-07-08), `_NUMBER_RE` matched no minus sign and the
+    grounded set held only signed values, so *every* negative figure was
+    unmatchable: "Revenue down 15%" — the single most important line an owner
+    reads — was rewritten to "Revenue down [unverified]" and the narrative
+    marked verified=False. The guard was mutilating the correct number it
+    exists to protect.
   • Enforcement redacts in place rather than dropping whole sentences — the
     qualitative judgement survives; only the false digit is removed.
 """
@@ -40,11 +49,16 @@ _REL_TOL = 0.01
 
 _REDACTION = "[unverified]"
 
-# Matches: 1,234.56  |  1234  |  25%  |  KES 9,000  |  $12.50 — capturing the
-# numeric core and any %/currency context so we can decide if it's "checkable".
+# Matches: 1,234.56  |  1234  |  25%  |  KES 9,000  |  $12.50  |  -15% — capturing
+# the numeric core and any %/currency context so we can decide if it's "checkable".
+#
+# The leading minus is only consumed when it isn't preceded by a word char, "."
+# or "," — so a real negative ("down -15%", "(-15%)") is read as -15, while a
+# hyphen doing other work is not: "2026-07-08" still reads 2026/07/08 and the
+# range "15-20%" still reads 15 and 20, not 15 and -20.
 _NUMBER_RE = re.compile(
     r"(?P<cur>KES\s*|\$\s*|USD\s*)?"
-    r"(?P<num>\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)"
+    r"(?P<num>(?<![\w.,])-?(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?))"
     r"(?P<pct>\s*%)?",
     re.IGNORECASE,
 )
@@ -90,12 +104,27 @@ def _walk(obj, out: set) -> None:
 
 
 def _derivations(n: float) -> set:
-    """The forms a model might reasonably write a payload number as."""
-    forms = {n, round(n)}
-    forms.add(n / 100.0)      # cents -> currency units
-    forms.add(n * 100.0)      # ratio -> percent
-    forms.add(round(n / 100.0))
-    forms.add(round(n * 100.0))
+    """
+    The forms a model might reasonably write a payload number as.
+
+    Both the signed value and its magnitude are grounded: prose carries the sign
+    as a word ("revenue down 15%") far more often than as a glyph, so -15.0 must
+    ground "15" as readily as "-15".
+
+    Deliberately NOT included: the *rounded* forms of the ÷100 / ×100
+    derivations. `_REL_TOL` already absorbs the model rounding 25.3 → "25%" or
+    1234.56 → "KES 1,235", so those extra entries bought nothing and widened the
+    set — e.g. round(2547 / 100) = 25 would let an invented "25%" ground itself
+    against an unrelated payload count of 2547. A false redact costs UX; a false
+    pass costs trust. Bias to the former. `round(n)` on the base value stays —
+    it's how a model renders the figure it was actually handed.
+    """
+    forms: set = set()
+    for base in (n, abs(n)):
+        forms.add(base)
+        forms.add(float(round(base)))  # model rounds the value it was given
+        forms.add(base / 100.0)        # cents -> currency units
+        forms.add(base * 100.0)        # ratio -> percent
     return {float(f) for f in forms}
 
 
@@ -120,7 +149,9 @@ def _redact_text(text: str, grounded: set, ungrounded_out: list) -> str:
             value = float(num_str.replace(",", ""))
         except ValueError:
             return m.group(0)
-        if not checkable and value < _MIN_CHECKABLE_MAGNITUDE:
+        # abs(), not the raw value: a bare "-500" is a large figure worth
+        # policing, but `-500 < 10` would have waved it straight through.
+        if not checkable and abs(value) < _MIN_CHECKABLE_MAGNITUDE:
             return m.group(0)  # bare small integer — not policed
         if _is_grounded(value, grounded):
             return m.group(0)  # correct figure — leave it

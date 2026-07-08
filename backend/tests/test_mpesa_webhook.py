@@ -156,3 +156,60 @@ def test_tokenless_path_still_works_when_token_unset(client, db_session, monkeyp
 
     order = db_session.query(models.Order).filter(models.Order.id == 1).first()
     assert order.is_paid is True
+
+
+# ── Duplicate / concurrent settlement ─────────────────────────────────────────
+#
+# `if order.is_paid` is a lock-free read. Two Safaricom retries landing together
+# both pass it, both settle, and both emit ORDER_PAID -> two "payment confirmed"
+# WhatsApps and two audit rows. The conditional UPDATE moves the decision into
+# the DB, where it is atomic.
+
+def test_settle_order_once_is_atomic_under_a_real_race(db_session):
+    """
+    Deterministic interleave of the exact race: session A reads the order as
+    unpaid, session B settles it, then A tries to settle. Only one of them may
+    be told it won. (Two sessions, because the race is between two requests,
+    each with its own `Depends(get_db)` session.)
+    """
+    from routers.webhooks import _settle_order_once
+    import database
+
+    _seed(db_session)
+
+    session_a = database.SessionLocal()
+    session_b = database.SessionLocal()
+    try:
+        # A reads the order and sees is_paid=False — the lock-free read that
+        # made the old code think it was safe to proceed.
+        order_a = session_a.query(models.Order).filter(models.Order.id == 1).first()
+        assert order_a.is_paid is False
+
+        # B settles first and wins.
+        assert _settle_order_once(session_b, 1, "RECEIPT_B") is True
+
+        # A now settles on stale knowledge — the DB must refuse it.
+        assert _settle_order_once(session_a, 1, "RECEIPT_A") is False
+    finally:
+        session_a.close()
+        session_b.close()
+
+    db_session.expire_all()
+    order = db_session.query(models.Order).filter(models.Order.id == 1).first()
+    assert order.is_paid is True
+    assert order.mpesa_receipt == "RECEIPT_B"   # the winner's receipt, not overwritten
+
+
+def test_duplicate_callback_emits_order_paid_exactly_once(client, db_session, monkeypatch):
+    """End-to-end: two identical callbacks produce exactly one ORDER_PAID."""
+    import events.bus as bus
+
+    emitted = []
+    monkeypatch.setattr(bus, "emit_async", lambda et, payload: emitted.append((et, payload)))
+
+    _seed(db_session)
+    assert client.post("/webhooks/mpesa", json=_success_callback()).status_code == 200
+    assert client.post("/webhooks/mpesa", json=_success_callback()).status_code == 200
+
+    paid = [e for e in emitted if e[0] == bus.EventType.ORDER_PAID]
+    assert len(paid) == 1, f"expected exactly one ORDER_PAID, got {len(paid)}"

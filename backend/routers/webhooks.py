@@ -107,6 +107,38 @@ def _verify_mpesa_token(supplied: str | None) -> None:
         raise HTTPException(status_code=403, detail="Forbidden")
 
 
+def _settle_order_once(db: Session, order_id: int, receipt: str) -> bool:
+    """
+    Mark an order paid, exactly once, and report whether THIS caller was the one
+    that did it. Returns False if it was already settled.
+
+    The `WHERE is_paid = false` predicate is the whole point: it moves the
+    decision into the database, where it is atomic. Safaricom retries callbacks
+    aggressively, and the caller's earlier `if order.is_paid` check is a
+    lock-free read — two retries landing together both pass it, both settle, and
+    both emit ORDER_PAID, producing two "payment confirmed" WhatsApps to the
+    customer and two audit rows. Here exactly one UPDATE reports rowcount == 1,
+    and only that caller notifies.
+
+    Works identically on SQLite and Postgres: no SELECT FOR UPDATE, no advisory
+    lock, no dependence on the transaction isolation level.
+    """
+    rowcount = (
+        db.query(models.Order)
+        .filter(models.Order.id == order_id, models.Order.is_paid.is_(False))
+        .update(
+            {
+                models.Order.is_paid: True,
+                models.Order.payment_method: models.PaymentMethod.MPESA,
+                models.Order.mpesa_receipt: receipt,
+            },
+            synchronize_session=False,
+        )
+    )
+    db.commit()
+    return rowcount == 1
+
+
 @router.post("/mpesa")
 @limiter.limit("30/minute")
 async def mpesa_webhook_untokenized(request: Request, db: Session = Depends(get_db)):
@@ -189,10 +221,13 @@ async def _handle_mpesa_callback(request: Request, db: Session):
     # about settlement state. (Previously is_paid was set by the event handler
     # in a separate session/commit — if that swallowed an error, the ACK said
     # "success" to Safaricom while the order stayed unpaid, with no retry.)
-    order.is_paid = True
-    order.payment_method = models.PaymentMethod.MPESA
-    order.mpesa_receipt = meta["mpesa_receipt"]
-    db.commit()
+    #
+    # `_settle_order_once` is what makes this safe under concurrency, and it —
+    # not the `if order.is_paid` read above — is the real idempotency guarantee.
+    if not _settle_order_once(db, order.id, meta["mpesa_receipt"]):
+        # Another callback won the race and has already notified. Ack and stop.
+        logger.info(f"[MPesa Webhook] Order {order.id} settled concurrently - not re-notifying")
+        return _MPESA_ACK
 
     # Notification + audit are pure side-effects — fire-and-forget so a slow
     # Twilio call never blocks the callback ACK, and a notification failure

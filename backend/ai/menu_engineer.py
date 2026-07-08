@@ -26,6 +26,78 @@ from ai.analysis_clock import analysis_anchor
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# CLASSIFICATION CONSTANTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+# An item counts as "popular" at 70% of the mean units sold, not at the mean
+# itself. This is the standard Kasavana & Smith popularity index, and the reason
+# for it is that unit sales are strongly right-skewed: a couple of bestsellers
+# drag the arithmetic mean above what a perfectly healthy mid-list item sells.
+# Judging against the raw mean (as this did until 2026-07-08) therefore condemns
+# most of the menu — and "N Dog items" is a headline risk figure on the owner's
+# dashboard. On a menu of 10 where one item sells 500 and nine sell 50 each, the
+# mean is 95 and every one of those nine is a "Dog"; at 0.7 x mean the cutoff is
+# 66.5 and they still are, correctly, because they genuinely are unpopular
+# relative to the star. The index earns its keep on realistic spreads, where it
+# stops a solid seller a shade under the mean from being written off.
+POPULARITY_INDEX = 0.7
+
+# Weights for the 0-100 menu optimization score. Each component below is
+# normalised to [0, 1] first, and the weights sum to 1, so the score is bounded
+# by construction rather than by a clamp.
+#
+# Replaces `stars_pct*130 + (1-dogs_pct)*70 - food_cost*0.5 + rising_count*3`,
+# which had no defensible basis and, worse, was not bounded: `rising_count` is a
+# raw count of items, so a large menu with many rising items could contribute
+# hundreds of points and peg the score at 100 regardless of profitability. It
+# was rendered to owners as a precise 0-100 metric.
+W_PORTFOLIO   = 0.60   # what the menu is made of — this IS menu engineering
+W_COST        = 0.25   # how efficiently it's costed
+W_MOMENTUM    = 0.15   # which way it's trending; noisiest signal, least weight
+
+# Credit each quadrant contributes to the portfolio component.
+# Star      — popular AND profitable: the goal.
+# Plowhorse — popular, thin margin: drives traffic; reprice or re-cost.
+# Puzzle    — profitable, unpopular: fixable by promotion/placement.
+# Dog       — neither: the thing to cut.
+# Plowhorse edges out Puzzle because volume is harder to create than margin.
+QUADRANT_CREDIT = {"Star": 1.0, "Plowhorse": 0.6, "Puzzle": 0.5, "Dog": 0.0}
+
+# Food-cost band for the cost component: <=25% scores full marks, >=40% zero.
+# Matches the 40% margin floor / 35% food-cost ceiling the pricing engine
+# enforces in ai/pricing/analysis.py.
+FOOD_COST_FLOOR_PCT   = 25.0
+FOOD_COST_CEILING_PCT = 40.0
+
+
+def _menu_optimization_score(classifications: Counter, avg_food_cost: float,
+                             rising_count: int, falling_count: int,
+                             item_count: int) -> int:
+    """
+    Menu health as a bounded 0-100 index. Every component is a ratio in [0, 1]
+    and the weights sum to 1, so the result cannot exceed its range.
+    """
+    if item_count <= 0:
+        return 0
+
+    portfolio = sum(
+        QUADRANT_CREDIT.get(name, 0.0) * count for name, count in classifications.items()
+    ) / item_count
+
+    span = FOOD_COST_CEILING_PCT - FOOD_COST_FLOOR_PCT
+    cost = (FOOD_COST_CEILING_PCT - avg_food_cost) / span
+    cost = max(0.0, min(1.0, cost))
+
+    # Net momentum in [-1, 1] (every item rising vs every item falling),
+    # rescaled to [0, 1] so a flat menu sits at the neutral midpoint.
+    momentum = ((rising_count - falling_count) / item_count + 1) / 2
+    momentum = max(0.0, min(1.0, momentum))
+
+    score = W_PORTFOLIO * portfolio + W_COST * cost + W_MOMENTUM * momentum
+    return round(100 * max(0.0, min(1.0, score)))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # MAIN ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
 def get_menu_engineering(db: Session, restaurant_id: int) -> dict:
@@ -44,7 +116,13 @@ def get_menu_engineering(db: Session, restaurant_id: int) -> dict:
     seven_days_ago = now - timedelta(days=7)
     thirty_days_ago = now - timedelta(days=30)
 
-    # ── Pre-fetch all order data in bulk ──
+    # ── Pre-fetch order data for the analysis window, in bulk ──
+    # Bounded to 30 days 2026-07-08. This GROUP BY previously spanned the
+    # restaurant's ENTIRE order history (~107k orders / 200k+ order_items in
+    # prod) on every AI-dashboard load — the one hot-path query that never got
+    # the 30-day bound the other modules were given. It also made "popularity"
+    # mean all-time volume while the trend detection below compared 7-day
+    # against 8-to-30-day windows, so a long-dead item still counted as a Star.
     order_data = (
         db.query(
             models.OrderItem.menu_item_id,
@@ -52,7 +130,11 @@ def get_menu_engineering(db: Session, restaurant_id: int) -> dict:
             func.sum(models.OrderItem.quantity * models.OrderItem.unit_price).label("revenue"),
         )
         .join(models.Order)
-        .filter(models.Order.restaurant_id == restaurant_id, models.Order.status != models.OrderStatus.CANCELLED)
+        .filter(
+            models.Order.restaurant_id == restaurant_id,
+            models.Order.status != models.OrderStatus.CANCELLED,
+            models.Order.created_at >= thirty_days_ago,
+        )
         .group_by(models.OrderItem.menu_item_id)
         .all()
     )
@@ -120,6 +202,7 @@ def get_menu_engineering(db: Session, restaurant_id: int) -> dict:
     # ── Calculate Averages ──
     total_qty_sold = sum(order_counts.values()) if order_counts else 1
     avg_popularity = total_qty_sold / max(len(items), 1)
+    popularity_cutoff = POPULARITY_INDEX * avg_popularity
     all_margins = [(i.price - (i.cost_price or 0)) for i in items]
     avg_margin = sum(all_margins) / max(len(all_margins), 1)
 
@@ -140,8 +223,9 @@ def get_menu_engineering(db: Session, restaurant_id: int) -> dict:
         popularity_pct = round((qty_sold / max(total_qty_sold, 1)) * 100, 1)
         sell_through_per_day = round(qty_sold / total_days, 2)
 
-        # Classification
-        is_popular = qty_sold >= avg_popularity
+        # Classification. `popularity_cutoff` is 0.7 x mean, not the raw mean —
+        # see POPULARITY_INDEX.
+        is_popular = qty_sold >= popularity_cutoff
         is_profitable = margin >= avg_margin
         if is_popular and is_profitable:
             classification = "Star"
@@ -213,10 +297,10 @@ def get_menu_engineering(db: Session, restaurant_id: int) -> dict:
     rising_count = sum(1 for m in matrix if m["trend"] == "rising")
     falling_count = sum(1 for m in matrix if m["trend"] == "falling")
 
-    # Menu optimization score (0-100)
-    stars_pct = classifications.get("Star", 0) / max(len(matrix), 1)
-    dogs_pct = classifications.get("Dog", 0) / max(len(matrix), 1)
-    menu_opt_score = round(max(0, min(100, (stars_pct * 130) + ((1 - dogs_pct) * 70) - (avg_food_cost * 0.5) + (rising_count * 3))))
+    # Menu optimization score (0-100) — see _menu_optimization_score.
+    menu_opt_score = _menu_optimization_score(
+        classifications, avg_food_cost, rising_count, falling_count, len(matrix)
+    )
 
     return {
         "matrix": sorted(matrix, key=lambda x: x["revenue"], reverse=True),

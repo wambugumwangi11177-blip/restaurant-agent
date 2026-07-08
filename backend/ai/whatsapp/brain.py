@@ -31,6 +31,14 @@ WINBACK_DAYS         = 21
 SLOW_DAY_THRESHOLD   = 20    # % below average to trigger alert
 STOCK_CRITICAL_HOURS = 6
 
+# Minimum gap between two owner alerts about the SAME inventory item.
+# run_stock_check fires every 2h across a 14h service day, so an item that stays
+# low — which is the normal case, since restocking takes a delivery, not a
+# minute — used to generate 7 identical WhatsApps a day. Pricing has had a
+# 7-day cooldown since day one; stock had none. 12h means at most one nudge per
+# service day per item, which is what an owner can actually act on.
+STOCK_ALERT_COOLDOWN_HOURS = 12
+
 
 def owner_phone_for(restaurant) -> str:
     """
@@ -638,15 +646,49 @@ def run_stock_check(SessionLocal) -> None:
     this was the only place that could plausibly emit them, and it never did
     — this scheduled job itself was also never registered until the same
     audit. Both gaps had to be fixed together for either to matter.
+
+    Two more defects fixed 2026-07-08:
+
+      • DOUBLE SEND. This emitted STOCK_CRITICAL (whose handler,
+        executive.on_stock_critical, WhatsApps the owner) and then *also* sent
+        `compose_stock_alert(urgent[0])` directly — so the first urgent item
+        generated two messages describing the same shortage. Notification is
+        now the event handlers' job alone; this function only decides what is
+        worth an event. (`on_stock_depleted` grew a send of its own: a fully
+        out-of-stock item with no recent usage scores WARNING, never entered
+        `urgent`, and so was silently never reported at all.)
+
+      • NO COOLDOWN. Every item that qualified re-alerted on every 2-hourly
+        cycle. `last_alerted_at` is stamped on each item we raise an event for
+        and re-checked here, so a persistently low item nudges the owner at most
+        once per STOCK_ALERT_COOLDOWN_HOURS.
     """
     from events.bus import emit_async, EventType
 
     db = SessionLocal()
     try:
+        cooldown_cutoff = utcnow() - timedelta(hours=STOCK_ALERT_COOLDOWN_HOURS)
+
         for restaurant in db.query(models.Restaurant).all():
             alerts = get_critical_stock_alerts(db, restaurant.id)
-            urgent = [a for a in alerts if a["severity"] == "URGENT"]
-            depleted = [a for a in alerts if a["current_qty"] <= 0]
+            if not alerts:
+                continue
+
+            alert_ids = [a["inventory_item_id"] for a in alerts]
+            recently_alerted = {
+                row.id for row in db.query(models.InventoryItem.id).filter(
+                    models.InventoryItem.id.in_(alert_ids),
+                    models.InventoryItem.last_alerted_at.isnot(None),
+                    models.InventoryItem.last_alerted_at >= cooldown_cutoff,
+                ).all()
+            }
+
+            actionable = [a for a in alerts if a["inventory_item_id"] not in recently_alerted]
+            depleted = [a for a in actionable if a["current_qty"] <= 0]
+            # `> 0` keeps a depleted item from being reported twice, once under
+            # each event — it is depleted, not merely critical.
+            urgent = [a for a in actionable
+                      if a["severity"] == "URGENT" and a["current_qty"] > 0]
 
             for item in depleted:
                 emit_async(EventType.STOCK_DEPLETED, {
@@ -655,17 +697,19 @@ def run_stock_check(SessionLocal) -> None:
                     "inventory_item_id": item["inventory_item_id"],
                 })
             for item in urgent:
-                if item["current_qty"] > 0:  # avoid double-emitting depleted items as also "critical"
-                    emit_async(EventType.STOCK_CRITICAL, {
-                        "restaurant_id": restaurant.id,
-                        "item_name": item["item_name"],
-                        "hours_remaining": item["hours_remaining"],
-                        "inventory_item_id": item["inventory_item_id"],
-                    })
+                emit_async(EventType.STOCK_CRITICAL, {
+                    "restaurant_id": restaurant.id,
+                    "item_name": item["item_name"],
+                    "hours_remaining": item["hours_remaining"],
+                    "inventory_item_id": item["inventory_item_id"],
+                })
 
-            if urgent:
-                owner_phone = owner_phone_for(restaurant)
-                if owner_phone:
-                    send_whatsapp_message(owner_phone, compose_stock_alert(urgent[0]), db=db, restaurant_id=restaurant.id, message_type="stock_alert")
+            notified_ids = [a["inventory_item_id"] for a in depleted + urgent]
+            if notified_ids:
+                db.query(models.InventoryItem).filter(
+                    models.InventoryItem.id.in_(notified_ids)
+                ).update({models.InventoryItem.last_alerted_at: utcnow()},
+                         synchronize_session=False)
+                db.commit()
     finally:
         db.close()

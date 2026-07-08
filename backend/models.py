@@ -197,7 +197,12 @@ class InventoryItem(Base):
     cost_per_unit = Column(Float, default=0)  # For procurement cost tracking
     low_stock_threshold = Column(Integer)
     expiry_days = Column(Integer, default=30)  # Avg shelf life — for spoilage prediction
-    
+    # When the owner was last WhatsApped that this item is low/out. The stock
+    # check runs every 2h; without this a persistently low item re-alerts every
+    # cycle (7 messages/day, per item) until someone restocks. See
+    # ai/whatsapp/brain.STOCK_ALERT_COOLDOWN_HOURS. Added by migration 010.
+    last_alerted_at = Column(DateTime, nullable=True)
+
     restaurant = relationship("Restaurant", back_populates="inventory_items")
     movements = relationship("StockMovement", back_populates="inventory_item")
 

@@ -173,6 +173,26 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
     from_number = form.get("From", "")
     body = form.get("Body", "")
 
+    # Customer opt-out / opt-in is handled BEFORE owner resolution: a STOP comes
+    # from a customer number that won't match any owner, and honouring it is a
+    # legal obligation (AUP §04) that must work regardless of who sent it.
+    from ai.whatsapp import optout as optout_mod
+    if optout_mod.is_stop_keyword(body):
+        optout_mod.record_opt_out(db, from_number, source="whatsapp_stop")
+        reply = ("You have been unsubscribed and will no longer receive messages "
+                 "from us. Reply START to resubscribe.")
+        return PlainTextResponse(
+            f"<Response><Message>{escape(reply)}</Message></Response>",
+            media_type="application/xml",
+        )
+    if optout_mod.is_start_keyword(body):
+        optout_mod.remove_opt_out(db, from_number)
+        reply = "You are resubscribed. Reply STOP at any time to opt out."
+        return PlainTextResponse(
+            f"<Response><Message>{escape(reply)}</Message></Response>",
+            media_type="application/xml",
+        )
+
     restaurant = _resolve_restaurant_by_phone(db, from_number)
     if not restaurant:
         logger.warning("[WhatsApp Webhook] No restaurant matched for inbound sender")

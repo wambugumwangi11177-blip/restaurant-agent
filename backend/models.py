@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum as SqEnum, DateTime, Float, Text, Date, Time, Index, UniqueConstraint
 from sqlalchemy.orm import relationship, declarative_base
-import datetime
 import enum
+from time_utils import utcnow
 
 Base = declarative_base()
 
@@ -63,7 +63,7 @@ class Tenant(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     plan = Column(String, default="free")
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
     
     users = relationship("User", back_populates="tenant")
     restaurants = relationship("Restaurant", back_populates="tenant")
@@ -77,6 +77,7 @@ class User(Base):
     role = Column(SqEnum(Role), default=Role.STAFF)
     failed_login_attempts = Column(Integer, default=0)   # brute-force lockout (2026-07-07 security pass)
     locked_until = Column(DateTime, nullable=True)         # None = not locked
+    last_login_at = Column(DateTime, nullable=True)        # set on successful login (staff-activity record)
 
     tenant = relationship("Tenant", back_populates="users")
 
@@ -149,7 +150,7 @@ class Order(Base):
     customer_phone = Column(String, default="")
     total = Column(Integer)  # In cents
     notes = Column(Text, default="")
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
     completed_at = Column(DateTime, nullable=True)
     
     restaurant = relationship("Restaurant", back_populates="orders")
@@ -208,7 +209,7 @@ class StockMovement(Base):
     movement_type = Column(SqEnum(StockMovementType))
     quantity = Column(Float)
     reason = Column(String, default="")  # "sale", "waste", "purchase", "adjustment"
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
     
     inventory_item = relationship("InventoryItem", back_populates="movements")
 
@@ -231,7 +232,7 @@ class Reservation(Base):
     status = Column(SqEnum(ReservationStatus), default=ReservationStatus.CONFIRMED)
     deposit_paid = Column(Boolean, default=False)
     notes = Column(Text, default="")
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
     
     restaurant = relationship("Restaurant", back_populates="reservations")
     table = relationship("Table", back_populates="reservations")
@@ -254,7 +255,7 @@ class PricingRecommendation(Base):
     recommendation_strength = Column(Integer, default=0)
     status                  = Column(String, default="PENDING")
     rejection_reason        = Column(String, default="")
-    created_at              = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at              = Column(DateTime, default=utcnow)
     actioned_at             = Column(DateTime, nullable=True)
     menu_item  = relationship("MenuItem")
     restaurant = relationship("Restaurant")
@@ -276,7 +277,7 @@ class AgentMessage(Base):
     llm_model     = Column(String, nullable=True)
     input_tokens  = Column(Integer, nullable=True)
     output_tokens = Column(Integer, nullable=True)
-    created_at    = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at    = Column(DateTime, default=utcnow)
     restaurant    = relationship("Restaurant")
     __table_args__ = (
         Index("ix_agent_messages_restaurant_created", "restaurant_id", "created_at"),
@@ -316,7 +317,7 @@ class MemoryEvent(Base):
     affected_items      = Column(Text, default="")   # JSON list of item names affected
     agent_notes         = Column(Text, default="")   # What the agent learned
     human_notes         = Column(Text, default="")   # Owner annotation
-    created_at          = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at          = Column(DateTime, default=utcnow)
     created_by          = Column(String, default="system")   # "system" or user email
 
     restaurant = relationship("Restaurant")
@@ -372,7 +373,7 @@ class StaffMember(Base):
     role_title    = Column(String, default="")   # "Head Chef", "Waiter", "Cashier"
     hourly_rate   = Column(Integer, default=0)   # In cents
     is_active     = Column(Boolean, default=True)
-    created_at    = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at    = Column(DateTime, default=utcnow)
 
     restaurant = relationship("Restaurant")
     shifts     = relationship("LaborShift", back_populates="staff_member")
@@ -401,7 +402,7 @@ class LaborShift(Base):
     actual_hours    = Column(Float, nullable=True)
     labor_cost      = Column(Integer, nullable=True)    # Computed: hours * hourly_rate (cents)
     notes           = Column(Text, default="")
-    created_at      = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at      = Column(DateTime, default=utcnow)
 
     staff_member = relationship("StaffMember", back_populates="shifts")
     restaurant   = relationship("Restaurant")
@@ -428,7 +429,7 @@ class Supplier(Base):
     reliability_score = Column(Float, default=100.0)  # 0-100, computed from history
     is_active         = Column(Boolean, default=True)
     notes             = Column(Text, default="")
-    created_at        = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at        = Column(DateTime, default=utcnow)
 
     restaurant     = relationship("Restaurant")
     purchase_orders = relationship("PurchaseOrder", back_populates="supplier")
@@ -456,7 +457,7 @@ class PurchaseOrder(Base):
     cost_per_unit     = Column(Integer, default=0)   # Cents
     total_cost        = Column(Integer, default=0)   # Cents
     status            = Column(String, default="PENDING")   # PENDING, SENT, DELIVERED, LATE, PARTIAL
-    ordered_at        = Column(DateTime, default=datetime.datetime.utcnow)
+    ordered_at        = Column(DateTime, default=utcnow)
     expected_at       = Column(DateTime, nullable=True)
     delivered_at      = Column(DateTime, nullable=True)
     notes             = Column(Text, default="")
@@ -492,7 +493,7 @@ class AgentPrediction(Base):
     agent_name        = Column(String, nullable=False)   # "revenue_forecaster", "pricing_intelligence"
     prediction_type   = Column(String, nullable=False)   # "daily_revenue", "price_impact", "demand"
     prediction_date   = Column(Date, nullable=False)     # Date the prediction was FOR (not made)
-    made_at           = Column(DateTime, default=datetime.datetime.utcnow)
+    made_at           = Column(DateTime, default=utcnow)
     predicted_value   = Column(Float, nullable=False)
     predicted_ci_low  = Column(Float, nullable=True)
     predicted_ci_high = Column(Float, nullable=True)
@@ -530,7 +531,7 @@ class AgentExecution(Base):
     error_message = Column(Text, default="")
     records_processed = Column(Integer, default=0)
     triggered_by  = Column(String, default="scheduler")   # scheduler, api, event, manual
-    created_at    = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at    = Column(DateTime, default=utcnow)
 
     __table_args__ = (
         Index("ix_agent_executions_name_created", "agent_name", "created_at"),
@@ -567,7 +568,7 @@ class AgentAuditLog(Base):
     data_sources   = Column(Text, default="[]")       # JSON list of data used
     approved_by    = Column(String, default="system") # user email or "auto"
     recommendation_id = Column(Integer, nullable=True)  # Links to PricingRecommendation if applicable
-    created_at     = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at     = Column(DateTime, default=utcnow)
 
     restaurant = relationship("Restaurant")
 
@@ -594,13 +595,35 @@ class CustomerConsent(Base):
     restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
     customer_phone = Column(String, nullable=False)
     purpose       = Column(String, nullable=False)   # e.g. "order_checkout", "reservation_booking"
-    consented_at  = Column(DateTime, default=datetime.datetime.utcnow)
+    consented_at  = Column(DateTime, default=utcnow)
 
     restaurant = relationship("Restaurant")
 
     __table_args__ = (
         Index("ix_customer_consents_restaurant_phone", "restaurant_id", "customer_phone"),
     )
+
+
+class CustomerOptOut(Base):
+    """
+    Marketing/communications suppression list. A customer who replies STOP (or
+    UNSUBSCRIBE/CANCEL/etc.) to a WhatsApp message is recorded here and is never
+    messaged again until they opt back in (START/UNSTOP removes the row).
+
+    Deliberately keyed by phone number ALONE, with no restaurant_id: an inbound
+    STOP arrives on the shared Twilio number and cannot be reliably attributed to
+    one restaurant, and — more importantly — "stop messaging me" is a person's
+    choice that should hold across every sender on the platform. This is a
+    suppression list, not tenant data, so global scope is the privacy-safe choice.
+    Phone is stored NORMALIZED (payments.mpesa_client.normalize_phone) so it
+    matches order/reservation phones regardless of input format.
+    """
+    __tablename__ = "customer_optouts"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    customer_phone = Column(String, nullable=False, unique=True, index=True)  # normalized 2547XXXXXXXX
+    source        = Column(String, default="whatsapp_stop")  # how the opt-out was captured
+    opted_out_at  = Column(DateTime, default=utcnow)
 
 
 class TokenUsage(Base):
@@ -617,7 +640,7 @@ class TokenUsage(Base):
     llm_model     = Column(String, nullable=True)
     input_tokens  = Column(Integer, nullable=True)
     output_tokens = Column(Integer, nullable=True)
-    created_at    = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at    = Column(DateTime, default=utcnow)
 
     restaurant = relationship("Restaurant")
 

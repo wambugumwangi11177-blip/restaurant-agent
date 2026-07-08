@@ -70,14 +70,30 @@ def _safe_run(agent_name: str, restaurant_id: int, fn, *args, **kwargs):
 
 @router.get("/pricing")
 async def ai_pricing(
+    narrate: bool = True,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Pricing intelligence: SURGE, REPRICE, STIMULATE recommendations."""
+    """
+    Pricing intelligence: SURGE, REPRICE, STIMULATE recommendations.
+
+    Numbers are deterministic. When an LLM provider is set (and narrate=true) a
+    `narrative` block is attached — pricing runs on the MEDIUM model tier since
+    it's a money decision (see ai/reasoning/narrator.py's task registry), and
+    every figure it cites is grounding-checked before it's returned.
+    """
     restaurant = get_or_create_restaurant(db, current_user)
 
     from ai.pricing.recommendations import get_pricing_intelligence
-    return _safe_run("pricing_intelligence", restaurant.id, get_pricing_intelligence, db, restaurant.id)
+    data = _safe_run("pricing_intelligence", restaurant.id, get_pricing_intelligence, db, restaurant.id)
+
+    if narrate and isinstance(data, dict) and not data.get("error"):
+        from ai.reasoning import narrate as reason
+        note = reason(data, "pricing", restaurant_id=restaurant.id)
+        if note:
+            data["narrative"] = note
+
+    return data
 
 
 @router.post("/pricing/{rec_id}/approve")
@@ -151,14 +167,31 @@ async def ai_inventory(
 
 @router.get("/profit")
 async def ai_profit(
+    narrate: bool = True,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Contribution margins, profit leaks, portion drift, daypart/channel profitability."""
+    """
+    Contribution margins, profit leaks, portion drift, daypart/channel profitability.
+
+    The numbers are computed deterministically. When an LLM provider is configured
+    (and narrate=true), a reasoning layer adds a `narrative` block — plain-language
+    judgment over those numbers. It never computes: pass narrate=false to skip the
+    LLM call entirely. Absence of `narrative` never means the data failed — it just
+    means no provider is set or narration was skipped.
+    """
     restaurant = get_or_create_restaurant(db, current_user)
 
     from ai.profit.intelligence import get_profit_intelligence
-    return _safe_run("profit_intelligence", restaurant.id, get_profit_intelligence, db, restaurant.id)
+    data = _safe_run("profit_intelligence", restaurant.id, get_profit_intelligence, db, restaurant.id)
+
+    if narrate and isinstance(data, dict) and not data.get("error"):
+        from ai.reasoning import narrate as reason
+        narrative = reason(data, "profit", restaurant_id=restaurant.id)
+        if narrative:
+            data["narrative"] = narrative
+
+    return data
 
 
 # ─────────────────────────────────────────────────────────────────────────────

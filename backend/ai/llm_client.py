@@ -48,6 +48,47 @@ _GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
 _PROVIDER = "anthropic" if _ANTHROPIC_API_KEY else ("groq" if _GROQ_API_KEY else None)
 
+# ── Model tiers ──────────────────────────────────────────────────────────────
+# Callers pick a tier by task complexity; we resolve it to a concrete model for
+# whichever provider is active. This is the main cost lever: cheap models do the
+# routine narration (a dashboard refresh fires a handful of LOW calls), and the
+# expensive model is reserved for genuine cross-domain strategy (HIGH). Every
+# entry is env-overridable so the mapping can be tuned per deployment without a
+# code change. The whole table auto-upgrades from Groq to Claude the moment an
+# ANTHROPIC_API_KEY is set — no caller changes needed (see module docstring).
+TIER_LOW, TIER_MEDIUM, TIER_HIGH = "low", "medium", "high"
+
+_MODEL_TIERS = {
+    "anthropic": {
+        TIER_LOW:    os.getenv("ANTHROPIC_MODEL_LOW",    "claude-haiku-4-5-20251001"),
+        TIER_MEDIUM: os.getenv("ANTHROPIC_MODEL_MEDIUM", _ANTHROPIC_MODEL),
+        TIER_HIGH:   os.getenv("ANTHROPIC_MODEL_HIGH",   "claude-opus-4-8"),
+    },
+    "groq": {
+        # Groq has no equivalent to a big frontier model, so MEDIUM/HIGH both
+        # map to the largest configured model; only LOW drops to a smaller,
+        # faster one. When ANTHROPIC_API_KEY is added this table stops being
+        # used at all — the anthropic row above takes over.
+        TIER_LOW:    os.getenv("GROQ_MODEL_LOW",    "llama-3.1-8b-instant"),
+        TIER_MEDIUM: os.getenv("GROQ_MODEL_MEDIUM", _GROQ_MODEL),
+        TIER_HIGH:   os.getenv("GROQ_MODEL_HIGH",   _GROQ_MODEL),
+    },
+}
+
+
+def model_for_tier(tier: str | None) -> str | None:
+    """
+    Resolve a complexity tier ("low"|"medium"|"high") to a concrete model id for
+    the active provider. Returns None if no provider is configured or no tier is
+    given (callers then fall back to the provider default). Unknown tier names
+    fall back to MEDIUM rather than erroring.
+    """
+    if _PROVIDER is None or tier is None:
+        return None
+    tiers = _MODEL_TIERS.get(_PROVIDER, {})
+    return tiers.get(tier, tiers.get(TIER_MEDIUM))
+
+
 _client = None
 
 
@@ -97,38 +138,84 @@ def _compress_if_library_mode(messages: list[dict]) -> list[dict]:
     ]
 
 
+def chat_with_usage(
+    messages: list[dict],
+    system: str = "",
+    max_tokens: int = 1024,
+    model: str | None = None,
+    tier: str | None = None,
+    temperature: float | None = None,
+):
+    """
+    Send a chat completion and return BOTH the reply text and token usage,
+    normalized across providers as
+    SimpleNamespace(text, model, usage.{input_tokens, output_tokens}).
+
+    Model selection precedence: explicit `model` > `tier` lookup > provider
+    default. `temperature` is passed through when set (the reasoning layer uses
+    0 for the most deterministic, least-embellished output). Used by the
+    reasoning layer, which needs usage back for per-tenant cost metering
+    (ai/reasoning/narrator.py).
+    """
+    client = _get_client()
+    resolved = model or model_for_tier(tier)
+
+    if _PROVIDER == "anthropic":
+        messages = _compress_if_library_mode(messages)
+        kwargs = {
+            "model": resolved or _ANTHROPIC_MODEL,
+            "max_tokens": max_tokens,
+            "system": system,
+            "messages": messages,
+        }
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        response = client.messages.create(**kwargs)
+        text = "".join(block.text for block in response.content if block.type == "text")
+        return SimpleNamespace(
+            text=text,
+            model=response.model,
+            usage=SimpleNamespace(
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens,
+            ),
+        )
+
+    # Groq / OpenAI-compatible
+    openai_messages = ([{"role": "system", "content": system}] if system else []) + messages
+    kwargs = {
+        "model": resolved or _GROQ_MODEL,
+        "max_tokens": max_tokens,
+        "messages": openai_messages,
+    }
+    if temperature is not None:
+        kwargs["temperature"] = temperature
+    response = client.chat.completions.create(**kwargs)
+    return SimpleNamespace(
+        text=response.choices[0].message.content or "",
+        model=response.model,
+        usage=SimpleNamespace(
+            input_tokens=response.usage.prompt_tokens,
+            output_tokens=response.usage.completion_tokens,
+        ),
+    )
+
+
 def chat(
     messages: list[dict],
     system: str = "",
     max_tokens: int = 1024,
     model: str | None = None,
+    tier: str | None = None,
+    temperature: float | None = None,
 ) -> str:
     """
-    Send a chat completion through the active provider.
+    Send a chat completion through the active provider; returns the reply text.
 
     messages: [{"role": "user"|"assistant", "content": "..."}]
-    Returns the assistant's text reply.
+    Thin wrapper over chat_with_usage() for callers that don't need token counts.
     """
-    client = _get_client()
-
-    if _PROVIDER == "anthropic":
-        messages = _compress_if_library_mode(messages)
-        response = client.messages.create(
-            model=model or _ANTHROPIC_MODEL,
-            max_tokens=max_tokens,
-            system=system,
-            messages=messages,
-        )
-        return "".join(block.text for block in response.content if block.type == "text")
-
-    # Groq / OpenAI-compatible
-    openai_messages = ([{"role": "system", "content": system}] if system else []) + messages
-    response = client.chat.completions.create(
-        model=model or _GROQ_MODEL,
-        max_tokens=max_tokens,
-        messages=openai_messages,
-    )
-    return response.choices[0].message.content or ""
+    return chat_with_usage(messages, system, max_tokens, model, tier, temperature).text
 
 
 def _tools_to_openai_format(tools: list[dict]) -> list[dict]:
@@ -201,12 +288,15 @@ def chat_with_tools(
     system: str = "",
     max_tokens: int = 1024,
     model: str | None = None,
+    tier: str | None = None,
 ):
     """
     One turn of a tool-calling loop. Returns a response normalized to
     Anthropic's shape regardless of active provider — see module docstring.
+    Model selection precedence: explicit `model` > `tier` lookup > default.
     """
     client = _get_client()
+    resolved = model or model_for_tier(tier)
 
     if _PROVIDER == "anthropic":
         messages = _compress_if_library_mode(messages)
@@ -216,7 +306,7 @@ def chat_with_tools(
         system_blocks = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}] if system else []
 
         return client.messages.create(
-            model=model or _ANTHROPIC_MODEL,
+            model=resolved or _ANTHROPIC_MODEL,
             max_tokens=max_tokens,
             system=system_blocks,
             tools=cached_tools,
@@ -227,7 +317,7 @@ def chat_with_tools(
     # so ai/whatsapp/orchestrator.py's loop logic stays provider-agnostic.
     openai_messages = ([{"role": "system", "content": system}] if system else []) + _canonical_messages_to_openai(messages)
     response = client.chat.completions.create(
-        model=model or _GROQ_MODEL,
+        model=resolved or _GROQ_MODEL,
         max_tokens=max_tokens,
         messages=openai_messages,
         tools=_tools_to_openai_format(tools),

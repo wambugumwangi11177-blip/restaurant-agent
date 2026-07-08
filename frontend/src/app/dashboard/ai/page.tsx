@@ -19,6 +19,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
     Brain, TrendingUp, AlertTriangle, CheckCircle,
     RefreshCw, Zap, Shield, Activity, ArrowRight,
+    Sparkles, ShieldCheck, ShieldAlert,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -406,6 +407,7 @@ function PricingSection() {
     interface PricingData {
         summary: { surge_opportunities: number; reprice_needed: number; stimulate_candidates: number; total_revenue_opportunity_cents: number; items_analysed: number };
         recommendations: { item_id: number; item_name: string; type: string; current_price: number; suggested_price: number; monthly_impact_cents: number; reason: string }[];
+        narrative?: Narrative;
     }
     const { data, loading, error, retry } = useAiModule<PricingData>("/ai/pricing");
 
@@ -413,6 +415,7 @@ function PricingSection() {
         <ModuleShell icon={TrendingUp} title="Pricing Intelligence" loading={loading} error={error} onRetry={retry}>
             {data && (
                 <>
+                    <NarrativeBlock n={data.narrative} />
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                         <MiniStat label="Surge" value={data.summary.surge_opportunities} />
                         <MiniStat label="Reprice" value={data.summary.reprice_needed} />
@@ -489,6 +492,7 @@ function MenuEngineeringSection() {
         summary: { total_items: number; stars: number; plowhorses: number; puzzles: number; dogs: number; avg_food_cost_pct: number; menu_optimization_score?: number };
         category_performance: { category: string; revenue_share_pct: number; avg_margin_pct: number; item_count: number }[];
         recommendations: { item: string; action: string; reason: string; priority: string; impact: string }[];
+        narrative?: Narrative;
     }
     const { data, loading, error, retry } = useAiModule<MenuData>("/ai/menu-engineering");
 
@@ -497,6 +501,7 @@ function MenuEngineeringSection() {
             subtitle="Classifies every dish by popularity × profit so you know what to promote, reprice, or cut.">
             {data && (
                 <>
+                    <NarrativeBlock n={data.narrative} />
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
                         {([["Stars", data.summary.stars], ["Plowhorses", data.summary.plowhorses],
                           ["Puzzles", data.summary.puzzles], ["Dogs", data.summary.dogs]] as const).map(([k, v]) => (
@@ -557,6 +562,7 @@ function ProfitSection() {
         profit_leaks: { item_name: string; current_margin_pct: number; food_cost_pct: number; monthly_leak_cents: number; severity: string; action: string }[];
         stars: string[];
         dogs: string[];
+        narrative?: Narrative;
     }
     const { data, loading, error, retry } = useAiModule<ProfitData>("/ai/profit");
 
@@ -565,6 +571,7 @@ function ProfitSection() {
             subtitle="Where money leaks out — dishes sold below a healthy margin, and exactly how much each costs you per month.">
             {data && (
                 <>
+                    <NarrativeBlock n={data.narrative} />
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                         <MiniStat label="Gross Margin" value={`${data.summary.gross_margin_pct}%`} tone={data.summary.gross_margin_pct >= 55 ? "ok" : "warn"} />
                         <MiniStat label="Food Cost" value={`${data.summary.food_cost_pct}%`} tone={data.summary.food_cost_status === "HEALTHY" ? "ok" : "warn"} />
@@ -633,6 +640,77 @@ function HealthBoostSection({ breakdown, score }: { breakdown: { category: strin
                     ))}
                 </div>
             )}
+        </div>
+    );
+}
+
+// Shape of the `narrative` block attached by the backend reasoning layer
+// (ai/reasoning/narrator.py). The figures shown in each module are computed
+// deterministically; this is the LLM's plain-language *interpretation* of them,
+// with every number it cites already grounding-checked server-side.
+interface Narrative {
+    headline: string;
+    priorities: string[];
+    actions: { action: string; why?: string; impact?: string }[];
+    verified: boolean;
+    ungrounded_numbers: string[];
+    cached?: boolean;
+}
+
+// Renders the AI interpretation with a trust badge. `verified` means every
+// figure the model wrote was found in the real data; if not, the backend has
+// already redacted the bad figures and we surface how many were removed — so
+// the badge is an honest trust signal, not decoration.
+function NarrativeBlock({ n }: { n?: Narrative }) {
+    if (!n || (!n.headline && (!n.priorities || n.priorities.length === 0))) return null;
+    const redacted = n.ungrounded_numbers?.length || 0;
+    return (
+        <div className="mb-4 rounded-lg border border-[#d4a853]/25 bg-[#d4a853]/[0.04] p-4">
+            <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[#d4a853]" />
+                    <span className="text-xs font-semibold uppercase tracking-wide text-[#d4a853]">AI reading</span>
+                </div>
+                {n.verified ? (
+                    <span
+                        className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded px-1.5 py-0.5 whitespace-nowrap"
+                        title="Every figure cited was checked against your real numbers"
+                    >
+                        <ShieldCheck className="w-3 h-3" /> Figures checked
+                    </span>
+                ) : (
+                    <span
+                        className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-1.5 py-0.5 whitespace-nowrap"
+                        title={`Unverified figure(s) removed: ${n.ungrounded_numbers.join(", ")}`}
+                    >
+                        <ShieldAlert className="w-3 h-3" /> {redacted} figure{redacted === 1 ? "" : "s"} removed
+                    </span>
+                )}
+            </div>
+            {n.headline && <p className="text-sm text-[#e5e5e5] leading-snug">{n.headline}</p>}
+            {n.priorities && n.priorities.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                    {n.priorities.map((p, i) => (
+                        <li key={i} className="text-xs text-[#a3a3a3] flex gap-2">
+                            <span className="text-[#d4a853] flex-shrink-0">•</span>
+                            <span>{p}</span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {n.actions && n.actions.length > 0 && (
+                <div className="mt-2 space-y-1">
+                    {n.actions.slice(0, 3).map((a, i) => (
+                        <p key={i} className="text-xs text-[#737373]">
+                            <span className="text-[#e5e5e5]">→ {a.action}</span>
+                            {a.why ? ` — ${a.why}` : ""}
+                        </p>
+                    ))}
+                </div>
+            )}
+            <p className="mt-2 text-[10px] text-[#525252] italic">
+                AI interpretation · the figures above are computed exactly, not by the AI.
+            </p>
         </div>
     );
 }

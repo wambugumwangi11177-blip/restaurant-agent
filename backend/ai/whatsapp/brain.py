@@ -23,6 +23,7 @@ from collections import defaultdict
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 import models
+from time_utils import utcnow
 from . import twilio_client
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -47,7 +48,7 @@ def owner_phone_for(restaurant) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def compose_morning_briefing(db: Session, restaurant_id: int) -> str:
-    now_utc   = datetime.utcnow()
+    now_utc   = utcnow()
     yesterday = (now_utc - timedelta(days=1)).date()
     lw_date   = (now_utc - timedelta(days=7)).date()
 
@@ -103,7 +104,7 @@ def compose_morning_briefing(db: Session, restaurant_id: int) -> str:
     pending_count = db.query(models.PricingRecommendation).filter(
         models.PricingRecommendation.restaurant_id == restaurant_id,
         models.PricingRecommendation.status == "PENDING",
-        models.PricingRecommendation.created_at >= datetime.utcnow() - timedelta(hours=48),
+        models.PricingRecommendation.created_at >= utcnow() - timedelta(hours=48),
     ).count()
     pricing_str = f"\n\n💡 *{pending_count} pricing recommendation(s) awaiting your approval.* Reply PENDING to review." if pending_count > 0 else ""
 
@@ -166,7 +167,7 @@ def get_critical_stock_alerts(db: Session, restaurant_id: int) -> list[dict]:
         return []
 
     item_ids      = [i.id for i in below_threshold]
-    three_days_ago = datetime.utcnow() - timedelta(days=3)
+    three_days_ago = utcnow() - timedelta(days=3)
 
     # Single batched query for all at-risk items
     usage_rows = (
@@ -228,7 +229,7 @@ def compose_slow_day_alert(db: Session, restaurant_id: int) -> str | None:
     Correct approach: compare today's revenue from UTC midnight to now,
     vs same window on previous same-DOW dates.
     """
-    now_utc      = datetime.utcnow()
+    now_utc      = utcnow()
     eat_hour     = (now_utc.hour + 3) % 24
     if eat_hour < 14:
         return None   # Only check after 2pm EAT
@@ -298,7 +299,7 @@ def get_winback_candidates(db: Session, restaurant_id: int) -> list[dict]:
     BUG-11 FIX: passes restaurant.name to compose_winback_message instead of "us".
     BUG-15 (already fixed in uploaded version): favourite item fetched in batch.
     """
-    cutoff = datetime.utcnow() - timedelta(days=WINBACK_DAYS)
+    cutoff = utcnow() - timedelta(days=WINBACK_DAYS)
 
     restaurant      = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
     restaurant_name = restaurant.name if restaurant else "us"
@@ -351,9 +352,15 @@ def get_winback_candidates(db: Session, restaurant_id: int) -> list[dict]:
         if row.customer_phone not in fav_map:
             fav_map[row.customer_phone] = row.name
 
-    now_utc    = datetime.utcnow()
+    # Honour opt-outs at selection time too (the send engine also gates, but
+    # filtering here keeps opted-out customers out of counts and message logs).
+    from .optout import is_opted_out
+
+    now_utc    = utcnow()
     candidates = []
     for row in customer_rows:
+        if is_opted_out(db, row.customer_phone):
+            continue
         days_away = (now_utc - row.last_order).days
         fav_item  = fav_map.get(row.customer_phone)
         candidates.append({
@@ -382,7 +389,8 @@ def compose_winback_message(restaurant_name: str, name: str, fav_item: str | Non
         f"We miss you at {restaurant_name}! {fav_str}\n\n"
         f"It's been {days_away} days — come back and enjoy *10% off* your next visit.\n"
         f"Just show this message when you arrive.\n\n"
-        f"See you soon! 🍽️"
+        f"See you soon! 🍽️\n\n"
+        f"_Reply STOP to opt out of these messages._"
     )
 
 
@@ -397,6 +405,17 @@ def send_whatsapp_message(
     restaurant_id: int | None = None,
     message_type: str = "general",
 ) -> dict:
+    # Opt-out suppression: honour a customer's STOP everywhere. This is the
+    # single choke point every outbound message passes through, so gating here
+    # covers winback, campaigns, and any future sender. Requires a db handle to
+    # check the suppression list; callers without one (rare) can't be filtered.
+    if db is not None:
+        from .optout import is_opted_out
+        if is_opted_out(db, to_number):
+            if restaurant_id:
+                _log_message(db, restaurant_id, to_number, message, message_type, "suppressed_optout")
+            return {"status": "suppressed_optout", "sid": None}
+
     result = twilio_client.send(to_number, message)
     if db and restaurant_id:
         _log_message(db, restaurant_id, to_number, message, message_type, result["status"], result.get("sid"))
@@ -457,7 +476,7 @@ def handle_owner_command(db: Session, restaurant_id: int, message: str) -> str:
 
 
 def _cmd_sales_today(db: Session, restaurant_id: int) -> str:
-    now_utc = datetime.utcnow()
+    now_utc = utcnow()
     orders  = db.query(models.Order).filter(
         models.Order.restaurant_id == restaurant_id,
         models.Order.status != models.OrderStatus.CANCELLED,
@@ -493,7 +512,7 @@ def _cmd_pending_pricing(db: Session, restaurant_id: int) -> str:
         .filter(
             models.PricingRecommendation.restaurant_id == restaurant_id,
             models.PricingRecommendation.status == "PENDING",
-            models.PricingRecommendation.created_at >= datetime.utcnow() - timedelta(hours=48),
+            models.PricingRecommendation.created_at >= utcnow() - timedelta(hours=48),
         )
         .order_by(models.PricingRecommendation.monthly_impact_cents.desc())
         .all()
@@ -516,7 +535,7 @@ def _cmd_pending_pricing(db: Session, restaurant_id: int) -> str:
 def _cmd_tonight(db: Session, restaurant_id: int) -> str:
     tonight = db.query(models.Reservation).filter(
         models.Reservation.restaurant_id == restaurant_id,
-        models.Reservation.reservation_date == datetime.utcnow().date(),
+        models.Reservation.reservation_date == utcnow().date(),
         models.Reservation.status == models.ReservationStatus.CONFIRMED,
     ).order_by(models.Reservation.reservation_time).all()
     if not tonight:

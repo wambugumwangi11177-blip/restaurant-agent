@@ -80,3 +80,23 @@ def test_unknown_sender_returns_empty_twiml_without_crashing(client, db_session)
     resp = client.post(request_url, data=params, headers={"X-Twilio-Signature": sig})
     assert resp.status_code == 200
     assert "<Response>" in resp.text
+
+
+def test_customer_stop_records_optout(client, db_session):
+    """
+    A STOP from a customer number (not an owner) must be recorded as an opt-out
+    and acknowledged — this is the AUP §04 opt-out obligation, and it has to work
+    for senders that match no restaurant owner.
+    """
+    _seed_restaurant(db_session)
+    url = "https://testserver/webhooks/whatsapp"
+    request_url = "http://testserver/webhooks/whatsapp"
+    params = {"From": "whatsapp:+254712345678", "Body": "STOP"}
+    sig = _sign(url, params)
+
+    resp = client.post(request_url, data=params, headers={"X-Twilio-Signature": sig})
+    assert resp.status_code == 200
+    assert "unsubscribed" in resp.text.lower()
+
+    from ai.whatsapp.optout import is_opted_out
+    assert is_opted_out(db_session, "0712345678") is True

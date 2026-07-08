@@ -109,3 +109,49 @@ def test_erase_customer_does_not_touch_other_tenant(client, db_session):
     db_session.expire_all()
     ob = db_session.query(models.Order).filter(models.Order.id == order_b_id).first()
     assert ob.customer_name == "Bob"  # tenant B untouched
+
+
+def test_erase_customer_cannot_optout_a_foreign_tenants_number(client, db_session):
+    """
+    `CustomerOptOut` is phone-global (no restaurant_id) — a suppressed number is
+    suppressed for every tenant. So tenant A submitting a number that belongs
+    only to tenant B must NOT create an opt-out, or A could permanently kill B's
+    ability to message its own customer.
+    """
+    r_a, hdr_a = _tenant(db_session, "a")
+    r_b, _ = _tenant(db_session, "b")
+    db_session.add(models.Order(
+        restaurant_id=r_b.id, status=models.OrderStatus.SERVED,
+        payment_method=models.PaymentMethod.CASH, is_paid=True, total=5000,
+        customer_name="Bob", customer_phone="0722222222",  # only tenant B knows it
+    ))
+    db_session.commit()
+
+    resp = client.post("/data/erase-customer",
+                       json={"customer_phone": "0722222222"}, headers=hdr_a)
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "no_data"
+
+    from ai.whatsapp.optout import is_opted_out
+    db_session.expire_all()
+    assert is_opted_out(db_session, "0722222222") is False  # B can still reach Bob
+
+
+def test_erase_customer_optout_still_works_for_own_number(client, db_session):
+    """The guard must not break the legitimate path: a phone the caller's own
+    tenant holds data for still gets globally suppressed."""
+    r_a, hdr_a = _tenant(db_session, "a")
+    db_session.add(models.Order(
+        restaurant_id=r_a.id, status=models.OrderStatus.SERVED,
+        payment_method=models.PaymentMethod.CASH, is_paid=True, total=5000,
+        customer_name="Alice", customer_phone="0712345678",
+    ))
+    db_session.commit()
+
+    resp = client.post("/data/erase-customer",
+                       json={"customer_phone": "0712345678"}, headers=hdr_a)
+    assert resp.json()["orders_scrubbed"] == 1
+
+    from ai.whatsapp.optout import is_opted_out
+    db_session.expire_all()
+    assert is_opted_out(db_session, "0712345678") is True

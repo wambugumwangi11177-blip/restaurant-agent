@@ -3,10 +3,12 @@ from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 from urllib.parse import parse_qsl
 from xml.sax.saxutils import escape
+import hmac
 import logging
 import os
 
 from database import get_db
+from rate_limit import limiter
 import models
 from ai.whatsapp import twilio_client, brain
 
@@ -65,8 +67,63 @@ def _extract_stk_metadata(items: list[dict]) -> dict:
     }
 
 
+_MPESA_TOKEN_WARNED = False
+
+
+def _verify_mpesa_token(supplied: str | None) -> None:
+    """
+    Origin check for the Daraja callback. Safaricom signs nothing and publishes
+    no fixed source-IP range, so the only practical authentication is a secret
+    embedded in the CallBackURL we register with them (`/webhooks/mpesa/{token}`)
+    — Safaricom echoes it back on every callback; an attacker probing
+    `/webhooks/mpesa` never sees it.
+
+    This matters because the settlement path reads the paid amount from the
+    request body (attacker-controlled), so the amount check below is trivially
+    satisfied by a forger. Before this guard, anyone who obtained a
+    CheckoutRequestID (logs, a leaked STK response, an insider) could POST a
+    `ResultCode: 0` and flip an order to paid + fire the "payment confirmed"
+    WhatsApp — free-order fraud.
+
+    Degrades safe: with MPESA_CALLBACK_TOKEN unset (local dev, tests) the check
+    is skipped with a loud warning, so nothing breaks without the env var. The
+    deploy checklist makes setting it mandatory in production; once it IS set,
+    the legacy tokenless `/webhooks/mpesa` path 403s.
+    """
+    expected = os.getenv("MPESA_CALLBACK_TOKEN", "").strip()
+    if not expected:
+        global _MPESA_TOKEN_WARNED
+        if not _MPESA_TOKEN_WARNED:
+            logger.warning(
+                "[MPesa Webhook] MPESA_CALLBACK_TOKEN is unset — the payment "
+                "callback is UNAUTHENTICATED. Anyone who learns a "
+                "CheckoutRequestID can forge a settlement. Set it in prod."
+            )
+            _MPESA_TOKEN_WARNED = True
+        return
+
+    if supplied is None or not hmac.compare_digest(supplied, expected):
+        logger.warning("[MPesa Webhook] Rejected callback with missing/incorrect URL token")
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
 @router.post("/mpesa")
-async def mpesa_webhook(request: Request, db: Session = Depends(get_db)):
+@limiter.limit("30/minute")
+async def mpesa_webhook_untokenized(request: Request, db: Session = Depends(get_db)):
+    """Legacy tokenless path. 403s as soon as MPESA_CALLBACK_TOKEN is configured."""
+    _verify_mpesa_token(None)
+    return await _handle_mpesa_callback(request, db)
+
+
+@router.post("/mpesa/{token}")
+@limiter.limit("30/minute")
+async def mpesa_webhook(token: str, request: Request, db: Session = Depends(get_db)):
+    """Tokenized Daraja callback — this is the URL registered as CallBackURL."""
+    _verify_mpesa_token(token)
+    return await _handle_mpesa_callback(request, db)
+
+
+async def _handle_mpesa_callback(request: Request, db: Session):
     """
     Safaricom Daraja STK push result callback. Always acks with 200 + the
     Safaricom-expected body regardless of payment outcome — this endpoint's

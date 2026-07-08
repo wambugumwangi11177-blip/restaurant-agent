@@ -102,3 +102,57 @@ def test_underpaid_callback_does_not_settle_order(client, db_session):
     order = db_session.query(models.Order).filter(models.Order.id == 1).first()
     assert order.is_paid is False
     assert order.mpesa_receipt is None
+
+
+# ── Callback origin verification (MPESA_CALLBACK_TOKEN) ──
+#
+# Safaricom signs nothing, so the CallBackURL secret is the only authentication.
+# The settlement amount is read from the attacker-controlled body, so without
+# this guard a forged ResultCode:0 against a known CheckoutRequestID settles an
+# order for free.
+
+def test_forged_callback_without_token_is_rejected(client, db_session, monkeypatch):
+    monkeypatch.setenv("MPESA_CALLBACK_TOKEN", "s3cret-daraja-token")
+    _seed(db_session)
+
+    resp = client.post("/webhooks/mpesa", json=_success_callback())
+    assert resp.status_code == 403
+
+    order = db_session.query(models.Order).filter(models.Order.id == 1).first()
+    assert order.is_paid is False
+
+
+def test_callback_with_wrong_token_is_rejected(client, db_session, monkeypatch):
+    monkeypatch.setenv("MPESA_CALLBACK_TOKEN", "s3cret-daraja-token")
+    _seed(db_session)
+
+    resp = client.post("/webhooks/mpesa/guessed-token", json=_success_callback())
+    assert resp.status_code == 403
+
+    order = db_session.query(models.Order).filter(models.Order.id == 1).first()
+    assert order.is_paid is False
+
+
+def test_callback_with_correct_token_settles(client, db_session, monkeypatch):
+    monkeypatch.setenv("MPESA_CALLBACK_TOKEN", "s3cret-daraja-token")
+    _seed(db_session)
+
+    resp = client.post("/webhooks/mpesa/s3cret-daraja-token", json=_success_callback())
+    assert resp.status_code == 200
+    assert resp.json()["ResultCode"] == 0
+
+    order = db_session.query(models.Order).filter(models.Order.id == 1).first()
+    assert order.is_paid is True
+    assert order.mpesa_receipt == "NLJ7RT61SV"
+
+
+def test_tokenless_path_still_works_when_token_unset(client, db_session, monkeypatch):
+    """Degrade-safe: no env var (local dev) → legacy path keeps working."""
+    monkeypatch.delenv("MPESA_CALLBACK_TOKEN", raising=False)
+    _seed(db_session)
+
+    resp = client.post("/webhooks/mpesa", json=_success_callback())
+    assert resp.status_code == 200
+
+    order = db_session.query(models.Order).filter(models.Order.id == 1).first()
+    assert order.is_paid is True

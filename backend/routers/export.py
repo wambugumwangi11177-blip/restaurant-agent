@@ -187,6 +187,26 @@ class EraseCustomerRequest(BaseModel):
     customer_phone: str
 
 
+def _restaurant_knows_phone(db: Session, restaurant_id: int, variants: list[str]) -> bool:
+    """
+    True iff this restaurant holds at least one order, reservation, or consent
+    row for any variant of the phone number. Gate for the phone-global opt-out
+    write — see `erase_customer`.
+    """
+    for model in (models.Order, models.Reservation, models.CustomerConsent):
+        exists = (
+            db.query(model.id)
+            .filter(
+                model.restaurant_id == restaurant_id,
+                model.customer_phone.in_(variants),
+            )
+            .first()
+        )
+        if exists:
+            return True
+    return False
+
+
 @router.post("/erase-customer")
 async def erase_customer(
     body: EraseCustomerRequest,
@@ -199,9 +219,25 @@ async def erase_customer(
     but the name and phone are nulled), removes consent rows, and adds an
     opt-out so the number is never re-targeted. Restaurant-scoped: only the
     caller's own tenant data is touched.
+
+    Ownership pre-flight (security pass): the opt-out list this writes to
+    (`CustomerOptOut`) is phone-global and has no restaurant_id — a suppressed
+    number is suppressed for EVERY tenant. Without the check below, tenant A
+    could submit tenant B's customer's number and permanently destroy B's
+    ability to WhatsApp them (denial-of-messaging). So we only honour an
+    erasure for a phone this tenant demonstrably holds data for.
     """
     restaurant = get_or_create_restaurant(db, current_user)
     variants = _phone_variants(body.customer_phone)
+
+    if not _restaurant_knows_phone(db, restaurant.id, variants):
+        return {
+            "status": "no_data",
+            "customer_phone": body.customer_phone,
+            "orders_scrubbed": 0,
+            "reservations_scrubbed": 0,
+            "consents_deleted": 0,
+        }
 
     orders_scrubbed = (
         db.query(models.Order)

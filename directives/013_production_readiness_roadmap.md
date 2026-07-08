@@ -661,14 +661,33 @@ refuses to run without them.
   food cost <= 35% *after* rounding.
 - `no_show_rate > 20` is correct — the value is a real percent, not a fraction.
 
-### Open — found by running the app, NOT fixed (outside the approved plan)
-- **`avg_spend_per_guest` is dimensionally wrong**, before and after this pass. It divides
-  **all** dine-in revenue (mostly walk-ins) by **reserved** guests only. On a smoke dataset
-  it reads KES 5,845/guest pre-fix and KES 7,315/guest post-fix — both nonsense, inflated by
-  1/(reservation share of covers). It feeds `revenue_lost_to_no_shows`, per-table revenue,
-  and overbooking recovery. The module already estimates a walk-in vs reservation ratio
-  (feature #7 in its own docstring); that is the correction factor. **Fix before any of
-  those three numbers is shown to a customer.**
+### `avg_spend_per_guest` divided revenue by the wrong people (fixed, follow-up commit)
+It divided **all** dine-in revenue (mostly walk-ins) by **reserved** guests only, so the
+denominator was a small fraction of the people who generated the numerator, and the rate was
+inflated by 1/(reservation share of covers). On a smoke dataset: **KES 7,315 "per guest" at
+a venue whose average check is KES 179**. It feeds `estimated_revenue_lost`, per-table
+revenue, and overbooking recovery — and the old formula let a 10-seat no-show "cost" five
+times the restaurant's entire dine-in revenue.
+
+`Order` records no guest count, so covers cannot be counted, only estimated. Each dine-in
+order is one check, i.e. one party, and the reservation book gives people-per-party:
+
+    covers ~= dine_in_orders x avg_party_size
+
+The same dataset now reads **KES 44/head** against a KES 179 check for a party of four —
+i.e. 179/4, which is what the arithmetic should say. The payload carries `dine_in_orders`,
+`avg_party_size`, `estimated_covers` and `covers_are_estimated: true`, so the figure can be
+audited and any UI can label it an estimate.
+
+**⚠ An audit finding can be wrong because a docstring is.** The first draft of this section
+said "the module already estimates a walk-in vs reservation ratio (feature #7 in its own
+docstring); that is the correction factor." It is listed in the docstring. It was **never
+implemented** — no function in `reservation_optimizer.py` has ever computed it. That
+docstring's feature list was also mis-numbered (7, 9, 10 …), which is how a phantom feature
+survived inside it. The false line is deleted and the list renumbered. **Read the code, not
+the module docstring, before citing a capability as available.**
+
+### Open — found by running the app, NOT fixed
 - **`execution/seed_demo_data.py` crashes on Windows** before it reaches `drop_all`:
   `print("<broom emoji> ...")` raises `UnicodeEncodeError` under a cp1252 console. It has
   presumably never run on this machine.

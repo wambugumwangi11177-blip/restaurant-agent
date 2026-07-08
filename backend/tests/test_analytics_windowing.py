@@ -119,10 +119,15 @@ def test_reservation_revenue_is_bounded_and_aggregated_in_sql(seeded):
     # Recent dine-in revenue only: RECENT_ORDERS x 1000 cents.
     assert impact["total_dine_in_revenue"] == RECENT_ORDERS * 1000
 
-    # The rate divides windowed revenue by the 4 windowed guests, never by the
-    # all-time 104 — that would have collapsed the rate (and the three money
-    # estimates derived from it) by ~26x.
-    assert impact["avg_spend_per_guest"] == (RECENT_ORDERS * 1000) // 4
+    # The rate divides windowed revenue by windowed COVERS (orders x avg party
+    # size), never by the all-time reserved-guest count. Both the numerator and
+    # the denominator are drawn from the same window; mixing them would have
+    # collapsed the rate — and the three money estimates derived from it — by ~26x.
+    # Window holds RECENT_ORDERS orders and one 4-top: covers = 40 x 4 = 160.
+    assert impact["dine_in_orders"] == RECENT_ORDERS
+    assert impact["avg_party_size"] == 4.0
+    assert impact["estimated_covers"] == RECENT_ORDERS * 4
+    assert impact["avg_spend_per_guest"] == (RECENT_ORDERS * 1000) // (RECENT_ORDERS * 4)
 
     # The revenue must come back as one aggregate row, not 90 ORM objects.
     dine_in_sums = [s for s in statements if "sum(" in s.lower() and "orders.total" in s.lower()]
@@ -161,5 +166,8 @@ def test_degenerate_window_falls_back_to_all_time_rate(db_session):
     db_session.commit()
 
     impact = reservation_optimizer.get_reservation_insights(db_session, 1)["revenue_impact"]
-    assert impact["total_dine_in_revenue"] == RECENT_ORDERS * 1000    # all-time fallback
-    assert impact["avg_spend_per_guest"] == (RECENT_ORDERS * 1000) // 4
+    assert impact["total_dine_in_revenue"] == RECENT_ORDERS * 1000    # windowed orders exist
+    # No completed reservation in the window, so party size falls back to the
+    # all-time book (one 4-top) rather than to DEFAULT_PARTY_SIZE.
+    assert impact["avg_party_size"] == 4.0
+    assert impact["avg_spend_per_guest"] == (RECENT_ORDERS * 1000) // (RECENT_ORDERS * 4)

@@ -553,3 +553,133 @@ Warnings 155 → 9 (all third-party: passlib/argon2, FastAPI `on_event`).
       overlapping CONFIRMED reservations first — nothing ever prevented them, so
       `ADD CONSTRAINT` may fail on live data. Reconciliation query is in the migration's
       docstring.
+
+## Security + correctness hardening, Sprints 1–2 (2026-07-08)
+
+Independent audit of the whole app, not a re-read of this roadmap. Two commits:
+`security: authenticate M-Pesa callback…` and `fix: grounding guard…`. Suite 85 → 129.
+Every fix was **reproduced against running code before being written**, which is the only
+reason the three notes marked ⚠ below exist — a purely static pass would have shipped all
+three as regressions.
+
+### The M-Pesa callback was an unauthenticated money endpoint
+`/webhooks/mpesa` had no signature check, no IP allowlist, no rate limit. The amount
+verification reads the paid amount from the **request body**, so a forger satisfies it
+trivially; the only barrier was knowing a `CheckoutRequestID`. Anyone with one (logs, a
+leaked STK response, an insider) could POST `ResultCode: 0` and flip an order to paid plus
+fire the "payment confirmed" WhatsApp.
+
+Safaricom **signs nothing and publishes no fixed source-IP range**, so there is no
+signature to verify — the only practical authentication is a secret embedded in the
+`CallBackURL` we register with Daraja, which Safaricom echoes back. Hence
+`/webhooks/mpesa/{token}` + constant-time compare against `MPESA_CALLBACK_TOKEN`. Degrades
+safe when unset (local/dev); once set, the legacy tokenless path 403s.
+**Deploy blocker: set `MPESA_CALLBACK_TOKEN` in prod and register the tokenized URL.**
+
+### Phone-global tables need an ownership pre-flight
+`CustomerOptOut` has no `restaurant_id` — a suppressed number is suppressed for *every*
+tenant. `/data/erase-customer` wrote to it from an arbitrary caller-supplied phone, so
+tenant A could permanently destroy tenant B's ability to WhatsApp B's own customer. This
+class of bug is invisible to `test_tenant_isolation.py`, which proves you cannot read or
+write another tenant's rows — here the row is nobody's. **Rule: before writing to any table
+without a tenant scope, prove the caller's tenant owns the subject.** Grep for other
+restaurant-less tables in `models.py`.
+
+### The grounding guard destroyed the number it existed to protect ⚠
+`ai/reasoning/grounding.py` matched no minus sign and grounded only signed payload values,
+so **no negative figure could ever ground**. Reproduced: payload `revenue_mom_pct: -15.0`,
+narrative "Revenue down 15% this month" → "Revenue down `[unverified]`", `verified=False`.
+The single most important sentence an owner reads, mutilated on every month revenue fell.
+It had a full test file and 8 passing tests — none used a negative number. **Lesson: a
+guard's tests must include the values the guard is most likely to meet in the field, not
+just the values that make it pass.**
+
+While there: `value < _MIN_CHECKABLE_MAGNITUDE` waved every large negative through
+unpoliced (`-500 < 10`), and `round(n/100)` in the derivation set let an invented "25%"
+ground itself against an unrelated order count of 2547.
+
+### ⚠ Bounding a numerator without its denominator
+The audit said "bound `reservation_optimizer`'s dine-in order query to 30 days" (perf: it
+`.all()`-ed ~107k rows). But that revenue is the numerator of `avg_spend_per_guest`, whose
+denominator is **all-time** completed-reservation guests, and which feeds three downstream
+money estimates. Bounding one side alone would have deflated the rate ~26x — a silent wrong
+number, worse than the slow query. Both sides now move to the same window, with a fallback
+to the all-time ratio when imported data leaves either side empty.
+
+### ⚠ Deleting a duplicate send can delete the only send
+`brain.run_stock_check` both emitted `STOCK_CRITICAL` (whose handler messages the owner)
+*and* sent `compose_stock_alert()` directly. Measured on pre-fix code: **2 messages for one
+low item.** But removing the direct send exposed two bugs hiding behind it:
+
+- `on_stock_critical` resolved the owner from `OWNER_PHONE` env **only**, ignoring the
+  `owner_phone` column added in migration 006. A restaurant onboarded via the column got
+  *no* orchestrated stock alert at all — which is also why the double send only reproduces
+  with the legacy env var set. Both call sites now share `brain.owner_phone_for`.
+- A depleted item with no recent usage scores `WARNING` (`hours_remaining` defaults to
+  999), never enters `urgent`, and never emits `STOCK_CRITICAL`. Its *only* path to the
+  owner was that arbitrary direct send of `urgent[0]`. `on_stock_depleted` now sends.
+
+Stock alerts also had **no cooldown** while pricing has had a 7-day one since day one: the
+2-hourly job re-alerted the same low item on all 7 cycles a day until someone restocked.
+New `inventory_items.last_alerted_at` (migration 010), 12h window.
+
+### Headline metrics were methodologically wrong
+- **Star/Dog classification** used the raw mean of units sold as the popularity cutoff.
+  Unit sales are right-skewed, so the mean over-condemns. Now `0.7 x mean` (the Kasavana &
+  Smith popularity index). Measured on a hand-built skew: four items selling 40% of the
+  bestseller's volume went Puzzle → Star; the thin-margin one at the same volume went
+  **Dog → Plowhorse**. (Precisely: the raw mean files a mid-list item as Dog only when its
+  margin is *also* below average, else Puzzle. "N Dog items" is a dashboard headline.)
+- **`menu_optimization_score`** was `stars_pct*130 + (1-dogs_pct)*70 - food_cost*0.5 +
+  rising_count*3`. `rising_count` is an **unbounded item count**: a 40-item all-Dog menu at
+  50% food cost, all trending up, scored **95/100**. Replaced with a weighted mean of three
+  `[0,1]` components (portfolio 0.60, cost 0.25, momentum 0.15) — bounded by construction,
+  fuzzed over 200k random menus, and 15/100 for that same menu.
+- **`day_over_day_change`** returned a flat `0` whenever yesterday's revenue was under KES
+  1,000, and the UI renders that `0` as a real "no change". Now guards only a zero
+  denominator: KES 450 → KES 900 reads **+100%**, not 0%.
+
+### Destructive `execution/` scripts had no guard rails
+Five scripts ran `drop_all` / bulk `DELETE` / mass `UPDATE` against whatever `DATABASE_URL`
+was in `backend/.env` — the live Neon DB — with no confirmation. New `execution/_guard.py`
+requires **both** `--yes` and `ALLOW_DESTRUCTIVE=1`, and echoes the target host (credentials
+stripped) plus what will be destroyed. Corrections to the audit while wiring it:
+`tune_showcase_health.py` and `smooth_recent_and_finalize.py` issue **no** `DELETE` — they
+destroy via mass `UPDATE` of inventory quantities and reservation statuses.
+
+`populate_production.py` seeded a hardcoded ADMIN (`client@leviii.ai` / `client123`) and
+printed the password on success. Now `SEED_ADMIN_PASSWORD` / `SEED_ADMIN_EMAIL`, and it
+refuses to run without them.
+
+### Verified CLEAN — do not re-spend effort here
+- LLM prompt-injection is contained: all five orchestrator tools are read-only, loop bounded
+  at `MAX_TOOL_TURNS=4`. Free-form text cannot drive DB writes.
+- Inbound number → tenant is an exact `owner_phone` match; the mutating owner commands
+  (`APPROVE n` / `REJECT n`) require the registered owner number, and the HTTP origin is
+  Twilio-signature-verified.
+- Pricing cannot recommend a loss-making price: SURGE/STIMULATE re-verify margin >= 40% and
+  food cost <= 35% *after* rounding.
+- `no_show_rate > 20` is correct — the value is a real percent, not a fraction.
+
+### Open — found by running the app, NOT fixed (outside the approved plan)
+- **`avg_spend_per_guest` is dimensionally wrong**, before and after this pass. It divides
+  **all** dine-in revenue (mostly walk-ins) by **reserved** guests only. On a smoke dataset
+  it reads KES 5,845/guest pre-fix and KES 7,315/guest post-fix — both nonsense, inflated by
+  1/(reservation share of covers). It feeds `revenue_lost_to_no_shows`, per-table revenue,
+  and overbooking recovery. The module already estimates a walk-in vs reservation ratio
+  (feature #7 in its own docstring); that is the correction factor. **Fix before any of
+  those three numbers is shown to a customer.**
+- **`execution/seed_demo_data.py` crashes on Windows** before it reaches `drop_all`:
+  `print("<broom emoji> ...")` raises `UnicodeEncodeError` under a cp1252 console. It has
+  presumably never run on this machine.
+
+### Standing items (not code — carry forward)
+- [ ] **Set `MPESA_CALLBACK_TOKEN` in prod** and register `/webhooks/mpesa/{token}` as the
+      Daraja `CallBackURL`. Deploy blocker for the fix above.
+- [ ] **Rotate `GROQ_API_KEY`** — flagged burned since Phase 0, still live in `backend/.env`.
+- [ ] **Rotate the Neon DB password** — pasted into chat history previously.
+- [ ] **Run migration 009 against a staging/branch Postgres** before trusting the
+      reservation overlap guard (see the section above; unchanged).
+- Migration **010** (`inventory_items.last_alerted_at`) was verified both ways on a scratch
+  DB: skipped when `create_all` had already added the column, and adding it on a table that
+  lacked one. It is additive and nullable — safe on live data.

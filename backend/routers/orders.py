@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from rate_limit import limiter
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
-from datetime import datetime
 
 from database import get_db
 import models
 import schemas
 import auth
 from routers.deps import get_or_create_restaurant
+from time_utils import utcnow
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -134,7 +134,7 @@ async def update_order_status(
 
     order.status = new_status
     if new_status == models.OrderStatus.SERVED:
-        order.completed_at = datetime.utcnow()
+        order.completed_at = utcnow()
 
     db.commit()
     db.refresh(order)

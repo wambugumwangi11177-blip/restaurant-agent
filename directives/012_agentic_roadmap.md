@@ -125,10 +125,45 @@ This is the only phase that should introduce LLM calls.
 - [x] `ai/reservation_optimizer.find_available_tables()`: real deterministic
       capacity + time-overlap conflict checker, verified against 6 scenarios (empty
       slate, party too large, exact overlap, partial overlap, adjacent non-overlap,
-      cross-date isolation). **Known gap, documented in the function's docstring**: no
-      DB-level concurrency guard yet — needs the same class of fix as the
-      `ix_pricing_rec_one_pending_per_item` partial unique index before it's safe under
-      concurrent writers.
+      cross-date isolation).
+- [x] **Booking-write guards + concurrency gap closed (2026-07-08).** The docstring's
+      "no DB-level concurrency guard yet" caveat turned out to *understate* the problem.
+      Auditing the write path found `routers/reservations.create_reservation` never
+      called `find_available_tables()` — or any availability check — at all. It took
+      `table_id` from the request body and wrote it straight to the row. Consequences,
+      both reproduced in tests before fixing:
+        1. **Double-booking needed no race**: two plain sequential POSTs for the same
+           table and overlapping times both succeeded.
+        2. **Cross-tenant IDOR**: passing another restaurant's `table_id` booked *their*
+           table, since nothing checked the table belonged to the caller's restaurant.
+           `test_tenant_isolation.py` covered orders/reservations *update/delete by id*,
+           but not a **foreign key supplied in a create body** — a class of IDOR that
+           id-scoping tests structurally miss. Worth auditing other routers for
+           FK-in-body inputs that are never ownership-validated.
+      Fixed in three layers: table ownership + capacity + `is_table_available()` checked
+      before INSERT (409 on conflict, **404 — not 403 — on another tenant's table**, so
+      the response cannot be used to enumerate other restaurants' floor plans); an
+      `IntegrityError` catch turning a lost race into the same clean 409; and
+      `alembic/versions/009_add_reservation_overlap_guard.py`.
+      **Why not the `ix_pricing_rec_one_pending_per_item` partial-unique-index pattern
+      this roadmap originally prescribed**: uniqueness cannot express *interval overlap*.
+      Bookings at 18:00 and 18:30 on one table are distinct rows under any unique key,
+      yet they conflict. It needs `EXCLUDE USING gist (table_id WITH =, tsrange(...) WITH
+      &&)` plus the `btree_gist` extension. The original prescription was wrong — noting
+      it because "apply the same fix as last time" is exactly how a wrong guard ships
+      looking right. Half-open `tsrange` matches the Python `_intervals_overlap` boundary
+      semantics by construction, so 18:00–19:30 and 19:30–21:00 conflict in neither layer.
+      Verified: 9 new tests in `tests/test_reservation_booking.py` (overlap rejected,
+      adjacent allowed, cancelled frees the slot, cross-tenant table 404s, undersized
+      table 400s, table-less booking still works, migration no-ops on SQLite / emits the
+      constraint on Postgres / is idempotent). Suite: 85 passed.
+- [ ] **Migration 009 has not been run against a real Postgres.** No local Postgres exists
+      here and the only reachable instance is the production Neon DB — running untested
+      DDL against production to prove it works is not testing. Before deploy: run it
+      against a staging/Neon branch, confirm the role may `CREATE EXTENSION btree_gist`,
+      and **check for pre-existing overlapping CONFIRMED rows first** — nothing has ever
+      prevented them, so `ADD CONSTRAINT` can fail on live data. The migration's docstring
+      carries the exact reconciliation query.
 - [ ] **Blocked on a product/legal decision, not an engineering one**: reservation
       booking needs a customer-facing inbound flow (distinct from the owner-command
       webhook) and a decision on consent/PII handling — the consent/tokenization vault

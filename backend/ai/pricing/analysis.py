@@ -5,7 +5,7 @@ Pure analytics layer for the Pricing Intelligence agent.
 No DB writes. Read and compute only.
 
 Fixes vs previous version:
-  BUG-03  — All DB queries now use UTC (datetime.utcnow()) not EAT.
+  BUG-03  — All DB queries now use UTC (utcnow()) not EAT.
              EAT is used ONLY for display strings and DOW/hour bucketing
              of results. Mixing naive EAT with naive UTC in SQLAlchemy
              filter() caused a silent 3-hour window drop on every query.
@@ -22,10 +22,11 @@ Fixes vs previous version:
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import NamedTuple
 import models
 from ai.analysis_clock import analysis_anchor
+from time_utils import utcnow
 
 # ── Constants ────────────────────────────────────────────────────────────────
 SURGE_THRESHOLD         = 1.30
@@ -63,7 +64,7 @@ def fetch_item_velocities(
     """
     Compute velocity metrics for every menu item.
 
-    BUG-03 FIX: Uses datetime.utcnow() for all DB range filters.
+    BUG-03 FIX: Uses utcnow() for all DB range filters.
     created_at is stored as naive UTC in the DB — never compare it to
     a naive EAT datetime or you silently lose 3 hours of data.
 
@@ -152,7 +153,7 @@ def fetch_item_velocities(
 
 def items_on_cooldown(db: Session, restaurant_id: int) -> set[int]:
     """Return set of menu_item_ids with a PENDING/APPROVED rec in the last 7 days."""
-    cutoff = datetime.utcnow() - timedelta(days=COOLDOWN_DAYS)   # BUG-03 FIX: UTC
+    cutoff = utcnow() - timedelta(days=COOLDOWN_DAYS)   # BUG-03 FIX: UTC
     recs = (
         db.query(models.PricingRecommendation.menu_item_id)
         .filter(
@@ -169,7 +170,7 @@ def items_on_cooldown_for_restaurant(
     db: Session, restaurant_id: int
 ) -> set[int]:
     """Correct version with restaurant_id filter."""
-    cutoff = datetime.utcnow() - timedelta(days=COOLDOWN_DAYS)
+    cutoff = utcnow() - timedelta(days=COOLDOWN_DAYS)
     recs = (
         db.query(models.PricingRecommendation.menu_item_id)
         .filter(

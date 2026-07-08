@@ -26,13 +26,14 @@ It always calls agent functions. The agents own the data logic.
 """
 
 import logging
-from datetime import datetime, date
+from datetime import date
 from sqlalchemy.orm import Session
 from database import SessionLocal
 import models
 from events.bus import subscribe, EventType, emit_async
 from ai.memory import store as memory
 from ai.evaluation.tracker import write_audit_log
+from time_utils import utcnow
 
 logger = logging.getLogger("ai.orchestrator")
 
@@ -90,12 +91,12 @@ def on_stock_critical(payload: dict) -> None:
         # Tonight's reservations
         tonight_covers = db.query(models.Reservation).filter(
             models.Reservation.restaurant_id == restaurant_id,
-            models.Reservation.reservation_date == datetime.utcnow().date(),
+            models.Reservation.reservation_date == utcnow().date(),
             models.Reservation.status == models.ReservationStatus.CONFIRMED,
         ).count()
 
         # Memory: has this happened before?
-        ctx = memory.recall_context(db, restaurant_id, datetime.utcnow().date())
+        ctx = memory.recall_context(db, restaurant_id, utcnow().date())
         past_stockouts = ctx["recent_stockouts"]
         stockout_history = f"This item has stocked out {len(past_stockouts)} time(s) recently." if past_stockouts else ""
 
@@ -179,7 +180,7 @@ def on_recommendation_approved(payload: dict) -> None:
             db, restaurant_id,
             event_type        = "price_change",
             event_name        = f"Price change: {item_name}",
-            event_date        = datetime.utcnow().date(),
+            event_date        = utcnow().date(),
             impact_type       = "price_change",
             agent_notes       = f"{item_name} changed from KES {old_price//100:,} to KES {new_price//100:,}. Approved by {approved_by}.",
         )
@@ -264,7 +265,7 @@ def on_reservation_no_show(payload: dict) -> None:
             db, restaurant_id,
             event_type        = "no_show",
             event_name        = f"No-show: {customer_name or 'unknown'}",
-            event_date        = datetime.utcnow().date(),
+            event_date        = utcnow().date(),
             impact_type       = "traffic_drop",
             agent_notes       = f"Party of {party_size} did not arrive. Phone: {customer_phone}.",
         )
@@ -340,7 +341,7 @@ def on_agent_failed(payload: dict) -> None:
     try:
         # Check how many failures in the last hour
         from datetime import timedelta
-        cutoff = datetime.utcnow() - timedelta(hours=1)
+        cutoff = utcnow() - timedelta(hours=1)
         recent_failures = db.query(models.AgentExecution).filter(
             models.AgentExecution.agent_name == agent_name,
             models.AgentExecution.success    == False,

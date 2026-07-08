@@ -444,13 +444,70 @@ def _empty_response():
 # above: this is Layer 3 deterministic logic that a booking flow (LLM-driven
 # or not) must call rather than letting a model guess at availability.
 #
-# Concurrency note: this checks-then-suggests only. Whatever calls
-# book_table() must re-run this check inside the same transaction that
-# inserts the Reservation row, to avoid a race between two bookings for the
-# same table/slot (see the PENDING-pricing partial-unique-index pattern in
-# alembic/versions/001_add_agent_tables.py for the kind of DB-level guard
-# this still needs before it's safe under concurrent writers).
+# Concurrency note (resolved 2026-07-08): `find_available_tables` still
+# checks-then-suggests, so its result is advisory the moment it returns. The
+# actual write path (`routers/reservations.create_reservation`) now re-runs the
+# single-table check via `is_table_available()` immediately before INSERT, and
+# alembic/versions/009_add_reservation_overlap_guard.py adds a Postgres
+# EXCLUDE-USING-GIST constraint so two concurrent writers that both pass the
+# application check still cannot both commit. That constraint is the real
+# guarantee; the application check exists to turn the race into a clean 409
+# instead of an IntegrityError in the common (uncontended) case.
+#
+# Why EXCLUDE rather than the partial unique index used for PENDING pricing
+# recommendations: uniqueness cannot express *interval overlap*. Two bookings on
+# one table at 18:00 and 18:30 are distinct rows under any unique key, yet
+# conflict. GiST range exclusion is the only DB-level construct that says "no two
+# rows whose time ranges intersect."
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def _intervals_overlap(a_start, a_end, b_start, b_end) -> bool:
+    """Half-open overlap: touching intervals (18:00-19:30, 19:30-21:00) do NOT conflict."""
+    return a_start < b_end and b_start < a_end
+
+
+def _reservation_bounds(reservation_date, reservation_time, duration_minutes):
+    start = datetime.combine(reservation_date, reservation_time)
+    return start, start + timedelta(minutes=duration_minutes or 90)
+
+
+def is_table_available(
+    db: Session,
+    restaurant_id: int,
+    table_id: int,
+    reservation_date,
+    reservation_time,
+    duration_minutes: int = 90,
+    exclude_reservation_id: int | None = None,
+) -> bool:
+    """
+    True if `table_id` has no overlapping CONFIRMED reservation in the window.
+
+    Scoped by `restaurant_id` so it can never be satisfied by (or collide with)
+    another tenant's reservations. `exclude_reservation_id` lets a future
+    reschedule flow ignore the row it is itself moving.
+    """
+    requested_start, requested_end = _reservation_bounds(
+        reservation_date, reservation_time, duration_minutes
+    )
+
+    q = db.query(models.Reservation).filter(
+        models.Reservation.restaurant_id == restaurant_id,
+        models.Reservation.table_id == table_id,
+        models.Reservation.reservation_date == reservation_date,
+        models.Reservation.status == models.ReservationStatus.CONFIRMED,
+    )
+    if exclude_reservation_id is not None:
+        q = q.filter(models.Reservation.id != exclude_reservation_id)
+
+    for res in q.all():
+        res_start, res_end = _reservation_bounds(
+            res.reservation_date, res.reservation_time, res.duration_minutes
+        )
+        if _intervals_overlap(requested_start, requested_end, res_start, res_end):
+            return False
+    return True
 
 def find_available_tables(
     db: Session,
@@ -465,8 +522,9 @@ def find_available_tables(
     reservation for the requested date/time/duration, smallest-capacity-first
     (best fit, avoids wasting a large table on a small party).
     """
-    requested_start = datetime.combine(reservation_date, reservation_time)
-    requested_end = requested_start + timedelta(minutes=duration_minutes)
+    requested_start, requested_end = _reservation_bounds(
+        reservation_date, reservation_time, duration_minutes
+    )
 
     tables = (
         db.query(models.Table)
@@ -493,17 +551,16 @@ def find_available_tables(
 
     booked_intervals_by_table: dict[int, list[tuple[datetime, datetime]]] = defaultdict(list)
     for res in same_day_reservations:
-        res_start = datetime.combine(res.reservation_date, res.reservation_time)
-        res_end = res_start + timedelta(minutes=res.duration_minutes or 90)
-        booked_intervals_by_table[res.table_id].append((res_start, res_end))
-
-    def overlaps(a_start, a_end, b_start, b_end) -> bool:
-        return a_start < b_end and b_start < a_end
+        booked_intervals_by_table[res.table_id].append(
+            _reservation_bounds(res.reservation_date, res.reservation_time, res.duration_minutes)
+        )
 
     available = []
     for table in tables:
         conflicts = booked_intervals_by_table.get(table.id, [])
-        if any(overlaps(requested_start, requested_end, s, e) for s, e in conflicts):
+        if any(
+            _intervals_overlap(requested_start, requested_end, s, e) for s, e in conflicts
+        ):
             continue
         available.append({
             "table_id": table.id,

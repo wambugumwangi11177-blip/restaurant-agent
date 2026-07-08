@@ -6,7 +6,7 @@ Does NOT drop tables. Safe to run in production.
 import sys
 import os
 import random
-from datetime import datetime, timedelta, time, date
+from datetime import timedelta, time, date
 
 # backend is now the current directory
 
@@ -18,6 +18,7 @@ from models import (
     OrderStatus, OrderType, TableStatus, ReservationStatus, StockMovementType, Role
 )
 from auth import get_password_hash
+from time_utils import utcnow
 
 def populate():
     db = SessionLocal()
@@ -147,7 +148,7 @@ def populate():
 
         # -- GENERATE 30 DAYS OF ORDERS --
         print("[INFO] Generating 30 days of order history...")
-        today = datetime.utcnow()
+        today = utcnow()
         total_orders = 0
 
         for day_offset in range(30, 0, -1):

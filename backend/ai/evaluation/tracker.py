@@ -43,10 +43,11 @@ import time
 import json
 import logging
 import functools
-from datetime import datetime, date
+from datetime import date
 from typing import Callable
 from sqlalchemy.orm import Session
 import models
+from time_utils import utcnow
 
 logger = logging.getLogger("ai.evaluation")
 
@@ -201,7 +202,7 @@ def evaluate_prediction(
     pred.actual_value  = actual
     pred.error_pct     = round(error_pct, 2)
     pred.within_ci     = within_ci
-    pred.evaluated_at  = datetime.utcnow()
+    pred.evaluated_at  = utcnow()
     db.commit()
 
     return {
@@ -220,7 +221,7 @@ def get_agent_accuracy(db: Session, restaurant_id: int, agent_name: str, days: i
     Returns mean absolute error%, % within CI, prediction count.
     """
     from datetime import timedelta
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = utcnow() - timedelta(days=days)
     preds = db.query(models.AgentPrediction).filter(
         models.AgentPrediction.restaurant_id == restaurant_id,
         models.AgentPrediction.agent_name    == agent_name,

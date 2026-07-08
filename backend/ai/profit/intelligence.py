@@ -4,7 +4,7 @@ backend/ai/profit/intelligence.py
 Profit Intelligence — complete financial brain.
 
 Fixes vs previous version:
-  BUG-04  — All DB range queries now use datetime.utcnow() not _now_eat().
+  BUG-04  — All DB range queries now use utcnow() not _now_eat().
              EAT is used only for DOW/hour display bucketing of results.
   BUG-10  — _channel_profitability and _daypart_profitability: replaced
              the implicit `.cost_price` access on potentially-None items
@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 import math
 import models
 from ai.analysis_clock import analysis_anchor
+from time_utils import utcnow
 
 # ── Benchmarks ────────────────────────────────────────────────────────────────
 HEALTHY_FOOD_COST_MAX = 35.0
@@ -431,7 +432,7 @@ def _profit_forecast(orders: list, total_cost: int, total_revenue: int) -> dict:
     cost_ratio  = total_cost / max(total_revenue, 1)
 
     forecast = []
-    now      = datetime.utcnow()
+    now      = utcnow()
     for i in range(1, 8):
         future_date = now + timedelta(days=i)
         dow         = future_date.weekday()

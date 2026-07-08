@@ -511,3 +511,45 @@ Treat this as the actual production checklist — not aspirational, checked one 
       be fixed regardless. Fix: both 002's and 003's `downgrade()` now use Alembic's
       `batch_alter_table` (recreates the table safely on SQLite; transparently falls back
       to plain `ALTER TABLE` on Postgres/production — no behavior change there).
+
+## Reservation booking guards + `utcnow()` deprecation pass (2026-07-08)
+
+**IDOR class this project's tenant tests structurally miss.** `test_tenant_isolation.py`
+proves you cannot update/delete another tenant's rows by guessing sequential ids. It does
+not — and by construction cannot — catch a **foreign key accepted in a create body and
+never ownership-validated**. `POST /reservations` took `table_id` straight from the request
+and wrote it, so any authenticated user could book any restaurant's table by guessing an
+integer. Same endpoint also never checked availability at all (`find_available_tables()`
+existed, correct, since Phase 2, and no write path had ever called it) — so two ordinary
+sequential requests double-booked a table, no concurrency required. Fixed; 9 tests added;
+suite 85 passed. **Action item**: audit every other router for the same shape — an FK id in
+a POST/PATCH body that is trusted without a `restaurant_id`/`tenant_id` scope check. Grep
+starting points: `menu_item_id`, `table_id`, `supplier_id`, `inventory_item_id` in
+`schemas.py` create models.
+
+Ownership failures return **404, not 403**. A 403 confirms the row exists, turning the
+endpoint into an enumeration oracle for other tenants' floor plans and menus.
+
+**`datetime.utcnow()` (155 deprecation warnings) — why the obvious fix was the wrong one.**
+The mechanical replacement, `datetime.now(timezone.utc)`, returns a timezone-*aware*
+datetime. `utcnow()` returns a *naive* one. Every `DateTime` column in `models.py` is naive
+(none declare `timezone=True`), so every value read back from the DB is naive, and Python
+raises `TypeError: can't subtract offset-naive and offset-aware datetimes` where the two
+meet. This codebase does exactly that in a dozen places (`analysis_clock.py`'s
+`utcnow() - latest`, and every `cutoff = utcnow() - timedelta(...)` across pricing,
+marketing, evaluation, executive). A find/replace would have shipped a **runtime crash in
+production while the test suite stayed green**, since tests mostly build their own naive
+fixtures. Instead: new `backend/time_utils.py` with `utcnow()` preserving naive-UTC
+semantics byte-for-byte, all 64 call sites migrated, orphaned `datetime` imports removed.
+Warnings 155 → 9 (all third-party: passlib/argon2, FastAPI `on_event`).
+
+- [ ] **Migrate to timezone-aware datetimes properly.** `DateTime(timezone=True)` columns,
+      one Alembic migration per table, and an audit of every naive comparison.
+      `time_utils.utcnow()` is the single place that flips; `aware_utcnow()` is what it
+      flips to. A real change — deliberately not smuggled into a deprecation cleanup.
+- [ ] **Run migration 009 against a real Postgres before deploy.** Never executed against
+      one: no local Postgres here, and the only reachable instance is production Neon.
+      Confirm the role may `CREATE EXTENSION btree_gist`, and query for pre-existing
+      overlapping CONFIRMED reservations first — nothing ever prevented them, so
+      `ADD CONSTRAINT` may fail on live data. Reconciliation query is in the migration's
+      docstring.

@@ -17,9 +17,10 @@ Pulls deep insights from all AI services and produces:
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import datetime, timedelta
+from datetime import timedelta
 import models
 from ai import menu_engineer, revenue_forecaster, kds_intelligence, inventory_predictor, reservation_optimizer
+from time_utils import utcnow
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -38,7 +39,7 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
         .filter(models.Order.restaurant_id == restaurant_id)
         .scalar()
     )
-    now = latest_order or datetime.utcnow()
+    now = latest_order or utcnow()
     today = now.date()
     yesterday = today - timedelta(days=1)
 

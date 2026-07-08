@@ -6,7 +6,7 @@ Changes vs original:
   - Added refresh token support scaffold (ready to wire in)
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from database import get_db
 import models
+from time_utils import utcnow
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
@@ -45,7 +46,7 @@ def get_password_hash(password: str) -> str:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + (
+    expire = utcnow() + (
         expires_delta if expires_delta else timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
     )
     to_encode.update({"exp": expire})

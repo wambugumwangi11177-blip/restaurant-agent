@@ -21,12 +21,13 @@ Campaign types:
 
 import os
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 import models
 from events.bus import emit, EventType
 from ai.evaluation.tracker import write_audit_log
+from time_utils import utcnow
 
 logger = logging.getLogger("ai.marketing")
 
@@ -79,7 +80,7 @@ def run_daily_campaigns(db: Session, restaurant_id: int) -> dict:
 
 def _can_send_campaign(db: Session, restaurant_id: int) -> bool:
     """Check if we've sent a campaign recently — rate limit."""
-    cutoff = datetime.utcnow() - timedelta(days=MIN_DAYS_BETWEEN_CAMPAIGNS)
+    cutoff = utcnow() - timedelta(days=MIN_DAYS_BETWEEN_CAMPAIGNS)
     recent = db.query(models.AgentMessage).filter(
         models.AgentMessage.restaurant_id == restaurant_id,
         models.AgentMessage.message_type.like("campaign_%"),
@@ -94,7 +95,7 @@ def _find_surplus_inventory(db: Session, restaurant_id: int) -> dict | None:
     Find inventory items that are high-stock but close to expiry.
     These are waste-risk items — a flash special moves them.
     """
-    now = datetime.utcnow()
+    now = utcnow()
     items = db.query(models.InventoryItem).filter(
         models.InventoryItem.restaurant_id == restaurant_id,
         models.InventoryItem.quantity      > 0,
@@ -191,7 +192,7 @@ def _run_winback_campaign(db: Session, restaurant_id: int) -> int:
 def _run_star_promotion(db: Session, restaurant_id: int) -> str | None:
     """Push the highest-margin available item as a weekly special."""
     # Only run on Mondays (start of week push)
-    if datetime.utcnow().weekday() != 0:
+    if utcnow().weekday() != 0:
         return None
 
     items = db.query(models.MenuItem).filter(

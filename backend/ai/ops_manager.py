@@ -27,7 +27,18 @@ from ai import menu_engineer, revenue_forecaster, kds_intelligence, inventory_pr
 # ─────────────────────────────────────────────────────────────────────────────
 def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
     """Complete AI Operations Manager dashboard — exhaustive."""
-    now = datetime.utcnow()
+    # "Today" for the snapshot = the most recent day the restaurant actually
+    # had orders, not wall-clock UTC. For a live restaurant that IS today; for
+    # data that doesn't reach the current wall-clock day (historical/imported,
+    # or just a timezone offset between UTC storage and the venue's day) it
+    # avoids a permanently-empty "Today's Sales" tile. Same principle as
+    # ai/analysis_clock.py.
+    latest_order = (
+        db.query(func.max(models.Order.created_at))
+        .filter(models.Order.restaurant_id == restaurant_id)
+        .scalar()
+    )
+    now = latest_order or datetime.utcnow()
     today = now.date()
     yesterday = today - timedelta(days=1)
 

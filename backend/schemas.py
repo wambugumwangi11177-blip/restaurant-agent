@@ -170,13 +170,17 @@ class ReservationOut(BaseModel):
     customer_email: str
     party_size: int
     reservation_date: date
-    reservation_time: time
+    # Optional/nullable so the whole /reservations list doesn't 500 on a single
+    # legacy row with a null timestamp — found 2026-07-07: 150 seeded
+    # reservations had created_at=None, which failed response validation and
+    # took down the entire bookings page. reservation_time guarded too.
+    reservation_time: Optional[time] = None
     duration_minutes: int
     status: str
     deposit_paid: bool
     notes: str
     table_id: Optional[int]
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

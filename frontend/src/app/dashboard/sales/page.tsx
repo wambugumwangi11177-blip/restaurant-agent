@@ -47,9 +47,16 @@ export default function SalesPage() {
 
     const isDemo = isOrdersEmpty(orders);
 
-    // Calculate real stats
-    const today = new Date().toDateString();
-    const todayOrders = orders.filter((o) => new Date(o.created_at).toDateString() === today);
+    // Calculate real stats. Group by the STORED date string (YYYY-MM-DD) rather
+    // than `new Date(created_at).toDateString()` — the timestamps are naive UTC,
+    // and letting the browser parse them as local time shifts orders across the
+    // day boundary (an EAT viewer saw every UTC-dated order land on the "wrong"
+    // day, so "today" matched nothing → sales showed 0). Show the most recent
+    // business day that actually has orders: that's real today for a live
+    // restaurant, and the latest data day for the showcase — always non-empty.
+    const dayKey = (s: string) => (s || "").slice(0, 10);
+    const latestDay = orders.reduce((m, o) => (dayKey(o.created_at) > m ? dayKey(o.created_at) : m), "");
+    const todayOrders = orders.filter((o) => dayKey(o.created_at) === latestDay);
     const completedToday = todayOrders.filter((o) => o.status !== "cancelled");
 
     const totalRevenue = completedToday.reduce((sum, o) => sum + (o.total || 0), 0);

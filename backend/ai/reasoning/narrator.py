@@ -54,6 +54,13 @@ _MAX_PAYLOAD_CHARS = 12000
 _cache: dict[str, dict] = {}
 _CACHE_MAX = 256
 
+# Process-local tally of grounding outcomes, surfaced to the frontend as an
+# honest "how often do we get it right" stat (see get_trust_stats()). Counts
+# fresh narrations only (cache hits reuse an already-counted verdict) so this
+# reflects actual LLM output quality, not cache size. Not persisted — resets
+# on deploy — because it's a live trust signal, not an audit trail.
+_trust_stats = {"total": 0, "verified": 0}
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TASK REGISTRY — one entry per deterministic module we narrate.
@@ -72,7 +79,15 @@ TASKS = {
             "highest-leverage fixes. Call out margin leaks, low-margin bestsellers, "
             "and channel/daypart profitability if present."
         ),
-        "keys": None,
+        # Whitelisted (was None). The full profit payload is ~6.2k tokens, which
+        # alone exceeds Groq's free-tier 6,000 tokens/minute cap → every call
+        # 413'd and narrate() returned None, so profit showed NO narrative on the
+        # free tier. These keys carry exactly the focus above (leaks, bestsellers,
+        # channel/daypart, actions) at ~2.3k tokens; the dropped keys
+        # (contribution_margins, customer_intelligence, upsell_uplift,
+        # profit_forecast) are large and off-focus for this narration.
+        "keys": ["summary", "profit_leaks", "channel_analysis",
+                 "daypart_analysis", "stars", "dogs", "recommendations"],
     },
     "menu": {
         "tier": TIER_LOW,
@@ -147,7 +162,13 @@ def narrate(payload: dict, task: str, *, restaurant_id: int | None = None,
         resp = llm_client.chat_with_usage(
             messages=[{"role": "user", "content": user}],
             system=system,
-            max_tokens=700,
+            # 700 was too tight for Groq's gpt-oss reasoning models (MEDIUM/HIGH
+            # tier): they spend ~700-800 tokens on hidden reasoning before
+            # writing the actual JSON answer, so pricing narratives were
+            # getting cut off mid-response (finish_reason="length") and
+            # falling back to a garbled, useless narrative. 2000 gives the
+            # reasoning + full JSON answer room to complete.
+            max_tokens=2000,
             tier=tier,
             temperature=_TEMPERATURE,
         )
@@ -157,13 +178,20 @@ def narrate(payload: dict, task: str, *, restaurant_id: int | None = None,
 
     narrative = _parse(resp.text)
     # Grounding guard: redact any figure the model wrote that isn't backed by the
-    # deterministic payload, and record it. verify() adds `verified` +
-    # `ungrounded_numbers`. This is what makes the narrative safe to show.
-    narrative = grounding.verify(narrative, payload)
+    # data, and record it. verify() adds `verified` + `ungrounded_numbers`.
+    # We ground against `payload_json` — the exact (whitelisted, truncated) text
+    # the model actually saw — NOT the full pre-shrink `payload`. A model can only
+    # faithfully cite what was in its prompt; grounding against numbers buried in
+    # detail arrays it never received both over-passed fabrications and, on real
+    # payloads, saturated the grounded set so badly that ~all numbers passed.
+    narrative = grounding.verify(narrative, payload_json)
     narrative["model"] = resp.model
     narrative["tier"] = tier
     narrative["cached"] = False
-    if not narrative["verified"]:
+    _trust_stats["total"] += 1
+    if narrative["verified"]:
+        _trust_stats["verified"] += 1
+    else:
         logger.warning("narrate(): redacted ungrounded numbers %s in task=%s",
                        narrative["ungrounded_numbers"], task)
 
@@ -172,6 +200,25 @@ def narrate(payload: dict, task: str, *, restaurant_id: int | None = None,
 
     _remember(cache_key, narrative)
     return narrative
+
+
+def get_trust_stats() -> dict:
+    """
+    Aggregate, tenant-agnostic grounding stats for the current worker process.
+    Every AI narrative on the platform runs through the same grounding check
+    (see grounding.verify) before it can reach an owner, so this number is a
+    genuine measure of output quality, not a marketing figure invented
+    separately from the mechanism that produces it.
+    """
+    total = _trust_stats["total"]
+    verified = _trust_stats["verified"]
+    pct = round(100 * verified / total, 1) if total else None
+    return {
+        "narratives_generated": total,
+        "narratives_fully_grounded": verified,
+        "grounded_pct": pct,
+        "grounding_enabled": True,
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────

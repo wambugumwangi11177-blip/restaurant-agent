@@ -55,6 +55,11 @@ def _seed(db):
     return user, restaurant
 
 
+# A model id no default would ever produce, so asserting the narrative carries
+# it proves the code propagated the provider's model rather than the test's.
+_STUB_MODEL_ID = "stub-model-v7-propagation-check"
+
+
 def _stub_llm(monkeypatch, reply_text: str):
     """Force the reasoning layer to use a canned LLM reply — no real provider."""
     from ai import llm_client
@@ -65,7 +70,7 @@ def _stub_llm(monkeypatch, reply_text: str):
 
     def fake_chat_with_usage(**kwargs):
         return SimpleNamespace(
-            text=reply_text, model="stub-model",
+            text=reply_text, model=_STUB_MODEL_ID,
             usage=SimpleNamespace(input_tokens=10, output_tokens=5),
         )
     monkeypatch.setattr(llm_client, "chat_with_usage", fake_chat_with_usage)
@@ -98,7 +103,12 @@ def test_all_three_endpoints_attach_verified_narrative(client, db_session, monke
         assert n["headline"] == "Delivery is your least profitable channel."
         assert n["verified"] is True, f"{endpoint} should be verified"
         assert n["ungrounded_numbers"] == []
-        assert n["model"] == "stub-model"
+        # Propagation, not tautology: the narrative must carry through whatever
+        # model the provider reported (`_stub_llm` returns a distinctive id), so
+        # a regression that dropped or hardcoded the model would fail here. The
+        # old assert compared against "stub-model", the same literal the stub
+        # sets — it could never fail.
+        assert n["model"] == _STUB_MODEL_ID
 
     # Token usage was metered for this tenant (one row per narrated endpoint).
     rows = db_session.query(models.TokenUsage).filter(

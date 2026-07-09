@@ -32,6 +32,18 @@ Two hazards specific to this codebase, handled explicitly below:
    short by the rate limiter before reaching the lockout threshold. Reset
    before every test, not just rate-limit tests, since any test hitting
    auth/order endpoints shares the same counters.
+
+5. `ai/reasoning/narrator._cache` memoizes payload-hash -> narrative for the
+   life of the process. A test that stubs the LLM and asserts on a narrative
+   can otherwise be served a sibling test's cached result (or poison the cache
+   for a later one), since the hash is over the payload, not the DB. Cleared
+   per test.
+
+6. `ai/llm_client._client` is a lazily-built, process-cached provider client
+   bound to whatever ANTHROPIC/GROQ env vars were set the first time any test
+   touched it. A later test that monkeypatches those env vars would still get
+   the stale client. Reset to None so the next call rebuilds it under that
+   test's environment.
 """
 
 import importlib
@@ -69,6 +81,18 @@ def db_env(tmp_path, monkeypatch):
     from rate_limit import limiter, SLOWAPI_AVAILABLE
     if SLOWAPI_AVAILABLE:
         limiter.reset()
+
+    # Two more process-wide singletons beyond the four documented above.
+    try:
+        from ai.reasoning import narrator
+        narrator._cache.clear()
+    except Exception:
+        pass
+    try:
+        import ai.llm_client as llm_client
+        llm_client._client = None
+    except Exception:
+        pass
 
     yield db_path
 

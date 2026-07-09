@@ -554,10 +554,11 @@ class AgentAuditLog(Base):
     Required for enterprise compliance: what changed, why, who approved.
 
     action_type examples:
-      - price_changed        (from pricing_intelligence approve)
-      - whatsapp_sent        (from whatsapp_brain)
-      - purchase_recommended (from supply_chain agent)
-      - campaign_launched    (from marketing agent)
+      - price_changed          (from pricing_intelligence approve)
+      - whatsapp_sent          (from whatsapp_brain)
+      - purchase_recommended   (from supply_chain agent)
+      - mpesa_payment_received (from the executive orchestrator)
+      - stock_critical_alert   (from the executive orchestrator)
     """
     __tablename__ = "agent_audit_log"
 

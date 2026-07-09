@@ -3,10 +3,14 @@
 /**
  * /dashboard/ai — AI Command Center
  *
- * FIX: This page replaces BOTH the old /dashboard/insights (hardcoded Lavy demo)
- * and the disconnected /ai-dashboard (used raw fetch, different layout).
+ * Replaced, and as of 2026-07-08 fully deleted, two earlier attempts:
+ * /dashboard/insights (hardcoded Lavy demo) and /ai-dashboard (raw fetch, its
+ * own layout, and broken against the live API — it read `data.restaurant.name`
+ * from /ai/dashboard, which returns no `restaurant` key, and its pricing
+ * "Apply" posted a menu-item id to a route keyed on recommendation id).
+ * Nothing linked to either, yet both shipped in every `next build`.
  *
- * Now it:
+ * This page:
  *   - Lives inside the main dashboard layout (same sidebar/nav as POS, Kitchen etc)
  *   - Uses the shared api.ts axios client (automatic auth, 401 redirect, base URL)
  *   - Shows REAL data from the backend AI agents

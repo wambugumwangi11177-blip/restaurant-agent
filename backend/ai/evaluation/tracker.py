@@ -267,7 +267,8 @@ def write_audit_log(
 ) -> None:
     """
     Write an immutable governance record for an AI action that changed data.
-    Called by: approve_recommendation, send_whatsapp_message, campaign_launch, etc.
+    Called by: approve_recommendation, send_whatsapp_message, the executive
+    orchestrator's event handlers, etc.
     """
     try:
         log = models.AgentAuditLog(

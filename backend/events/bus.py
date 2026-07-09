@@ -71,9 +71,12 @@ class EventType(str, Enum):
     PURCHASE_ORDER_DELIVERED = "purchase_order.delivered"
     PURCHASE_ORDER_LATE      = "purchase_order.late"
 
-    # Marketing
-    CAMPAIGN_LAUNCHED  = "campaign.launched"
-    WINBACK_TRIGGERED  = "winback.triggered"
+    # Marketing: CAMPAIGN_LAUNCHED / WINBACK_TRIGGERED were removed 2026-07-08
+    # along with ai/marketing/campaigns.py, their only emitter. Nothing ever
+    # subscribed to them. Winback is served instead by
+    # brain.get_winback_candidates(): the owner asks, the AI answers, the owner
+    # decides who to message. Re-introducing an autonomous outbound-marketing
+    # event means first re-deciding consent, opt-out, Twilio spend, kill switch.
 
     # Agent system
     AGENT_FAILED    = "agent.failed"

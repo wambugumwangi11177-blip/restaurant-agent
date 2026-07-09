@@ -791,3 +791,58 @@ get a stale client.
       is no longer load-bearing in production.
 - [ ] **Revisit the ecdsa ignore** if the JWT algorithm ever moves off HS256 — the ECDSA
       timing path becomes reachable then.
+
+## Live-run verification + extra vulnerability sweep (2026-07-08)
+
+The Sprint 1-2 plan's stated biggest limitation was "Nothing was run — all findings are
+from reading code." Closed here: the backend was booted with `uvicorn` against a scratch DB
+(`MPESA_CALLBACK_TOKEN` set) and the security-critical flows were driven with real HTTP.
+
+**M-Pesa callback (1.1 / 2.4), observed live:**
+  - forged callback to `/webhooks/mpesa` (no token)        -> 403
+  - forged callback to `/webhooks/mpesa/guessed` (wrong)   -> 403
+  - legit callback to `/webhooks/mpesa/{token}`            -> 200, order settled (is_paid, receipt)
+  - replay of the settled callback                          -> 200, no double-settle
+  - 35 rapid POSTs                                          -> 429 after the 30/min window filled
+
+**Auth pipeline, observed live:**
+  - every `/ai/*` route unauthenticated                    -> 401
+  - HS256 login issues a token; authed `/ai/*` routes      -> 200
+  - the auto-creating routes (`/ai/inventory`,
+    `/ai/revenue-forecast`) return data; the read-only
+    analytics routes correctly say "No restaurant found"
+    for a tenant with no restaurant (command-query
+    separation, by design — not a regression)
+  - wrong password                                          -> 401 (not 500), lockout path intact
+
+**Graph-guided sweep (used graphify's god-node ranking to pick what to audit):**
+  - `get_or_create_restaurant()` (35 edges, the tenant-scoping choke point every AI route
+    hits) filters strictly on `user.tenant_id` — tenant-safe. Minor: `.first()` with no
+    ORDER BY silently picks one if a tenant ever has multiple restaurants; product question,
+    not a security hole.
+  - `send_whatsapp_message()` (14 edges, the opt-out choke point) — verified EVERY outbound
+    WhatsApp routes through it: the only `twilio_client.send` call is inside it, after the
+    `is_opted_out` gate. The two senders added in Sprint 2 (`on_mpesa_payment_failed`,
+    `on_stock_depleted`) both pass `db=`, so they are gated. TwiML `<Response>` replies in
+    the webhook bypass it deliberately — those are replies to an inbound message (STOP
+    confirmation, owner command), a different consent model.
+  - No committed secrets in backend source; `backend/.env` is untracked; the M-Pesa token is
+    never written to the app log.
+
+**Frontend CVEs (npm audit, re-run today — the prior session's numbers were stale):**
+  Was 1 high + 3 moderate. Bumped Next.js 16.1.6 -> 16.2.10 (a minor bump; the exact pin
+  made npm call it "out of range") to clear the high — HTTP request smuggling, null-origin
+  Server Actions CSRF bypass, middleware/proxy bypass, RSC cache poisoning, all live for an
+  authed App Router app. `next build` + `tsc --noEmit` pass. 3 moderates remain (postcss via
+  next, uuid via next-auth); their only fix downgrades next-auth 4.x -> 3.29.10, a breaking
+  login-flow change deferred to its own test window.
+
+**Accepted risk, documented so it isn't re-discovered as a "finding":**
+  The M-Pesa token sits in the URL path, so uvicorn/Railway ACCESS logs capture it even
+  though the app never logs it. Inherent to the Daraja pattern — Safaricom echoes back the
+  exact CallBackURL we register, so the secret must be in the URL. Anyone with access to
+  those logs already has deeper access. If Daraja ever supports a signed callback or a
+  custom header, prefer that.
+
+Backend suite 156 passing (85 at the start of this whole pass). Frontend build + typecheck
+green. Working tree clean.

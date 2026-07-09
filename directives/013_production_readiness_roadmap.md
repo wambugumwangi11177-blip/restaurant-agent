@@ -702,3 +702,92 @@ the module docstring, before citing a capability as available.**
 - Migration **010** (`inventory_items.last_alerted_at`) was verified both ways on a scratch
   DB: skipped when `create_all` had already added the column, and adding it on a table that
   lacked one. It is additive and nullable — safe on live data.
+
+## Dead code, deploy hygiene, coverage + CI, Sprints 3-4 (2026-07-08)
+
+Two commits: `chore: delete orphaned frontend...` and `test+ci: AI-route smoke...`.
+Backend suite 135 -> 156; frontend `next build` + `tsc --noEmit` pass and now run in CI.
+
+### Orphaned frontend was broken, not merely unlinked
+`/ai-dashboard` (4 files) and `/dashboard/insights` had no nav link yet shipped in every
+`next build`. Confirmed broken against the live API before deleting: `/ai-dashboard` read
+`data.restaurant.name` from `/ai/dashboard`, which returns no `restaurant` key (a `TypeError`
+on load), and its pricing "Apply" POSTed a menu-item id to `/ai/pricing/{rec_id}/approve`,
+which looks the row up by `PricingRecommendation.id` — always "not found". Deleted; the
+stale comments in `/dashboard/ai` and the dashboard layout that named the dead routes were
+rewritten, not left dangling. **A route that builds is not a route that works — check the
+data contract against what the backend actually returns.**
+
+### Deploy config had three files disagreeing; now one
+`railway.json` pins `"builder": "DOCKERFILE"`, so `Procfile` and `nixpacks.toml` were never
+read — and both contradicted the Dockerfile (`--workers 2`, which breaks the per-process
+in-memory rate-limit counters the Dockerfile documents; and nixpacks.toml had no migration
+step at all). Deleted both. The Dockerfile now states in a comment that it is the single
+source of truth. **Dead config isn't harmless when it disagrees with the live config — the
+next person edits the dead one.**
+
+### The core schema has never been under migration control
+`Dockerfile` runs `init_db()` (`create_all`) then `alembic upgrade head`. `create_all` adds
+missing **tables** but never missing **columns**. So any column added to `models.py` on an
+existing table without a migration is present on every fresh DB (CI, local) and absent on
+every long-lived one (prod) — an `UndefinedColumn` the first time it's selected, invisible
+in a test suite that builds a fresh SQLite file each run. Measured: **164** model columns
+have no `add_column` in any migration; the audit's five suspects
+(`MenuItem.cost_price/prep_station`, `Reservation.customer_email`, `Order.delivery_channel`;
+`duration_minutes` is covered by 009) are a subset.
+
+Migration **011** reconciles rather than guesses, because deciding *which* of the 164 are
+actually missing on the live DB requires reading the live DB, and we will not introspect
+prod on a hunch. It inspects whatever database it runs against and adds exactly the columns
+`models.py` declares and the table lacks. Verified three ways on scratch DBs: no-op on a
+fresh DB, adds exactly the four dropped columns on a **non-empty** drifted DB (existing row
+intact), clean no-op on re-run. NOT NULL columns without a server default are skipped loudly
+(they need a hand-written backfill); `downgrade` is a deliberate no-op so it can't drop a
+column `create_all` made. **Standing item: this does not replace bringing the schema under
+proper migration control — it stops the bleeding.**
+
+### Dead modules deleted (your call, delegated to engineering judgment)
+`ai/marketing/campaigns.py` (227 lines) had zero callers and emitted `CAMPAIGN_LAUNCHED` /
+`WINBACK_TRIGGERED` that nothing subscribed to. It sends outbound marketing WhatsApps to
+customers; the safe posture — AI advises, human sends — is already served by
+`brain.get_winback_candidates()` (owner texts WINBACK, gets a list). Deleted rather than
+scheduled: autonomous daily customer marketing is a feature needing consent gating, opt-out,
+a Twilio cost ceiling and a kill switch, none of which should ride in a hardening commit.
+Removed the two orphan `EventType`s with it. `ai/forecasting/holt_winters.py` (223 lines,
+zero callers, superseded by `revenue_forecaster`) deleted too. Both recoverable from git.
+
+### AI routes had crash history and zero request-level coverage
+`tests/test_ai_routes_smoke.py`: one GET per `/ai/*` route on an empty and a seeded
+restaurant. The failure mode is specific — `_safe_run`/bare try-except converts an agent
+exception into a **200 carrying `{"error": ...}`**, so `assert 200` is worthless. Every test
+also asserts no error key and a shape key the agent only emits when it truly ran. This is
+exactly how `/ai/inventory` served a 200 for weeks while importing a function name that did
+not exist.
+
+### CI: frontend build + typecheck, and pip-audit is now blocking
+Added a `frontend-ci` job (`npm ci` + `npm run build` + `tsc --noEmit`) — breaks previously
+surfaced only on a Vercel deploy, which never caught the untyped `json()` drift that broke
+`/ai-dashboard`. `pip-audit` flipped from `continue-on-error` to **blocking**, after driving
+the baseline clean (python-multipart, python-dotenv, requests, pytest bumped to fix
+versions; 8 of 15 CVEs cleared, full suite green on all four). The remaining six are ignored
+**by explicit id with a reason each**, never a blanket skip, so a new CVE still fails:
+  - 5 starlette advisories — every fix needs starlette >= 1.0; fastapi 0.128.8 pins
+    `< 1.0.0`. Needs a fastapi major upgrade (tracked below), not a hardening-pass bump.
+  - ecdsa PYSEC-2026-1325 — a Minerva ECDSA timing side-channel with **no fix published**,
+    and **not reachable**: `auth.py` signs/verifies JWTs with HS256 (symmetric HMAC), so the
+    ECDSA path never runs.
+
+### Two more conftest singleton resets
+`narrator._cache` (payload-hash -> narrative memo) and `llm_client._client` (provider client
+bound to first-seen API env vars) join the four already documented. A stubbed-LLM narrative
+test could otherwise be served a sibling's cached result, and an env-var monkeypatch could
+get a stale client.
+
+### New standing items
+- [ ] **fastapi major upgrade** to lift the `starlette < 1.0.0` cap and clear the 5 starlette
+      CVEs currently ignored in CI. Its own project — fastapi 0.128 -> 1.x is a breaking jump.
+- [ ] **Bring the core schema under migration control.** Migration 011 reconciles drift but
+      the real fix is a baseline migration that owns table+column creation, so `create_all`
+      is no longer load-bearing in production.
+- [ ] **Revisit the ecdsa ignore** if the JWT algorithm ever moves off HS256 — the ECDSA
+      timing path becomes reachable then.

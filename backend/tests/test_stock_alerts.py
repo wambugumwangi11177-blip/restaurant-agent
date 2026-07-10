@@ -66,6 +66,14 @@ def _run_check(db_session, monkeypatch):
     monkeypatch.setattr(bus, "emit_async", bus.emit)
     monkeypatch.setattr(brain_mod, "utcnow", utcnow)
 
+    # Pin service hours ON so these tests are deterministic. run_stock_check gates
+    # merely-urgent (still-in-stock) items behind within_service_hours(), which
+    # reads the real wall clock — so before this pin the urgent-path tests below
+    # silently failed whenever the suite ran outside 07:00–22:00 EAT. Quiet-hours
+    # behaviour is orthogonal to what these tests assert (dedup / cooldown /
+    # single-send); depleted-item tests fire regardless of hours anyway.
+    monkeypatch.setattr(brain_mod, "within_service_hours", lambda *a, **k: True)
+
     brain_mod.run_stock_check(database.SessionLocal)
     return sent
 

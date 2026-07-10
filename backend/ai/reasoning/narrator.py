@@ -107,6 +107,17 @@ TASKS = {
         ),
         "keys": None,
     },
+    "roi": {
+        "tier": TIER_LOW,
+        "role": "You are explaining the software's ROI to a restaurant owner deciding whether it's worth paying for.",
+        "focus": (
+            "Explain, in plain language, how many hours of staff time were automated "
+            "away and what that's worth, keeping it clearly separate from the extra "
+            "money captured via approved pricing recommendations and from the "
+            "flagged-but-unrealized opportunities. Never combine the three totals into one number."
+        ),
+        "keys": None,
+    },
     # On-demand "explain this to me" for a SINGLE insight — powers the dashboard
     # per-item Explain button. Deliberately the cheap tier and the simplest, most
     # concrete language, because the audience is a non-analyst owner/staff member.

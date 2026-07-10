@@ -85,6 +85,7 @@ ROUTES = [
     ("/ai/reservation-insights",  "revenue_impact"),
     ("/ai/menu-engineering",      "matrix"),
     ("/ai/dashboard",             "health_score"),
+    ("/ai/roi",                   "time_saved"),
 ]
 
 

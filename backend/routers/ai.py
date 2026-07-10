@@ -15,6 +15,7 @@ Endpoints:
   GET  /ai/inventory                  → inventory health + restock predictions
   GET  /ai/profit                     → profit intelligence (contribution margins, leaks, drift)
   GET  /ai/supply-chain               → supplier performance + purchase order recommendations
+  GET  /ai/roi                        → hours/money saved by automation, money captured, opportunities found
 
 /ai/profit and /ai/supply-chain wired 2026-07-07: ai/profit/intelligence.py and
 ai/supply_chain/intelligence.py were real, complete, working modules (verified against
@@ -189,6 +190,35 @@ async def ai_profit(
     from starlette.concurrency import run_in_threadpool
     from ai.reasoning import attach_narrative
     data = await run_in_threadpool(attach_narrative, data, "profit", restaurant.id, narrate)
+
+    return data
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ROI — TIME & MONEY SAVED
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/roi")
+async def ai_roi(
+    narrate: bool = True,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Hours of staff time automated away (converted to money via this
+    restaurant's own staff wages), extra profit already captured via approved
+    pricing recommendations, and opportunities the AI has flagged but the
+    owner hasn't acted on yet. The three totals are kept separate — see
+    ai/roi/savings.py's docstring for why they must never be summed.
+    """
+    restaurant = get_or_create_restaurant(db, current_user)
+
+    from ai.roi.savings import get_roi_savings
+    data = _safe_run("roi_savings", restaurant.id, get_roi_savings, db, restaurant.id)
+
+    from starlette.concurrency import run_in_threadpool
+    from ai.reasoning import attach_narrative
+    data = await run_in_threadpool(attach_narrative, data, "roi", restaurant.id, narrate)
 
     return data
 

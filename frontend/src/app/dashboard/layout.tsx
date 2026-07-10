@@ -17,6 +17,7 @@ import {
     CreditCard,
     ChefHat,
     DollarSign,
+    Clock,
 } from "lucide-react";
 
 const navItems = [
@@ -31,6 +32,7 @@ const navItems = [
     // The AI Command Center. Superseded /dashboard/insights, which served a
     // hardcoded Lavy demo and was deleted 2026-07-08.
     { href: "/dashboard/ai",           label: "AI",       icon: Brain },
+    { href: "/dashboard/roi",          label: "ROI",      icon: Clock },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum as SqEnum, DateTime, Float, Text, Date, Time, Index, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum as SqEnum, DateTime, Float, Text, Date, Time, Index, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship, declarative_base
 import enum
 from time_utils import utcnow
@@ -110,9 +110,14 @@ class Table(Base):
     table_number = Column(Integer)
     capacity = Column(Integer, default=4)
     status = Column(SqEnum(TableStatus), default=TableStatus.AVAILABLE)
-    
+
     restaurant = relationship("Restaurant", back_populates="tables")
     reservations = relationship("Reservation", back_populates="table")
+    __table_args__ = (
+        # A table number is unique within a restaurant — two "Table 5"s in the
+        # same venue is a data error (and would confuse reservation seating).
+        UniqueConstraint("restaurant_id", "table_number", name="uq_tables_restaurant_number"),
+    )
 
 # ──────────────────────────────────────────────
 # MENU ITEMS (Enhanced for AI)
@@ -133,6 +138,11 @@ class MenuItem(Base):
     
     restaurant = relationship("Restaurant", back_populates="menu_items")
     order_items = relationship("OrderItem", back_populates="menu_item")
+    __table_args__ = (
+        # Sale and cost prices are money in cents — never negative (0 allowed).
+        CheckConstraint("price >= 0", name="ck_menu_items_price_nonneg"),
+        CheckConstraint("cost_price >= 0", name="ck_menu_items_cost_nonneg"),
+    )
 
 # ──────────────────────────────────────────────
 # ORDERS (Enhanced for AI)
@@ -165,6 +175,9 @@ class Order(Base):
         Index("ix_orders_restaurant_created", "restaurant_id", "created_at"),
         Index("ix_orders_restaurant_status", "restaurant_id", "status"),
         Index("ix_orders_customer_phone", "customer_phone"),
+        # An order total is money in cents — never negative. Allows 0 (comped/
+        # zero-total orders are legitimate). See migration 016.
+        CheckConstraint("total >= 0", name="ck_orders_total_nonneg"),
     )
 
 class OrderItem(Base):
@@ -179,6 +192,11 @@ class OrderItem(Base):
     order = relationship("Order", back_populates="items")
     menu_item = relationship("MenuItem", back_populates="order_items")
     prep_time = relationship("PrepTime", back_populates="order_item", uselist=False)
+    __table_args__ = (
+        # You cannot order a non-positive quantity; a line's unit price is money.
+        CheckConstraint("quantity > 0", name="ck_order_items_qty_pos"),
+        CheckConstraint("unit_price >= 0", name="ck_order_items_price_nonneg"),
+    )
 
 # ──────────────────────────────────────────────
 # KDS: PREP TIME TRACKING
@@ -260,6 +278,8 @@ class Reservation(Base):
         # drives export/erasure. See migration 015.
         Index("ix_reservations_restaurant_date", "restaurant_id", "reservation_date"),
         Index("ix_reservations_customer_phone", "customer_phone"),
+        # A booking is for at least one guest.
+        CheckConstraint("party_size > 0", name="ck_reservations_party_pos"),
     )
 
 # ─────────────────────────────────────────────────────────────────────────────

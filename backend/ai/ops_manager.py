@@ -17,9 +17,10 @@ Pulls deep insights from all AI services and produces:
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import datetime, timedelta
+from datetime import timedelta
 import models
 from ai import menu_engineer, revenue_forecaster, kds_intelligence, inventory_predictor, reservation_optimizer
+from time_utils import utcnow
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -38,7 +39,7 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
         .filter(models.Order.restaurant_id == restaurant_id)
         .scalar()
     )
-    now = latest_order or datetime.utcnow()
+    now = latest_order or utcnow()
     today = now.date()
     yesterday = today - timedelta(days=1)
 
@@ -146,7 +147,12 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
         "today_orders": today_orders,
         "today_revenue": today_revenue,
         "yesterday_revenue": yesterday_revenue,
-        "day_over_day_change": round(((today_revenue - yesterday_revenue) / yesterday_revenue) * 100, 1) if yesterday_revenue >= 100_000 else 0,
+        # Guard against divide-by-zero only. The old guard was
+        # `yesterday_revenue >= 100_000` (KES 1,000 in cents), which silently
+        # reported a flat 0% for any day under a thousand shillings — the UI
+        # renders that 0 as a real figure, so a low-volume venue whose takings
+        # doubled saw "0.0%". A zero denominator is undefined; KES 900 is not.
+        "day_over_day_change": round(((today_revenue - yesterday_revenue) / yesterday_revenue) * 100, 1) if yesterday_revenue > 0 else 0,
         "pending_orders": pending_orders,
         "menu_items": menu_data.get("summary", {}).get("total_items", 0),
         "total_revenue_30d": revenue_data.get("trends", {}).get("total_revenue", 0),
@@ -258,6 +264,13 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
         "opportunities": opportunities,
         "ai_modules": ai_modules,
         "recent_ai_actions": recent_ai_actions,
+        # Private: the MAX(orders.created_at) we already computed above, handed to
+        # data_freshness() so the freshness wrapper doesn't re-run the identical
+        # aggregate. routers.analytics._with_freshness pops this before the
+        # payload is returned to the client. `latest_order` is the raw scalar
+        # (None if the restaurant has no orders), NOT `now` (which coalesces to
+        # utcnow()).
+        "_latest_order": latest_order,
     }
 
 

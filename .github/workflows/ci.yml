@@ -1,0 +1,100 @@
+name: ci
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run test suite
+        run: pytest -v
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      # BLOCKING as of 2026-07-08 (was continue-on-error): a newly-disclosed CVE
+      # in any dependency now fails the build instead of printing a warning
+      # nobody reads. The baseline was first driven clean — python-multipart,
+      # python-dotenv, requests and pytest were bumped to their fix versions.
+      #
+      # Six advisories remain and are ignored EXPLICITLY, by id, each for a
+      # reason — never with a blanket continue-on-error, so a NEW starlette or
+      # ecdsa CVE still blocks:
+      #
+      #   PYSEC-2026-161 / -248 / -249, CVE-2026-48817 / -48818 (starlette)
+      #     All fixes require starlette >= 1.0. fastapi 0.128.8 pins
+      #     `starlette < 1.0.0`, so they cannot be taken without a fastapi major
+      #     upgrade — tracked separately, not smuggled into a hardening pass.
+      #
+      #   PYSEC-2026-1325 (ecdsa, a python-jose transitive dep)
+      #     A timing side-channel (Minerva) in ECDSA verification, with NO fix
+      #     version published. Not reachable here: auth.py signs and verifies
+      #     JWTs with HS256 (symmetric HMAC); the ECDSA code path is never
+      #     executed. Revisit if the token algorithm ever changes.
+      #
+      # When any of these gains a fix that fits our constraints, bump the pin and
+      # delete its --ignore-vuln line. Do not add new ids without a comment.
+      - name: Audit dependencies
+        run: |
+          pip-audit -r requirements.txt \
+            --ignore-vuln PYSEC-2026-161 \
+            --ignore-vuln PYSEC-2026-248 \
+            --ignore-vuln PYSEC-2026-249 \
+            --ignore-vuln CVE-2026-48817 \
+            --ignore-vuln CVE-2026-48818 \
+            --ignore-vuln PYSEC-2026-1325
+
+  frontend-ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Type errors and build breaks currently only surface on a Vercel deploy —
+      # too late, and Vercel does not catch the untyped `json()` contract drifts
+      # that broke /ai-dashboard against the live API (deleted 2026-07-08).
+      # tsc runs after the build so it typechecks against Next's generated route
+      # types, not a stale `.next/` from a previous run.
+      - name: Build
+        run: npm run build
+
+      - name: Typecheck
+        run: npx tsc --noEmit

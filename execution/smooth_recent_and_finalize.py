@@ -32,6 +32,8 @@ from sqlalchemy import func
 from database import SessionLocal
 import models
 
+from _guard import require_destructive_confirmation
+
 RID = 3
 SMOOTH_DAYS = 16
 random.seed(99)
@@ -138,6 +140,11 @@ def fix_inventory(db):
 
 
 def main():
+    require_destructive_confirmation(
+        f"INSERTs synthetic orders across the last {SMOOTH_DAYS} days and OVERWRITES "
+        f"every inventory quantity for restaurant_id={RID} (the order inserts are "
+        f"additive, but the inventory overwrite destroys real stock levels)"
+    )
     db = SessionLocal()
     try:
         smooth_recent(db)

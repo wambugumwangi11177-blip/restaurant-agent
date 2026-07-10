@@ -32,6 +32,8 @@ load_dotenv(os.path.join(_backend, ".env"))
 from database import SessionLocal
 import models
 
+from _guard import require_destructive_confirmation
+
 RID = 3
 random.seed(7)
 TODAY = datetime.utcnow().date()
@@ -39,6 +41,14 @@ TODAY = datetime.utcnow().date()
 # Items that should stay genuinely low (predictive restock alerts). The first
 # two are short-shelf-life perishables → also spoilage-risk alerts.
 KEEP_LOW = {"Chicken", "Tomatoes", "Passion Fruit", "Fish (Tilapia)", "Prawns"}
+
+# This script has no main() — it runs on import, so the gate must come before
+# the first query. It issues no DELETE, but the mass UPDATEs below irreversibly
+# overwrite real inventory quantities and past reservation statuses.
+require_destructive_confirmation(
+    f"OVERWRITES every inventory quantity and rewrites every past CONFIRMED "
+    f"reservation to COMPLETED/NO_SHOW for restaurant_id={RID}"
+)
 
 db = SessionLocal()
 try:

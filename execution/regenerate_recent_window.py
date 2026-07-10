@@ -32,6 +32,8 @@ from sqlalchemy import func
 from database import SessionLocal
 import models
 
+from _guard import require_destructive_confirmation
+
 RID = 3
 WINDOW_DAYS = 40
 random.seed(2026)
@@ -45,6 +47,10 @@ HOUR_W = list(HOUR_WEIGHTS.values())
 
 
 def main():
+    require_destructive_confirmation(
+        f"DELETES every order (plus its order_items and prep_times) for "
+        f"restaurant_id={RID} in the last {WINDOW_DAYS} days, then regenerates them"
+    )
     db = SessionLocal()
     try:
         window_start = datetime.combine(TODAY - timedelta(days=WINDOW_DAYS), time.min)

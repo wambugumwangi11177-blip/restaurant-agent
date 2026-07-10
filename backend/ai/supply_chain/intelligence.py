@@ -11,11 +11,12 @@ What it does:
   5. Reorder recommendations with supplier selection
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from collections import defaultdict
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 import models
+from time_utils import utcnow
 
 RELIABILITY_THRESHOLD = 85.0   # Below this = consider switching supplier
 
@@ -39,7 +40,7 @@ def get_supply_chain_intelligence(db: Session, restaurant_id: int) -> dict:
     supplier_analyses.sort(key=lambda x: x["reliability_score"], reverse=True)
 
     # Pending orders (overdue)
-    now = datetime.utcnow()
+    now = utcnow()
     overdue = db.query(models.PurchaseOrder).filter(
         models.PurchaseOrder.restaurant_id == restaurant_id,
         models.PurchaseOrder.status        == "SENT",
@@ -160,7 +161,7 @@ def _generate_recommendations(supplier_analyses: list, overdue_orders: list) -> 
 
 
 def _serialize_order(o: models.PurchaseOrder) -> dict:
-    days_overdue = (datetime.utcnow() - o.expected_at).days if o.expected_at else 0
+    days_overdue = (utcnow() - o.expected_at).days if o.expected_at else 0
     return {
         "id":           o.id,
         "supplier":     o.supplier.name if o.supplier else "Unknown",

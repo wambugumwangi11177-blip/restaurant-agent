@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff, ShieldCheck, Lock, GitBranch } from "lucide-react";
+import api from "@/lib/api";
 
 export default function LoginPage() {
     const { login, register } = useAuth();
@@ -16,6 +17,13 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [trustStats, setTrustStats] = useState<{ grounded_pct: number | null; narratives_generated: number } | null>(null);
+
+    useEffect(() => {
+        api.get("/ai/trust-stats")
+            .then((r) => setTrustStats(r.data))
+            .catch(() => { });
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -146,6 +154,33 @@ export default function LoginPage() {
                                 : "New restaurant? Create account"}
                         </button>
                     </div>
+                </div>
+
+                {/* Trust panel — why owners can rely on the numbers */}
+                <div className="mt-6 rounded-xl border border-[#262626] bg-[#141414]/60 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                        <ShieldCheck className="w-4 h-4 text-[#d4a853]" />
+                        <p className="text-xs font-semibold text-[#e5e5e5]">Built to be trusted, not just used</p>
+                    </div>
+                    <ul className="space-y-2">
+                        <li className="flex items-start gap-2 text-xs text-[#a3a3a3]">
+                            <GitBranch className="w-3.5 h-3.5 text-[#525252] mt-0.5 flex-shrink-0" />
+                            <span>Every number comes from deterministic math over your real data — AI only interprets it, never computes it.</span>
+                        </li>
+                        <li className="flex items-start gap-2 text-xs text-[#a3a3a3]">
+                            <ShieldCheck className="w-3.5 h-3.5 text-[#525252] mt-0.5 flex-shrink-0" />
+                            <span>
+                                Every figure the AI writes is checked against your data before you see it
+                                {trustStats?.grounded_pct != null && (
+                                    <> — <span className="text-[#d4a853] font-medium">{trustStats.grounded_pct}% verified</span> across {trustStats.narratives_generated.toLocaleString()} insights so far</>
+                                )}.
+                            </span>
+                        </li>
+                        <li className="flex items-start gap-2 text-xs text-[#a3a3a3]">
+                            <Lock className="w-3.5 h-3.5 text-[#525252] mt-0.5 flex-shrink-0" />
+                            <span>Your restaurant's data is isolated per account — never mixed with, or trained on across, other tenants.</span>
+                        </li>
+                    </ul>
                 </div>
             </motion.div>
         </div>

@@ -5,7 +5,7 @@ Pure analytics layer for the Pricing Intelligence agent.
 No DB writes. Read and compute only.
 
 Fixes vs previous version:
-  BUG-03  — All DB queries now use UTC (datetime.utcnow()) not EAT.
+  BUG-03  — All DB queries now use UTC (utcnow()) not EAT.
              EAT is used ONLY for display strings and DOW/hour bucketing
              of results. Mixing naive EAT with naive UTC in SQLAlchemy
              filter() caused a silent 3-hour window drop on every query.
@@ -22,10 +22,11 @@ Fixes vs previous version:
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import NamedTuple
 import models
 from ai.analysis_clock import analysis_anchor
+from time_utils import utcnow
 
 # ── Constants ────────────────────────────────────────────────────────────────
 SURGE_THRESHOLD         = 1.30
@@ -63,7 +64,7 @@ def fetch_item_velocities(
     """
     Compute velocity metrics for every menu item.
 
-    BUG-03 FIX: Uses datetime.utcnow() for all DB range filters.
+    BUG-03 FIX: Uses utcnow() for all DB range filters.
     created_at is stored as naive UTC in the DB — never compare it to
     a naive EAT datetime or you silently lose 3 hours of data.
 
@@ -150,26 +151,11 @@ def fetch_item_velocities(
     return velocities
 
 
-def items_on_cooldown(db: Session, restaurant_id: int) -> set[int]:
-    """Return set of menu_item_ids with a PENDING/APPROVED rec in the last 7 days."""
-    cutoff = datetime.utcnow() - timedelta(days=COOLDOWN_DAYS)   # BUG-03 FIX: UTC
-    recs = (
-        db.query(models.PricingRecommendation.menu_item_id)
-        .filter(
-            models.PricingRecommendation.restaurant_id == None,  # handled by caller
-            models.PricingRecommendation.created_at >= cutoff,
-            models.PricingRecommendation.status.in_(["PENDING", "APPROVED"]),
-        )
-        .all()
-    )
-    return {r.menu_item_id for r in recs}
-
-
 def items_on_cooldown_for_restaurant(
     db: Session, restaurant_id: int
 ) -> set[int]:
     """Correct version with restaurant_id filter."""
-    cutoff = datetime.utcnow() - timedelta(days=COOLDOWN_DAYS)
+    cutoff = utcnow() - timedelta(days=COOLDOWN_DAYS)
     recs = (
         db.query(models.PricingRecommendation.menu_item_id)
         .filter(
@@ -258,7 +244,9 @@ def analyse_item(
 
     # ── REPRICE — margin floor violation (always valid, no velocity required) ─
     if margin_pct < MIN_MARGIN_PCT and cost > 0:
-        target_price   = _round_price(cost / (1 - MIN_MARGIN_PCT / 100))
+        # Round UP, not to nearest: REPRICE must never emit a price that is still
+        # under the floor it exists to restore. See _round_price_up().
+        target_price   = _round_price_up(cost / (1 - MIN_MARGIN_PCT / 100))
         new_food_cost  = (cost / max(target_price, 1)) * 100
         new_margin     = ((target_price - cost) / max(target_price, 1)) * 100
         monthly_impact = int((target_price - current_price) * vel.avg_daily_baseline * 30)
@@ -346,6 +334,21 @@ def check_delivery_margins(
 def _round_price(price_cents: float) -> int:
     rounded = round(price_cents / 50) * 50
     return int(max(rounded, 100))
+
+
+def _round_price_up(price_cents: float) -> int:
+    """
+    Round UP to the nearest 50. Used by REPRICE, whose whole job is to lift a
+    below-floor item back to the margin floor: nearest-50 rounding can land just
+    under the exact target (cost 610 → 610/0.6 = 1016.67 → nearest-50 = 1000 →
+    39%, one point under the 40% floor), so REPRICE would recommend a price that
+    still violates the floor it exists to restore. Ceiling to 50 guarantees the
+    rounded price is >= the exact floor price, so the resulting margin is always
+    >= MIN_MARGIN_PCT.
+    """
+    import math
+    ceiled = math.ceil(price_cents / 50) * 50
+    return int(max(ceiled, 100))
 
 
 def _describe_when(is_weekend_heavy: bool, daypart: str) -> str:

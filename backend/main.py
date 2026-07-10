@@ -15,7 +15,7 @@ import os
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai
+from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 
@@ -35,6 +35,7 @@ except Exception:
 # file's docstring for why (it was configured here but never applied to any
 # endpoint, since routers importing from main.py would be circular).
 from rate_limit import limiter, SLOWAPI_AVAILABLE
+from time_utils import utcnow
 
 app = FastAPI(title="Restaurant Agent API", version="2.0.0")
 
@@ -113,6 +114,15 @@ def _start_scheduler():
             id="slow_day_check",
             replace_existing=True,
         )
+        # Same-day reservation reminders to cut no-shows. Once per day so it never
+        # re-sends (there is no per-reservation reminded flag) — see
+        # brain.run_reservation_reminders.
+        scheduler.add_job(
+            _run_reservation_reminders_job,
+            CronTrigger(hour=7, minute=0),   # 10:00 EAT
+            id="reservation_reminders",
+            replace_existing=True,
+        )
 
         scheduler.start()
         print("[OK] Scheduler started (morning briefing: 07:00 EAT)")
@@ -138,14 +148,13 @@ def _send_all_morning_briefings():
 def _check_late_purchase_orders():
     """Emit PURCHASE_ORDER_LATE events for overdue POs."""
     try:
-        from datetime import datetime
         from database import SessionLocal
         from events.bus import emit_async, EventType
         import models
 
         db = SessionLocal()
         try:
-            now = datetime.utcnow()
+            now = utcnow()
             late_pos = (
                 db.query(models.PurchaseOrder)
                 .filter(
@@ -187,6 +196,15 @@ def _run_slow_day_check_job():
         logger.error(f"[Slow Day Check] Scheduler job failed: {exc}")
 
 
+def _run_reservation_reminders_job():
+    try:
+        from database import SessionLocal
+        from ai.whatsapp.brain import run_reservation_reminders
+        run_reservation_reminders(SessionLocal)
+    except Exception as exc:
+        logger.error(f"[Reservation Reminders] Scheduler job failed: {exc}")
+
+
 # ── CORS ──────────────────────────────────────────────────────────────────────
 # Real Vercel production domain is included as a fallback default (not just
 # localhost) — found 2026-07-07 that a misconfigured/placeholder CORS_ORIGINS
@@ -224,6 +242,7 @@ app.include_router(webhooks.router)
 app.include_router(analytics.router)
 app.include_router(reservations.router)
 app.include_router(ai.router)
+app.include_router(export.router)
 
 
 @app.get("/")

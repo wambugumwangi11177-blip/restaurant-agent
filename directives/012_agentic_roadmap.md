@@ -125,10 +125,45 @@ This is the only phase that should introduce LLM calls.
 - [x] `ai/reservation_optimizer.find_available_tables()`: real deterministic
       capacity + time-overlap conflict checker, verified against 6 scenarios (empty
       slate, party too large, exact overlap, partial overlap, adjacent non-overlap,
-      cross-date isolation). **Known gap, documented in the function's docstring**: no
-      DB-level concurrency guard yet — needs the same class of fix as the
-      `ix_pricing_rec_one_pending_per_item` partial unique index before it's safe under
-      concurrent writers.
+      cross-date isolation).
+- [x] **Booking-write guards + concurrency gap closed (2026-07-08).** The docstring's
+      "no DB-level concurrency guard yet" caveat turned out to *understate* the problem.
+      Auditing the write path found `routers/reservations.create_reservation` never
+      called `find_available_tables()` — or any availability check — at all. It took
+      `table_id` from the request body and wrote it straight to the row. Consequences,
+      both reproduced in tests before fixing:
+        1. **Double-booking needed no race**: two plain sequential POSTs for the same
+           table and overlapping times both succeeded.
+        2. **Cross-tenant IDOR**: passing another restaurant's `table_id` booked *their*
+           table, since nothing checked the table belonged to the caller's restaurant.
+           `test_tenant_isolation.py` covered orders/reservations *update/delete by id*,
+           but not a **foreign key supplied in a create body** — a class of IDOR that
+           id-scoping tests structurally miss. Worth auditing other routers for
+           FK-in-body inputs that are never ownership-validated.
+      Fixed in three layers: table ownership + capacity + `is_table_available()` checked
+      before INSERT (409 on conflict, **404 — not 403 — on another tenant's table**, so
+      the response cannot be used to enumerate other restaurants' floor plans); an
+      `IntegrityError` catch turning a lost race into the same clean 409; and
+      `alembic/versions/009_add_reservation_overlap_guard.py`.
+      **Why not the `ix_pricing_rec_one_pending_per_item` partial-unique-index pattern
+      this roadmap originally prescribed**: uniqueness cannot express *interval overlap*.
+      Bookings at 18:00 and 18:30 on one table are distinct rows under any unique key,
+      yet they conflict. It needs `EXCLUDE USING gist (table_id WITH =, tsrange(...) WITH
+      &&)` plus the `btree_gist` extension. The original prescription was wrong — noting
+      it because "apply the same fix as last time" is exactly how a wrong guard ships
+      looking right. Half-open `tsrange` matches the Python `_intervals_overlap` boundary
+      semantics by construction, so 18:00–19:30 and 19:30–21:00 conflict in neither layer.
+      Verified: 9 new tests in `tests/test_reservation_booking.py` (overlap rejected,
+      adjacent allowed, cancelled frees the slot, cross-tenant table 404s, undersized
+      table 400s, table-less booking still works, migration no-ops on SQLite / emits the
+      constraint on Postgres / is idempotent). Suite: 85 passed.
+- [ ] **Migration 009 has not been run against a real Postgres.** No local Postgres exists
+      here and the only reachable instance is the production Neon DB — running untested
+      DDL against production to prove it works is not testing. Before deploy: run it
+      against a staging/Neon branch, confirm the role may `CREATE EXTENSION btree_gist`,
+      and **check for pre-existing overlapping CONFIRMED rows first** — nothing has ever
+      prevented them, so `ADD CONSTRAINT` can fail on live data. The migration's docstring
+      carries the exact reconciliation query.
 - [ ] **Blocked on a product/legal decision, not an engineering one**: reservation
       booking needs a customer-facing inbound flow (distinct from the owner-command
       webhook) and a decision on consent/PII handling — the consent/tokenization vault
@@ -218,3 +253,40 @@ Before calling anything "AI," answer one question: does it call an LLM, or is it
 deterministic logic? Label it accordingly in code comments, directive docs, and any
 customer-facing copy. This single check would have caught the mislabeling across all of
 Phase 3–5 in the original plan.
+
+## Orchestration corrections found by running it (2026-07-08)
+
+The 2026-07-07 pass fixed "5 of 7 event types subscribed but never emitted." Running the
+orchestrator end to end surfaced the mirror-image defect and two silent recipients. Full
+detail in `013_production_readiness_roadmap.md`; the parts that change how this layer is
+built:
+
+- **An emitted event with no subscriber is as dead as a subscriber with no emitter.**
+  `MPESA_PAYMENT_FAILED` was emitted by `routers/webhooks.py` and subscribed by nobody, so a
+  cancelled or insufficient-funds STK push notified no one and the order silently stayed
+  unpaid. The previous audit checked one direction only. `tests/test_event_orchestration.py`
+  now asserts the subscription exists, not just that the emit fires.
+
+- **Notification belongs to the handler, never to the emitter.** `brain.run_stock_check`
+  emitted `STOCK_CRITICAL` *and* sent its own WhatsApp for the same item — two messages, one
+  shortage. Emitters decide *what happened*; handlers decide *who hears about it*. Anything
+  else double-sends the moment a handler is added.
+
+- **Every handler that notifies must resolve the owner the same way.** `on_stock_critical`
+  read `OWNER_PHONE` from env only, ignoring the `owner_phone` column that migration 006
+  introduced — so a restaurant onboarded the new way received no orchestrated stock alert at
+  all, and the double-send above was invisible unless the legacy env var happened to be set.
+  Both paths now go through `brain.owner_phone_for`, which is also what inbound resolution
+  (`webhooks._resolve_restaurant_by_phone`) uses. Bugs like this hide *behind* other bugs:
+  the redundant direct send masked a handler that could never reach anyone.
+
+- **Scheduled jobs that fire every N hours need a per-subject cooldown, always.** The stock
+  check ran every 2h and re-alerted the same low item on all 7 cycles a day until someone
+  restocked. Pricing had had a 7-day cooldown since day one. Anything that messages a human
+  on a timer gets one: `inventory_items.last_alerted_at` (migration 010), 12h.
+
+- **`MAX_TOOL_TURNS=4` and read-only tools are the containment story for prompt injection.**
+  Re-verified: all five orchestrator tools (`get_sales_today`, `get_stock_alerts`,
+  `get_pending_pricing`, `get_tonight_reservations`, `get_winback_candidates`) are reads.
+  Free-form text into the LLM cannot drive a DB write. Keep it that way — any future tool
+  that mutates needs an explicit human-approval hop, like `APPROVE n` already has.

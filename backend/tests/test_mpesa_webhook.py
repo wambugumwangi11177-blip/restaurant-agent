@@ -102,3 +102,114 @@ def test_underpaid_callback_does_not_settle_order(client, db_session):
     order = db_session.query(models.Order).filter(models.Order.id == 1).first()
     assert order.is_paid is False
     assert order.mpesa_receipt is None
+
+
+# ── Callback origin verification (MPESA_CALLBACK_TOKEN) ──
+#
+# Safaricom signs nothing, so the CallBackURL secret is the only authentication.
+# The settlement amount is read from the attacker-controlled body, so without
+# this guard a forged ResultCode:0 against a known CheckoutRequestID settles an
+# order for free.
+
+def test_forged_callback_without_token_is_rejected(client, db_session, monkeypatch):
+    monkeypatch.setenv("MPESA_CALLBACK_TOKEN", "s3cret-daraja-token")
+    _seed(db_session)
+
+    resp = client.post("/webhooks/mpesa", json=_success_callback())
+    assert resp.status_code == 403
+
+    order = db_session.query(models.Order).filter(models.Order.id == 1).first()
+    assert order.is_paid is False
+
+
+def test_callback_with_wrong_token_is_rejected(client, db_session, monkeypatch):
+    monkeypatch.setenv("MPESA_CALLBACK_TOKEN", "s3cret-daraja-token")
+    _seed(db_session)
+
+    resp = client.post("/webhooks/mpesa/guessed-token", json=_success_callback())
+    assert resp.status_code == 403
+
+    order = db_session.query(models.Order).filter(models.Order.id == 1).first()
+    assert order.is_paid is False
+
+
+def test_callback_with_correct_token_settles(client, db_session, monkeypatch):
+    monkeypatch.setenv("MPESA_CALLBACK_TOKEN", "s3cret-daraja-token")
+    _seed(db_session)
+
+    resp = client.post("/webhooks/mpesa/s3cret-daraja-token", json=_success_callback())
+    assert resp.status_code == 200
+    assert resp.json()["ResultCode"] == 0
+
+    order = db_session.query(models.Order).filter(models.Order.id == 1).first()
+    assert order.is_paid is True
+    assert order.mpesa_receipt == "NLJ7RT61SV"
+
+
+def test_tokenless_path_still_works_when_token_unset(client, db_session, monkeypatch):
+    """Degrade-safe: no env var (local dev) → legacy path keeps working."""
+    monkeypatch.delenv("MPESA_CALLBACK_TOKEN", raising=False)
+    _seed(db_session)
+
+    resp = client.post("/webhooks/mpesa", json=_success_callback())
+    assert resp.status_code == 200
+
+    order = db_session.query(models.Order).filter(models.Order.id == 1).first()
+    assert order.is_paid is True
+
+
+# ── Duplicate / concurrent settlement ─────────────────────────────────────────
+#
+# `if order.is_paid` is a lock-free read. Two Safaricom retries landing together
+# both pass it, both settle, and both emit ORDER_PAID -> two "payment confirmed"
+# WhatsApps and two audit rows. The conditional UPDATE moves the decision into
+# the DB, where it is atomic.
+
+def test_settle_order_once_is_atomic_under_a_real_race(db_session):
+    """
+    Deterministic interleave of the exact race: session A reads the order as
+    unpaid, session B settles it, then A tries to settle. Only one of them may
+    be told it won. (Two sessions, because the race is between two requests,
+    each with its own `Depends(get_db)` session.)
+    """
+    from routers.webhooks import _settle_order_once
+    import database
+
+    _seed(db_session)
+
+    session_a = database.SessionLocal()
+    session_b = database.SessionLocal()
+    try:
+        # A reads the order and sees is_paid=False — the lock-free read that
+        # made the old code think it was safe to proceed.
+        order_a = session_a.query(models.Order).filter(models.Order.id == 1).first()
+        assert order_a.is_paid is False
+
+        # B settles first and wins.
+        assert _settle_order_once(session_b, 1, "RECEIPT_B") is True
+
+        # A now settles on stale knowledge — the DB must refuse it.
+        assert _settle_order_once(session_a, 1, "RECEIPT_A") is False
+    finally:
+        session_a.close()
+        session_b.close()
+
+    db_session.expire_all()
+    order = db_session.query(models.Order).filter(models.Order.id == 1).first()
+    assert order.is_paid is True
+    assert order.mpesa_receipt == "RECEIPT_B"   # the winner's receipt, not overwritten
+
+
+def test_duplicate_callback_emits_order_paid_exactly_once(client, db_session, monkeypatch):
+    """End-to-end: two identical callbacks produce exactly one ORDER_PAID."""
+    import events.bus as bus
+
+    emitted = []
+    monkeypatch.setattr(bus, "emit_async", lambda et, payload: emitted.append((et, payload)))
+
+    _seed(db_session)
+    assert client.post("/webhooks/mpesa", json=_success_callback()).status_code == 200
+    assert client.post("/webhooks/mpesa", json=_success_callback()).status_code == 200
+
+    paid = [e for e in emitted if e[0] == bus.EventType.ORDER_PAID]
+    assert len(paid) == 1, f"expected exactly one ORDER_PAID, got {len(paid)}"

@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from rate_limit import limiter
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
-from datetime import datetime
 
 from database import get_db
 import models
 import schemas
 import auth
 from routers.deps import get_or_create_restaurant
+from time_utils import utcnow
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -134,7 +134,7 @@ async def update_order_status(
 
     order.status = new_status
     if new_status == models.OrderStatus.SERVED:
-        order.completed_at = datetime.utcnow()
+        order.completed_at = utcnow()
 
     db.commit()
     db.refresh(order)
@@ -161,9 +161,27 @@ async def update_order_payment(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid payment method: {update.payment_method}")
 
+    # Capture the transition so a receipt fires exactly once, only when an order
+    # actually moves unpaid -> paid. Re-marking an already-paid order (or a paid
+    # M-Pesa order the webhook already settled + receipted) must not re-send.
+    was_paid = bool(order.is_paid)
     order.is_paid = update.is_paid
     db.commit()
     db.refresh(order)
+
+    if order.is_paid and not was_paid:
+        # Mirrors the M-Pesa webhook's ORDER_PAID emit (routers/webhooks.py) so
+        # cash/card orders marked paid at the POS get the same itemized customer
+        # receipt. No mpesa_reference for these — compose_receipt omits that line.
+        from events.bus import emit_async, EventType
+        emit_async(EventType.ORDER_PAID, {
+            "restaurant_id": order.restaurant_id,
+            "order_id": order.id,
+            "amount_cents": order.total or 0,
+            "customer_phone": order.customer_phone or "",
+            "payment_method": order.payment_method.value if order.payment_method else "unknown",
+        })
+
     return _order_to_dict(order)
 
 

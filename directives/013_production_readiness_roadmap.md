@@ -511,3 +511,338 @@ Treat this as the actual production checklist — not aspirational, checked one 
       be fixed regardless. Fix: both 002's and 003's `downgrade()` now use Alembic's
       `batch_alter_table` (recreates the table safely on SQLite; transparently falls back
       to plain `ALTER TABLE` on Postgres/production — no behavior change there).
+
+## Reservation booking guards + `utcnow()` deprecation pass (2026-07-08)
+
+**IDOR class this project's tenant tests structurally miss.** `test_tenant_isolation.py`
+proves you cannot update/delete another tenant's rows by guessing sequential ids. It does
+not — and by construction cannot — catch a **foreign key accepted in a create body and
+never ownership-validated**. `POST /reservations` took `table_id` straight from the request
+and wrote it, so any authenticated user could book any restaurant's table by guessing an
+integer. Same endpoint also never checked availability at all (`find_available_tables()`
+existed, correct, since Phase 2, and no write path had ever called it) — so two ordinary
+sequential requests double-booked a table, no concurrency required. Fixed; 9 tests added;
+suite 85 passed. **Action item**: audit every other router for the same shape — an FK id in
+a POST/PATCH body that is trusted without a `restaurant_id`/`tenant_id` scope check. Grep
+starting points: `menu_item_id`, `table_id`, `supplier_id`, `inventory_item_id` in
+`schemas.py` create models.
+
+Ownership failures return **404, not 403**. A 403 confirms the row exists, turning the
+endpoint into an enumeration oracle for other tenants' floor plans and menus.
+
+**`datetime.utcnow()` (155 deprecation warnings) — why the obvious fix was the wrong one.**
+The mechanical replacement, `datetime.now(timezone.utc)`, returns a timezone-*aware*
+datetime. `utcnow()` returns a *naive* one. Every `DateTime` column in `models.py` is naive
+(none declare `timezone=True`), so every value read back from the DB is naive, and Python
+raises `TypeError: can't subtract offset-naive and offset-aware datetimes` where the two
+meet. This codebase does exactly that in a dozen places (`analysis_clock.py`'s
+`utcnow() - latest`, and every `cutoff = utcnow() - timedelta(...)` across pricing,
+marketing, evaluation, executive). A find/replace would have shipped a **runtime crash in
+production while the test suite stayed green**, since tests mostly build their own naive
+fixtures. Instead: new `backend/time_utils.py` with `utcnow()` preserving naive-UTC
+semantics byte-for-byte, all 64 call sites migrated, orphaned `datetime` imports removed.
+Warnings 155 → 9 (all third-party: passlib/argon2, FastAPI `on_event`).
+
+- [ ] **Migrate to timezone-aware datetimes properly.** `DateTime(timezone=True)` columns,
+      one Alembic migration per table, and an audit of every naive comparison.
+      `time_utils.utcnow()` is the single place that flips; `aware_utcnow()` is what it
+      flips to. A real change — deliberately not smuggled into a deprecation cleanup.
+- [ ] **Run migration 009 against a real Postgres before deploy.** Never executed against
+      one: no local Postgres here, and the only reachable instance is production Neon.
+      Confirm the role may `CREATE EXTENSION btree_gist`, and query for pre-existing
+      overlapping CONFIRMED reservations first — nothing ever prevented them, so
+      `ADD CONSTRAINT` may fail on live data. Reconciliation query is in the migration's
+      docstring.
+
+## Security + correctness hardening, Sprints 1–2 (2026-07-08)
+
+Independent audit of the whole app, not a re-read of this roadmap. Two commits:
+`security: authenticate M-Pesa callback…` and `fix: grounding guard…`. Suite 85 → 129.
+Every fix was **reproduced against running code before being written**, which is the only
+reason the three notes marked ⚠ below exist — a purely static pass would have shipped all
+three as regressions.
+
+### The M-Pesa callback was an unauthenticated money endpoint
+`/webhooks/mpesa` had no signature check, no IP allowlist, no rate limit. The amount
+verification reads the paid amount from the **request body**, so a forger satisfies it
+trivially; the only barrier was knowing a `CheckoutRequestID`. Anyone with one (logs, a
+leaked STK response, an insider) could POST `ResultCode: 0` and flip an order to paid plus
+fire the "payment confirmed" WhatsApp.
+
+Safaricom **signs nothing and publishes no fixed source-IP range**, so there is no
+signature to verify — the only practical authentication is a secret embedded in the
+`CallBackURL` we register with Daraja, which Safaricom echoes back. Hence
+`/webhooks/mpesa/{token}` + constant-time compare against `MPESA_CALLBACK_TOKEN`. Degrades
+safe when unset (local/dev); once set, the legacy tokenless path 403s.
+**Deploy blocker: set `MPESA_CALLBACK_TOKEN` in prod and register the tokenized URL.**
+
+### Phone-global tables need an ownership pre-flight
+`CustomerOptOut` has no `restaurant_id` — a suppressed number is suppressed for *every*
+tenant. `/data/erase-customer` wrote to it from an arbitrary caller-supplied phone, so
+tenant A could permanently destroy tenant B's ability to WhatsApp B's own customer. This
+class of bug is invisible to `test_tenant_isolation.py`, which proves you cannot read or
+write another tenant's rows — here the row is nobody's. **Rule: before writing to any table
+without a tenant scope, prove the caller's tenant owns the subject.** Grep for other
+restaurant-less tables in `models.py`.
+
+### The grounding guard destroyed the number it existed to protect ⚠
+`ai/reasoning/grounding.py` matched no minus sign and grounded only signed payload values,
+so **no negative figure could ever ground**. Reproduced: payload `revenue_mom_pct: -15.0`,
+narrative "Revenue down 15% this month" → "Revenue down `[unverified]`", `verified=False`.
+The single most important sentence an owner reads, mutilated on every month revenue fell.
+It had a full test file and 8 passing tests — none used a negative number. **Lesson: a
+guard's tests must include the values the guard is most likely to meet in the field, not
+just the values that make it pass.**
+
+While there: `value < _MIN_CHECKABLE_MAGNITUDE` waved every large negative through
+unpoliced (`-500 < 10`), and `round(n/100)` in the derivation set let an invented "25%"
+ground itself against an unrelated order count of 2547.
+
+### ⚠ Bounding a numerator without its denominator
+The audit said "bound `reservation_optimizer`'s dine-in order query to 30 days" (perf: it
+`.all()`-ed ~107k rows). But that revenue is the numerator of `avg_spend_per_guest`, whose
+denominator is **all-time** completed-reservation guests, and which feeds three downstream
+money estimates. Bounding one side alone would have deflated the rate ~26x — a silent wrong
+number, worse than the slow query. Both sides now move to the same window, with a fallback
+to the all-time ratio when imported data leaves either side empty.
+
+### ⚠ Deleting a duplicate send can delete the only send
+`brain.run_stock_check` both emitted `STOCK_CRITICAL` (whose handler messages the owner)
+*and* sent `compose_stock_alert()` directly. Measured on pre-fix code: **2 messages for one
+low item.** But removing the direct send exposed two bugs hiding behind it:
+
+- `on_stock_critical` resolved the owner from `OWNER_PHONE` env **only**, ignoring the
+  `owner_phone` column added in migration 006. A restaurant onboarded via the column got
+  *no* orchestrated stock alert at all — which is also why the double send only reproduces
+  with the legacy env var set. Both call sites now share `brain.owner_phone_for`.
+- A depleted item with no recent usage scores `WARNING` (`hours_remaining` defaults to
+  999), never enters `urgent`, and never emits `STOCK_CRITICAL`. Its *only* path to the
+  owner was that arbitrary direct send of `urgent[0]`. `on_stock_depleted` now sends.
+
+Stock alerts also had **no cooldown** while pricing has had a 7-day one since day one: the
+2-hourly job re-alerted the same low item on all 7 cycles a day until someone restocked.
+New `inventory_items.last_alerted_at` (migration 010), 12h window.
+
+### Headline metrics were methodologically wrong
+- **Star/Dog classification** used the raw mean of units sold as the popularity cutoff.
+  Unit sales are right-skewed, so the mean over-condemns. Now `0.7 x mean` (the Kasavana &
+  Smith popularity index). Measured on a hand-built skew: four items selling 40% of the
+  bestseller's volume went Puzzle → Star; the thin-margin one at the same volume went
+  **Dog → Plowhorse**. (Precisely: the raw mean files a mid-list item as Dog only when its
+  margin is *also* below average, else Puzzle. "N Dog items" is a dashboard headline.)
+- **`menu_optimization_score`** was `stars_pct*130 + (1-dogs_pct)*70 - food_cost*0.5 +
+  rising_count*3`. `rising_count` is an **unbounded item count**: a 40-item all-Dog menu at
+  50% food cost, all trending up, scored **95/100**. Replaced with a weighted mean of three
+  `[0,1]` components (portfolio 0.60, cost 0.25, momentum 0.15) — bounded by construction,
+  fuzzed over 200k random menus, and 15/100 for that same menu.
+- **`day_over_day_change`** returned a flat `0` whenever yesterday's revenue was under KES
+  1,000, and the UI renders that `0` as a real "no change". Now guards only a zero
+  denominator: KES 450 → KES 900 reads **+100%**, not 0%.
+
+### Destructive `execution/` scripts had no guard rails
+Five scripts ran `drop_all` / bulk `DELETE` / mass `UPDATE` against whatever `DATABASE_URL`
+was in `backend/.env` — the live Neon DB — with no confirmation. New `execution/_guard.py`
+requires **both** `--yes` and `ALLOW_DESTRUCTIVE=1`, and echoes the target host (credentials
+stripped) plus what will be destroyed. Corrections to the audit while wiring it:
+`tune_showcase_health.py` and `smooth_recent_and_finalize.py` issue **no** `DELETE` — they
+destroy via mass `UPDATE` of inventory quantities and reservation statuses.
+
+`populate_production.py` seeded a hardcoded ADMIN (`client@leviii.ai` / `client123`) and
+printed the password on success. Now `SEED_ADMIN_PASSWORD` / `SEED_ADMIN_EMAIL`, and it
+refuses to run without them.
+
+### Verified CLEAN — do not re-spend effort here
+- LLM prompt-injection is contained: all five orchestrator tools are read-only, loop bounded
+  at `MAX_TOOL_TURNS=4`. Free-form text cannot drive DB writes.
+- Inbound number → tenant is an exact `owner_phone` match; the mutating owner commands
+  (`APPROVE n` / `REJECT n`) require the registered owner number, and the HTTP origin is
+  Twilio-signature-verified.
+- Pricing cannot recommend a loss-making price: SURGE/STIMULATE re-verify margin >= 40% and
+  food cost <= 35% *after* rounding.
+- `no_show_rate > 20` is correct — the value is a real percent, not a fraction.
+
+### `avg_spend_per_guest` divided revenue by the wrong people (fixed, follow-up commit)
+It divided **all** dine-in revenue (mostly walk-ins) by **reserved** guests only, so the
+denominator was a small fraction of the people who generated the numerator, and the rate was
+inflated by 1/(reservation share of covers). On a smoke dataset: **KES 7,315 "per guest" at
+a venue whose average check is KES 179**. It feeds `estimated_revenue_lost`, per-table
+revenue, and overbooking recovery — and the old formula let a 10-seat no-show "cost" five
+times the restaurant's entire dine-in revenue.
+
+`Order` records no guest count, so covers cannot be counted, only estimated. Each dine-in
+order is one check, i.e. one party, and the reservation book gives people-per-party:
+
+    covers ~= dine_in_orders x avg_party_size
+
+The same dataset now reads **KES 44/head** against a KES 179 check for a party of four —
+i.e. 179/4, which is what the arithmetic should say. The payload carries `dine_in_orders`,
+`avg_party_size`, `estimated_covers` and `covers_are_estimated: true`, so the figure can be
+audited and any UI can label it an estimate.
+
+**⚠ An audit finding can be wrong because a docstring is.** The first draft of this section
+said "the module already estimates a walk-in vs reservation ratio (feature #7 in its own
+docstring); that is the correction factor." It is listed in the docstring. It was **never
+implemented** — no function in `reservation_optimizer.py` has ever computed it. That
+docstring's feature list was also mis-numbered (7, 9, 10 …), which is how a phantom feature
+survived inside it. The false line is deleted and the list renumbered. **Read the code, not
+the module docstring, before citing a capability as available.**
+
+### Open — found by running the app, NOT fixed
+- **`execution/seed_demo_data.py` crashes on Windows** before it reaches `drop_all`:
+  `print("<broom emoji> ...")` raises `UnicodeEncodeError` under a cp1252 console. It has
+  presumably never run on this machine.
+
+### Standing items (not code — carry forward)
+- [ ] **Set `MPESA_CALLBACK_TOKEN` in prod** and register `/webhooks/mpesa/{token}` as the
+      Daraja `CallBackURL`. Deploy blocker for the fix above.
+- [ ] **Rotate `GROQ_API_KEY`** — flagged burned since Phase 0, still live in `backend/.env`.
+- [ ] **Rotate the Neon DB password** — pasted into chat history previously.
+- [ ] **Run migration 009 against a staging/branch Postgres** before trusting the
+      reservation overlap guard (see the section above; unchanged).
+- Migration **010** (`inventory_items.last_alerted_at`) was verified both ways on a scratch
+  DB: skipped when `create_all` had already added the column, and adding it on a table that
+  lacked one. It is additive and nullable — safe on live data.
+
+## Dead code, deploy hygiene, coverage + CI, Sprints 3-4 (2026-07-08)
+
+Two commits: `chore: delete orphaned frontend...` and `test+ci: AI-route smoke...`.
+Backend suite 135 -> 156; frontend `next build` + `tsc --noEmit` pass and now run in CI.
+
+### Orphaned frontend was broken, not merely unlinked
+`/ai-dashboard` (4 files) and `/dashboard/insights` had no nav link yet shipped in every
+`next build`. Confirmed broken against the live API before deleting: `/ai-dashboard` read
+`data.restaurant.name` from `/ai/dashboard`, which returns no `restaurant` key (a `TypeError`
+on load), and its pricing "Apply" POSTed a menu-item id to `/ai/pricing/{rec_id}/approve`,
+which looks the row up by `PricingRecommendation.id` — always "not found". Deleted; the
+stale comments in `/dashboard/ai` and the dashboard layout that named the dead routes were
+rewritten, not left dangling. **A route that builds is not a route that works — check the
+data contract against what the backend actually returns.**
+
+### Deploy config had three files disagreeing; now one
+`railway.json` pins `"builder": "DOCKERFILE"`, so `Procfile` and `nixpacks.toml` were never
+read — and both contradicted the Dockerfile (`--workers 2`, which breaks the per-process
+in-memory rate-limit counters the Dockerfile documents; and nixpacks.toml had no migration
+step at all). Deleted both. The Dockerfile now states in a comment that it is the single
+source of truth. **Dead config isn't harmless when it disagrees with the live config — the
+next person edits the dead one.**
+
+### The core schema has never been under migration control
+`Dockerfile` runs `init_db()` (`create_all`) then `alembic upgrade head`. `create_all` adds
+missing **tables** but never missing **columns**. So any column added to `models.py` on an
+existing table without a migration is present on every fresh DB (CI, local) and absent on
+every long-lived one (prod) — an `UndefinedColumn` the first time it's selected, invisible
+in a test suite that builds a fresh SQLite file each run. Measured: **164** model columns
+have no `add_column` in any migration; the audit's five suspects
+(`MenuItem.cost_price/prep_station`, `Reservation.customer_email`, `Order.delivery_channel`;
+`duration_minutes` is covered by 009) are a subset.
+
+Migration **011** reconciles rather than guesses, because deciding *which* of the 164 are
+actually missing on the live DB requires reading the live DB, and we will not introspect
+prod on a hunch. It inspects whatever database it runs against and adds exactly the columns
+`models.py` declares and the table lacks. Verified three ways on scratch DBs: no-op on a
+fresh DB, adds exactly the four dropped columns on a **non-empty** drifted DB (existing row
+intact), clean no-op on re-run. NOT NULL columns without a server default are skipped loudly
+(they need a hand-written backfill); `downgrade` is a deliberate no-op so it can't drop a
+column `create_all` made. **Standing item: this does not replace bringing the schema under
+proper migration control — it stops the bleeding.**
+
+### Dead modules deleted (your call, delegated to engineering judgment)
+`ai/marketing/campaigns.py` (227 lines) had zero callers and emitted `CAMPAIGN_LAUNCHED` /
+`WINBACK_TRIGGERED` that nothing subscribed to. It sends outbound marketing WhatsApps to
+customers; the safe posture — AI advises, human sends — is already served by
+`brain.get_winback_candidates()` (owner texts WINBACK, gets a list). Deleted rather than
+scheduled: autonomous daily customer marketing is a feature needing consent gating, opt-out,
+a Twilio cost ceiling and a kill switch, none of which should ride in a hardening commit.
+Removed the two orphan `EventType`s with it. `ai/forecasting/holt_winters.py` (223 lines,
+zero callers, superseded by `revenue_forecaster`) deleted too. Both recoverable from git.
+
+### AI routes had crash history and zero request-level coverage
+`tests/test_ai_routes_smoke.py`: one GET per `/ai/*` route on an empty and a seeded
+restaurant. The failure mode is specific — `_safe_run`/bare try-except converts an agent
+exception into a **200 carrying `{"error": ...}`**, so `assert 200` is worthless. Every test
+also asserts no error key and a shape key the agent only emits when it truly ran. This is
+exactly how `/ai/inventory` served a 200 for weeks while importing a function name that did
+not exist.
+
+### CI: frontend build + typecheck, and pip-audit is now blocking
+Added a `frontend-ci` job (`npm ci` + `npm run build` + `tsc --noEmit`) — breaks previously
+surfaced only on a Vercel deploy, which never caught the untyped `json()` drift that broke
+`/ai-dashboard`. `pip-audit` flipped from `continue-on-error` to **blocking**, after driving
+the baseline clean (python-multipart, python-dotenv, requests, pytest bumped to fix
+versions; 8 of 15 CVEs cleared, full suite green on all four). The remaining six are ignored
+**by explicit id with a reason each**, never a blanket skip, so a new CVE still fails:
+  - 5 starlette advisories — every fix needs starlette >= 1.0; fastapi 0.128.8 pins
+    `< 1.0.0`. Needs a fastapi major upgrade (tracked below), not a hardening-pass bump.
+  - ecdsa PYSEC-2026-1325 — a Minerva ECDSA timing side-channel with **no fix published**,
+    and **not reachable**: `auth.py` signs/verifies JWTs with HS256 (symmetric HMAC), so the
+    ECDSA path never runs.
+
+### Two more conftest singleton resets
+`narrator._cache` (payload-hash -> narrative memo) and `llm_client._client` (provider client
+bound to first-seen API env vars) join the four already documented. A stubbed-LLM narrative
+test could otherwise be served a sibling's cached result, and an env-var monkeypatch could
+get a stale client.
+
+### New standing items
+- [ ] **fastapi major upgrade** to lift the `starlette < 1.0.0` cap and clear the 5 starlette
+      CVEs currently ignored in CI. Its own project — fastapi 0.128 -> 1.x is a breaking jump.
+- [ ] **Bring the core schema under migration control.** Migration 011 reconciles drift but
+      the real fix is a baseline migration that owns table+column creation, so `create_all`
+      is no longer load-bearing in production.
+- [ ] **Revisit the ecdsa ignore** if the JWT algorithm ever moves off HS256 — the ECDSA
+      timing path becomes reachable then.
+
+## Live-run verification + extra vulnerability sweep (2026-07-08)
+
+The Sprint 1-2 plan's stated biggest limitation was "Nothing was run — all findings are
+from reading code." Closed here: the backend was booted with `uvicorn` against a scratch DB
+(`MPESA_CALLBACK_TOKEN` set) and the security-critical flows were driven with real HTTP.
+
+**M-Pesa callback (1.1 / 2.4), observed live:**
+  - forged callback to `/webhooks/mpesa` (no token)        -> 403
+  - forged callback to `/webhooks/mpesa/guessed` (wrong)   -> 403
+  - legit callback to `/webhooks/mpesa/{token}`            -> 200, order settled (is_paid, receipt)
+  - replay of the settled callback                          -> 200, no double-settle
+  - 35 rapid POSTs                                          -> 429 after the 30/min window filled
+
+**Auth pipeline, observed live:**
+  - every `/ai/*` route unauthenticated                    -> 401
+  - HS256 login issues a token; authed `/ai/*` routes      -> 200
+  - the auto-creating routes (`/ai/inventory`,
+    `/ai/revenue-forecast`) return data; the read-only
+    analytics routes correctly say "No restaurant found"
+    for a tenant with no restaurant (command-query
+    separation, by design — not a regression)
+  - wrong password                                          -> 401 (not 500), lockout path intact
+
+**Graph-guided sweep (used graphify's god-node ranking to pick what to audit):**
+  - `get_or_create_restaurant()` (35 edges, the tenant-scoping choke point every AI route
+    hits) filters strictly on `user.tenant_id` — tenant-safe. Minor: `.first()` with no
+    ORDER BY silently picks one if a tenant ever has multiple restaurants; product question,
+    not a security hole.
+  - `send_whatsapp_message()` (14 edges, the opt-out choke point) — verified EVERY outbound
+    WhatsApp routes through it: the only `twilio_client.send` call is inside it, after the
+    `is_opted_out` gate. The two senders added in Sprint 2 (`on_mpesa_payment_failed`,
+    `on_stock_depleted`) both pass `db=`, so they are gated. TwiML `<Response>` replies in
+    the webhook bypass it deliberately — those are replies to an inbound message (STOP
+    confirmation, owner command), a different consent model.
+  - No committed secrets in backend source; `backend/.env` is untracked; the M-Pesa token is
+    never written to the app log.
+
+**Frontend CVEs (npm audit, re-run today — the prior session's numbers were stale):**
+  Was 1 high + 3 moderate. Bumped Next.js 16.1.6 -> 16.2.10 (a minor bump; the exact pin
+  made npm call it "out of range") to clear the high — HTTP request smuggling, null-origin
+  Server Actions CSRF bypass, middleware/proxy bypass, RSC cache poisoning, all live for an
+  authed App Router app. `next build` + `tsc --noEmit` pass. 3 moderates remain (postcss via
+  next, uuid via next-auth); their only fix downgrades next-auth 4.x -> 3.29.10, a breaking
+  login-flow change deferred to its own test window.
+
+**Accepted risk, documented so it isn't re-discovered as a "finding":**
+  The M-Pesa token sits in the URL path, so uvicorn/Railway ACCESS logs capture it even
+  though the app never logs it. Inherent to the Daraja pattern — Safaricom echoes back the
+  exact CallBackURL we register, so the secret must be in the URL. Anyone with access to
+  those logs already has deeper access. If Daraja ever supports a signed callback or a
+  custom header, prefer that.
+
+Backend suite 156 passing (85 at the start of this whole pass). Frontend build + typecheck
+green. Working tree clean.

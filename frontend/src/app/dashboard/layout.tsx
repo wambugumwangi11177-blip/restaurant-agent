@@ -28,8 +28,8 @@ const navItems = [
     { href: "/dashboard/inventory",    label: "Stock",    icon: Package },
     { href: "/dashboard/reservations", label: "Bookings", icon: CalendarDays },
     { href: "/dashboard/sales",        label: "Sales",    icon: DollarSign },
-    // FIX: was /dashboard/insights (hardcoded Lavy demo) — now points to the
-    // real AI Command Center where live agent data is served.
+    // The AI Command Center. Superseded /dashboard/insights, which served a
+    // hardcoded Lavy demo and was deleted 2026-07-08.
     { href: "/dashboard/ai",           label: "AI",       icon: Brain },
 ];
 

@@ -70,14 +70,30 @@ def _safe_run(agent_name: str, restaurant_id: int, fn, *args, **kwargs):
 
 @router.get("/pricing")
 async def ai_pricing(
+    narrate: bool = True,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Pricing intelligence: SURGE, REPRICE, STIMULATE recommendations."""
+    """
+    Pricing intelligence: SURGE, REPRICE, STIMULATE recommendations.
+
+    Numbers are deterministic. When an LLM provider is set (and narrate=true) a
+    `narrative` block is attached — pricing runs on the MEDIUM model tier since
+    it's a money decision (see ai/reasoning/narrator.py's task registry), and
+    every figure it cites is grounding-checked before it's returned.
+    """
     restaurant = get_or_create_restaurant(db, current_user)
 
     from ai.pricing.recommendations import get_pricing_intelligence
-    return _safe_run("pricing_intelligence", restaurant.id, get_pricing_intelligence, db, restaurant.id)
+    data = _safe_run("pricing_intelligence", restaurant.id, get_pricing_intelligence, db, restaurant.id)
+
+    # narrate() drives a synchronous, blocking LLM SDK call. This route is async,
+    # so run it off the event loop or the whole worker stalls for the round-trip.
+    from starlette.concurrency import run_in_threadpool
+    from ai.reasoning import attach_narrative
+    data = await run_in_threadpool(attach_narrative, data, "pricing", restaurant.id, narrate)
+
+    return data
 
 
 @router.post("/pricing/{rec_id}/approve")
@@ -151,14 +167,81 @@ async def ai_inventory(
 
 @router.get("/profit")
 async def ai_profit(
+    narrate: bool = True,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Contribution margins, profit leaks, portion drift, daypart/channel profitability."""
+    """
+    Contribution margins, profit leaks, portion drift, daypart/channel profitability.
+
+    The numbers are computed deterministically. When an LLM provider is configured
+    (and narrate=true), a reasoning layer adds a `narrative` block — plain-language
+    judgment over those numbers. It never computes: pass narrate=false to skip the
+    LLM call entirely. Absence of `narrative` never means the data failed — it just
+    means no provider is set or narration was skipped.
+    """
     restaurant = get_or_create_restaurant(db, current_user)
 
     from ai.profit.intelligence import get_profit_intelligence
-    return _safe_run("profit_intelligence", restaurant.id, get_profit_intelligence, db, restaurant.id)
+    data = _safe_run("profit_intelligence", restaurant.id, get_profit_intelligence, db, restaurant.id)
+
+    # Offload the blocking LLM narration off the event loop — see /ai/pricing.
+    from starlette.concurrency import run_in_threadpool
+    from ai.reasoning import attach_narrative
+    data = await run_in_threadpool(attach_narrative, data, "profit", restaurant.id, narrate)
+
+    return data
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EXPLAIN THIS  (on-demand plain-language explanation of one insight)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/explain")
+async def ai_explain(
+    body: dict,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Explain a SINGLE insight (a pricing rec, profit leak, menu item, …) in plain
+    language for a non-analyst owner. Reuses the grounded reasoning layer at the
+    cheap tier — every figure it cites is checked against the item passed in.
+    Body: {"item": {...}, "label": "optional context"}. Returns {available, explanation}.
+    """
+    restaurant = get_or_create_restaurant(db, current_user)
+    item = body.get("item")
+    if not isinstance(item, dict):
+        return {"available": False, "error": "Provide an 'item' object to explain."}
+
+    payload = {"item": item, "context": body.get("label", "")}
+
+    from starlette.concurrency import run_in_threadpool
+    from ai.reasoning import narrate
+    note = await run_in_threadpool(narrate, payload, "explain", restaurant_id=restaurant.id)
+    if not note:
+        return {"available": False}
+    return {"available": True, "explanation": note}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# COST-PRICE DATA QUALITY
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/data-quality")
+async def ai_data_quality(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Flags menu items with missing or implausible cost prices. Every profit and
+    pricing figure depends on cost_price, so this is the data-integrity guard for
+    all of them — deterministic, no LLM.
+    """
+    restaurant = get_or_create_restaurant(db, current_user)
+
+    from ai.data_quality import get_cost_price_quality
+    return _safe_run("data_quality", restaurant.id, get_cost_price_quality, db, restaurant.id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

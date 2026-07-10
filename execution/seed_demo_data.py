@@ -21,8 +21,14 @@ from models import (
 )
 from auth import get_password_hash
 
+from _guard import require_destructive_confirmation
+
 
 def seed():
+    require_destructive_confirmation(
+        "DROPS EVERY TABLE in the database (drop_all), recreates the schema, and "
+        "reseeds 30 days of demo data: total, irreversible loss of all data"
+    )
     db = SessionLocal()
     try:
         print("🧹 Clearing existing data...")

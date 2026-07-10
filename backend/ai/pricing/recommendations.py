@@ -12,10 +12,11 @@ Fixes vs previous version:
   CLEAN   — removed the broken items_on_cooldown() stub (no restaurant_id filter)
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError
 import models
+from time_utils import utcnow
 from .analysis import (
     fetch_item_velocities,
     items_on_cooldown_for_restaurant,
@@ -121,7 +122,7 @@ def generate_and_store_recommendations(db: Session, restaurant_id: int) -> list[
 
 def get_pending_recommendations(db: Session, restaurant_id: int) -> list[dict]:
     """Fetch pending recommendations for the approval UI."""
-    cutoff = datetime.utcnow() - timedelta(hours=48)
+    cutoff = utcnow() - timedelta(hours=48)
     recs = (
         db.query(models.PricingRecommendation)
         .options(joinedload(models.PricingRecommendation.menu_item))
@@ -187,7 +188,7 @@ def approve_recommendation(db: Session, rec_id: int, restaurant_id: int, approve
     old_price       = item.price
     item.price      = rec.suggested_price
     rec.status      = "APPROVED"
-    rec.actioned_at = datetime.utcnow()
+    rec.actioned_at = utcnow()
     db.commit()
 
     # RECOMMENDATION_APPROVED was subscribed to by executive.py (records into
@@ -232,7 +233,7 @@ def reject_recommendation(
 
     rec.status           = "REJECTED"
     rec.rejection_reason = reason
-    rec.actioned_at      = datetime.utcnow()
+    rec.actioned_at      = utcnow()
     db.commit()
     return {"success": True, "message": "Recommendation rejected"}
 

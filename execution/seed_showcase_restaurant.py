@@ -44,6 +44,8 @@ from sqlalchemy import func
 from database import SessionLocal
 import models
 
+from _guard import require_destructive_confirmation
+
 RID = 3
 random.seed(42)  # deterministic
 TODAY = datetime.utcnow().replace(hour=20, minute=0, second=0, microsecond=0)
@@ -424,6 +426,10 @@ def seed_upcoming_reservations(db):
 
 # ─────────────────────────────────────────────────────────────────────────────
 def main():
+    require_destructive_confirmation(
+        f"DELETES and rewrites orders, labor shifts, inventory, suppliers and "
+        f"reservations for restaurant_id={RID}, and overwrites its menu margins"
+    )
     db = SessionLocal()
     try:
         print("=" * 64)

@@ -13,7 +13,7 @@ FIXES:
     from the onboarding wizard.
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from database import get_db
@@ -21,6 +21,7 @@ import models, auth
 from pydantic import BaseModel
 from routers.deps import get_restaurant_or_none
 from rate_limit import limiter
+from time_utils import utcnow
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -119,8 +120,8 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
 
     # Lockout check FIRST, before touching the password at all — rejects
     # locked accounts without a password-verification timing signal.
-    if user and user.locked_until and user.locked_until > datetime.utcnow():
-        remaining = int((user.locked_until - datetime.utcnow()).total_seconds() / 60) + 1
+    if user and user.locked_until and user.locked_until > utcnow():
+        remaining = int((user.locked_until - utcnow()).total_seconds() / 60) + 1
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Account temporarily locked due to repeated failed logins. Try again in {remaining} minute(s).",
@@ -130,7 +131,7 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
         if user:
             user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
             if user.failed_login_attempts >= MAX_FAILED_ATTEMPTS:
-                user.locked_until = datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+                user.locked_until = utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
             db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -138,11 +139,12 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Successful login — reset the counter.
-    if user.failed_login_attempts or user.locked_until:
-        user.failed_login_attempts = 0
-        user.locked_until = None
-        db.commit()
+    # Successful login — reset the counter and record the login timestamp
+    # (staff-activity record referenced in the DPA).
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    user.last_login_at = utcnow()
+    db.commit()
 
     access_token = auth.create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
@@ -180,7 +182,11 @@ async def update_restaurant(
     if data.address is not None:
         restaurant.address = data.address
     if data.owner_phone is not None:
-        restaurant.owner_phone = data.owner_phone
+        # Normalize on write so it matches the normalized inbound WhatsApp number
+        # at compare time (see routers/webhooks.py / phone_utils.py). Storing the
+        # raw form silently broke owner-command matching for any non-E.164 entry.
+        from phone_utils import normalize_phone
+        restaurant.owner_phone = normalize_phone(data.owner_phone)
     db.commit()
     db.refresh(restaurant)
     return {

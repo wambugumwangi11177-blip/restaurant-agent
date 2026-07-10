@@ -12,6 +12,7 @@ import {
     Activity,
     Zap,
     Shield,
+    ShieldCheck,
     Wifi,
     Monitor,
     Smartphone,
@@ -21,12 +22,16 @@ export default function DashboardPage() {
     const { user } = useAuth();
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [trustStats, setTrustStats] = useState<{ grounded_pct: number | null; narratives_generated: number } | null>(null);
 
     useEffect(() => {
         api.get("/ai/dashboard")
             .then((r) => setData(r.data))
             .catch(() => { })
             .finally(() => setLoading(false));
+        api.get("/ai/trust-stats")
+            .then((r) => setTrustStats(r.data))
+            .catch(() => { });
     }, []);
 
     const getGreeting = () => {
@@ -110,12 +115,22 @@ export default function DashboardPage() {
 
             {/* Connected Systems */}
             <div className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3">
-                <div className="flex items-center gap-2 mb-2">
-                    <span className="flex h-2 w-2">
-                        <span className="animate-ping absolute h-2 w-2 rounded-full bg-[#22c55e] opacity-75" />
-                        <span className="relative rounded-full h-2 w-2 bg-[#22c55e]" />
-                    </span>
-                    <span className="text-xs font-medium text-[#22c55e]">Systems Connected</span>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                        <span className="flex h-2 w-2">
+                            <span className="animate-ping absolute h-2 w-2 rounded-full bg-[#22c55e] opacity-75" />
+                            <span className="relative rounded-full h-2 w-2 bg-[#22c55e]" />
+                        </span>
+                        <span className="text-xs font-medium text-[#22c55e]">Systems Connected</span>
+                    </div>
+                    {trustStats?.grounded_pct != null && (
+                        <span
+                            className="flex items-center gap-1 text-[10px] text-[#d4a853] bg-[#d4a853]/10 border border-[#d4a853]/20 rounded px-1.5 py-0.5 whitespace-nowrap"
+                            title={`${trustStats.narratives_generated.toLocaleString()} AI insights generated; every cited figure is checked against your real data before it's shown`}
+                        >
+                            <ShieldCheck className="w-3 h-3" /> {trustStats.grounded_pct}% of AI figures verified
+                        </span>
+                    )}
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                     <SystemStatus icon={Monitor} label="POS" status="connected" />

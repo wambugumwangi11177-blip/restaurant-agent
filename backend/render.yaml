@@ -14,3 +14,11 @@ services:
         value: "3.12.0"
       - key: CORS_ORIGINS
         sync: false
+      # LLM provider for the reasoning layer (ai/reasoning/narrator.py). WITHOUT
+      # this, llm_client.is_available() is False in production, every narrate()
+      # returns None, and NO `narrative` block is ever attached — so the AI
+      # insights silently never render in the frontend. sync:false = the secret
+      # value is entered in the Render dashboard, never committed to git.
+      # Add ANTHROPIC_API_KEY the same way to upgrade Groq -> Claude.
+      - key: GROQ_API_KEY
+        sync: false

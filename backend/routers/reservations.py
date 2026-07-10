@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
@@ -7,6 +8,7 @@ from database import get_db
 import models
 import schemas
 import auth
+from ai.reservation_optimizer import is_table_available
 from routers.deps import get_or_create_restaurant
 
 router = APIRouter(prefix="/reservations", tags=["reservations"])
@@ -41,6 +43,47 @@ async def create_reservation(
 ):
     restaurant = get_or_create_restaurant(db, current_user)
 
+    # Both checks below were entirely absent until 2026-07-08: `table_id` was
+    # taken from the request body and written straight to the row. That allowed
+    # (a) booking a table belonging to *another restaurant* by guessing its id,
+    # and (b) double-booking one table — not merely under concurrency, but with
+    # two plain sequential requests, since nothing ever consulted existing
+    # reservations. `find_available_tables()` existed and was correct, but no
+    # write path had ever called it.
+    if reservation.table_id is not None:
+        table = (
+            db.query(models.Table)
+            .filter(
+                models.Table.id == reservation.table_id,
+                models.Table.restaurant_id == restaurant.id,
+            )
+            .first()
+        )
+        # 404, not 403: a table belonging to another tenant must be
+        # indistinguishable from one that does not exist, or the response
+        # becomes an id-enumeration oracle for other restaurants' floor plans.
+        if not table:
+            raise HTTPException(status_code=404, detail="Table not found")
+
+        if table.capacity < reservation.party_size:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Table seats {table.capacity}, party size is {reservation.party_size}",
+            )
+
+        if not is_table_available(
+            db,
+            restaurant_id=restaurant.id,
+            table_id=reservation.table_id,
+            reservation_date=reservation.reservation_date,
+            reservation_time=reservation.reservation_time,
+            duration_minutes=reservation.duration_minutes,
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Table is already booked for an overlapping time slot",
+            )
+
     db_res = models.Reservation(
         restaurant_id=restaurant.id,
         customer_name=reservation.customer_name,
@@ -55,7 +98,18 @@ async def create_reservation(
         notes=reservation.notes,
     )
     db.add(db_res)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # The check above lost a race: a concurrent writer committed an
+        # overlapping booking between our SELECT and our INSERT. The Postgres
+        # EXCLUDE constraint (migration 009) is what actually caught it. Present
+        # it as the same 409 the uncontended path returns.
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Table is already booked for an overlapping time slot",
+        )
     db.refresh(db_res)
     return _res_to_dict(db_res)
 
@@ -81,8 +135,46 @@ async def update_reservation_status(
         raise HTTPException(status_code=400, detail=f"Invalid status: {update.status}")
 
     was_no_show = reservation.status == models.ReservationStatus.NO_SHOW
+
+    # Re-confirming a reservation (e.g. undoing a NO_SHOW/CANCELLED) re-occupies
+    # its table/slot, so it must pass the same overlap check create_reservation()
+    # runs — otherwise the slot freed by the cancel could already hold another
+    # CONFIRMED booking, and flipping this one back produces two overlapping
+    # confirmed reservations on one table. Only relevant when the target status
+    # is CONFIRMED and a table is assigned; other transitions (cancel, complete,
+    # no-show) only ever free a slot.
+    if (
+        new_status == models.ReservationStatus.CONFIRMED
+        and reservation.status != models.ReservationStatus.CONFIRMED
+        and reservation.table_id is not None
+    ):
+        if not is_table_available(
+            db,
+            restaurant_id=restaurant.id,
+            table_id=reservation.table_id,
+            reservation_date=reservation.reservation_date,
+            reservation_time=reservation.reservation_time,
+            duration_minutes=reservation.duration_minutes,
+            exclude_reservation_id=reservation.id,
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Table is already booked for an overlapping time slot",
+            )
+
     reservation.status = new_status
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Lost the race to a concurrent writer, or the Postgres EXCLUDE
+        # constraint (migration 009) caught an overlap the app-level check
+        # above could not see under concurrency. Present it as the same 409
+        # create_reservation() returns rather than a raw 500.
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Table is already booked for an overlapping time slot",
+        )
     db.refresh(reservation)
 
     # RESERVATION_NO_SHOW was subscribed to by executive.py (records into

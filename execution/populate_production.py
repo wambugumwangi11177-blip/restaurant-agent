@@ -2,6 +2,14 @@
 Production Sub-Account Population Script
 Creates a specific "Leviii Client Demo" tenant and populates it with realistic data.
 Does NOT drop tables. Safe to run in production.
+
+Credentials come from the environment, never from a literal in this file:
+    SEED_ADMIN_EMAIL     (default: client@leviii.ai)
+    SEED_ADMIN_PASSWORD  (required — the script refuses to run without it)
+
+Security pass 2026-07-08: this previously seeded a hardcoded ADMIN
+`client@leviii.ai` / `client123` into whatever DATABASE_URL was configured —
+i.e. a known-credential admin backdoor in production, committed to git.
 """
 import sys
 import os
@@ -21,7 +29,23 @@ from models import (
 )
 from auth import get_password_hash
 
+def _admin_credentials() -> tuple[str, str]:
+    """Read seed-admin credentials from env. No literal fallback for the password."""
+    password = os.getenv("SEED_ADMIN_PASSWORD", "").strip()
+    if not password:
+        print(
+            "[ABORT] SEED_ADMIN_PASSWORD is not set.\n"
+            "        This script creates an ADMIN user; it will not invent a password.\n"
+            "        Set it and re-run, e.g.:\n"
+            '            SEED_ADMIN_PASSWORD="<strong-password>" py execution/populate_production.py\n'
+            "        Optionally override SEED_ADMIN_EMAIL (default: client@leviii.ai)."
+        )
+        sys.exit(1)
+    return os.getenv("SEED_ADMIN_EMAIL", "client@leviii.ai").strip(), password
+
+
 def populate():
+    admin_email, admin_password = _admin_credentials()
     db = SessionLocal()
     try:
         print("[INFO] Checking for existing Client Demo tenant...")
@@ -39,8 +63,8 @@ def populate():
 
         admin = User(
             tenant_id=tenant.id,
-            email="client@leviii.ai",
-            hashed_password=get_password_hash("client123"),
+            email=admin_email,
+            hashed_password=get_password_hash(admin_password),
             role=Role.ADMIN,
         )
         db.add(admin)
@@ -272,7 +296,7 @@ def populate():
         db.commit()
         print(f"\n[SUCCESS] Client Demo Seed complete!")
         print(f"   Tenant: Leviii Client Demo")
-        print(f"   Login: client@leviii.ai / client123")
+        print(f"   Login: {admin_email} / (the SEED_ADMIN_PASSWORD you supplied)")
         print(f"   {total_orders} orders generated")
         print(f"   {len(menu_items)} menu items")
 

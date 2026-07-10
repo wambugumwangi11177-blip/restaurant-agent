@@ -21,10 +21,11 @@ Full-depth revenue analytics including:
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import timedelta
 import math
 import models
 from ai.analysis_clock import analysis_anchor
+from time_utils import utcnow
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -337,7 +338,7 @@ def _detect_anomalies(daily_revenue):
 # ─────────────────────────────────────────────────────────────────────────────
 def _forecast_next_7(weekly_pattern, daily_revenue, trends):
     """Enhanced forecast with confidence intervals."""
-    today = datetime.utcnow()
+    today = utcnow()
     day_map = {p["day"]: p["avg_revenue"] for p in weekly_pattern}
 
     # Calculate daily variance for confidence intervals

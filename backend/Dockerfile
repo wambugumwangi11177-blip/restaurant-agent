@@ -16,6 +16,13 @@ COPY . .
 # from whatever the platform actually injects.
 EXPOSE 8000
 
+# This file is the SINGLE SOURCE OF TRUTH for how the backend starts.
+# `Procfile` and `nixpacks.toml` were deleted 2026-07-08: railway.json pins
+# "builder": "DOCKERFILE", so neither was ever read — and both disagreed with
+# this file in ways that would have been silent if they ever HAD been read
+# (`--workers 2`, see below, and in nixpacks.toml no migration step at all).
+# Do not re-add a start command anywhere else. Change it here.
+#
 # railway.json uses the DOCKERFILE builder, which does NOT read Procfile's
 # release phase (that's a Nixpacks/Heroku-only convention) — so migrations
 # must run here, as part of container startup, or they silently never run

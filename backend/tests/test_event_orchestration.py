@@ -117,3 +117,97 @@ def test_approve_recommendation_emits_recommendation_approved(db_session):
     assert received[0]["approved_by"] == "owner@test.com"
     assert received[0]["old_price"] == 50000
     assert received[0]["new_price"] == 55000
+
+
+# ── MPESA_PAYMENT_FAILED ──────────────────────────────────────────────────────
+#
+# webhooks.py emitted this event and executive.register_all_handlers never
+# subscribed to it (found 2026-07-08): a cancelled or insufficient-funds STK push
+# told nobody, and the order silently stayed unpaid.
+
+def _seed_restaurant_with_owner(db_session, owner_phone="+254712345678"):
+    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x",
+                          owner_phone=owner_phone)
+    order = models.Order(
+        id=7, restaurant_id=1, status=models.OrderStatus.PENDING,
+        payment_method=models.PaymentMethod.PENDING, is_paid=False, total=50000,
+    )
+    db_session.add_all([r, order])
+    db_session.commit()
+
+
+def test_mpesa_payment_failed_is_subscribed(db_session):
+    """The event must have a handler at all — this is the bug that shipped."""
+    clear_handlers()
+    from ai.orchestrator.executive import register_all_handlers
+    register_all_handlers()
+
+    import events.bus as bus
+    assert bus._handlers.get(EventType.MPESA_PAYMENT_FAILED), \
+        "MPESA_PAYMENT_FAILED is emitted by webhooks.py but nothing subscribes to it"
+
+
+def test_mpesa_payment_failed_notifies_the_owner_once(db_session, monkeypatch):
+    _seed_restaurant_with_owner(db_session)
+
+    sent = []
+    import ai.whatsapp as whatsapp_mod
+    monkeypatch.setattr(whatsapp_mod, "send_whatsapp_message",
+                        lambda to, msg, **kw: sent.append((to, msg)))
+
+    clear_handlers()
+    from ai.orchestrator.executive import register_all_handlers, on_mpesa_payment_failed
+    register_all_handlers()
+
+    on_mpesa_payment_failed({
+        "restaurant_id": 1, "order_id": 7, "reason": "Request cancelled by user",
+    })
+
+    assert len(sent) == 1
+    to, msg = sent[0]
+    assert to == "+254712345678"           # the owner, not the customer
+    assert "#7" in msg
+    assert "Request cancelled by user" in msg
+
+
+def test_mpesa_payment_failed_audits_even_with_no_owner_phone(db_session, monkeypatch):
+    """No owner number configured must not swallow the failure silently."""
+    _seed_restaurant_with_owner(db_session, owner_phone=None)
+    monkeypatch.delenv("OWNER_PHONE", raising=False)
+    monkeypatch.delenv("OWNER_PHONE_1", raising=False)
+
+    sent = []
+    import ai.whatsapp as whatsapp_mod
+    monkeypatch.setattr(whatsapp_mod, "send_whatsapp_message",
+                        lambda to, msg, **kw: sent.append((to, msg)))
+
+    from ai.orchestrator.executive import on_mpesa_payment_failed
+    on_mpesa_payment_failed({"restaurant_id": 1, "order_id": 7, "reason": "Timeout"})
+
+    assert sent == []
+    logs = db_session.query(models.AgentAuditLog).filter(
+        models.AgentAuditLog.action_type == "mpesa_payment_failed"
+    ).all()
+    assert len(logs) == 1
+    assert "Timeout" in logs[0].reasoning
+
+
+def test_successful_payment_does_not_notify_owner_of_failure(db_session, monkeypatch):
+    """Regression guard: the success path must not trip the failure handler."""
+    _seed_restaurant_with_owner(db_session)
+
+    sent = []
+    import ai.whatsapp as whatsapp_mod
+    monkeypatch.setattr(whatsapp_mod, "send_whatsapp_message",
+                        lambda to, msg, **kw: sent.append((to, msg)))
+
+    clear_handlers()
+    from ai.orchestrator.executive import register_all_handlers
+    register_all_handlers()
+
+    emit(EventType.ORDER_PAID, {
+        "restaurant_id": 1, "order_id": 7, "amount_cents": 50000,
+        "customer_phone": None, "mpesa_reference": "OK123",
+    })
+
+    assert not any("Payment Failed" in m for _, m in sent)

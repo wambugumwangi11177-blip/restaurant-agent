@@ -26,9 +26,10 @@ The orchestrator calls recall_context() before making decisions.
 
 import json
 import logging
-from datetime import datetime, date, timedelta
+from datetime import date, timedelta
 from sqlalchemy.orm import Session
 import models
+from time_utils import utcnow
 
 logger = logging.getLogger("ai.memory")
 
@@ -228,7 +229,7 @@ def auto_record_stockout(
 ) -> None:
     """Auto-called when stock level hits 0."""
     if event_date is None:
-        event_date = datetime.utcnow().date()
+        event_date = utcnow().date()
 
     remember(
         db, restaurant_id,

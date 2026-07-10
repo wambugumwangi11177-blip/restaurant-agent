@@ -30,3 +30,9 @@ Desktop.ini
 *.db
 .tmp/
 
+# Local tool state / quarantined content (not for version control)
+.obsidian/
+graphify-out/
+_quarantine_untrusted/
+restaurant-agent/
+

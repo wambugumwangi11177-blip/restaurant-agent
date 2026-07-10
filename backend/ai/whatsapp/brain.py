@@ -18,17 +18,50 @@ Fixes vs previous version:
 """
 
 import os
+import time
+import threading
 from datetime import datetime, timedelta
 from collections import defaultdict
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 import models
+from time_utils import utcnow
 from . import twilio_client
 
 # ── Config ────────────────────────────────────────────────────────────────────
 WINBACK_DAYS         = 21
 SLOW_DAY_THRESHOLD   = 20    # % below average to trigger alert
 STOCK_CRITICAL_HOURS = 6
+
+# Quiet hours: don't nudge owners with non-urgent alerts outside service hours.
+# Expressed in EAT (UTC+3). A stock alert at 3am helps no one and trains owners
+# to mute the assistant. Fully-depleted items are exempt (handled at the call site).
+SERVICE_START_EAT    = 7     # 07:00 EAT
+SERVICE_END_EAT      = 22    # 22:00 EAT
+# How many recent days a customer counts as "reachable" for a promo broadcast.
+PROMO_AUDIENCE_DAYS  = 60
+# Safety cap + throttle so one PROMO can't fire thousands of messages at once or
+# trip the provider's per-second rate limit. The send runs in the background.
+PROMO_MAX_RECIPIENTS = 500
+PROMO_SEND_INTERVAL_S = 0.2
+
+
+def _eat_hour(now_utc: datetime) -> int:
+    return (now_utc.hour + 3) % 24
+
+
+def within_service_hours(now_utc: datetime | None = None) -> bool:
+    """True if the current EAT hour is inside service hours (quiet-hours gate)."""
+    h = _eat_hour(now_utc or utcnow())
+    return SERVICE_START_EAT <= h < SERVICE_END_EAT
+
+# Minimum gap between two owner alerts about the SAME inventory item.
+# run_stock_check fires every 2h across a 14h service day, so an item that stays
+# low — which is the normal case, since restocking takes a delivery, not a
+# minute — used to generate 7 identical WhatsApps a day. Pricing has had a
+# 7-day cooldown since day one; stock had none. 12h means at most one nudge per
+# service day per item, which is what an owner can actually act on.
+STOCK_ALERT_COOLDOWN_HOURS = 12
 
 
 def owner_phone_for(restaurant) -> str:
@@ -47,7 +80,7 @@ def owner_phone_for(restaurant) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def compose_morning_briefing(db: Session, restaurant_id: int) -> str:
-    now_utc   = datetime.utcnow()
+    now_utc   = utcnow()
     yesterday = (now_utc - timedelta(days=1)).date()
     lw_date   = (now_utc - timedelta(days=7)).date()
 
@@ -103,7 +136,7 @@ def compose_morning_briefing(db: Session, restaurant_id: int) -> str:
     pending_count = db.query(models.PricingRecommendation).filter(
         models.PricingRecommendation.restaurant_id == restaurant_id,
         models.PricingRecommendation.status == "PENDING",
-        models.PricingRecommendation.created_at >= datetime.utcnow() - timedelta(hours=48),
+        models.PricingRecommendation.created_at >= utcnow() - timedelta(hours=48),
     ).count()
     pricing_str = f"\n\n💡 *{pending_count} pricing recommendation(s) awaiting your approval.* Reply PENDING to review." if pending_count > 0 else ""
 
@@ -116,17 +149,23 @@ def compose_morning_briefing(db: Session, restaurant_id: int) -> str:
 
     focus = _daily_focus(db, restaurant_id, now_utc)
 
+    from ai.data_quality import cost_price_briefing_line
+    data_check_str = cost_price_briefing_line(db, restaurant_id)
+
+    # Plain-language "why" clauses on each section so the briefing itself teaches
+    # a non-analyst owner what the numbers mean — the same explain-it-simply goal
+    # as the dashboard "How this works" panels, in the channel they read daily.
     return (
         f"🌅 *Good morning! Here's {restaurant_name}*\n\n"
         f"📊 *Yesterday's Performance*\n"
-        f"Revenue: KES {yesterday_revenue // 100:,} {wow_emoji} ({wow_str} vs last week)\n"
+        f"Revenue: KES {yesterday_revenue // 100:,} {wow_emoji} ({wow_str} vs the same day last week)\n"
         f"Orders: {yesterday_count}\n\n"
-        f"🏆 *Top Sellers*\n{top_str}\n\n"
-        f"💳 *Payments*\n{pay_str}"
-        f"{stock_str}{pricing_str}{res_str}\n\n"
-        f"🎯 *Today's Focus*\n{focus}\n\n"
+        f"🏆 *Top Sellers* — your best-moving dishes; keep these stocked and pushed\n{top_str}\n\n"
+        f"💳 *Payments* — how customers paid\n{pay_str}"
+        f"{stock_str}{pricing_str}{res_str}{data_check_str}\n\n"
+        f"🎯 *Today's Focus* — the one move with the biggest payoff today\n{focus}\n\n"
         f"_Powered by {restaurant_name} AI_ 🤖\n"
-        f"_Reply SALES, STOCK, PENDING, or TONIGHT for live data_"
+        f"_Reply SALES, STOCK, PENDING, or TONIGHT for live data · HELP for all commands_"
     )
 
 
@@ -166,7 +205,7 @@ def get_critical_stock_alerts(db: Session, restaurant_id: int) -> list[dict]:
         return []
 
     item_ids      = [i.id for i in below_threshold]
-    three_days_ago = datetime.utcnow() - timedelta(days=3)
+    three_days_ago = utcnow() - timedelta(days=3)
 
     # Single batched query for all at-risk items
     usage_rows = (
@@ -228,7 +267,7 @@ def compose_slow_day_alert(db: Session, restaurant_id: int) -> str | None:
     Correct approach: compare today's revenue from UTC midnight to now,
     vs same window on previous same-DOW dates.
     """
-    now_utc      = datetime.utcnow()
+    now_utc      = utcnow()
     eat_hour     = (now_utc.hour + 3) % 24
     if eat_hour < 14:
         return None   # Only check after 2pm EAT
@@ -274,8 +313,126 @@ def compose_slow_day_alert(db: Session, restaurant_id: int) -> str | None:
         f"Revenue at {eat_hour:02d}:00 EAT: KES {today_revenue // 100:,}\n"
         f"Usual {day_name} by now: KES {int(avg_revenue) // 100:,}\n"
         f"Gap: {gap_pct:.0f}% below average\n\n"
-        f"*Suggestion:* Consider a quick special or push high-margin items on social media now."
+        f"*Suggestion:* Consider a quick special or push high-margin items on social media now.\n"
+        f"💬 Reply *PROMO <your offer>* to text a special to your regulars right now "
+        f"(e.g. PROMO 15% off all mains till 9pm)."
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROMO BROADCAST  (owner-triggered blast to reachable customers)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def promo_audience_count(db: Session, restaurant_id: int) -> int:
+    """
+    Fast count of who a promo would reach: customers who ordered in the last
+    PROMO_AUDIENCE_DAYS, gave consent, and haven't opted out. Used to reply to the
+    owner instantly before the (backgrounded) send runs.
+    """
+    return len(_promo_recipients(db, restaurant_id))
+
+
+def _promo_recipients(db: Session, restaurant_id: int) -> list[str]:
+    """De-duplicated, consented, non-opted-out phone list for a promo blast."""
+    from .optout import canonical, is_opted_out
+
+    cutoff = utcnow() - timedelta(days=PROMO_AUDIENCE_DAYS)
+    rows = (
+        db.query(models.Order.customer_phone)
+        .filter(
+            models.Order.restaurant_id == restaurant_id,
+            models.Order.status != models.OrderStatus.CANCELLED,
+            models.Order.customer_phone != "",
+            models.Order.customer_phone.isnot(None),
+            models.Order.created_at >= cutoff,
+        )
+        .distinct()
+        .all()
+    )
+    # Marketing gate: only message customers with a recorded consent (any purpose).
+    # Stricter than the STOP-only opt-out used for transactional messages —
+    # a promo is marketing, so it needs a positive consent signal, not just the
+    # absence of an opt-out. See models.CustomerConsent.
+    consented = {
+        canonical(c.customer_phone)
+        for c in db.query(models.CustomerConsent.customer_phone)
+        .filter(models.CustomerConsent.restaurant_id == restaurant_id)
+        .all()
+    }
+
+    seen: set[str] = set()
+    recipients: list[str] = []
+    for (phone,) in rows:
+        key = canonical(phone)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        if key not in consented:
+            continue
+        if is_opted_out(db, phone):
+            continue
+        recipients.append(phone)
+    return recipients
+
+
+def broadcast_promo(db: Session, restaurant_id: int, offer_text: str) -> dict:
+    """
+    Send a one-off promo to consented, non-opted-out customers who ordered in the
+    last PROMO_AUDIENCE_DAYS. Capped at PROMO_MAX_RECIPIENTS with a light throttle
+    so a large list can't hammer the provider. Returns {sent, skipped, audience}.
+
+    Intended to run in the BACKGROUND (see _cmd_promo) — the send loop is too slow
+    to block the inbound webhook.
+    """
+    restaurant      = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
+    restaurant_name = restaurant.name if restaurant else "us"
+
+    recipients = _promo_recipients(db, restaurant_id)
+    capped = recipients[:PROMO_MAX_RECIPIENTS]
+
+    message = (
+        f"📣 *{restaurant_name}*\n\n{offer_text}\n\n"
+        f"See you soon! 🍽️\n_Reply STOP to opt out._"
+    )
+
+    sent = skipped = 0
+    for phone in capped:
+        result = send_whatsapp_message(
+            phone, message, db=db, restaurant_id=restaurant_id,
+            message_type="promo", channel="whatsapp", fallback_sms=True,
+        )
+        if result["status"] == "sent":
+            sent += 1
+        else:
+            skipped += 1
+        time.sleep(PROMO_SEND_INTERVAL_S)   # gentle throttle for provider rate limits
+    return {"sent": sent, "skipped": skipped, "audience": len(recipients)}
+
+
+def compose_receipt(db: Session, order, mpesa_ref: str = "") -> str:
+    """
+    Itemized customer receipt for a paid order. Works for any payment method —
+    M-Pesa ref line only shows when present. Renders rich for WhatsApp; the SMS
+    transport auto-strips formatting (twilio_client.to_sms).
+    """
+    restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == order.restaurant_id).first()
+    r_name = restaurant.name if restaurant else "the restaurant"
+    method = order.payment_method.value.replace("_", " ").title() if order.payment_method else "Paid"
+
+    lines = [f"🧾 *{r_name} — Receipt*\n"]
+    for oi in order.items:
+        name = oi.menu_item.name if oi.menu_item else "Item"
+        line_total = (oi.quantity or 0) * (oi.unit_price or 0)
+        lines.append(f"{int(oi.quantity)}× {name} — KES {line_total // 100:,}")
+
+    lines.append(f"\n*Total: KES {(order.total or 0) // 100:,}*")
+    lines.append(f"Paid by: {method}")
+    if mpesa_ref:
+        lines.append(f"M-Pesa Ref: {mpesa_ref}")
+    lines.append(f"Order #{order.id}")
+    lines.append(f"\nThank you for dining with us! 🍽️")
+    lines.append("_Reply REORDER to order the same again · STOP to opt out._")
+    return "\n".join(lines)
 
 
 def compose_pricing_approved_message(item_name: str, old_price: int, new_price: int) -> str:
@@ -298,7 +455,7 @@ def get_winback_candidates(db: Session, restaurant_id: int) -> list[dict]:
     BUG-11 FIX: passes restaurant.name to compose_winback_message instead of "us".
     BUG-15 (already fixed in uploaded version): favourite item fetched in batch.
     """
-    cutoff = datetime.utcnow() - timedelta(days=WINBACK_DAYS)
+    cutoff = utcnow() - timedelta(days=WINBACK_DAYS)
 
     restaurant      = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
     restaurant_name = restaurant.name if restaurant else "us"
@@ -351,9 +508,15 @@ def get_winback_candidates(db: Session, restaurant_id: int) -> list[dict]:
         if row.customer_phone not in fav_map:
             fav_map[row.customer_phone] = row.name
 
-    now_utc    = datetime.utcnow()
+    # Honour opt-outs at selection time too (the send engine also gates, but
+    # filtering here keeps opted-out customers out of counts and message logs).
+    from .optout import is_opted_out
+
+    now_utc    = utcnow()
     candidates = []
     for row in customer_rows:
+        if is_opted_out(db, row.customer_phone):
+            continue
         days_away = (now_utc - row.last_order).days
         fav_item  = fav_map.get(row.customer_phone)
         candidates.append({
@@ -375,6 +538,55 @@ def get_winback_candidates(db: Session, restaurant_id: int) -> list[dict]:
     return candidates
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# RESERVATION REMINDERS  (cut no-shows — the dashboard recommends these)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def compose_reservation_reminder(reservation, restaurant_name: str) -> str:
+    t = reservation.reservation_time.strftime("%H:%M") if reservation.reservation_time else "your booked time"
+    return (
+        f"📅 *Reservation reminder — {restaurant_name}*\n\n"
+        f"Hi {reservation.customer_name or 'there'}, we're holding a table for "
+        f"{reservation.party_size} today at {t} EAT.\n\n"
+        f"Reply *YES* to confirm or *NO* to cancel. See you soon! 🍽️"
+    )
+
+
+def run_reservation_reminders(SessionLocal) -> None:
+    """
+    Send a same-day reminder to each confirmed reservation with a phone number.
+    Idempotent within the day: `reminder_sent_at` is stamped once the reminder is
+    sent and re-checked here, so a scheduler misfire or restart can't double-send.
+    Tries WhatsApp, falls back to SMS; opt-out is honoured at the send choke point.
+    """
+    db = SessionLocal()
+    try:
+        now = utcnow()
+        today = now.date()
+        day_start = datetime(today.year, today.month, today.day)
+        for restaurant in db.query(models.Restaurant).all():
+            r_name = restaurant.name
+            reservations = db.query(models.Reservation).filter(
+                models.Reservation.restaurant_id == restaurant.id,
+                models.Reservation.reservation_date == today,
+                models.Reservation.status == models.ReservationStatus.CONFIRMED,
+                models.Reservation.customer_phone != "",
+                # Not already reminded today (NULL, or stamped on a previous day).
+                (models.Reservation.reminder_sent_at.is_(None))
+                | (models.Reservation.reminder_sent_at < day_start),
+            ).all()
+            for res in reservations:
+                msg = compose_reservation_reminder(res, r_name)
+                send_whatsapp_message(
+                    res.customer_phone, msg, db=db, restaurant_id=restaurant.id,
+                    message_type="reservation_reminder", channel="whatsapp", fallback_sms=True,
+                )
+                res.reminder_sent_at = now
+            db.commit()
+    finally:
+        db.close()
+
+
 def compose_winback_message(restaurant_name: str, name: str, fav_item: str | None, days_away: int) -> str:
     fav_str = f"Your favourite *{fav_item}* is waiting for you." if fav_item else "We have something special waiting."
     return (
@@ -382,7 +594,8 @@ def compose_winback_message(restaurant_name: str, name: str, fav_item: str | Non
         f"We miss you at {restaurant_name}! {fav_str}\n\n"
         f"It's been {days_away} days — come back and enjoy *10% off* your next visit.\n"
         f"Just show this message when you arrive.\n\n"
-        f"See you soon! 🍽️"
+        f"See you soon! 🍽️\n\n"
+        f"_Reply STOP to opt out of these messages._"
     )
 
 
@@ -396,11 +609,73 @@ def send_whatsapp_message(
     db: Session | None = None,
     restaurant_id: int | None = None,
     message_type: str = "general",
+    channel: str = "whatsapp",
+    fallback_sms: bool = False,
+    media_url: str | None = None,
 ) -> dict:
-    result = twilio_client.send(to_number, message)
+    """
+    Send an outbound message and log it. Despite the historical name this is the
+    single choke point for ALL channels — pass channel="sms" to send SMS, or
+    fallback_sms=True to try WhatsApp first and drop to SMS if it doesn't send
+    (for the many Kenyan customers who aren't on WhatsApp). The opt-out gate is
+    honoured once, up front, for every channel.
+    """
+    # Opt-out suppression: honour a customer's STOP everywhere. This is the
+    # single choke point every outbound message passes through, so gating here
+    # covers winback, campaigns, and any future sender. Requires a db handle to
+    # check the suppression list; callers without one (rare) can't be filtered.
+    if db is not None:
+        from .optout import is_opted_out
+        if is_opted_out(db, to_number):
+            if restaurant_id:
+                _log_message(db, restaurant_id, to_number, message, message_type, "suppressed_optout")
+            return {"status": "suppressed_optout", "sid": None}
+
+    result = twilio_client.send(to_number, message, channel=channel, media_url=media_url)
+
+    # Fallback: if a WhatsApp send didn't actually go out (not configured / error /
+    # undeliverable) and the caller allowed it, try SMS — the customer may simply
+    # not be on WhatsApp. Never fall back on an opt-out suppression.
+    used_channel = channel
+    if fallback_sms and channel == "whatsapp" and result["status"] not in ("sent", "suppressed_optout"):
+        sms_result = twilio_client.send(to_number, message, channel="sms")
+        if sms_result["status"] == "sent":
+            result, used_channel = sms_result, "sms"
+
     if db and restaurant_id:
-        _log_message(db, restaurant_id, to_number, message, message_type, result["status"], result.get("sid"))
+        _log_message(db, restaurant_id, to_number, message, f"{message_type}:{used_channel}",
+                     result["status"], result.get("sid"))
     return result
+
+
+def owner_channel_for(restaurant) -> str:
+    """Owner's preferred alert channel: 'whatsapp' (default), 'sms', or 'both'."""
+    return (getattr(restaurant, "owner_channel", None) or "whatsapp").lower()
+
+
+def send_to_owner(db: Session, restaurant, message: str, message_type: str) -> None:
+    """
+    Deliver an owner alert over their preferred channel(s). 'both' sends WhatsApp
+    and SMS; 'sms' sends SMS only; anything else defaults to WhatsApp with an SMS
+    fallback if WhatsApp doesn't go through. Resolves the owner phone once.
+    """
+    phone = owner_phone_for(restaurant)
+    if not phone:
+        print(f"[WhatsApp Brain] No owner phone for restaurant {restaurant.id}")
+        return
+
+    pref = owner_channel_for(restaurant)
+    if pref == "sms":
+        send_whatsapp_message(phone, message, db=db, restaurant_id=restaurant.id,
+                              message_type=message_type, channel="sms")
+    elif pref == "both":
+        send_whatsapp_message(phone, message, db=db, restaurant_id=restaurant.id,
+                              message_type=message_type, channel="whatsapp")
+        send_whatsapp_message(phone, message, db=db, restaurant_id=restaurant.id,
+                              message_type=message_type, channel="sms")
+    else:
+        send_whatsapp_message(phone, message, db=db, restaurant_id=restaurant.id,
+                              message_type=message_type, channel="whatsapp", fallback_sms=True)
 
 
 def _log_message(db, restaurant_id, to_number, message, message_type, status, sid=None):
@@ -431,6 +706,7 @@ def handle_owner_command(db: Session, restaurant_id: int, message: str) -> str:
         "pending": _cmd_pending_pricing, "pricing": _cmd_pending_pricing, "approvals": _cmd_pending_pricing,
         "tonight": _cmd_tonight, "bookings": _cmd_tonight, "reservations": _cmd_tonight,
         "winback": _cmd_winback_summary, "win back": _cmd_winback_summary,
+        "costs": _cmd_cost_quality, "cost": _cmd_cost_quality, "data": _cmd_cost_quality,
         "help": _cmd_help, "commands": _cmd_help, "?": _cmd_help,
     }
 
@@ -449,6 +725,13 @@ def handle_owner_command(db: Session, restaurant_id: int, message: str) -> str:
         except (ValueError, IndexError):
             return "❌ Invalid format. Try: REJECT 3"
 
+    if cmd.startswith("promo "):
+        # Preserve the original casing/punctuation of the offer text.
+        offer = message.strip()[len("promo "):].strip()
+        if not offer:
+            return "❌ Add your offer. Try: PROMO 15% off all mains till 9pm"
+        return _cmd_promo(db, restaurant_id, offer)
+
     # Free-form text falls through to the LLM orchestrator (Phase 2 —
     # directives/012_agentic_roadmap.md). Known commands above never reach
     # here, so this only spends tokens on messages that actually need them.
@@ -456,8 +739,111 @@ def handle_owner_command(db: Session, restaurant_id: int, message: str) -> str:
     return handle_natural_language(db, restaurant_id, message)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CUSTOMER MESSAGE HANDLER  (two-way replies from diners, not owners)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _find_last_customer_order(db: Session, restaurant_id: int, phone: str):
+    """Most recent non-cancelled order for this customer at this restaurant.
+    A SQL last-9-digit LIKE narrows to this customer regardless of stored format
+    (0712…, +254712…, 254712…), so a returning diner is found even at a busy
+    restaurant; canonical() then confirms to rule out a rare suffix collision."""
+    from .optout import canonical, last9
+    key = canonical(phone)
+    if not key:
+        return None
+    q = (
+        db.query(models.Order)
+        .options(joinedload(models.Order.items).joinedload(models.OrderItem.menu_item))
+        .filter(
+            models.Order.restaurant_id == restaurant_id,
+            models.Order.status != models.OrderStatus.CANCELLED,
+            models.Order.customer_phone != "",
+        )
+    )
+    suf = last9(phone)
+    if suf:
+        q = q.filter(models.Order.customer_phone.like(f"%{suf}%"))
+    for o in q.order_by(models.Order.created_at.desc()).limit(50).all():
+        if canonical(o.customer_phone) == key:
+            return o
+    return None
+
+
+def handle_customer_message(db: Session, restaurant_id: int, phone: str, message: str) -> str:
+    """
+    Route an inbound message from a diner (not the owner). Supports REORDER and a
+    1–5 star rating (from the receipt prompt). Anything else gets a friendly
+    pointer. Ratings of 2 or below privately alert the owner for service recovery.
+    """
+    text = message.strip().lower()
+
+    # Reservation confirm/cancel (reply to a reminder), keyed on today's booking.
+    if text in {"yes", "y", "confirm", "no", "n", "cancel"}:
+        from .optout import canonical
+        key = canonical(phone)
+        res = None
+        if key:
+            todays = db.query(models.Reservation).filter(
+                models.Reservation.restaurant_id == restaurant_id,
+                models.Reservation.reservation_date == utcnow().date(),
+                models.Reservation.customer_phone != "",
+            ).all()
+            res = next((r for r in todays if canonical(r.customer_phone) == key), None)
+        if res:
+            if text in {"no", "n", "cancel"}:
+                res.status = models.ReservationStatus.CANCELLED
+                db.commit()
+                return "Your reservation has been cancelled. We hope to see you another time. 🙏"
+            res.status = models.ReservationStatus.CONFIRMED
+            db.commit()
+            return "Your reservation is confirmed — see you today! 🍽️"
+        # No booking to act on; fall through to the generic pointer below.
+
+    # Star rating: a lone digit 1–5.
+    if text in {"1", "2", "3", "4", "5"}:
+        rating = int(text)
+        last = _find_last_customer_order(db, restaurant_id, phone)
+        db.add(models.CustomerFeedback(
+            restaurant_id  = restaurant_id,
+            order_id       = last.id if last else None,
+            customer_phone = phone,
+            rating         = rating,
+        ))
+        db.commit()
+        if rating <= 2:
+            restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
+            if restaurant:
+                alert = (f"⚠️ *Low rating received* — {rating}/5"
+                         + (f" on Order #{last.id}" if last else "")
+                         + f"\nFrom: {phone}\nReach out to make it right.")
+                send_to_owner(db, restaurant, alert, message_type="feedback_alert")
+            return "Thank you for the honest feedback — we're sorry we fell short and will do better. 🙏"
+        return "Thank you for the *" + text + "★* rating! We'd love to see you again soon. 🍽️"
+
+    # Reorder: acknowledge and notify staff/owner. Deliberately does NOT auto-create
+    # an order (price/availability/payment need a human) — it flags intent instead.
+    if text == "reorder":
+        last = _find_last_customer_order(db, restaurant_id, phone)
+        if not last:
+            return "We couldn't find a previous order for this number yet. Reply with what you'd like, or visit us to order."
+        items_str = ", ".join(
+            f"{int(oi.quantity)}× {oi.menu_item.name if oi.menu_item else 'item'}" for oi in last.items
+        )
+        restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
+        if restaurant:
+            notice = (f"🔁 *Reorder request* from {phone}\n{items_str}\n"
+                      f"Previous total: KES {(last.total or 0) // 100:,}. Confirm with the customer.")
+            send_to_owner(db, restaurant, notice, message_type="reorder_request")
+        return (f"Got it! We've sent your usual to the team: {items_str}.\n"
+                f"They'll confirm shortly. 🍽️")
+
+    return ("Thanks for your message! Reply *REORDER* to repeat your last order, or a number "
+            "*1–5* to rate your visit. To place a new order, visit us or ask our staff.")
+
+
 def _cmd_sales_today(db: Session, restaurant_id: int) -> str:
-    now_utc = datetime.utcnow()
+    now_utc = utcnow()
     orders  = db.query(models.Order).filter(
         models.Order.restaurant_id == restaurant_id,
         models.Order.status != models.OrderStatus.CANCELLED,
@@ -493,7 +879,7 @@ def _cmd_pending_pricing(db: Session, restaurant_id: int) -> str:
         .filter(
             models.PricingRecommendation.restaurant_id == restaurant_id,
             models.PricingRecommendation.status == "PENDING",
-            models.PricingRecommendation.created_at >= datetime.utcnow() - timedelta(hours=48),
+            models.PricingRecommendation.created_at >= utcnow() - timedelta(hours=48),
         )
         .order_by(models.PricingRecommendation.monthly_impact_cents.desc())
         .all()
@@ -516,7 +902,7 @@ def _cmd_pending_pricing(db: Session, restaurant_id: int) -> str:
 def _cmd_tonight(db: Session, restaurant_id: int) -> str:
     tonight = db.query(models.Reservation).filter(
         models.Reservation.restaurant_id == restaurant_id,
-        models.Reservation.reservation_date == datetime.utcnow().date(),
+        models.Reservation.reservation_date == utcnow().date(),
         models.Reservation.status == models.ReservationStatus.CONFIRMED,
     ).order_by(models.Reservation.reservation_time).all()
     if not tonight:
@@ -545,12 +931,67 @@ def _cmd_winback_summary(db: Session, restaurant_id: int) -> str:
     return "\n".join(lines)
 
 
+def _cmd_cost_quality(db: Session, restaurant_id: int) -> str:
+    from ai.data_quality import get_cost_price_quality
+    data = get_cost_price_quality(db, restaurant_id)
+    s = data["summary"]
+    if not data["issues"]:
+        return (f"✅ *Cost prices look healthy.*\n{s['coverage_pct']}% of your "
+                f"{s['total_items']} dishes have a cost price set.")
+    labels = {
+        "MISSING_COST": "no cost price set", "MISSING_PRICE": "no price set",
+        "SELLING_AT_LOSS": "sold at a loss", "SUSPICIOUSLY_LOW_COST": "cost looks like a typo",
+        "THIN_MARGIN": "very thin margin",
+    }
+    lines = [
+        "🧮 *Cost-price check*\n",
+        f"{s['items_with_issues']} of {s['total_items']} dishes need attention "
+        f"({s['coverage_pct']}% have a cost price).",
+        "_These drive your profit & pricing numbers — fixing them makes those accurate._\n",
+    ]
+    for i in data["issues"][:6]:
+        sold = f" ({i['qty_30d']} sold in 30d)" if i["qty_30d"] else ""
+        lines.append(f"• *{i['item_name']}* — {labels.get(i['issue'], i['issue'])}{sold}")
+    return "\n".join(lines)
+
+
+def _cmd_promo(db: Session, restaurant_id: int, offer: str) -> str:
+    """
+    Kick off a promo blast in the background and reply to the owner immediately.
+    The send loop is far too slow to run inside the inbound webhook (it would hit
+    the provider one customer at a time and blow the webhook timeout), so it runs
+    on its own thread with its own DB session.
+    """
+    audience = promo_audience_count(db, restaurant_id)
+    if audience == 0:
+        return ("No customers to send to yet — a promo only goes to diners who "
+                "gave consent at checkout and haven't opted out.")
+
+    def _run():
+        from database import SessionLocal
+        bg = SessionLocal()
+        try:
+            broadcast_promo(bg, restaurant_id, offer)
+        except Exception as exc:   # background thread — never surfaces to a caller
+            print(f"[WhatsApp Brain] Promo broadcast failed: {exc}")
+        finally:
+            bg.close()
+
+    threading.Thread(target=_run, daemon=True).start()
+    capped = min(audience, PROMO_MAX_RECIPIENTS)
+    extra = "" if audience <= PROMO_MAX_RECIPIENTS else f" (capped from {audience})"
+    return (f"📣 Sending your promo to {capped} customer{'s' if capped != 1 else ''}{extra} now. "
+            f"Opted-out customers are skipped automatically.")
+
+
 def _cmd_help(db: Session, restaurant_id: int) -> str:
     return (
         "🤖 *AI Commands*\n\n"
         "• SALES — today's revenue\n• STOCK — critical inventory\n"
         "• PENDING — pricing approvals\n• TONIGHT — tonight's bookings\n"
-        "• WINBACK — lapsed customers\n• APPROVE [n] — approve rec\n• REJECT [n] — reject rec"
+        "• WINBACK — lapsed customers\n• COSTS — cost-price data check\n"
+        "• PROMO [offer] — text a special to your regulars\n"
+        "• APPROVE [n] — approve rec\n• REJECT [n] — reject rec"
     )
 
 
@@ -584,13 +1025,42 @@ def run_morning_briefing(SessionLocal) -> None:
     db = SessionLocal()
     try:
         for restaurant in db.query(models.Restaurant).all():
-            owner_phone = owner_phone_for(restaurant)
-            if not owner_phone:
-                print(f"[WhatsApp Brain] No owner phone for restaurant {restaurant.id}")
-                continue
             message = compose_morning_briefing(db, restaurant.id)
-            send_whatsapp_message(owner_phone, message, db=db, restaurant_id=restaurant.id, message_type="morning_briefing")
+            send_to_owner(db, restaurant, message, message_type="morning_briefing")
             print(f"[WhatsApp Brain] Morning briefing sent: {restaurant.name}")
+    finally:
+        db.close()
+
+
+def run_morning_briefing_voice(SessionLocal, tts_render=None) -> None:
+    """
+    Voice-note variant of the 8am briefing, for owners who'd rather listen than
+    read. Requires a `tts_render(text) -> public_audio_url` callable (a TTS
+    provider plus a publicly reachable hosted file) because Twilio attaches media
+    by URL. Without one this no-ops and the text briefing stays the default. The
+    transport already carries media (twilio_client.send(media_url=...)); plugging
+    in a TTS provider is the only remaining piece.
+    """
+    if tts_render is None:
+        print("[WhatsApp Brain] Voice briefing skipped — no TTS/audio-URL provider configured")
+        return
+    db = SessionLocal()
+    try:
+        for restaurant in db.query(models.Restaurant).all():
+            phone = owner_phone_for(restaurant)
+            if not phone:
+                continue
+            text = compose_morning_briefing(db, restaurant.id)
+            try:
+                audio_url = tts_render(text)
+            except Exception as exc:
+                print(f"[WhatsApp Brain] TTS render failed for {restaurant.name}: {exc}")
+                continue
+            send_whatsapp_message(
+                phone, "🌅 Your morning briefing (voice note)", db=db,
+                restaurant_id=restaurant.id, message_type="morning_briefing_voice",
+                media_url=audio_url,
+            )
     finally:
         db.close()
 
@@ -602,9 +1072,7 @@ def run_slow_day_check(SessionLocal) -> None:
         for restaurant in db.query(models.Restaurant).all():
             alert = compose_slow_day_alert(db, restaurant.id)
             if alert:
-                owner_phone = owner_phone_for(restaurant)
-                if owner_phone:
-                    send_whatsapp_message(owner_phone, alert, db=db, restaurant_id=restaurant.id, message_type="slow_day_alert")
+                send_to_owner(db, restaurant, alert, message_type="slow_day_alert")
     finally:
         db.close()
 
@@ -619,15 +1087,55 @@ def run_stock_check(SessionLocal) -> None:
     this was the only place that could plausibly emit them, and it never did
     — this scheduled job itself was also never registered until the same
     audit. Both gaps had to be fixed together for either to matter.
+
+    Two more defects fixed 2026-07-08:
+
+      • DOUBLE SEND. This emitted STOCK_CRITICAL (whose handler,
+        executive.on_stock_critical, WhatsApps the owner) and then *also* sent
+        `compose_stock_alert(urgent[0])` directly — so the first urgent item
+        generated two messages describing the same shortage. Notification is
+        now the event handlers' job alone; this function only decides what is
+        worth an event. (`on_stock_depleted` grew a send of its own: a fully
+        out-of-stock item with no recent usage scores WARNING, never entered
+        `urgent`, and so was silently never reported at all.)
+
+      • NO COOLDOWN. Every item that qualified re-alerted on every 2-hourly
+        cycle. `last_alerted_at` is stamped on each item we raise an event for
+        and re-checked here, so a persistently low item nudges the owner at most
+        once per STOCK_ALERT_COOLDOWN_HOURS.
     """
     from events.bus import emit_async, EventType
 
+    # Quiet hours: outside service hours only fully-depleted items are worth a
+    # ping; a merely-low item can wait until the restaurant reopens.
+    in_hours = within_service_hours()
+
     db = SessionLocal()
     try:
+        cooldown_cutoff = utcnow() - timedelta(hours=STOCK_ALERT_COOLDOWN_HOURS)
+
         for restaurant in db.query(models.Restaurant).all():
             alerts = get_critical_stock_alerts(db, restaurant.id)
-            urgent = [a for a in alerts if a["severity"] == "URGENT"]
-            depleted = [a for a in alerts if a["current_qty"] <= 0]
+            if not alerts:
+                continue
+
+            alert_ids = [a["inventory_item_id"] for a in alerts]
+            recently_alerted = {
+                row.id for row in db.query(models.InventoryItem.id).filter(
+                    models.InventoryItem.id.in_(alert_ids),
+                    models.InventoryItem.last_alerted_at.isnot(None),
+                    models.InventoryItem.last_alerted_at >= cooldown_cutoff,
+                ).all()
+            }
+
+            actionable = [a for a in alerts if a["inventory_item_id"] not in recently_alerted]
+            depleted = [a for a in actionable if a["current_qty"] <= 0]
+            # `> 0` keeps a depleted item from being reported twice, once under
+            # each event — it is depleted, not merely critical. Outside service
+            # hours we hold back merely-urgent (still-in-stock) items; a full
+            # stock-out still fires because it blocks service the moment they open.
+            urgent = [a for a in actionable
+                      if a["severity"] == "URGENT" and a["current_qty"] > 0] if in_hours else []
 
             for item in depleted:
                 emit_async(EventType.STOCK_DEPLETED, {
@@ -636,17 +1144,19 @@ def run_stock_check(SessionLocal) -> None:
                     "inventory_item_id": item["inventory_item_id"],
                 })
             for item in urgent:
-                if item["current_qty"] > 0:  # avoid double-emitting depleted items as also "critical"
-                    emit_async(EventType.STOCK_CRITICAL, {
-                        "restaurant_id": restaurant.id,
-                        "item_name": item["item_name"],
-                        "hours_remaining": item["hours_remaining"],
-                        "inventory_item_id": item["inventory_item_id"],
-                    })
+                emit_async(EventType.STOCK_CRITICAL, {
+                    "restaurant_id": restaurant.id,
+                    "item_name": item["item_name"],
+                    "hours_remaining": item["hours_remaining"],
+                    "inventory_item_id": item["inventory_item_id"],
+                })
 
-            if urgent:
-                owner_phone = owner_phone_for(restaurant)
-                if owner_phone:
-                    send_whatsapp_message(owner_phone, compose_stock_alert(urgent[0]), db=db, restaurant_id=restaurant.id, message_type="stock_alert")
+            notified_ids = [a["inventory_item_id"] for a in depleted + urgent]
+            if notified_ids:
+                db.query(models.InventoryItem).filter(
+                    models.InventoryItem.id.in_(notified_ids)
+                ).update({models.InventoryItem.last_alerted_at: utcnow()},
+                         synchronize_session=False)
+                db.commit()
     finally:
         db.close()

@@ -74,11 +74,22 @@ def handle_natural_language(db: Session, restaurant_id: int, message: str) -> st
     token usage to the token_usage table for per-tenant cost tracking.
     """
     from ai import llm_client
+    from ai.reasoning import grounding
 
     if not llm_client.is_available():
         return "I didn't understand that. Reply HELP to see all commands."
 
     messages = [{"role": "user", "content": message}]
+
+    # Every figure the model is allowed to state must trace to a deterministic
+    # tool result it was actually handed. We accumulate the numbers from those
+    # results and redact any figure in the final reply that isn't among them —
+    # the same number-faithfulness guarantee narrator.verify() gives the
+    # dashboard, applied to this free-form path (which otherwise returned raw
+    # model text straight to the owner). An empty set (model answered without
+    # calling a tool) correctly redacts every cited figure, since none was
+    # looked up.
+    grounded_numbers: set = set()
 
     for _ in range(MAX_TOOL_TURNS):
         response = llm_client.chat_with_tools(
@@ -89,8 +100,15 @@ def handle_natural_language(db: Session, restaurant_id: int, message: str) -> st
         _log_usage(restaurant_id, response)
 
         if response.stop_reason != "tool_use":
-            return "".join(b.text for b in response.content if b.type == "text") or \
-                "I didn't understand that. Reply HELP to see all commands."
+            reply = "".join(b.text for b in response.content if b.type == "text")
+            if reply:
+                reply, ungrounded = grounding.redact_free_text(reply, grounded_numbers)
+                if ungrounded:
+                    logger.warning(
+                        "[Orchestrator] redacted ungrounded numbers %s from reply",
+                        ungrounded,
+                    )
+            return reply or "I didn't understand that. Reply HELP to see all commands."
 
         messages.append({"role": "assistant", "content": response.content})
         tool_results = []
@@ -99,6 +117,7 @@ def handle_natural_language(db: Session, restaurant_id: int, message: str) -> st
                 continue
             fn = _TOOL_DISPATCH.get(block.name)
             result_text = fn(db, restaurant_id) if fn else f"Unknown tool: {block.name}"
+            grounded_numbers |= grounding.collect_payload_numbers(result_text)
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": block.id,

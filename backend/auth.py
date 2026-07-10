@@ -74,4 +74,12 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
 
+    # Session revocation: a token is only valid while its embedded version matches
+    # the user's current token_version. Bumping token_version (logout-all, or a
+    # response to credential compromise) invalidates every token minted before it.
+    # Tokens issued before this feature carry no "ver" claim → default 0, which
+    # matches the column default, so they remain valid until the next bump.
+    if payload.get("ver", 0) != (user.token_version or 0):
+        raise credentials_exception
+
     return user

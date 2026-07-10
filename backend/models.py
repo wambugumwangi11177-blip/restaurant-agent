@@ -78,6 +78,11 @@ class User(Base):
     failed_login_attempts = Column(Integer, default=0)   # brute-force lockout (2026-07-07 security pass)
     locked_until = Column(DateTime, nullable=True)         # None = not locked
     last_login_at = Column(DateTime, nullable=True)        # set on successful login (staff-activity record)
+    # Bumped to invalidate every outstanding JWT for this user (logout-all /
+    # credential compromise). Tokens embed the value they were minted with as the
+    # "ver" claim; get_current_user rejects a token whose ver != this. Added by
+    # migration 017.
+    token_version = Column(Integer, default=0, nullable=False)
 
     tenant = relationship("Tenant", back_populates="users")
 

@@ -247,17 +247,30 @@ app.add_middleware(BodySizeLimitMiddleware)
 app.add_middleware(CorrelationIdMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
+#
+# API versioning (2026-07-10): the data API is now canonically served under
+# /api/v1/* (documented in OpenAPI). The original unversioned paths (/orders,
+# /menu, …) are ALSO mounted so the current frontend keeps working unchanged, but
+# hidden from the schema (include_in_schema=False) to mark them deprecated — new
+# consumers should target /api/v1. Migrate the frontend to /api/v1, then drop the
+# legacy mount in a later release.
+#
+# NOT versioned, deliberately:
+#   • auth.router already carries its own /api/v1/auth prefix.
+#   • webhooks — Safaricom/Twilio POST to fixed, externally-registered callback
+#     URLs; versioning them would break every registered CallBackURL.
+#   • health — conventionally unversioned (probes/uptime checks hit /health).
+_VERSIONED_ROUTERS = [
+    menu.router, orders.router, inventory.router, analytics.router,
+    reservations.router, ai.router, export.router,
+]
 
 app.include_router(auth.router)
-app.include_router(menu.router)
-app.include_router(orders.router)
-app.include_router(inventory.router)
-app.include_router(health.router)
 app.include_router(webhooks.router)
-app.include_router(analytics.router)
-app.include_router(reservations.router)
-app.include_router(ai.router)
-app.include_router(export.router)
+app.include_router(health.router)
+for _r in _VERSIONED_ROUTERS:
+    app.include_router(_r, prefix="/api/v1")          # canonical, documented
+    app.include_router(_r, include_in_schema=False)   # legacy path, still works
 
 
 @app.get("/")

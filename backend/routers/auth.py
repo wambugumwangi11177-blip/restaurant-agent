@@ -109,7 +109,9 @@ async def register(request: Request, user_data: UserCreate, db: Session = Depend
         ))
     db.commit()
 
-    access_token = auth.create_access_token(data={"sub": new_user.email})
+    access_token = auth.create_access_token(
+        data={"sub": new_user.email, "ver": new_user.token_version or 0}
+    )
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -146,7 +148,9 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
     user.last_login_at = utcnow()
     db.commit()
 
-    access_token = auth.create_access_token(data={"sub": user.email})
+    access_token = auth.create_access_token(
+        data={"sub": user.email, "ver": user.token_version or 0}
+    )
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -164,6 +168,27 @@ async def read_users_me(
         "restaurant_name": restaurant.name if restaurant else None,
         "restaurant_id": restaurant.id if restaurant else None,
     }
+
+
+@router.post("/logout-all")
+async def logout_all(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Revoke every outstanding session for the current user by bumping
+    token_version — all JWTs minted before this call (including the one used to
+    make it) immediately stop validating. Use after a suspected token leak or a
+    password change. Stateless-JWT logout is otherwise client-side only.
+    """
+    # Re-fetch in THIS session and update it there, rather than mutating the
+    # current_user instance (attached to get_current_user's session) and
+    # committing a different session — that only persists while the two sessions
+    # happen to be the same object, an implicit coupling we don't want to rely on.
+    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    user.token_version = (user.token_version or 0) + 1
+    db.commit()
+    return {"status": "all_sessions_revoked", "token_version": user.token_version}
 
 
 @router.put("/restaurant")

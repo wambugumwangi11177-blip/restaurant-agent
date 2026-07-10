@@ -290,6 +290,91 @@ def write_audit_log(
         logger.error(f"[AuditLog] Failed to write audit record: {exc}")
 
 
+def _percentile(sorted_values: list[int], pct: int) -> int | None:
+    """Nearest-rank percentile of a pre-sorted list. None if empty."""
+    if not sorted_values:
+        return None
+    k = max(0, min(len(sorted_values) - 1, round((pct / 100.0) * len(sorted_values) + 0.5) - 1))
+    return sorted_values[k]
+
+
+def get_ai_ops_summary(db: Session, restaurant_id: int, days: int = 30) -> dict:
+    """
+    AIOps surface for one tenant: LLM token spend (by model), agent latency
+    (p50/p95) and success rate, and the grounding trust rate. All of this was
+    already captured (token_usage, agent_executions, the grounding verifier) but
+    never exposed — this aggregates it read-only for a dashboard/alerting. See
+    directives / the production-readiness roadmap's AIOps (G3) item.
+    """
+    from datetime import timedelta
+    cutoff = utcnow() - timedelta(days=days)
+
+    # ── LLM token spend ──────────────────────────────────────────────────────
+    usage = (
+        db.query(models.TokenUsage)
+        .filter(models.TokenUsage.restaurant_id == restaurant_id,
+                models.TokenUsage.created_at >= cutoff)
+        .all()
+    )
+    total_in = total_out = 0
+    by_model: dict[str, dict] = {}
+    for u in usage:
+        ti, to = (u.input_tokens or 0), (u.output_tokens or 0)
+        total_in += ti
+        total_out += to
+        m = by_model.setdefault(u.llm_model or "unknown",
+                                {"calls": 0, "input_tokens": 0, "output_tokens": 0})
+        m["calls"] += 1
+        m["input_tokens"] += ti
+        m["output_tokens"] += to
+
+    # ── Agent latency + reliability ──────────────────────────────────────────
+    execs = (
+        db.query(models.AgentExecution)
+        .filter(models.AgentExecution.restaurant_id == restaurant_id,
+                models.AgentExecution.created_at >= cutoff)
+        .all()
+    )
+    per_agent: dict[str, dict] = {}
+    for e in execs:
+        a = per_agent.setdefault(e.agent_name, {"runs": 0, "failures": 0, "latencies": []})
+        a["runs"] += 1
+        if not e.success:
+            a["failures"] += 1
+        if e.execution_ms is not None:
+            a["latencies"].append(e.execution_ms)
+
+    agents = []
+    for name, d in sorted(per_agent.items()):
+        lat = sorted(d["latencies"])
+        agents.append({
+            "agent": name,
+            "runs": d["runs"],
+            "success_rate_pct": round(100 * (d["runs"] - d["failures"]) / d["runs"], 1) if d["runs"] else None,
+            "p50_ms": _percentile(lat, 50),
+            "p95_ms": _percentile(lat, 95),
+        })
+
+    # ── Output grounding (process-wide; honest about scope) ──────────────────
+    try:
+        from ai.reasoning.narrator import get_trust_stats
+        grounding = get_trust_stats()
+    except Exception:
+        grounding = {"grounding_enabled": True}
+
+    return {
+        "window_days": days,
+        "llm": {
+            "calls": len(usage),
+            "input_tokens": total_in,
+            "output_tokens": total_out,
+            "by_model": by_model,
+        },
+        "agents": agents,
+        "grounding": grounding,
+    }
+
+
 def get_audit_trail(
     db: Session,
     restaurant_id: int,

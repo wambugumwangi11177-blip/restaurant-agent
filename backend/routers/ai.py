@@ -288,3 +288,24 @@ async def ai_supply_chain(
 
     from ai.supply_chain.intelligence import get_supply_chain_intelligence
     return _safe_run("supply_chain_intelligence", restaurant.id, get_supply_chain_intelligence, db, restaurant.id)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AI OPS — token spend, agent latency/reliability, grounding (surfaces metered data)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/usage")
+async def ai_usage(
+    days: int = 30,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    AIOps summary for this tenant: LLM token spend (by model), per-agent latency
+    (p50/p95) + success rate, and the grounding trust rate. Read-only aggregation
+    of already-metered data (token_usage, agent_executions, grounding verifier).
+    """
+    restaurant = get_or_create_restaurant(db, current_user)
+    days = min(max(days, 1), 365)
+    from ai.evaluation.tracker import get_ai_ops_summary
+    return _safe_run("ai_ops_summary", restaurant.id, get_ai_ops_summary, db, restaurant.id, days)

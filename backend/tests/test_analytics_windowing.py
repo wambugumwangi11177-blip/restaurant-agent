@@ -1,10 +1,12 @@
 """
 The AI-dashboard hot path must not load a restaurant's entire order history.
 
-Two modules were missed when every other analytics module was bounded to 30
-days (fixed 2026-07-08):
+Three modules were missed when every other analytics module was bounded to 30
+days (menu/reservation fixed 2026-07-08, KDS 2026-07-09):
   • menu_engineer         — GROUP BY over all order_items, no created_at filter
   • reservation_optimizer — `.all()` over every DINE_IN order, summed in Python
+  • kds_intelligence      — `.all()` over every SERVED/READY order for throughput,
+                            and a per-day divisor of days-since-the-first-order-EVER
 
 In production that's ~107k orders / 200k+ order_items materialized on every
 dashboard load. These tests assert both halves of the fix: the emitted SQL
@@ -23,7 +25,7 @@ import pytest
 from sqlalchemy import event
 
 import models
-from ai import menu_engineer, reservation_optimizer
+from ai import menu_engineer, reservation_optimizer, kds_intelligence
 from ai.analysis_clock import ANCHOR_SAMPLE_SIZE
 
 ANCHOR = datetime(2026, 7, 1, 12, 0, 0)
@@ -171,3 +173,77 @@ def test_degenerate_window_falls_back_to_all_time_rate(db_session):
     # all-time book (one 4-top) rather than to DEFAULT_PARTY_SIZE.
     assert impact["avg_party_size"] == 4.0
     assert impact["avg_spend_per_guest"] == (RECENT_ORDERS * 1000) // (RECENT_ORDERS * 4)
+
+
+def _add_completed_order_with_prep(db, days_ago: int, prep_minutes: float = 12.0):
+    """A SERVED order with an OrderItem and a PrepTime — the shape KDS needs.
+
+    KDS early-returns unless prep_times exist, so a throughput test must seed
+    them (the menu/reservation fixtures don't). Both the order and its prep row
+    are dated `days_ago` so the 30-day bound includes or excludes them together.
+    """
+    created = ANCHOR - timedelta(days=days_ago)
+    o = models.Order(
+        restaurant_id=1, status=models.OrderStatus.SERVED,
+        order_type=models.OrderType.DINE_IN,
+        payment_method=models.PaymentMethod.CASH, is_paid=True,
+        total=1000, created_at=created, completed_at=created + timedelta(minutes=20),
+    )
+    db.add(o)
+    db.flush()
+    oi = models.OrderItem(order_id=o.id, menu_item_id=1, quantity=1, unit_price=1000)
+    db.add(oi)
+    db.flush()
+    db.add(models.PrepTime(
+        order_item_id=oi.id, station="main", started_at=created,
+        completed_at=created + timedelta(minutes=prep_minutes), actual_minutes=prep_minutes,
+    ))
+
+
+def test_kds_throughput_counts_only_the_recent_window(db_session):
+    """
+    Throughput loaded every SERVED/READY order ever (`.all()`, no date bound) and
+    divided by days-since-the-first-order, so a long-lived kitchen's throughput
+    was diluted across its whole lifetime. Both halves are now windowed.
+    """
+    db_session.add_all([
+        models.Restaurant(id=1, tenant_id=None, name="KDS Bistro", address="x"),
+        models.MenuItem(id=1, restaurant_id=1, name="Nyama Choma", price=1000, category="main"),
+    ])
+    db_session.commit()
+
+    for _ in range(ANCIENT_ORDERS):
+        _add_completed_order_with_prep(db_session, days_ago=100)
+    for _ in range(RECENT_ORDERS):
+        _add_completed_order_with_prep(db_session, days_ago=2)
+    db_session.commit()
+
+    result, statements = _captured_sql(
+        db_session, lambda: kds_intelligence.get_kds_intelligence(db_session, 1)
+    )
+    throughput = result["throughput"]
+
+    # RECENT_ORDERS, not RECENT_ORDERS + ANCIENT_ORDERS: the 100-day-old block is
+    # out of window.
+    assert throughput["total_completed"] == RECENT_ORDERS
+    assert throughput["total_completed"] != RECENT_ORDERS + ANCIENT_ORDERS
+
+    # The per-day divisor is the window span (<= 30d), so throughput reflects the
+    # last 30 days, not a lifetime average diluted toward zero. All recent orders
+    # sit on one day here, so orders/day == the recent count, never /100+ days.
+    assert throughput["orders_per_day"] >= RECENT_ORDERS
+    # completion_rate numerator and denominator both windowed -> 100% here.
+    assert throughput["completion_rate"] == 100.0
+
+    # The exclusion happened in SQL. The order query that feeds throughput must
+    # carry a created_at predicate — a full-history SELECT of orders must not appear.
+    order_selects = [
+        s for s in statements
+        if s.lower().lstrip().startswith("select") and "from orders" in s.lower()
+        and "join" not in s.lower()
+    ]
+    assert order_selects, "expected a SELECT over orders for throughput"
+    assert all("created_at" in s for s in order_selects), (
+        "every throughput order query must carry a created_at predicate:\n"
+        + "\n\n".join(order_selects)
+    )

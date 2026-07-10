@@ -36,4 +36,9 @@ EXPOSE 8000
 # was ~50% as effective as intended). Single worker makes the counter
 # authoritative again; see rate_limit.py's docstring for the full tradeoff
 # and the real fix (Redis-backed storage) if traffic ever needs >1 worker.
-CMD ["sh", "-c", "python -c 'from database import init_db; init_db()' && alembic upgrade head && gunicorn main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT"]
+# --timeout 60: a worker whose request runs longer than this is killed and
+# restarted, so a single hung upstream (LLM/Twilio/M-Pesa) can't wedge the one
+# worker indefinitely. It sits above the app-level client timeouts (LLM 30s,
+# Twilio 10s) so those fire first and degrade gracefully; the gunicorn timeout
+# is the last-resort backstop. Tunable via GUNICORN_TIMEOUT.
+CMD ["sh", "-c", "python -c 'from database import init_db; init_db()' && alembic upgrade head && gunicorn main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --timeout ${GUNICORN_TIMEOUT:-60} --bind 0.0.0.0:$PORT"]

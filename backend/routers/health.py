@@ -2,6 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 # from database import get_db # Assuming db setup is done or will be done
 import os
+import logging
+
+logger = logging.getLogger("health")
 
 router = APIRouter(
     prefix="/health",
@@ -24,7 +27,7 @@ async def db_health_check(db: Session = Depends(get_db)):
         return {"status": "ok", "database": "connected"}
     except Exception as e:
         # Log the error (Sentry will catch it if configured)
-        print(f"Database connection error: {e}")
+        logger.error(f"Database connection error: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable"

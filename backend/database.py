@@ -25,8 +25,20 @@ if DATABASE_URL.startswith("sqlite"):
         DATABASE_URL = f"sqlite:///{db_path}"
     connect_args = {"check_same_thread": False}
 else:
-    # PostgreSQL (Neon/Render): keep connections healthy after idle/sleep
-    engine_kwargs = {"pool_pre_ping": True, "pool_recycle": 300}
+    # PostgreSQL (Neon/Render): keep connections healthy after idle/sleep, and
+    # cap the pool EXPLICITLY. SQLAlchemy's silent defaults (pool_size=5 +
+    # max_overflow=10 = up to 15 connections per process) can exceed a managed
+    # Postgres connection limit — especially once worker count grows — and a
+    # pool that's exhausted should fail fast, not hang forever. All three are
+    # env-tunable so the ceiling can be matched to the provisioned DB plan
+    # without a code change.
+    engine_kwargs = {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+        "pool_size": int(os.getenv("DB_POOL_SIZE", "5")),
+        "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "10")),
+        "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),
+    }
 
 engine = create_engine(DATABASE_URL, connect_args=connect_args, **engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

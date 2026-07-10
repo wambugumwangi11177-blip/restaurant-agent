@@ -71,7 +71,7 @@ class Tenant(Base):
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"))
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), index=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     role = Column(SqEnum(Role), default=Role.STAFF)
@@ -87,7 +87,7 @@ class User(Base):
 class Restaurant(Base):
     __tablename__ = "restaurants"
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("tenants.id"))
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), index=True)
     name = Column(String)
     address = Column(String)
     owner_phone = Column(String, nullable=True)   # WhatsApp owner routing (was OWNER_PHONE_{id} env var)
@@ -106,7 +106,7 @@ class Table(Base):
     """Physical tables in the restaurant — required for reservation intelligence."""
     __tablename__ = "tables"
     id = Column(Integer, primary_key=True, index=True)
-    restaurant_id = Column(Integer, ForeignKey("restaurants.id"))
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), index=True)
     table_number = Column(Integer)
     capacity = Column(Integer, default=4)
     status = Column(SqEnum(TableStatus), default=TableStatus.AVAILABLE)
@@ -120,7 +120,7 @@ class Table(Base):
 class MenuItem(Base):
     __tablename__ = "menu_items"
     id = Column(Integer, primary_key=True, index=True)
-    restaurant_id = Column(Integer, ForeignKey("restaurants.id"))
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), index=True)
     name = Column(String)
     description = Column(Text, default="")
     price = Column(Integer)           # Sale price in cents
@@ -155,16 +155,24 @@ class Order(Base):
     notes = Column(Text, default="")
     created_at = Column(DateTime, default=utcnow)
     completed_at = Column(DateTime, nullable=True)
-    
+
     restaurant = relationship("Restaurant", back_populates="orders")
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    __table_args__ = (
+        # Tenant-scoped list/ordering and status filtering are the hot read paths;
+        # customer_phone drives export/erasure/customer resolution. FK columns
+        # aren't auto-indexed on Postgres — see migration 015.
+        Index("ix_orders_restaurant_created", "restaurant_id", "created_at"),
+        Index("ix_orders_restaurant_status", "restaurant_id", "status"),
+        Index("ix_orders_customer_phone", "customer_phone"),
+    )
 
 class OrderItem(Base):
     """Links orders to menu items — critical for menu performance analysis."""
     __tablename__ = "order_items"
     id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(Integer, ForeignKey("orders.id"))
-    menu_item_id = Column(Integer, ForeignKey("menu_items.id"))
+    order_id = Column(Integer, ForeignKey("orders.id"), index=True)
+    menu_item_id = Column(Integer, ForeignKey("menu_items.id"), index=True)
     quantity = Column(Integer, default=1)
     unit_price = Column(Integer)  # Snapshot of price at time of order
     
@@ -179,7 +187,7 @@ class PrepTime(Base):
     """Tracks actual kitchen prep time per order item — powers KDS intelligence."""
     __tablename__ = "prep_times"
     id = Column(Integer, primary_key=True, index=True)
-    order_item_id = Column(Integer, ForeignKey("order_items.id"))
+    order_item_id = Column(Integer, ForeignKey("order_items.id"), index=True)
     station = Column(String, default="main")  # grill, fryer, salad, drinks, main
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
@@ -193,7 +201,7 @@ class PrepTime(Base):
 class InventoryItem(Base):
     __tablename__ = "inventory_items"
     id = Column(Integer, primary_key=True, index=True)
-    restaurant_id = Column(Integer, ForeignKey("restaurants.id"))
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), index=True)
     item_name = Column(String)
     quantity = Column(Float, default=0)
     unit = Column(String)
@@ -213,7 +221,7 @@ class StockMovement(Base):
     """Tracks inventory in/out — powers depletion prediction and reorder intelligence."""
     __tablename__ = "stock_movements"
     id = Column(Integer, primary_key=True, index=True)
-    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id"))
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id"), index=True)
     movement_type = Column(SqEnum(StockMovementType))
     quantity = Column(Float)
     reason = Column(String, default="")  # "sale", "waste", "purchase", "adjustment"
@@ -229,7 +237,7 @@ class Reservation(Base):
     __tablename__ = "reservations"
     id = Column(Integer, primary_key=True, index=True)
     restaurant_id = Column(Integer, ForeignKey("restaurants.id"))
-    table_id = Column(Integer, ForeignKey("tables.id"), nullable=True)
+    table_id = Column(Integer, ForeignKey("tables.id"), nullable=True, index=True)
     customer_name = Column(String)
     customer_phone = Column(String, default="")
     customer_email = Column(String, default="")
@@ -244,9 +252,15 @@ class Reservation(Base):
     # When a same-day reminder was last sent — prevents a scheduler misfire/restart
     # from re-sending. See ai/whatsapp/brain.run_reservation_reminders.
     reminder_sent_at = Column(DateTime, nullable=True)
-    
+
     restaurant = relationship("Restaurant", back_populates="reservations")
     table = relationship("Table", back_populates="reservations")
+    __table_args__ = (
+        # Availability/day queries filter by restaurant + date; customer_phone
+        # drives export/erasure. See migration 015.
+        Index("ix_reservations_restaurant_date", "restaurant_id", "reservation_date"),
+        Index("ix_reservations_customer_phone", "customer_phone"),
+    )
 
 # ─────────────────────────────────────────────────────────────────────────────
 # EXISTING (from previous release) — keep as-is

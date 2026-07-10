@@ -40,16 +40,19 @@ async def update_menu_item(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    # Verify ownership (TODO: Strict permission checks)
-    db_item = db.query(models.MenuItem).filter(models.MenuItem.id == item_id).first()
+    # Tenant scoping via the shared restaurant lookup, consistent with every
+    # other mutation endpoint (orders.py, inventory.py). Scoping the QUERY by
+    # restaurant_id fails closed: a cross-tenant item_id simply isn't found (404),
+    # so there is no ad-hoc post-fetch ownership check that a future edit could
+    # drop and silently open an IDOR.
+    restaurant = get_or_create_restaurant(db, current_user)
+    db_item = db.query(models.MenuItem).filter(
+        models.MenuItem.id == item_id,
+        models.MenuItem.restaurant_id == restaurant.id,
+    ).first()
     if not db_item:
         raise HTTPException(status_code=404, detail="Menu item not found")
-        
-    # Simple check: does item belong to user's tenant's restaurant?
-    # db_item.restaurant.tenant_id == current_user.tenant_id
-    if db_item.restaurant.tenant_id != current_user.tenant_id:
-        raise HTTPException(status_code=403, detail="Not authorized to update this item")
-    
+
     for key, value in item_update.dict(exclude_unset=True).items():
         setattr(db_item, key, value)
         
@@ -63,13 +66,14 @@ async def delete_menu_item(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    db_item = db.query(models.MenuItem).filter(models.MenuItem.id == item_id).first()
+    restaurant = get_or_create_restaurant(db, current_user)
+    db_item = db.query(models.MenuItem).filter(
+        models.MenuItem.id == item_id,
+        models.MenuItem.restaurant_id == restaurant.id,
+    ).first()
     if not db_item:
         raise HTTPException(status_code=404, detail="Menu item not found")
-        
-    if db_item.restaurant.tenant_id != current_user.tenant_id:
-        raise HTTPException(status_code=403, detail="Not authorized to delete this item")
-        
+
     db.delete(db_item)
     db.commit()
     return {"message": "Item deleted successfully"}

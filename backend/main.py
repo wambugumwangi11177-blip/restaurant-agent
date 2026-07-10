@@ -15,10 +15,15 @@ import os
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from logging_config import configure_logging
 from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
+from middleware.body_limit import BodySizeLimitMiddleware
+from middleware.correlation import CorrelationIdMiddleware
 
+# Install structured logging before anything else logs.
+configure_logging()
 logger = logging.getLogger(__name__)
 
 # ── Sentry (optional) ─────────────────────────────────────────────────────────
@@ -54,9 +59,9 @@ def on_startup():
     from database import init_db
     try:
         init_db()
-        print("[OK] Database tables initialised")
+        logger.info("[OK] Database tables initialised")
     except Exception as e:
-        print(f"[WARN] DB init deferred: {e}")
+        logger.warning(f"[WARN] DB init deferred: {e}")
 
     # 2. Wire the event bus — THIS WAS MISSING.
     #    Without this call, all orchestrator handlers were registered as
@@ -64,9 +69,9 @@ def on_startup():
     try:
         from ai.orchestrator.executive import register_all_handlers
         register_all_handlers()
-        print("[OK] Orchestrator event handlers registered")
+        logger.info("[OK] Orchestrator event handlers registered")
     except Exception as e:
-        print(f"[WARN] Orchestrator registration failed: {e}")
+        logger.warning(f"[WARN] Orchestrator registration failed: {e}")
 
     # 3. Schedule morning WhatsApp briefing (07:00 EAT = 04:00 UTC)
     _start_scheduler()
@@ -125,11 +130,11 @@ def _start_scheduler():
         )
 
         scheduler.start()
-        print("[OK] Scheduler started (morning briefing: 07:00 EAT)")
+        logger.info("[OK] Scheduler started (morning briefing: 07:00 EAT)")
     except ImportError:
-        print("[WARN] APScheduler not installed — scheduled jobs disabled. Run: pip install apscheduler")
+        logger.warning("[WARN] APScheduler not installed — scheduled jobs disabled. Run: pip install apscheduler")
     except Exception as e:
-        print(f"[WARN] Scheduler failed to start: {e}")
+        logger.warning(f"[WARN] Scheduler failed to start: {e}")
 
 
 def _send_all_morning_briefings():
@@ -230,6 +235,11 @@ app.add_middleware(
 
 app.add_middleware(TimingMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(BodySizeLimitMiddleware)
+# Added last so it wraps OUTERMOST: the request_id is set before any other
+# middleware or route runs (so their logs carry it) and the oversized-body
+# rejection above still emits under the correlation id.
+app.add_middleware(CorrelationIdMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 
@@ -253,4 +263,6 @@ def read_root():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # Bind all interfaces: required inside the container so Railway's edge proxy
+    # can reach the app; not exposed directly to the internet.
+    uvicorn.run(app, host="0.0.0.0", port=port)  # nosec B104

@@ -90,6 +90,40 @@ def _constraint_exists(name: str) -> bool:
     )
 
 
+def _cancel_overlapping_duplicates() -> None:
+    # Reconciles pre-existing overlaps so ADD CONSTRAINT can build. For each
+    # colliding pair, the lower-id (earlier-created) reservation is kept
+    # CONFIRMED and the later one is marked CANCELLED. Looped because
+    # cancelling one row in a chain of 3+ overlapping bookings can still
+    # leave the remaining two colliding with each other.
+    bind = op.get_bind()
+    while True:
+        result = bind.execute(
+            sa.text(
+                """
+                UPDATE reservations r
+                SET status = 'CANCELLED'
+                WHERE r.id IN (
+                    SELECT b.id
+                    FROM reservations a
+                    JOIN reservations b
+                      ON a.table_id = b.table_id
+                     AND a.id < b.id
+                     AND a.status = 'CONFIRMED' AND b.status = 'CONFIRMED'
+                     AND tsrange(a.reservation_date + a.reservation_time,
+                                 a.reservation_date + a.reservation_time
+                                   + (coalesce(a.duration_minutes, 90) * interval '1 minute'))
+                      && tsrange(b.reservation_date + b.reservation_time,
+                                 b.reservation_date + b.reservation_time
+                                   + (coalesce(b.duration_minutes, 90) * interval '1 minute'))
+                )
+                """
+            )
+        )
+        if result.rowcount == 0:
+            break
+
+
 def upgrade() -> None:
     if not _is_postgres():
         return
@@ -100,6 +134,8 @@ def upgrade() -> None:
 
     if _constraint_exists(CONSTRAINT_NAME):
         return
+
+    _cancel_overlapping_duplicates()
 
     op.execute(
         f"""

@@ -9,6 +9,7 @@ from twilio.request_validator import RequestValidator
 
 import models
 from ai.whatsapp import twilio_client
+from phone_utils import normalize_phone
 
 
 def _seed_restaurant(db_session, owner_phone="+15559999999"):
@@ -22,7 +23,12 @@ def _seed_restaurant(db_session, owner_phone="+15559999999"):
     # reload so validate_twilio_request actually sees "testtoken123".
     importlib.reload(twilio_client)
 
-    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x", owner_phone=owner_phone)
+    # Store the normalized form, exactly as onboarding (routers/auth.py) now
+    # does — the inbound resolver compares against the canonical value.
+    r = models.Restaurant(
+        id=1, tenant_id=None, name="Test Bistro", address="x",
+        owner_phone=normalize_phone(owner_phone),
+    )
     db_session.add(r)
     db_session.commit()
 

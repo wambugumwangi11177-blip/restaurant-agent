@@ -182,7 +182,11 @@ async def update_restaurant(
     if data.address is not None:
         restaurant.address = data.address
     if data.owner_phone is not None:
-        restaurant.owner_phone = data.owner_phone
+        # Normalize on write so it matches the normalized inbound WhatsApp number
+        # at compare time (see routers/webhooks.py / phone_utils.py). Storing the
+        # raw form silently broke owner-command matching for any non-E.164 entry.
+        from phone_utils import normalize_phone
+        restaurant.owner_phone = normalize_phone(data.owner_phone)
     db.commit()
     db.refresh(restaurant)
     return {

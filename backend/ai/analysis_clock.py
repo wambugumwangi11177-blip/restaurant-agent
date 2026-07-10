@@ -76,13 +76,22 @@ def analysis_anchor(db: Session, restaurant_id: int) -> datetime:
     return rows[-1][0] or utcnow()
 
 
-def data_freshness(db: Session, restaurant_id: int) -> dict:
+# Sentinel so a caller can pass an explicit latest_order=None ("this restaurant
+# has no orders") and have it honoured, distinct from "not supplied, go query".
+_UNSET = object()
+
+
+def data_freshness(db: Session, restaurant_id: int, latest_order=_UNSET) -> dict:
     """
     Staleness signal for the analytics dashboard. Because analysis_anchor()
     intentionally makes stale/imported data look analysable, a broken order
     feed is otherwise indistinguishable from a healthy restaurant. This surfaces
     that: it reports how far the newest order lags real (wall-clock) time so the
     frontend can warn "you're looking at N-day-old data".
+
+    `latest_order` lets a caller that already computed MAX(orders.created_at)
+    (e.g. ops_manager.get_operations_dashboard) hand it in so this doesn't re-run
+    the identical aggregate query in the same request. Omit it and it's queried.
 
     Returns:
       latest_order_at : ISO timestamp of the most recent order, or None if no orders
@@ -94,6 +103,8 @@ def data_freshness(db: Session, restaurant_id: int) -> dict:
         db.query(func.max(models.Order.created_at))
         .filter(models.Order.restaurant_id == restaurant_id)
         .scalar()
+        if latest_order is _UNSET
+        else latest_order
     )
     if latest is None:
         return {

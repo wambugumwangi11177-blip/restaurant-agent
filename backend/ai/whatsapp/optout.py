@@ -32,6 +32,18 @@ def canonical(phone: str) -> str:
     return "".join(ch for ch in phone if ch.isdigit())
 
 
+def last9(phone: str) -> str:
+    """
+    Last 9 digits of a phone — the subscriber part of a Kenyan mobile number,
+    identical whether stored as 0712345678, +254712345678 or 254712345678.
+    Used for a SQL `LIKE %suffix%` pre-filter so customer lookups don't depend on
+    a capped recent-order scan; callers still confirm with canonical() to rule out
+    the rare suffix collision.
+    """
+    digits = "".join(ch for ch in (phone or "") if ch.isdigit())
+    return digits[-9:] if len(digits) >= 9 else ""
+
+
 def is_stop_keyword(message: str) -> bool:
     return message.strip().lower() in STOP_KEYWORDS
 

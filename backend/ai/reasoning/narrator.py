@@ -107,6 +107,19 @@ TASKS = {
         ),
         "keys": None,
     },
+    # On-demand "explain this to me" for a SINGLE insight — powers the dashboard
+    # per-item Explain button. Deliberately the cheap tier and the simplest, most
+    # concrete language, because the audience is a non-analyst owner/staff member.
+    "explain": {
+        "tier": TIER_LOW,
+        "role": "You explain one restaurant insight to a non-analyst owner in plain, simple language.",
+        "focus": (
+            "Explain, in one short paragraph, what this single item means, why it was "
+            "flagged, and what to do about it. No jargon — if a term is unavoidable, "
+            "define it in a few words. Speak plainly, like to a busy shop owner."
+        ),
+        "keys": None,
+    },
 }
 
 # Output contract the model must return. Kept tiny and strict so it parses

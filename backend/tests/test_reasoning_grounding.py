@@ -181,3 +181,63 @@ def test_model_rounding_of_a_derived_figure_still_grounds():
         {"revenue_cents": 900000},
     )
     assert out["verified"] is True, out["ungrounded_numbers"]
+
+
+# ── Container lengths are not grounded ────────────────────────────────────────
+#
+# Tracking len() of every dict/list let a fabricated figure pass whenever it
+# equalled some unrelated collection's size (an invented "25%" grounding against
+# a 25-item order list). Real counts that matter appear as explicit numeric
+# fields, which are still grounded; small counts pass via the magnitude carve-out.
+
+def test_container_length_does_not_ground_an_invented_percentage():
+    payload = {"orders": [{"id": i} for i in range(25)], "revenue_cents": 900000}
+    out = grounding.verify(
+        {"headline": "Delivery was 25% of revenue.", "priorities": [], "actions": []},
+        payload,
+    )
+    assert out["verified"] is False
+    assert "25%" in out["ungrounded_numbers"]
+
+
+def test_explicit_count_field_still_grounds():
+    # The count that genuinely matters is stored as a value, not just a length.
+    payload = {"summary": {"total_items": 42}, "items": [{"n": i} for i in range(42)]}
+    out = grounding.verify(
+        {"headline": "You run 42 menu items.", "priorities": [], "actions": []},
+        payload,
+    )
+    assert out["verified"] is True, out["ungrounded_numbers"]
+
+
+# ── Free-text redaction (WhatsApp orchestrator path) ──────────────────────────
+#
+# collect_payload_numbers() also accepts a plain string (the prose the model was
+# actually handed), and redact_free_text() polices a plain-string reply. This is
+# what stops a hallucinated figure in the free-form WhatsApp reply from reaching
+# the owner unchecked.
+
+def test_redact_free_text_keeps_grounded_and_redacts_invented():
+    grounded = grounding.collect_payload_numbers("Today: KES 25,000 across 40 orders")
+    clean, ungrounded = grounding.redact_free_text(
+        "You made KES 25,000 today, up 99% on yesterday.", grounded
+    )
+    assert "KES 25,000" in clean
+    assert "99%" not in clean
+    assert "99%" in ungrounded
+    assert grounding._REDACTION in clean
+
+
+def test_redact_free_text_with_no_grounding_redacts_all_figures():
+    # Model answered without calling a tool: any cited figure is ungrounded.
+    clean, ungrounded = grounding.redact_free_text("Revenue was KES 88,000.", set())
+    assert "88,000" not in clean
+    assert grounding._REDACTION in clean
+
+
+def test_redact_free_text_leaves_qualitative_text_untouched():
+    clean, ungrounded = grounding.redact_free_text(
+        "Stock is running low on a few items — reorder soon.", set()
+    )
+    assert clean == "Stock is running low on a few items — reorder soon."
+    assert ungrounded == []

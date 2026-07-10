@@ -18,7 +18,6 @@ Full-depth kitchen analytics including:
 """
 
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
 from collections import defaultdict
 from datetime import timedelta
 import math
@@ -193,9 +192,15 @@ def get_kds_intelligence(db: Session, restaurant_id: int) -> dict:
             })
 
     # ── Throughput Metrics ──
+    # Bounded to the same 30-day window as the prep-time query above. Loading
+    # every SERVED/READY order ever (107k+ on a real restaurant) blew up this hot
+    # dashboard path, and — worse — the per-day divisor below used to be
+    # days-since-the-first-order-EVER, so a long-lived venue's throughput was
+    # diluted across its whole lifetime instead of reflecting the last 30 days.
     completed_orders = db.query(models.Order).filter(
         models.Order.restaurant_id == restaurant_id,
         models.Order.status.in_([models.OrderStatus.SERVED, models.OrderStatus.READY]),
+        models.Order.created_at >= thirty_days_ago,
     ).all()
 
     order_completion_times = []
@@ -212,11 +217,19 @@ def get_kds_intelligence(db: Session, restaurant_id: int) -> dict:
     else:
         avg_completion = median_completion = p95_completion = 0
 
-    # Calculate throughput per day
-    first_order = db.query(func.min(models.Order.created_at)).filter(
-        models.Order.restaurant_id == restaurant_id
-    ).scalar()
-    active_days = max((now - first_order).days, 1) if first_order else 30
+    # Per-day divisor = span of the 30-day window that actually holds data,
+    # capped at 30. (now - window_start).days is <= 30 by construction, so
+    # orders/items per day reflect recent kitchen throughput, not a lifetime avg.
+    earliest = min((o.created_at for o in completed_orders if o.created_at), default=None)
+    window_start = earliest if (earliest and earliest > thirty_days_ago) else thirty_days_ago
+    active_days = max((now - window_start).days, 1)
+
+    # Completion rate over the same window — numerator and denominator must span
+    # the same period, or the rate is meaningless.
+    total_orders_window = db.query(models.Order).filter(
+        models.Order.restaurant_id == restaurant_id,
+        models.Order.created_at >= thirty_days_ago,
+    ).count()
 
     throughput = {
         "total_completed": len(completed_orders),
@@ -227,7 +240,7 @@ def get_kds_intelligence(db: Session, restaurant_id: int) -> dict:
         "p95_completion_minutes": round(p95_completion, 1),
         "avg_prep_minutes": round(avg_overall, 1),
         "stations_active": len(station_data),
-        "completion_rate": round(len(completed_orders) / max(db.query(models.Order).filter(models.Order.restaurant_id == restaurant_id).count(), 1) * 100, 1),
+        "completion_rate": round(len(completed_orders) / max(total_orders_window, 1) * 100, 1),
     }
 
     # ── Station Efficiency Ratings ──

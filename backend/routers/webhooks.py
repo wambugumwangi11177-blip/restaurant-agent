@@ -10,6 +10,7 @@ import os
 from database import get_db
 from rate_limit import limiter
 import models
+from phone_utils import normalize_phone
 from ai.whatsapp import twilio_client, brain
 
 # Configure logging
@@ -28,7 +29,7 @@ def _resolve_restaurant_by_phone(db: Session, from_number: str) -> models.Restau
     legacy OWNER_PHONE_{id} / OWNER_PHONE env-var scan for any restaurant whose
     column isn't set yet (backward compatible during transition).
     """
-    normalized = from_number.replace("whatsapp:", "").strip()
+    normalized = normalize_phone(from_number)
 
     match = db.query(models.Restaurant).filter(
         models.Restaurant.owner_phone == normalized
@@ -40,8 +41,32 @@ def _resolve_restaurant_by_phone(db: Session, from_number: str) -> models.Restau
         models.Restaurant.owner_phone.is_(None)
     ).all():
         owner_phone = os.getenv(f"OWNER_PHONE_{restaurant.id}", os.getenv("OWNER_PHONE", ""))
-        if owner_phone and owner_phone.replace("whatsapp:", "").strip() == normalized:
+        if owner_phone and normalize_phone(owner_phone) == normalized:
             return restaurant
+    return None
+
+
+def _resolve_restaurant_for_customer(db: Session, from_number: str) -> models.Restaurant | None:
+    """
+    Resolve which restaurant a diner is talking to, by their most recent order.
+    Enables two-way customer replies (REORDER / rating) for non-owner senders.
+    Matches on canonical phone form since orders store many formats.
+    """
+    from ai.whatsapp.optout import canonical, last9
+    key = canonical(from_number)
+    if not key:
+        return None
+    q = db.query(models.Order).filter(models.Order.customer_phone != "")
+    suf = last9(from_number)
+    if suf:
+        # Narrow to this customer by subscriber digits so resolution doesn't
+        # depend on the order being among the N globally-most-recent.
+        q = q.filter(models.Order.customer_phone.like(f"%{suf}%"))
+    for o in q.order_by(models.Order.created_at.desc()).limit(50).all():
+        if canonical(o.customer_phone) == key:
+            return db.query(models.Restaurant).filter(
+                models.Restaurant.id == o.restaurant_id
+            ).first()
     return None
 
 @router.post("/stripe")
@@ -143,26 +168,31 @@ def _settle_order_once(db: Session, order_id: int, receipt: str) -> bool:
 @limiter.limit("30/minute")
 async def mpesa_webhook_untokenized(request: Request, db: Session = Depends(get_db)):
     """Legacy tokenless path. 403s as soon as MPESA_CALLBACK_TOKEN is configured."""
-    _verify_mpesa_token(None)
-    return await _handle_mpesa_callback(request, db)
+    return await _handle_mpesa_callback(request, db, token=None)
 
 
 @router.post("/mpesa/{token}")
 @limiter.limit("30/minute")
 async def mpesa_webhook(token: str, request: Request, db: Session = Depends(get_db)):
     """Tokenized Daraja callback — this is the URL registered as CallBackURL."""
-    _verify_mpesa_token(token)
-    return await _handle_mpesa_callback(request, db)
+    return await _handle_mpesa_callback(request, db, token=token)
 
 
-async def _handle_mpesa_callback(request: Request, db: Session):
+async def _handle_mpesa_callback(request: Request, db: Session, token: str | None):
     """
     Safaricom Daraja STK push result callback. Always acks with 200 + the
     Safaricom-expected body regardless of payment outcome — this endpoint's
     job is to acknowledge receipt of the callback, correlate it to an order,
     and hand off to the existing event bus; Safaricom will retry on non-200
     or on a body it doesn't recognize.
+
+    Auth lives HERE, at the single choke point every callback route funnels
+    through, not in each thin route body — so a new Daraja route (a C2B
+    validation/confirmation URL, say) physically cannot reach settlement without
+    passing the origin check, even if a future author forgets to add it. Verify
+    before reading the body: an unauthenticated caller gets nothing.
     """
+    _verify_mpesa_token(token)
     try:
         payload = await request.json()
     except Exception as e:
@@ -286,11 +316,18 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
         )
 
     restaurant = _resolve_restaurant_by_phone(db, from_number)
-    if not restaurant:
-        logger.warning("[WhatsApp Webhook] No restaurant matched for inbound sender")
-        return PlainTextResponse("<Response></Response>", media_type="application/xml")
+    if restaurant:
+        reply_text = brain.handle_owner_command(db, restaurant.id, body)
+        twiml = f"<Response><Message>{escape(reply_text)}</Message></Response>"
+        return PlainTextResponse(twiml, media_type="application/xml")
 
-    reply_text = brain.handle_owner_command(db, restaurant.id, body)
+    # Not an owner — try to resolve a diner by their order history so two-way
+    # customer replies (REORDER, 1–5 rating from the receipt) work too.
+    customer_restaurant = _resolve_restaurant_for_customer(db, from_number)
+    if customer_restaurant:
+        reply_text = brain.handle_customer_message(db, customer_restaurant.id, from_number, body)
+        twiml = f"<Response><Message>{escape(reply_text)}</Message></Response>"
+        return PlainTextResponse(twiml, media_type="application/xml")
 
-    twiml = f"<Response><Message>{escape(reply_text)}</Message></Response>"
-    return PlainTextResponse(twiml, media_type="application/xml")
+    logger.warning("[WhatsApp Webhook] No restaurant matched for inbound sender")
+    return PlainTextResponse("<Response></Response>", media_type="application/xml")

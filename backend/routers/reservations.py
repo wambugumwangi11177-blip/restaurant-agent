@@ -135,8 +135,46 @@ async def update_reservation_status(
         raise HTTPException(status_code=400, detail=f"Invalid status: {update.status}")
 
     was_no_show = reservation.status == models.ReservationStatus.NO_SHOW
+
+    # Re-confirming a reservation (e.g. undoing a NO_SHOW/CANCELLED) re-occupies
+    # its table/slot, so it must pass the same overlap check create_reservation()
+    # runs — otherwise the slot freed by the cancel could already hold another
+    # CONFIRMED booking, and flipping this one back produces two overlapping
+    # confirmed reservations on one table. Only relevant when the target status
+    # is CONFIRMED and a table is assigned; other transitions (cancel, complete,
+    # no-show) only ever free a slot.
+    if (
+        new_status == models.ReservationStatus.CONFIRMED
+        and reservation.status != models.ReservationStatus.CONFIRMED
+        and reservation.table_id is not None
+    ):
+        if not is_table_available(
+            db,
+            restaurant_id=restaurant.id,
+            table_id=reservation.table_id,
+            reservation_date=reservation.reservation_date,
+            reservation_time=reservation.reservation_time,
+            duration_minutes=reservation.duration_minutes,
+            exclude_reservation_id=reservation.id,
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Table is already booked for an overlapping time slot",
+            )
+
     reservation.status = new_status
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Lost the race to a concurrent writer, or the Postgres EXCLUDE
+        # constraint (migration 009) caught an overlap the app-level check
+        # above could not see under concurrency. Present it as the same 409
+        # create_reservation() returns rather than a raw 500.
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Table is already booked for an overlapping time slot",
+        )
     db.refresh(reservation)
 
     # RESERVATION_NO_SHOW was subscribed to by executive.py (records into

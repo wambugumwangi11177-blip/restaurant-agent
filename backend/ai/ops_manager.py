@@ -264,6 +264,13 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
         "opportunities": opportunities,
         "ai_modules": ai_modules,
         "recent_ai_actions": recent_ai_actions,
+        # Private: the MAX(orders.created_at) we already computed above, handed to
+        # data_freshness() so the freshness wrapper doesn't re-run the identical
+        # aggregate. routers.analytics._with_freshness pops this before the
+        # payload is returned to the client. `latest_order` is the raw scalar
+        # (None if the restaurant has no orders), NOT `now` (which coalesces to
+        # utcnow()).
+        "_latest_order": latest_order,
     }
 
 

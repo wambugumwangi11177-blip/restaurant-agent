@@ -32,8 +32,29 @@ def _with_freshness(db: Session, restaurant_id: int, data: dict) -> dict:
     This block lets the frontend warn when it's showing stale data.
     """
     if isinstance(data, dict):
-        data["freshness"] = data_freshness(db, restaurant_id)
+        # If the producer already computed MAX(orders.created_at) (ops_manager
+        # stashes it under a private key), reuse it instead of re-querying. The
+        # key is popped so it never reaches the client. Routes without it (the
+        # other analytics modules) fall through to the querying form.
+        if "_latest_order" in data:
+            latest_order = data.pop("_latest_order")
+            data["freshness"] = data_freshness(db, restaurant_id, latest_order=latest_order)
+        else:
+            data["freshness"] = data_freshness(db, restaurant_id)
     return data
+
+
+@router.get("/trust-stats")
+def ai_trust_stats():
+    """
+    Public, tenant-agnostic AI accuracy stat: what share of AI narratives this
+    worker has generated had every cited figure verified against real data
+    (see ai/reasoning/grounding.py). No auth required — this is a platform-wide
+    trust signal meant to be shown on the login screen and dashboard, not
+    restaurant-specific data.
+    """
+    from ai.reasoning import get_trust_stats
+    return get_trust_stats()
 
 
 @router.get("/dashboard")
@@ -57,11 +78,11 @@ def menu_engineering(narrate: bool = True, db: Session = Depends(get_db), user: 
         return {"error": "No restaurant found"}
     data = menu_engineer.get_menu_engineering(db, rid)
     data["upsell_pairs"] = menu_engineer.get_upsell_pairs(db, rid)
-    if narrate:
-        from ai.reasoning import narrate as reason
-        note = reason(data, "menu", restaurant_id=rid)
-        if note:
-            data["narrative"] = note
+    # Shared narrate-attach helper — this route is a plain `def`, so FastAPI
+    # already runs it in the threadpool; no event-loop concern here. The helper
+    # also restores the `not data.get("error")` guard this copy had dropped.
+    from ai.reasoning import attach_narrative
+    data = attach_narrative(data, "menu", rid, narrate)
     return _with_freshness(db, rid, data)
 
 

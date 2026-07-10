@@ -114,6 +114,15 @@ def _start_scheduler():
             id="slow_day_check",
             replace_existing=True,
         )
+        # Same-day reservation reminders to cut no-shows. Once per day so it never
+        # re-sends (there is no per-reservation reminded flag) — see
+        # brain.run_reservation_reminders.
+        scheduler.add_job(
+            _run_reservation_reminders_job,
+            CronTrigger(hour=7, minute=0),   # 10:00 EAT
+            id="reservation_reminders",
+            replace_existing=True,
+        )
 
         scheduler.start()
         print("[OK] Scheduler started (morning briefing: 07:00 EAT)")
@@ -185,6 +194,15 @@ def _run_slow_day_check_job():
         run_slow_day_check(SessionLocal)
     except Exception as exc:
         logger.error(f"[Slow Day Check] Scheduler job failed: {exc}")
+
+
+def _run_reservation_reminders_job():
+    try:
+        from database import SessionLocal
+        from ai.whatsapp.brain import run_reservation_reminders
+        run_reservation_reminders(SessionLocal)
+    except Exception as exc:
+        logger.error(f"[Reservation Reminders] Scheduler job failed: {exc}")
 
 
 # ── CORS ──────────────────────────────────────────────────────────────────────

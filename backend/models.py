@@ -91,6 +91,9 @@ class Restaurant(Base):
     name = Column(String)
     address = Column(String)
     owner_phone = Column(String, nullable=True)   # WhatsApp owner routing (was OWNER_PHONE_{id} env var)
+    # Preferred channel for owner alerts: "whatsapp" (default), "sms", or "both".
+    # SMS matters in Kenya where not every owner uses WhatsApp.
+    owner_channel = Column(String, default="whatsapp")
 
     tenant = relationship("Tenant", back_populates="restaurants")
     menu_items = relationship("MenuItem", back_populates="restaurant")
@@ -238,6 +241,9 @@ class Reservation(Base):
     deposit_paid = Column(Boolean, default=False)
     notes = Column(Text, default="")
     created_at = Column(DateTime, default=utcnow)
+    # When a same-day reminder was last sent — prevents a scheduler misfire/restart
+    # from re-sending. See ai/whatsapp/brain.run_reservation_reminders.
+    reminder_sent_at = Column(DateTime, nullable=True)
     
     restaurant = relationship("Restaurant", back_populates="reservations")
     table = relationship("Table", back_populates="reservations")
@@ -652,4 +658,28 @@ class TokenUsage(Base):
 
     __table_args__ = (
         Index("ix_token_usage_restaurant_created", "restaurant_id", "created_at"),
+    )
+
+
+class CustomerFeedback(Base):
+    """
+    Lightweight customer rating captured over the messaging channel — a customer
+    replies "1".."5" to their receipt. Low scores (<=2) trigger a private owner
+    alert for service recovery. Kept intentionally minimal; not a full reviews
+    system.
+    """
+    __tablename__ = "customer_feedback"
+
+    id             = Column(Integer, primary_key=True, index=True)
+    restaurant_id  = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
+    order_id       = Column(Integer, ForeignKey("orders.id"), nullable=True)
+    customer_phone = Column(String, default="")
+    rating         = Column(Integer, nullable=False)
+    comment        = Column(Text, default="")
+    created_at     = Column(DateTime, default=utcnow)
+
+    restaurant = relationship("Restaurant")
+
+    __table_args__ = (
+        Index("ix_customer_feedback_restaurant_created", "restaurant_id", "created_at"),
     )

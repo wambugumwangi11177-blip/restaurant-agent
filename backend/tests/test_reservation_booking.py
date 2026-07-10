@@ -112,6 +112,93 @@ def test_cancelled_reservation_does_not_block_the_slot(client, db_session):
     assert retry.status_code == 200, retry.text
 
 
+def test_reconfirming_a_reservation_into_an_occupied_slot_is_rejected(client, db_session):
+    """
+    Re-confirming a previously-freed reservation must re-run the overlap check.
+    A NO_SHOW frees the slot; another booking takes it; flipping the first back
+    to CONFIRMED would double-book the table, so it must 409 (the same answer
+    create_reservation gives), not silently succeed.
+    """
+    restaurant, token = _make_tenant_with_user_and_restaurant(db_session, "reconfirm")
+    table = _add_table(db_session, restaurant, "T1")
+
+    first = client.post("/reservations/", json=_booking(table.id, hour=18), headers=_auth_headers(token))
+    assert first.status_code == 200, first.text
+    first_id = first.json()["id"]
+
+    # Free the slot, then let a second booking take the same table/time.
+    no_show = client.patch(
+        f"/reservations/{first_id}/status", json={"status": "no_show"}, headers=_auth_headers(token)
+    )
+    assert no_show.status_code == 200, no_show.text
+
+    second = client.post("/reservations/", json=_booking(table.id, hour=18), headers=_auth_headers(token))
+    assert second.status_code == 200, second.text
+
+    # Undoing the no-show would collide with the second booking.
+    reconfirm = client.patch(
+        f"/reservations/{first_id}/status", json={"status": "confirmed"}, headers=_auth_headers(token)
+    )
+    assert reconfirm.status_code == 409, reconfirm.text
+    assert "overlapping" in reconfirm.json()["detail"].lower()
+
+    confirmed = db_session.query(models.Reservation).filter(
+        models.Reservation.status == models.ReservationStatus.CONFIRMED
+    ).count()
+    assert confirmed == 1
+
+
+def test_reconfirming_when_slot_is_free_succeeds(client, db_session):
+    """The guard must not block a legitimate un-cancel when nothing else took the slot."""
+    restaurant, token = _make_tenant_with_user_and_restaurant(db_session, "reconfirm_ok")
+    table = _add_table(db_session, restaurant, "T1")
+
+    booked = client.post("/reservations/", json=_booking(table.id, hour=18), headers=_auth_headers(token))
+    assert booked.status_code == 200
+    res_id = booked.json()["id"]
+
+    client.patch(f"/reservations/{res_id}/status", json={"status": "cancelled"}, headers=_auth_headers(token))
+    reconfirm = client.patch(
+        f"/reservations/{res_id}/status", json={"status": "confirmed"}, headers=_auth_headers(token)
+    )
+    assert reconfirm.status_code == 200, reconfirm.text
+    assert reconfirm.json()["status"] == "confirmed"
+
+
+def test_cross_midnight_reservation_blocks_next_day_overlap(client, db_session):
+    """
+    A reservation starting 23:00 with a 120-min duration runs to 01:00 the next
+    calendar day. is_table_available scoped to the exact reservation_date used to
+    miss it, letting a 00:00 next-day booking double-book the table.
+    """
+    from datetime import date, time
+    from ai.reservation_optimizer import is_table_available
+
+    restaurant, token = _make_tenant_with_user_and_restaurant(db_session, "midnight")
+    table = _add_table(db_session, restaurant, "T1")
+
+    late = {
+        "customer_name": "Late Diner",
+        "party_size": 2,
+        "reservation_date": str(date(2026, 8, 1)),
+        "reservation_time": str(time(23, 0)),
+        "duration_minutes": 120,
+        "table_id": table.id,
+    }
+    resp = client.post("/reservations/", json=late, headers=_auth_headers(token))
+    assert resp.status_code == 200, resp.text
+
+    # A 00:00 booking on 2026-08-02 overlaps the 23:00–01:00 window from 08-01.
+    assert is_table_available(
+        db_session,
+        restaurant_id=restaurant.id,
+        table_id=table.id,
+        reservation_date=date(2026, 8, 2),
+        reservation_time=time(0, 0),
+        duration_minutes=60,
+    ) is False
+
+
 def test_cannot_book_another_tenants_table(client, db_session):
     """IDOR: guessing another restaurant's table id must look like a missing table, not a forbidden one."""
     _restaurant_a, token_a = _make_tenant_with_user_and_restaurant(db_session, "a")

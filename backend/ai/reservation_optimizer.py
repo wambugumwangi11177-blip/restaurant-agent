@@ -238,7 +238,12 @@ def get_reservation_insights(db: Session, restaurant_id: int) -> dict:
         r for r in completed if r.reservation_date >= revenue_window_start.date()
     ]
 
-    if windowed_revenue and windowed_orders:
+    # Order count — not revenue — is the "do we have windowed data" signal. A
+    # window with real dine-in orders that are all comped/free has revenue 0 but
+    # is still valid data; gating on `windowed_revenue` (falsy at 0) would
+    # silently discard the correct windowed count and fall back to all-time,
+    # reintroducing the window-skew this block exists to prevent.
+    if windowed_orders:
         total_dine_revenue = windowed_revenue
         dine_in_orders = windowed_orders
         avg_party = _avg_party_size(windowed_completed or completed)
@@ -582,10 +587,18 @@ def is_table_available(
         reservation_date, reservation_time, duration_minutes
     )
 
+    # Widen the SQL pre-filter one day either side of the requested date so a
+    # reservation that starts late and runs past midnight (its row is stamped
+    # with the *previous* day, but its interval reaches into this one) is
+    # actually fetched. Without this, a 23:00+90min booking on day D is invisible
+    # to an availability check for D+1 00:00 and the table double-books. The
+    # precise conflict decision is still made by _intervals_overlap below; this
+    # only controls which rows are candidates.
     q = db.query(models.Reservation).filter(
         models.Reservation.restaurant_id == restaurant_id,
         models.Reservation.table_id == table_id,
-        models.Reservation.reservation_date == reservation_date,
+        models.Reservation.reservation_date >= reservation_date - timedelta(days=1),
+        models.Reservation.reservation_date <= reservation_date + timedelta(days=1),
         models.Reservation.status == models.ReservationStatus.CONFIRMED,
     )
     if exclude_reservation_id is not None:
@@ -628,11 +641,16 @@ def find_available_tables(
     if not tables:
         return []
 
+    # ±1 day so a reservation crossing midnight (stamped with the prior date but
+    # overlapping into this one) is still a conflict candidate — see the same
+    # widening and rationale in is_table_available(). _intervals_overlap below
+    # makes the exact decision.
     same_day_reservations = (
         db.query(models.Reservation)
         .filter(
             models.Reservation.restaurant_id == restaurant_id,
-            models.Reservation.reservation_date == reservation_date,
+            models.Reservation.reservation_date >= reservation_date - timedelta(days=1),
+            models.Reservation.reservation_date <= reservation_date + timedelta(days=1),
             models.Reservation.status == models.ReservationStatus.CONFIRMED,
             models.Reservation.table_id.isnot(None),
         )

@@ -27,7 +27,7 @@ It always calls agent functions. The agents own the data logic.
 
 import logging
 from datetime import date
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from database import SessionLocal
 import models
 from events.bus import subscribe, EventType, emit_async
@@ -50,7 +50,7 @@ def register_all_handlers() -> None:
     subscribe(EventType.STOCK_CRITICAL,          on_stock_critical)
     subscribe(EventType.STOCK_DEPLETED,          on_stock_depleted)
     subscribe(EventType.RECOMMENDATION_APPROVED, on_recommendation_approved)
-    subscribe(EventType.ORDER_PAID,              on_order_paid_mpesa)
+    subscribe(EventType.ORDER_PAID,              on_order_paid)
     subscribe(EventType.MPESA_PAYMENT_FAILED,    on_mpesa_payment_failed)
     subscribe(EventType.RESERVATION_NO_SHOW,     on_reservation_no_show)
     subscribe(EventType.PURCHASE_ORDER_LATE,     on_purchase_order_late)
@@ -231,48 +231,55 @@ def on_recommendation_approved(payload: dict) -> None:
         db.close()
 
 
-def on_order_paid_mpesa(payload: dict) -> None:
+def on_order_paid(payload: dict) -> None:
     """
-    Reacts to an ORDER_PAID event (past tense — the order is ALREADY settled
-    atomically by the M-Pesa webhook before this fires). This handler does the
-    pure side-effects only: send the WhatsApp receipt + write the audit log.
-    It deliberately does NOT mutate is_paid — settlement is the emitter's job,
-    so a failure here can never leave the order in a half-paid state.
+    Reacts to an ORDER_PAID event (past tense — the order is ALREADY settled by
+    the emitter, whether the M-Pesa webhook or the POS payment endpoint, before
+    this fires). Side-effects only: send an itemized customer receipt + write the
+    audit log. It deliberately does NOT mutate is_paid — settlement is the
+    emitter's job, so a failure here can never leave the order half-paid.
+
+    Channel: tries WhatsApp, falls back to SMS (many Kenyan customers aren't on
+    WhatsApp). Opt-out (STOP) is honoured by the send choke point. The receipt is
+    itemized via brain.compose_receipt and works for any payment method.
     """
     restaurant_id  = payload.get("restaurant_id")
     order_id       = payload.get("order_id")
     amount         = payload.get("amount_cents", 0)
     customer_phone = payload.get("customer_phone")
     mpesa_ref      = payload.get("mpesa_reference", "")
+    method         = payload.get("payment_method", "mpesa" if mpesa_ref else "unknown")
 
     db = SessionLocal()
     try:
-        # Send WhatsApp receipt to customer (if phone available)
         if customer_phone:
             from ai.whatsapp import send_whatsapp_message
-            restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
-            r_name = restaurant.name if restaurant else "the restaurant"
-            msg = (
-                f"✅ *Payment Confirmed*\n\n"
-                f"Thank you! KES {amount // 100:,} received at {r_name}.\n"
-                f"M-Pesa Ref: {mpesa_ref}\n"
-                f"Order #{order_id} is confirmed.\n\n"
-                f"_Thank you for dining with us!_"
+            from ai.whatsapp.brain import compose_receipt
+            order = (
+                db.query(models.Order)
+                .options(
+                    joinedload(models.Order.items).joinedload(models.OrderItem.menu_item)
+                )
+                .filter(models.Order.id == order_id)
+                .first()
             )
-            send_whatsapp_message(customer_phone, msg, db=db,
-                                  restaurant_id=restaurant_id, message_type="mpesa_receipt")
+            if order:
+                msg = compose_receipt(db, order, mpesa_ref=mpesa_ref)
+                send_whatsapp_message(customer_phone, msg, db=db,
+                                      restaurant_id=restaurant_id, message_type="receipt",
+                                      channel="whatsapp", fallback_sms=True)
 
         write_audit_log(
-            db, restaurant_id, "mpesa_payment_received", "executive_orchestrator",
+            db, restaurant_id, "payment_received", "executive_orchestrator",
             entity_type = "order",
             entity_id   = order_id,
             before      = {"is_paid": False},
-            after       = {"is_paid": True, "mpesa_ref": mpesa_ref},
-            reasoning   = f"M-Pesa STK push confirmed. Amount: KES {amount // 100:,}.",
+            after       = {"is_paid": True, "payment_method": method, "mpesa_ref": mpesa_ref},
+            reasoning   = f"Payment confirmed ({method}). Amount: KES {amount // 100:,}.",
         )
 
     except Exception as exc:
-        logger.error(f"[Orchestrator] on_order_paid_mpesa failed: {exc}")
+        logger.error(f"[Orchestrator] on_order_paid failed: {exc}")
     finally:
         db.close()
 

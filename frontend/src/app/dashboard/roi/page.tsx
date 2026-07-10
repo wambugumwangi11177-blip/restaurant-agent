@@ -17,7 +17,7 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Clock, TrendingUp, Target, RefreshCw, AlertTriangle, Zap } from "lucide-react";
+import { Clock, TrendingUp, Target, RefreshCw, AlertTriangle, Zap, ChefHat } from "lucide-react";
 
 interface RoiBreakdownItem {
     category: string;
@@ -40,6 +40,12 @@ interface RoiData {
         recommendations_approved: number;
     };
     opportunities: { source: string; label: string; monthly_value_cents: number }[];
+    capacity: {
+        avg_order_minutes: number;
+        orders_per_day: number;
+        bottlenecks_found: number;
+        reclaimable_delay_minutes: number;
+    } | null;
     narrative?: { headline: string; priorities: string[]; actions: { action: string; why: string; impact: string }[] };
     error?: string;
 }
@@ -147,7 +153,8 @@ export default function RoiDashboard() {
         !data ||
         (data.time_saved.hours_saved_30d === 0 &&
             data.money_captured.monthly_impact_cents === 0 &&
-            data.opportunities.length === 0);
+            data.opportunities.length === 0 &&
+            !data.capacity);
     if (isEmpty) {
         return <EmptyState />;
     }
@@ -155,6 +162,7 @@ export default function RoiDashboard() {
     const ts = data!.time_saved;
     const mc = data!.money_captured;
     const opps = data!.opportunities;
+    const cap = data!.capacity;
     const oppsTotal = opps.reduce((sum, o) => sum + o.monthly_value_cents, 0);
 
     return (
@@ -248,7 +256,8 @@ export default function RoiDashboard() {
             {/* Opportunities breakdown */}
             {opps.length > 0 && (
                 <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
-                    <p className="text-[#e5e5e5] font-semibold text-sm mb-4">Opportunities the AI has found</p>
+                    <p className="text-[#e5e5e5] font-semibold text-sm mb-1">Money on the table the AI has found</p>
+                    <p className="text-[#525252] text-xs mb-4">Flagged but not yet acted on — approve or action these to capture it.</p>
                     <div className="space-y-2">
                         {opps.map((o, i) => (
                             <div key={i} className="flex items-center justify-between text-sm py-2 border-b border-[#1a1a1a] last:border-0">
@@ -256,6 +265,37 @@ export default function RoiDashboard() {
                                 <span className="text-amber-400 font-medium">{formatKES(o.monthly_value_cents)}</span>
                             </div>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Kitchen capacity — non-monetary "do more with the same staff" story */}
+            {cap && (
+                <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
+                    <div className="flex items-center gap-2 text-[#e5e5e5] mb-1">
+                        <ChefHat className="w-4 h-4 text-[#d4a853]" />
+                        <p className="font-semibold text-sm">Kitchen capacity</p>
+                    </div>
+                    <p className="text-[#525252] text-xs mb-4">
+                        Serve more covers with the same staff — not counted as money above.
+                    </p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                            <p className="text-2xl font-bold text-[#e5e5e5]">{cap.avg_order_minutes}<span className="text-sm text-[#525252]"> min</span></p>
+                            <p className="text-[#525252] text-xs mt-1">avg order time</p>
+                        </div>
+                        <div>
+                            <p className="text-2xl font-bold text-[#e5e5e5]">{cap.orders_per_day}</p>
+                            <p className="text-[#525252] text-xs mt-1">orders / day</p>
+                        </div>
+                        <div>
+                            <p className="text-2xl font-bold text-[#e5e5e5]">{cap.bottlenecks_found}</p>
+                            <p className="text-[#525252] text-xs mt-1">bottlenecks flagged</p>
+                        </div>
+                        <div>
+                            <p className="text-2xl font-bold text-[#e5e5e5]">{cap.reclaimable_delay_minutes}<span className="text-sm text-[#525252]"> min</span></p>
+                            <p className="text-[#525252] text-xs mt-1">reclaimable delay</p>
+                        </div>
                     </div>
                 </div>
             )}

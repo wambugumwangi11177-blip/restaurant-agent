@@ -155,39 +155,101 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
         "recommendations_approved": len(approved_recs),
     }
 
-    # ── 3. OPPORTUNITIES FOUND (flagged, not yet realized) ──────────────────
-    opportunities = []
+    # ── 3. OPPORTUNITIES FOUND (money the AI has flagged, not yet realized) ──
+    # Each source is a separate deterministic module. They are wrapped
+    # individually so one slow/failing module degrades to "that line is
+    # missing" instead of taking down the whole ROI endpoint. Every value is
+    # normalized to CENTS here — the frontend divides by 100 exactly once, so a
+    # source that reports in whole KES (inventory: cost_per_unit is a Float in
+    # KES, not cents) must be ×100 at the point it's added.
+    opportunities: list[dict] = []
 
-    from ai.reservation_optimizer import get_reservation_insights
-    res = get_reservation_insights(db, restaurant_id)
-    revenue_impact = res.get("revenue_impact") or {}
-    if revenue_impact.get("estimated_revenue_lost"):
-        opportunities.append({
-            "source": "no_show_prevention",
-            "label": "Revenue at risk from no-shows",
-            "monthly_value_cents": revenue_impact["estimated_revenue_lost"],
-        })
-    overbooking = res.get("overbooking") or {}
-    if overbooking.get("potential_monthly_recovery"):
-        opportunities.append({
-            "source": "overbooking_recovery",
-            "label": "Recoverable via smarter overbooking",
-            "monthly_value_cents": overbooking["potential_monthly_recovery"],
-        })
+    def _add(source: str, label: str, cents) -> None:
+        cents = int(cents or 0)
+        if cents > 0:
+            opportunities.append({"source": source, "label": label, "monthly_value_cents": cents})
 
-    from ai.labor.intelligence import get_labor_intelligence
-    labor = get_labor_intelligence(db, restaurant_id)
-    overtime_cost = (labor.get("summary") or {}).get("overtime_cost_30d") or 0
-    if overtime_cost:
-        opportunities.append({
-            "source": "overtime_reduction",
-            "label": "Overtime cost flagged for review",
-            "monthly_value_cents": overtime_cost,
-        })
+    # Pricing recommendations the owner hasn't approved yet — money on the table.
+    try:
+        pending_recs = db.query(models.PricingRecommendation).filter(
+            models.PricingRecommendation.restaurant_id == restaurant_id,
+            models.PricingRecommendation.status == "PENDING",
+        ).all()
+        _add("pricing_pending", "Uncaptured margin in pending pricing recs",
+             sum(r.monthly_impact_cents for r in pending_recs))
+    except Exception:  # noqa: BLE001 — ROI must degrade, not crash
+        pass
+
+    # Profit leaks + portion drift (already in cents).
+    try:
+        from ai.profit.intelligence import get_profit_intelligence
+        profit = get_profit_intelligence(db, restaurant_id)
+        _add("profit_leaks", "Margin leaking from low-margin items",
+             (profit.get("summary") or {}).get("total_leak_amount"))
+        _add("portion_drift", "Lost to portion / discount drift",
+             sum(d.get("estimated_monthly_leak", 0) for d in (profit.get("portion_drift") or [])))
+    except Exception:  # noqa: BLE001
+        pass
+
+    # Inventory waste (cost_per_unit is a Float in KES → ×100 to cents).
+    try:
+        from ai.inventory_predictor import get_inventory_predictions
+        inv = get_inventory_predictions(db, restaurant_id)
+        waste_kes = sum(
+            (p.get("waste_qty_30d") or 0) * (p.get("cost_per_unit") or 0)
+            for p in (inv.get("predictions") or [])
+        )
+        _add("inventory_waste", "Stock lost to waste / spoilage", round(waste_kes * 100))
+    except Exception:  # noqa: BLE001
+        pass
+
+    # Reservation no-shows + overbooking recovery (already in cents).
+    try:
+        from ai.reservation_optimizer import get_reservation_insights
+        res = get_reservation_insights(db, restaurant_id)
+        _add("no_show_prevention", "Revenue at risk from no-shows",
+             (res.get("revenue_impact") or {}).get("estimated_revenue_lost"))
+        _add("overbooking_recovery", "Recoverable via smarter overbooking",
+             (res.get("overbooking") or {}).get("potential_monthly_recovery"))
+    except Exception:  # noqa: BLE001
+        pass
+
+    # Overtime cost flagged (already in cents).
+    try:
+        from ai.labor.intelligence import get_labor_intelligence
+        labor = get_labor_intelligence(db, restaurant_id)
+        _add("overtime_reduction", "Overtime cost flagged for review",
+             (labor.get("summary") or {}).get("overtime_cost_30d"))
+    except Exception:  # noqa: BLE001
+        pass
+
+    opportunities.sort(key=lambda o: -o["monthly_value_cents"])
+
+    # ── 4. KITCHEN CAPACITY (non-monetary — a "do more with the same staff"
+    # story). Deliberately NOT converted to money: turning ticket-speed into
+    # KES needs assumptions the app can't verify, so it's surfaced as
+    # throughput/bottleneck facts the KDS module already computes. ────────────
+    capacity = None
+    try:
+        from ai.kds_intelligence import get_kds_intelligence
+        kds = get_kds_intelligence(db, restaurant_id)
+        thr = kds.get("throughput") or {}
+        bottlenecks = kds.get("bottlenecks") or []
+        if thr.get("total_completed"):
+            capacity = {
+                "avg_order_minutes": thr.get("avg_order_completion_minutes"),
+                "orders_per_day": thr.get("orders_per_day"),
+                "bottlenecks_found": len(bottlenecks),
+                # Total systemic delay the AI has flagged as reclaimable.
+                "reclaimable_delay_minutes": round(sum(b.get("impact_score", 0) for b in bottlenecks), 1),
+            }
+    except Exception:  # noqa: BLE001
+        pass
 
     return {
         "window_days": 30,
         "time_saved": time_saved,
         "money_captured": money_captured,
         "opportunities": opportunities,
+        "capacity": capacity,
     }

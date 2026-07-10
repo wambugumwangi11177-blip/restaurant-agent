@@ -269,7 +269,17 @@ def test_migration_009_emits_exclude_constraint_on_postgres(monkeypatch):
     """
     from alembic import op as alembic_op
 
-    fake_bind = type("Bind", (), {"dialect": type("D", (), {"name": "postgresql"})()})()
+    # upgrade() first reconciles pre-existing overlaps via bind.execute(UPDATE ...)
+    # in a loop that stops when rowcount == 0 (added with the reconciliation step,
+    # commit e2bc6e4). The fake bind must therefore support .execute returning a
+    # result whose rowcount is 0 (no overlaps to cancel in this control-flow test).
+    class _FakeResult:
+        rowcount = 0
+
+    fake_bind = type("Bind", (), {
+        "dialect": type("D", (), {"name": "postgresql"})(),
+        "execute": lambda self, *a, **k: _FakeResult(),
+    })()
     monkeypatch.setattr(alembic_op, "get_bind", lambda: fake_bind)
 
     statements = []

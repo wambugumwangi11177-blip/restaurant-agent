@@ -55,6 +55,11 @@ if SLOWAPI_AVAILABLE:
 
 @app.on_event("startup")
 def on_startup():
+    # 0. Fail-closed config validation — in production, refuse to boot with a
+    #    security-critical misconfig (e.g. an unauthenticated M-Pesa callback).
+    from startup_checks import enforce_startup_checks
+    enforce_startup_checks()
+
     # 1. Init DB tables
     from database import init_db
     try:

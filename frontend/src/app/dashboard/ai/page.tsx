@@ -22,10 +22,16 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import {
     Brain, TrendingUp, AlertTriangle, CheckCircle,
-    RefreshCw, Zap, Shield, Activity, ArrowRight,
-    Sparkles, ShieldCheck, ShieldAlert, Info, ChevronDown,
+    RefreshCw, Zap, Shield, Activity, ArrowRight, Truck,
 } from "lucide-react";
 import Link from "next/link";
+import { formatKES } from "@/lib/format";
+import { useAiModule } from "@/lib/useAiModule";
+import { HowItWorks } from "@/components/ai/HowItWorks";
+import { NarrativeBlock, type Narrative } from "@/components/ai/NarrativeBlock";
+import { ExplainButton } from "@/components/ai/ExplainButton";
+import { MiniStat } from "@/components/ai/MiniStat";
+import { ModuleShell } from "@/components/ai/ModuleShell";
 
 // Mirrors the actual shape returned by ai/ops_manager.get_operations_dashboard
 // (served via GET /ai/dashboard) — this page previously assumed field names
@@ -51,11 +57,6 @@ interface DashboardData {
     opportunities: { opportunity: string; potential: string; detail: string }[];
     ai_modules: { revenue?: { week_over_week_growth?: number } };
     recent_ai_actions: { action: string; agent: string; time: string }[];
-}
-
-function formatKES(cents: number) {
-    if (!cents) return "KES 0";
-    return `KES ${(cents / 100).toLocaleString("en-KE", { maximumFractionDigits: 0 })}`;
 }
 
 const healthColor = (score: number) =>
@@ -273,6 +274,7 @@ export default function AiDashboard() {
             <PricingSection />
             <MenuEngineeringSection />
             <LaborSection />
+            <SupplyChainSection />
             <DataQualitySection />
 
             {/* Risks + Opportunities */}
@@ -348,238 +350,7 @@ export default function AiDashboard() {
     );
 }
 
-/* ── Plain-language explanations ───────────────────────────────────────────
-   Every AI module speaks analyst jargon a normal restaurant owner/staff won't
-   recognise ("contribution margin", "velocity ratio", "Plowhorse"). This is the
-   translation layer: what each brain does, where its numbers come from, and what
-   every term means — in plain language. Definitions are kept faithful to the
-   backend that computes them (e.g. popularity index = 0.7x average in
-   ai/menu_engineer.py; 40% margin floor / 35% food-cost ceiling in
-   ai/pricing/analysis.py). This is static copy — it invents no numbers, so the
-   server-side grounding guarantee (ai/reasoning/narrator.py) is untouched. */
-interface Explainer {
-    what: string;
-    where: string;
-    caveat?: string;
-    terms: { t: string; d: string }[];
-}
-
-const AI_EXPLAIN: Record<string, Explainer> = {
-    profit: {
-        what: "Shows where your money is really going — true profit on each dish after ingredient cost, and exactly where you're losing it.",
-        where: "Your last 30 days of real orders plus the cost price you entered for each menu item.",
-        caveat: "If cost prices are wrong or missing, these numbers are wrong. Keep them up to date.",
-        terms: [
-            { t: "Gross margin", d: "Out of every KES 100 a dish earns, how much is left after paying for ingredients. 55%+ is healthy." },
-            { t: "Food cost %", d: "How much of the price goes to ingredients. Under 35% is healthy." },
-            { t: "Profit leak", d: "A dish priced too low for what it costs you — shown as shillings lost per month." },
-            { t: "Portion drift", d: "The menu says one price but the till keeps charging less — often quiet staff discounts. Worth checking." },
-            { t: "Daypart", d: "Which part of the day (breakfast/lunch/dinner) makes the most money after cost." },
-            { t: "Channel", d: "Walk-in vs delivery. After Uber/Glovo/Bolt take 20–25%, delivery often earns much less." },
-        ],
-    },
-    pricing: {
-        what: "Watches how fast each dish sells and whether its price still makes sense, then suggests small changes.",
-        where: "Your last 30 days of sales speed plus cost prices. New dishes (under 14 days of data) only get margin fixes, not demand-based changes.",
-        caveat: "Depends on correct cost prices to judge margin.",
-        terms: [
-            { t: "SURGE", d: "Selling much faster than usual and still profitable → raise the price a little (max 15%) while it's hot." },
-            { t: "REPRICE", d: "Margin is below the healthy 40% floor → raise it so you actually make money on the dish." },
-            { t: "STIMULATE", d: "Selling slowly but good margin → drop about 10% to pull more orders." },
-            { t: "Velocity", d: "How fast it's selling now vs its own normal. 1.0 = normal, 1.3 = 30% hotter, 0.6 = 40% slower." },
-            { t: "Cooldown", d: "After a suggestion, the same dish won't be raised again for 7 days." },
-            { t: "Delivery gap", d: "A dish that looks fine in-store but loses money once the delivery app takes its cut." },
-        ],
-    },
-    menu: {
-        what: "Sorts every dish by how popular and how profitable it is, so you know what to promote, fix, or cut.",
-        where: "Your last 30 days of orders plus cost prices.",
-        terms: [
-            { t: "Star", d: "Popular AND profitable — your winners. Keep them front and centre." },
-            { t: "Plowhorse", d: "Popular but thin margin — nudge the price up or trim portion cost." },
-            { t: "Puzzle", d: "Good margin but few order it — promote it or move it where people see it." },
-            { t: "Dog", d: "Few orders and little money — fix the recipe or remove it." },
-            { t: "Popularity index", d: "A dish counts as 'popular' if it sells at least 70% of the average — one or two bestsellers pull the plain average up unfairly." },
-            { t: "Menu score", d: "Overall menu health out of 100 — mostly what your menu is made of (Stars vs Dogs), plus costing and trend." },
-        ],
-    },
-    labor: {
-        what: "Checks whether your staffing cost is in line with sales, and flags expensive overtime.",
-        where: "Your staff shifts and hours plus sales over the last 30 days.",
-        terms: [
-            { t: "Labor cost %", d: "Wages as a share of sales. Around 30% or below is typical; higher eats into profit." },
-            { t: "Sales per hour", d: "Revenue earned for each staff hour worked — higher means a more efficient shift." },
-            { t: "Overtime cost", d: "Extra pay from hours beyond normal — usually a quick target to trim." },
-        ],
-    },
-    health: {
-        what: "One 0–100 score for the whole business, built from five areas, with your biggest fixable weaknesses listed first.",
-        where: "A weighted blend of five checks below, each scored from your live data.",
-        terms: [
-            { t: "Menu Health", d: "How many Stars vs Dogs are on your menu." },
-            { t: "Revenue Trend", d: "Whether sales are rising or falling week-over-week." },
-            { t: "Kitchen Efficiency", d: "Prep speed at your stations during the busy hours." },
-            { t: "Inventory Status", d: "Low-stock and spoilage-risk items." },
-            { t: "Reservation Reliability", d: "No-shows vs completed bookings." },
-        ],
-    },
-    dataquality: {
-        what: "Checks that every dish has a sensible cost price — because your profit and pricing numbers are only as accurate as the cost prices you enter.",
-        where: "Your menu items' price and cost price, cross-checked with your last 30 days of sales so the most-sold gaps show first.",
-        caveat: "A missing or wrong cost price silently distorts profit, margin, and every price suggestion — this is the fix-at-the-source list.",
-        terms: [
-            { t: "No cost set", d: "No cost price entered — the dish is left out of your profit figures entirely." },
-            { t: "Sold at a loss", d: "Ingredients cost as much as or more than the price — you lose money on each one." },
-            { t: "Cost looks like a typo", d: "Cost is only a tiny fraction of the price — usually a wrong-units or missing-digit slip." },
-            { t: "Very thin margin", d: "Under 10% left after ingredients — real, or a data-entry error worth checking." },
-        ],
-    },
-};
-
-function HowItWorks({ id }: { id: keyof typeof AI_EXPLAIN }) {
-    const [open, setOpen] = useState(false);
-    const e = AI_EXPLAIN[id];
-    if (!e) return null;
-    return (
-        <div className="mt-1">
-            <button
-                onClick={() => setOpen((v) => !v)}
-                className="flex items-center gap-1 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"
-            >
-                <Info className="w-3 h-3" />
-                <span>How this works</span>
-                <ChevronDown className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} />
-            </button>
-            {open && (
-                <div className="mt-2 rounded-lg border border-[#1a1a1a] bg-[#0a0a0a] p-3 space-y-2.5">
-                    <p className="text-xs text-[#a3a3a3] leading-relaxed">{e.what}</p>
-                    <p className="text-[11px] text-[#525252]">
-                        <span className="text-[#737373] font-medium">Where this comes from:</span> {e.where}
-                    </p>
-                    {e.caveat && (
-                        <p className="text-[11px] text-amber-400/80 flex gap-1.5">
-                            <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
-                            <span>{e.caveat}</span>
-                        </p>
-                    )}
-                    <div className="pt-1 border-t border-[#1a1a1a] space-y-1.5">
-                        <p className="text-[10px] uppercase tracking-wide text-[#525252] font-semibold">What the words mean</p>
-                        {e.terms.map((term) => (
-                            <p key={term.t} className="text-[11px] text-[#737373] leading-snug">
-                                <span className="text-[#e5e5e5] font-medium">{term.t}</span> — {term.d}
-                            </p>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-// On-demand "Explain this to me": sends one insight to the grounded reasoning
-// layer (POST /ai/explain) and shows a plain-language paragraph. Degrades quietly
-// when no LLM provider is configured (available:false → a short notice).
-function ExplainButton({ item, label }: { item: Record<string, any>; label?: string }) {
-    const [state, setState] = useState<"idle" | "loading" | "done" | "none">("idle");
-    const [text, setText] = useState("");
-
-    const explain = async () => {
-        if (state === "loading") return;
-        setState("loading");
-        try {
-            const res = await api.post("/ai/explain", { item, label });
-            if (res.data?.available && res.data.explanation) {
-                const n = res.data.explanation;
-                const extra = (n.actions || []).slice(0, 1).map((a: any) => a.action).join(" ");
-                setText([n.headline, extra].filter(Boolean).join(" — "));
-                setState("done");
-            } else {
-                setState("none");
-            }
-        } catch {
-            setState("none");
-        }
-    };
-
-    if (state === "done") {
-        return <p className="text-[11px] text-[#a3a3a3] mt-1 leading-relaxed bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-2">{text}</p>;
-    }
-    if (state === "none") {
-        return <p className="text-[11px] text-[#525252] mt-1 italic">Plain-language explainer isn’t available right now.</p>;
-    }
-    return (
-        <button
-            onClick={explain}
-            disabled={state === "loading"}
-            className="mt-1 flex items-center gap-1 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors disabled:opacity-60"
-        >
-            <Info className="w-3 h-3" />
-            {state === "loading" ? "Explaining…" : "Explain this to me"}
-        </button>
-    );
-}
-
 /* ── Inline AI module sections ─────────────────────────────────────────── */
-
-function ModuleShell({
-    icon: Icon, title, subtitle, explainKey, loading, error, onRetry, children,
-}: {
-    icon: any; title: string; subtitle?: string; explainKey?: keyof typeof AI_EXPLAIN; loading: boolean; error: string; onRetry: () => void; children: React.ReactNode;
-}) {
-    return (
-        <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
-            <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2">
-                <Icon className="w-4 h-4 text-[#d4a853]" />
-                {title}
-            </h2>
-            {subtitle && <p className="text-xs text-[#525252] mt-1">{subtitle}</p>}
-            {explainKey && <HowItWorks id={explainKey} />}
-            <div className="mb-4" />
-            {loading ? (
-                <div className="space-y-2">
-                    <div className="bg-[#141414] rounded-lg h-16 animate-pulse" />
-                </div>
-            ) : error ? (
-                <div className="flex items-center justify-between gap-3 py-2">
-                    <p className="text-[#525252] text-sm">{error}</p>
-                    <button onClick={onRetry} className="text-xs text-[#d4a853] hover:underline flex-shrink-0">Retry</button>
-                </div>
-            ) : (
-                children
-            )}
-        </div>
-    );
-}
-
-function useAiModule<T>(endpoint: string) {
-    const [data, setData] = useState<T | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
-
-    const fetchData = async () => {
-        setLoading(true);
-        setError("");
-        try {
-            const res = await api.get(endpoint);
-            // _safe_run on the backend returns 200 with {error, available:false}
-            // on internal failure rather than an HTTP error status — surface
-            // that as a real error here instead of rendering undefined fields.
-            if (res.data && res.data.available === false) {
-                setError(res.data.error || "This module hit an error analysing your data");
-            } else {
-                setData(res.data);
-            }
-        } catch (e: any) {
-            setError(e?.response?.data?.detail || e?.message || "Could not load this module");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => { fetchData(); }, [endpoint]);
-
-    return { data, loading, error, retry: fetchData };
-}
 
 function PricingSection() {
     interface PricingData {
@@ -667,6 +438,69 @@ function LaborSection() {
                                 <div key={i} className="p-3 rounded-lg bg-[#141414] border border-[#1a1a1a] text-sm">
                                     <p className="text-[#e5e5e5]">{r.message}</p>
                                     {r.action && <p className="text-xs text-[#d4a853] mt-1">💡 {r.action}</p>}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </>
+            )}
+        </ModuleShell>
+    );
+}
+
+function SupplyChainSection() {
+    interface Supplier {
+        id: number; name: string; reliability_score: number; reliability_label: string;
+        delivered_on_time: number; delivered_late: number; pending_orders: number;
+        avg_lead_days: number; lead_time_variance: number; cost_trend_pct: number; cost_trend_label: string; at_risk: boolean;
+    }
+    interface SupplyData {
+        summary: { total_suppliers: number; overdue_orders: number; at_risk_suppliers: number; avg_reliability_pct: number };
+        suppliers: Supplier[];
+        overdue_orders: { supplier_name?: string; expected_at?: string }[];
+        recommendations: { type?: string; priority?: string; message: string }[];
+    }
+    const { data, loading, error, retry } = useAiModule<SupplyData>("/ai/supply-chain");
+
+    return (
+        <ModuleShell icon={Truck} title="Supplier Intelligence" explainKey="supply" loading={loading} error={error} onRetry={retry}
+            subtitle="Which suppliers deliver on time, whose prices are creeping up, and which orders are overdue.">
+            {data && (
+                <>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                        <MiniStat label="Suppliers" value={data.summary.total_suppliers} />
+                        <MiniStat label="Avg reliability" value={`${data.summary.avg_reliability_pct}%`} tone={data.summary.avg_reliability_pct >= 85 ? "ok" : "warn"} />
+                        <MiniStat label="At risk" value={data.summary.at_risk_suppliers} tone={data.summary.at_risk_suppliers > 0 ? "warn" : "ok"} />
+                        <MiniStat label="Overdue orders" value={data.summary.overdue_orders} tone={data.summary.overdue_orders > 0 ? "warn" : "ok"} />
+                    </div>
+                    {data.suppliers.length === 0 ? (
+                        <p className="text-[#525252] text-sm">No suppliers set up yet — add suppliers and purchase orders and this fills in.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {data.suppliers.slice(0, 6).map((s) => (
+                                <div key={s.id} className="p-3 rounded-lg bg-[#141414] border border-[#1a1a1a] text-sm">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <p className="text-[#e5e5e5]">{s.name}</p>
+                                            <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${s.reliability_label === "EXCELLENT" ? "bg-emerald-500/10 text-emerald-400" : s.reliability_label === "GOOD" ? "bg-[#3b82f6]/10 text-[#60a5fa]" : "bg-red-500/10 text-red-400"}`}>{s.reliability_label}</span>
+                                        </div>
+                                        <span className={`text-xs font-medium whitespace-nowrap ${s.reliability_score >= 85 ? "text-emerald-400" : "text-red-400"}`}>{s.reliability_score}% on time</span>
+                                    </div>
+                                    <p className="text-xs text-[#525252] mt-1">
+                                        {s.delivered_on_time} on time · {s.delivered_late} late
+                                        {s.pending_orders > 0 ? ` · ${s.pending_orders} pending` : ""}
+                                        {" · "}avg lead {s.avg_lead_days}d
+                                        {s.cost_trend_label !== "stable" ? ` · prices ${s.cost_trend_label} ${Math.abs(s.cost_trend_pct)}%` : ""}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {data.recommendations && data.recommendations.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                            {data.recommendations.slice(0, 4).map((r, i) => (
+                                <div key={i} className="p-3 rounded-lg bg-[#141414] border border-[#1a1a1a] text-sm">
+                                    <p className="text-[#e5e5e5]">{r.message}</p>
                                 </div>
                             ))}
                         </div>
@@ -902,104 +736,3 @@ function HealthBoostSection({ breakdown, score }: { breakdown: { category: strin
     );
 }
 
-// Shape of the `narrative` block attached by the backend reasoning layer
-// (ai/reasoning/narrator.py). The figures shown in each module are computed
-// deterministically; this is the LLM's plain-language *interpretation* of them,
-// with every number it cites already grounding-checked server-side.
-interface Narrative {
-    headline: string;
-    priorities: string[];
-    actions: { action: string; why?: string; impact?: string }[];
-    verified: boolean;
-    ungrounded_numbers: string[];
-    cached?: boolean;
-}
-
-// Renders the AI interpretation with a trust badge. `verified` means every
-// figure the model wrote was found in the real data; if not, the backend has
-// already redacted the bad figures and we surface how many were removed — so
-// the badge is an honest trust signal, not decoration.
-function NarrativeBlock({ n }: { n?: Narrative }) {
-    const [showTrust, setShowTrust] = useState(false);
-    if (!n || (!n.headline && (!n.priorities || n.priorities.length === 0))) return null;
-    const redacted = n.ungrounded_numbers?.length || 0;
-    return (
-        <div className="mb-4 rounded-lg border border-[#d4a853]/25 bg-[#d4a853]/[0.04] p-4">
-            <div className="flex items-start justify-between gap-3 mb-2">
-                <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-[#d4a853]" />
-                    <span className="text-xs font-semibold uppercase tracking-wide text-[#d4a853]">AI reading</span>
-                </div>
-                {n.verified ? (
-                    <span
-                        className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded px-1.5 py-0.5 whitespace-nowrap"
-                        title="Every figure cited was checked against your real numbers"
-                    >
-                        <ShieldCheck className="w-3 h-3" /> Figures checked
-                    </span>
-                ) : (
-                    <span
-                        className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-1.5 py-0.5 whitespace-nowrap"
-                        title={`Unverified figure(s) removed: ${n.ungrounded_numbers.join(", ")}`}
-                    >
-                        <ShieldAlert className="w-3 h-3" /> {redacted} figure{redacted === 1 ? "" : "s"} removed
-                    </span>
-                )}
-            </div>
-            {n.headline && <p className="text-sm text-[#e5e5e5] leading-snug">{n.headline}</p>}
-            {n.priorities && n.priorities.length > 0 && (
-                <ul className="mt-2 space-y-1">
-                    {n.priorities.map((p, i) => (
-                        <li key={i} className="text-xs text-[#a3a3a3] flex gap-2">
-                            <span className="text-[#d4a853] flex-shrink-0">•</span>
-                            <span>{p}</span>
-                        </li>
-                    ))}
-                </ul>
-            )}
-            {n.actions && n.actions.length > 0 && (
-                <div className="mt-2 space-y-1">
-                    {n.actions.slice(0, 3).map((a, i) => (
-                        <p key={i} className="text-xs text-[#737373]">
-                            <span className="text-[#e5e5e5]">→ {a.action}</span>
-                            {a.why ? ` — ${a.why}` : ""}
-                        </p>
-                    ))}
-                </div>
-            )}
-            <button
-                onClick={() => setShowTrust((v) => !v)}
-                className="mt-2 flex items-center gap-1 text-[10px] text-[#525252] italic hover:text-[#737373] transition-colors"
-            >
-                AI interpretation · the figures above are computed exactly, not by the AI.
-                <ChevronDown className={`w-2.5 h-2.5 transition-transform ${showTrust ? "rotate-180" : ""}`} />
-            </button>
-            {showTrust && (
-                <div className="mt-1.5 rounded-md border border-[#1a1a1a] bg-[#0a0a0a] p-2.5 space-y-1.5">
-                    <p className="text-[11px] text-[#a3a3a3] leading-relaxed">
-                        The "AI reading" is only the AI's opinion in words. Every number is calculated
-                        exactly by the system — never made up by the AI.
-                    </p>
-                    <p className="text-[11px] text-[#737373] leading-snug flex gap-1.5">
-                        <ShieldCheck className="w-3 h-3 flex-shrink-0 mt-0.5 text-emerald-400" />
-                        <span><span className="text-[#e5e5e5] font-medium">Figures checked</span> — every number the AI wrote was found in your real data.</span>
-                    </p>
-                    <p className="text-[11px] text-[#737373] leading-snug flex gap-1.5">
-                        <ShieldAlert className="w-3 h-3 flex-shrink-0 mt-0.5 text-amber-400" />
-                        <span><span className="text-[#e5e5e5] font-medium">Figures removed</span> — a number couldn't be matched to your data, so it was taken out before you saw it.</span>
-                    </p>
-                </div>
-            )}
-        </div>
-    );
-}
-
-function MiniStat({ label, value, tone }: { label: string; value: string | number; tone?: "ok" | "warn" }) {
-    const color = tone === "warn" ? "text-red-400" : tone === "ok" ? "text-emerald-400" : "text-[#e5e5e5]";
-    return (
-        <div className="rounded-lg bg-[#141414] border border-[#1a1a1a] p-3">
-            <p className="text-xs text-[#525252] mb-1">{label}</p>
-            <p className={`text-sm font-bold ${color}`}>{value}</p>
-        </div>
-    );
-}

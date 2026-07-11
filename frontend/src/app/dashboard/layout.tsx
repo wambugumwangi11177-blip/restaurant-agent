@@ -18,6 +18,8 @@ import {
     ChefHat,
     DollarSign,
     Clock,
+    Megaphone,
+    Cpu,
 } from "lucide-react";
 
 const navItems = [
@@ -32,7 +34,11 @@ const navItems = [
     // The AI Command Center. Superseded /dashboard/insights, which served a
     // hardcoded Lavy demo and was deleted 2026-07-08.
     { href: "/dashboard/ai",           label: "AI",       icon: Brain },
+    { href: "/dashboard/marketing",    label: "Growth",   icon: Megaphone },
     { href: "/dashboard/roi",          label: "ROI",      icon: Clock },
+    // AI Ops shows this restaurant's OWN AI cost/reliability — visible to every
+    // signed-in user (data is tenant-scoped), not just admins.
+    { href: "/dashboard/ai-ops",       label: "AI Ops",   icon: Cpu },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

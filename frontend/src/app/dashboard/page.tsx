@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { demoData, isDashboardEmpty } from "@/lib/demo-data";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import {
     TrendingUp,
     ShoppingBag,
@@ -16,6 +17,10 @@ import {
     Wifi,
     Monitor,
     Smartphone,
+    Clock,
+    Megaphone,
+    Brain,
+    ArrowRight,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -23,6 +28,9 @@ export default function DashboardPage() {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [trustStats, setTrustStats] = useState<{ grounded_pct: number | null; narratives_generated: number } | null>(null);
+    const [glance, setGlance] = useState<{
+        hoursPerDay: number; moneyPerDayCents: number; capturedCents: number; oppsCents: number; winbackReachable: number;
+    } | null>(null);
 
     useEffect(() => {
         api.get("/ai/dashboard")
@@ -32,6 +40,26 @@ export default function DashboardPage() {
         api.get("/ai/trust-stats")
             .then((r) => setTrustStats(r.data))
             .catch(() => { });
+        // "What your AI did" launchpad — narrate=false keeps it cheap and instant.
+        Promise.all([
+            api.get("/ai/roi?narrate=false").catch(() => null),
+            api.get("/ai/marketing?narrate=false").catch(() => null),
+        ]).then(([roi, mkt]) => {
+            const rd = roi?.data;
+            const md = mkt?.data;
+            if (!rd && !md) return;
+            const days = rd?.window_days || 30;
+            const hours = rd?.time_saved?.hours_saved_30d || 0;
+            const moneyCents = rd?.time_saved?.money_saved_cents || 0;
+            const opps = (rd?.opportunities || []).reduce((s: number, o: any) => s + (o.monthly_value_cents || 0), 0);
+            setGlance({
+                hoursPerDay: Math.round((hours / days) * 10) / 10,
+                moneyPerDayCents: Math.round(moneyCents / days),
+                capturedCents: rd?.money_captured?.monthly_impact_cents || 0,
+                oppsCents: opps,
+                winbackReachable: md?.winback?.reachable || 0,
+            });
+        });
     }, []);
 
     const getGreeting = () => {
@@ -140,6 +168,41 @@ export default function DashboardPage() {
                     <SystemStatus icon={Wifi} label="Payments" status="connected" />
                 </div>
             </div>
+
+            {/* What your AI is doing — launchpad into ROI / AI / Growth */}
+            {glance && (glance.moneyPerDayCents > 0 || glance.capturedCents > 0 || glance.oppsCents > 0 || glance.winbackReachable > 0) && (
+                <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Zap className="w-3.5 h-3.5 text-[#d4a853]" />
+                        <p className="text-xs font-semibold text-[#e5e5e5]">What your AI is doing for you</p>
+                    </div>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[#d4a853]/40 transition-colors">
+                            <p className="text-lg font-bold text-emerald-400">{formatKES(glance.moneyPerDayCents)}<span className="text-xs text-[#525252] font-normal">/day</span></p>
+                            <p className="text-[10px] text-[#525252] mt-0.5">saved in staff time (≈ {glance.hoursPerDay} hrs/day)</p>
+                        </Link>
+                        <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[#d4a853]/40 transition-colors">
+                            <p className="text-lg font-bold text-[#d4a853]">{formatKES(glance.capturedCents)}</p>
+                            <p className="text-[10px] text-[#525252] mt-0.5">extra profit captured this month</p>
+                        </Link>
+                        <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[#d4a853]/40 transition-colors">
+                            <p className="text-lg font-bold text-amber-400">{formatKES(glance.oppsCents)}</p>
+                            <p className="text-[10px] text-[#525252] mt-0.5">opportunities flagged, not yet actioned</p>
+                        </Link>
+                        <Link href="/dashboard/marketing" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[#d4a853]/40 transition-colors">
+                            <p className="text-lg font-bold text-[#e5e5e5]">{glance.winbackReachable}</p>
+                            <p className="text-[10px] text-[#525252] mt-0.5">lapsed regulars ready to win back</p>
+                        </Link>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                        <Link href="/dashboard/ai" className="flex items-center gap-1.5 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"><Brain className="w-3 h-3" /> AI Command Center</Link>
+                        <span className="text-[#262626]">·</span>
+                        <Link href="/dashboard/roi" className="flex items-center gap-1.5 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"><Clock className="w-3 h-3" /> Time & Money Saved</Link>
+                        <span className="text-[#262626]">·</span>
+                        <Link href="/dashboard/marketing" className="flex items-center gap-1.5 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"><Megaphone className="w-3 h-3" /> Campaigns & Win-back <ArrowRight className="w-3 h-3" /></Link>
+                    </div>
+                </div>
+            )}
 
             {/* What's happening at a glance */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

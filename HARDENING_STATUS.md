@@ -31,17 +31,21 @@ https://github.com/wambugumwangi11177-blip/restaurant-agent/pull/new/feat/phase1
 - **Docs set** added under `docs/` (engineering standards, architecture, ADRs,
   security threat model, trust-center, compliance matrix, governance, etc.).
 - (model-version persistence + grounding suppression were already built.)
-- **Verification (2026-07-11):** backend suite **211 passed**, Bandit clean at
+- **Verification (2026-07-11):** backend suite **212 passed**, Bandit clean at
   `-ll`, frontend `tsc --noEmit` clean, `next build` green (18 routes),
   all internal doc links resolve.
 
-## Not done — needs YOU (ops access or a product decision)
+## Not done — needs YOU (ops access) or deliberately deferred
+**These four genuinely require your accounts/credentials — no code can do them:**
 - [ ] Enable Railway Postgres **backups** + run one **restore drill** (steps in `backend/DISASTER_RECOVERY.md`)
 - [ ] Set/verify prod env on Railway: **`MPESA_CALLBACK_TOKEN`** (prod won't boot without it when M-Pesa is configured), **`CORS_ORIGINS`**
 - [ ] Sentry alert rules · UptimeRobot on `/health` · OWASP ZAP baseline
-- [ ] **`ON DELETE` cascade** — deferred: no delete flow triggers it and erasure keeps orders for tax integrity; needs a decision on delete semantics
-- [ ] Migrate frontend to `/api/v1/*`, then drop the legacy mount
-- [ ] AIOps extras: prompt versioning, quality-drift alarm, written fallback policy
+- [ ] Confirm/enable GitHub **branch protection** on `master` (require PR + CI green)
+
+**Deferred by design (a product decision or waits for traffic):**
+- [ ] **`ON DELETE` cascade** — no delete flow triggers it and erasure keeps orders for tax integrity; needs a decision on delete semantics
+- [ ] Migrate frontend to `/api/v1/*`, then drop the legacy mount — legacy mount works today; broad, risky sweep left until deliberately scheduled
+- [x] ~~AIOps extras: prompt versioning, quality-drift alarm, written fallback policy~~ **DONE** (commit 7243228, migration 018, docs/ai-governance.md v1.2)
 - Phase 3 (AT-SCALE): Redis, durable queue, load/stress testing, SLOs, feature flags, OTel, pentest — intentionally deferred until traffic. (RBAC pulled forward — done, see commit 3665c7d.)
 
 ## Pending requests (open when the chat switched)
@@ -53,4 +57,4 @@ https://github.com/wambugumwangi11177-blip/restaurant-agent/pull/new/feat/phase1
   previously uncommitted is now **committed** (3665c7d, 7c4cff0, 6dd8458) and
   green. Completed a missing `SupplyChainSection` in the AI page along the way.
 - Test env: venv at `backend/.venv` (gitignored). Run: `cd backend && .venv/Scripts/python.exe -m pytest -q` with `LOG_FORMAT=plain`.
-- Migrations 015/016/017 are idempotent, dialect-aware, and run at container start.
+- Migrations 015/016/017/018 are idempotent, dialect-aware, and run at container start.

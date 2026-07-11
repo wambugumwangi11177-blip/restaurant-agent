@@ -65,6 +65,9 @@ class RestaurantUpdate(BaseModel):
 @router.post("/register", response_model=Token)
 @limiter.limit("5/hour")
 async def register(request: Request, user_data: UserCreate, db: Session = Depends(get_db)):
+    # Enforce minimum password strength before anything else.
+    auth.require_strong_password(user_data.password)
+
     # Guard: duplicate email
     if db.query(models.User).filter(models.User.email == user_data.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -194,10 +197,10 @@ async def logout_all(
 @router.put("/restaurant")
 async def update_restaurant(
     data: RestaurantUpdate,
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
-    """Onboarding wizard uses this to save restaurant profile."""
+    """Onboarding wizard uses this to save restaurant profile. Admin-only."""
     restaurant = get_restaurant_or_none(db, current_user)
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")

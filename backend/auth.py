@@ -32,8 +32,34 @@ if not SECRET_KEY:
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = int(os.getenv("ACCESS_TOKEN_EXPIRE_HOURS", "8"))   # was 30 MINUTES
 
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+# Pin the Argon2 variant explicitly to Argon2id (OWASP-recommended). passlib's
+# argon2 handler already defaults to type "ID", but pinning makes the guarantee
+# explicit and stable across library/backend upgrades instead of relying on a
+# library default that a future version could change.
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto", argon2__type="ID")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+
+# ── Password policy ──────────────────────────────────────────────────────────
+# Minimum enforced at registration (see routers/auth.py::register). Length is the
+# dominant strength factor (NIST SP 800-63B); the letter+digit rule additionally
+# rejects trivially weak single-character-class inputs.
+MIN_PASSWORD_LENGTH = 8
+
+
+def require_strong_password(password: str) -> None:
+    """Raise HTTP 400 unless the password meets the minimum policy."""
+    problems = []
+    if len(password) < MIN_PASSWORD_LENGTH:
+        problems.append(f"at least {MIN_PASSWORD_LENGTH} characters")
+    if not any(c.isalpha() for c in password):
+        problems.append("at least one letter")
+    if not any(c.isdigit() for c in password):
+        problems.append("at least one number")
+    if problems:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password too weak — must contain " + ", ".join(problems) + ".",
+        )
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -83,3 +109,28 @@ async def get_current_user(
         raise credentials_exception
 
     return user
+
+
+def require_role(*allowed_roles: "models.Role"):
+    """
+    Dependency factory enforcing role-based access control. Returns a FastAPI
+    dependency that yields the current user only if their role is one of
+    allowed_roles; SUPERADMIN always passes (full system access). Otherwise it
+    raises HTTP 403.
+
+    Usage:
+        current_user: models.User = Depends(require_role(models.Role.ADMIN))
+    """
+    allowed = set(allowed_roles)
+
+    async def _require_role_dep(
+        current_user: models.User = Depends(get_current_user),
+    ) -> models.User:
+        if current_user.role == models.Role.SUPERADMIN or current_user.role in allowed:
+            return current_user
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions for this action",
+        )
+
+    return _require_role_dep

@@ -19,6 +19,7 @@ Fixes vs previous version:
 
 import os
 import time
+import logging
 import threading
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -27,6 +28,8 @@ from sqlalchemy import func
 import models
 from time_utils import utcnow
 from . import twilio_client
+
+logger = logging.getLogger("ai.whatsapp.brain")
 
 # ── Config ────────────────────────────────────────────────────────────────────
 WINBACK_DAYS         = 21
@@ -599,6 +602,78 @@ def compose_winback_message(restaurant_name: str, name: str, fav_item: str | Non
     )
 
 
+def winback_reachable(db: Session, restaurant_id: int) -> int:
+    """
+    How many lapsed regulars a win-back blast could actually reach right now:
+    a candidate must have given marketing consent AND not opted out. Mirrors the
+    marketing gate promo uses (positive consent, not just absence of a STOP), so
+    win-back — which is marketing, not transactional — is held to the same bar.
+    """
+    from .optout import canonical, is_opted_out
+    candidates = get_winback_candidates(db, restaurant_id)
+    if not candidates:
+        return 0
+    consented = {
+        canonical(c.customer_phone)
+        for c in db.query(models.CustomerConsent.customer_phone)
+        .filter(models.CustomerConsent.restaurant_id == restaurant_id)
+        .all()
+    }
+    reachable = 0
+    for c in candidates:
+        key = canonical(c["phone"])
+        if key and key in consented and not is_opted_out(db, c["phone"]):
+            reachable += 1
+    return reachable
+
+
+def broadcast_winback(db: Session, restaurant_id: int) -> dict:
+    """
+    Send the personalised win-back message to each lapsed regular who gave
+    marketing consent and hasn't opted out. Logs message_type="campaign_winback"
+    at the single send choke point (which also re-checks opt-out), capped at
+    PROMO_MAX_RECIPIENTS with a light throttle. Returns {sent, skipped, audience}.
+
+    Intended to run in the BACKGROUND (see the /ai/marketing/winback route) — the
+    per-customer send loop is far too slow to block a request.
+    """
+    import time as _time
+    from .optout import canonical, is_opted_out
+
+    candidates = get_winback_candidates(db, restaurant_id)
+    if not candidates:
+        return {"sent": 0, "skipped": 0, "audience": 0}
+
+    consented = {
+        canonical(c.customer_phone)
+        for c in db.query(models.CustomerConsent.customer_phone)
+        .filter(models.CustomerConsent.restaurant_id == restaurant_id)
+        .all()
+    }
+
+    sent = skipped = audience = 0
+    for c in candidates:
+        key = canonical(c["phone"])
+        # Marketing gate: positive consent + not opted out. Everyone else is
+        # skipped silently (they were never a legal recipient).
+        if not key or key not in consented or is_opted_out(db, c["phone"]):
+            continue
+        audience += 1
+        if sent + skipped >= PROMO_MAX_RECIPIENTS:
+            continue
+        result = send_whatsapp_message(
+            c["phone"], c["message"], db=db, restaurant_id=restaurant_id,
+            message_type="campaign_winback", channel="whatsapp", fallback_sms=True,
+        )
+        if result["status"] == "sent":
+            sent += 1
+        else:
+            skipped += 1
+        _time.sleep(PROMO_SEND_INTERVAL_S)
+
+    return {"sent": sent, "skipped": skipped, "audience": audience}
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SEND ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
@@ -661,7 +736,7 @@ def send_to_owner(db: Session, restaurant, message: str, message_type: str) -> N
     """
     phone = owner_phone_for(restaurant)
     if not phone:
-        print(f"[WhatsApp Brain] No owner phone for restaurant {restaurant.id}")
+        logger.warning(f"[WhatsApp Brain] No owner phone for restaurant {restaurant.id}")
         return
 
     pref = owner_channel_for(restaurant)
@@ -690,7 +765,7 @@ def _log_message(db, restaurant_id, to_number, message, message_type, status, si
         ))
         db.commit()
     except Exception as exc:
-        print(f"[WhatsApp Brain] Failed to log message: {exc}")
+        logger.warning(f"[WhatsApp Brain] Failed to log message: {exc}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -973,7 +1048,7 @@ def _cmd_promo(db: Session, restaurant_id: int, offer: str) -> str:
         try:
             broadcast_promo(bg, restaurant_id, offer)
         except Exception as exc:   # background thread — never surfaces to a caller
-            print(f"[WhatsApp Brain] Promo broadcast failed: {exc}")
+            logger.warning(f"[WhatsApp Brain] Promo broadcast failed: {exc}")
         finally:
             bg.close()
 
@@ -1027,7 +1102,7 @@ def run_morning_briefing(SessionLocal) -> None:
         for restaurant in db.query(models.Restaurant).all():
             message = compose_morning_briefing(db, restaurant.id)
             send_to_owner(db, restaurant, message, message_type="morning_briefing")
-            print(f"[WhatsApp Brain] Morning briefing sent: {restaurant.name}")
+            logger.info(f"[WhatsApp Brain] Morning briefing sent: {restaurant.name}")
     finally:
         db.close()
 
@@ -1042,7 +1117,7 @@ def run_morning_briefing_voice(SessionLocal, tts_render=None) -> None:
     in a TTS provider is the only remaining piece.
     """
     if tts_render is None:
-        print("[WhatsApp Brain] Voice briefing skipped — no TTS/audio-URL provider configured")
+        logger.info("[WhatsApp Brain] Voice briefing skipped — no TTS/audio-URL provider configured")
         return
     db = SessionLocal()
     try:
@@ -1054,7 +1129,7 @@ def run_morning_briefing_voice(SessionLocal, tts_render=None) -> None:
             try:
                 audio_url = tts_render(text)
             except Exception as exc:
-                print(f"[WhatsApp Brain] TTS render failed for {restaurant.name}: {exc}")
+                logger.warning(f"[WhatsApp Brain] TTS render failed for {restaurant.name}: {exc}")
                 continue
             send_whatsapp_message(
                 phone, "🌅 Your morning briefing (voice note)", db=db,

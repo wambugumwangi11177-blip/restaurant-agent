@@ -42,6 +42,14 @@ logger = logging.getLogger("ai.reasoning")
 # defence, before the grounding verifier catches whatever still slips through.
 _TEMPERATURE = 0.0
 
+# Version of the narration prompt. Recorded on every metered turn
+# (token_usage.prompt_version) so AIOps can trace a shift in token spend or
+# grounding rate to a specific prompt revision. BUMP THIS whenever _build_system,
+# the _OUTPUT_SHAPE contract, or a TASK's role/focus text changes materially —
+# it is a manual, human-meaningful version, not an auto hash, so a reviewer can
+# see at a glance which prompt generation a metered call belongs to.
+PROMPT_VERSION = "2026-07-11.v1"
+
 # Guard against dumping a huge payload into the prompt — trims tokens/latency.
 # The deterministic modules return summary + detail; the salient signal is well
 # within this budget, and `keys` whitelists below trim most tasks further.
@@ -117,6 +125,18 @@ TASKS = {
             "flagged-but-unrealized opportunities. Never combine the three totals into one number."
         ),
         "keys": None,
+    },
+    "marketing": {
+        "tier": TIER_LOW,
+        "role": "You are a restaurant marketing advisor helping the owner decide which campaign to run next.",
+        "focus": (
+            "Look at the lapsed regulars, the reachable audience and the suggested offers, "
+            "and say — in plain language — which one or two campaigns are worth running now "
+            "and why. Respect that nothing sends without the owner's approval and only "
+            "consented, non-opted-out customers can be reached. Never invent audience sizes "
+            "or money figures."
+        ),
+        "keys": ["winback", "audience", "suggested_offers"],
     },
     # On-demand "explain this to me" for a SINGLE insight — powers the dashboard
     # per-item Explain button. Deliberately the cheap tier and the simplest, most
@@ -320,6 +340,7 @@ def _log_usage(restaurant_id: int, resp) -> None:
         session.add(models.TokenUsage(
             restaurant_id=restaurant_id,
             llm_model=resp.model,
+            prompt_version=PROMPT_VERSION,
             input_tokens=resp.usage.input_tokens,
             output_tokens=resp.usage.output_tokens,
         ))

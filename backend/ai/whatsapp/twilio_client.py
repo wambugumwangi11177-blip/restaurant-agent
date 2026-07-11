@@ -15,6 +15,9 @@ import re
 import hmac
 import hashlib
 import base64
+import logging
+
+logger = logging.getLogger("ai.whatsapp.twilio")
 
 TWILIO_ACCOUNT_SID   = os.getenv("TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN    = os.getenv("TWILIO_AUTH_TOKEN", "")
@@ -76,12 +79,18 @@ def send(to_number: str, message: str, channel: str = CHANNEL_WHATSAPP,
     which can't carry rich media.
     """
     if not _channel_configured(channel):
-        print(f"[Twilio] NOT CONFIGURED ({channel}) — would send to {to_number}:\n{message[:200]}")
+        logger.warning(f"[Twilio] NOT CONFIGURED ({channel}) — would send to {to_number}: {message[:200]}")
         return {"status": "not_configured", "sid": None}
 
     try:
         from twilio.rest import Client
-        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+        from twilio.http.http_client import TwilioHttpClient
+        # Bound the HTTP call so a slow Twilio never hangs the request (critical
+        # on a single gunicorn worker). No automatic retry: a message send is not
+        # idempotent — retrying a timed-out request risks double-sending a
+        # WhatsApp/SMS. Callers already treat a failed send as best-effort.
+        http_client = TwilioHttpClient(timeout=float(os.getenv("TWILIO_TIMEOUT_SECONDS", "10")))
+        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, http_client=http_client)
 
         create_kwargs = {}
         if channel == CHANNEL_SMS:
@@ -98,10 +107,10 @@ def send(to_number: str, message: str, channel: str = CHANNEL_WHATSAPP,
         msg = client.messages.create(from_=from_, to=to, body=body, **create_kwargs)
         return {"status": "sent", "sid": msg.sid}
     except ImportError:
-        print("[Twilio] Package not installed. Run: pip install twilio")
+        logger.error("[Twilio] Package not installed. Run: pip install twilio")
         return {"status": "twilio_not_installed", "sid": None}
     except Exception as exc:
-        print(f"[Twilio] Send error: {exc}")
+        logger.error(f"[Twilio] Send error: {exc}")
         return {"status": "error", "sid": None}
 
 

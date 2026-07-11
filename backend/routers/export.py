@@ -92,7 +92,7 @@ def _phone_variants(phone: str) -> list[str]:
 @router.get("/export/orders.csv")
 async def export_orders_csv(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
 ):
     """One row per order (with an item summary). Money reported in KES."""
     restaurant = get_or_create_restaurant(db, current_user)
@@ -139,7 +139,7 @@ async def export_orders_csv(
 @router.get("/export/customers.csv")
 async def export_customers_csv(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
 ):
     """Aggregated customer list (portability of the customer records we hold)."""
     restaurant = get_or_create_restaurant(db, current_user)
@@ -211,7 +211,7 @@ def _restaurant_knows_phone(db: Session, restaurant_id: int, variants: list[str]
 async def erase_customer(
     body: EraseCustomerRequest,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
 ):
     """
     Right to erasure. Scrubs customer PII from this restaurant's orders and

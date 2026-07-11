@@ -71,14 +71,17 @@ def _resolve_restaurant_for_customer(db: Session, from_number: str) -> models.Re
 
 @router.post("/stripe")
 async def stripe_webhook(request: Request):
-    try:
-        payload = await request.body()
-        logger.info(f"Received Stripe webhook: {len(payload)} bytes")
-        # Process webhook logic here
-        return {"status": "received"}
-    except Exception as e:
-        logger.error(f"Error processing Stripe webhook: {e}")
-        raise HTTPException(status_code=400, detail="Error processing webhook")
+    """
+    Disabled. Stripe is not a payment path in this system (M-Pesa is — see
+    /mpesa above), and this endpoint never verified a `Stripe-Signature`. A
+    signature-less webhook that returns 200 is a settlement-forgery vector the
+    moment anyone wires order fulfilment to it, so it fails closed with 501.
+
+    To enable: verify `stripe.Webhook.construct_event(payload, sig, secret)`
+    against `STRIPE_WEBHOOK_SECRET` BEFORE reading the body or acting on it —
+    mirror the origin-check-first pattern in `_handle_mpesa_callback`.
+    """
+    raise HTTPException(status_code=501, detail="Stripe webhook not implemented")
 
 _MPESA_ACK = {"ResultCode": 0, "ResultDesc": "Confirmation received successfully"}
 

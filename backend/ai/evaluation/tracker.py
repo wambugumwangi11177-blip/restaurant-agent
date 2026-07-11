@@ -290,6 +290,172 @@ def write_audit_log(
         logger.error(f"[AuditLog] Failed to write audit record: {exc}")
 
 
+def _percentile(sorted_values: list[int], pct: int) -> int | None:
+    """Nearest-rank percentile of a pre-sorted list. None if empty."""
+    if not sorted_values:
+        return None
+    k = max(0, min(len(sorted_values) - 1, round((pct / 100.0) * len(sorted_values) + 0.5) - 1))
+    return sorted_values[k]
+
+
+def get_ai_ops_summary(db: Session, restaurant_id: int, days: int = 30) -> dict:
+    """
+    AIOps surface for one tenant: LLM token spend (by model), agent latency
+    (p50/p95) and success rate, and the grounding trust rate. All of this was
+    already captured (token_usage, agent_executions, the grounding verifier) but
+    never exposed — this aggregates it read-only for a dashboard/alerting. See
+    directives / the production-readiness roadmap's AIOps (G3) item.
+    """
+    from datetime import timedelta
+    cutoff = utcnow() - timedelta(days=days)
+
+    # ── LLM token spend ──────────────────────────────────────────────────────
+    usage = (
+        db.query(models.TokenUsage)
+        .filter(models.TokenUsage.restaurant_id == restaurant_id,
+                models.TokenUsage.created_at >= cutoff)
+        .all()
+    )
+    total_in = total_out = 0
+    by_model: dict[str, dict] = {}
+    by_prompt_version: dict[str, dict] = {}
+    for u in usage:
+        ti, to = (u.input_tokens or 0), (u.output_tokens or 0)
+        total_in += ti
+        total_out += to
+        m = by_model.setdefault(u.llm_model or "unknown",
+                                {"calls": 0, "input_tokens": 0, "output_tokens": 0})
+        m["calls"] += 1
+        m["input_tokens"] += ti
+        m["output_tokens"] += to
+        # Prompt-version breakdown: a jump in tokens/call against a new version is
+        # the signal a prompt change got more expensive. Rows written before the
+        # column existed report as "unknown".
+        pv = by_prompt_version.setdefault(u.prompt_version or "unknown",
+                                          {"calls": 0, "input_tokens": 0, "output_tokens": 0})
+        pv["calls"] += 1
+        pv["input_tokens"] += ti
+        pv["output_tokens"] += to
+
+    # ── Agent latency + reliability ──────────────────────────────────────────
+    execs = (
+        db.query(models.AgentExecution)
+        .filter(models.AgentExecution.restaurant_id == restaurant_id,
+                models.AgentExecution.created_at >= cutoff)
+        .all()
+    )
+    per_agent: dict[str, dict] = {}
+    for e in execs:
+        a = per_agent.setdefault(e.agent_name, {"runs": 0, "failures": 0, "latencies": []})
+        a["runs"] += 1
+        if not e.success:
+            a["failures"] += 1
+        if e.execution_ms is not None:
+            a["latencies"].append(e.execution_ms)
+
+    agents = []
+    for name, d in sorted(per_agent.items()):
+        lat = sorted(d["latencies"])
+        agents.append({
+            "agent": name,
+            "runs": d["runs"],
+            "success_rate_pct": round(100 * (d["runs"] - d["failures"]) / d["runs"], 1) if d["runs"] else None,
+            "p50_ms": _percentile(lat, 50),
+            "p95_ms": _percentile(lat, 95),
+        })
+
+    # ── Output grounding (process-wide; honest about scope) ──────────────────
+    try:
+        from ai.reasoning.narrator import get_trust_stats, PROMPT_VERSION
+        grounding = get_trust_stats()
+        current_prompt_version = PROMPT_VERSION
+    except Exception:
+        grounding = {"grounding_enabled": True}
+        current_prompt_version = None
+
+    return {
+        "window_days": days,
+        "llm": {
+            "calls": len(usage),
+            "input_tokens": total_in,
+            "output_tokens": total_out,
+            "current_prompt_version": current_prompt_version,
+            "by_model": by_model,
+            "by_prompt_version": by_prompt_version,
+        },
+        "agents": agents,
+        "grounding": grounding,
+        "quality_drift": get_quality_drift(db, restaurant_id, days=days),
+    }
+
+
+def get_quality_drift(db: Session, restaurant_id: int, days: int = 30,
+                      min_samples: int = 3, drift_threshold_pct: float = 10.0) -> dict:
+    """
+    Quality-drift alarm for the forecasting agents. Compares each agent's
+    prediction error in the RECENT half of the window against the PRIOR half; if
+    the mean absolute error worsened by more than `drift_threshold_pct` points
+    (with enough samples on both sides to be meaningful), it is flagged as
+    drifting so an operator can investigate before owners lose trust in a number.
+
+    Honest about scope: it can only judge agents that record predictions AND get
+    them evaluated against actuals (revenue/reservation forecasters). Agents with
+    too little evaluated history report status "insufficient_data", never a false
+    all-clear. Returns {status, checked_agents, drifting[], stable[]}.
+    """
+    from datetime import timedelta
+    now = utcnow()
+    window_start = now - timedelta(days=days)
+    midpoint = now - timedelta(days=days / 2)
+
+    preds = (
+        db.query(models.AgentPrediction)
+        .filter(models.AgentPrediction.restaurant_id == restaurant_id,
+                models.AgentPrediction.evaluated_at >= window_start,
+                models.AgentPrediction.actual_value != None,  # noqa: E711
+                models.AgentPrediction.error_pct != None)     # noqa: E711
+        .all()
+    )
+
+    by_agent: dict[str, dict] = {}
+    for p in preds:
+        bucket = by_agent.setdefault(p.agent_name, {"recent": [], "prior": []})
+        half = "recent" if p.evaluated_at >= midpoint else "prior"
+        bucket[half].append(p.error_pct)
+
+    drifting, stable, insufficient = [], [], []
+    for name, halves in sorted(by_agent.items()):
+        recent, prior = halves["recent"], halves["prior"]
+        if len(recent) < min_samples or len(prior) < min_samples:
+            insufficient.append(name)
+            continue
+        recent_mae = round(sum(recent) / len(recent), 2)
+        prior_mae = round(sum(prior) / len(prior), 2)
+        delta = round(recent_mae - prior_mae, 2)
+        entry = {
+            "agent": name,
+            "recent_mae_pct": recent_mae,
+            "baseline_mae_pct": prior_mae,
+            "delta_pct": delta,
+            "recent_samples": len(recent),
+        }
+        (drifting if delta > drift_threshold_pct else stable).append(entry)
+
+    if not drifting and not stable:
+        status = "insufficient_data"
+    else:
+        status = "drift_detected" if drifting else "stable"
+
+    return {
+        "status": status,
+        "threshold_pct": drift_threshold_pct,
+        "checked_agents": len(drifting) + len(stable),
+        "insufficient_data_agents": insufficient,
+        "drifting": drifting,
+        "stable": stable,
+    }
+
+
 def get_audit_trail(
     db: Session,
     restaurant_id: int,

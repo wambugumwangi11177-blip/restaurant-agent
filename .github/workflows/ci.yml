@@ -21,8 +21,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run test suite
-        run: pytest -v
+      - name: Run test suite (with coverage)
+        # pytest-cov is a CI-only tool (kept out of requirements.txt so it never
+        # ships in the runtime image). Coverage is MEASURED and printed, not yet
+        # gated on a threshold — we establish the real number before setting a
+        # --cov-fail-under floor, so the gate reflects reality instead of a guess.
+        run: |
+          pip install pytest-cov
+          pytest -v --cov=. --cov-report=term-missing --cov-report=xml
 
   dependency-audit:
     runs-on: ubuntu-latest
@@ -71,6 +77,30 @@ jobs:
             --ignore-vuln CVE-2026-48818 \
             --ignore-vuln PYSEC-2026-1325
 
+  sast:
+    # Static application security testing for the Python code (complements the
+    # dependency-audit job, which only covers third-party CVEs). Runs at
+    # medium-and-above severity (-ll): the low band is mostly assert/try-pass
+    # noise, while medium+ is the high-signal set. Currently BLOCKING and clean —
+    # the one medium finding (0.0.0.0 bind, required in-container) carries an
+    # inline `# nosec B104` with justification. A new medium/high finding fails CI.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install bandit
+        run: pip install bandit
+
+      - name: Run bandit SAST
+        run: bandit -r . -ll -x ./tests,./alembic,./.venv
+
   frontend-ci:
     runs-on: ubuntu-latest
     defaults:
@@ -87,6 +117,16 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # JS dependency audit — the Python deps are audited (pip-audit) but the
+      # frontend's were not. Introduced non-blocking (like pip-audit was before
+      # 2026-07-08): npm's transitive advisories are noisy and often
+      # unreachable, so we surface high-severity ones without failing the build
+      # yet. Once the baseline is triaged, drop continue-on-error to make a new
+      # high-severity advisory blocking.
+      - name: Audit npm dependencies
+        run: npm audit --audit-level=high
+        continue-on-error: true
 
       # Type errors and build breaks currently only surface on a Vercel deploy —
       # too late, and Vercel does not catch the untyped `json()` contract drifts

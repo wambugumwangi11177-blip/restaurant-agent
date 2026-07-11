@@ -46,6 +46,14 @@ _HEADROOM_PROXY_URL = os.getenv("HEADROOM_PROXY_URL", "")
 _ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
 _GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
+# Bound every LLM call: without a timeout a slow/hung provider ties up the
+# request (and, on a single gunicorn worker, starves all other traffic). Both
+# the Anthropic and OpenAI SDKs retry transient errors idempotently with
+# backoff, so a small max_retries is safe here (unlike a message send). Both are
+# env-tunable.
+_LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT_SECONDS", "30"))
+_LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
+
 _PROVIDER = "anthropic" if _ANTHROPIC_API_KEY else ("groq" if _GROQ_API_KEY else None)
 
 # ── Model tiers ──────────────────────────────────────────────────────────────
@@ -104,7 +112,11 @@ def _get_client():
 
     if _PROVIDER == "anthropic":
         import anthropic
-        kwargs = {"api_key": _ANTHROPIC_API_KEY}
+        kwargs = {
+            "api_key": _ANTHROPIC_API_KEY,
+            "timeout": _LLM_TIMEOUT,
+            "max_retries": _LLM_MAX_RETRIES,
+        }
         if _HEADROOM_ENABLED and _HEADROOM_PROXY_URL:
             # Proxy mode: Headroom sits between us and Anthropic, compressing
             # request bodies in transit. No other code changes required.
@@ -114,7 +126,12 @@ def _get_client():
         # Groq exposes an OpenAI-compatible endpoint — reuse the openai SDK
         # rather than adding a second HTTP client dependency.
         from openai import OpenAI
-        _client = OpenAI(api_key=_GROQ_API_KEY, base_url="https://api.groq.com/openai/v1")
+        _client = OpenAI(
+            api_key=_GROQ_API_KEY,
+            base_url="https://api.groq.com/openai/v1",
+            timeout=_LLM_TIMEOUT,
+            max_retries=_LLM_MAX_RETRIES,
+        )
     else:
         raise RuntimeError(
             "No LLM provider configured — set ANTHROPIC_API_KEY or GROQ_API_KEY "

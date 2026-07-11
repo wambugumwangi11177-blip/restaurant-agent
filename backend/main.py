@@ -15,10 +15,15 @@ import os
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from logging_config import configure_logging
 from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
+from middleware.body_limit import BodySizeLimitMiddleware
+from middleware.correlation import CorrelationIdMiddleware
 
+# Install structured logging before anything else logs.
+configure_logging()
 logger = logging.getLogger(__name__)
 
 # ── Sentry (optional) ─────────────────────────────────────────────────────────
@@ -50,13 +55,18 @@ if SLOWAPI_AVAILABLE:
 
 @app.on_event("startup")
 def on_startup():
+    # 0. Fail-closed config validation — in production, refuse to boot with a
+    #    security-critical misconfig (e.g. an unauthenticated M-Pesa callback).
+    from startup_checks import enforce_startup_checks
+    enforce_startup_checks()
+
     # 1. Init DB tables
     from database import init_db
     try:
         init_db()
-        print("[OK] Database tables initialised")
+        logger.info("[OK] Database tables initialised")
     except Exception as e:
-        print(f"[WARN] DB init deferred: {e}")
+        logger.warning(f"[WARN] DB init deferred: {e}")
 
     # 2. Wire the event bus — THIS WAS MISSING.
     #    Without this call, all orchestrator handlers were registered as
@@ -64,9 +74,9 @@ def on_startup():
     try:
         from ai.orchestrator.executive import register_all_handlers
         register_all_handlers()
-        print("[OK] Orchestrator event handlers registered")
+        logger.info("[OK] Orchestrator event handlers registered")
     except Exception as e:
-        print(f"[WARN] Orchestrator registration failed: {e}")
+        logger.warning(f"[WARN] Orchestrator registration failed: {e}")
 
     # 3. Schedule morning WhatsApp briefing (07:00 EAT = 04:00 UTC)
     _start_scheduler()
@@ -125,11 +135,11 @@ def _start_scheduler():
         )
 
         scheduler.start()
-        print("[OK] Scheduler started (morning briefing: 07:00 EAT)")
+        logger.info("[OK] Scheduler started (morning briefing: 07:00 EAT)")
     except ImportError:
-        print("[WARN] APScheduler not installed — scheduled jobs disabled. Run: pip install apscheduler")
+        logger.warning("[WARN] APScheduler not installed — scheduled jobs disabled. Run: pip install apscheduler")
     except Exception as e:
-        print(f"[WARN] Scheduler failed to start: {e}")
+        logger.warning(f"[WARN] Scheduler failed to start: {e}")
 
 
 def _send_all_morning_briefings():
@@ -230,19 +240,37 @@ app.add_middleware(
 
 app.add_middleware(TimingMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(BodySizeLimitMiddleware)
+# Added last so it wraps OUTERMOST: the request_id is set before any other
+# middleware or route runs (so their logs carry it) and the oversized-body
+# rejection above still emits under the correlation id.
+app.add_middleware(CorrelationIdMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
+#
+# API versioning (2026-07-10): the data API is now canonically served under
+# /api/v1/* (documented in OpenAPI). The original unversioned paths (/orders,
+# /menu, …) are ALSO mounted so the current frontend keeps working unchanged, but
+# hidden from the schema (include_in_schema=False) to mark them deprecated — new
+# consumers should target /api/v1. Migrate the frontend to /api/v1, then drop the
+# legacy mount in a later release.
+#
+# NOT versioned, deliberately:
+#   • auth.router already carries its own /api/v1/auth prefix.
+#   • webhooks — Safaricom/Twilio POST to fixed, externally-registered callback
+#     URLs; versioning them would break every registered CallBackURL.
+#   • health — conventionally unversioned (probes/uptime checks hit /health).
+_VERSIONED_ROUTERS = [
+    menu.router, orders.router, inventory.router, analytics.router,
+    reservations.router, ai.router, export.router,
+]
 
 app.include_router(auth.router)
-app.include_router(menu.router)
-app.include_router(orders.router)
-app.include_router(inventory.router)
-app.include_router(health.router)
 app.include_router(webhooks.router)
-app.include_router(analytics.router)
-app.include_router(reservations.router)
-app.include_router(ai.router)
-app.include_router(export.router)
+app.include_router(health.router)
+for _r in _VERSIONED_ROUTERS:
+    app.include_router(_r, prefix="/api/v1")          # canonical, documented
+    app.include_router(_r, include_in_schema=False)   # legacy path, still works
 
 
 @app.get("/")
@@ -253,4 +281,6 @@ def read_root():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # Bind all interfaces: required inside the container so Railway's edge proxy
+    # can reach the app; not exposed directly to the internet.
+    uvicorn.run(app, host="0.0.0.0", port=port)  # nosec B104

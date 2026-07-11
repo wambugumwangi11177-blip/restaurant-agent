@@ -19,8 +19,9 @@ Railway deploy, neither reproducible locally:
    request looked like it came from the same handful of proxy IPs (or, if
    Railway load-balances across edge nodes, from a shifting set of
    non-client IPs) — either way, not a usable per-user key. Fixed with
-   `_client_ip` below, which reads the first hop of X-Forwarded-For and
-   falls back to the raw peer for local/direct connections (e.g. tests).
+   `_client_ip` below, which reads the hop the trusted edge proxy appended
+   (from the RIGHT of X-Forwarded-For, spoof-resistant — see its docstring)
+   and falls back to the raw peer for local/direct connections (e.g. tests).
 
 2. slowapi's default storage is an in-process Python dict. `Dockerfile` runs
    `gunicorn --workers 2` — two separate OS processes, each with its own
@@ -39,22 +40,37 @@ Railway deploy, neither reproducible locally:
 """
 
 import logging
+import os
 
 logger = logging.getLogger(__name__)
+
+# Number of trusted reverse proxies in front of this app. On Railway there is a
+# single edge proxy, so the default is 1. Override with TRUSTED_PROXY_HOPS if the
+# topology changes (e.g. Cloudflare in front of Railway would be 2).
+_TRUSTED_PROXY_HOPS = max(int(os.getenv("TRUSTED_PROXY_HOPS", "1")), 1)
 
 
 def _client_ip(request) -> str:
     """
-    Real client IP behind Railway's reverse proxy. Railway (like most
-    reverse proxies) terminates the client connection itself and forwards
-    the original IP via X-Forwarded-For — request.client.host would just be
-    Railway's own proxy. Take the first hop (the original client; later hops
-    are intermediate proxies) and fall back to the raw peer for direct
-    connections (local dev, tests).
+    Real client IP behind Railway's reverse proxy — resistant to header spoofing.
+
+    X-Forwarded-For is `client, proxy1, proxy2, ...`: each proxy APPENDS the peer
+    it received the connection from to the RIGHT. So the value our trusted edge
+    proxy appended is the (N-from-right) hop, where N = number of trusted proxies.
+    An attacker who sends `X-Forwarded-For: 1.2.3.4` cannot forge that hop —
+    Railway's edge appends the attacker's real IP to the right of it — so we read
+    from the right, never `split(",")[0]` (the attacker-controlled leftmost value,
+    the old bug: it let anyone mint a fresh key per request and defeat every
+    per-IP limit — login brute-force, register spam, paid STK-push abuse).
+
+    Falls back to the raw TCP peer for direct connections (local dev, tests).
     """
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        parts = [p.strip() for p in forwarded.split(",") if p.strip()]
+        if parts:
+            idx = max(len(parts) - _TRUSTED_PROXY_HOPS, 0)
+            return parts[idx]
     if request.client and request.client.host:
         return request.client.host
     return "127.0.0.1"

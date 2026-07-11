@@ -689,6 +689,10 @@ class TokenUsage(Base):
     id            = Column(Integer, primary_key=True, index=True)
     restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
     llm_model     = Column(String, nullable=True)
+    # Version of the narration prompt that produced this turn. Lets AIOps trace a
+    # shift in token spend or grounding rate back to a specific prompt change
+    # instead of guessing (see ai/reasoning/narrator.py::PROMPT_VERSION).
+    prompt_version = Column(String, nullable=True)
     input_tokens  = Column(Integer, nullable=True)
     output_tokens = Column(Integer, nullable=True)
     created_at    = Column(DateTime, default=utcnow)

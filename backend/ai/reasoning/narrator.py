@@ -118,6 +118,18 @@ TASKS = {
         ),
         "keys": None,
     },
+    "marketing": {
+        "tier": TIER_LOW,
+        "role": "You are a restaurant marketing advisor helping the owner decide which campaign to run next.",
+        "focus": (
+            "Look at the lapsed regulars, the reachable audience and the suggested offers, "
+            "and say — in plain language — which one or two campaigns are worth running now "
+            "and why. Respect that nothing sends without the owner's approval and only "
+            "consented, non-opted-out customers can be reached. Never invent audience sizes "
+            "or money figures."
+        ),
+        "keys": ["winback", "audience", "suggested_offers"],
+    },
     # On-demand "explain this to me" for a SINGLE insight — powers the dashboard
     # per-item Explain button. Deliberately the cheap tier and the simplest, most
     # concrete language, because the audience is a non-analyst owner/staff member.

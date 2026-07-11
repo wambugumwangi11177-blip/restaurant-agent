@@ -82,9 +82,13 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
         )
         .all()
     )
+    # The send choke point logs message_type as "<type>:<channel>" (e.g.
+    # promo:whatsapp) and sometimes raw. Normalise on the part before ":" so a
+    # promo / win-back sent over any channel still maps to its benchmark and
+    # label instead of silently falling to the default minutes.
     message_counts = defaultdict(int)
     for m in messages:
-        message_counts[m.message_type] += 1
+        message_counts[(m.message_type or "").split(":", 1)[0]] += 1
 
     message_breakdown = [
         {

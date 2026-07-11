@@ -224,6 +224,113 @@ async def ai_roi(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# MARKETING / CAMPAIGNS  (read-only intelligence + owner-approved sends)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/marketing")
+async def ai_marketing(
+    narrate: bool = True,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Read-only marketing view: lapsed regulars to win back, the reachable
+    (consented, non-opted-out) audience, recent campaign history, and a list of
+    AI-suggested offers each with a plain-language WHY. Nothing is sent here —
+    see the POST routes below, which the owner triggers explicitly.
+    """
+    restaurant = get_or_create_restaurant(db, current_user)
+
+    from ai.marketing import get_marketing_insights
+    data = _safe_run("marketing", restaurant.id, get_marketing_insights, db, restaurant.id)
+
+    from starlette.concurrency import run_in_threadpool
+    from ai.reasoning import attach_narrative
+    data = await run_in_threadpool(attach_narrative, data, "marketing", restaurant.id, narrate)
+
+    return data
+
+
+def _background_send(fn, *args) -> None:
+    """
+    Run a (slow, throttled) send loop on its own thread with its own DB session,
+    so the request returns immediately. The send functions are opt-out- and
+    consent-gated internally; this only handles the threading + session lifecycle.
+    """
+    import threading
+
+    def _run():
+        from database import SessionLocal
+        bg = SessionLocal()
+        try:
+            fn(bg, *args)
+        except Exception as exc:  # background thread — never surfaces to a caller
+            logger.warning(f"Background send failed: {exc}")
+        finally:
+            bg.close()
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+@router.post("/marketing/promo")
+async def ai_marketing_promo(
+    body: dict,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Send a one-off promo to consented, non-opted-out customers who ordered
+    recently. Owner-triggered and explicit — the same safe path as the WhatsApp
+    `PROMO <offer>` command. Returns the audience it will reach; the send runs in
+    the background.
+    """
+    restaurant = get_or_create_restaurant(db, current_user)
+    offer_text = (body or {}).get("offer_text", "").strip()
+    if not offer_text:
+        return {"started": False, "audience": 0, "error": "Add an offer to send (e.g. '15% off all mains till 9pm')."}
+
+    from ai.whatsapp import brain
+    audience = brain.promo_audience_count(db, restaurant.id)
+    if audience == 0:
+        return {
+            "started": False,
+            "audience": 0,
+            "error": "No one to send to yet — a promo only reaches diners who gave consent at checkout and haven't opted out.",
+        }
+
+    _background_send(brain.broadcast_promo, restaurant.id, offer_text)
+    capped = min(audience, brain.PROMO_MAX_RECIPIENTS)
+    return {"started": True, "audience": capped, "message": f"Sending your promo to {capped} customer(s). Opted-out customers are skipped automatically."}
+
+
+@router.post("/marketing/winback")
+async def ai_marketing_winback(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Send the personalised win-back message to lapsed regulars who gave marketing
+    consent and haven't opted out. Owner-triggered and explicit. Returns the
+    reachable audience; the send runs in the background and logs
+    message_type="campaign_winback".
+    """
+    restaurant = get_or_create_restaurant(db, current_user)
+
+    from ai.whatsapp import brain
+    reachable = brain.winback_reachable(db, restaurant.id)
+    if reachable == 0:
+        return {
+            "started": False,
+            "audience": 0,
+            "error": "No reachable lapsed regulars — a win-back only reaches customers who gave consent and haven't opted out.",
+        }
+
+    _background_send(brain.broadcast_winback, restaurant.id)
+    capped = min(reachable, brain.PROMO_MAX_RECIPIENTS)
+    return {"started": True, "audience": capped, "message": f"Sending win-back messages to {capped} lapsed regular(s). Opted-out customers are skipped automatically."}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # EXPLAIN THIS  (on-demand plain-language explanation of one insight)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -304,6 +411,11 @@ async def ai_usage(
     AIOps summary for this tenant: LLM token spend (by model), per-agent latency
     (p50/p95) + success rate, and the grounding trust rate. Read-only aggregation
     of already-metered data (token_usage, agent_executions, grounding verifier).
+
+    Scoped to the caller's own restaurant, so any authenticated owner/staff can
+    see what their AI costs and how well it's working — the counterweight to the
+    ROI page's "what it saves." (Previously ADMIN-only, which hid it from owners,
+    who register as STAFF by default and so could never see their own usage.)
     """
     restaurant = get_or_create_restaurant(db, current_user)
     days = min(max(days, 1), 365)

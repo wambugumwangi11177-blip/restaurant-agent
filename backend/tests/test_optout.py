@@ -71,6 +71,35 @@ def test_winback_candidates_exclude_opted_out(db_session):
     assert "0712345678" not in phones
 
 
+def test_winback_reachable_requires_consent_and_honours_optout(db_session):
+    """A win-back is marketing: it may only reach a lapsed regular who gave
+    positive consent AND hasn't opted out — the same bar broadcast_promo uses."""
+    from datetime import timedelta
+    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x")
+    db_session.add(r)
+    db_session.commit()
+
+    long_ago = utcnow() - timedelta(days=40)
+    for phone in ("0712345678", "0722222222"):
+        db_session.add(models.Order(
+            restaurant_id=1, status=models.OrderStatus.SERVED,
+            payment_method=models.PaymentMethod.CASH, is_paid=True, total=5000,
+            customer_name="X", customer_phone=phone, created_at=long_ago,
+        ))
+    # Only the first customer consented to marketing.
+    db_session.add(models.CustomerConsent(
+        restaurant_id=1, customer_phone="0712345678", purpose="order_checkout",
+    ))
+    db_session.commit()
+
+    # Two lapsed candidates, but only one is a legal recipient.
+    assert brain.winback_reachable(db_session, 1) == 1
+
+    # Opting the consented one out drops the reachable audience to zero.
+    optout.record_opt_out(db_session, "0712345678")
+    assert brain.winback_reachable(db_session, 1) == 0
+
+
 def test_stop_keyword_detection():
     assert optout.is_stop_keyword("STOP")
     assert optout.is_stop_keyword("  Unsubscribe ")

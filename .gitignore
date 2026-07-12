@@ -37,3 +37,7 @@ graphify-out/
 _quarantine_untrusted/
 restaurant-agent/
 
+
+# Local object-storage backend (Phase 9) — never commit uploaded blobs
+backend/.storage/
+.storage/

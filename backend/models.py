@@ -432,6 +432,27 @@ class ProductEvent(Base):
     )
 
 
+class Subscription(Base):
+    """
+    Per-tenant subscription/billing state (Phase 10). The plan/status state machine
+    is provider-agnostic; `provider` records HOW it's billed ("manual" by default —
+    the actual payment integration, e.g. M-Pesa recurring or Stripe, is a pluggable
+    business decision, so this stores the state without hard-wiring a processor).
+    """
+    __tablename__ = "subscriptions"
+
+    id                 = Column(Integer, primary_key=True, index=True)
+    tenant_id          = Column(Integer, ForeignKey("tenants.id"), unique=True, nullable=False)
+    plan               = Column(String, nullable=False, default="free")     # free | pro | enterprise
+    status             = Column(String, nullable=False, default="active")   # active | past_due | canceled
+    provider           = Column(String, nullable=False, default="manual")   # manual | mpesa | stripe
+    current_period_end = Column(DateTime, nullable=True)
+    created_at         = Column(DateTime, default=utcnow)
+    updated_at         = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    tenant = relationship("Tenant")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # LAYER 3: KNOWLEDGE GRAPH — INGREDIENT TO MENU ITEM MAPPING
 # ─────────────────────────────────────────────────────────────────────────────

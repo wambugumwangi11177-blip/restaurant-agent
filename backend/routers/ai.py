@@ -124,6 +124,311 @@ async def reject_pricing_rec(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# DECISION INTELLIGENCE — every agent's recommendations, ranked into one stream
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/decisions")
+async def ai_decisions(
+    narrate: bool = True,
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """
+    Unified, ranked Decision Intelligence: pulls recommendations from every
+    deterministic agent (pricing, inventory, supply-chain, menu, labor,
+    marketing), normalizes them into one `Decision` schema, and ranks them
+    best-first by impact / confidence / risk / effort.
+
+    Numbers are deterministic. When an LLM provider is set (and narrate=true) a
+    grounded `narrative` block is attached — it interprets the ranking, it never
+    recomputes the scores or invents figures.
+    """
+    restaurant = get_or_create_restaurant(db, current_user)
+
+    from ai.decisions import get_ranked_decisions
+    data = _safe_run("decision_intelligence", restaurant.id, get_ranked_decisions, db, restaurant.id)
+
+    from starlette.concurrency import run_in_threadpool
+    from ai.reasoning import attach_narrative
+    data = await run_in_threadpool(attach_narrative, data, "decisions", restaurant.id, narrate)
+
+    return data
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STRATEGY — the goal-driven CEO agent (Phase 3)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/strategy")
+async def ai_strategy(
+    body: dict,
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """
+    Goal-driven strategy: give a goal ("increase monthly profit by KES 100,000")
+    and get back ONE prioritized plan. When the CEO agent is enabled and an LLM
+    provider is configured it consults the specialist agents + simulator + graph
+    as read-only tools and narrates a grounded, sequenced plan; otherwise it
+    degrades to the deterministic top-ranked decisions. Read-only — applying any
+    step still goes through the existing approval endpoints.
+
+    Body: {"goal": "...", "timeframe": "this quarter"}
+    """
+    restaurant = get_or_create_restaurant(db, current_user)
+    goal = (body or {}).get("goal", "")
+    timeframe = (body or {}).get("timeframe", "")
+
+    # Blocking LLM tool loop → keep it off the event loop (see /ai/pricing).
+    from starlette.concurrency import run_in_threadpool
+    from ai.orchestrator.strategist import run_strategy
+    return await run_in_threadpool(
+        _safe_run, "strategist", restaurant.id, run_strategy, db, restaurant.id, goal, timeframe
+    )
+
+
+@router.post("/strategy/plan")
+async def ai_strategy_plan(
+    body: dict,
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """
+    Autonomous planning (Phase 9): a time-phased, monitored plan for a goal — a
+    ranked decision per week, each with a scheduled check-in and (for price moves)
+    a simulation of the expected effect. Deterministic; always available.
+
+    Body: {"goal": "...", "horizon_weeks": 4}
+    """
+    restaurant = get_or_create_restaurant(db, current_user)
+    goal = (body or {}).get("goal", "")
+    weeks = int((body or {}).get("horizon_weeks", 4) or 4)
+    from ai.orchestrator.strategist import plan
+    return _safe_run("strategist", restaurant.id, plan, db, restaurant.id, goal, weeks)
+
+
+@router.get("/feedback")
+async def ai_feedback(
+    days: int = 14,
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """
+    Self-evaluation feedback loop (Phase 9): classifies recently-scored
+    predictions (worked / acceptable / missed, and why), and reports the derived
+    per-agent reliability the Decision ranking uses. Read-only.
+    """
+    restaurant = get_or_create_restaurant(db, current_user)
+    days = min(max(days, 1), 90)
+    from ai.evaluation.feedback import run_feedback_cycle
+    return _safe_run("feedback_loop", restaurant.id, run_feedback_cycle, db, restaurant.id, days)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MARKETPLACE / PLUGINS — third-party agents (Phase 11)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/plugins")
+async def ai_plugins_list(
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+):
+    """List registered marketplace plugins (name, author, capabilities, scopes)."""
+    from ai.plugins import registry
+    return {"plugins": registry.list()}
+
+
+@router.post("/plugins/{name}/invoke")
+async def ai_plugin_invoke(
+    name: str,
+    body: dict = None,
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """
+    Invoke a registered plugin behind the SDK guardrails (read-only context,
+    declared scopes, approval-gated mutation). Body: {"payload": {...},
+    "approved": bool}. A mutating plugin returns requires_approval until approved.
+    """
+    restaurant = get_or_create_restaurant(db, current_user)
+    payload = (body or {}).get("payload") or {}
+    approved = bool((body or {}).get("approved", False))
+    from ai.plugins import registry
+    return _safe_run("plugin_sdk", restaurant.id, registry.invoke, name, db, restaurant.id, payload, approved)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WORKFLOW ENGINE — durable, multi-step agentic processes (Phase 8)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/workflows/templates")
+async def ai_workflow_templates(
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+):
+    """List the available workflow templates that can be started."""
+    from ai.workflows import template_names
+    return {"templates": template_names()}
+
+
+@router.post("/workflows/{template}/start")
+async def ai_workflow_start(
+    template: str,
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """
+    Start a durable workflow run from a template. Runs auto steps until it
+    reaches a human-approval or wait-for-external pause, then returns the run
+    state (id + steps) for the owner to act on.
+    """
+    restaurant = get_or_create_restaurant(db, current_user)
+    from ai.workflows import start_workflow
+    return _safe_run("workflow_engine", restaurant.id, start_workflow, db, restaurant.id, template)
+
+
+@router.get("/workflows/{run_id}")
+async def ai_workflow_get(
+    run_id: int,
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """Fetch one workflow run's current state (steps, status, context)."""
+    restaurant = get_or_create_restaurant(db, current_user)
+    from ai.workflows import get_run
+    run = _safe_run("workflow_engine", restaurant.id, get_run, db, run_id)
+    # Tenant guard: never expose another restaurant's run.
+    if run.get("available") and _workflow_belongs(db, run_id, restaurant.id) is False:
+        return {"available": False, "error": "Workflow run not found."}
+    return run
+
+
+@router.post("/workflows/{run_id}/resume")
+async def ai_workflow_resume(
+    run_id: int,
+    body: dict = None,
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """
+    Resume a paused run. Body: {"decision": "approve"|"reject", "payload": {...}}.
+    An approval advances the run; a rejection cancels it. This is the
+    human-in-the-loop hop that gates any mutating step (e.g. creating a real PO).
+    """
+    restaurant = get_or_create_restaurant(db, current_user)
+    if _workflow_belongs(db, run_id, restaurant.id) is False:
+        return {"available": False, "error": "Workflow run not found."}
+    decision = (body or {}).get("decision", "approve")
+    payload = (body or {}).get("payload")
+    from ai.workflows import resume
+    return _safe_run("workflow_engine", restaurant.id, resume, db, run_id, decision, payload)
+
+
+@router.post("/workflows/{run_id}/cancel")
+async def ai_workflow_cancel(
+    run_id: int,
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """Cancel a running/awaiting workflow."""
+    restaurant = get_or_create_restaurant(db, current_user)
+    if _workflow_belongs(db, run_id, restaurant.id) is False:
+        return {"available": False, "error": "Workflow run not found."}
+    from ai.workflows import cancel
+    return _safe_run("workflow_engine", restaurant.id, cancel, db, run_id)
+
+
+def _workflow_belongs(db: Session, run_id: int, restaurant_id: int) -> bool:
+    """Cross-tenant guard for workflow runs — a run is only visible to its own
+    restaurant. Returns False when the run exists but belongs to someone else."""
+    row = (
+        db.query(models.WorkflowRun.restaurant_id)
+        .filter(models.WorkflowRun.id == run_id)
+        .first()
+    )
+    if row is None:
+        return True   # non-existent: let the handler return its own not-found
+    return row[0] == restaurant_id
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# KNOWLEDGE GRAPH — cross-domain impact traversal (Phase 6)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/graph/impact")
+async def ai_graph_impact(
+    entity: str,
+    id: int,
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """
+    Downstream impact of one entity across the Business Knowledge Graph:
+    "if this supplier/ingredient/dish changes, what does it affect?" Deterministic
+    traversal over the existing tables — suppliers → ingredients → dishes →
+    categories — with 30-day revenue-at-risk on the critical dependencies.
+
+    entity: "supplier" | "ingredient" | "menu_item"
+    """
+    valid = {"supplier", "ingredient", "menu_item"}
+    if entity not in valid:
+        return {"available": False, "error": f"entity must be one of {sorted(valid)}."}
+
+    restaurant = get_or_create_restaurant(db, current_user)
+    from ai.graph import get_impact
+    return _safe_run("knowledge_graph", restaurant.id, get_impact, db, restaurant.id, entity, id)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SIMULATION — deterministic "what if…" projection (Phase 2)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/simulate")
+async def ai_simulate(
+    body: dict,
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """
+    Project the effect of a proposed change before making it: price change,
+    promo discount, or supplier cost change. Deterministic — no LLM. Returns
+    projected sales/profit/margin deltas, a confidence score, and a
+    YES/CAUTION/NO verdict.
+
+    Body: {"change": {"type": "price_change"|"promo"|"cost_change", "item_id": N, ...}}
+    See ai/simulation.run_simulation for the accepted change shapes.
+    """
+    import feature_flags
+    if not feature_flags.is_enabled("simulation"):
+        return {"available": False, "error": "Simulation is disabled."}
+
+    restaurant = get_or_create_restaurant(db, current_user)
+    change = (body or {}).get("change", body)   # accept {"change": {...}} or a bare change
+
+    from ai.simulation import run_simulation
+    return _safe_run("simulation", restaurant.id, run_simulation, db, restaurant.id, change)
+
+
+@router.get("/forecast/twin")
+async def ai_forecast_twin(
+    horizon: int = 30,
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """
+    Digital Twin revenue projection: the restaurant's own sales-history baseline
+    combined with exogenous calendar signals (public holidays, school breaks;
+    weather/sports once configured). Deterministic. Returns baseline vs projected
+    vs uplift, a confidence band, and the days whose projection a signal moved.
+    """
+    import feature_flags
+    if not feature_flags.is_enabled("simulation"):
+        return {"available": False, "error": "Simulation is disabled."}
+
+    restaurant = get_or_create_restaurant(db, current_user)
+    from ai.simulation import forecast_twin
+    return _safe_run("digital_twin", restaurant.id, forecast_twin, db, restaurant.id, horizon)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # LABOR INTELLIGENCE
 # ─────────────────────────────────────────────────────────────────────────────
 

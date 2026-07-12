@@ -87,6 +87,8 @@ ROUTES = [
     ("/ai/dashboard",             "health_score"),
     ("/ai/roi",                   "time_saved"),
     ("/ai/marketing",             "suggested_offers"),
+    ("/ai/decisions",             "decisions"),   # Phase 1: ranked cross-agent stream
+    ("/ai/forecast/twin",         None),          # Phase 4: digital twin (degrades on no data)
 ]
 
 
@@ -106,7 +108,11 @@ def test_ai_route_on_empty_restaurant_does_not_crash(client, db_session, path, e
     # {"error": "No restaurant found"}-style note ONLY on the two dashboard
     # routes that opt out of auto-create; the agent routes auto-create and must
     # not surface an error.
-    if path not in ("/ai/dashboard",):
+    # /ai/dashboard opts out of auto-create; /ai/forecast/twin legitimately
+    # reports available:false + a message when a brand-new restaurant has no
+    # revenue history yet to project from (a valid degraded state, not a
+    # swallowed module failure).
+    if path not in ("/ai/dashboard", "/ai/forecast/twin"):
         assert "error" not in body, f"{path} returned a swallowed error: {body.get('error')}"
 
 

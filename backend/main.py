@@ -16,7 +16,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from logging_config import configure_logging
-from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags
+from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
@@ -262,7 +262,7 @@ app.add_middleware(CorrelationIdMiddleware)
 #   • health — conventionally unversioned (probes/uptime checks hit /health).
 _VERSIONED_ROUTERS = [
     menu.router, orders.router, inventory.router, analytics.router,
-    reservations.router, ai.router, export.router, flags.router,
+    reservations.router, ai.router, export.router, flags.router, events.router,
 ]
 
 app.include_router(auth.router)
@@ -276,6 +276,17 @@ for _r in _VERSIONED_ROUTERS:
 @app.get("/")
 def read_root():
     return {"service": "Restaurant Agent API", "version": "2.0.0", "status": "ok"}
+
+
+@app.get("/metrics")
+def metrics_endpoint():
+    """Prometheus scrape target — process-local request counters + latency (see
+    metrics.py). Unversioned/unauthenticated by Prometheus convention; restrict at
+    the network layer in production. Multi-worker aggregation needs a shared
+    collector (same Redis caveat as rate limiting)."""
+    from fastapi import Response
+    import metrics
+    return Response(content=metrics.render(), media_type="text/plain; version=0.0.4")
 
 
 if __name__ == "__main__":

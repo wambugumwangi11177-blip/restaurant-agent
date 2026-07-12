@@ -411,6 +411,27 @@ class ConversationTurn(Base):
     )
 
 
+class ProductEvent(Base):
+    """
+    Product-analytics events for the APP's own users (owners/staff) — feature
+    usage, funnels, retention — as distinct from the restaurant's business
+    metrics. Self-hosted (no PostHog/third party): a row per tracked action,
+    queryable for counts/DAU/funnel. Phase 8.
+    """
+    __tablename__ = "product_events"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    tenant_id   = Column(Integer, ForeignKey("tenants.id"), nullable=True)
+    user_id     = Column(Integer, ForeignKey("users.id"), nullable=True)
+    event_name  = Column(String, nullable=False)   # e.g. "viewed_dashboard", "approved_pricing"
+    properties  = Column(Text, default="")          # JSON blob of event context
+    created_at  = Column(DateTime, default=utcnow)
+
+    __table_args__ = (
+        Index("ix_product_events_tenant_name_created", "tenant_id", "event_name", "created_at"),
+    )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # LAYER 3: KNOWLEDGE GRAPH — INGREDIENT TO MENU ITEM MAPPING
 # ─────────────────────────────────────────────────────────────────────────────

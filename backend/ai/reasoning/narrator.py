@@ -30,6 +30,8 @@ import hashlib
 import json
 import logging
 
+from pydantic import BaseModel
+
 from ai import llm_client
 from ai.llm_client import TIER_LOW, TIER_MEDIUM, TIER_HIGH  # noqa: F401  (re-exported)
 from . import grounding
@@ -163,6 +165,25 @@ _OUTPUT_SHAPE = (
 )
 
 
+# Pydantic mirror of _OUTPUT_SHAPE. Used by _parse() to VALIDATE the interior
+# structure of the model's reply (each action really is {action, why, impact}
+# strings) rather than trusting a hand-rolled dict. Fields are intentionally
+# LENIENT (every one defaults to empty / []): a partial action from the model is
+# coerced to the full shape, never rejected — matching the pre-existing tolerant
+# behaviour. Strict rejection here would drop an entire otherwise-good narrative
+# to the truncated fallback, a reliability regression. See P6 (2026-07-11).
+class NarratorAction(BaseModel):
+    action: str = ""
+    why: str = ""
+    impact: str = ""
+
+
+class NarratorOutput(BaseModel):
+    headline: str = ""
+    priorities: list[str] = []
+    actions: list[NarratorAction] = []
+
+
 def narrate(payload: dict, task: str, *, restaurant_id: int | None = None,
             tier: str | None = None) -> dict | None:
     """
@@ -178,6 +199,12 @@ def narrate(payload: dict, task: str, *, restaurant_id: int | None = None,
     None as "no narrative available" and fall back to the raw payload.
     """
     if not isinstance(payload, dict):
+        return None
+    # Operational kill-switch: FEATURE_AI_NARRATION=false stops all LLM narration
+    # (zero token spend) without a redeploy. Same contract as "no provider" — the
+    # caller falls back to the deterministic payload.
+    import feature_flags
+    if not feature_flags.is_enabled("ai_narration"):
         return None
     if not llm_client.is_available():
         return None
@@ -313,11 +340,25 @@ def _parse(text: str) -> dict:
     try:
         data = json.loads(candidate)
         if isinstance(data, dict):
-            return {
-                "headline": str(data.get("headline", "")).strip(),
-                "priorities": [str(p) for p in data.get("priorities", []) if str(p).strip()],
-                "actions": [a for a in data.get("actions", []) if isinstance(a, dict)],
-            }
+            # Validate the interior shape via Pydantic while staying tolerant:
+            # non-dict action elements are dropped (as before), and each action
+            # dict is coerced to the full {action, why, impact} shape rather than
+            # rejected. str() coercion up-front means a stray non-string value
+            # can never raise mid-validation and lose the whole narrative.
+            actions = [
+                NarratorAction(
+                    action=str(a.get("action", "")),
+                    why=str(a.get("why", "")),
+                    impact=str(a.get("impact", "")),
+                ).model_dump()
+                for a in data.get("actions", [])
+                if isinstance(a, dict)
+            ]
+            return NarratorOutput(
+                headline=str(data.get("headline", "")).strip(),
+                priorities=[str(p) for p in data.get("priorities", []) if str(p).strip()],
+                actions=actions,
+            ).model_dump()
     except (json.JSONDecodeError, ValueError):
         pass
     return {"headline": text[:280], "priorities": [], "actions": [], "parse_fallback": True}

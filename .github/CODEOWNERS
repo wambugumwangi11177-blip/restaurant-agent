@@ -1,0 +1,21 @@
+# Code owners for restaurant-agent (P5, 2026-07-11).
+# Every PR touching a matched path requests review from the owner below. With
+# branch protection's "require review from Code Owners" enabled on master, this
+# turns the single-maintainer review policy into an enforced one instead of a
+# convention. Add teammates here (and to the relevant path lines) as the team grows.
+
+# Default owner for everything not matched more specifically below.
+*                       @wambugumwangi11177-blip
+
+# Backend service (FastAPI, payments, AI) — the highest-risk surface.
+/backend/               @wambugumwangi11177-blip
+/backend/ai/            @wambugumwangi11177-blip
+/backend/payments/      @wambugumwangi11177-blip
+
+# Frontend (Next.js).
+/frontend/              @wambugumwangi11177-blip
+
+# Security-sensitive: CI, security docs, and the secret-scan config.
+/.github/               @wambugumwangi11177-blip
+/docs/security/         @wambugumwangi11177-blip
+/.gitleaks.toml         @wambugumwangi11177-blip

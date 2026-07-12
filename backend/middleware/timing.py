@@ -13,7 +13,15 @@ class TimingMiddleware(BaseHTTPMiddleware):
         
         # Log the processing time
         logger.info(f"Request: {request.method} {request.url.path} - Duration: {process_time:.4f}s")
-        
+
+        # Feed the Prometheus /metrics collector (best-effort; never break a
+        # response over a metrics hiccup).
+        try:
+            import metrics
+            metrics.record_request(request.method, response.status_code, process_time)
+        except Exception:
+            pass
+
         # Add custom header
         response.headers["X-Process-Time"] = str(process_time)
         return response

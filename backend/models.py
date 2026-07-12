@@ -83,6 +83,12 @@ class User(Base):
     # "ver" claim; get_current_user rejects a token whose ver != this. Added by
     # migration 017.
     token_version = Column(Integer, default=0, nullable=False)
+    # TOTP multi-factor auth (migration 020). mfa_secret is the base32 shared
+    # secret (set at /mfa/setup, but MFA only enforced once mfa_enabled flips true
+    # after the user proves they can generate a valid code). Nullable so existing
+    # users are unaffected until they opt in.
+    mfa_secret = Column(String, nullable=True)
+    mfa_enabled = Column(Boolean, default=False, nullable=False)
 
     tenant = relationship("Tenant", back_populates="users")
 
@@ -376,6 +382,75 @@ class MemoryEvent(Base):
         Index("ix_memory_events_restaurant_month", "restaurant_id", "month_number"),
         Index("ix_memory_events_restaurant_type",  "restaurant_id", "event_type"),
     )
+
+
+class ConversationTurn(Base):
+    """
+    Short-term conversation memory for the WhatsApp LLM orchestrator (Phase 6).
+    Persists each owner<->assistant turn so a follow-up ("and last week?") has
+    context the current stateless-per-message path lacks.
+
+    Keyed by restaurant_id ALONE, deliberately: the owner is the only free-form
+    LLM user per restaurant (customers use the deterministic keyword path in
+    brain.handle_customer_message, which never reaches the LLM), so no per-sender
+    threading is needed. Gated behind FEATURE_CONVERSATION_MEMORY (default off);
+    nothing reads/writes this table until the flag is enabled.
+    """
+    __tablename__ = "conversation_turns"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
+    role          = Column(String, nullable=False)   # "user" | "assistant"
+    content       = Column(Text, nullable=False)
+    created_at    = Column(DateTime, default=utcnow)
+
+    restaurant = relationship("Restaurant")
+
+    __table_args__ = (
+        Index("ix_conversation_turns_restaurant_created", "restaurant_id", "created_at"),
+    )
+
+
+class ProductEvent(Base):
+    """
+    Product-analytics events for the APP's own users (owners/staff) — feature
+    usage, funnels, retention — as distinct from the restaurant's business
+    metrics. Self-hosted (no PostHog/third party): a row per tracked action,
+    queryable for counts/DAU/funnel. Phase 8.
+    """
+    __tablename__ = "product_events"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    tenant_id   = Column(Integer, ForeignKey("tenants.id"), nullable=True)
+    user_id     = Column(Integer, ForeignKey("users.id"), nullable=True)
+    event_name  = Column(String, nullable=False)   # e.g. "viewed_dashboard", "approved_pricing"
+    properties  = Column(Text, default="")          # JSON blob of event context
+    created_at  = Column(DateTime, default=utcnow)
+
+    __table_args__ = (
+        Index("ix_product_events_tenant_name_created", "tenant_id", "event_name", "created_at"),
+    )
+
+
+class Subscription(Base):
+    """
+    Per-tenant subscription/billing state (Phase 10). The plan/status state machine
+    is provider-agnostic; `provider` records HOW it's billed ("manual" by default —
+    the actual payment integration, e.g. M-Pesa recurring or Stripe, is a pluggable
+    business decision, so this stores the state without hard-wiring a processor).
+    """
+    __tablename__ = "subscriptions"
+
+    id                 = Column(Integer, primary_key=True, index=True)
+    tenant_id          = Column(Integer, ForeignKey("tenants.id"), unique=True, nullable=False)
+    plan               = Column(String, nullable=False, default="free")     # free | pro | enterprise
+    status             = Column(String, nullable=False, default="active")   # active | past_due | canceled
+    provider           = Column(String, nullable=False, default="manual")   # manual | mpesa | stripe
+    current_period_end = Column(DateTime, nullable=True)
+    created_at         = Column(DateTime, default=utcnow)
+    updated_at         = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    tenant = relationship("Tenant")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

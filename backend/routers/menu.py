@@ -24,7 +24,7 @@ async def read_menu_items(
 async def create_menu_item(
     item: schemas.MenuItemCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN))
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     db_item = models.MenuItem(**item.dict(), restaurant_id=restaurant.id)
@@ -35,10 +35,10 @@ async def create_menu_item(
 
 @router.put("/{item_id}", response_model=schemas.MenuItem)
 async def update_menu_item(
-    item_id: int, 
-    item_update: schemas.MenuItemUpdate, 
+    item_id: int,
+    item_update: schemas.MenuItemUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN))
 ):
     # Tenant scoping via the shared restaurant lookup, consistent with every
     # other mutation endpoint (orders.py, inventory.py). Scoping the QUERY by
@@ -62,9 +62,9 @@ async def update_menu_item(
 
 @router.delete("/{item_id}")
 async def delete_menu_item(
-    item_id: int, 
+    item_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN))
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     db_item = db.query(models.MenuItem).filter(

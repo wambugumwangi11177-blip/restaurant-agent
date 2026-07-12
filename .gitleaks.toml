@@ -1,0 +1,28 @@
+# gitleaks configuration for restaurant-agent (P3, 2026-07-11).
+# Extends the bundled default rule set (broad provider/secret coverage) and adds
+# an allowlist for this repo's known-safe placeholders so CI stays signal, not
+# noise. Referenced by .github/workflows/ci.yml (GITLEAKS_CONFIG).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known-safe placeholders and example files — not real secrets."
+
+# Documentation and instruction files use illustrative example tokens, not live
+# credentials. .env.example ships intentional placeholder values.
+paths = [
+    '''(^|/)\.env\.example$''',
+    '''(^|/)directives/''',
+    '''(^|/)docs/''',
+    '''(^|/)execution/''',
+    '''(^|/)graphify-out/''',
+]
+
+# Common placeholder strings that pattern-match as secrets but are not.
+regexes = [
+    '''your_secret_key_here''',
+    '''(?i)changeme''',
+    '''(?i)example[_-]?(key|token|secret)''',
+    '''xxxx+''',
+]

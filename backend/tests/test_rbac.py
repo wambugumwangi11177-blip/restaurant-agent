@@ -51,6 +51,56 @@ def test_superadmin_allowed_on_admin_route(client, db_session):
     assert r.status_code == 200
 
 
+# ── RBAC coverage on the AI / management routes (P2, 2026-07-11) ──────────────
+# Before this pass, every /ai/* route and menu/inventory writes used only
+# get_current_user, so any authenticated STAFF token could approve price changes
+# (mutates menu prices) and trigger real customer marketing sends. These prove
+# the money-moving and management routes are now ADMIN-gated, while owners
+# (who register as ADMIN) are not locked out.
+
+def test_staff_forbidden_approving_pricing(client, db_session):
+    """The most severe pre-fix gap: STAFF could approve a price change."""
+    token = _user_with_role(db_session, models.Role.STAFF, "staffprice")
+    r = client.post("/ai/pricing/1/approve", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 403
+
+
+def test_admin_not_forbidden_approving_pricing(client, db_session):
+    """Owners (ADMIN) still reach the route — a missing rec is a 4xx that is NOT 403."""
+    token = _user_with_role(db_session, models.Role.ADMIN, "adminprice")
+    r = client.post("/ai/pricing/999999/approve", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code != 403
+
+
+def test_staff_forbidden_sending_promo(client, db_session):
+    """STAFF could previously trigger a real customer marketing broadcast."""
+    token = _user_with_role(db_session, models.Role.STAFF, "staffpromo")
+    r = client.post(
+        "/ai/marketing/promo",
+        json={"offer_text": "15% off"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 403
+
+
+def test_staff_forbidden_creating_menu_item(client, db_session):
+    """Menu definition (price-bearing) is management, not a POS action."""
+    token = _user_with_role(db_session, models.Role.STAFF, "staffmenu")
+    r = client.post(
+        "/menu/",
+        json={"name": "Ugali", "price": 200, "category": "mains"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 403
+
+
+def test_staff_forbidden_on_ai_usage(client, db_session):
+    """AIOps cost data is ADMIN-only (corrects a stale 'owners are STAFF' comment)."""
+    token = _user_with_role(db_session, models.Role.STAFF, "staffusage")
+    r = client.get("/ai/usage", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 403
+
+
 # ── Password policy at registration ───────────────────────────────────────────
 
 def test_register_rejects_weak_passwords(client, db_session):

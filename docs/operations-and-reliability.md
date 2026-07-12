@@ -121,6 +121,10 @@ rolling" wording or add a purge job (tracked in [tech-debt-register.md](tech-deb
 - Define on-call/alerting rota.
 - Record backup-restore drill results and set secret-rotation cadence.
 
+> The operator-facing, tick-box version of the backup drill, alerting/uptime, and
+> branch-protection actions lives in
+> [external-hardening-checklist.md](external-hardening-checklist.md) (Phase 3b).
+
 ## Revision history
 
 | Version | Date | Author | Change |

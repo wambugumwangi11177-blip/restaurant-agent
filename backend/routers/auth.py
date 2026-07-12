@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from database import get_db
 import models, auth
-from pydantic import BaseModel
+from schemas import StrictModel
 from routers.deps import get_restaurant_or_none
 from rate_limit import limiter
 from time_utils import utcnow
@@ -36,23 +36,28 @@ LOCKOUT_MINUTES = 15
 
 # ── Request / Response schemas ────────────────────────────────────────────────
 
-class UserCreate(BaseModel):
+class UserCreate(StrictModel):
     email: str
     password: str
     tenant_name: str   # used as restaurant name on signup
 
 
-class Token(BaseModel):
+class Token(StrictModel):
     access_token: str
     token_type: str
 
 
-class LoginRequest(BaseModel):
+class LoginRequest(StrictModel):
     email: str
     password: str
+    mfa_code: str | None = None   # required only when the account has MFA enabled
 
 
-class RestaurantUpdate(BaseModel):
+class MfaCode(StrictModel):
+    code: str
+
+
+class RestaurantUpdate(StrictModel):
     name: str | None = None
     address: str | None = None
     currency: str | None = None
@@ -144,6 +149,18 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Second factor: only when the account has enrolled+enabled MFA. Checked
+    # AFTER the password so a missing/invalid code on a correct password doesn't
+    # count toward brute-force lockout differently — but a wrong code still fails
+    # the login. The client resubmits email+password+mfa_code together.
+    if user.mfa_enabled:
+        if not login_data.mfa_code or not auth.verify_totp(user.mfa_secret, login_data.mfa_code):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="A valid authenticator code is required.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
     # Successful login — reset the counter and record the login timestamp
     # (staff-activity record referenced in the DPA).
     user.failed_login_attempts = 0
@@ -192,6 +209,64 @@ async def logout_all(
     user.token_version = (user.token_version or 0) + 1
     db.commit()
     return {"status": "all_sessions_revoked", "token_version": user.token_version}
+
+
+@router.post("/mfa/setup")
+async def mfa_setup(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Begin TOTP enrollment: generate a secret and return the otpauth:// URI for the
+    user to scan into an authenticator app. MFA is NOT active yet — the user must
+    prove they can generate a valid code via /mfa/enable. Re-calling before enable
+    rotates the pending secret.
+    """
+    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    if user.mfa_enabled:
+        raise HTTPException(status_code=400, detail="MFA is already enabled.")
+    user.mfa_secret = auth.generate_mfa_secret()
+    db.commit()
+    return {
+        "secret": user.mfa_secret,
+        "otpauth_uri": auth.mfa_provisioning_uri(user.email, user.mfa_secret),
+    }
+
+
+@router.post("/mfa/enable")
+async def mfa_enable(
+    body: MfaCode,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Activate MFA after verifying the first code against the pending secret."""
+    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    if not user.mfa_secret:
+        raise HTTPException(status_code=400, detail="Call /mfa/setup first.")
+    if not auth.verify_totp(user.mfa_secret, body.code):
+        raise HTTPException(status_code=400, detail="Invalid code — try again.")
+    user.mfa_enabled = True
+    db.commit()
+    return {"status": "mfa_enabled"}
+
+
+@router.post("/mfa/disable")
+async def mfa_disable(
+    body: MfaCode,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Turn MFA off — requires a current valid code, so a stolen session alone
+    can't strip the second factor."""
+    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    if not user.mfa_enabled:
+        raise HTTPException(status_code=400, detail="MFA is not enabled.")
+    if not auth.verify_totp(user.mfa_secret, body.code):
+        raise HTTPException(status_code=400, detail="Invalid code.")
+    user.mfa_enabled = False
+    user.mfa_secret = None
+    db.commit()
+    return {"status": "mfa_disabled"}
 
 
 @router.put("/restaurant")

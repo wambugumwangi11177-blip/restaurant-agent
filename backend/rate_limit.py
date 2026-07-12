@@ -76,9 +76,23 @@ def _client_ip(request) -> str:
     return "127.0.0.1"
 
 
+# Optional shared storage. When RATE_LIMIT_STORAGE_URI (or REDIS_URL) is set —
+# e.g. "redis://…" from a provisioned Redis add-on — the limiter uses it as an
+# external, cross-process counter, which makes rate limiting correct under
+# gunicorn --workers >1 and removes the single-worker constraint documented
+# above. When it is UNSET (local dev, CI, current prod), the limiter falls back
+# to the in-memory store and behaviour is exactly as before. This is the code
+# half of the "provision Redis" step in docs/external-hardening-checklist.md:
+# once the add-on exists and the env var is set, no code change is needed.
+_RATE_LIMIT_STORAGE_URI = os.getenv("RATE_LIMIT_STORAGE_URI") or os.getenv("REDIS_URL")
+
 try:
     from slowapi import Limiter
-    limiter = Limiter(key_func=_client_ip)
+    if _RATE_LIMIT_STORAGE_URI:
+        limiter = Limiter(key_func=_client_ip, storage_uri=_RATE_LIMIT_STORAGE_URI)
+        logger.info("[RateLimit] using shared storage backend (multi-worker safe)")
+    else:
+        limiter = Limiter(key_func=_client_ip)
     SLOWAPI_AVAILABLE = True
 except ImportError:
     SLOWAPI_AVAILABLE = False

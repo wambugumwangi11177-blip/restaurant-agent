@@ -119,14 +119,14 @@ jobs:
         run: npm ci
 
       # JS dependency audit — the Python deps are audited (pip-audit) but the
-      # frontend's were not. Introduced non-blocking (like pip-audit was before
-      # 2026-07-08): npm's transitive advisories are noisy and often
-      # unreachable, so we surface high-severity ones without failing the build
-      # yet. Once the baseline is triaged, drop continue-on-error to make a new
-      # high-severity advisory blocking.
+      # frontend's were not. BLOCKING as of 2026-07-11 (was continue-on-error):
+      # the baseline was verified clean at --audit-level=high on that date
+      # (`npm audit --audit-level=high` exits 0; only 4 *moderate* transitive
+      # advisories via next-auth remain, below the gate). A NEW high/critical
+      # advisory now fails CI instead of printing a warning nobody reads —
+      # mirroring how pip-audit was made blocking on 2026-07-08.
       - name: Audit npm dependencies
         run: npm audit --audit-level=high
-        continue-on-error: true
 
       # Type errors and build breaks currently only surface on a Vercel deploy —
       # too late, and Vercel does not catch the untyped `json()` contract drifts
@@ -138,3 +138,46 @@ jobs:
 
       - name: Typecheck
         run: npx tsc --noEmit
+
+  gitleaks:
+    # Secret scanning — catches an API key / token / password committed to the
+    # repo before it reaches history. Complements pip-audit/bandit (which cover
+    # dependency + code vulns, not leaked credentials). Scoped to the PR diff /
+    # pushed commits by the action's default behaviour, so it doesn't re-flag
+    # the whole existing history on every run. Blocking: a leaked secret should
+    # stop the merge.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # gitleaks needs history to resolve the commit range
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  container-scan:
+    # Scans the actual backend image for OS/package CVEs (Trivy) — a layer the
+    # source-level scanners (bandit, pip-audit) don't cover, e.g. a vulnerable
+    # system lib in the python:3.12-slim base. Introduced NON-BLOCKING
+    # (continue-on-error), exactly as pip-audit and bandit were before they were
+    # driven clean and pinned: the base-image baseline needs triage first. Flip
+    # continue-on-error to false (and pin/justify any accepted CVEs by id, like
+    # the dependency-audit job does) once that triage is done.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -t restaurant-agent-backend:ci ./backend
+
+      - name: Trivy scan (HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@v0.36.0
+        continue-on-error: true
+        with:
+          image-ref: restaurant-agent-backend:ci
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true

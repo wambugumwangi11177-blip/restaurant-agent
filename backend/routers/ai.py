@@ -36,7 +36,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from database import get_db
-from auth import get_current_user
+from auth import require_role
 import models
 from routers.deps import get_or_create_restaurant
 
@@ -72,7 +72,7 @@ def _safe_run(agent_name: str, restaurant_id: int, fn, *args, **kwargs):
 @router.get("/pricing")
 async def ai_pricing(
     narrate: bool = True,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     """
@@ -100,7 +100,7 @@ async def ai_pricing(
 @router.post("/pricing/{rec_id}/approve")
 async def approve_pricing_rec(
     rec_id: int,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     """Approve a pricing recommendation — updates menu item price immediately."""
@@ -113,7 +113,7 @@ async def approve_pricing_rec(
 async def reject_pricing_rec(
     rec_id: int,
     body: dict = None,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     """Reject a pricing recommendation."""
@@ -129,7 +129,7 @@ async def reject_pricing_rec(
 
 @router.get("/labor")
 async def ai_labor(
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     """Labor cost analytics, overtime analysis, and staffing recommendations."""
@@ -145,7 +145,7 @@ async def ai_labor(
 
 @router.get("/inventory")
 async def ai_inventory(
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     """Inventory health, usage velocity, ABC classification, restock predictions."""
@@ -169,7 +169,7 @@ async def ai_inventory(
 @router.get("/profit")
 async def ai_profit(
     narrate: bool = True,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     """
@@ -201,7 +201,7 @@ async def ai_profit(
 @router.get("/roi")
 async def ai_roi(
     narrate: bool = True,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     """
@@ -230,7 +230,7 @@ async def ai_roi(
 @router.get("/marketing")
 async def ai_marketing(
     narrate: bool = True,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     """
@@ -275,7 +275,7 @@ def _background_send(fn, *args) -> None:
 @router.post("/marketing/promo")
 async def ai_marketing_promo(
     body: dict,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     """
@@ -305,7 +305,7 @@ async def ai_marketing_promo(
 
 @router.post("/marketing/winback")
 async def ai_marketing_winback(
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     """
@@ -337,7 +337,7 @@ async def ai_marketing_winback(
 @router.post("/explain")
 async def ai_explain(
     body: dict,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     """
@@ -367,7 +367,7 @@ async def ai_explain(
 
 @router.get("/data-quality")
 async def ai_data_quality(
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     """
@@ -387,7 +387,7 @@ async def ai_data_quality(
 
 @router.get("/supply-chain")
 async def ai_supply_chain(
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     """Supplier performance analysis, overdue purchase orders, reorder recommendations."""
@@ -404,7 +404,7 @@ async def ai_supply_chain(
 @router.get("/usage")
 async def ai_usage(
     days: int = 30,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     """
@@ -412,10 +412,11 @@ async def ai_usage(
     (p50/p95) + success rate, and the grounding trust rate. Read-only aggregation
     of already-metered data (token_usage, agent_executions, grounding verifier).
 
-    Scoped to the caller's own restaurant, so any authenticated owner/staff can
-    see what their AI costs and how well it's working — the counterweight to the
-    ROI page's "what it saves." (Previously ADMIN-only, which hid it from owners,
-    who register as STAFF by default and so could never see their own usage.)
+    ADMIN-only, like the rest of /ai/* — this is management/cost intelligence, not
+    something a STAFF (POS) account needs. (An earlier comment claimed owners
+    register as STAFF and so were locked out; that was never true — register()
+    creates the owner as ADMIN, so gating this ADMIN keeps owners in and floor
+    staff out.)
     """
     restaurant = get_or_create_restaurant(db, current_user)
     days = min(max(days, 1), 365)

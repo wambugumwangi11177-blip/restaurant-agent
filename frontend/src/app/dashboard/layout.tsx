@@ -22,8 +22,13 @@ import {
     Cpu,
 } from "lucide-react";
 
+// adminOnly pages call management/AI endpoints that are ADMIN-gated on the
+// backend (routers/ai.py, analytics.py — RBAC pass 2026-07-11). Hiding their nav
+// entries from STAFF avoids sending floor staff to pages that would 403. STAFF
+// (POS role) keep the operational pages: POS, Kitchen, Orders, Menu, Stock,
+// Bookings, Sales (Sales reads /orders/, which stays staff-accessible).
 const navItems = [
-    { href: "/dashboard",              label: "Home",     icon: Home },
+    { href: "/dashboard",              label: "Home",     icon: Home, adminOnly: true },
     { href: "/dashboard/pos",          label: "POS",      icon: CreditCard },
     { href: "/dashboard/kitchen",      label: "Kitchen",  icon: ChefHat },
     { href: "/dashboard/orders",       label: "Orders",   icon: ShoppingBag },
@@ -33,13 +38,16 @@ const navItems = [
     { href: "/dashboard/sales",        label: "Sales",    icon: DollarSign },
     // The AI Command Center. Superseded /dashboard/insights, which served a
     // hardcoded Lavy demo and was deleted 2026-07-08.
-    { href: "/dashboard/ai",           label: "AI",       icon: Brain },
-    { href: "/dashboard/marketing",    label: "Growth",   icon: Megaphone },
-    { href: "/dashboard/roi",          label: "ROI",      icon: Clock },
-    // AI Ops shows this restaurant's OWN AI cost/reliability — visible to every
-    // signed-in user (data is tenant-scoped), not just admins.
-    { href: "/dashboard/ai-ops",       label: "AI Ops",   icon: Cpu },
+    { href: "/dashboard/ai",           label: "AI",       icon: Brain, adminOnly: true },
+    { href: "/dashboard/marketing",    label: "Growth",   icon: Megaphone, adminOnly: true },
+    { href: "/dashboard/roi",          label: "ROI",      icon: Clock, adminOnly: true },
+    // AI Ops shows this restaurant's OWN AI cost/reliability — ADMIN-only, like
+    // the rest of /ai/* (it reads /ai/usage).
+    { href: "/dashboard/ai-ops",       label: "AI Ops",   icon: Cpu, adminOnly: true },
 ];
+
+// STAFF land here instead of /dashboard (Home is an admin analytics page).
+const STAFF_HOME = "/dashboard/pos";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { user, logout, isLoading } = useAuth();
@@ -47,11 +55,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const pathname = usePathname();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
+    const isStaff = ((user as any)?.role || "").toLowerCase() === "staff";
+
     useEffect(() => {
         if (!isLoading && !user) {
             router.push("/login");
+            return;
         }
-    }, [user, isLoading, router]);
+        // Keep STAFF out of admin-only pages entirely — the backend already
+        // returns 403 there, so this avoids a broken page rather than enforcing
+        // security (which lives server-side). Redirect to their POS home.
+        if (!isLoading && user && isStaff) {
+            const onAdminPage = navItems.some(
+                (i) =>
+                    i.adminOnly &&
+                    // Home is "/dashboard" — match it exactly, never as a prefix,
+                    // or it would swallow every /dashboard/* path (incl. POS).
+                    (pathname === i.href ||
+                        (i.href !== "/dashboard" && pathname.startsWith(i.href + "/")))
+            );
+            if (onAdminPage) router.push(STAFF_HOME);
+        }
+    }, [user, isLoading, isStaff, pathname, router]);
 
     if (isLoading) {
         return (
@@ -82,7 +107,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                 {/* Nav */}
                 <nav className="p-3 space-y-0.5">
-                    {navItems.map((item) => {
+                    {navItems
+                        .filter((item) => !item.adminOnly || !isStaff)
+                        .map((item) => {
                         const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
                         return (
                             <Link

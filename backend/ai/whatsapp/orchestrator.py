@@ -73,13 +73,14 @@ def handle_natural_language(db: Session, restaurant_id: int, message: str) -> st
     keyword command. Runs a bounded tool-calling loop against the LLM and logs
     token usage to the token_usage table for per-tenant cost tracking.
     """
-    from ai import llm_client
+    from ai import llm_client, pii_scrub
     from ai.reasoning import grounding
 
     if not llm_client.is_available():
         return "I didn't understand that. Reply HELP to see all commands."
 
-    messages = [{"role": "user", "content": message}]
+    # Redact PII before the owner's free text leaves the process for the LLM.
+    messages = [{"role": "user", "content": pii_scrub.scrub_for_llm(message)}]
 
     # Every figure the model is allowed to state must trace to a deterministic
     # tool result it was actually handed. We accumulate the numbers from those
@@ -117,6 +118,11 @@ def handle_natural_language(db: Session, restaurant_id: int, message: str) -> st
                 continue
             fn = _TOOL_DISPATCH.get(block.name)
             result_text = fn(db, restaurant_id) if fn else f"Unknown tool: {block.name}"
+            # Scrub PII (e.g. the raw-phone fallback in winback/tonight summaries)
+            # BEFORE it's grounded and appended to the next LLM turn. Runs before
+            # collect_payload_numbers so money/percent figures still survive for
+            # grounding — only phone/code/PIN/ID patterns are stripped.
+            result_text = pii_scrub.scrub_for_llm(result_text)
             grounded_numbers |= grounding.collect_payload_numbers(result_text)
             tool_results.append({
                 "type": "tool_result",

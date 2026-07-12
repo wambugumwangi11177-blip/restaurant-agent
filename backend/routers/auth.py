@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from database import get_db
 import models, auth
-from pydantic import BaseModel
+from schemas import StrictModel
 from routers.deps import get_restaurant_or_none
 from rate_limit import limiter
 from time_utils import utcnow
@@ -36,23 +36,23 @@ LOCKOUT_MINUTES = 15
 
 # ── Request / Response schemas ────────────────────────────────────────────────
 
-class UserCreate(BaseModel):
+class UserCreate(StrictModel):
     email: str
     password: str
     tenant_name: str   # used as restaurant name on signup
 
 
-class Token(BaseModel):
+class Token(StrictModel):
     access_token: str
     token_type: str
 
 
-class LoginRequest(BaseModel):
+class LoginRequest(StrictModel):
     email: str
     password: str
 
 
-class RestaurantUpdate(BaseModel):
+class RestaurantUpdate(StrictModel):
     name: str | None = None
     address: str | None = None
     currency: str | None = None

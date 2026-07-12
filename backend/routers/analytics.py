@@ -8,7 +8,7 @@ directives/012_agentic_roadmap.md's standing rule on labeling honestly.
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from database import get_db
-from auth import get_current_user
+from auth import require_role
 import models
 from ai import menu_engineer, revenue_forecaster, kds_intelligence, inventory_predictor, reservation_optimizer, ops_manager
 from ai.analysis_clock import data_freshness
@@ -58,7 +58,7 @@ def ai_trust_stats():
 
 
 @router.get("/dashboard")
-def ai_dashboard(db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+def ai_dashboard(db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
     """AI Operations Manager — central intelligence dashboard."""
     rid = _get_restaurant_id(db, user)
     if not rid:
@@ -67,7 +67,7 @@ def ai_dashboard(db: Session = Depends(get_db), user: models.User = Depends(get_
 
 
 @router.get("/menu-engineering")
-def menu_engineering(narrate: bool = True, db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+def menu_engineering(narrate: bool = True, db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
     """
     Menu Engineering Matrix — Star/Plowhorse/Puzzle/Dog classification.
     Numbers are deterministic; when an LLM provider is set (and narrate=true) a
@@ -87,7 +87,7 @@ def menu_engineering(narrate: bool = True, db: Session = Depends(get_db), user: 
 
 
 @router.get("/revenue-forecast")
-def revenue_forecast(db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+def revenue_forecast(db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
     """Revenue forecasting with trends and predictions."""
     rid = _get_restaurant_id(db, user)
     if not rid:
@@ -96,7 +96,7 @@ def revenue_forecast(db: Session = Depends(get_db), user: models.User = Depends(
 
 
 @router.get("/kds-intelligence")
-def kds_intel(db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+def kds_intel(db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
     """Kitchen Display System intelligence — prep times, bottlenecks, throughput."""
     rid = _get_restaurant_id(db, user)
     if not rid:
@@ -105,7 +105,7 @@ def kds_intel(db: Session = Depends(get_db), user: models.User = Depends(get_cur
 
 
 @router.get("/inventory-predictions")
-def inventory_intel(db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+def inventory_intel(db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
     """Inventory intelligence — depletion forecasts, reorder alerts, spoilage risk."""
     rid = _get_restaurant_id(db, user)
     if not rid:
@@ -114,7 +114,7 @@ def inventory_intel(db: Session = Depends(get_db), user: models.User = Depends(g
 
 
 @router.get("/reservation-insights")
-def reservation_intel(db: Session = Depends(get_db), user: models.User = Depends(get_current_user)):
+def reservation_intel(db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
     """Reservation intelligence — no-show analysis, table utilization, revenue per seat."""
     rid = _get_restaurant_id(db, user)
     if not rid:

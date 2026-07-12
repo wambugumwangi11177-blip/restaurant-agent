@@ -1,11 +1,21 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime, date, time
+
+
+class StrictModel(BaseModel):
+    """Base for all request/response schemas: rejects unrecognized fields with a
+    422 instead of silently dropping them. Closes threat-model risk R6 — a client
+    (or attacker) sending an unexpected field no longer has it quietly ignored.
+    Output models that read from ORM objects add `from_attributes=True` on top of
+    this via their own model_config (extra="forbid" is safe there: attribute-based
+    validation only ever reads declared fields)."""
+    model_config = ConfigDict(extra="forbid")
 
 # ──────────────────────────────────────────────
 # AUTH
 # ──────────────────────────────────────────────
-class UserBase(BaseModel):
+class UserBase(StrictModel):
     email: str
 
 class UserCreate(UserBase):
@@ -17,20 +27,19 @@ class User(UserBase):
     is_active: bool = True
     role: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
-class Token(BaseModel):
+class Token(StrictModel):
     access_token: str
     token_type: str
 
-class TokenData(BaseModel):
+class TokenData(StrictModel):
     email: Optional[str] = None
 
 # ──────────────────────────────────────────────
 # MENU
 # ──────────────────────────────────────────────
-class MenuItemBase(BaseModel):
+class MenuItemBase(StrictModel):
     name: str
     price: int  # In cents
     category: str
@@ -40,7 +49,7 @@ class MenuItemBase(BaseModel):
 class MenuItemCreate(MenuItemBase):
     pass
 
-class MenuItemUpdate(BaseModel):
+class MenuItemUpdate(StrictModel):
     name: Optional[str] = None
     price: Optional[int] = None
     category: Optional[str] = None
@@ -51,17 +60,16 @@ class MenuItem(MenuItemBase):
     id: int
     restaurant_id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 # ──────────────────────────────────────────────
 # ORDERS
 # ──────────────────────────────────────────────
-class OrderItemCreate(BaseModel):
+class OrderItemCreate(StrictModel):
     menu_item_id: int
     quantity: int = 1
 
-class OrderCreate(BaseModel):
+class OrderCreate(StrictModel):
     items: List[OrderItemCreate]
     order_type: str = "dine_in"          # dine_in, takeout, delivery
     delivery_channel: str = "walk_in"    # walk_in, app, uber_eats, bolt_food, glovo
@@ -72,17 +80,16 @@ class OrderCreate(BaseModel):
     notes: str = ""
     consent: bool = False   # required True on the public (customer-facing) endpoint only
 
-class OrderItemOut(BaseModel):
+class OrderItemOut(StrictModel):
     id: int
     menu_item_id: int
     quantity: int
     unit_price: int
     item_name: str = ""
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
-class OrderOut(BaseModel):
+class OrderOut(StrictModel):
     id: int
     status: str
     order_type: str
@@ -98,20 +105,19 @@ class OrderOut(BaseModel):
     completed_at: Optional[datetime]
     items: List[OrderItemOut] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
-class OrderStatusUpdate(BaseModel):
+class OrderStatusUpdate(StrictModel):
     status: str   # pending, prep, ready, served, cancelled
 
-class OrderPaymentUpdate(BaseModel):
+class OrderPaymentUpdate(StrictModel):
     payment_method: str  # cash, mpesa, card
     is_paid: bool = True
 
 # ──────────────────────────────────────────────
 # INVENTORY
 # ──────────────────────────────────────────────
-class InventoryItemCreate(BaseModel):
+class InventoryItemCreate(StrictModel):
     item_name: str
     quantity: float = 0
     unit: str = "kg"
@@ -119,7 +125,7 @@ class InventoryItemCreate(BaseModel):
     low_stock_threshold: int = 10
     expiry_days: int = 30
 
-class InventoryItemUpdate(BaseModel):
+class InventoryItemUpdate(StrictModel):
     item_name: Optional[str] = None
     quantity: Optional[float] = None
     unit: Optional[str] = None
@@ -127,7 +133,7 @@ class InventoryItemUpdate(BaseModel):
     low_stock_threshold: Optional[int] = None
     expiry_days: Optional[int] = None
 
-class InventoryItemOut(BaseModel):
+class InventoryItemOut(StrictModel):
     id: int
     item_name: str
     quantity: float
@@ -136,22 +142,21 @@ class InventoryItemOut(BaseModel):
     low_stock_threshold: int
     expiry_days: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
-class StockReceive(BaseModel):
+class StockReceive(StrictModel):
     quantity: float
     cost_per_unit: Optional[float] = None
     supplier: str = ""
 
-class StockAdjust(BaseModel):
+class StockAdjust(StrictModel):
     quantity: float     # Positive = add, negative = remove
     reason: str = ""    # waste, breakage, correction
 
 # ──────────────────────────────────────────────
 # RESERVATIONS
 # ──────────────────────────────────────────────
-class ReservationCreate(BaseModel):
+class ReservationCreate(StrictModel):
     customer_name: str
     customer_phone: str = ""
     customer_email: str = ""
@@ -163,7 +168,7 @@ class ReservationCreate(BaseModel):
     deposit_paid: bool = False
     notes: str = ""
 
-class ReservationOut(BaseModel):
+class ReservationOut(StrictModel):
     id: int
     customer_name: str
     customer_phone: str
@@ -182,8 +187,7 @@ class ReservationOut(BaseModel):
     table_id: Optional[int]
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
-class ReservationStatusUpdate(BaseModel):
+class ReservationStatusUpdate(StrictModel):
     status: str  # confirmed, cancelled, completed, no_show

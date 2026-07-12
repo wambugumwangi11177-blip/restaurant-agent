@@ -27,7 +27,7 @@ async def get_inventory(
 async def create_inventory_item(
     item: schemas.InventoryItemCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     db_item = models.InventoryItem(
@@ -50,7 +50,7 @@ async def update_inventory_item(
     item_id: int,
     item_update: schemas.InventoryItemUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     db_item = db.query(models.InventoryItem).filter(
@@ -134,7 +134,7 @@ async def adjust_stock(
 async def delete_inventory_item(
     item_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     db_item = db.query(models.InventoryItem).filter(

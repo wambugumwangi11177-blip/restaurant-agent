@@ -20,7 +20,7 @@ import csv
 import io
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from schemas import StrictModel
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func
 
@@ -183,7 +183,7 @@ async def export_customers_csv(
 
 # ── Erasure ───────────────────────────────────────────────────────────────────
 
-class EraseCustomerRequest(BaseModel):
+class EraseCustomerRequest(StrictModel):
     customer_phone: str
 
 

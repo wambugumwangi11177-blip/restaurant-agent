@@ -105,6 +105,11 @@ class Restaurant(Base):
     # Preferred channel for owner alerts: "whatsapp" (default), "sms", or "both".
     # SMS matters in Kenya where not every owner uses WhatsApp.
     owner_channel = Column(String, default="whatsapp")
+    # Enterprise hierarchy (Phase 10). Nullable + backward-compatible: a single
+    # independent restaurant leaves both null and behaves exactly as before; a
+    # chain groups its sites under an Organization and (optionally) a Region.
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
+    region_id       = Column(Integer, ForeignKey("regions.id"), nullable=True, index=True)
 
     tenant = relationship("Tenant", back_populates="restaurants")
     menu_items = relationship("MenuItem", back_populates="restaurant")
@@ -801,3 +806,100 @@ class CustomerFeedback(Base):
     __table_args__ = (
         Index("ix_customer_feedback_restaurant_created", "restaurant_id", "created_at"),
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WORKFLOW ENGINE (Phase 8) — durable, multi-step agentic processes
+# ─────────────────────────────────────────────────────────────────────────────
+
+class WorkflowRun(Base):
+    """
+    One durable run of a workflow template (e.g. a low-stock → reorder → notify
+    process). State lives here, in the DB, NOT in memory — so a run survives a
+    restart and can pause for hours on a human approval or an external reply.
+
+    status: running | awaiting | completed | failed | cancelled
+      - awaiting: paused on a human_approval or wait_external step until resumed.
+    """
+    __tablename__ = "workflow_runs"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
+    template      = Column(String, nullable=False)
+    status        = Column(String, nullable=False, default="running")
+    context_json  = Column(Text, default="{}")   # accumulated data passed between steps
+    current_step  = Column(Integer, default=0)    # index of the next step to run
+    created_at    = Column(DateTime, default=utcnow)
+    updated_at    = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    restaurant = relationship("Restaurant")
+    steps      = relationship("WorkflowStep", back_populates="run",
+                              order_by="WorkflowStep.seq", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_workflow_runs_restaurant_status", "restaurant_id", "status"),
+    )
+
+
+class WorkflowStep(Base):
+    """
+    One step of a workflow run. step_type drives executor behaviour:
+      agent_call     — runs a deterministic handler, then auto-advances.
+      human_approval — pauses the run (awaiting) until an owner approves/rejects.
+      wait_external  — pauses until an external event resumes it (e.g. supplier reply).
+      notify         — sends an owner notification, then auto-advances.
+
+    status: pending | running | done | awaiting | skipped | failed
+    """
+    __tablename__ = "workflow_steps"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    run_id       = Column(Integer, ForeignKey("workflow_runs.id"), nullable=False)
+    seq          = Column(Integer, nullable=False)
+    name         = Column(String, nullable=False)
+    step_type    = Column(String, nullable=False)
+    status       = Column(String, nullable=False, default="pending")
+    output_json  = Column(Text, default="{}")
+    error        = Column(Text, default="")
+    created_at   = Column(DateTime, default=utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+    run = relationship("WorkflowRun", back_populates="steps")
+
+    __table_args__ = (
+        Index("ix_workflow_steps_run_seq", "run_id", "seq"),
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENTERPRISE HIERARCHY (Phase 10) — chains / franchises above Restaurant
+# ─────────────────────────────────────────────────────────────────────────────
+
+class Organization(Base):
+    """
+    A chain/franchise grouping several restaurants under one tenant. Optional —
+    single-location tenants never create one. Cross-location benchmarking and the
+    enterprise audit center scope to an organization.
+    """
+    __tablename__ = "organizations"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    tenant_id  = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
+    name       = Column(String, nullable=False)
+    created_at = Column(DateTime, default=utcnow)
+
+    tenant = relationship("Tenant")
+
+
+class Region(Base):
+    """A geographic/operational grouping of restaurants within an organization
+    (e.g. 'Nairobi', 'Coast'), for regional-manager scoping and roll-ups."""
+    __tablename__ = "regions"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    name            = Column(String, nullable=False)
+    manager_email   = Column(String, default="")
+    created_at      = Column(DateTime, default=utcnow)
+
+    organization = relationship("Organization")

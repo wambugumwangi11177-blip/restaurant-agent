@@ -378,6 +378,33 @@ class MemoryEvent(Base):
     )
 
 
+class ConversationTurn(Base):
+    """
+    Short-term conversation memory for the WhatsApp LLM orchestrator (Phase 6).
+    Persists each owner<->assistant turn so a follow-up ("and last week?") has
+    context the current stateless-per-message path lacks.
+
+    Keyed by restaurant_id ALONE, deliberately: the owner is the only free-form
+    LLM user per restaurant (customers use the deterministic keyword path in
+    brain.handle_customer_message, which never reaches the LLM), so no per-sender
+    threading is needed. Gated behind FEATURE_CONVERSATION_MEMORY (default off);
+    nothing reads/writes this table until the flag is enabled.
+    """
+    __tablename__ = "conversation_turns"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
+    role          = Column(String, nullable=False)   # "user" | "assistant"
+    content       = Column(Text, nullable=False)
+    created_at    = Column(DateTime, default=utcnow)
+
+    restaurant = relationship("Restaurant")
+
+    __table_args__ = (
+        Index("ix_conversation_turns_restaurant_created", "restaurant_id", "created_at"),
+    )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # LAYER 3: KNOWLEDGE GRAPH — INGREDIENT TO MENU ITEM MAPPING
 # ─────────────────────────────────────────────────────────────────────────────

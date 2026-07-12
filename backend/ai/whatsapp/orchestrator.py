@@ -84,7 +84,15 @@ def handle_natural_language(db: Session, restaurant_id: int, message: str) -> st
         return "I didn't understand that. Reply HELP to see all commands."
 
     # Redact PII before the owner's free text leaves the process for the LLM.
-    messages = [{"role": "user", "content": pii_scrub.scrub_for_llm(message)}]
+    scrubbed = pii_scrub.scrub_for_llm(message)
+
+    # Short-term memory (Phase 6), flag-gated. When on, prepend the recent
+    # owner<->assistant turns so a follow-up ("and last week?") has context.
+    # Default off -> history is [], behaviour identical to the stateless path.
+    from ai.whatsapp import conversation
+    use_memory = feature_flags.is_enabled("conversation_memory")
+    history = conversation.load_recent(db, restaurant_id) if use_memory else []
+    messages = history + [{"role": "user", "content": scrubbed}]
 
     # Every figure the model is allowed to state must trace to a deterministic
     # tool result it was actually handed. We accumulate the numbers from those
@@ -113,7 +121,13 @@ def handle_natural_language(db: Session, restaurant_id: int, message: str) -> st
                         "[Orchestrator] redacted ungrounded numbers %s from reply",
                         ungrounded,
                     )
-            return reply or "I didn't understand that. Reply HELP to see all commands."
+            final = reply or "I didn't understand that. Reply HELP to see all commands."
+            # Persist the exchange (scrubbed user text + the grounded reply) so the
+            # next message can build on it. Own session, never blocks the reply.
+            if use_memory:
+                conversation.save_turn(restaurant_id, "user", scrubbed)
+                conversation.save_turn(restaurant_id, "assistant", final)
+            return final
 
         messages.append({"role": "assistant", "content": response.content})
         tool_results = []

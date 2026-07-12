@@ -373,6 +373,27 @@ def get_ai_ops_summary(db: Session, restaurant_id: int, days: int = 30) -> dict:
         grounding = {"grounding_enabled": True}
         current_prompt_version = None
 
+    # ── Money conversion (Phase 5): token counts → dollars, per model + total ─
+    from ai.cost_model import cost_usd, USD_TO_KES
+    total_cost_usd = 0.0
+    for model_name, m in by_model.items():
+        c = round(cost_usd(model_name, m["input_tokens"], m["output_tokens"]), 4)
+        m["cost_usd"] = c
+        total_cost_usd += c
+    total_cost_usd = round(total_cost_usd, 4)
+    cost_per_response = round(total_cost_usd / len(usage), 4) if usage else 0.0
+
+    # Cost vs. profit-generated — the "is the AI paying for itself" line. Profit
+    # comes from roi/savings.money_captured (approved pricing recs), kept as its
+    # own already-audited figure; never blended into the token cost.
+    money_captured_cents = 0
+    try:
+        from ai.roi.savings import get_roi_savings
+        money_captured_cents = get_roi_savings(db, restaurant_id).get(
+            "money_captured", {}).get("monthly_impact_cents", 0)
+    except Exception:  # noqa: BLE001
+        pass
+
     return {
         "window_days": days,
         "llm": {
@@ -382,11 +403,73 @@ def get_ai_ops_summary(db: Session, restaurant_id: int, days: int = 30) -> dict:
             "current_prompt_version": current_prompt_version,
             "by_model": by_model,
             "by_prompt_version": by_prompt_version,
+            "cost_usd": total_cost_usd,
+            "cost_kes_cents": int(round(total_cost_usd * USD_TO_KES * 100)),
+            "cost_per_response_usd": cost_per_response,
+        },
+        "economics": {
+            "llm_cost_usd": total_cost_usd,
+            "llm_cost_kes_cents": int(round(total_cost_usd * USD_TO_KES * 100)),
+            "profit_generated_cents": money_captured_cents,
+            "note": "Profit is from approved pricing recommendations (roi/savings); "
+                    "never summed with token cost.",
         },
         "agents": agents,
+        "scorecards": get_agent_scorecards(db, restaurant_id, days=days),
         "grounding": grounding,
         "quality_drift": get_quality_drift(db, restaurant_id, days=days),
     }
+
+
+def get_agent_scorecards(db: Session, restaurant_id: int, days: int = 30) -> list[dict]:
+    """
+    Per-agent scorecard for the AI-Ops view: forecast accuracy (for agents that
+    record+evaluate predictions) and the owner acceptance rate (for pricing,
+    from approved vs rejected recommendations). Deterministic aggregation of
+    already-recorded data — nothing new is computed about the business here.
+    """
+    from datetime import timedelta
+    cutoff = utcnow() - timedelta(days=days)
+
+    # Which agents have evaluated predictions in the window → accuracy per agent.
+    agent_names = [
+        r[0] for r in db.query(models.AgentPrediction.agent_name)
+        .filter(models.AgentPrediction.restaurant_id == restaurant_id,
+                models.AgentPrediction.evaluated_at >= cutoff)
+        .distinct().all()
+    ]
+    cards: list[dict] = []
+    for name in sorted(agent_names):
+        acc = get_agent_accuracy(db, restaurant_id, name, days=days)
+        cards.append({
+            "agent": name,
+            "prediction_count": acc.get("prediction_count", 0),
+            "mae_pct": acc.get("mae_pct"),
+            "ci_coverage_pct": acc.get("ci_coverage_pct"),
+            "quality": acc.get("quality"),
+        })
+
+    # Pricing acceptance rate: approved / (approved + rejected) in the window.
+    approved = db.query(models.PricingRecommendation).filter(
+        models.PricingRecommendation.restaurant_id == restaurant_id,
+        models.PricingRecommendation.status == "APPROVED",
+        models.PricingRecommendation.actioned_at >= cutoff,
+    ).count()
+    rejected = db.query(models.PricingRecommendation).filter(
+        models.PricingRecommendation.restaurant_id == restaurant_id,
+        models.PricingRecommendation.status == "REJECTED",
+        models.PricingRecommendation.actioned_at >= cutoff,
+    ).count()
+    decided = approved + rejected
+    if decided:
+        cards.append({
+            "agent": "pricing_intelligence",
+            "acceptance_rate_pct": round(100 * approved / decided, 1),
+            "approved": approved,
+            "rejected": rejected,
+        })
+
+    return cards
 
 
 def get_quality_drift(db: Session, restaurant_id: int, days: int = 30,

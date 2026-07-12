@@ -134,6 +134,16 @@ def _start_scheduler():
             replace_existing=True,
         )
 
+        # Phase 5 continuous-learning loop — once daily, early, before the
+        # morning briefing so the accuracy/drift numbers it feeds are fresh.
+        scheduler.add_job(
+            _run_learning_cycle_job,
+            CronTrigger(hour=2, minute=0),   # 05:00 EAT
+            id="learning_cycle",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+
         scheduler.start()
         logger.info("[OK] Scheduler started (morning briefing: 07:00 EAT)")
     except ImportError:
@@ -195,6 +205,21 @@ def _run_stock_check_job():
         run_stock_check(SessionLocal)
     except Exception as exc:
         logger.error(f"[Stock Check] Scheduler job failed: {exc}")
+
+
+def _run_learning_cycle_job():
+    """Phase 5 continuous-learning loop: record tomorrow's revenue forecast and
+    score any matured predictions against actuals, across every restaurant."""
+    try:
+        from database import SessionLocal
+        from ai.evaluation.learning import run_learning_cycle
+        db = SessionLocal()
+        try:
+            run_learning_cycle(db)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Learning Cycle] Scheduler job failed: {exc}")
 
 
 def _run_slow_day_check_job():

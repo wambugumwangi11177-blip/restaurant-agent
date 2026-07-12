@@ -40,6 +40,53 @@ export const AI_EXPLAIN: Record<string, Explainer> = {
             { t: "Channel", d: "Walk-in vs delivery. After Uber/Glovo/Bolt take 20–25%, delivery often earns much less." },
         ],
     },
+    decisions: {
+        what: "Collects every recommendation from all your AI brains — pricing, stock, suppliers, menu, staffing, marketing — and ranks them into one 'do this first' list.",
+        where: "Each brain's own findings, scored together by four things: how much money it moves, how sure we are, how risky it is, and how hard it is to do.",
+        caveat: "Only pricing gives an exact shillings-per-month figure today. Operational fixes (reorder, staffing, suppliers) are ranked on confidence, risk and effort — never on a made-up money number.",
+        terms: [
+            { t: "Priority score", d: "0–100 overall — how worth-doing this is, blending impact, confidence, safety and ease. Higher = do it sooner." },
+            { t: "Impact", d: "How much money the change moves per month. Empty stars mean the brain didn't put a shilling figure on it." },
+            { t: "Ease", d: "How little effort it takes. More stars = quicker to do (a price change is one click; renegotiating a supplier isn't)." },
+            { t: "Safety", d: "How low the downside is. More stars = safer to try with little risk of backfiring." },
+            { t: "Confidence", d: "How sure the brain is, based on how much of your data backs the recommendation." },
+        ],
+    },
+    strategy: {
+        what: "Give it a business goal and it acts like a CEO: it asks every specialist brain what they'd do, tests the best ideas, then hands you one ranked plan of steps.",
+        where: "The ranked decisions from all your brains, the what-if simulator, the knowledge graph (what affects what), and your revenue outlook — combined into a sequence.",
+        caveat: "It only suggests. Nothing changes until you approve each step (a price change, a promo, a reorder) the normal way. If no AI provider is set up, it still gives you the ranked plan without the written narrative.",
+        terms: [
+            { t: "Goal", d: "What you want to achieve, in plain words — e.g. 'increase monthly profit by KES 100,000' or 'cut waste'." },
+            { t: "Plan step", d: "One concrete action, in priority order — the biggest, safest, easiest wins first." },
+            { t: "Reasoning trace", d: "The receipts: which brains the agent consulted and what each said, so the plan isn't a black box." },
+            { t: "Ranked mode", d: "Shown when no AI writer is connected — you still get the prioritised plan, just without the written explanation." },
+        ],
+    },
+    twin: {
+        what: "A forward look at your revenue that mixes your own sales pattern with what's coming on the calendar — public holidays and school breaks — so you can plan stock and staff ahead.",
+        where: "Your last 30 days of sales for the day-by-day baseline, plus a built-in list of Kenyan public holidays and school-term breaks. Weather and match days can be added later.",
+        caveat: "It's a projection, not a promise. Holiday and school-break effects are sensible general assumptions, not measured for your specific restaurant — shown separately from your baseline so you can see the difference. The further out, the less certain.",
+        terms: [
+            { t: "Baseline", d: "What you'd earn from your normal weekly pattern alone, with no special days." },
+            { t: "Projected", d: "The baseline adjusted up or down for holidays and school breaks in the window." },
+            { t: "Uplift", d: "The difference the calendar makes — extra revenue expected from those special days." },
+            { t: "Range", d: "A low-to-high band. A wider band means less certainty (further out, or a big special day)." },
+            { t: "Demand mover", d: "A specific upcoming day a holiday or school break is expected to change your takings." },
+        ],
+    },
+    simulate: {
+        what: "Lets you try a price change on paper first. Pick a dish, propose a new price, and see what would likely happen to sales, profit and margin before you commit.",
+        where: "Your last 30 days of sales for that dish, plus a demand model that assumes people buy a bit less when a price goes up and a bit more when it drops — tuned by how hot or slow the dish is running.",
+        caveat: "It's a projection, not a promise. The satisfaction figure is a rough proxy, not a real survey. Big price jumps are less reliable — the model is most accurate near the current price.",
+        terms: [
+            { t: "Verdict", d: "YES = projected to help with little risk. CAUTION = mixed (test it). NO = projected to hurt profit or break the healthy margin floor." },
+            { t: "Sales change", d: "How much order volume is expected to move. Prices up usually means slightly fewer orders." },
+            { t: "Profit / mo", d: "The projected change in monthly profit after ingredient cost — the number that actually matters." },
+            { t: "Elasticity", d: "How sensitive this dish is to price. A hot-selling dish takes a price rise better than a slow one." },
+            { t: "Confidence", d: "How much to trust the projection, based on how much sales history backs it and how big the change is." },
+        ],
+    },
     pricing: {
         what: "Watches how fast each dish sells and whether its price still makes sense, then suggests small changes.",
         where: "Your last 30 days of sales speed plus cost prices. New dishes (under 14 days of data) only get margin fixes, not demand-based changes.",

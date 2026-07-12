@@ -32,6 +32,10 @@ import { NarrativeBlock, type Narrative } from "@/components/ai/NarrativeBlock";
 import { ExplainButton } from "@/components/ai/ExplainButton";
 import { MiniStat } from "@/components/ai/MiniStat";
 import { ModuleShell } from "@/components/ai/ModuleShell";
+import { DecisionCard, type Decision } from "@/components/ai/DecisionCard";
+import { WhatIfSimulator } from "@/components/ai/WhatIfSimulator";
+import { StrategyAgent } from "@/components/ai/StrategyAgent";
+import { DigitalTwin } from "@/components/ai/DigitalTwin";
 
 // Mirrors the actual shape returned by ai/ops_manager.get_operations_dashboard
 // (served via GET /ai/dashboard) — this page previously assumed field names
@@ -261,6 +265,19 @@ export default function AiDashboard() {
                 ))}
             </div>
 
+            {/* CEO Strategy Agent — goal in, one prioritized plan out. */}
+            <StrategyAgent />
+
+            {/* Decision Intelligence — every agent's recommendations, ranked into
+                one prioritised stream. The owner's "what should I do first" view. */}
+            <DecisionsSection />
+
+            {/* What-If Simulator — test a price change before committing. */}
+            <WhatIfSimulator />
+
+            {/* Digital Twin — forward revenue projection with calendar signals. */}
+            <DigitalTwin />
+
             {/* Concrete, prioritised actions to raise the health score */}
             <HealthBoostSection breakdown={data!.health_breakdown} score={hs} />
 
@@ -351,6 +368,55 @@ export default function AiDashboard() {
 }
 
 /* ── Inline AI module sections ─────────────────────────────────────────── */
+
+function DecisionsSection() {
+    interface DecisionsData {
+        summary: {
+            total_decisions: number;
+            quantified_decisions: number;
+            total_monthly_impact_cents: number;
+            top_action: string | null;
+            by_category: Record<string, number>;
+        };
+        decisions: Decision[];
+        narrative?: Narrative;
+    }
+    const { data, loading, error, retry } = useAiModule<DecisionsData>("/ai/decisions");
+
+    return (
+        <ModuleShell
+            icon={Brain}
+            title="Decision Intelligence"
+            subtitle="Every agent's recommendations, ranked by impact, confidence, risk and effort"
+            explainKey="decisions"
+            loading={loading}
+            error={error}
+            onRetry={retry}
+        >
+            {data && (
+                <>
+                    <NarrativeBlock n={data.narrative} />
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                        <MiniStat label="Open Decisions" value={data.summary.total_decisions} />
+                        <MiniStat label="Quantified" value={data.summary.quantified_decisions} />
+                        <MiniStat label="Total Impact" value={formatKES(data.summary.total_monthly_impact_cents)} />
+                    </div>
+                    {data.decisions.length === 0 ? (
+                        <p className="text-[#525252] text-sm">
+                            No open decisions right now — every agent is happy with the current setup.
+                        </p>
+                    ) : (
+                        <div className="space-y-2">
+                            {data.decisions.slice(0, 8).map((d, i) => (
+                                <DecisionCard key={`${d.category}-${d.rank}`} d={d} highlight={i === 0} />
+                            ))}
+                        </div>
+                    )}
+                </>
+            )}
+        </ModuleShell>
+    );
+}
 
 function PricingSection() {
     interface PricingData {

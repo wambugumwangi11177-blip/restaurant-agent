@@ -24,7 +24,7 @@ import { useAuth } from "@/context/AuthContext";
 import { formatKES } from "@/lib/format";
 import { HowItWorks } from "@/components/ai/HowItWorks";
 import { NarrativeBlock, type Narrative } from "@/components/ai/NarrativeBlock";
-import { Clock, TrendingUp, Target, RefreshCw, AlertTriangle, Zap, ChefHat, Info } from "lucide-react";
+import { Clock, TrendingUp, Target, RefreshCw, AlertTriangle, Zap, ChefHat, Info, ArrowUpRight, ArrowDownRight, Scale, CalendarClock } from "lucide-react";
 
 interface RoiBreakdownItem {
     category: string;
@@ -41,10 +41,17 @@ interface RoiData {
         avg_hourly_rate_cents: number;
         hourly_rate_is_estimated: boolean;
         breakdown: RoiBreakdownItem[];
+        hours_saved_prev_30d?: number;
+        money_saved_prev_cents?: number;
+        hours_change_pct?: number | null;
     };
     money_captured: {
         monthly_impact_cents: number;
         recommendations_approved: number;
+        prev_monthly_impact_cents?: number;
+        change_pct?: number | null;
+        all_time_monthly_impact_cents?: number;
+        all_time_approved?: number;
     };
     opportunities: { source: string; label: string; monthly_value_cents: number }[];
     capacity: {
@@ -53,8 +60,31 @@ interface RoiData {
         bottlenecks_found: number;
         reclaimable_delay_minutes: number;
     } | null;
+    economics?: {
+        ai_cost_cents: number;
+        value_delivered_cents: number;
+        roi_multiple: number | null;
+    };
+    projection?: {
+        annual_hours_saved: number;
+        annual_money_saved_cents: number;
+        annual_captured_cents: number;
+    };
     narrative?: Narrative;
     error?: string;
+}
+
+// Small signed-percentage delta chip. Green when up, muted red when down,
+// nothing at all when there's no prior baseline (null) — never a fake "0%".
+function TrendChip({ pct }: { pct?: number | null }) {
+    if (pct === null || pct === undefined) return null;
+    const up = pct >= 0;
+    return (
+        <span className={`inline-flex items-center gap-0.5 text-[11px] font-medium ${up ? "text-emerald-400" : "text-red-400"}`}>
+            {up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+            {Math.abs(pct)}% vs prior 30d
+        </span>
+    );
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -200,6 +230,8 @@ export default function RoiDashboard() {
     const mc = data!.money_captured;
     const opps = data!.opportunities;
     const cap = data!.capacity;
+    const econ = data!.economics;
+    const proj = data!.projection;
     const oppsTotal = opps.reduce((sum, o) => sum + o.monthly_value_cents, 0);
 
     // "Saved every day" framing — the owner's core question. The window is 30
@@ -269,6 +301,7 @@ export default function RoiDashboard() {
                         ≈ {formatKES(ts.money_saved_cents)}
                         {ts.hourly_rate_is_estimated ? " (estimated wage)" : " (your staff wages)"}
                     </p>
+                    <div className="mt-1"><TrendChip pct={ts.hours_change_pct} /></div>
                     <HowItWorks id="roi_time" />
                 </div>
 
@@ -282,6 +315,12 @@ export default function RoiDashboard() {
                         from {mc.recommendations_approved} approved pricing recommendation
                         {mc.recommendations_approved === 1 ? "" : "s"}
                     </p>
+                    <div className="mt-1"><TrendChip pct={mc.change_pct} /></div>
+                    {!!mc.all_time_approved && mc.all_time_monthly_impact_cents !== undefined && (
+                        <p className="text-[11px] text-[#525252] mt-2 pt-2 border-t border-[#d4a853]/15">
+                            All-time: <span className="text-[#a3a3a3]">{formatKES(mc.all_time_monthly_impact_cents)}/mo</span> standing uplift from {mc.all_time_approved} approved change{mc.all_time_approved === 1 ? "" : "s"}
+                        </p>
+                    )}
                     <HowItWorks id="roi_captured" />
                 </div>
 
@@ -295,6 +334,32 @@ export default function RoiDashboard() {
                     <HowItWorks id="roi_opportunities" />
                 </div>
             </div>
+
+            {/* Net ROI — the "is it worth what it costs?" answer. Only shown once
+                there's metered AI spend to divide by; otherwise it would be a
+                divide-by-zero dressed up as a number. */}
+            {econ && econ.roi_multiple !== null && econ.roi_multiple !== undefined && (
+                <div className="rounded-xl border border-[#d4a853]/30 bg-gradient-to-br from-[#d4a853]/[0.07] to-transparent p-5">
+                    <div className="flex items-center gap-2 text-[#d4a853] mb-2">
+                        <Scale className="w-4 h-4" />
+                        <p className="text-xs uppercase tracking-widest">Net return on your AI</p>
+                    </div>
+                    <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
+                        <p className="text-3xl font-black text-[#e5e5e5]">
+                            {econ.roi_multiple}× <span className="text-base font-bold text-[#737373]">return</span>
+                        </p>
+                        <p className="text-[#a3a3a3] text-sm mb-1">
+                            Every <span className="text-[#e5e5e5] font-medium">{formatKES(100)}</span> spent on AI returned{" "}
+                            <span className="text-emerald-400 font-medium">{formatKES(Math.round(econ.roi_multiple * 100))}</span> in value.
+                        </p>
+                    </div>
+                    <p className="text-[11px] text-[#525252] mt-2">
+                        {formatKES(econ.value_delivered_cents)} value delivered (time saved + profit captured) vs{" "}
+                        {formatKES(econ.ai_cost_cents)} in AI cost, last {days} days. Opportunities not yet captured are excluded — this counts only real money.
+                    </p>
+                    <HowItWorks id="roi_net" />
+                </div>
+            )}
 
             {/* Grounded AI reading (same trust badge as the AI Command Center) */}
             <NarrativeBlock n={data!.narrative} />
@@ -378,6 +443,34 @@ export default function RoiDashboard() {
                         <div>
                             <p className="text-2xl font-bold text-[#e5e5e5]">{cap.reclaimable_delay_minutes}<span className="text-sm text-[#525252]"> min</span></p>
                             <p className="text-[#525252] text-xs mt-1">reclaimable delay</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Annual run-rate — a simple ×12 projection of the two monthly money
+                figures. Framed as "at the current pace", never a guarantee. */}
+            {proj && (proj.annual_money_saved_cents > 0 || proj.annual_captured_cents > 0) && (
+                <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
+                    <div className="flex items-center gap-2 text-[#e5e5e5] mb-1">
+                        <CalendarClock className="w-4 h-4 text-[#d4a853]" />
+                        <p className="font-semibold text-sm">At this pace, over a year</p>
+                    </div>
+                    <p className="text-[#525252] text-xs mb-4">
+                        A straight projection of your current monthly savings — shown to size the opportunity, not as a promise.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <p className="text-2xl font-bold text-[#e5e5e5]">{proj.annual_hours_saved.toLocaleString()}<span className="text-sm text-[#525252]"> hrs</span></p>
+                            <p className="text-[#525252] text-xs mt-1">staff time saved / year</p>
+                        </div>
+                        <div>
+                            <p className="text-2xl font-bold text-emerald-400">{formatKES(proj.annual_money_saved_cents)}</p>
+                            <p className="text-[#525252] text-xs mt-1">labour value / year</p>
+                        </div>
+                        <div>
+                            <p className="text-2xl font-bold text-[#d4a853]">{formatKES(proj.annual_captured_cents)}</p>
+                            <p className="text-[#525252] text-xs mt-1">captured profit / year</p>
                         </div>
                     </div>
                 </div>

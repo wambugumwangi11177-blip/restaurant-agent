@@ -197,6 +197,16 @@ export const AI_EXPLAIN: Record<string, Explainer> = {
             { t: "Overtime", d: "Extra wage cost flagged for review." },
         ],
     },
+    roi_net: {
+        what: "The honest bottom line: for every shilling your AI costs to run, how many shillings of real value it gave back.",
+        where: "Value = the two 'real money' figures on this page — staff time saved (priced at your wage) plus profit you captured by approving price changes. Cost = your AI's actual token spend over the last 30 days, priced by the same table AI Ops uses.",
+        caveat: "Opportunities you haven't acted on yet are deliberately left out — this ratio only counts money that has actually moved. It only appears once there's real AI spend to divide by.",
+        terms: [
+            { t: "Value delivered", d: "Time-saved money + profit captured. Never includes un-actioned opportunities." },
+            { t: "AI cost", d: "What the language-model calls cost you this month, estimated from token usage at public list prices." },
+            { t: "× return", d: "Value ÷ cost. A 12× means every KES 1 of AI returned about KES 12 of value." },
+        ],
+    },
     roi_capacity: {
         what: "How much more you could serve with the same staff — a throughput story, deliberately NOT turned into money.",
         where: "Your kitchen's ticket times and bottlenecks from the KDS over the last 30 days.",

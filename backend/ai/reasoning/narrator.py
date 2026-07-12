@@ -200,6 +200,12 @@ def narrate(payload: dict, task: str, *, restaurant_id: int | None = None,
     """
     if not isinstance(payload, dict):
         return None
+    # Operational kill-switch: FEATURE_AI_NARRATION=false stops all LLM narration
+    # (zero token spend) without a redeploy. Same contract as "no provider" — the
+    # caller falls back to the deterministic payload.
+    import feature_flags
+    if not feature_flags.is_enabled("ai_narration"):
+        return None
     if not llm_client.is_available():
         return None
 

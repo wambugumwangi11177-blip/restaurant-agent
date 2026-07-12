@@ -75,8 +75,12 @@ def handle_natural_language(db: Session, restaurant_id: int, message: str) -> st
     """
     from ai import llm_client, pii_scrub
     from ai.reasoning import grounding
+    import feature_flags
 
-    if not llm_client.is_available():
+    # Respect the global LLM kill-switch (FEATURE_AI_NARRATION=false) here too, so
+    # one env flag disables every LLM code path — dashboard narration AND this
+    # free-form fallback — for cost/incident control.
+    if not feature_flags.is_enabled("ai_narration") or not llm_client.is_available():
         return "I didn't understand that. Reply HELP to see all commands."
 
     # Redact PII before the owner's free text leaves the process for the LLM.

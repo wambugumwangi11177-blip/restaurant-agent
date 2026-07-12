@@ -216,15 +216,22 @@ export default function RoiDashboard() {
         );
     }
 
-    const isEmpty =
-        !data ||
-        (data.time_saved.hours_saved_30d === 0 &&
-            data.money_captured.monthly_impact_cents === 0 &&
-            data.opportunities.length === 0 &&
-            !data.capacity);
-    if (isEmpty) {
+    // No payload at all (shouldn't normally happen without an error) — keep the
+    // getting-started guide as a genuine fallback.
+    if (!data) {
         return <EmptyState />;
     }
+
+    // "Sparse" = every pillar is still zero (a new restaurant, or the AI hasn't
+    // done measurable work yet). We deliberately no longer hide the whole page
+    // in this case — the owner should always SEE the ROI dashboard (and that it
+    // is real and populating), with a gentle banner instead of a blank
+    // placeholder that reads as "the feature is missing".
+    const isSparse =
+        data.time_saved.hours_saved_30d === 0 &&
+        data.money_captured.monthly_impact_cents === 0 &&
+        data.opportunities.length === 0 &&
+        !data.capacity;
 
     const ts = data!.time_saved;
     const mc = data!.money_captured;
@@ -257,6 +264,22 @@ export default function RoiDashboard() {
                     <span>{lastUpdated ? lastUpdated.toLocaleTimeString() : "Refresh"}</span>
                 </button>
             </div>
+
+            {/* Still gathering data — shown instead of hiding the whole page, so
+                the owner always sees the ROI dashboard exists and is filling in. */}
+            {isSparse && (
+                <div className="rounded-xl border border-[#d4a853]/25 bg-[#d4a853]/[0.06] p-4 flex items-start gap-3">
+                    <Clock className="w-5 h-5 text-[#d4a853] flex-shrink-0 mt-0.5" />
+                    <div>
+                        <p className="text-sm font-medium text-[#e5e5e5]">Your ROI dashboard is still gathering data</p>
+                        <p className="text-[#737373] text-xs mt-1 max-w-xl">
+                            As the AI sends messages, runs analysis, and you approve pricing recommendations
+                            on the AI page, these numbers start filling in — you&apos;ll see hours saved,
+                            profit captured, and money left on the table, updated every day.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Top explainer — the three-totals model, and why they're never summed */}
             <div className="rounded-xl border border-[#d4a853]/25 bg-[#d4a853]/[0.04] p-5">

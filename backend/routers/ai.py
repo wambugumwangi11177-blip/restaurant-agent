@@ -85,8 +85,22 @@ async def ai_pricing(
     """
     restaurant = get_or_create_restaurant(db, current_user)
 
-    from ai.pricing.recommendations import get_pricing_intelligence
+    from ai.pricing.recommendations import get_pricing_intelligence, sync_pending_recommendations
     data = _safe_run("pricing_intelligence", restaurant.id, get_pricing_intelligence, db, restaurant.id)
+
+    # The analysis above is read-only and its recommendations carry no persisted
+    # id — so nothing could be approved. Materialize them into PENDING rows and
+    # swap in the persisted list (each with an `id` + `status`) so the UI's
+    # approve/reject buttons have something to act on. Guarded: a failure here
+    # must degrade to the id-less recs, never take down the working payload.
+    if isinstance(data, dict) and data.get("available") is not False and "recommendations" in data:
+        try:
+            data["recommendations"] = sync_pending_recommendations(
+                db, restaurant.id, data["recommendations"]
+            )
+        except Exception:  # noqa: BLE001 — degrade, don't 500
+            db.rollback()
+            logger.exception("sync_pending_recommendations failed for restaurant %s", restaurant.id)
 
     # narrate() drives a synchronous, blocking LLM SDK call. This route is async,
     # so run it off the event loop or the whole worker stalls for the round-trip.

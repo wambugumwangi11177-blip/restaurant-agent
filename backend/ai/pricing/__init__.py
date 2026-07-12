@@ -6,6 +6,7 @@ Import from here, not from submodules directly.
 
 from .recommendations import (
     get_pricing_intelligence,
+    sync_pending_recommendations,
     generate_and_store_recommendations,
     get_pending_recommendations,
     approve_recommendation,
@@ -14,6 +15,7 @@ from .recommendations import (
 
 __all__ = [
     "get_pricing_intelligence",
+    "sync_pending_recommendations",
     "generate_and_store_recommendations",
     "get_pending_recommendations",
     "approve_recommendation",

@@ -75,6 +75,96 @@ def get_pricing_intelligence(db: Session, restaurant_id: int) -> dict:
     }
 
 
+# Recommendation lifecycle statuses. PENDING rows are the owner's action queue;
+# APPROVED/REJECTED are terminal owner decisions. EXPIRED is set by
+# sync_pending_recommendations() when the live analysis no longer makes a
+# previously-pending recommendation (e.g. the item's velocity cooled off), so the
+# queue always reflects current reality instead of growing forever.
+PENDING = "PENDING"
+APPROVED = "APPROVED"
+REJECTED = "REJECTED"
+EXPIRED = "EXPIRED"
+
+
+def sync_pending_recommendations(
+    db: Session, restaurant_id: int, recommendations: list[dict] | None = None
+) -> list[dict]:
+    """
+    Idempotently reconcile stored PENDING pricing recommendations with the live
+    analysis and return them — each carrying a real DB `id` so the approval UI can
+    act on it.
+
+    This is the bridge between the read-only analysis (get_pricing_intelligence,
+    keyed by item_id with no persisted id) and the approve/reject endpoints (which
+    need a persisted PricingRecommendation.id). Without it the UI has nothing to
+    approve and the ROI/AI-Ops "captured profit" figures can never leave zero.
+
+    Safe to call on every read — it converges instead of duplicating:
+      • a computed rec with no PENDING row  → INSERT a PENDING row
+      • a computed rec with a PENDING row   → UPDATE its numbers in place
+      • a PENDING row no longer computed    → mark EXPIRED (drops off the queue)
+
+    Keyed on (menu_item_id, recommendation_type): an item carries at most one
+    pending rec per type at a time. Keeping the persisted numbers in lock-step
+    with the analysis guarantees an approval always applies the *current*
+    suggested price, and keeps the ROI "uncaptured margin" total honest.
+
+    Pass `recommendations` (from an already-computed get_pricing_intelligence) to
+    avoid recomputing the analysis a second time.
+    """
+    if recommendations is None:
+        recommendations = get_pricing_intelligence(db, restaurant_id).get("recommendations", [])
+
+    computed = {(r["item_id"], r["type"]): r for r in recommendations}
+
+    existing = (
+        db.query(models.PricingRecommendation)
+        .filter(
+            models.PricingRecommendation.restaurant_id == restaurant_id,
+            models.PricingRecommendation.status == PENDING,
+        )
+        .all()
+    )
+    existing_by_key = {(e.menu_item_id, e.recommendation_type): e for e in existing}
+
+    now = utcnow()
+    rows_by_key: dict[tuple, models.PricingRecommendation] = {}
+
+    for key, rec in computed.items():
+        row = existing_by_key.get(key)
+        if row is None:
+            row = models.PricingRecommendation(
+                restaurant_id       = restaurant_id,
+                menu_item_id        = rec["item_id"],
+                recommendation_type = rec["type"],
+                status              = PENDING,
+            )
+            db.add(row)
+        # Keep persisted numbers in lock-step with the live analysis.
+        row.current_price           = rec["current_price"]
+        row.suggested_price         = rec["suggested_price"]
+        row.reason                  = rec["reason"]
+        row.when_to_apply           = rec.get("when", "All times")
+        row.monthly_impact_cents    = rec["monthly_impact_cents"]
+        row.recommendation_strength = rec["recommendation_strength"]
+        rows_by_key[key] = row
+
+    # Expire pending rows the analysis no longer recommends.
+    for key, row in existing_by_key.items():
+        if key not in computed:
+            row.status = EXPIRED
+            row.actioned_at = now
+
+    db.flush()   # assign ids to freshly-inserted rows
+    db.commit()
+
+    # Emit the frontend recommendation shape (rich analysis fields) plus the
+    # persisted id/status the approval buttons need, highest-impact first.
+    out = [{**rec, "id": rows_by_key[key].id, "status": PENDING} for key, rec in computed.items()]
+    out.sort(key=lambda r: r["monthly_impact_cents"], reverse=True)
+    return out
+
+
 def generate_and_store_recommendations(db: Session, restaurant_id: int) -> list[int]:
     """
     Run pricing analysis and persist new recommendations.

@@ -174,7 +174,7 @@ jobs:
         run: docker build -t restaurant-agent-backend:ci ./backend
 
       - name: Trivy scan (HIGH/CRITICAL)
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.36.0
         continue-on-error: true
         with:
           image-ref: restaurant-agent-backend:ci

@@ -50,7 +50,7 @@ _TEMPERATURE = 0.0
 # the _OUTPUT_SHAPE contract, or a TASK's role/focus text changes materially —
 # it is a manual, human-meaningful version, not an auto hash, so a reviewer can
 # see at a glance which prompt generation a metered call belongs to.
-PROMPT_VERSION = "2026-07-11.v1"
+PROMPT_VERSION = "2026-07-12.v2"
 
 # Guard against dumping a huge payload into the prompt — trims tokens/latency.
 # The deterministic modules return summary + detail; the salient signal is well
@@ -139,6 +139,21 @@ TASKS = {
             "or money figures."
         ),
         "keys": ["winback", "audience", "suggested_offers"],
+    },
+    # Cross-agent Decision Intelligence — narrates the ranked stream of decisions
+    # from every agent. MEDIUM tier: this is the owner's "what should I do first"
+    # view, spanning pricing/inventory/marketing/etc, so it's worth the better
+    # model. Sent the ranked list + summary only (already terse, pre-scored).
+    "decisions": {
+        "tier": TIER_MEDIUM,
+        "role": "You are the owner's operations strategist, triaging every open recommendation.",
+        "focus": (
+            "The decisions are ALREADY ranked and scored. Explain, in plain language, "
+            "which one or two to do first and why, weighing impact, confidence, risk and "
+            "effort. Do not re-rank or invent figures — only cite numbers present in the "
+            "payload (impact, confidence, scores)."
+        ),
+        "keys": ["summary", "decisions"],
     },
     # On-demand "explain this to me" for a SINGLE insight — powers the dashboard
     # per-item Explain button. Deliberately the cheap tier and the simplest, most

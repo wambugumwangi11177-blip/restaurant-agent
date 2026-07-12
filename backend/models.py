@@ -83,6 +83,12 @@ class User(Base):
     # "ver" claim; get_current_user rejects a token whose ver != this. Added by
     # migration 017.
     token_version = Column(Integer, default=0, nullable=False)
+    # TOTP multi-factor auth (migration 020). mfa_secret is the base32 shared
+    # secret (set at /mfa/setup, but MFA only enforced once mfa_enabled flips true
+    # after the user proves they can generate a valid code). Nullable so existing
+    # users are unaffected until they opt in.
+    mfa_secret = Column(String, nullable=True)
+    mfa_enabled = Column(Boolean, default=False, nullable=False)
 
     tenant = relationship("Tenant", back_populates="users")
 

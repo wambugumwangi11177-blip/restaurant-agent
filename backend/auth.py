@@ -62,6 +62,55 @@ def require_strong_password(password: str) -> None:
         )
 
 
+# ── TOTP multi-factor auth (RFC 6238) ────────────────────────────────────────
+# Implemented in pure stdlib (hmac/hashlib/base64) rather than adding a pyotp
+# dependency — TOTP is ~20 lines and the codes are standard, so Google
+# Authenticator / Authy / 1Password all interoperate. Used by the /mfa/* routes
+# and enforced at login when a user has mfa_enabled.
+import base64
+import hashlib
+import hmac
+import struct
+import time as _time
+
+
+def generate_mfa_secret() -> str:
+    """A fresh base32 TOTP secret (160-bit, per RFC 4226 recommendation)."""
+    return base64.b32encode(os.urandom(20)).decode("utf-8")
+
+
+def _hotp(key: bytes, counter: int) -> str:
+    mac = hmac.new(key, struct.pack(">Q", counter), hashlib.sha1).digest()
+    offset = mac[-1] & 0x0F
+    binary = ((mac[offset] & 0x7F) << 24 | mac[offset + 1] << 16
+              | mac[offset + 2] << 8 | mac[offset + 3])
+    return str(binary % 1_000_000).zfill(6)
+
+
+def verify_totp(secret_b32: str, code: str, window: int = 1) -> bool:
+    """True if `code` matches the TOTP for `secret_b32` within +/- `window`
+    30-second steps (tolerates minor clock skew)."""
+    if not secret_b32 or not code:
+        return False
+    code = str(code).strip()
+    if not code.isdigit() or len(code) != 6:
+        return False
+    try:
+        key = base64.b32decode(secret_b32, casefold=True)
+    except Exception:
+        return False
+    step = int(_time.time() // 30)
+    return any(hmac.compare_digest(_hotp(key, step + w), code)
+               for w in range(-window, window + 1))
+
+
+def mfa_provisioning_uri(email: str, secret_b32: str, issuer: str = "RestaurantAgent") -> str:
+    """otpauth:// URI for QR-code enrollment in an authenticator app."""
+    from urllib.parse import quote
+    label = quote(f"{issuer}:{email}")
+    return f"otpauth://totp/{label}?secret={secret_b32}&issuer={quote(issuer)}"
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 

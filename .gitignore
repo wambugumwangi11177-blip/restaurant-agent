@@ -41,3 +41,5 @@ restaurant-agent/
 # Local object-storage backend (Phase 9) — never commit uploaded blobs
 backend/.storage/
 .storage/
+
+.vercel

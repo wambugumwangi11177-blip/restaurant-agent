@@ -32,6 +32,12 @@ _FLAGS: dict[str, tuple[bool, str]] = {
     # Reserved for Phase 6 — persist WhatsApp turn history for cross-message LLM
     # context. Default OFF until the feature lands.
     "conversation_memory": (False, "Persist WhatsApp conversation history for cross-message LLM context."),
+    # Business-intelligence layer. Deterministic what-if simulation and the
+    # forward-looking digital twin are additive and read-only, so default ON.
+    # The goal-driven CEO/Strategy agent spends LLM tokens, so it defaults OFF
+    # and is additionally gated by ai_narration + a configured provider.
+    "simulation": (True, "What-if simulation engine (POST /ai/simulate) and digital twin."),
+    "strategy_agent": (False, "Goal-driven CEO/Strategy agent (POST /ai/strategy); spends LLM tokens."),
 }
 
 _TRUTHY = {"1", "true", "yes", "on"}

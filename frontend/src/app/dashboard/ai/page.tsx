@@ -22,7 +22,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import {
     Brain, TrendingUp, AlertTriangle, CheckCircle,
-    RefreshCw, Zap, Shield, Activity, ArrowRight, Truck,
+    RefreshCw, Zap, Shield, Activity, ArrowRight, Truck, Check, X,
 } from "lucide-react";
 import Link from "next/link";
 import { formatKES } from "@/lib/format";
@@ -32,6 +32,10 @@ import { NarrativeBlock, type Narrative } from "@/components/ai/NarrativeBlock";
 import { ExplainButton } from "@/components/ai/ExplainButton";
 import { MiniStat } from "@/components/ai/MiniStat";
 import { ModuleShell } from "@/components/ai/ModuleShell";
+import { DecisionCard, type Decision } from "@/components/ai/DecisionCard";
+import { WhatIfSimulator } from "@/components/ai/WhatIfSimulator";
+import { StrategyAgent } from "@/components/ai/StrategyAgent";
+import { DigitalTwin } from "@/components/ai/DigitalTwin";
 
 // Mirrors the actual shape returned by ai/ops_manager.get_operations_dashboard
 // (served via GET /ai/dashboard) — this page previously assumed field names
@@ -261,6 +265,19 @@ export default function AiDashboard() {
                 ))}
             </div>
 
+            {/* CEO Strategy Agent — goal in, one prioritized plan out. */}
+            <StrategyAgent />
+
+            {/* Decision Intelligence — every agent's recommendations, ranked into
+                one prioritised stream. The owner's "what should I do first" view. */}
+            <DecisionsSection />
+
+            {/* What-If Simulator — test a price change before committing. */}
+            <WhatIfSimulator />
+
+            {/* Digital Twin — forward revenue projection with calendar signals. */}
+            <DigitalTwin />
+
             {/* Concrete, prioritised actions to raise the health score */}
             <HealthBoostSection breakdown={data!.health_breakdown} score={hs} />
 
@@ -352,13 +369,108 @@ export default function AiDashboard() {
 
 /* ── Inline AI module sections ─────────────────────────────────────────── */
 
+function DecisionsSection() {
+    interface DecisionsData {
+        summary: {
+            total_decisions: number;
+            quantified_decisions: number;
+            total_monthly_impact_cents: number;
+            top_action: string | null;
+            by_category: Record<string, number>;
+        };
+        decisions: Decision[];
+        narrative?: Narrative;
+    }
+    const { data, loading, error, retry } = useAiModule<DecisionsData>("/ai/decisions");
+
+    return (
+        <ModuleShell
+            icon={Brain}
+            title="Decision Intelligence"
+            subtitle="Every agent's recommendations, ranked by impact, confidence, risk and effort"
+            explainKey="decisions"
+            loading={loading}
+            error={error}
+            onRetry={retry}
+        >
+            {data && (
+                <>
+                    <NarrativeBlock n={data.narrative} />
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                        <MiniStat label="Open Decisions" value={data.summary.total_decisions} />
+                        <MiniStat label="Quantified" value={data.summary.quantified_decisions} />
+                        <MiniStat label="Total Impact" value={formatKES(data.summary.total_monthly_impact_cents)} />
+                    </div>
+                    {data.decisions.length === 0 ? (
+                        <p className="text-[#525252] text-sm">
+                            No open decisions right now — every agent is happy with the current setup.
+                        </p>
+                    ) : (
+                        <div className="space-y-2">
+                            {data.decisions.slice(0, 8).map((d, i) => (
+                                <DecisionCard key={`${d.category}-${d.rank}`} d={d} highlight={i === 0} />
+                            ))}
+                        </div>
+                    )}
+                </>
+            )}
+        </ModuleShell>
+    );
+}
+
+interface PricingRec {
+    id?: number;
+    status?: string;
+    item_id: number;
+    item_name: string;
+    type: string;
+    current_price: number;
+    suggested_price: number;
+    monthly_impact_cents: number;
+    reason: string;
+    data_days?: number;
+    has_velocity_data?: boolean;
+}
+
 function PricingSection() {
     interface PricingData {
         summary: { surge_opportunities: number; reprice_needed: number; stimulate_candidates: number; total_revenue_opportunity_cents: number; items_analysed: number };
-        recommendations: { item_id: number; item_name: string; type: string; current_price: number; suggested_price: number; monthly_impact_cents: number; reason: string; data_days?: number; has_velocity_data?: boolean }[];
+        recommendations: PricingRec[];
         narrative?: Narrative;
     }
     const { data, loading, error, retry } = useAiModule<PricingData>("/ai/pricing");
+
+    // Approve/reject wiring. `/ai/pricing` now returns each recommendation with a
+    // persisted `id` (see backend sync_pending_recommendations); approving posts
+    // to /ai/pricing/{id}/approve (which updates the live menu price and feeds the
+    // ROI "profit captured" figure), then refetches so the actioned rec drops off.
+    const [actioningId, setActioningId] = useState<number | null>(null);
+    const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+    const act = async (rec: PricingRec, action: "approve" | "reject") => {
+        if (!rec.id) return;
+        setActioningId(rec.id);
+        setNotice(null);
+        try {
+            const res = await api.post(`/ai/pricing/${rec.id}/${action}`);
+            if (res.data?.error) {
+                setNotice({ kind: "err", text: res.data.error });
+            } else {
+                setNotice({
+                    kind: "ok",
+                    text: res.data?.message
+                        || (action === "approve"
+                            ? `${rec.item_name} price updated`
+                            : `${rec.item_name} recommendation dismissed`),
+                });
+            }
+            retry(); // re-materialize: the actioned rec is no longer PENDING
+        } catch (e: any) {
+            setNotice({ kind: "err", text: e?.response?.data?.detail || `Could not ${action} this recommendation` });
+        } finally {
+            setActioningId(null);
+        }
+    };
 
     return (
         <ModuleShell icon={TrendingUp} title="Pricing Intelligence" explainKey="pricing" loading={loading} error={error} onRetry={retry}>
@@ -371,6 +483,12 @@ function PricingSection() {
                         <MiniStat label="Stimulate" value={data.summary.stimulate_candidates} />
                         <MiniStat label="Opportunity" value={formatKES(data.summary.total_revenue_opportunity_cents)} />
                     </div>
+                    {notice && (
+                        <div className={`mb-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${notice.kind === "ok" ? "bg-emerald-500/10 text-emerald-300" : "bg-red-500/10 text-red-300"}`}>
+                            {notice.kind === "ok" ? <Check className="w-3.5 h-3.5 flex-shrink-0" /> : <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />}
+                            <span>{notice.text}</span>
+                        </div>
+                    )}
                     {data.recommendations.length === 0 ? (
                         <p className="text-[#525252] text-sm">No pricing changes recommended right now — {data.summary.items_analysed} items analysed.</p>
                     ) : (
@@ -380,8 +498,9 @@ function PricingSection() {
                                 // trusts demand-based moves (SURGE/STIMULATE). has_velocity_data=false
                                 // (or data_days < 14) means treat this as a lighter signal.
                                 const earlySignal = r.has_velocity_data === false || (typeof r.data_days === "number" && r.data_days < 14);
+                                const busy = actioningId === r.id;
                                 return (
-                                    <div key={r.item_id} className="flex items-center justify-between py-2 border-b border-[#1a1a1a] last:border-0 text-sm gap-3">
+                                    <div key={r.id ?? r.item_id} className="flex items-center justify-between py-2 border-b border-[#1a1a1a] last:border-0 text-sm gap-3">
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <p className="text-[#e5e5e5]">{r.item_name}</p>
@@ -401,7 +520,29 @@ function PricingSection() {
                                             <p className="text-xs text-[#525252] mt-0.5">{r.reason}</p>
                                             <ExplainButton item={r} label={`Pricing ${r.type} for ${r.item_name}`} />
                                         </div>
-                                        <span className="text-emerald-400 text-xs font-medium whitespace-nowrap">+{formatKES(r.monthly_impact_cents)}/mo</span>
+                                        <div className="flex items-center gap-3 flex-shrink-0">
+                                            <span className="text-emerald-400 text-xs font-medium whitespace-nowrap">+{formatKES(r.monthly_impact_cents)}/mo</span>
+                                            {r.id && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <button
+                                                        onClick={() => act(r, "approve")}
+                                                        disabled={busy}
+                                                        title="Apply this price to your live menu"
+                                                        className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium transition-colors"
+                                                    >
+                                                        <Check className="w-3.5 h-3.5" /> Apply
+                                                    </button>
+                                                    <button
+                                                        onClick={() => act(r, "reject")}
+                                                        disabled={busy}
+                                                        title="Dismiss this recommendation"
+                                                        className="flex items-center justify-center w-7 h-7 rounded-md bg-[#1a1a1a] text-[#737373] hover:text-red-300 hover:bg-red-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                    >
+                                                        <X className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })}

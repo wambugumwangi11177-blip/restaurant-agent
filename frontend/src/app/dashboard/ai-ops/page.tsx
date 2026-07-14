@@ -24,10 +24,35 @@ interface UsageData {
         calls: number;
         input_tokens: number;
         output_tokens: number;
-        by_model: Record<string, { calls: number; input_tokens: number; output_tokens: number }>;
+        cost_usd?: number;
+        cost_per_response_usd?: number;
+        by_model: Record<string, { calls: number; input_tokens: number; output_tokens: number; cost_usd?: number }>;
+    };
+    economics?: {
+        llm_cost_usd: number;
+        llm_cost_kes_cents: number;
+        profit_generated_cents: number;
     };
     agents: { agent: string; runs: number; success_rate_pct: number; p50_ms: number; p95_ms: number }[];
+    scorecards?: {
+        agent: string;
+        prediction_count?: number;
+        mae_pct?: number | null;
+        ci_coverage_pct?: number | null;
+        quality?: string;
+        acceptance_rate_pct?: number;
+        approved?: number;
+        rejected?: number;
+    }[];
     grounding: Record<string, any>;
+}
+
+function usd(n: number | null | undefined): string {
+    if (!n) return "$0.00";
+    return `$${n.toFixed(n < 1 ? 4 : 2)}`;
+}
+function kes(cents: number | null | undefined): string {
+    return `KES ${Math.round((cents || 0) / 100).toLocaleString("en-KE")}`;
 }
 
 function fmt(n: number | null | undefined): string {
@@ -129,10 +154,22 @@ export default function AiOpsPage() {
                 <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2 mb-3"><Cpu className="w-4 h-4 text-[#d4a853]" /> How much the AI is thinking</h2>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <Stat label="AI calls" value={fmt(d.llm?.calls)} />
-                    <Stat label="Input tokens" value={fmt(d.llm?.input_tokens)} />
-                    <Stat label="Output tokens" value={fmt(d.llm?.output_tokens)} />
+                    <Stat label="Est. cost" value={usd(d.llm?.cost_usd)} />
+                    <Stat label="Cost / response" value={usd(d.llm?.cost_per_response_usd)} />
                     <Stat label="Figures verified" value={typeof groundedPct === "number" ? `${groundedPct}%` : groundedPct ? "On" : "—"} tone="ok" />
                 </div>
+                {d.economics && (
+                    <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-4 mt-3 flex items-center justify-between flex-wrap gap-2">
+                        <div className="text-sm">
+                            <span className="text-[#525252]">AI cost </span>
+                            <span className="text-[#e5e5e5] font-medium">{usd(d.economics.llm_cost_usd)}</span>
+                            <span className="text-[#525252]"> ({kes(d.economics.llm_cost_kes_cents)})</span>
+                            <span className="text-[#525252]"> vs. profit captured </span>
+                            <span className="text-emerald-400 font-medium">{kes(d.economics.profit_generated_cents)}</span>
+                        </div>
+                        <p className="text-[10px] text-[#525252]">Profit = approved pricing recommendations. Never summed with cost.</p>
+                    </div>
+                )}
                 {models.length > 0 && (
                     <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5 mt-3">
                         <p className="text-xs font-semibold text-[#737373] mb-3">By model</p>
@@ -140,7 +177,7 @@ export default function AiOpsPage() {
                             {models.map(([model, m]) => (
                                 <div key={model} className="flex items-center justify-between text-sm py-1.5 border-b border-[#1a1a1a] last:border-0">
                                     <span className="text-[#e5e5e5] truncate">{model}</span>
-                                    <span className="text-[#525252] text-xs whitespace-nowrap">{fmt(m.calls)} calls · {fmt(m.input_tokens + m.output_tokens)} tokens</span>
+                                    <span className="text-[#525252] text-xs whitespace-nowrap">{fmt(m.calls)} calls · {fmt(m.input_tokens + m.output_tokens)} tokens · {usd(m.cost_usd)}</span>
                                 </div>
                             ))}
                         </div>
@@ -175,6 +212,38 @@ export default function AiOpsPage() {
                     </div>
                 )}
             </div>
+
+            {/* Agent scorecards — accuracy + owner acceptance (measured like an employee) */}
+            {d.scorecards && d.scorecards.length > 0 && (
+                <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
+                    <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2 mb-1">
+                        <ShieldCheck className="w-4 h-4 text-[#d4a853]" /> Agent scorecards
+                    </h2>
+                    <p className="text-xs text-[#525252] mb-4">Forecast accuracy and how often you accept each agent&apos;s advice — measured against reality.</p>
+                    <div className="space-y-2">
+                        {d.scorecards.map((c) => (
+                            <div key={c.agent} className="flex items-center justify-between text-sm py-1.5 border-b border-[#1a1a1a] last:border-0">
+                                <span className="text-[#e5e5e5]">{c.agent}</span>
+                                <span className="text-xs text-[#525252] flex items-center gap-3 whitespace-nowrap">
+                                    {typeof c.acceptance_rate_pct === "number" && (
+                                        <span className={c.acceptance_rate_pct >= 60 ? "text-emerald-400" : "text-amber-400"}>
+                                            {c.acceptance_rate_pct}% accepted ({c.approved}/{(c.approved || 0) + (c.rejected || 0)})
+                                        </span>
+                                    )}
+                                    {typeof c.mae_pct === "number" && (
+                                        <span className={c.mae_pct <= 10 ? "text-emerald-400" : c.mae_pct <= 20 ? "text-amber-400" : "text-red-400"}>
+                                            {c.mae_pct}% avg error · {c.prediction_count} scored
+                                        </span>
+                                    )}
+                                    {typeof c.ci_coverage_pct === "number" && (
+                                        <span>{c.ci_coverage_pct}% in range</span>
+                                    )}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

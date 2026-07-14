@@ -16,7 +16,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from logging_config import configure_logging
-from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing
+from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
@@ -134,6 +134,16 @@ def _start_scheduler():
             replace_existing=True,
         )
 
+        # Phase 5 continuous-learning loop — once daily, early, before the
+        # morning briefing so the accuracy/drift numbers it feeds are fresh.
+        scheduler.add_job(
+            _run_learning_cycle_job,
+            CronTrigger(hour=2, minute=0),   # 05:00 EAT
+            id="learning_cycle",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+
         scheduler.start()
         logger.info("[OK] Scheduler started (morning briefing: 07:00 EAT)")
     except ImportError:
@@ -195,6 +205,21 @@ def _run_stock_check_job():
         run_stock_check(SessionLocal)
     except Exception as exc:
         logger.error(f"[Stock Check] Scheduler job failed: {exc}")
+
+
+def _run_learning_cycle_job():
+    """Phase 5 continuous-learning loop: record tomorrow's revenue forecast and
+    score any matured predictions against actuals, across every restaurant."""
+    try:
+        from database import SessionLocal
+        from ai.evaluation.learning import run_learning_cycle
+        db = SessionLocal()
+        try:
+            run_learning_cycle(db)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Learning Cycle] Scheduler job failed: {exc}")
 
 
 def _run_slow_day_check_job():
@@ -263,7 +288,7 @@ app.add_middleware(CorrelationIdMiddleware)
 _VERSIONED_ROUTERS = [
     menu.router, orders.router, inventory.router, analytics.router,
     reservations.router, ai.router, export.router, flags.router, events.router,
-    billing.router,
+    billing.router, enterprise.router,
 ]
 
 app.include_router(auth.router)

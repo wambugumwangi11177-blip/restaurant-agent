@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leviii AI — The Restaurant Operating System</title>
+<style>
+  :root{
+    --ink:#141618; --muted:#5b6570; --line:#e4e8ec; --bg:#ffffff;
+    --brand:#0f7d5c; --brand-soft:#e9f6f1; --accent:#c8892b; --danger:#b23b3b;
+    --card:#f7f9fa;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);background:var(--bg);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:900px;margin:0 auto;padding:32px 28px}
+  .page{padding:44px 0;border-bottom:1px dashed var(--line)}
+  .page:last-child{border-bottom:none}
+  h1{font-size:34px;line-height:1.12;margin:0 0 12px;letter-spacing:-.02em}
+  h2{font-size:24px;margin:0 0 16px;letter-spacing:-.01em}
+  h3{font-size:15px;margin:0 0 6px}
+  p{margin:0 0 12px}
+  .lead{font-size:19px;color:var(--muted);margin-bottom:24px}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);margin:0 0 10px}
+  .cover{background:linear-gradient(160deg,#0f7d5c,#0c5f47);color:#fff;border-radius:18px;padding:48px 40px;margin-bottom:8px}
+  .cover h1{font-size:42px;color:#fff}
+  .cover .outcomes{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+  .cover .outcomes span{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);
+    padding:8px 14px;border-radius:999px;font-weight:600;font-size:14px}
+  .cover .sub{color:rgba(255,255,255,.9);font-size:17px;margin-top:18px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .feat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .feat h3{color:var(--brand);font-size:15px;display:flex;align-items:center;gap:8px}
+  .feat p{margin:0;color:var(--ink);font-size:14px}
+  .check{list-style:none;padding:0;margin:0}
+  .check li{padding:10px 0;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start;font-size:16px}
+  .check li:last-child{border-bottom:none}
+  .check li::before{content:"✔";color:var(--brand);font-weight:800;flex:none}
+  table{width:100%;border-collapse:collapse;margin:8px 0 4px;font-size:14px}
+  th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .yes{color:var(--brand);font-weight:800}
+  .no{color:#b9c0c6;font-weight:700}
+  .col-brand{background:var(--brand-soft)}
+  .roi-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .tile .n{font-size:26px;font-weight:800;color:var(--brand);letter-spacing:-.02em}
+  .tile .l{font-size:13px;color:var(--muted);margin-top:4px}
+  .assume{background:#fbf7ee;border:1px solid #efe2c6;border-radius:10px;padding:14px 16px;font-size:13px;color:#6b5a34;margin-top:14px}
+  .timeline{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:8px}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .step .d{font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em}
+  .step h3{margin:6px 0 4px;font-size:15px}
+  .step p{font-size:13px;color:var(--muted);margin:0}
+  .support{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .sup{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .sup h3{color:var(--brand)}
+  .soon{display:inline-block;font-size:11px;font-weight:700;color:var(--accent);
+    background:#fbf1de;border:1px solid #f0dcb4;border-radius:999px;padding:2px 9px;margin-left:8px;letter-spacing:.04em;vertical-align:middle}
+  .foot{color:var(--muted);font-size:13px;text-align:center;padding-top:24px}
+  @media (max-width:640px){.grid,.roi-tiles,.timeline,.support{grid-template-columns:1fr}h1{font-size:30px}.cover h1{font-size:34px}}
+  @media print{
+    body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .page{page-break-inside:avoid;border-bottom:none;padding:24px 0}
+    .cover{page-break-after:always}
+    .wrap{padding:0 12px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- COVER / OUTCOMES -->
+  <section class="page">
+    <div class="cover">
+      <p class="eyebrow" style="color:#bfe9da">Leviii AI</p>
+      <h1>Run Every Restaurant<br>From One System.</h1>
+      <div class="outcomes">
+        <span>Increase profit</span><span>Reduce waste</span>
+        <span>Speed up service</span><span>Manage every branch</span>
+      </div>
+      <p class="sub">The Restaurant Operating System — POS, kitchen, inventory, reservations,
+      M-Pesa and an AI that tells your managers what to do next. Built for restaurants, not generic retail.</p>
+    </div>
+  </section>
+
+  <!-- WHY LEVIII (executive summary) -->
+  <section class="page">
+    <p class="eyebrow">Executive summary</p>
+    <h2>Why enterprise restaurants choose Leviii</h2>
+    <ul class="check">
+      <li>One operating system instead of five disconnected tools.</li>
+      <li>AI that recommends the highest-impact actions — not just dashboards you have to interpret.</li>
+      <li>Every recommendation ranked by its effect on your profit.</li>
+      <li>Human approval before any important change — nothing moves without your say-so.</li>
+      <li>Every branch visible on one screen, with a single audit trail across the whole chain.</li>
+      <li>M-Pesa built in — customers pay by STK push and the money reconciles itself.</li>
+      <li>Designed around real restaurant operations, by people who understand the dinner rush.</li>
+    </ul>
+  </section>
+
+  <!-- WHAT YOU GET (benefit language) -->
+  <section class="page">
+    <p class="eyebrow">What you get</p>
+    <h2>Everything the restaurant runs on — in one place</h2>
+    <div class="grid">
+      <div class="feat"><h3>🧾 POS &amp; Kitchen Display</h3><p>Take orders and run the kitchen on one live system — no more lost or shouted tickets.</p></div>
+      <div class="feat"><h3>📦 Smart Inventory</h3><p>Get warned days before you run out of an ingredient — never stall the dinner rush again.</p></div>
+      <div class="feat"><h3>💰 Profit Intelligence</h3><p>See true profit per dish after cost, and catch it the moment the till charges less than the menu.</p></div>
+      <div class="feat"><h3>🏷️ AI Pricing</h3><p>Automatically spot the menu items quietly killing your profit — and fix the price in one tap.</p></div>
+      <div class="feat"><h3>📅 Reservations</h3><p>Fill tables without double-bookings, and win back no-shows automatically.</p></div>
+      <div class="feat"><h3>💬 WhatsApp Owner Assistant</h3><p>Run your restaurant by text — sales, stock, approvals — right from your phone.</p></div>
+      <div class="feat"><h3>📲 M-Pesa Built In</h3><p>Customers pay by STK push; payment reconciles itself, exactly once, every time.</p></div>
+      <div class="feat"><h3>🎯 Daily Action List</h3><p>Every morning, Leviii tells your managers the three highest-impact things to do for today's profit.</p></div>
+      <div class="feat"><h3>🔮 Test Before You Risk</h3><p>Model a price or promo change on your own restaurant before you touch a single real order.</p></div>
+      <div class="feat"><h3>🏢 Every Branch, One Screen</h3><p>Rank and compare all your locations on revenue, orders and health — with one chain-wide audit trail.</p></div>
+      <div class="feat"><h3>🎯 Goal-Based Planning <span class="soon">Rolling out</span></h3><p>Set a goal like "+KES 100k profit" and get a step-by-step, sequenced plan back.</p></div>
+      <div class="feat"><h3>🧩 App Marketplace <span class="soon">Coming soon</span></h3><p>Extend Leviii with vetted add-ons built for your kind of restaurant.</p></div>
+    </div>
+  </section>
+
+  <!-- COMPARISON -->
+  <section class="page">
+    <p class="eyebrow">The category shift</p>
+    <h2>A POS takes orders. An operating system runs the business.</h2>
+    <table>
+      <thead><tr><th>Capability</th><th style="text-align:center">Traditional POS</th><th style="text-align:center" class="col-brand">Leviii Operating System</th></tr></thead>
+      <tbody>
+        <tr><td>Takes orders &amp; runs the kitchen</td><td style="text-align:center" class="yes">✔</td><td style="text-align:center" class="col-brand yes">✔</td></tr>
+        <tr><td>Inventory &amp; stock control</td><td style="text-align:center" class="yes">✔</td><td style="text-align:center" class="col-brand yes">✔</td></tr>
+        <tr><td>Reservations &amp; no-show win-back</td><td style="text-align:center" class="no">—</td><td style="text-align:center" class="col-brand yes">✔</td></tr>
+        <tr><td>True profit per dish &amp; leak detection</td><td style="text-align:center" class="no">—</td><td style="text-align:center" class="col-brand yes">✔</td></tr>
+        <tr><td>AI pricing recommendations</td><td style="text-align:center" class="no">—</td><td style="text-align:center" class="col-brand yes">✔</td></tr>
+        <tr><td>Ranked daily action list</td><td style="text-align:center" class="no">—</td><td style="text-align:center" class="col-brand yes">✔</td></tr>
+        <tr><td>Test a change before committing</td><td style="text-align:center" class="no">—</td><td style="text-align:center" class="col-brand yes">✔</td></tr>
+        <tr><td>WhatsApp management</td><td style="text-align:center" class="no">—</td><td style="text-align:center" class="col-brand yes">✔</td></tr>
+        <tr><td>M-Pesa reconciliation built in</td><td style="text-align:center" class="no">—</td><td style="text-align:center" class="col-brand yes">✔</td></tr>
+        <tr><td>Multi-branch benchmarking &amp; audit trail</td><td style="text-align:center" class="no">—</td><td style="text-align:center" class="col-brand yes">✔</td></tr>
+        <tr><td>Human approval before AI changes anything</td><td style="text-align:center" class="no">—</td><td style="text-align:center" class="col-brand yes">✔</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ROI -->
+  <section class="page">
+    <p class="eyebrow">The money</p>
+    <h2>What Leviii puts back on your bottom line</h2>
+    <p>Leviii creates value in four ways every month. The figures below are <strong>illustrative ranges</strong> for a
+    mid-size restaurant — your real numbers depend on your menu, volume and current waste. During onboarding we measure
+    each of these against your actual data.</p>
+
+    <table>
+      <thead><tr><th>Where the money comes from</th><th>How Leviii helps</th><th>Typical monthly impact*</th></tr></thead>
+      <tbody>
+        <tr><td>Less food waste</td><td>Warns you before stock runs out or expires; sharper reorder quantities</td><td>Cut waste ~20–30%</td></tr>
+        <tr><td>Recovered profit leaks</td><td>Catches undercharging &amp; portion drift; reprices low-margin dishes</td><td>+0.5–1.5% of revenue</td></tr>
+        <tr><td>Smarter labor</td><td>Flags overtime &amp; over/under-staffing against real sales-per-hour</td><td>+3–5% of labor cost</td></tr>
+        <tr><td>Manager time saved</td><td>Automated reporting, alerts and the daily action list</td><td>~10–15 hours/week</td></tr>
+      </tbody>
+    </table>
+
+    <div class="roi-tiles">
+      <div class="tile"><div class="n">~KES 45–90k</div><div class="l">est. monthly value — small<br>(~KES 1.5M/mo revenue)</div></div>
+      <div class="tile"><div class="n">~KES 90–170k</div><div class="l">est. monthly value — mid<br>(~KES 3M/mo revenue)</div></div>
+      <div class="tile"><div class="n">~KES 180–330k</div><div class="l">est. monthly value — large<br>(~KES 6M/mo revenue)</div></div>
+    </div>
+
+    <div class="assume">
+      <strong>How these were estimated (assumptions stated so nothing is a black box):</strong>
+      food cost ≈ 30–35% of revenue with 4–8% wasted, reduced ~25%; profit-leak recovery of 0.5–1.5% of revenue from
+      pricing + portion-drift detection; labor ≈ 25–30% of revenue optimised ~3–5%; manager time valued at ~KES 250–350/hour.
+      Ranges are deliberately conservative and exclude one-off wins (e.g. catching a single supplier overcharge or theft pattern).
+      *Not a guarantee — a planning estimate we validate against your books during setup.
+    </div>
+  </section>
+
+  <!-- IMPLEMENTATION + SUPPORT -->
+  <section class="page">
+    <p class="eyebrow">Getting started</p>
+    <h2>Live in four days</h2>
+    <div class="timeline">
+      <div class="step"><div class="d">Day 1</div><h3>Setup</h3><p>Account, branches and staff roles configured.</p></div>
+      <div class="step"><div class="d">Day 2</div><h3>Menu import</h3><p>Menu, prices and recipes loaded; M-Pesa connected.</p></div>
+      <div class="step"><div class="d">Day 3</div><h3>Staff training</h3><p>POS and kitchen team trained on the live system.</p></div>
+      <div class="step"><div class="d">Day 4</div><h3>Go live</h3><p>Full service on Leviii, with us on standby.</p></div>
+    </div>
+
+    <h2 style="margin-top:32px">Support you can count on</h2>
+    <div class="support">
+      <div class="sup"><h3>If the POS stops during service</h3><p>Critical, service-hours issues are our top priority with a
+        direct WhatsApp line to the team — plus a simple paper-fallback procedure so service never stops while we restore you.</p></div>
+      <div class="sup"><h3>Who you call</h3><p>A named support contact from onboarding, reachable on WhatsApp during
+        operating hours, with emergency cover for service-critical outages.</p></div>
+      <div class="sup"><h3>Your data is yours</h3><p>Full export any time, tenant-isolated from every other restaurant,
+        encrypted in transit and at rest. Complete trust &amp; security pack available for your IT team.</p></div>
+      <div class="sup"><h3>The AI never acts alone</h3><p>Every recommendation is advisory. Nothing changes a price or sends
+        a message without a human approving it — and every action is logged with who approved it.</p></div>
+    </div>
+    <p class="foot">Leviii AI Technologies · Nairobi, Kenya · leviiiaikenya@gmail.com<br>
+      Full security, compliance and legal documentation available for your technical team on request.</p>
+  </section>
+
+</div>
+</body>
+</html>

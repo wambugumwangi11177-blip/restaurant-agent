@@ -94,6 +94,15 @@ def db_env(tmp_path, monkeypatch):
     except Exception:
         pass
 
+    # Phase 11: the marketplace plugin registry is a process-wide singleton, like
+    # the event bus. A plugin registered in one test would otherwise leak into a
+    # later test's Decision ranking. Clear it per test.
+    try:
+        from ai.plugins import registry as _plugin_registry
+        _plugin_registry.clear()
+    except Exception:
+        pass
+
     yield db_path
 
 

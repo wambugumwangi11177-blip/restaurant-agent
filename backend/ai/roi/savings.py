@@ -67,6 +67,52 @@ DEFAULT_EXECUTION_MINUTES = 15
 DEFAULT_HOURLY_RATE_CENTS = 25000  # KES 250/hr — used only if no staff wage data exists yet
 
 
+def _time_saved_in_window(db, restaurant_id, start, end, avg_hourly_rate_cents) -> tuple[float, int]:
+    """
+    (hours, money_cents) of automated work completed in [start, end), using the
+    same minutes-saved benchmarks as the main breakdown. Kept lean (no per-row
+    breakdown) — it exists so the current 30-day figure can be compared against
+    the previous 30 days for a trend, without duplicating the breakdown logic.
+    """
+    msgs = (
+        db.query(models.AgentMessage)
+        .filter(
+            models.AgentMessage.restaurant_id == restaurant_id,
+            models.AgentMessage.created_at >= start,
+            models.AgentMessage.created_at < end,
+            models.AgentMessage.message_type.notin_(EXCLUDED_MESSAGE_TYPES),
+        )
+        .all()
+    )
+    minutes = sum(
+        MESSAGE_MINUTES_SAVED.get((m.message_type or "").split(":", 1)[0], DEFAULT_MESSAGE_MINUTES)
+        for m in msgs
+    )
+    execs = (
+        db.query(models.AgentExecution)
+        .filter(
+            models.AgentExecution.restaurant_id == restaurant_id,
+            models.AgentExecution.created_at >= start,
+            models.AgentExecution.created_at < end,
+            models.AgentExecution.success.is_(True),
+        )
+        .all()
+    )
+    minutes += sum(
+        EXECUTION_MINUTES_SAVED.get(e.agent_name, DEFAULT_EXECUTION_MINUTES) for e in execs
+    )
+    hours = round(minutes / 60, 1)
+    return hours, round(hours * avg_hourly_rate_cents)
+
+
+def _pct_change(current: float, previous: float) -> float | None:
+    """Signed % change current-vs-previous. None when there's no prior baseline
+    (can't honestly express a % change from zero)."""
+    if not previous:
+        return None
+    return round((current - previous) / previous * 100, 1)
+
+
 def get_roi_savings(db: Session, restaurant_id: int) -> dict:
     """Time & money the software has saved/made this restaurant, last 30 days."""
     now = analysis_anchor(db, restaurant_id)
@@ -140,12 +186,23 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
 
     money_saved_from_time_cents = round(hours_saved * avg_hourly_rate_cents)
 
+    # Prior 30-day window (days 30–60 back) for a trend arrow — "is the AI saving
+    # more this month than last?". Same benchmarks, priced at the same rate so the
+    # comparison is apples-to-apples.
+    sixty_days_ago = now - timedelta(days=60)
+    prev_hours, prev_money_saved_cents = _time_saved_in_window(
+        db, restaurant_id, sixty_days_ago, thirty_days_ago, avg_hourly_rate_cents
+    )
+
     time_saved = {
         "hours_saved_30d": hours_saved,
         "money_saved_cents": money_saved_from_time_cents,
         "avg_hourly_rate_cents": avg_hourly_rate_cents,
         "hourly_rate_is_estimated": hourly_rate_is_estimated,
         "breakdown": sorted(message_breakdown + execution_breakdown, key=lambda x: -x["total_minutes"]),
+        "hours_saved_prev_30d": prev_hours,
+        "money_saved_prev_cents": prev_money_saved_cents,
+        "hours_change_pct": _pct_change(hours_saved, prev_hours),
     }
 
     # ── 2. MONEY ALREADY CAPTURED (realized, caused by an approved AI rec) ──
@@ -154,9 +211,28 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
         models.PricingRecommendation.status == "APPROVED",
         models.PricingRecommendation.actioned_at >= thirty_days_ago,
     ).all()
+    monthly_impact_cents = sum(r.monthly_impact_cents for r in approved_recs)
+
+    # Prior-window captured (for the same trend treatment) and all-time captured
+    # (the standing monthly profit uplift from EVERY price change ever approved —
+    # a "since you started" figure the 30-day window alone can't show).
+    prev_approved = db.query(models.PricingRecommendation).filter(
+        models.PricingRecommendation.restaurant_id == restaurant_id,
+        models.PricingRecommendation.status == "APPROVED",
+        models.PricingRecommendation.actioned_at >= sixty_days_ago,
+        models.PricingRecommendation.actioned_at < thirty_days_ago,
+    ).all()
+    all_approved = db.query(models.PricingRecommendation).filter(
+        models.PricingRecommendation.restaurant_id == restaurant_id,
+        models.PricingRecommendation.status == "APPROVED",
+    ).all()
     money_captured = {
-        "monthly_impact_cents": sum(r.monthly_impact_cents for r in approved_recs),
+        "monthly_impact_cents": monthly_impact_cents,
         "recommendations_approved": len(approved_recs),
+        "prev_monthly_impact_cents": sum(r.monthly_impact_cents for r in prev_approved),
+        "change_pct": _pct_change(monthly_impact_cents, sum(r.monthly_impact_cents for r in prev_approved)),
+        "all_time_monthly_impact_cents": sum(r.monthly_impact_cents for r in all_approved),
+        "all_time_approved": len(all_approved),
     }
 
     # ── 3. OPPORTUNITIES FOUND (money the AI has flagged, not yet realized) ──
@@ -250,10 +326,50 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
     except Exception:  # noqa: BLE001
         pass
 
+    # ── 5. NET ROI (is the AI worth what it costs?) ──────────────────────────
+    # AI cost = this restaurant's LLM token spend over the window, priced by the
+    # same static cost model AI-Ops uses. Value delivered = the two "real money"
+    # figures already on this page (time saved + profit captured) — opportunities
+    # are deliberately excluded because they aren't realized yet. Kept as a ratio,
+    # never a blended total, so it stays honest.
+    ai_cost_cents = 0
+    try:
+        from ai.cost_model import cost_kes_cents
+        token_rows = db.query(models.TokenUsage).filter(
+            models.TokenUsage.restaurant_id == restaurant_id,
+            models.TokenUsage.created_at >= thirty_days_ago,
+        ).all()
+        ai_cost_cents = sum(
+            cost_kes_cents(t.llm_model, t.input_tokens or 0, t.output_tokens or 0)
+            for t in token_rows
+        )
+    except Exception:  # noqa: BLE001 — ROI must degrade, not crash
+        pass
+
+    value_delivered_cents = money_saved_from_time_cents + monthly_impact_cents
+    economics = {
+        "ai_cost_cents": ai_cost_cents,
+        "value_delivered_cents": value_delivered_cents,
+        # "Every KES 1 spent on AI returned KES X." None when there's no metered
+        # AI spend yet (can't divide by zero — the frontend shows this honestly).
+        "roi_multiple": round(value_delivered_cents / ai_cost_cents, 1) if ai_cost_cents > 0 else None,
+    }
+
+    # ── 6. ANNUAL RUN-RATE (at the current pace) ─────────────────────────────
+    # Simple ×12 annualization of the two monthly figures. Labelled "at current
+    # pace" in the UI — a projection, not a promise.
+    projection = {
+        "annual_hours_saved": round(hours_saved * 12),
+        "annual_money_saved_cents": round(money_saved_from_time_cents * 12),
+        "annual_captured_cents": round(monthly_impact_cents * 12),
+    }
+
     return {
         "window_days": 30,
         "time_saved": time_saved,
         "money_captured": money_captured,
         "opportunities": opportunities,
         "capacity": capacity,
+        "economics": economics,
+        "projection": projection,
     }

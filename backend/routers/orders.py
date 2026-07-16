@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from rate_limit import limiter
 from sqlalchemy.orm import Session, joinedload
@@ -9,6 +10,9 @@ import schemas
 import auth
 from routers.deps import get_or_create_restaurant
 from time_utils import utcnow
+from ai.order_stock import deduct_ingredients_for_order, reverse_ingredients_for_order
+
+logger = logging.getLogger("orders.router")
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -71,6 +75,19 @@ async def create_order(
     db.add(db_order)
     db.commit()
     db.refresh(db_order)
+
+    # Directive 017: deduct recipe ingredients the moment the order is rung
+    # up — not at SERVED. Best-effort, same posture as the M-Pesa STK push
+    # below: a deduction problem must never block the order itself from
+    # existing (the sale still happened; stock accuracy is a downstream
+    # concern, not a reason to fail the till).
+    try:
+        deduct_ingredients_for_order(db, db_order, performed_by_user_id=current_user.id)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.error(f"Ingredient deduction failed for order {db_order.id}: {exc}")
+
     return _order_to_dict(db_order)
 
 
@@ -132,11 +149,30 @@ async def update_order_status(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid status: {update.status}")
 
+    old_status = order.status
     order.status = new_status
     if new_status == models.OrderStatus.SERVED:
         order.completed_at = utcnow()
 
     db.commit()
+
+    # Directive 017's reversal rule: cancelling before the food was ever
+    # served credits the deducted ingredients back — cancelling AFTER served
+    # does not, because they were physically used regardless of what happens
+    # to the bill. `old_status != CANCELLED` guards against re-reversing an
+    # already-cancelled order if this endpoint is called twice.
+    if (
+        new_status == models.OrderStatus.CANCELLED
+        and old_status in (models.OrderStatus.PENDING, models.OrderStatus.PREP)
+        and old_status != models.OrderStatus.CANCELLED
+    ):
+        try:
+            reverse_ingredients_for_order(db, order, performed_by_user_id=current_user.id)
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.error(f"Ingredient reversal failed for cancelled order {order.id}: {exc}")
+
     db.refresh(order)
     return _order_to_dict(order)
 
@@ -264,6 +300,16 @@ async def create_public_order(
     db.add(db_order)
     db.commit()
     db.refresh(db_order)
+
+    # Directive 017: same auto-deduction as the staff-facing create_order —
+    # no current_user here (unauthenticated customer order), so the movement
+    # is attributed to no one rather than guessing at a staff member.
+    try:
+        deduct_ingredients_for_order(db, db_order, performed_by_user_id=None)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.error(f"Ingredient deduction failed for public order {db_order.id}: {exc}")
 
     if payment_method == models.PaymentMethod.MPESA:
         _trigger_mpesa_stk_push(db, db_order)

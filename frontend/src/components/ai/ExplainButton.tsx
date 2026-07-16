@@ -44,7 +44,7 @@ export function ExplainButton({ item, label }: { item: Record<string, any>; labe
         <button
             onClick={explain}
             disabled={state === "loading"}
-            className="mt-1 flex items-center gap-1 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors disabled:opacity-60"
+            className="mt-1 flex items-center gap-1 text-[11px] text-[#737373] hover:text-[var(--accent)] transition-colors disabled:opacity-60"
         >
             <Info className="w-3 h-3" />
             {state === "loading" ? "Explaining…" : "Explain this to me"}

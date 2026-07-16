@@ -89,6 +89,10 @@ async def register(request: Request, user_data: UserCreate, db: Session = Depend
         email=user_data.email,
         hashed_password=hashed_password,
         role=models.Role.ADMIN,
+        # A fresh signup is always the Owner of their own restaurant —
+        # matches the migration 025 backfill for pre-existing ADMIN users
+        # (directive 015: Owner maps 1:1 onto Role.ADMIN).
+        staff_role=models.StaffRole.OWNER,
         tenant_id=tenant.id,
     )
     db.add(new_user)
@@ -185,6 +189,11 @@ async def read_users_me(
         "id": current_user.id,
         "email": current_user.email,
         "role": current_user.role,
+        # directive 015 — read straight from the DB on every /me call rather
+        # than embedding it as a JWT claim, so a role change (or the
+        # "unassigned" state) is reflected on the user's very next request
+        # instead of only after their token expires/refreshes.
+        "staff_role": current_user.staff_role,
         "restaurant_name": restaurant.name if restaurant else None,
         "restaurant_id": restaurant.id if restaurant else None,
     }

@@ -57,7 +57,7 @@ function Meter({ label, filled, tone }: { label: string; filled: number; tone: s
 }
 
 const categoryTone: Record<string, string> = {
-    pricing: "text-[#d4a853] bg-[#d4a853]/10",
+    pricing: "text-[var(--accent)] bg-[var(--accent)]/10",
     inventory: "text-[#60a5fa] bg-[#3b82f6]/10",
     supply_chain: "text-[#a78bfa] bg-[#8b5cf6]/10",
     marketing: "text-[#f472b6] bg-[#ec4899]/10",
@@ -69,13 +69,13 @@ export function DecisionCard({ d, highlight = false }: { d: Decision; highlight?
     return (
         <div
             className={`rounded-lg border p-4 ${
-                highlight ? "border-[#d4a853]/40 bg-[#d4a853]/[0.04]" : "border-[#1a1a1a] bg-[#0f0f0f]"
+                highlight ? "border-[var(--accent)]/40 bg-[var(--accent)]/[0.04]" : "border-[#1a1a1a] bg-[#0f0f0f]"
             }`}
         >
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className="text-[10px] font-bold text-[#0a0a0a] bg-[#d4a853] rounded px-1.5 py-0.5">
+                        <span className="text-[10px] font-bold text-[#0a0a0a] bg-[var(--accent)] rounded px-1.5 py-0.5">
                             #{d.rank}
                         </span>
                         <span className={`text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded ${categoryTone[d.category] || "text-[#737373] bg-[#141414]"}`}>
@@ -101,7 +101,7 @@ export function DecisionCard({ d, highlight = false }: { d: Decision; highlight?
             <div className="flex gap-5 mt-3 pt-3 border-t border-[#1a1a1a]">
                 <Meter label="Impact" filled={d.impact_stars} tone="bg-emerald-400" />
                 <Meter label="Ease" filled={d.ease_stars} tone="bg-[#60a5fa]" />
-                <Meter label="Safety" filled={6 - d.risk_stars} tone="bg-[#d4a853]" />
+                <Meter label="Safety" filled={6 - d.risk_stars} tone="bg-[var(--accent)]" />
             </div>
         </div>
     );

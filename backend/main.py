@@ -16,7 +16,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from logging_config import configure_logging
-from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise
+from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
@@ -78,6 +78,17 @@ def on_startup():
     except Exception as e:
         logger.warning(f"[WARN] Orchestrator registration failed: {e}")
 
+    # 2b. Second, independent event-bus subscriber: in-app + push
+    #     notifications (ai/notify.py), alongside (not instead of) the
+    #     WhatsApp handlers above. A failure here must never block boot or
+    #     affect the WhatsApp pipeline — same posture as 2.
+    try:
+        from ai.orchestrator.push_notifier import register_push_handlers
+        register_push_handlers()
+        logger.info("[OK] Push/in-app notification handlers registered")
+    except Exception as e:
+        logger.warning(f"[WARN] Push notification handler registration failed: {e}")
+
     # 3. Schedule morning WhatsApp briefing (07:00 EAT = 04:00 UTC)
     _start_scheduler()
 
@@ -118,10 +129,29 @@ def _start_scheduler():
             id="stock_check",
             replace_existing=True,
         )
+        # Directive 016: theoretical-vs-actual usage variance, once daily
+        # after most of the day's covers — deliberately NOT on the 2-hourly
+        # cadence above. A shift-level summary, not a per-movement ping (see
+        # ai/stock_custody.py and the stock-loss-prevention skill).
+        scheduler.add_job(
+            _run_variance_check_job,
+            CronTrigger(hour=18, minute=0),  # 21:00 EAT
+            id="variance_check",
+            replace_existing=True,
+        )
         scheduler.add_job(
             _run_slow_day_check_job,
             CronTrigger(hour=11, minute=0),  # 14:00 EAT — matches the function's own gate (only fires after 14:00 EAT)
             id="slow_day_check",
+            replace_existing=True,
+        )
+        # Directive 018: par-level reorder check, once daily early — a draft
+        # PO should be ready for the owner to approve before/during opening,
+        # not discovered mid-shift.
+        scheduler.add_job(
+            _run_reorder_check_job,
+            CronTrigger(hour=3, minute=0),   # 06:00 EAT
+            id="reorder_check",
             replace_existing=True,
         )
         # Same-day reservation reminders to cut no-shows. Once per day so it never
@@ -207,6 +237,65 @@ def _run_stock_check_job():
         logger.error(f"[Stock Check] Scheduler job failed: {exc}")
 
 
+def _run_variance_check_job():
+    """Directive 016: compute the theoretical-vs-actual variance report for
+    every restaurant and emit STOCK_VARIANCE_FLAGGED for any with at least
+    one item over threshold. Emitting only when there's something to flag
+    (rather than one event per restaurant regardless) is what keeps this a
+    real signal instead of a daily no-op ping."""
+    try:
+        from database import SessionLocal
+        from events.bus import emit_async, EventType
+        from ai.stock_custody import flagged_items
+        import models
+
+        db = SessionLocal()
+        try:
+            for restaurant in db.query(models.Restaurant).all():
+                items = flagged_items(db, restaurant.id, hours=24)
+                if not items:
+                    continue
+                emit_async(EventType.STOCK_VARIANCE_FLAGGED, {
+                    "restaurant_id": restaurant.id,
+                    "items": [
+                        {
+                            "item_name": i.item_name,
+                            "variance_pct": i.variance_pct,
+                            "theoretical": i.theoretical_usage,
+                            "actual": i.actual_usage,
+                        }
+                        for i in items
+                    ],
+                })
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Variance Check] Scheduler job failed: {exc}")
+
+
+def _run_reorder_check_job():
+    """Directive 018: for every restaurant, find items at their reorder
+    point with a par_level and default_supplier_id set, draft a purchase
+    order (demand-adjusted), and notify the owner it's awaiting approval.
+    Items with neither set are simply never drafted — no guessing at a par
+    level or a supplier nobody configured."""
+    try:
+        from database import SessionLocal
+        from ai.reorder import find_reorder_candidates, draft_purchase_order
+        import models
+
+        db = SessionLocal()
+        try:
+            for restaurant in db.query(models.Restaurant).all():
+                candidates = find_reorder_candidates(db, restaurant.id)
+                for candidate in candidates:
+                    draft_purchase_order(db, restaurant.id, candidate)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Reorder Check] Scheduler job failed: {exc}")
+
+
 def _run_learning_cycle_job():
     """Phase 5 continuous-learning loop: record tomorrow's revenue forecast and
     score any matured predictions against actuals, across every restaurant."""
@@ -288,7 +377,8 @@ app.add_middleware(CorrelationIdMiddleware)
 _VERSIONED_ROUTERS = [
     menu.router, orders.router, inventory.router, analytics.router,
     reservations.router, ai.router, export.router, flags.router, events.router,
-    billing.router, enterprise.router,
+    billing.router, enterprise.router, staff.router, stock_custody.router,
+    suppliers.router, purchase_orders.router, notifications.router, support.router,
 ]
 
 app.include_router(auth.router)

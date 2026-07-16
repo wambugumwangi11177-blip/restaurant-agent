@@ -117,8 +117,8 @@ export default function SalesPage() {
 
             {/* Demo Banner */}
             {isDemo && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-[#d4a853]/8 border border-[#d4a853]/20 rounded-lg">
-                    <span className="text-[10px] text-[#d4a853]">📊 Demo Mode — Showing sample data for Lavy restaurant</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent)]/8 border border-[var(--accent)]/20 rounded-lg">
+                    <span className="text-[10px] text-[var(--accent)]">📊 Demo Mode — Showing sample data for Lavy restaurant</span>
                 </div>
             )}
 
@@ -143,7 +143,7 @@ export default function SalesPage() {
             {isDemo && (
                 <div className="bg-[#141414] border border-[#262626] rounded-xl">
                     <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center gap-2">
-                        <TrendingUp className="w-3.5 h-3.5 text-[#d4a853]" />
+                        <TrendingUp className="w-3.5 h-3.5 text-[var(--accent)]" />
                         <h2 className="text-sm font-semibold text-[#e5e5e5]">Revenue — Last 7 Days</h2>
                     </div>
                     <div className="px-4 py-4">
@@ -163,10 +163,10 @@ export default function SalesPage() {
                                             {(day.revenue / 1000).toFixed(0)}k
                                         </span>
                                         <div
-                                            className={`w-full rounded-t transition-all ${isBest ? "bg-[#d4a853]" : "bg-[#d4a853]/25"}`}
+                                            className={`w-full rounded-t transition-all ${isBest ? "bg-[var(--accent)]" : "bg-[var(--accent)]/25"}`}
                                             style={{ height: `${pct}%` }}
                                         />
-                                        <span className={`text-[10px] ${isBest ? "text-[#d4a853] font-semibold" : "text-[#525252]"}`}>
+                                        <span className={`text-[10px] ${isBest ? "text-[var(--accent)] font-semibold" : "text-[#525252]"}`}>
                                             {day.date}
                                         </span>
                                     </motion.div>
@@ -225,9 +225,9 @@ export default function SalesPage() {
                                 return (
                                     <div key={hour} className="flex-1 flex flex-col items-center gap-1">
                                         <div className="w-full relative" style={{ height: `${Math.max(pct, 2)}%` }}>
-                                            <div className={`w-full h-full rounded-t ${isNow ? "bg-[#d4a853]" : "bg-[#d4a853]/20"}`} />
+                                            <div className={`w-full h-full rounded-t ${isNow ? "bg-[var(--accent)]" : "bg-[var(--accent)]/20"}`} />
                                         </div>
-                                        <span className={`text-[8px] ${isNow ? "text-[#d4a853]" : "text-[#525252]"}`}>
+                                        <span className={`text-[8px] ${isNow ? "text-[var(--accent)]" : "text-[#525252]"}`}>
                                             {hour > 12 ? `${hour - 12}p` : hour === 12 ? "12p" : `${hour}a`}
                                         </span>
                                     </div>
@@ -242,7 +242,7 @@ export default function SalesPage() {
             {(isDemo || topItems.length > 0) && (
                 <div className="bg-[#141414] border border-[#262626] rounded-xl">
                     <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center gap-2">
-                        <Crown className="w-3.5 h-3.5 text-[#d4a853]" />
+                        <Crown className="w-3.5 h-3.5 text-[var(--accent)]" />
                         <h2 className="text-sm font-semibold text-[#e5e5e5]">
                             {isDemo ? "Top Sellers — This Week" : "Top Sellers Today"}
                         </h2>
@@ -262,7 +262,7 @@ export default function SalesPage() {
                                         <p className="text-xs text-[#e5e5e5]">{item.name}</p>
                                         <p className="text-[10px] text-[#525252]">{item.orders} sold · {item.margin}% margin</p>
                                     </div>
-                                    <span className="text-xs font-semibold text-[#d4a853]">
+                                    <span className="text-xs font-semibold text-[var(--accent)]">
                                         KES {item.revenue.toLocaleString("en-KE")}
                                     </span>
                                 </motion.div>
@@ -274,7 +274,7 @@ export default function SalesPage() {
                                         <p className="text-xs text-[#e5e5e5]">{item.name}</p>
                                         <p className="text-[10px] text-[#525252]">{item.qty} sold</p>
                                     </div>
-                                    <span className="text-xs font-semibold text-[#d4a853]">{formatKES(item.revenue)}</span>
+                                    <span className="text-xs font-semibold text-[var(--accent)]">{formatKES(item.revenue)}</span>
                                 </div>
                             ))
                         }

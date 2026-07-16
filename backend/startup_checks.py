@@ -66,6 +66,18 @@ def collect_problems() -> tuple[list[str], list[str]]:
     if prod and not os.getenv("CORS_ORIGINS"):
         soft.append("CORS_ORIGINS is not set — using built-in default origins in production")
 
+    # storage.py defaults to writing to the container's own disk. That's fine
+    # until something is actually uploaded through it — but Railway's
+    # filesystem is ephemeral, so any file saved there is lost on the next
+    # redeploy/restart. Soft, not hard: no upload endpoint exists yet, so this
+    # is a durability trap waiting to be wired up, not an active data-loss bug.
+    if prod and os.getenv("STORAGE_BACKEND", "local").strip().lower() != "s3":
+        soft.append(
+            "STORAGE_BACKEND=local in production — any uploaded file will not "
+            "survive a Railway redeploy (ephemeral disk). Set STORAGE_BACKEND=s3 "
+            "before wiring up any upload feature."
+        )
+
     return hard, soft
 
 

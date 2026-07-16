@@ -157,6 +157,15 @@ async def get_current_user(
     if payload.get("ver", 0) != (user.token_version or 0):
         raise credentials_exception
 
+    # Account lifecycle (directive 016): deactivating a StaffMember with a
+    # linked login also bumps token_version (see routers/staff.py), so this
+    # check is largely redundant with the one above — but is_active is kept
+    # as an explicit, independently-readable gate rather than relying solely
+    # on the version-bump side effect, in case a future caller sets one
+    # without the other.
+    if user.is_active is False:
+        raise credentials_exception
+
     return user
 
 
@@ -183,3 +192,46 @@ def require_role(*allowed_roles: "models.Role"):
         )
 
     return _require_role_dep
+
+
+def require_staff_role(*allowed_staff_roles: "models.StaffRole"):
+    """
+    Dependency factory for the fine-grained 7-tier model (directive 015).
+    Composable with require_role, not a replacement for it:
+
+      - SUPERADMIN/ADMIN always pass, exactly like require_role — an Owner
+        IS an ADMIN user (directive 015), so this never locks out the
+        account tier that already has full access today.
+      - Otherwise the user's staff_role must be one of allowed_staff_roles.
+      - A STAFF-role user with staff_role IS NULL gets a distinguishable
+        403 detail ("staff_role_unassigned") rather than the generic
+        "insufficient permissions" — see directive 015's Edge Cases on why
+        NULL isn't defaulted to a tier, and why the frontend needs to tell
+        these users apart from a plain permission denial so it can render
+        "ask your manager to assign your role" instead of a dead end.
+
+    Usage:
+        current_user: models.User = Depends(
+            require_staff_role(models.StaffRole.MANAGER, models.StaffRole.SUPERVISOR)
+        )
+    """
+    allowed = set(allowed_staff_roles)
+
+    async def _require_staff_role_dep(
+        current_user: models.User = Depends(get_current_user),
+    ) -> models.User:
+        if current_user.role in (models.Role.SUPERADMIN, models.Role.ADMIN):
+            return current_user
+        if current_user.staff_role is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="staff_role_unassigned",
+            )
+        if current_user.staff_role in allowed:
+            return current_user
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions for this action",
+        )
+
+    return _require_staff_role_dep

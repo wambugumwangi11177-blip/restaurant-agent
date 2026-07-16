@@ -52,10 +52,10 @@ export default function ReservationsPage() {
             </div>
 
             {/* Today at a glance */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
                     <p className="text-xs text-[#525252]">Today</p>
-                    <p className="text-lg font-bold text-[#d4a853] mt-1">{todayBookings.length}</p>
+                    <p className="text-lg font-bold text-[var(--accent)] mt-1">{todayBookings.length}</p>
                 </div>
                 <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
                     <p className="text-xs text-[#525252]">Coming Up</p>
@@ -100,10 +100,10 @@ export default function ReservationsPage() {
 
                         {/* Overbooking opportunity */}
                         {overbooking.recommended_rate > 0 && (
-                            <div className="bg-[#d4a853]/5 border border-[#d4a853]/10 rounded-lg px-3 py-2">
+                            <div className="bg-[var(--accent)]/5 border border-[var(--accent)]/10 rounded-lg px-3 py-2">
                                 <p className="text-xs text-[#e5e5e5] flex items-center gap-2">
-                                    <DollarSign className="w-3 h-3 text-[#d4a853]" />
-                                    You can safely take <span className="font-bold text-[#d4a853]">{overbooking.recommended_rate}% more bookings</span> to make up for no-shows — that&apos;s about <span className="font-bold text-[#d4a853]">{formatKES(overbooking.potential_monthly_recovery || 0)} extra per month</span>
+                                    <DollarSign className="w-3 h-3 text-[var(--accent)]" />
+                                    You can safely take <span className="font-bold text-[var(--accent)]">{overbooking.recommended_rate}% more bookings</span> to make up for no-shows — that&apos;s about <span className="font-bold text-[var(--accent)]">{formatKES(overbooking.potential_monthly_recovery || 0)} extra per month</span>
                                 </p>
                             </div>
                         )}
@@ -114,7 +114,7 @@ export default function ReservationsPage() {
                                 <p className="text-[10px] text-[#525252] uppercase tracking-wider">Suggestions</p>
                                 {recommendations.slice(0, 3).map((rec: any, i: number) => (
                                     <div key={i} className="flex items-start gap-2 text-xs">
-                                        <span className="text-[#d4a853] mt-0.5">💡</span>
+                                        <span className="text-[var(--accent)] mt-0.5">💡</span>
                                         <div>
                                             <p className="text-[#e5e5e5]">{rec.message}</p>
                                             {rec.action && <p className="text-[#525252] mt-0.5">{rec.action}</p>}

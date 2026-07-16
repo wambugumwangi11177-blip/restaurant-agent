@@ -40,3 +40,22 @@ def get_restaurant_or_none(db: Session, user: models.User) -> models.Restaurant 
     return db.query(models.Restaurant).filter(
         models.Restaurant.tenant_id == user.tenant_id
     ).first()
+
+
+def get_staff_users_for_restaurant(
+    db: Session, restaurant: models.Restaurant, staff_roles: "list[models.StaffRole]"
+) -> "list[models.User]":
+    """
+    The reverse of get_restaurant_or_none: every active dashboard login at
+    this restaurant's tenant whose staff_role is one of staff_roles. Added
+    for ai/notify.py's role-based fan-out (directive 016 flagged that no
+    per-staff/per-role notification routing existed at all — this is that
+    lookup). Belongs here, not inline in the caller, per this file's own
+    rationale above (near-identical restaurant/user lookups scattered across
+    routers is the exact DRY violation this module was extracted to fix).
+    """
+    return db.query(models.User).filter(
+        models.User.tenant_id == restaurant.tenant_id,
+        models.User.staff_role.in_(staff_roles),
+        models.User.is_active == True,  # noqa: E712 - SQLAlchemy filter, not a Python bool compare
+    ).all()

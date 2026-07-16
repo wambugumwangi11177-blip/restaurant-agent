@@ -54,3 +54,39 @@ self.addEventListener('fetch', (event) => {
             })
     );
 });
+
+// Push — staff notifications (stock alerts, support tickets, etc). Twilio is
+// unfunded, so this is the channel that actually reaches staff in the
+// background; see backend/ai/notify.py for the send side. Payload is plain
+// JSON ({title, body, url}), not the Push API's binary default.
+self.addEventListener('push', (event) => {
+    let data = {};
+    try {
+        data = event.data ? event.data.json() : {};
+    } catch (e) {
+        data = { title: 'Chakula', body: event.data ? event.data.text() : '' };
+    }
+    event.waitUntil(
+        self.registration.showNotification(data.title || 'Chakula', {
+            body: data.body || '',
+            icon: '/icon-192.png',
+            badge: '/icon-192.png',
+            data: { url: data.url || '/dashboard' },
+        })
+    );
+});
+
+// Notification click — focus an existing dashboard tab on that route if one
+// is open, otherwise open a new one.
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const url = event.notification.data && event.notification.data.url ? event.notification.data.url : '/dashboard';
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+            for (const c of clientList) {
+                if (c.url.includes(url) && 'focus' in c) return c.focus();
+            }
+            return self.clients.openWindow(url);
+        })
+    );
+});

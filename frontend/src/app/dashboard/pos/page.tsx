@@ -173,7 +173,7 @@ export default function POSPage() {
                                 key={cat}
                                 onClick={() => setSelectedCategory(cat)}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${selectedCategory === cat
-                                        ? "bg-[#d4a853] text-black"
+                                        ? "bg-[var(--accent)] text-black"
                                         : "bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5]"
                                     }`}
                             >
@@ -191,16 +191,16 @@ export default function POSPage() {
                                     key={item.id}
                                     whileTap={{ scale: 0.95 }}
                                     onClick={() => addToCart(item)}
-                                    className={`relative bg-[#141414] border rounded-xl p-3 text-left transition-all hover:border-[#d4a853]/50 ${inCart ? "border-[#d4a853]/40" : "border-[#262626]"
+                                    className={`relative bg-[#141414] border rounded-xl p-3 text-left transition-all hover:border-[var(--accent)]/50 ${inCart ? "border-[var(--accent)]/40" : "border-[#262626]"
                                         }`}
                                 >
                                     {inCart && (
-                                        <span className="absolute -top-1.5 -right-1.5 bg-[#d4a853] text-black text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                                        <span className="absolute -top-1.5 -right-1.5 bg-[var(--accent)] text-black text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
                                             {inCart.quantity}
                                         </span>
                                     )}
                                     <p className="text-sm font-medium text-[#e5e5e5] truncate">{item.name}</p>
-                                    <p className="text-xs text-[#d4a853] mt-1">{formatKES(item.price)}</p>
+                                    <p className="text-xs text-[var(--accent)] mt-1">{formatKES(item.price)}</p>
                                     <p className="text-[10px] text-[#525252] mt-0.5">{item.category}</p>
                                 </motion.button>
                             );
@@ -212,7 +212,7 @@ export default function POSPage() {
                 <div className="bg-[#141414] border border-[#262626] rounded-xl flex flex-col min-h-0">
                     <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <ShoppingBag className="w-4 h-4 text-[#d4a853]" />
+                            <ShoppingBag className="w-4 h-4 text-[var(--accent)]" />
                             <span className="text-sm font-semibold text-[#e5e5e5]">Cart</span>
                         </div>
                         <span className="text-[10px] text-[#525252]">{itemCount} item{itemCount !== 1 ? "s" : ""}</span>
@@ -226,19 +226,22 @@ export default function POSPage() {
                                 <div key={c.menuItem.id} className="flex items-center gap-2 py-1.5">
                                     <div className="flex-1 min-w-0">
                                         <p className="text-xs text-[#e5e5e5] truncate">{c.menuItem.name}</p>
-                                        <p className="text-[10px] text-[#d4a853]">{formatKES(c.menuItem.price * c.quantity)}</p>
+                                        <p className="text-[10px] text-[var(--accent)]">{formatKES(c.menuItem.price * c.quantity)}</p>
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <button onClick={() => updateQty(c.menuItem.id, -1)}
+                                            aria-label={`Decrease quantity of ${c.menuItem.name}`}
                                             className="w-6 h-6 rounded bg-[#1a1a1a] flex items-center justify-center text-[#737373] hover:text-[#e5e5e5]">
                                             <Minus className="w-3 h-3" />
                                         </button>
                                         <span className="text-xs text-[#e5e5e5] w-5 text-center">{c.quantity}</span>
                                         <button onClick={() => updateQty(c.menuItem.id, 1)}
+                                            aria-label={`Increase quantity of ${c.menuItem.name}`}
                                             className="w-6 h-6 rounded bg-[#1a1a1a] flex items-center justify-center text-[#737373] hover:text-[#e5e5e5]">
                                             <Plus className="w-3 h-3" />
                                         </button>
                                         <button onClick={() => removeFromCart(c.menuItem.id)}
+                                            aria-label={`Remove ${c.menuItem.name} from cart`}
                                             className="w-6 h-6 rounded flex items-center justify-center text-[#525252] hover:text-[#ef4444]">
                                             <Trash2 className="w-3 h-3" />
                                         </button>
@@ -259,7 +262,7 @@ export default function POSPage() {
                             ].map((t) => (
                                 <button key={t.v} onClick={() => setOrderType(t.v)}
                                     className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium transition-all ${orderType === t.v
-                                            ? "bg-[#d4a853]/10 text-[#d4a853] border border-[#d4a853]/30"
+                                            ? "bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/30"
                                             : "bg-[#1a1a1a] text-[#737373] border border-transparent"
                                         }`}>
                                     <t.icon className="w-3 h-3" />
@@ -295,7 +298,7 @@ export default function POSPage() {
                                 <input
                                     type="text" placeholder="Name" value={customerName}
                                     onChange={(e) => setCustomerName(e.target.value)}
-                                    className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none"
+                                    className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[var(--accent)]/50 focus:outline-none"
                                 />
                             </div>
                             {orderType === "dine_in" ? (
@@ -304,7 +307,7 @@ export default function POSPage() {
                                     <input
                                         type="text" placeholder="Table #" value={tableNumber}
                                         onChange={(e) => setTableNumber(e.target.value)}
-                                        className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none"
+                                        className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[var(--accent)]/50 focus:outline-none"
                                     />
                                 </div>
                             ) : (
@@ -313,7 +316,7 @@ export default function POSPage() {
                                     <input
                                         type="text" placeholder="Phone" value={customerPhone}
                                         onChange={(e) => setCustomerPhone(e.target.value)}
-                                        className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none"
+                                        className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[var(--accent)]/50 focus:outline-none"
                                     />
                                 </div>
                             )}
@@ -325,7 +328,7 @@ export default function POSPage() {
                             <input
                                 type="text" placeholder="Notes (e.g. no onions, extra spicy)" value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
-                                className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none"
+                                className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[var(--accent)]/50 focus:outline-none"
                             />
                         </div>
 
@@ -352,13 +355,13 @@ export default function POSPage() {
                         <div className="flex items-center justify-between pt-2 border-t border-[#1a1a1a]">
                             <div>
                                 <p className="text-[10px] text-[#525252]">Total</p>
-                                <p className="text-lg font-bold text-[#d4a853]">{formatKES(subtotal)}</p>
+                                <p className="text-lg font-bold text-[var(--accent)]">{formatKES(subtotal)}</p>
                             </div>
                             <button
                                 onClick={handleSubmit}
                                 disabled={cart.length === 0 || submitting}
                                 className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${cart.length > 0 && !submitting
-                                        ? "bg-[#d4a853] text-black hover:bg-[#c49843]"
+                                        ? "bg-[var(--accent)] text-black hover:bg-[#c49843]"
                                         : "bg-[#262626] text-[#525252] cursor-not-allowed"
                                     }`}
                             >

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime
@@ -11,11 +12,19 @@ from routers.deps import get_or_create_restaurant
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
+# Directive 015's permission matrix for `inventory`: RW = Owner, Manager,
+# Stockkeeper; R = Controller, Kitchen; nothing for Supervisor/Waiter. Owner
+# passes through every require_staff_role() call automatically (Role.ADMIN
+# bypass), so it isn't listed explicitly below.
+_CAN_WRITE = (models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER)
+_CAN_READ = (models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER,
+             models.StaffRole.CONTROLLER, models.StaffRole.KITCHEN)
+
 
 @router.get("/", response_model=List[schemas.InventoryItemOut])
 async def get_inventory(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_READ)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     return db.query(models.InventoryItem).filter(
@@ -27,7 +36,7 @@ async def get_inventory(
 async def create_inventory_item(
     item: schemas.InventoryItemCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     db_item = models.InventoryItem(
@@ -50,7 +59,7 @@ async def update_inventory_item(
     item_id: int,
     item_update: schemas.InventoryItemUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     db_item = db.query(models.InventoryItem).filter(
@@ -73,7 +82,7 @@ async def receive_stock(
     item_id: int,
     receive: schemas.StockReceive,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
 ):
     """Record stock received from supplier — increases quantity."""
     restaurant = get_or_create_restaurant(db, current_user)
@@ -93,6 +102,7 @@ async def receive_stock(
         movement_type=models.StockMovementType.IN,
         quantity=receive.quantity,
         reason=f"Received from {receive.supplier}" if receive.supplier else "Stock received",
+        performed_by_user_id=current_user.id,
     )
     db.add(movement)
     db.commit()
@@ -105,7 +115,7 @@ async def adjust_stock(
     item_id: int,
     adjust: schemas.StockAdjust,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
 ):
     """Adjust stock for waste, breakage, or corrections."""
     restaurant = get_or_create_restaurant(db, current_user)
@@ -123,6 +133,7 @@ async def adjust_stock(
         movement_type=models.StockMovementType.ADJUST if adjust.quantity >= 0 else models.StockMovementType.OUT,
         quantity=abs(adjust.quantity),
         reason=adjust.reason or "Manual adjustment",
+        performed_by_user_id=current_user.id,
     )
     db.add(movement)
     db.commit()
@@ -134,7 +145,10 @@ async def adjust_stock(
 async def delete_inventory_item(
     item_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
+    # Deleting an item definition (not adjusting its quantity) is more
+    # structural than the matrix's RW label implies — Stockkeeper can
+    # receive/adjust stock but not remove the item record itself.
+    current_user: models.User = Depends(auth.require_staff_role(models.StaffRole.MANAGER)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     db_item = db.query(models.InventoryItem).filter(
@@ -145,5 +159,48 @@ async def delete_inventory_item(
         raise HTTPException(status_code=404, detail="Item not found")
 
     db.delete(db_item)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # stock_movements/stock_transfers/stock_counts.inventory_item_id are all
+        # RESTRICT (migration 028) — the theft/shrinkage audit trail must
+        # survive an inventory item being removed.
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="This item has stock movement, transfer, or count history and can't be deleted.",
+        )
     return {"message": "Item deleted"}
+
+
+@router.put("/{item_id}/reorder-settings", response_model=schemas.InventoryItemOut)
+async def update_reorder_settings(
+    item_id: int,
+    body: schemas.InventoryReorderSettingsUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
+):
+    """Set the par level and default supplier that drive automated
+    reordering (directive 018 — ai/reorder.py). Both nullable: an item with
+    either unset is simply never auto-drafted."""
+    restaurant = get_or_create_restaurant(db, current_user)
+    db_item = db.query(models.InventoryItem).filter(
+        models.InventoryItem.id == item_id,
+        models.InventoryItem.restaurant_id == restaurant.id,
+    ).first()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    if body.default_supplier_id is not None:
+        supplier = db.query(models.Supplier).filter(
+            models.Supplier.id == body.default_supplier_id,
+            models.Supplier.restaurant_id == restaurant.id,
+        ).first()
+        if not supplier:
+            raise HTTPException(status_code=404, detail="Supplier not found")
+
+    for key, value in body.dict(exclude_unset=True).items():
+        setattr(db_item, key, value)
+    db.commit()
+    db.refresh(db_item)
+    return db_item

@@ -6,7 +6,7 @@ import { demoData } from "@/lib/demo-data";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Package, AlertTriangle, Plus, TruckIcon,
-    Minus, X, Check,
+    Minus, X, Check, ArrowRightLeft, ShieldAlert, ClipboardList, Send,
 } from "lucide-react";
 
 export default function InventoryPage() {
@@ -16,6 +16,29 @@ export default function InventoryPage() {
     const [showAddForm, setShowAddForm] = useState(false);
     const [showReceiveForm, setShowReceiveForm] = useState<number | null>(null);
     const [showAdjustForm, setShowAdjustForm] = useState<number | null>(null);
+
+    // Directive 016/017: store<->kitchen chain of custody (push + pull) +
+    // variance report + physical counts. All best-effort — a role without
+    // access to /stock/* (e.g. Waiter) simply doesn't see these panels
+    // rather than the page erroring.
+    const [transfers, setTransfers] = useState<any[] | null>(null);
+    const [variance, setVariance] = useState<any | null>(null);
+    const [showTransferForm, setShowTransferForm] = useState(false);
+    const [transferItemId, setTransferItemId] = useState("");
+    const [transferQty, setTransferQty] = useState("");
+    const [confirmingId, setConfirmingId] = useState<number | null>(null);
+    const [confirmQty, setConfirmQty] = useState("");
+
+    // Kitchen requisition (pull) — directive 017
+    const [showRequestForm, setShowRequestForm] = useState(false);
+    const [requestItemId, setRequestItemId] = useState("");
+    const [fulfillingId, setFulfillingId] = useState<number | null>(null);
+    const [fulfillQty, setFulfillQty] = useState("");
+
+    // Physical stock count — directive 017
+    const [showCountForm, setShowCountForm] = useState(false);
+    const [countItemId, setCountItemId] = useState("");
+    const [countQty, setCountQty] = useState("");
 
     const [newName, setNewName] = useState("");
     const [newUnit, setNewUnit] = useState("kg");
@@ -34,12 +57,22 @@ export default function InventoryPage() {
     const [toast, setToast] = useState("");
 
     const fetchData = async () => {
-        const [invRes, aiRes] = await Promise.all([
+        const [invRes, aiRes, transfersRes, varianceRes] = await Promise.all([
             api.get("/inventory/").catch(() => ({ data: [] })),
             api.get("/ai/inventory-predictions").catch(() => ({ data: null })),
+            api.get("/stock/transfers").catch(() => null),
+            api.get("/stock/variance-report").catch(() => null),
         ]);
         setItems(Array.isArray(invRes.data) ? invRes.data : []);
         setAiData(aiRes.data);
+        // Only the still-actionable statuses belong in this compact panel —
+        // confirmed/disputed history isn't shown here.
+        setTransfers(
+            transfersRes
+                ? (transfersRes.data as any[]).filter((t) => t.status === "requested" || t.status === "pending")
+                : null
+        );
+        setVariance(varianceRes ? varianceRes.data : null);
         setLoading(false);
     };
 
@@ -65,7 +98,9 @@ export default function InventoryPage() {
             setShowAddForm(false);
             setNewName(""); setNewQty(""); setNewCost("");
             await fetchData();
-        } catch (err) { console.error(err); }
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Failed to add item");
+        }
         setSubmitting(false);
     };
 
@@ -82,7 +117,9 @@ export default function InventoryPage() {
             setShowReceiveForm(null);
             setReceiveQty(""); setReceiveCost(""); setReceiveSupplier("");
             await fetchData();
-        } catch (err) { console.error(err); }
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Failed to record receipt");
+        }
         setSubmitting(false);
     };
 
@@ -98,7 +135,105 @@ export default function InventoryPage() {
             setShowAdjustForm(null);
             setAdjustQty(""); setAdjustReason("");
             await fetchData();
-        } catch (err) { console.error(err); }
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Failed to record adjustment");
+        }
+        setSubmitting(false);
+    };
+
+    const handleInitiateTransfer = async () => {
+        if (!transferItemId || !transferQty) return;
+        setSubmitting(true);
+        try {
+            await api.post("/stock/transfers", {
+                inventory_item_id: parseInt(transferItemId),
+                quantity: parseFloat(transferQty),
+                from_location: "store",
+                to_location: "kitchen",
+            });
+            showToast("Transfer sent to kitchen for confirmation");
+            setShowTransferForm(false);
+            setTransferItemId(""); setTransferQty("");
+            await fetchData();
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Failed to start transfer");
+        }
+        setSubmitting(false);
+    };
+
+    const handleConfirmTransfer = async (transferId: number) => {
+        if (!confirmQty) return;
+        setSubmitting(true);
+        try {
+            const res = await api.post(`/stock/transfers/${transferId}/confirm`, {
+                confirmed_quantity: parseFloat(confirmQty),
+            });
+            showToast(
+                res.data.status === "disputed"
+                    ? "Recorded — quantity didn't match, flagged for review"
+                    : "Transfer confirmed"
+            );
+            setConfirmingId(null);
+            setConfirmQty("");
+            await fetchData();
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Failed to confirm");
+        }
+        setSubmitting(false);
+    };
+
+    const handleRequestStock = async () => {
+        if (!requestItemId) return;
+        setSubmitting(true);
+        try {
+            await api.post("/stock/transfers/request", {
+                inventory_item_id: parseInt(requestItemId),
+                from_location: "store",
+                to_location: "kitchen",
+            });
+            showToast("Request sent to the store");
+            setShowRequestForm(false);
+            setRequestItemId("");
+            await fetchData();
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Failed to send request");
+        }
+        setSubmitting(false);
+    };
+
+    const handleFulfillTransfer = async (transferId: number) => {
+        if (!fulfillQty) return;
+        setSubmitting(true);
+        try {
+            await api.post(`/stock/transfers/${transferId}/fulfil`, {
+                quantity: parseFloat(fulfillQty),
+            });
+            showToast("Marked as sent — awaiting confirmation");
+            setFulfillingId(null);
+            setFulfillQty("");
+            await fetchData();
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Failed to fulfil request");
+        }
+        setSubmitting(false);
+    };
+
+    const handleSubmitCount = async () => {
+        if (!countItemId || !countQty) return;
+        setSubmitting(true);
+        try {
+            const res = await api.post("/stock/counts", {
+                inventory_item_id: parseInt(countItemId),
+                counted_quantity: parseFloat(countQty),
+            });
+            const gap = res.data.counted_quantity - res.data.expected_quantity;
+            showToast(Math.abs(gap) < 0.001 ? "Count matches — no adjustment needed" : `Count recorded, stock updated (${gap > 0 ? "+" : ""}${gap.toFixed(1)})`);
+            setShowCountForm(false);
+            setCountItemId(""); setCountQty("");
+            await fetchData();
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Failed to record count");
+        }
         setSubmitting(false);
     };
 
@@ -159,7 +294,7 @@ export default function InventoryPage() {
                 </div>
                 <div className="flex gap-2">
                     <button onClick={() => setShowAddForm(!showAddForm)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#d4a853]/10 border border-[#d4a853]/30 rounded-lg text-xs text-[#d4a853] hover:bg-[#d4a853]/20 transition-all">
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-lg text-xs text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-all">
                         <Plus className="w-3 h-3" />
                         Add Item
                     </button>
@@ -168,8 +303,8 @@ export default function InventoryPage() {
 
             {/* Demo Banner */}
             {isDemo && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-[#d4a853]/8 border border-[#d4a853]/20 rounded-lg">
-                    <span className="text-[10px] text-[#d4a853]">📊 Demo Mode — Showing sample data for Lavy restaurant</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent)]/8 border border-[var(--accent)]/20 rounded-lg">
+                    <span className="text-[10px] text-[var(--accent)]">📊 Demo Mode — Showing sample data for Lavy restaurant</span>
                 </div>
             )}
 
@@ -177,18 +312,18 @@ export default function InventoryPage() {
             <AnimatePresence>
                 {showAddForm && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                        className="bg-[#141414] border border-[#d4a853]/20 rounded-xl overflow-hidden">
+                        className="bg-[#141414] border border-[var(--accent)]/20 rounded-xl overflow-hidden">
                         <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
                             <span className="text-xs font-semibold text-[#e5e5e5]">New Stock Item</span>
-                            <button onClick={() => setShowAddForm(false)}><X className="w-4 h-4 text-[#525252]" /></button>
+                            <button onClick={() => setShowAddForm(false)} aria-label="Close form"><X className="w-4 h-4 text-[#525252]" /></button>
                         </div>
                         <div className="p-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
                             <input placeholder="Item name" value={newName} onChange={(e) => setNewName(e.target.value)}
-                                className="col-span-2 bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none" />
+                                className="col-span-2 bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[var(--accent)]/50 focus:outline-none" />
                             <input placeholder="Quantity" value={newQty} onChange={(e) => setNewQty(e.target.value)} type="number"
-                                className="bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none" />
+                                className="bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[var(--accent)]/50 focus:outline-none" />
                             <select value={newUnit} onChange={(e) => setNewUnit(e.target.value)}
-                                className="bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] focus:border-[#d4a853]/50 focus:outline-none">
+                                className="bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] focus:border-[var(--accent)]/50 focus:outline-none">
                                 <option value="kg">kg</option>
                                 <option value="liters">liters</option>
                                 <option value="pieces">pieces</option>
@@ -197,7 +332,7 @@ export default function InventoryPage() {
                                 <option value="bottles">bottles</option>
                             </select>
                             <button onClick={handleAddItem} disabled={!newName || submitting}
-                                className="bg-[#d4a853] text-black rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                                className="bg-[var(--accent)] text-black rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50">
                                 {submitting ? "Adding..." : "Add"}
                             </button>
                         </div>
@@ -386,6 +521,194 @@ export default function InventoryPage() {
                 </div>
             )}
 
+            {/* Store <-> kitchen transfers, both directions (directive 016
+                push, directive 017 pull). Only shown to roles that can reach
+                /stock/transfers — Waiter/Supervisor get null back and the
+                panel doesn't render, rather than an error state. */}
+            {transfers !== null && (
+                <div className="bg-[#141414] border border-[#262626] rounded-xl">
+                    <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                            <ArrowRightLeft className="w-3.5 h-3.5 text-[var(--accent)]" />
+                            <p className="text-xs font-semibold text-[#e5e5e5]">Store ↔ kitchen</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => { setShowRequestForm(!showRequestForm); setShowTransferForm(false); }}
+                                className="text-[10px] px-2 py-1 rounded bg-[#1a1a1a] text-[#737373] hover:text-[var(--accent)] transition-all">
+                                <ClipboardList className="w-3 h-3 inline mr-0.5" />
+                                Request from store
+                            </button>
+                            <button onClick={() => { setShowTransferForm(!showTransferForm); setShowRequestForm(false); }}
+                                className="text-[10px] px-2 py-1 rounded bg-[#1a1a1a] text-[#737373] hover:text-[var(--accent)] transition-all">
+                                <Send className="w-3 h-3 inline mr-0.5" />
+                                Send to kitchen
+                            </button>
+                        </div>
+                    </div>
+
+                    <AnimatePresence>
+                        {showRequestForm && (
+                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                                className="px-4 py-3 border-b border-[#1a1a1a] flex gap-2 items-center overflow-hidden">
+                                <select value={requestItemId} onChange={(e) => setRequestItemId(e.target.value)}
+                                    className="flex-1 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] focus:outline-none">
+                                    <option value="">What do you need?</option>
+                                    {items.map((i) => <option key={i.id} value={i.id}>{i.item_name}</option>)}
+                                </select>
+                                <button onClick={handleRequestStock} disabled={!requestItemId || submitting}
+                                    className="bg-[var(--accent)] text-black rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
+                                    {submitting ? "..." : "Request"}
+                                </button>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <AnimatePresence>
+                        {showTransferForm && (
+                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                                className="px-4 py-3 border-b border-[#1a1a1a] flex gap-2 items-center overflow-hidden">
+                                <select value={transferItemId} onChange={(e) => setTransferItemId(e.target.value)}
+                                    className="flex-1 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] focus:outline-none">
+                                    <option value="">Select item…</option>
+                                    {items.map((i) => <option key={i.id} value={i.id}>{i.item_name}</option>)}
+                                </select>
+                                <input placeholder="Quantity" value={transferQty} onChange={(e) => setTransferQty(e.target.value)}
+                                    type="number" className="w-24 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
+                                <button onClick={handleInitiateTransfer} disabled={!transferItemId || !transferQty || submitting}
+                                    className="bg-[var(--accent)] text-black rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
+                                    {submitting ? "..." : "Send"}
+                                </button>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <div className="divide-y divide-[#1a1a1a]">
+                        {transfers.length === 0 ? (
+                            <p className="text-xs text-[#525252] text-center py-6">Nothing pending</p>
+                        ) : (
+                            transfers.map((t) => {
+                                const isRequested = t.status === "requested";
+                                const isFulfilling = fulfillingId === t.id;
+                                return (
+                                    <div key={t.id} className="px-4 py-3">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-sm text-[#e5e5e5]">
+                                                    #{t.id} · {isRequested ? "requested" : `${t.quantity}${t.unit}`} {t.from_location} → {t.to_location}
+                                                </p>
+                                                <p className="text-[10px] text-[#525252] mt-0.5">
+                                                    {isRequested ? "Waiting for the store to send it" : "Awaiting confirmation from receiver"}
+                                                </p>
+                                            </div>
+                                            {isRequested ? (
+                                                <button
+                                                    onClick={() => { setFulfillingId(isFulfilling ? null : t.id); setFulfillQty(""); }}
+                                                    className="text-[10px] px-2 py-1 rounded bg-[#1a1a1a] text-[#737373] hover:text-[var(--accent)] transition-all">
+                                                    Fulfil
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => { setConfirmingId(confirmingId === t.id ? null : t.id); setConfirmQty(String(t.quantity)); }}
+                                                    className="text-[10px] px-2 py-1 rounded bg-[#1a1a1a] text-[#737373] hover:text-[#22c55e] transition-all">
+                                                    Confirm receipt
+                                                </button>
+                                            )}
+                                        </div>
+                                        <AnimatePresence>
+                                            {isFulfilling && (
+                                                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                                                    className="mt-2 flex gap-2 items-center">
+                                                    <input placeholder="Quantity being sent" value={fulfillQty} onChange={(e) => setFulfillQty(e.target.value)}
+                                                        type="number" className="flex-1 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
+                                                    <button onClick={() => handleFulfillTransfer(t.id)} disabled={!fulfillQty || submitting}
+                                                        className="bg-[var(--accent)] text-black rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
+                                                        {submitting ? "..." : "Send"}
+                                                    </button>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                        <AnimatePresence>
+                                            {confirmingId === t.id && (
+                                                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                                                    className="mt-2 flex gap-2 items-center">
+                                                    <input placeholder="Actual quantity received" value={confirmQty} onChange={(e) => setConfirmQty(e.target.value)}
+                                                        type="number" className="flex-1 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
+                                                    <button onClick={() => handleConfirmTransfer(t.id)} disabled={!confirmQty || submitting}
+                                                        className="bg-[#22c55e] text-black rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
+                                                        {submitting ? "..." : "Confirm"}
+                                                    </button>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Physical stock count (directive 017) — the independent check
+                that keeps theft/shrinkage detection meaningful once
+                ingredient deduction is automatic. Shown whenever the
+                transfers panel is (same role gate on the backend). */}
+            {transfers !== null && (
+                <div className="bg-[#141414] border border-[#262626] rounded-xl">
+                    <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <ClipboardList className="w-3.5 h-3.5 text-[var(--accent)]" />
+                            <p className="text-xs font-semibold text-[#e5e5e5]">Physical count</p>
+                        </div>
+                        <button onClick={() => setShowCountForm(!showCountForm)}
+                            className="text-[10px] px-2 py-1 rounded bg-[#1a1a1a] text-[#737373] hover:text-[var(--accent)] transition-all">
+                            <Plus className="w-3 h-3 inline mr-0.5" />
+                            Count an item
+                        </button>
+                    </div>
+                    <AnimatePresence>
+                        {showCountForm && (
+                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                                className="px-4 py-3 flex gap-2 items-center overflow-hidden">
+                                <select value={countItemId} onChange={(e) => setCountItemId(e.target.value)}
+                                    className="flex-1 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] focus:outline-none">
+                                    <option value="">What did you count?</option>
+                                    {items.map((i) => <option key={i.id} value={i.id}>{i.item_name}</option>)}
+                                </select>
+                                <input placeholder="What's actually there" value={countQty} onChange={(e) => setCountQty(e.target.value)}
+                                    type="number" className="w-32 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
+                                <button onClick={handleSubmitCount} disabled={!countItemId || !countQty || submitting}
+                                    className="bg-[var(--accent)] text-black rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
+                                    {submitting ? "..." : "Record"}
+                                </button>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            )}
+
+            {/* Variance report (directive 016) — Controller/Manager/Owner only,
+                same null-means-hidden pattern as transfers above. */}
+            {variance !== null && variance.items?.some((i: any) => i.flagged) && (
+                <div className="bg-[#141414] border border-[#ef4444]/20 rounded-xl">
+                    <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center gap-2">
+                        <ShieldAlert className="w-3.5 h-3.5 text-[#ef4444]" />
+                        <p className="text-xs font-semibold text-[#e5e5e5]">
+                            Stock variance — {variance.items.filter((i: any) => i.flagged).length} item(s) over {(variance.threshold * 100).toFixed(0)}%
+                        </p>
+                    </div>
+                    <div className="divide-y divide-[#1a1a1a]">
+                        {variance.items.filter((i: any) => i.flagged).map((i: any) => (
+                            <div key={i.inventory_item_id} className="px-4 py-2.5 flex items-center justify-between">
+                                <p className="text-xs text-[#e5e5e5]">{i.item_name}</p>
+                                <p className="text-xs text-[#ef4444]">
+                                    {(i.variance_pct * 100).toFixed(1)}% (expected ~{i.theoretical_usage.toFixed(1)}, actual {i.actual_usage.toFixed(1)})
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Real: AI alerts */}
             {!isDemo && alerts.length > 0 && (
                 <div className="bg-[#141414] border border-[#262626] rounded-xl">
@@ -398,7 +721,7 @@ export default function InventoryPage() {
                             <div key={i} className="px-4 py-2.5">
                                 <p className="text-xs text-[#e5e5e5]">{alert.message}</p>
                                 {alert.action && (
-                                    <p className="text-[10px] text-[#d4a853] mt-0.5">→ {alert.action}</p>
+                                    <p className="text-[10px] text-[var(--accent)] mt-0.5">→ {alert.action}</p>
                                 )}
                             </div>
                         ))}

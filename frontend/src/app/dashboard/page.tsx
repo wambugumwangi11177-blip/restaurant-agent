@@ -98,8 +98,8 @@ export default function DashboardPage() {
         <div className="space-y-5">
             {/* Demo Mode Banner */}
             {isDemo && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-[#d4a853]/8 border border-[#d4a853]/20 rounded-lg">
-                    <span className="text-[10px] text-[#d4a853]">📊 Demo Mode — Showing sample data for Lavy restaurant</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent)]/8 border border-[var(--accent)]/20 rounded-lg">
+                    <span className="text-[10px] text-[var(--accent)]">📊 Demo Mode — Showing sample data for Lavy restaurant</span>
                 </div>
             )}
 
@@ -153,7 +153,7 @@ export default function DashboardPage() {
                     </div>
                     {trustStats?.grounded_pct != null && (
                         <span
-                            className="flex items-center gap-1 text-[10px] text-[#d4a853] bg-[#d4a853]/10 border border-[#d4a853]/20 rounded px-1.5 py-0.5 whitespace-nowrap"
+                            className="flex items-center gap-1 text-[10px] text-[var(--accent)] bg-[var(--accent)]/10 border border-[var(--accent)]/20 rounded px-1.5 py-0.5 whitespace-nowrap"
                             title={`${trustStats.narratives_generated.toLocaleString()} AI insights generated; every cited figure is checked against your real data before it's shown`}
                         >
                             <ShieldCheck className="w-3 h-3" /> {trustStats.grounded_pct}% of AI figures verified
@@ -173,33 +173,33 @@ export default function DashboardPage() {
             {glance && (glance.moneyPerDayCents > 0 || glance.capturedCents > 0 || glance.oppsCents > 0 || glance.winbackReachable > 0) && (
                 <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                        <Zap className="w-3.5 h-3.5 text-[#d4a853]" />
+                        <Zap className="w-3.5 h-3.5 text-[var(--accent)]" />
                         <p className="text-xs font-semibold text-[#e5e5e5]">What your AI is doing for you</p>
                     </div>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                        <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[#d4a853]/40 transition-colors">
+                        <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[var(--accent)]/40 transition-colors">
                             <p className="text-lg font-bold text-emerald-400">{formatKES(glance.moneyPerDayCents)}<span className="text-xs text-[#525252] font-normal">/day</span></p>
                             <p className="text-[10px] text-[#525252] mt-0.5">saved in staff time (≈ {glance.hoursPerDay} hrs/day)</p>
                         </Link>
-                        <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[#d4a853]/40 transition-colors">
-                            <p className="text-lg font-bold text-[#d4a853]">{formatKES(glance.capturedCents)}</p>
+                        <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[var(--accent)]/40 transition-colors">
+                            <p className="text-lg font-bold text-[var(--accent)]">{formatKES(glance.capturedCents)}</p>
                             <p className="text-[10px] text-[#525252] mt-0.5">extra profit captured this month</p>
                         </Link>
-                        <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[#d4a853]/40 transition-colors">
+                        <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[var(--accent)]/40 transition-colors">
                             <p className="text-lg font-bold text-amber-400">{formatKES(glance.oppsCents)}</p>
                             <p className="text-[10px] text-[#525252] mt-0.5">opportunities flagged, not yet actioned</p>
                         </Link>
-                        <Link href="/dashboard/marketing" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[#d4a853]/40 transition-colors">
+                        <Link href="/dashboard/marketing" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[var(--accent)]/40 transition-colors">
                             <p className="text-lg font-bold text-[#e5e5e5]">{glance.winbackReachable}</p>
                             <p className="text-[10px] text-[#525252] mt-0.5">lapsed regulars ready to win back</p>
                         </Link>
                     </div>
                     <div className="flex flex-wrap gap-2 mt-3">
-                        <Link href="/dashboard/ai" className="flex items-center gap-1.5 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"><Brain className="w-3 h-3" /> AI Command Center</Link>
+                        <Link href="/dashboard/ai" className="flex items-center gap-1.5 text-[11px] text-[#737373] hover:text-[var(--accent)] transition-colors"><Brain className="w-3 h-3" /> AI Command Center</Link>
                         <span className="text-[#262626]">·</span>
-                        <Link href="/dashboard/roi" className="flex items-center gap-1.5 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"><Clock className="w-3 h-3" /> Time & Money Saved</Link>
+                        <Link href="/dashboard/roi" className="flex items-center gap-1.5 text-[11px] text-[#737373] hover:text-[var(--accent)] transition-colors"><Clock className="w-3 h-3" /> Time & Money Saved</Link>
                         <span className="text-[#262626]">·</span>
-                        <Link href="/dashboard/marketing" className="flex items-center gap-1.5 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"><Megaphone className="w-3 h-3" /> Campaigns & Win-back <ArrowRight className="w-3 h-3" /></Link>
+                        <Link href="/dashboard/marketing" className="flex items-center gap-1.5 text-[11px] text-[#737373] hover:text-[var(--accent)] transition-colors"><Megaphone className="w-3 h-3" /> Campaigns & Win-back <ArrowRight className="w-3 h-3" /></Link>
                     </div>
                 </div>
             )}
@@ -300,7 +300,7 @@ export default function DashboardPage() {
                 {/* Ways to earn more */}
                 <div className="bg-[#141414] border border-[#262626] rounded-xl">
                     <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center gap-2">
-                        <Zap className="w-3.5 h-3.5 text-[#d4a853]" />
+                        <Zap className="w-3.5 h-3.5 text-[var(--accent)]" />
                         <h2 className="text-sm font-semibold text-[#e5e5e5]">Ways to Earn More</h2>
                     </div>
                     {opportunities.length === 0 ? (
@@ -311,7 +311,7 @@ export default function DashboardPage() {
                                 <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                                     transition={{ delay: i * 0.05 }} className="px-4 py-3">
                                     <div className="flex items-center gap-2">
-                                        <Zap className="w-3 h-3 text-[#d4a853]" />
+                                        <Zap className="w-3 h-3 text-[var(--accent)]" />
                                         <p className="text-sm text-[#e5e5e5]">{friendlyOpportunity(o.opportunity || o)}</p>
                                     </div>
                                     <p className="text-xs text-[#525252] mt-1">{friendlyDetail(o.detail || "")}</p>
@@ -346,7 +346,7 @@ export default function DashboardPage() {
                                     <div>
                                         <p className="text-sm text-[#e5e5e5]">{a.message}</p>
                                         {a.action && (
-                                            <p className="text-xs text-[#d4a853] mt-1">💡 {a.action}</p>
+                                            <p className="text-xs text-[var(--accent)] mt-1">💡 {a.action}</p>
                                         )}
                                     </div>
                                 </div>

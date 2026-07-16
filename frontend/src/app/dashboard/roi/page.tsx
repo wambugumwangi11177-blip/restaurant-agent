@@ -149,7 +149,7 @@ function EmptyState() {
                 <p className="text-[#525252] mt-1 text-sm">Getting started</p>
             </div>
             <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-8 text-center space-y-4">
-                <Clock className="w-12 h-12 text-[#d4a853] mx-auto" />
+                <Clock className="w-12 h-12 text-[var(--accent)] mx-auto" />
                 <h2 className="text-[#e5e5e5] font-semibold text-lg">No automation activity yet</h2>
                 <p className="text-[#525252] text-sm max-w-md mx-auto">
                     Once the AI starts sending WhatsApp messages, running analysis, or
@@ -208,7 +208,7 @@ export default function RoiDashboard() {
                 <p className="text-[#525252] text-sm text-center max-w-sm">{error}</p>
                 <button
                     onClick={fetchData}
-                    className="px-4 py-2 bg-[#d4a853] text-[#0a0a0a] font-semibold rounded-lg text-sm hover:bg-[#e0b96a]"
+                    className="px-4 py-2 bg-[var(--accent)] text-[#0a0a0a] font-semibold rounded-lg text-sm hover:bg-[var(--accent-hover)]"
                 >
                     Retry
                 </button>
@@ -268,8 +268,8 @@ export default function RoiDashboard() {
             {/* Still gathering data — shown instead of hiding the whole page, so
                 the owner always sees the ROI dashboard exists and is filling in. */}
             {isSparse && (
-                <div className="rounded-xl border border-[#d4a853]/25 bg-[#d4a853]/[0.06] p-4 flex items-start gap-3">
-                    <Clock className="w-5 h-5 text-[#d4a853] flex-shrink-0 mt-0.5" />
+                <div className="rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/[0.06] p-4 flex items-start gap-3">
+                    <Clock className="w-5 h-5 text-[var(--accent)] flex-shrink-0 mt-0.5" />
                     <div>
                         <p className="text-sm font-medium text-[#e5e5e5]">Your ROI dashboard is still gathering data</p>
                         <p className="text-[#737373] text-xs mt-1 max-w-xl">
@@ -282,8 +282,8 @@ export default function RoiDashboard() {
             )}
 
             {/* Top explainer — the three-totals model, and why they're never summed */}
-            <div className="rounded-xl border border-[#d4a853]/25 bg-[#d4a853]/[0.04] p-5">
-                <div className="flex items-center gap-2 text-[#d4a853] mb-1">
+            <div className="rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/[0.04] p-5">
+                <div className="flex items-center gap-2 text-[var(--accent)] mb-1">
                     <Zap className="w-4 h-4" />
                     <p className="text-sm font-semibold text-[#e5e5e5]">How your AI is paying for itself</p>
                 </div>
@@ -328,8 +328,8 @@ export default function RoiDashboard() {
                     <HowItWorks id="roi_time" />
                 </div>
 
-                <div className="rounded-xl border border-[#d4a853]/30 bg-[#d4a853]/5 p-6">
-                    <div className="flex items-center gap-2 text-[#d4a853] mb-2">
+                <div className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-6">
+                    <div className="flex items-center gap-2 text-[var(--accent)] mb-2">
                         <TrendingUp className="w-4 h-4" />
                         <p className="text-xs uppercase tracking-widest">Profit captured</p>
                     </div>
@@ -340,7 +340,7 @@ export default function RoiDashboard() {
                     </p>
                     <div className="mt-1"><TrendChip pct={mc.change_pct} /></div>
                     {!!mc.all_time_approved && mc.all_time_monthly_impact_cents !== undefined && (
-                        <p className="text-[11px] text-[#525252] mt-2 pt-2 border-t border-[#d4a853]/15">
+                        <p className="text-[11px] text-[#525252] mt-2 pt-2 border-t border-[var(--accent)]/15">
                             All-time: <span className="text-[#a3a3a3]">{formatKES(mc.all_time_monthly_impact_cents)}/mo</span> standing uplift from {mc.all_time_approved} approved change{mc.all_time_approved === 1 ? "" : "s"}
                         </p>
                     )}
@@ -362,8 +362,8 @@ export default function RoiDashboard() {
                 there's metered AI spend to divide by; otherwise it would be a
                 divide-by-zero dressed up as a number. */}
             {econ && econ.roi_multiple !== null && econ.roi_multiple !== undefined && (
-                <div className="rounded-xl border border-[#d4a853]/30 bg-gradient-to-br from-[#d4a853]/[0.07] to-transparent p-5">
-                    <div className="flex items-center gap-2 text-[#d4a853] mb-2">
+                <div className="rounded-xl border border-[var(--accent)]/30 bg-gradient-to-br from-[var(--accent)]/[0.07] to-transparent p-5">
+                    <div className="flex items-center gap-2 text-[var(--accent)] mb-2">
                         <Scale className="w-4 h-4" />
                         <p className="text-xs uppercase tracking-widest">Net return on your AI</p>
                     </div>
@@ -443,7 +443,7 @@ export default function RoiDashboard() {
             {cap && (
                 <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
                     <div className="flex items-center gap-2 text-[#e5e5e5] mb-1">
-                        <ChefHat className="w-4 h-4 text-[#d4a853]" />
+                        <ChefHat className="w-4 h-4 text-[var(--accent)]" />
                         <p className="font-semibold text-sm">Kitchen capacity</p>
                     </div>
                     <p className="text-[#525252] text-xs mb-2">
@@ -476,7 +476,7 @@ export default function RoiDashboard() {
             {proj && (proj.annual_money_saved_cents > 0 || proj.annual_captured_cents > 0) && (
                 <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
                     <div className="flex items-center gap-2 text-[#e5e5e5] mb-1">
-                        <CalendarClock className="w-4 h-4 text-[#d4a853]" />
+                        <CalendarClock className="w-4 h-4 text-[var(--accent)]" />
                         <p className="font-semibold text-sm">At this pace, over a year</p>
                     </div>
                     <p className="text-[#525252] text-xs mb-4">
@@ -492,7 +492,7 @@ export default function RoiDashboard() {
                             <p className="text-[#525252] text-xs mt-1">labour value / year</p>
                         </div>
                         <div>
-                            <p className="text-2xl font-bold text-[#d4a853]">{formatKES(proj.annual_captured_cents)}</p>
+                            <p className="text-2xl font-bold text-[var(--accent)]">{formatKES(proj.annual_captured_cents)}</p>
                             <p className="text-[#525252] text-xs mt-1">captured profit / year</p>
                         </div>
                     </div>

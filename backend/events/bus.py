@@ -71,6 +71,17 @@ class EventType(str, Enum):
     PURCHASE_ORDER_DELIVERED = "purchase_order.delivered"
     PURCHASE_ORDER_LATE      = "purchase_order.late"
 
+    # Stock chain-of-custody (directive 016). Both are inherently
+    # non-repeating (a transfer confirm happens once; the variance job runs
+    # once daily) so neither needs the last_alerted_at-style cooldown the
+    # 2-hourly stock check needs — see run_variance_check in main.py.
+    STOCK_TRANSFER_DISCREPANCY = "stock_transfer.discrepancy"
+    STOCK_VARIANCE_FLAGGED     = "stock.variance_flagged"
+    # A physical count (directive 017) found a real gap against what the
+    # system expected. Fires once per count submission that exceeds
+    # tolerance — inherently non-repeating like STOCK_TRANSFER_DISCREPANCY.
+    STOCK_COUNT_DISCREPANCY    = "stock_count.discrepancy"
+
     # Marketing: CAMPAIGN_LAUNCHED / WINBACK_TRIGGERED were removed 2026-07-08
     # along with ai/marketing/campaigns.py, their only emitter. Nothing ever
     # subscribed to them. Winback is served instead by

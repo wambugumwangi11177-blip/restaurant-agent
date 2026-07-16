@@ -55,9 +55,9 @@ export function StrategyAgent() {
     };
 
     return (
-        <div className="rounded-xl border border-[#d4a853]/25 bg-gradient-to-b from-[#d4a853]/[0.05] to-[#0f0f0f] p-5">
+        <div className="rounded-xl border border-[var(--accent)]/25 bg-gradient-to-b from-[var(--accent)]/[0.05] to-[#0f0f0f] p-5">
             <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2">
-                <Target className="w-4 h-4 text-[#d4a853]" />
+                <Target className="w-4 h-4 text-[var(--accent)]" />
                 CEO Strategy Agent
             </h2>
             <p className="text-xs text-[#525252] mt-1">
@@ -77,7 +77,7 @@ export function StrategyAgent() {
                 <button
                     onClick={() => run(goal)}
                     disabled={loading || !goal.trim()}
-                    className="bg-[#d4a853] text-[#0a0a0a] font-medium text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity whitespace-nowrap"
+                    className="bg-[var(--accent)] text-[#0a0a0a] font-medium text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity whitespace-nowrap"
                 >
                     {loading ? "Thinking…" : "Build plan"}
                 </button>
@@ -87,7 +87,7 @@ export function StrategyAgent() {
                     <button
                         key={s}
                         onClick={() => { setGoal(s); run(s); }}
-                        className="text-[11px] text-[#737373] hover:text-[#d4a853] border border-[#1a1a1a] rounded-full px-2.5 py-1 transition-colors"
+                        className="text-[11px] text-[#737373] hover:text-[var(--accent)] border border-[#1a1a1a] rounded-full px-2.5 py-1 transition-colors"
                     >
                         {s}
                     </button>
@@ -111,7 +111,7 @@ export function StrategyAgent() {
                         {result.strategy.steps.map((s, i) => (
                             <li key={i} className="rounded-lg border border-[#1a1a1a] bg-[#0a0a0a] p-3">
                                 <div className="flex items-start gap-2">
-                                    <span className="text-[10px] font-bold text-[#0a0a0a] bg-[#d4a853] rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
+                                    <span className="text-[10px] font-bold text-[#0a0a0a] bg-[var(--accent)] rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
                                         {i + 1}
                                     </span>
                                     <div className="min-w-0">
@@ -138,7 +138,7 @@ export function StrategyAgent() {
                         <div>
                             <button
                                 onClick={() => setShowTrace((v) => !v)}
-                                className="flex items-center gap-1 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"
+                                className="flex items-center gap-1 text-[11px] text-[#737373] hover:text-[var(--accent)] transition-colors"
                             >
                                 <span>Reasoning trace ({result.trace.length})</span>
                                 <ChevronDown className={`w-3 h-3 transition-transform ${showTrace ? "rotate-180" : ""}`} />

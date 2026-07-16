@@ -53,7 +53,7 @@ export default function OrdersPage() {
             </div>
 
             {/* Today at a glance */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
                     <p className="text-xs text-[#525252]">Today&apos;s Sales</p>
                     <p className="text-lg font-bold text-[#22c55e] mt-1">{formatKES(todayRevenue)}</p>
@@ -64,7 +64,7 @@ export default function OrdersPage() {
                 </div>
                 <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
                     <p className="text-xs text-[#525252]">In the Kitchen</p>
-                    <p className="text-lg font-bold text-[#d4a853] mt-1">{pendingCount}</p>
+                    <p className="text-lg font-bold text-[var(--accent)] mt-1">{pendingCount}</p>
                 </div>
             </div>
 
@@ -97,9 +97,9 @@ export default function OrdersPage() {
                             )}
                             {peakDay && (
                                 <p className="text-xs text-[#737373]">
-                                    Your busiest day is usually <span className="text-[#d4a853] font-semibold">{peakDay}</span>
+                                    Your busiest day is usually <span className="text-[var(--accent)] font-semibold">{peakDay}</span>
                                     {peakHour !== undefined && (
-                                        <>, and the rush comes around <span className="text-[#d4a853] font-semibold">{formatHour(peakHour)}</span></>
+                                        <>, and the rush comes around <span className="text-[var(--accent)] font-semibold">{formatHour(peakHour)}</span></>
                                     )}
                                 </p>
                             )}
@@ -117,7 +117,7 @@ export default function OrdersPage() {
                                         return (
                                             <div key={i} className="flex-1 flex flex-col items-center gap-1">
                                                 <div className="w-full rounded-sm relative overflow-hidden" style={{ height: `${Math.max(pct, 8)}%` }}>
-                                                    <div className="absolute inset-0 bg-[#d4a853]/30 rounded-sm" />
+                                                    <div className="absolute inset-0 bg-[var(--accent)]/30 rounded-sm" />
                                                 </div>
                                                 <span className="text-[8px] text-[#525252]">{f.day_name?.slice(0, 3) || `Day ${i + 1}`}</span>
                                             </div>
@@ -187,7 +187,7 @@ export default function OrdersPage() {
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-sm font-medium text-[#d4a853]">{formatKES(order.total)}</p>
+                                        <p className="text-sm font-medium text-[var(--accent)]">{formatKES(order.total)}</p>
                                         <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-medium ${statusStyles[order.status] || statusStyles.pending}`}>
                                             {statusLabels[order.status] || order.status}
                                         </span>

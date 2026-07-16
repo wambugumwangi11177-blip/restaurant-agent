@@ -18,6 +18,7 @@
  */
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -27,7 +28,8 @@ import {
 import Link from "next/link";
 import { formatKES } from "@/lib/format";
 import { useAiModule } from "@/lib/useAiModule";
-import { HowItWorks } from "@/components/ai/HowItWorks";
+
+const HowItWorks = dynamic(() => import("@/components/ai/HowItWorks").then((mod) => mod.HowItWorks));
 import { NarrativeBlock, type Narrative } from "@/components/ai/NarrativeBlock";
 import { ExplainButton } from "@/components/ai/ExplainButton";
 import { MiniStat } from "@/components/ai/MiniStat";
@@ -90,7 +92,7 @@ function EmptyState({ restaurantName }: { restaurantName: string }) {
                 <p className="text-[#525252] mt-1 text-sm">{restaurantName} — Getting started</p>
             </div>
             <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-8 text-center space-y-4">
-                <Brain className="w-12 h-12 text-[#d4a853] mx-auto" />
+                <Brain className="w-12 h-12 text-[var(--accent)] mx-auto" />
                 <h2 className="text-[#e5e5e5] font-semibold text-lg">Your AI agents are ready</h2>
                 <p className="text-[#525252] text-sm max-w-md mx-auto">
                     Add menu items, record some orders, and your AI agents will start generating
@@ -99,7 +101,7 @@ function EmptyState({ restaurantName }: { restaurantName: string }) {
                 <div className="flex flex-wrap gap-3 justify-center pt-2">
                     <Link
                         href="/dashboard/menu"
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#d4a853] text-[#0a0a0a] font-semibold text-sm hover:bg-[#e0b96a] transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--accent)] text-[#0a0a0a] font-semibold text-sm hover:bg-[var(--accent-hover)] transition-colors"
                     >
                         Add menu items <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
@@ -118,7 +120,7 @@ function EmptyState({ restaurantName }: { restaurantName: string }) {
                     { icon: Activity, label: "Revenue Forecasting", desc: "7-day and 30-day predictions with confidence bands" },
                 ].map((agent) => (
                     <div key={agent.label} className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
-                        <agent.icon className="w-5 h-5 text-[#d4a853] mb-3" />
+                        <agent.icon className="w-5 h-5 text-[var(--accent)] mb-3" />
                         <p className="text-[#e5e5e5] font-medium text-sm">{agent.label}</p>
                         <p className="text-[#525252] text-xs mt-1">{agent.desc}</p>
                     </div>
@@ -185,7 +187,7 @@ export default function AiDashboard() {
                 <p className="text-[#525252] text-sm text-center max-w-sm">{error}</p>
                 <button
                     onClick={fetchData}
-                    className="px-4 py-2 bg-[#d4a853] text-[#0a0a0a] font-semibold rounded-lg text-sm hover:bg-[#e0b96a]"
+                    className="px-4 py-2 bg-[var(--accent)] text-[#0a0a0a] font-semibold rounded-lg text-sm hover:bg-[var(--accent-hover)]"
                 >
                     Retry
                 </button>
@@ -344,7 +346,7 @@ export default function AiDashboard() {
             {/* Recent AI Actions */}
             <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
                 <h2 className="text-sm font-semibold text-[#e5e5e5] mb-4 flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-[#d4a853]" />
+                    <Zap className="w-4 h-4 text-[var(--accent)]" />
                     Recent AI Actions
                 </h2>
                 {data!.recent_ai_actions.length === 0 ? (
@@ -506,7 +508,7 @@ function PricingSection() {
                                                 <p className="text-[#e5e5e5]">{r.item_name}</p>
                                                 {/* Worked example in the owner's own numbers */}
                                                 <span className="text-[11px] text-[#737373] whitespace-nowrap">
-                                                    KES {(r.current_price / 100).toLocaleString()} → <span className="text-[#d4a853]">KES {(r.suggested_price / 100).toLocaleString()}</span>
+                                                    KES {(r.current_price / 100).toLocaleString()} → <span className="text-[var(--accent)]">KES {(r.suggested_price / 100).toLocaleString()}</span>
                                                 </span>
                                                 {earlySignal && (
                                                     <span
@@ -536,6 +538,7 @@ function PricingSection() {
                                                         onClick={() => act(r, "reject")}
                                                         disabled={busy}
                                                         title="Dismiss this recommendation"
+                                                        aria-label="Dismiss this recommendation"
                                                         className="flex items-center justify-center w-7 h-7 rounded-md bg-[#1a1a1a] text-[#737373] hover:text-red-300 hover:bg-red-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                                     >
                                                         <X className="w-3.5 h-3.5" />
@@ -578,7 +581,7 @@ function LaborSection() {
                             {data.recommendations.slice(0, 4).map((r, i) => (
                                 <div key={i} className="p-3 rounded-lg bg-[#141414] border border-[#1a1a1a] text-sm">
                                     <p className="text-[#e5e5e5]">{r.message}</p>
-                                    {r.action && <p className="text-xs text-[#d4a853] mt-1">💡 {r.action}</p>}
+                                    {r.action && <p className="text-xs text-[var(--accent)] mt-1">💡 {r.action}</p>}
                                 </div>
                             ))}
                         </div>
@@ -699,7 +702,7 @@ function DataQualitySection() {
                                     <p className="text-xs text-[#525252] mt-1">{i.explanation}</p>
                                 </div>
                             ))}
-                            <Link href="/dashboard/menu" className="inline-flex items-center gap-1 text-xs text-[#d4a853] hover:underline mt-1">
+                            <Link href="/dashboard/menu" className="inline-flex items-center gap-1 text-xs text-[var(--accent)] hover:underline mt-1">
                                 Fix in Menu <ArrowRight className="w-3 h-3" />
                             </Link>
                         </div>
@@ -755,7 +758,7 @@ function MenuEngineeringSection() {
                                     <div key={i} className="flex items-center gap-2 text-xs">
                                         <span className="text-[#e5e5e5] w-24 flex-shrink-0 truncate">{c.category}</span>
                                         <div className="flex-1 h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
-                                            <div className="h-full bg-[#d4a853] rounded-full" style={{ width: `${Math.min(c.revenue_share_pct * 3, 100)}%` }} />
+                                            <div className="h-full bg-[var(--accent)] rounded-full" style={{ width: `${Math.min(c.revenue_share_pct * 3, 100)}%` }} />
                                         </div>
                                         <span className="text-[#737373] w-10 text-right">{c.revenue_share_pct}%</span>
                                         <span className={`w-12 text-right ${c.avg_margin_pct >= 55 ? "text-emerald-400" : c.avg_margin_pct >= 40 ? "text-amber-400" : "text-red-400"}`}>{c.avg_margin_pct}%</span>
@@ -828,7 +831,7 @@ function ProfitSection() {
                                         <span className="text-red-400 text-xs font-medium whitespace-nowrap">-{formatKES(l.monthly_leak_cents)}/mo</span>
                                     </div>
                                     <p className="text-xs text-[#525252] mt-1">Margin {l.current_margin_pct}% · food cost {l.food_cost_pct}%</p>
-                                    <p className="text-xs text-[#d4a853] mt-0.5">💡 {l.action}</p>
+                                    <p className="text-xs text-[var(--accent)] mt-0.5">💡 {l.action}</p>
                                     <ExplainButton item={l} label={`Profit leak: ${l.item_name}`} />
                                 </div>
                             ))}
@@ -852,9 +855,9 @@ const HEALTH_ADVICE: Record<string, (detail: string) => string> = {
 function HealthBoostSection({ breakdown, score }: { breakdown: { category: string; score: number; detail: string }[]; score: number }) {
     const weak = breakdown.filter((b) => b.score < 70).sort((a, b) => a.score - b.score);
     return (
-        <div className="rounded-xl border border-[#d4a853]/25 bg-[#d4a853]/[0.04] p-5">
+        <div className="rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/[0.04] p-5">
             <h2 className="text-sm font-semibold text-[#e5e5e5] mb-1 flex items-center gap-2">
-                <Zap className="w-4 h-4 text-[#d4a853]" />
+                <Zap className="w-4 h-4 text-[var(--accent)]" />
                 How to raise your health score ({score} → higher)
             </h2>
             <p className="text-xs text-[#525252] mb-4">Your biggest wins first — each item below is dragging the score and is fixable.</p>
@@ -867,7 +870,7 @@ function HealthBoostSection({ breakdown, score }: { breakdown: { category: strin
                             <span className={`text-xs font-bold w-9 text-center flex-shrink-0 rounded px-1 py-0.5 ${b.score < 40 ? "bg-red-500/10 text-red-400" : "bg-amber-500/10 text-amber-400"}`}>{b.score}</span>
                             <div>
                                 <p className="text-sm text-[#e5e5e5] font-medium">{b.category} <span className="text-[#525252] font-normal">— {b.detail}</span></p>
-                                <p className="text-xs text-[#d4a853] mt-1">→ {(HEALTH_ADVICE[b.category] || (() => "Review this area's details and act on the flagged items."))(b.detail)}</p>
+                                <p className="text-xs text-[var(--accent)] mt-1">→ {(HEALTH_ADVICE[b.category] || (() => "Review this area's details and act on the flagged items."))(b.detail)}</p>
                             </div>
                         </div>
                     ))}

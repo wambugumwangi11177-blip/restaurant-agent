@@ -262,7 +262,7 @@ function Column({
                                     <div className="space-y-0.5 mb-2">
                                         {order.items.map((item) => (
                                             <div key={item.id} className="flex items-center gap-2">
-                                                <span className="text-xs font-semibold text-[#d4a853] w-4">{item.quantity}×</span>
+                                                <span className="text-xs font-semibold text-[var(--accent)] w-4">{item.quantity}×</span>
                                                 <span className="text-xs text-[#e5e5e5]">{item.item_name || `Item #${item.menu_item_id}`}</span>
                                             </div>
                                         ))}

@@ -95,6 +95,7 @@ export function RecommendationCard({
             onClick={() => onReject(id)}
             className="p-2.5 text-zinc-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors active:scale-[0.98]"
             title="Reject Recommendation"
+            aria-label="Reject Recommendation"
           >
             <X className="w-5 h-5" />
           </button>

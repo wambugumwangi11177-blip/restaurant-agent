@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import PlainTextResponse
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from urllib.parse import parse_qsl
 from xml.sax.saxutils import escape
@@ -44,6 +45,24 @@ def _resolve_restaurant_by_phone(db: Session, from_number: str) -> models.Restau
         if owner_phone and normalize_phone(owner_phone) == normalized:
             return restaurant
     return None
+
+
+def _resolve_staff_by_phone(db: Session, from_number: str) -> models.StaffMember | None:
+    """
+    Third case in inbound resolution, alongside owner and customer (directive
+    016): is this message from a roster StaffMember? Matches on normalized
+    phone, same precedence style as _resolve_restaurant_by_phone. Only
+    StaffMember rows with a phone set are candidates — most of the roster
+    (see StaffMember.phone's nullable docstring in models.py) has no way to
+    be reached this way at all, which is expected, not a bug.
+    """
+    normalized = normalize_phone(from_number)
+    if not normalized:
+        return None
+    return db.query(models.StaffMember).filter(
+        models.StaffMember.phone == normalized,
+        models.StaffMember.is_active.is_(True),
+    ).first()
 
 
 def _resolve_restaurant_for_customer(db: Session, from_number: str) -> models.Restaurant | None:
@@ -163,7 +182,20 @@ def _settle_order_once(db: Session, order_id: int, receipt: str) -> bool:
             synchronize_session=False,
         )
     )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # uq_orders_mpesa_receipt (migration 029): this receipt is already
+        # recorded against a DIFFERENT order — a duplicated/forged callback,
+        # not a normal retry (a normal retry hits the `is_paid = false`
+        # predicate above and rowcount == 0 before this is ever reached).
+        # Never surface this as an error: Safaricom always gets its 200 ack.
+        db.rollback()
+        logger.warning(
+            "[MPesa Webhook] Duplicate mpesa_receipt %s rejected for order %s "
+            "— already settled against a different order.", receipt, order_id,
+        )
+        return False
     return rowcount == 1
 
 
@@ -324,7 +356,16 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
         twiml = f"<Response><Message>{escape(reply_text)}</Message></Response>"
         return PlainTextResponse(twiml, media_type="application/xml")
 
-    # Not an owner — try to resolve a diner by their order history so two-way
+    # Not the owner — is this a roster staff member (directive 016)? Checked
+    # before customer resolution: a staff phone should never be misread as a
+    # diner's just because it also appears somewhere in order history.
+    staff_member = _resolve_staff_by_phone(db, from_number)
+    if staff_member:
+        reply_text = brain.handle_staff_command(db, staff_member, body)
+        twiml = f"<Response><Message>{escape(reply_text)}</Message></Response>"
+        return PlainTextResponse(twiml, media_type="application/xml")
+
+    # Not staff either — try to resolve a diner by their order history so two-way
     # customer replies (REORDER, 1–5 rating from the receipt) work too.
     customer_restaurant = _resolve_restaurant_for_customer(db, from_number)
     if customer_restaurant:

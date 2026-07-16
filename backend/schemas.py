@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime, date, time
 
@@ -41,7 +41,7 @@ class TokenData(StrictModel):
 # ──────────────────────────────────────────────
 class MenuItemBase(StrictModel):
     name: str
-    price: int  # In cents
+    price: int = Field(ge=0)  # In cents
     category: str
     description: str = ""
     is_available: bool = True
@@ -51,7 +51,7 @@ class MenuItemCreate(MenuItemBase):
 
 class MenuItemUpdate(StrictModel):
     name: Optional[str] = None
-    price: Optional[int] = None
+    price: Optional[int] = Field(default=None, ge=0)
     category: Optional[str] = None
     description: Optional[str] = None
     is_available: Optional[bool] = None
@@ -67,7 +67,7 @@ class MenuItem(MenuItemBase):
 # ──────────────────────────────────────────────
 class OrderItemCreate(StrictModel):
     menu_item_id: int
-    quantity: int = 1
+    quantity: int = Field(default=1, gt=0)
 
 class OrderCreate(StrictModel):
     items: List[OrderItemCreate]
@@ -119,19 +119,19 @@ class OrderPaymentUpdate(StrictModel):
 # ──────────────────────────────────────────────
 class InventoryItemCreate(StrictModel):
     item_name: str
-    quantity: float = 0
+    quantity: float = Field(default=0, ge=0)
     unit: str = "kg"
-    cost_per_unit: float = 0
-    low_stock_threshold: int = 10
-    expiry_days: int = 30
+    cost_per_unit: float = Field(default=0, ge=0)
+    low_stock_threshold: int = Field(default=10, ge=0)
+    expiry_days: int = Field(default=30, ge=0)
 
 class InventoryItemUpdate(StrictModel):
     item_name: Optional[str] = None
-    quantity: Optional[float] = None
+    quantity: Optional[float] = Field(default=None, ge=0)
     unit: Optional[str] = None
-    cost_per_unit: Optional[float] = None
-    low_stock_threshold: Optional[int] = None
-    expiry_days: Optional[int] = None
+    cost_per_unit: Optional[float] = Field(default=None, ge=0)
+    low_stock_threshold: Optional[int] = Field(default=None, ge=0)
+    expiry_days: Optional[int] = Field(default=None, ge=0)
 
 class InventoryItemOut(StrictModel):
     id: int
@@ -141,12 +141,14 @@ class InventoryItemOut(StrictModel):
     cost_per_unit: float
     low_stock_threshold: int
     expiry_days: int
+    par_level: Optional[float] = None            # directive 018
+    default_supplier_id: Optional[int] = None     # directive 018
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 class StockReceive(StrictModel):
-    quantity: float
-    cost_per_unit: Optional[float] = None
+    quantity: float = Field(gt=0)
+    cost_per_unit: Optional[float] = Field(default=None, ge=0)
     supplier: str = ""
 
 class StockAdjust(StrictModel):
@@ -160,10 +162,10 @@ class ReservationCreate(StrictModel):
     customer_name: str
     customer_phone: str = ""
     customer_email: str = ""
-    party_size: int = 2
+    party_size: int = Field(default=2, gt=0)
     reservation_date: date
     reservation_time: time
-    duration_minutes: int = 90
+    duration_minutes: int = Field(default=90, gt=0)
     table_id: Optional[int] = None
     deposit_paid: bool = False
     notes: str = ""
@@ -191,3 +193,329 @@ class ReservationOut(StrictModel):
 
 class ReservationStatusUpdate(StrictModel):
     status: str  # confirmed, cancelled, completed, no_show
+
+# ──────────────────────────────────────────────
+# STAFF ROSTER & ROLES (directive 015)
+# ──────────────────────────────────────────────
+class StaffMemberCreate(StrictModel):
+    name: str
+    role_title: str = ""
+    hourly_rate: int = Field(default=0, ge=0)
+    phone: Optional[str] = None
+    # If set, a User account is created and linked. staff_role is required
+    # whenever a login is granted — no default that silently grants more
+    # access than intended (directive 015).
+    create_login: bool = False
+    email: Optional[str] = None
+    password: Optional[str] = None
+    staff_role: Optional[str] = None   # one of StaffRole's values, required if create_login
+
+class StaffMemberUpdate(StrictModel):
+    name: Optional[str] = None
+    role_title: Optional[str] = None
+    hourly_rate: Optional[int] = Field(default=None, ge=0)
+    phone: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class StaffMemberOut(StrictModel):
+    id: int
+    restaurant_id: int
+    user_id: Optional[int]
+    name: str
+    role_title: str
+    hourly_rate: int
+    phone: Optional[str]
+    is_active: bool
+    staff_role: Optional[str] = None   # from the linked User, if any
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+class StaffRoleAssign(StrictModel):
+    staff_role: str   # one of StaffRole's values
+
+
+# ──────────────────────────────────────────────
+# STOCK CUSTODY (directive 016)
+# ──────────────────────────────────────────────
+class StockTransferCreate(StrictModel):
+    inventory_item_id: int
+    quantity: float = Field(gt=0)
+    unit: str = ""
+    from_location: str = "store"
+    to_location: str = "kitchen"
+    notes: str = ""
+
+class StockTransferConfirm(StrictModel):
+    confirmed_quantity: float
+    notes: str = ""
+
+class StockTransferOut(StrictModel):
+    id: int
+    restaurant_id: int
+    inventory_item_id: int
+    quantity: Optional[float]   # null while status == "requested" (directive 017)
+    unit: str
+    from_location: str
+    to_location: str
+    status: str
+    requested_by_user_id: Optional[int] = None
+    requested_at: Optional[datetime] = None
+    initiated_by_user_id: Optional[int]
+    initiated_at: Optional[datetime]
+    confirmed_by_user_id: Optional[int]
+    confirmed_at: Optional[datetime]
+    confirmed_quantity: Optional[float]
+    notes: str
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+# Kitchen-initiated ("pull") requisition — directive 017. No quantity: the
+# kitchen is asking, not declaring; the storekeeper commits a quantity at
+# fulfil time via StockTransferFulfill.
+class StockTransferRequest(StrictModel):
+    inventory_item_id: int
+    from_location: str = "store"
+    to_location: str = "kitchen"
+    notes: str = ""
+
+class StockTransferFulfill(StrictModel):
+    quantity: float
+    unit: str = ""
+    notes: str = ""
+
+
+# ──────────────────────────────────────────────
+# RECIPES (directive 017) — what a menu item's dish is made of
+# ──────────────────────────────────────────────
+class MenuIngredientCreate(StrictModel):
+    inventory_item_id: int
+    quantity_per_serving: float = Field(gt=0)
+    is_critical: bool = True
+
+class MenuIngredientUpdate(StrictModel):
+    quantity_per_serving: Optional[float] = Field(default=None, gt=0)
+    is_critical: Optional[bool] = None
+
+class MenuIngredientOut(StrictModel):
+    id: int
+    menu_item_id: int
+    inventory_item_id: int
+    quantity_per_serving: float
+    is_critical: bool
+    # Denormalized for the editor UI so it doesn't need a second round-trip
+    # per ingredient just to show a name/unit next to the quantity.
+    item_name: Optional[str] = None
+    unit: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+
+# ──────────────────────────────────────────────
+# PHYSICAL STOCK COUNTS (directive 017)
+# ──────────────────────────────────────────────
+class StockCountCreate(StrictModel):
+    inventory_item_id: int
+    counted_quantity: float
+    notes: str = ""
+
+class StockCountOut(StrictModel):
+    id: int
+    restaurant_id: int
+    inventory_item_id: int
+    expected_quantity: float
+    counted_quantity: float
+    counted_by_user_id: int
+    counted_at: Optional[datetime]
+    notes: str
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+
+# ──────────────────────────────────────────────
+# SUPPLIERS & PURCHASE ORDERS (directive 018) — par-level reordering
+# ──────────────────────────────────────────────
+class SupplierCreate(StrictModel):
+    name: str
+    contact_phone: str = ""
+    contact_email: str = ""
+    avg_lead_days: float = Field(default=1.0, ge=0)
+    notes: str = ""
+
+class SupplierUpdate(StrictModel):
+    name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
+    avg_lead_days: Optional[float] = Field(default=None, ge=0)
+    is_active: Optional[bool] = None
+    notes: Optional[str] = None
+
+class SupplierOut(StrictModel):
+    id: int
+    restaurant_id: int
+    name: str
+    contact_phone: str
+    contact_email: str
+    avg_lead_days: float
+    reliability_score: float
+    is_active: bool
+    notes: str
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+class InventoryReorderSettingsUpdate(StrictModel):
+    par_level: Optional[float] = None
+    default_supplier_id: Optional[int] = None
+
+class PurchaseOrderOut(StrictModel):
+    id: int
+    restaurant_id: int
+    supplier_id: int
+    inventory_item_id: Optional[int]
+    quantity_ordered: float
+    quantity_received: Optional[float]
+    unit: str
+    cost_per_unit: int
+    total_cost: int
+    status: str
+    ordered_at: Optional[datetime]
+    expected_at: Optional[datetime]
+    delivered_at: Optional[datetime]
+    notes: str
+    # Denormalized for the approve/receive UI so it doesn't need a second
+    # round-trip just to show names next to ids.
+    supplier_name: Optional[str] = None
+    item_name: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+class PurchaseOrderReceive(StrictModel):
+    quantity_received: float
+    notes: str = ""
+
+
+# ──────────────────────────────────────────────
+# BILLING (Phase 10)
+# ──────────────────────────────────────────────
+class PlanUpdate(StrictModel):
+    plan: str
+
+
+# ──────────────────────────────────────────────
+# PRODUCT ANALYTICS (Phase 8)
+# ──────────────────────────────────────────────
+class ProductEventTrack(StrictModel):
+    event_name: str = ""
+    properties: dict = {}
+
+
+# ──────────────────────────────────────────────
+# AI ROUTER — bodies for routers/ai.py
+# ──────────────────────────────────────────────
+class PricingRejectBody(StrictModel):
+    reason: str = ""
+
+class StrategyGoalBody(StrictModel):
+    goal: str = ""
+    timeframe: str = ""
+
+class StrategyPlanBody(StrictModel):
+    goal: str = ""
+    horizon_weeks: int = Field(default=4, gt=0)
+
+class PluginInvokeBody(StrictModel):
+    payload: dict = {}
+    approved: bool = False
+
+class WorkflowResumeBody(StrictModel):
+    decision: str = "approve"
+    payload: Optional[dict] = None
+
+class SimulateBody(StrictModel):
+    change: dict = {}
+
+class MarketingPromoBody(StrictModel):
+    offer_text: str = ""
+
+class ExplainBody(StrictModel):
+    item: Optional[dict] = None
+    label: str = ""
+
+# ──────────────────────────────────────────────
+# NOTIFICATIONS (in-app feed + Web Push)
+# ──────────────────────────────────────────────
+class PushSubscriptionCreate(StrictModel):
+    endpoint: str
+    p256dh: str
+    auth: str
+    user_agent: Optional[str] = None
+
+class PushSubscriptionOut(StrictModel):
+    id: int
+    endpoint: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+class PushUnsubscribeBody(StrictModel):
+    endpoint: str
+
+class NotificationOut(StrictModel):
+    id: int
+    title: str
+    body: str
+    event_type: str
+    url: Optional[str] = None
+    is_read: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+class NotificationListOut(StrictModel):
+    items: List[NotificationOut]
+    unread_count: int
+
+# ──────────────────────────────────────────────
+# SUPPORT TICKETS
+# ──────────────────────────────────────────────
+class SupportTicketCreate(StrictModel):
+    subject: str = Field(min_length=1, max_length=200)
+    message: str = Field(min_length=1, max_length=4000)
+
+class SupportTicketMessageCreate(StrictModel):
+    body: str = Field(min_length=1, max_length=4000)
+
+class SupportTicketMessageOut(StrictModel):
+    id: int
+    sender_id: int
+    sender_email: str
+    body: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+class SupportTicketOut(StrictModel):
+    id: int
+    subject: str
+    status: str
+    created_by_id: int
+    created_by_email: str
+    created_at: datetime
+    updated_at: datetime
+    message_count: int
+    last_message_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+class SupportTicketDetailOut(StrictModel):
+    id: int
+    subject: str
+    status: str
+    created_by_id: int
+    created_at: datetime
+    updated_at: datetime
+    messages: List[SupportTicketMessageOut]
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+class SupportTicketStatusUpdate(StrictModel):
+    status: str

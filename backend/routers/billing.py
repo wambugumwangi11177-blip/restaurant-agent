@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from auth import require_role
 import models
+import schemas
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -49,7 +50,7 @@ async def get_subscription(
 
 @router.post("/plan")
 async def set_plan(
-    body: dict,
+    body: schemas.PlanUpdate,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
@@ -58,7 +59,7 @@ async def set_plan(
     selection; a real processor would gate the change on a successful payment.
     Body: {"plan": "pro"}.
     """
-    plan = (body or {}).get("plan", "").strip().lower()
+    plan = body.plan.strip().lower()
     if plan not in VALID_PLANS:
         raise HTTPException(status_code=400, detail=f"plan must be one of {sorted(VALID_PLANS)}")
     sub = _get_or_create(db, current_user.tenant_id)

@@ -8,13 +8,18 @@ directives/012_agentic_roadmap.md's standing rule on labeling honestly.
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from database import get_db
-from auth import require_role
+from auth import require_role, require_staff_role
 import models
 from ai import menu_engineer, revenue_forecaster, kds_intelligence, inventory_predictor, reservation_optimizer, ops_manager
 from ai.analysis_clock import data_freshness
 from routers.deps import get_restaurant_or_none
 
 router = APIRouter(prefix="/ai", tags=["Analytics"])
+
+# Directive 015: these are all read-only AI insight routes, matching the
+# `ai` matrix row's R group (Manager + Controller); Owner passes through
+# require_staff_role's own Role.ADMIN bypass.
+_AI_READ = (models.StaffRole.MANAGER, models.StaffRole.CONTROLLER)
 
 
 def _get_restaurant_id(db: Session, user: models.User) -> int:
@@ -58,7 +63,7 @@ def ai_trust_stats():
 
 
 @router.get("/dashboard")
-def ai_dashboard(db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
+def ai_dashboard(db: Session = Depends(get_db), user: models.User = Depends(require_staff_role(*_AI_READ))):
     """AI Operations Manager — central intelligence dashboard."""
     rid = _get_restaurant_id(db, user)
     if not rid:
@@ -67,7 +72,7 @@ def ai_dashboard(db: Session = Depends(get_db), user: models.User = Depends(requ
 
 
 @router.get("/menu-engineering")
-def menu_engineering(narrate: bool = True, db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
+def menu_engineering(narrate: bool = True, db: Session = Depends(get_db), user: models.User = Depends(require_staff_role(*_AI_READ))):
     """
     Menu Engineering Matrix — Star/Plowhorse/Puzzle/Dog classification.
     Numbers are deterministic; when an LLM provider is set (and narrate=true) a
@@ -87,7 +92,7 @@ def menu_engineering(narrate: bool = True, db: Session = Depends(get_db), user: 
 
 
 @router.get("/revenue-forecast")
-def revenue_forecast(db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
+def revenue_forecast(db: Session = Depends(get_db), user: models.User = Depends(require_staff_role(*_AI_READ))):
     """Revenue forecasting with trends and predictions."""
     rid = _get_restaurant_id(db, user)
     if not rid:
@@ -96,7 +101,7 @@ def revenue_forecast(db: Session = Depends(get_db), user: models.User = Depends(
 
 
 @router.get("/kds-intelligence")
-def kds_intel(db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
+def kds_intel(db: Session = Depends(get_db), user: models.User = Depends(require_staff_role(*_AI_READ))):
     """Kitchen Display System intelligence — prep times, bottlenecks, throughput."""
     rid = _get_restaurant_id(db, user)
     if not rid:
@@ -105,7 +110,7 @@ def kds_intel(db: Session = Depends(get_db), user: models.User = Depends(require
 
 
 @router.get("/inventory-predictions")
-def inventory_intel(db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
+def inventory_intel(db: Session = Depends(get_db), user: models.User = Depends(require_staff_role(*_AI_READ))):
     """Inventory intelligence — depletion forecasts, reorder alerts, spoilage risk."""
     rid = _get_restaurant_id(db, user)
     if not rid:
@@ -114,7 +119,7 @@ def inventory_intel(db: Session = Depends(get_db), user: models.User = Depends(r
 
 
 @router.get("/reservation-insights")
-def reservation_intel(db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
+def reservation_intel(db: Session = Depends(get_db), user: models.User = Depends(require_staff_role(*_AI_READ))):
     """Reservation intelligence — no-show analysis, table utilization, revenue per seat."""
     rid = _get_restaurant_id(db, user)
     if not rid:

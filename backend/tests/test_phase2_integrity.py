@@ -83,3 +83,49 @@ def test_same_table_number_allowed_across_restaurants(db_session):
     db_session.add(models.Table(restaurant_id=r1.id, table_number=1))
     db_session.add(models.Table(restaurant_id=r2.id, table_number=1))
     db_session.commit()  # unique is (restaurant_id, table_number), not table_number alone
+
+
+def test_duplicate_mpesa_receipt_rejected_across_orders(db_session):
+    r = _restaurant(db_session)
+    db_session.add(models.Order(
+        restaurant_id=r.id, total=100, mpesa_receipt="NLJ7RT61SV",
+        status=models.OrderStatus.PENDING, payment_method=models.PaymentMethod.MPESA,
+    ))
+    db_session.commit()
+    db_session.add(models.Order(
+        restaurant_id=r.id, total=200, mpesa_receipt="NLJ7RT61SV",
+        status=models.OrderStatus.PENDING, payment_method=models.PaymentMethod.MPESA,
+    ))
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+
+def test_multiple_unpaid_orders_with_null_mpesa_receipt_allowed(db_session):
+    r = _restaurant(db_session)
+    db_session.add(models.Order(
+        restaurant_id=r.id, total=100,
+        status=models.OrderStatus.PENDING, payment_method=models.PaymentMethod.PENDING,
+    ))
+    db_session.add(models.Order(
+        restaurant_id=r.id, total=200,
+        status=models.OrderStatus.PENDING, payment_method=models.PaymentMethod.PENDING,
+    ))
+    db_session.commit()  # mpesa_receipt is NULL on both — the partial index must not fire
+
+
+def test_duplicate_staff_phone_rejected_within_restaurant(db_session):
+    r = _restaurant(db_session)
+    db_session.add(models.StaffMember(restaurant_id=r.id, name="A", phone="+254700000001"))
+    db_session.commit()
+    db_session.add(models.StaffMember(restaurant_id=r.id, name="B", phone="+254700000001"))
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+
+def test_staff_members_without_phone_allowed(db_session):
+    r = _restaurant(db_session)
+    db_session.add(models.StaffMember(restaurant_id=r.id, name="A"))
+    db_session.add(models.StaffMember(restaurant_id=r.id, name="B"))
+    db_session.commit()  # phone is NULL on both — the partial index must not fire

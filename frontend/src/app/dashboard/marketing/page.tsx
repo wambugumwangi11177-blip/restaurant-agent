@@ -150,10 +150,10 @@ function ConfirmSend({
             <div className="w-full max-w-md rounded-xl border border-[#262626] bg-[#0f0f0f] p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2">
-                        <Send className="w-4 h-4 text-[#d4a853]" />
+                        <Send className="w-4 h-4 text-[var(--accent)]" />
                         <h3 className="text-sm font-semibold text-[#e5e5e5]">Send this campaign?</h3>
                     </div>
-                    <button onClick={onClose} className="text-[#525252] hover:text-[#e5e5e5]"><X className="w-4 h-4" /></button>
+                    <button onClick={onClose} aria-label="Close dialog" className="text-[#525252] hover:text-[#e5e5e5]"><X className="w-4 h-4" /></button>
                 </div>
 
                 <div className="rounded-lg border border-[#1a1a1a] bg-[#0a0a0a] p-3 space-y-1.5">
@@ -174,7 +174,7 @@ function ConfirmSend({
                     <button
                         onClick={send}
                         disabled={sending}
-                        className="px-4 py-2 rounded-lg bg-[#d4a853] text-[#0a0a0a] font-semibold text-sm hover:bg-[#e0b96a] disabled:opacity-60"
+                        className="px-4 py-2 rounded-lg bg-[var(--accent)] text-[#0a0a0a] font-semibold text-sm hover:bg-[var(--accent-hover)] disabled:opacity-60"
                     >
                         {sending ? "Sending…" : "Yes, send it"}
                     </button>
@@ -192,7 +192,7 @@ function EmptyState() {
                 <p className="text-[#525252] mt-1 text-sm">Getting started</p>
             </div>
             <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-8 text-center space-y-4">
-                <Megaphone className="w-12 h-12 text-[#d4a853] mx-auto" />
+                <Megaphone className="w-12 h-12 text-[var(--accent)] mx-auto" />
                 <h2 className="text-[#e5e5e5] font-semibold text-lg">No campaign audience yet</h2>
                 <p className="text-[#525252] text-sm max-w-md mx-auto">
                     Once customers order and opt in at checkout, the AI will suggest offers to run,
@@ -249,7 +249,7 @@ export default function MarketingPage() {
                 <AlertTriangle className="w-10 h-10 text-amber-400" />
                 <p className="text-[#e5e5e5] font-medium">Could not load marketing data</p>
                 <p className="text-[#525252] text-sm text-center max-w-sm">{error}</p>
-                <button onClick={fetchData} className="px-4 py-2 bg-[#d4a853] text-[#0a0a0a] font-semibold rounded-lg text-sm hover:bg-[#e0b96a]">Retry</button>
+                <button onClick={fetchData} className="px-4 py-2 bg-[var(--accent)] text-[#0a0a0a] font-semibold rounded-lg text-sm hover:bg-[var(--accent-hover)]">Retry</button>
             </div>
         );
     }
@@ -286,8 +286,8 @@ export default function MarketingPage() {
             )}
 
             {/* How campaigns work */}
-            <div className="rounded-xl border border-[#d4a853]/25 bg-[#d4a853]/[0.04] p-5">
-                <div className="flex items-center gap-2 text-[#d4a853] mb-1">
+            <div className="rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/[0.04] p-5">
+                <div className="flex items-center gap-2 text-[var(--accent)] mb-1">
                     <Sparkles className="w-4 h-4" />
                     <p className="text-sm font-semibold text-[#e5e5e5]">Where these campaigns come from</p>
                 </div>
@@ -306,7 +306,7 @@ export default function MarketingPage() {
             {/* Suggested offers */}
             <div>
                 <h2 className="text-sm font-semibold text-[#e5e5e5] mb-1 flex items-center gap-2">
-                    <Gift className="w-4 h-4 text-[#d4a853]" /> Offers worth running now
+                    <Gift className="w-4 h-4 text-[var(--accent)]" /> Offers worth running now
                 </h2>
                 <p className="text-xs text-[#525252] mb-3">Each offer shows the exact deal, who it reaches, and why it&apos;s worth it.</p>
                 {d.suggested_offers.length === 0 ? (
@@ -335,7 +335,7 @@ export default function MarketingPage() {
                                 {o.margin_note && <p className="text-[11px] text-[#525252] mt-2">💡 {o.margin_note}</p>}
                                 <button
                                     onClick={() => setConfirm({ title: o.title, offer_text: o.offer_text, audience_label: o.audience_label, action: o.action })}
-                                    className="mt-4 self-start flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#d4a853] text-[#0a0a0a] font-semibold text-sm hover:bg-[#e0b96a] transition-colors"
+                                    className="mt-4 self-start flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent)] text-[#0a0a0a] font-semibold text-sm hover:bg-[var(--accent-hover)] transition-colors"
                                 >
                                     <Send className="w-3.5 h-3.5" /> Send this
                                 </button>
@@ -350,7 +350,7 @@ export default function MarketingPage() {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2">
-                            <Users className="w-4 h-4 text-[#d4a853]" /> Win back your lapsed regulars
+                            <Users className="w-4 h-4 text-[var(--accent)]" /> Win back your lapsed regulars
                         </h2>
                         <p className="text-xs text-[#525252] mt-1">
                             Customers who used to visit but have gone quiet for {wb.lapse_days}+ days.
@@ -364,7 +364,7 @@ export default function MarketingPage() {
                                 audience_label: `${wb.reachable} reachable now`,
                                 action: "winback",
                             })}
-                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#d4a853] text-[#0a0a0a] font-semibold text-sm hover:bg-[#e0b96a] transition-colors"
+                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent)] text-[#0a0a0a] font-semibold text-sm hover:bg-[var(--accent-hover)] transition-colors"
                         >
                             <Send className="w-3.5 h-3.5" /> Send win-back
                         </button>
@@ -373,7 +373,7 @@ export default function MarketingPage() {
 
                 <HowItWorks id="winback" />
 
-                <div className="grid grid-cols-3 gap-3 my-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 my-4">
                     <div className="rounded-lg bg-[#141414] border border-[#1a1a1a] p-3">
                         <p className="text-xs text-[#525252] mb-1">Lapsed regulars</p>
                         <p className="text-sm font-bold text-[#e5e5e5]">{wb.count}</p>
@@ -412,7 +412,7 @@ export default function MarketingPage() {
                         ))}
                         {wb.candidates[0]?.message && (
                             <details className="mt-2">
-                                <summary className="text-xs text-[#d4a853] cursor-pointer hover:underline">Preview the message they&apos;ll receive</summary>
+                                <summary className="text-xs text-[var(--accent)] cursor-pointer hover:underline">Preview the message they&apos;ll receive</summary>
                                 <pre className="mt-2 whitespace-pre-wrap text-[11px] text-[#a3a3a3] bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg p-3 font-sans">{wb.candidates[0].message}</pre>
                             </details>
                         )}
@@ -423,7 +423,7 @@ export default function MarketingPage() {
             {/* Audience & consent */}
             <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
                 <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-[#d4a853]" /> Who you can reach — and how customers are protected
+                    <ShieldCheck className="w-4 h-4 text-[var(--accent)]" /> Who you can reach — and how customers are protected
                 </h2>
                 <HowItWorks id="consent" />
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
@@ -450,7 +450,7 @@ export default function MarketingPage() {
             {d.history.length > 0 && (
                 <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
                     <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2 mb-4">
-                        <Clock className="w-4 h-4 text-[#d4a853]" /> What&apos;s gone out (last 90 days)
+                        <Clock className="w-4 h-4 text-[var(--accent)]" /> What&apos;s gone out (last 90 days)
                     </h2>
                     <div className="space-y-2">
                         {d.history.map((h) => {
@@ -475,14 +475,14 @@ export default function MarketingPage() {
             {/* Offer playbook library */}
             <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
                 <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2 mb-1">
-                    <BookOpen className="w-4 h-4 text-[#d4a853]" /> Offer playbook
+                    <BookOpen className="w-4 h-4 text-[var(--accent)]" /> Offer playbook
                 </h2>
                 <p className="text-xs text-[#525252] mb-4">The main campaign types, when to use each, and how to keep the margin safe.</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {PLAYBOOK.map((p) => (
                         <div key={p.name} className="rounded-lg bg-[#141414] border border-[#1a1a1a] p-4">
                             <div className="flex items-center gap-2 mb-2">
-                                <p.icon className="w-4 h-4 text-[#d4a853]" />
+                                <p.icon className="w-4 h-4 text-[var(--accent)]" />
                                 <p className="text-sm font-medium text-[#e5e5e5]">{p.name}</p>
                             </div>
                             <p className="text-[11px] text-[#737373]"><span className="text-[#525252]">When:</span> {p.when}</p>

@@ -24,7 +24,7 @@ export function ModuleShell({
     return (
         <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
             <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2">
-                <Icon className="w-4 h-4 text-[#d4a853]" />
+                <Icon className="w-4 h-4 text-[var(--accent)]" />
                 {title}
             </h2>
             {subtitle && <p className="text-xs text-[#525252] mt-1">{subtitle}</p>}
@@ -37,7 +37,7 @@ export function ModuleShell({
             ) : error ? (
                 <div className="flex items-center justify-between gap-3 py-2">
                     <p className="text-[#525252] text-sm">{error}</p>
-                    <button onClick={onRetry} className="text-xs text-[#d4a853] hover:underline flex-shrink-0">Retry</button>
+                    <button onClick={onRetry} className="text-xs text-[var(--accent)] hover:underline flex-shrink-0">Retry</button>
                 </div>
             ) : (
                 children

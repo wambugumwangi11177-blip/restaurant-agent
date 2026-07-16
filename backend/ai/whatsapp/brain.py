@@ -917,6 +917,145 @@ def handle_customer_message(db: Session, restaurant_id: int, phone: str, message
             "*1–5* to rate your visit. To place a new order, visit us or ask our staff.")
 
 
+def _resolve_inventory_item_by_name(db: Session, restaurant_id: int, name: str):
+    """Case-insensitive lookup by name for the commands below, since a
+    kitchen worker knows an ingredient's name, not its database id (unlike
+    CONFIRM/SEND, which reference a transfer id the person already has from
+    a prior message or the dashboard). Exact match wins outright; otherwise
+    a single unambiguous partial match; anything else (none, or more than
+    one) returns None rather than guess which item was meant."""
+    needle = name.strip().lower()
+    if not needle:
+        return None
+    items = db.query(models.InventoryItem).filter(
+        models.InventoryItem.restaurant_id == restaurant_id
+    ).all()
+    exact = [i for i in items if i.item_name.strip().lower() == needle]
+    if len(exact) == 1:
+        return exact[0]
+    partial = [i for i in items if needle in i.item_name.strip().lower()]
+    if len(partial) == 1:
+        return partial[0]
+    return None
+
+
+def handle_staff_command(db: Session, staff_member: "models.StaffMember", message: str) -> str:
+    """
+    Route an inbound message from a resolved StaffMember (directive 016) —
+    the third case in routers/webhooks.py's inbound resolution, alongside
+    owner and customer. Lets a stockkeeper/kitchen worker run the whole
+    chain-of-custody flow from a phone, no dashboard needed:
+
+      NEED <item>                     — kitchen requests something (directive 017's "pull")
+      SEND <transfer_id> <quantity>   — storekeeper fulfils a REQUESTED transfer
+      CONFIRM <transfer_id> <quantity> — receiver confirms what actually arrived
+      COUNT <item> <quantity>          — record a physical count
+
+    All four require staff_member.user_id — every one of them writes a
+    record that needs an actor to attribute it to. A roster entry with no
+    linked login can still receive alerts, but can't perform an action that
+    needs to be audited under a specific account.
+    """
+    text = message.strip()
+    parts = text.split()
+    if not parts:
+        return _staff_help()
+
+    command = parts[0].upper()
+
+    if not staff_member.user_id and command in {"NEED", "SEND", "CONFIRM", "COUNT"}:
+        return ("Your account isn't linked to a login, so I can't record that under your "
+                "name. Ask your manager to set one up, or use the dashboard.")
+
+    if command == "NEED" and len(parts) >= 2:
+        item_name = " ".join(parts[1:])
+        from ai import stock_custody
+        item = _resolve_inventory_item_by_name(db, staff_member.restaurant_id, item_name)
+        if not item:
+            return f"❌ Couldn't find a single stock item matching \"{item_name}\" — check the spelling or use the dashboard."
+        try:
+            transfer = stock_custody.request_transfer(
+                db, staff_member.restaurant_id, item.id, staff_member.user_id,
+                notes="Requested via WhatsApp/SMS",
+            )
+        except stock_custody.TransferRequestError as exc:
+            return f"❌ {exc}"
+        return f"📨 Request #{transfer.id} sent: {item.item_name}. The storekeeper will reply SEND {transfer.id} <quantity>."
+
+    if command == "SEND" and len(parts) == 3:
+        from ai import stock_custody
+        try:
+            transfer_id = int(parts[1])
+            quantity = float(parts[2])
+        except ValueError:
+            return "❌ Invalid format. Try: SEND 42 15.5"
+        try:
+            transfer = stock_custody.fulfill_transfer(
+                db, transfer_id, staff_member.restaurant_id, staff_member.user_id,
+                quantity, notes="Fulfilled via WhatsApp/SMS",
+            )
+        except stock_custody.TransferRequestError as exc:
+            return f"❌ {exc}"
+        return f"📤 Transfer #{transfer.id} marked sent: {quantity}{transfer.unit}. Awaiting the receiver's confirmation."
+
+    if command == "CONFIRM" and len(parts) == 3:
+        from ai import stock_custody
+        try:
+            transfer_id = int(parts[1])
+            confirmed_quantity = float(parts[2])
+        except ValueError:
+            return "❌ Invalid format. Try: CONFIRM 42 15.5"
+        try:
+            transfer = stock_custody.confirm_transfer(
+                db, transfer_id, staff_member.restaurant_id,
+                staff_member.user_id, confirmed_quantity,
+                notes="Confirmed via WhatsApp/SMS",
+            )
+        except stock_custody.TransferConfirmError as exc:
+            return f"❌ {exc}"
+        if transfer.status == models.StockTransferStatus.DISPUTED:
+            return (f"⚠️ Recorded {confirmed_quantity}{transfer.unit} for transfer #{transfer.id} — "
+                    f"that doesn't match the {transfer.quantity}{transfer.unit} declared. "
+                    f"Flagged for review, not auto-corrected.")
+        return f"✅ Transfer #{transfer.id} confirmed: {confirmed_quantity}{transfer.unit} received."
+
+    if command == "COUNT" and len(parts) >= 3:
+        *name_parts, qty_str = parts[1:]
+        item_name = " ".join(name_parts)
+        try:
+            counted_quantity = float(qty_str)
+        except ValueError:
+            return "❌ Invalid format. Try: COUNT chicken 12.5"
+        from ai import stock_custody
+        item = _resolve_inventory_item_by_name(db, staff_member.restaurant_id, item_name)
+        if not item:
+            return f"❌ Couldn't find a single stock item matching \"{item_name}\" — check the spelling or use the dashboard."
+        try:
+            count = stock_custody.submit_count(
+                db, staff_member.restaurant_id, item.id, staff_member.user_id,
+                counted_quantity, notes="Counted via WhatsApp/SMS",
+            )
+        except stock_custody.StockCountError as exc:
+            return f"❌ {exc}"
+        gap = counted_quantity - count.expected_quantity
+        if abs(gap) < 1e-9:
+            return f"✅ Count recorded: {item.item_name} matches — {counted_quantity}{item.unit}."
+        return (f"📋 Count recorded: {item.item_name} — system expected {count.expected_quantity}{item.unit}, "
+                f"you counted {counted_quantity}{item.unit}. Stock updated to match your count.")
+
+    return _staff_help()
+
+
+def _staff_help() -> str:
+    return (
+        "Reply with one of:\n"
+        "*NEED <item>* — request stock from the store\n"
+        "*SEND <id> <qty>* — mark a request as sent\n"
+        "*CONFIRM <id> <qty>* — confirm what arrived\n"
+        "*COUNT <item> <qty>* — record a physical count"
+    )
+
+
 def _cmd_sales_today(db: Session, restaurant_id: int) -> str:
     now_utc = utcnow()
     orders  = db.query(models.Order).filter(

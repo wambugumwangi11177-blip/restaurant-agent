@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum as SqEnum, DateTime, Float, Text, Date, Time, Index, UniqueConstraint, CheckConstraint
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum as SqEnum, DateTime, Float, Text, Date, Time, Index, UniqueConstraint, CheckConstraint, text
 from sqlalchemy.orm import relationship, declarative_base
 import enum
 from time_utils import utcnow
@@ -12,6 +12,30 @@ class Role(enum.Enum):
     SUPERADMIN = "superadmin"
     ADMIN = "admin"
     STAFF = "staff"
+
+class StaffRole(enum.Enum):
+    """
+    Second, finer-grained axis layered on top of Role — see
+    directives/015_staff_roles_permissions.md for the full permission matrix.
+    Owner maps 1:1 onto Role.ADMIN (not a parallel concept); this enum only
+    exists to subdivide what used to be a single Role.STAFF bucket.
+    """
+    OWNER = "owner"
+    MANAGER = "manager"
+    SUPERVISOR = "supervisor"
+    CONTROLLER = "controller"
+    STOCKKEEPER = "stockkeeper"
+    KITCHEN = "kitchen"
+    WAITER = "waiter"
+
+class StockTransferStatus(enum.Enum):
+    # REQUESTED: kitchen asked for something, no quantity committed yet —
+    # the "pull" starting state (directive 017). A store-initiated ("push")
+    # transfer skips this and starts at PENDING directly, same as before.
+    REQUESTED = "requested"
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    DISPUTED = "disputed"
 
 class OrderStatus(enum.Enum):
     PENDING = "pending"
@@ -89,6 +113,17 @@ class User(Base):
     # users are unaffected until they opt in.
     mfa_secret = Column(String, nullable=True)
     mfa_enabled = Column(Boolean, default=False, nullable=False)
+    # Fine-grained tier layered on top of `role` (directive 015). NULL means
+    # "not yet assigned" — deliberately not defaulted, see directive's Edge
+    # Cases: guessing a tier for a pre-existing STAFF user could grant access
+    # nobody approved. Backfilled to OWNER for existing ADMIN users only.
+    staff_role = Column(SqEnum(StaffRole), nullable=True)
+    # Account lifecycle (directive 016, added 2026-07-15): StaffMember already
+    # had is_active but nothing downstream acted on it — deactivating a roster
+    # entry didn't revoke the linked login. Checked in auth.get_current_user
+    # alongside token_version, so deactivation takes effect on the very next
+    # request rather than just hiding a nav link.
+    is_active = Column(Boolean, default=True, nullable=False)
 
     tenant = relationship("Tenant", back_populates="users")
 
@@ -153,7 +188,13 @@ class MenuItem(Base):
     avg_prep_minutes = Column(Float, default=10.0)   # Baseline prep time
     
     restaurant = relationship("Restaurant", back_populates="menu_items")
-    order_items = relationship("OrderItem", back_populates="menu_item")
+    # passive_deletes=True: without it, SQLAlchemy's unit-of-work proactively
+    # NULLs order_items.menu_item_id on a MenuItem delete (since it's a plain
+    # relationship with no cascade config) BEFORE the DELETE reaches the DB —
+    # silently defeating the ON DELETE RESTRICT from migration 028. This tells
+    # the ORM to leave child rows alone and let the DB constraint be
+    # authoritative. Caught by tests/test_fk_ondelete.py.
+    order_items = relationship("OrderItem", back_populates="menu_item", passive_deletes=True)
     __table_args__ = (
         # Sale and cost prices are money in cents — never negative (0 allowed).
         CheckConstraint("price >= 0", name="ck_menu_items_price_nonneg"),
@@ -194,14 +235,28 @@ class Order(Base):
         # An order total is money in cents — never negative. Allows 0 (comped/
         # zero-total orders are legitimate). See migration 016.
         CheckConstraint("total >= 0", name="ck_orders_total_nonneg"),
+        # A real M-Pesa receipt number is unique across all orders — two orders
+        # can never legitimately settle against the same Safaricom transaction.
+        # Partial (WHERE NOT NULL) so unpaid orders (mpesa_receipt IS NULL)
+        # never collide. See migration 029.
+        Index(
+            "uq_orders_mpesa_receipt", "mpesa_receipt", unique=True,
+            postgresql_where=text("mpesa_receipt IS NOT NULL"),
+            sqlite_where=text("mpesa_receipt IS NOT NULL"),
+        ),
     )
 
 class OrderItem(Base):
     """Links orders to menu items — critical for menu performance analysis."""
     __tablename__ = "order_items"
     id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(Integer, ForeignKey("orders.id"), index=True)
-    menu_item_id = Column(Integer, ForeignKey("menu_items.id"), index=True)
+    # CASCADE: a line item has no independent value once its order is gone
+    # (matches the existing ORM cascade="all, delete-orphan" on Order.items,
+    # now also enforced at the DB level — see migration 028).
+    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    # RESTRICT (explicit): order history/pricing is an audit trail that must
+    # survive a menu item being edited away — see migration 028.
+    menu_item_id = Column(Integer, ForeignKey("menu_items.id", ondelete="RESTRICT"), index=True)
     quantity = Column(Integer, default=1)
     unit_price = Column(Integer)  # Snapshot of price at time of order
     
@@ -221,7 +276,8 @@ class PrepTime(Base):
     """Tracks actual kitchen prep time per order item — powers KDS intelligence."""
     __tablename__ = "prep_times"
     id = Column(Integer, primary_key=True, index=True)
-    order_item_id = Column(Integer, ForeignKey("order_items.id"), index=True)
+    # CASCADE: 1:1 owned child of the order item — see migration 028.
+    order_item_id = Column(Integer, ForeignKey("order_items.id", ondelete="CASCADE"), index=True)
     station = Column(String, default="main")  # grill, fryer, salad, drinks, main
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
@@ -247,21 +303,41 @@ class InventoryItem(Base):
     # cycle (7 messages/day, per item) until someone restocks. See
     # ai/whatsapp/brain.STOCK_ALERT_COOLDOWN_HOURS. Added by migration 010.
     last_alerted_at = Column(DateTime, nullable=True)
+    # Par-level reordering (directive 018). `low_stock_threshold` above
+    # already IS the reorder point in every alert path that reads it
+    # (get_critical_stock_alerts, run_stock_check) — this doesn't duplicate
+    # it, par_level is the NEW piece: how much to restock UP TO once that
+    # point is crossed. Nullable — an item with no par_level set is simply
+    # never auto-drafted, not defaulted to a guessed number.
+    par_level          = Column(Float, nullable=True)
+    default_supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
 
     restaurant = relationship("Restaurant", back_populates="inventory_items")
-    movements = relationship("StockMovement", back_populates="inventory_item")
+    # passive_deletes=True: same reasoning as MenuItem.order_items above — let
+    # the DB's ON DELETE RESTRICT (migration 028) be authoritative instead of
+    # the ORM proactively nulling stock_movements.inventory_item_id.
+    movements = relationship("StockMovement", back_populates="inventory_item", passive_deletes=True)
+    default_supplier = relationship("Supplier", foreign_keys=[default_supplier_id])
 
 class StockMovement(Base):
     """Tracks inventory in/out — powers depletion prediction and reorder intelligence."""
     __tablename__ = "stock_movements"
     id = Column(Integer, primary_key=True, index=True)
-    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id"), index=True)
+    # RESTRICT (explicit): this is the theft/shrinkage audit trail — it must
+    # survive an inventory item being deleted — see migration 028.
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id", ondelete="RESTRICT"), index=True)
     movement_type = Column(SqEnum(StockMovementType))
     quantity = Column(Float)
     reason = Column(String, default="")  # "sale", "waste", "purchase", "adjustment"
     created_at = Column(DateTime, default=utcnow)
-    
+    # Chain-of-custody (directive 016). Nullable: historical rows have no
+    # actor and can't be backfilled honestly — don't guess one. Every write
+    # path in routers/inventory.py and routers/stock_custody.py stamps this
+    # going forward.
+    performed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
     inventory_item = relationship("InventoryItem", back_populates="movements")
+    performed_by = relationship("User")
 
 # ──────────────────────────────────────────────
 # RESERVATIONS (New for AI)
@@ -306,7 +382,8 @@ class PricingRecommendation(Base):
     __tablename__ = "pricing_recommendations"
     id                      = Column(Integer, primary_key=True, index=True)
     restaurant_id           = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
-    menu_item_id            = Column(Integer, ForeignKey("menu_items.id"), nullable=False)
+    # CASCADE: an AI suggestion artifact tied 1:1 to the item — see migration 028.
+    menu_item_id            = Column(Integer, ForeignKey("menu_items.id", ondelete="CASCADE"), nullable=False)
     recommendation_type     = Column(String, nullable=False)
     current_price           = Column(Integer, nullable=False)
     suggested_price         = Column(Integer, nullable=False)
@@ -474,8 +551,10 @@ class MenuIngredient(Base):
     __tablename__ = "menu_ingredients"
 
     id                  = Column(Integer, primary_key=True, index=True)
-    menu_item_id        = Column(Integer, ForeignKey("menu_items.id"), nullable=False)
-    inventory_item_id   = Column(Integer, ForeignKey("inventory_items.id"), nullable=False)
+    # CASCADE: a recipe link is meaningless once either side no longer exists —
+    # see migration 028.
+    menu_item_id        = Column(Integer, ForeignKey("menu_items.id", ondelete="CASCADE"), nullable=False)
+    inventory_item_id   = Column(Integer, ForeignKey("inventory_items.id", ondelete="CASCADE"), nullable=False)
     quantity_per_serving = Column(Float, nullable=False, default=1.0)
     is_critical         = Column(Boolean, default=True)   # False = garnish, can be skipped
 
@@ -502,6 +581,11 @@ class StaffMember(Base):
     name          = Column(String, nullable=False)
     role_title    = Column(String, default="")   # "Head Chef", "Waiter", "Cashier"
     hourly_rate   = Column(Integer, default=0)   # In cents
+    # E.164 phone (directive 016). Nullable — many roster entries (see
+    # user_id above) have no way to reach them electronically at all. Lets a
+    # staff member with no dashboard login still receive/confirm a stock
+    # transfer over WhatsApp/SMS (routers/webhooks.py staff resolution).
+    phone         = Column(String, nullable=True)
     is_active     = Column(Boolean, default=True)
     created_at    = Column(DateTime, default=utcnow)
 
@@ -510,6 +594,16 @@ class StaffMember(Base):
 
     __table_args__ = (
         Index("ix_staff_members_restaurant", "restaurant_id"),
+        # Two roster entries at the same restaurant sharing a phone number is a
+        # data error (webhooks.py resolves an inbound WhatsApp/SMS sender to a
+        # staff member by phone — a duplicate makes that resolution ambiguous).
+        # Partial (WHERE phone IS NOT NULL): phone is optional (see comment
+        # above), so multiple NULLs must not collide. See migration 030.
+        Index(
+            "uq_staff_members_restaurant_phone", "restaurant_id", "phone", unique=True,
+            postgresql_where=text("phone IS NOT NULL"),
+            sqlite_where=text("phone IS NOT NULL"),
+        ),
     )
 
 
@@ -543,6 +637,126 @@ class LaborShift(Base):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# LAYER 4B: STAFF NOTIFICATIONS + SUPPORT
+#
+# The Twilio/WhatsApp channel (ai/whatsapp) requires a funded Twilio account
+# and, until directive 016's staff-comms follow-up, only ever reached the
+# restaurant owner's phone — no staff member ever got an alert. This layer is
+# a channel that costs nothing and needs no external account: an in-app feed
+# (Notification, always populated) plus optional Web Push (PushSubscription,
+# best-effort — see ai/notify.py). See ai/orchestrator/push_notifier.py for
+# the event-bus subscriber that populates Notification rows, and
+# routers/support.py for the staff support-ticket system that also notifies
+# through this same channel.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class Notification(Base):
+    """
+    A persisted in-app notification for one dashboard user. Always written
+    regardless of whether that user has an active PushSubscription — the
+    in-app feed (routers/notifications.py GET /) must never depend on push
+    having been set up, since push is inherently best-effort (browser
+    permission can be denied, iOS requires the PWA be installed, etc).
+    """
+    __tablename__ = "notifications"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title      = Column(String, nullable=False)
+    body       = Column(Text, nullable=False)
+    # Raw EventType.value string (e.g. "stock.critical"), not a DB enum — so
+    # the event registry can grow without a migration. "support.ticket" /
+    # "support.reply" for support-ticket notifications, which don't go
+    # through events/bus.py at all (see routers/support.py).
+    event_type = Column(String, nullable=False)
+    url        = Column(String, nullable=True)   # deep link, e.g. /dashboard/inventory
+    is_read    = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=utcnow)
+
+    __table_args__ = (
+        Index("ix_notifications_user_unread", "user_id", "is_read"),
+        Index("ix_notifications_user_created", "user_id", "created_at"),
+    )
+
+
+class PushSubscription(Base):
+    """
+    One browser/device's Web Push subscription (VAPID). `endpoint` is unique
+    per browser+origin regardless of which user is logged in when it
+    subscribes — see routers/notifications.py's upsert-by-endpoint logic for
+    why user_id can legitimately be reassigned on an existing row (a
+    different staff member logging into the same shared device/tablet).
+    """
+    __tablename__ = "push_subscriptions"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    endpoint   = Column(String, nullable=False, unique=True)
+    p256dh     = Column(String, nullable=False)
+    auth       = Column(String, nullable=False)
+    user_agent = Column(String, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_push_subscriptions_user", "user_id"),
+    )
+
+
+class SupportTicketStatus(enum.Enum):
+    OPEN        = "open"
+    IN_PROGRESS = "in_progress"
+    RESOLVED    = "resolved"
+    CLOSED      = "closed"
+
+
+class SupportTicket(Base):
+    """
+    An in-app support ticket, replacing "call/WhatsApp the owner" as the way
+    staff raise an issue while Twilio is unfunded. Any authenticated
+    dashboard user can open one; OWNER/MANAGER-tier users can see and
+    triage every ticket at their restaurant (routers/support.py).
+    """
+    __tablename__ = "support_tickets"
+
+    id             = Column(Integer, primary_key=True, index=True)
+    restaurant_id  = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
+    created_by_id  = Column(Integer, ForeignKey("users.id"), nullable=False)
+    subject        = Column(String, nullable=False)
+    status         = Column(SqEnum(SupportTicketStatus), default=SupportTicketStatus.OPEN, nullable=False)
+    created_at     = Column(DateTime, default=utcnow)
+    updated_at     = Column(DateTime, default=utcnow)
+
+    restaurant = relationship("Restaurant")
+    messages   = relationship(
+        "SupportTicketMessage", back_populates="ticket",
+        order_by="SupportTicketMessage.created_at", cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        Index("ix_support_tickets_restaurant_status", "restaurant_id", "status"),
+    )
+
+
+class SupportTicketMessage(Base):
+    """One message in a support ticket's thread — the opening message and
+    every reply are both rows here, so the thread has a single shape."""
+    __tablename__ = "support_ticket_messages"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    ticket_id  = Column(Integer, ForeignKey("support_tickets.id", ondelete="CASCADE"), nullable=False)
+    sender_id  = Column(Integer, ForeignKey("users.id"), nullable=False)
+    body       = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=utcnow)
+
+    ticket = relationship("SupportTicket", back_populates="messages")
+
+    __table_args__ = (
+        Index("ix_support_ticket_messages_ticket", "ticket_id"),
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # LAYER 5: SUPPLY CHAIN INTELLIGENCE
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -562,7 +776,11 @@ class Supplier(Base):
     created_at        = Column(DateTime, default=utcnow)
 
     restaurant     = relationship("Restaurant")
-    purchase_orders = relationship("PurchaseOrder", back_populates="supplier")
+    # passive_deletes=True: same reasoning as MenuItem.order_items above. Was
+    # "working" only by coincidence (purchase_orders.supplier_id is NOT NULL,
+    # so the ORM's phantom nulling UPDATE happened to fail too) — this makes
+    # the DB's ON DELETE RESTRICT (migration 028) the real, intended reason.
+    purchase_orders = relationship("PurchaseOrder", back_populates="supplier", passive_deletes=True)
 
     __table_args__ = (
         Index("ix_suppliers_restaurant", "restaurant_id"),
@@ -579,8 +797,11 @@ class PurchaseOrder(Base):
 
     id                = Column(Integer, primary_key=True, index=True)
     restaurant_id     = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
-    supplier_id       = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
-    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id"), nullable=True)
+    # RESTRICT (explicit): procurement/financial history — see migration 028.
+    supplier_id       = Column(Integer, ForeignKey("suppliers.id", ondelete="RESTRICT"), nullable=False)
+    # SET NULL: already nullable — keep the purchase record even if the catalog
+    # item it referred to is later removed — see migration 028.
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id", ondelete="SET NULL"), nullable=True)
     quantity_ordered  = Column(Float, nullable=False)
     quantity_received = Column(Float, nullable=True)
     unit              = Column(String, default="")
@@ -599,6 +820,99 @@ class PurchaseOrder(Base):
     __table_args__ = (
         Index("ix_purchase_orders_restaurant_status", "restaurant_id", "status"),
         Index("ix_purchase_orders_supplier", "supplier_id"),
+    )
+
+
+class StockTransfer(Base):
+    """
+    Store→kitchen leg of the chain of custody (directive 016). Deliberately a
+    two-party record, not a single StockMovement row: the sender declares a
+    quantity, the receiver independently confirms what actually arrived. A
+    mismatch (confirmed_quantity != quantity) is the theft/loss signal — it
+    only exists because both sides report independently, so trust isn't
+    self-certified by whichever party benefits from under-reporting.
+
+    On a matching confirm, this also writes the underlying StockMovement
+    OUT/IN pair so existing depletion-prediction code (which reads
+    StockMovement, not this table) keeps working unmodified.
+    """
+    __tablename__ = "stock_transfers"
+
+    id                    = Column(Integer, primary_key=True, index=True)
+    restaurant_id         = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
+    # RESTRICT (explicit): a chain-of-custody record — see migration 028.
+    inventory_item_id     = Column(Integer, ForeignKey("inventory_items.id", ondelete="RESTRICT"), nullable=False)
+    # Nullable (directive 017): a REQUESTED (pull) transfer has no committed
+    # quantity yet — the kitchen is asking, not declaring. Set when fulfilled.
+    quantity              = Column(Float, nullable=True)   # What the sender declares
+    unit                  = Column(String, default="")
+    from_location         = Column(String, default="store")     # "store", "kitchen"
+    to_location            = Column(String, default="kitchen")
+    status                = Column(SqEnum(StockTransferStatus), default=StockTransferStatus.PENDING)
+    # Kitchen-initiated ("pull") requests only — null for the original
+    # store-initiated ("push") flow. See directive 017.
+    requested_by_user_id  = Column(Integer, ForeignKey("users.id"), nullable=True)
+    requested_at          = Column(DateTime, nullable=True)
+    # "Who declared the quantity being sent." Set immediately for a push
+    # transfer; set at fulfil-time (REQUESTED -> PENDING) for a pull one —
+    # hence nullable now, where it used to be required at creation.
+    initiated_by_user_id  = Column(Integer, ForeignKey("users.id"), nullable=True)
+    initiated_at          = Column(DateTime, nullable=True)
+    confirmed_by_user_id  = Column(Integer, ForeignKey("users.id"), nullable=True)
+    confirmed_at          = Column(DateTime, nullable=True)
+    confirmed_quantity    = Column(Float, nullable=True)   # What the receiver actually counted
+    notes                 = Column(Text, default="")
+
+    restaurant      = relationship("Restaurant")
+    inventory_item  = relationship("InventoryItem")
+    requested_by    = relationship("User", foreign_keys=[requested_by_user_id])
+    initiated_by    = relationship("User", foreign_keys=[initiated_by_user_id])
+    confirmed_by    = relationship("User", foreign_keys=[confirmed_by_user_id])
+
+    __table_args__ = (
+        Index("ix_stock_transfers_restaurant_status", "restaurant_id", "status"),
+    )
+
+
+class StockCount(Base):
+    """
+    Physical stock count (directive 017) — the independent check that keeps
+    theft/shrinkage detection real once ingredient deduction is automatic.
+
+    Once StockMovement OUT entries are written automatically from recipes
+    (directive 017's order-time auto-deduction), comparing "theoretical
+    usage" against "recorded StockMovement OUT" stops being a real signal —
+    the recorded movements ARE the recipe math, so they always agree with
+    themselves. A physical count is the one number in this system that comes
+    from someone actually looking at the shelf, independent of anything the
+    system already believes — which is what makes a mismatch here meaningful.
+
+    Submitting a count also reconciles InventoryItem.quantity to match reality
+    (writes an ADJUST StockMovement), same as routers/inventory.py's existing
+    /adjust endpoint — a count IS an adjustment, just one with a declared
+    "expected" value to compare against first.
+    """
+    __tablename__ = "stock_counts"
+
+    id                 = Column(Integer, primary_key=True, index=True)
+    restaurant_id      = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
+    # RESTRICT (explicit): a physical-count audit record — see migration 028.
+    inventory_item_id  = Column(Integer, ForeignKey("inventory_items.id", ondelete="RESTRICT"), nullable=False)
+    # Snapshot of what the system believed at count time — captured explicitly
+    # rather than re-derived later, so a later query can't silently change
+    # what this count "found" as data continues to move.
+    expected_quantity  = Column(Float, nullable=False)
+    counted_quantity   = Column(Float, nullable=False)
+    counted_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    counted_at         = Column(DateTime, default=utcnow)
+    notes              = Column(Text, default="")
+
+    restaurant      = relationship("Restaurant")
+    inventory_item  = relationship("InventoryItem")
+    counted_by      = relationship("User")
+
+    __table_args__ = (
+        Index("ix_stock_counts_restaurant_item", "restaurant_id", "inventory_item_id"),
     )
 
 
@@ -854,7 +1168,9 @@ class WorkflowStep(Base):
     __tablename__ = "workflow_steps"
 
     id           = Column(Integer, primary_key=True, index=True)
-    run_id       = Column(Integer, ForeignKey("workflow_runs.id"), nullable=False)
+    # CASCADE: matches the existing ORM cascade="all, delete-orphan" on
+    # WorkflowRun.steps — see migration 028.
+    run_id       = Column(Integer, ForeignKey("workflow_runs.id", ondelete="CASCADE"), nullable=False)
     seq          = Column(Integer, nullable=False)
     name         = Column(String, nullable=False)
     step_type    = Column(String, nullable=False)

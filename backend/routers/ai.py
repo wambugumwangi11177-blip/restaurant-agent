@@ -36,13 +36,24 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from database import get_db
-from auth import require_role
+from auth import require_role, require_staff_role
 import models
+import schemas
 from routers.deps import get_or_create_restaurant
 
 logger = logging.getLogger("ai.router")
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+# Directive 015's matrix for `ai`/`ai-ops`: RW = Owner only, R = Manager +
+# Controller. Applied by HTTP verb below — GET (insight) routes loosen to
+# _AI_READ; POST routes that trigger a real action (approve a price change,
+# run a workflow step, send a campaign) stay Owner-only, since the matrix
+# grants no one but Owner write access here. `marketing` is the one
+# exception — its matrix row gives Manager RW, not just R — so its POST
+# routes use _MARKETING_WRITE instead of staying Owner-only.
+_AI_READ = (models.StaffRole.MANAGER, models.StaffRole.CONTROLLER)
+_MARKETING_WRITE = (models.StaffRole.MANAGER,)
 
 
 def _safe_run(agent_name: str, restaurant_id: int, fn, *args, **kwargs):
@@ -72,7 +83,7 @@ def _safe_run(agent_name: str, restaurant_id: int, fn, *args, **kwargs):
 @router.get("/pricing")
 async def ai_pricing(
     narrate: bool = True,
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
     """
@@ -126,15 +137,14 @@ async def approve_pricing_rec(
 @router.post("/pricing/{rec_id}/reject")
 async def reject_pricing_rec(
     rec_id: int,
-    body: dict = None,
+    body: schemas.PricingRejectBody = schemas.PricingRejectBody(),
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
     """Reject a pricing recommendation."""
     restaurant = get_or_create_restaurant(db, current_user)
     from ai.pricing.recommendations import reject_recommendation
-    reason = (body or {}).get("reason", "")
-    return reject_recommendation(db, rec_id, restaurant.id, reason)
+    return reject_recommendation(db, rec_id, restaurant.id, body.reason)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -144,7 +154,7 @@ async def reject_pricing_rec(
 @router.get("/decisions")
 async def ai_decisions(
     narrate: bool = True,
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
     """
@@ -175,7 +185,7 @@ async def ai_decisions(
 
 @router.post("/strategy")
 async def ai_strategy(
-    body: dict,
+    body: schemas.StrategyGoalBody,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
@@ -190,8 +200,8 @@ async def ai_strategy(
     Body: {"goal": "...", "timeframe": "this quarter"}
     """
     restaurant = get_or_create_restaurant(db, current_user)
-    goal = (body or {}).get("goal", "")
-    timeframe = (body or {}).get("timeframe", "")
+    goal = body.goal
+    timeframe = body.timeframe
 
     # Blocking LLM tool loop → keep it off the event loop (see /ai/pricing).
     from starlette.concurrency import run_in_threadpool
@@ -203,7 +213,7 @@ async def ai_strategy(
 
 @router.post("/strategy/plan")
 async def ai_strategy_plan(
-    body: dict,
+    body: schemas.StrategyPlanBody,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
@@ -215,8 +225,8 @@ async def ai_strategy_plan(
     Body: {"goal": "...", "horizon_weeks": 4}
     """
     restaurant = get_or_create_restaurant(db, current_user)
-    goal = (body or {}).get("goal", "")
-    weeks = int((body or {}).get("horizon_weeks", 4) or 4)
+    goal = body.goal
+    weeks = body.horizon_weeks
     from ai.orchestrator.strategist import plan
     return _safe_run("strategist", restaurant.id, plan, db, restaurant.id, goal, weeks)
 
@@ -224,7 +234,7 @@ async def ai_strategy_plan(
 @router.get("/feedback")
 async def ai_feedback(
     days: int = 14,
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
     """
@@ -244,7 +254,7 @@ async def ai_feedback(
 
 @router.get("/plugins")
 async def ai_plugins_list(
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_AI_READ)),
 ):
     """List registered marketplace plugins (name, author, capabilities, scopes)."""
     from ai.plugins import registry
@@ -254,7 +264,7 @@ async def ai_plugins_list(
 @router.post("/plugins/{name}/invoke")
 async def ai_plugin_invoke(
     name: str,
-    body: dict = None,
+    body: schemas.PluginInvokeBody = schemas.PluginInvokeBody(),
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
@@ -264,10 +274,8 @@ async def ai_plugin_invoke(
     "approved": bool}. A mutating plugin returns requires_approval until approved.
     """
     restaurant = get_or_create_restaurant(db, current_user)
-    payload = (body or {}).get("payload") or {}
-    approved = bool((body or {}).get("approved", False))
     from ai.plugins import registry
-    return _safe_run("plugin_sdk", restaurant.id, registry.invoke, name, db, restaurant.id, payload, approved)
+    return _safe_run("plugin_sdk", restaurant.id, registry.invoke, name, db, restaurant.id, body.payload, body.approved)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -276,7 +284,7 @@ async def ai_plugin_invoke(
 
 @router.get("/workflows/templates")
 async def ai_workflow_templates(
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_AI_READ)),
 ):
     """List the available workflow templates that can be started."""
     from ai.workflows import template_names
@@ -302,7 +310,7 @@ async def ai_workflow_start(
 @router.get("/workflows/{run_id}")
 async def ai_workflow_get(
     run_id: int,
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
     """Fetch one workflow run's current state (steps, status, context)."""
@@ -318,7 +326,7 @@ async def ai_workflow_get(
 @router.post("/workflows/{run_id}/resume")
 async def ai_workflow_resume(
     run_id: int,
-    body: dict = None,
+    body: schemas.WorkflowResumeBody = schemas.WorkflowResumeBody(),
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
@@ -330,10 +338,8 @@ async def ai_workflow_resume(
     restaurant = get_or_create_restaurant(db, current_user)
     if _workflow_belongs(db, run_id, restaurant.id) is False:
         return {"available": False, "error": "Workflow run not found."}
-    decision = (body or {}).get("decision", "approve")
-    payload = (body or {}).get("payload")
     from ai.workflows import resume
-    return _safe_run("workflow_engine", restaurant.id, resume, db, run_id, decision, payload)
+    return _safe_run("workflow_engine", restaurant.id, resume, db, run_id, body.decision, body.payload)
 
 
 @router.post("/workflows/{run_id}/cancel")
@@ -371,7 +377,7 @@ def _workflow_belongs(db: Session, run_id: int, restaurant_id: int) -> bool:
 async def ai_graph_impact(
     entity: str,
     id: int,
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
     """
@@ -397,7 +403,7 @@ async def ai_graph_impact(
 
 @router.post("/simulate")
 async def ai_simulate(
-    body: dict,
+    body: schemas.SimulateBody,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
@@ -415,7 +421,7 @@ async def ai_simulate(
         return {"available": False, "error": "Simulation is disabled."}
 
     restaurant = get_or_create_restaurant(db, current_user)
-    change = (body or {}).get("change", body)   # accept {"change": {...}} or a bare change
+    change = body.change
 
     from ai.simulation import run_simulation
     return _safe_run("simulation", restaurant.id, run_simulation, db, restaurant.id, change)
@@ -424,7 +430,7 @@ async def ai_simulate(
 @router.get("/forecast/twin")
 async def ai_forecast_twin(
     horizon: int = 30,
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
     """
@@ -448,7 +454,7 @@ async def ai_forecast_twin(
 
 @router.get("/labor")
 async def ai_labor(
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
     """Labor cost analytics, overtime analysis, and staffing recommendations."""
@@ -464,7 +470,7 @@ async def ai_labor(
 
 @router.get("/inventory")
 async def ai_inventory(
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
     """Inventory health, usage velocity, ABC classification, restock predictions."""
@@ -488,7 +494,7 @@ async def ai_inventory(
 @router.get("/profit")
 async def ai_profit(
     narrate: bool = True,
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
     """
@@ -520,7 +526,7 @@ async def ai_profit(
 @router.get("/roi")
 async def ai_roi(
     narrate: bool = True,
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
     """
@@ -549,7 +555,7 @@ async def ai_roi(
 @router.get("/marketing")
 async def ai_marketing(
     narrate: bool = True,
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_MARKETING_WRITE)),
     db: Session = Depends(get_db),
 ):
     """
@@ -593,8 +599,8 @@ def _background_send(fn, *args) -> None:
 
 @router.post("/marketing/promo")
 async def ai_marketing_promo(
-    body: dict,
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    body: schemas.MarketingPromoBody,
+    current_user: models.User = Depends(require_staff_role(*_MARKETING_WRITE)),
     db: Session = Depends(get_db),
 ):
     """
@@ -604,7 +610,7 @@ async def ai_marketing_promo(
     the background.
     """
     restaurant = get_or_create_restaurant(db, current_user)
-    offer_text = (body or {}).get("offer_text", "").strip()
+    offer_text = body.offer_text.strip()
     if not offer_text:
         return {"started": False, "audience": 0, "error": "Add an offer to send (e.g. '15% off all mains till 9pm')."}
 
@@ -624,7 +630,7 @@ async def ai_marketing_promo(
 
 @router.post("/marketing/winback")
 async def ai_marketing_winback(
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_MARKETING_WRITE)),
     db: Session = Depends(get_db),
 ):
     """
@@ -655,8 +661,8 @@ async def ai_marketing_winback(
 
 @router.post("/explain")
 async def ai_explain(
-    body: dict,
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    body: schemas.ExplainBody,
+    current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
     """
@@ -666,11 +672,10 @@ async def ai_explain(
     Body: {"item": {...}, "label": "optional context"}. Returns {available, explanation}.
     """
     restaurant = get_or_create_restaurant(db, current_user)
-    item = body.get("item")
-    if not isinstance(item, dict):
+    if not isinstance(body.item, dict):
         return {"available": False, "error": "Provide an 'item' object to explain."}
 
-    payload = {"item": item, "context": body.get("label", "")}
+    payload = {"item": body.item, "context": body.label}
 
     from starlette.concurrency import run_in_threadpool
     from ai.reasoning import narrate
@@ -686,7 +691,7 @@ async def ai_explain(
 
 @router.get("/data-quality")
 async def ai_data_quality(
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
     """
@@ -706,7 +711,7 @@ async def ai_data_quality(
 
 @router.get("/supply-chain")
 async def ai_supply_chain(
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
     """Supplier performance analysis, overdue purchase orders, reorder recommendations."""
@@ -723,7 +728,7 @@ async def ai_supply_chain(
 @router.get("/usage")
 async def ai_usage(
     days: int = 30,
-    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
     """
@@ -731,11 +736,10 @@ async def ai_usage(
     (p50/p95) + success rate, and the grounding trust rate. Read-only aggregation
     of already-metered data (token_usage, agent_executions, grounding verifier).
 
-    ADMIN-only, like the rest of /ai/* — this is management/cost intelligence, not
-    something a STAFF (POS) account needs. (An earlier comment claimed owners
-    register as STAFF and so were locked out; that was never true — register()
-    creates the owner as ADMIN, so gating this ADMIN keeps owners in and floor
-    staff out.)
+    Gated to Owner (Role.ADMIN bypass) + Manager/Controller (directive 015's
+    `ai-ops` matrix row: RW Owner, R Manager/Controller) — this is
+    management/cost intelligence, not something a floor-staff (Waiter/Kitchen/
+    Stockkeeper) account needs.
     """
     restaurant = get_or_create_restaurant(db, current_user)
     days = min(max(days, 1), 365)

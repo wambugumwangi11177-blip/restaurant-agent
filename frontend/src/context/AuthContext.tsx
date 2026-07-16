@@ -16,6 +16,11 @@ interface User {
   id: number;
   email: string;
   role: string;
+  // Directive 015 — fine-grained tier (owner/manager/supervisor/controller/
+  // stockkeeper/kitchen/waiter), or null if not yet assigned. Read fresh from
+  // /auth/me on every load rather than cached in a JWT claim, so a role
+  // change or the "unassigned" state shows up on the very next page load.
+  staff_role: string | null;
 }
 
 interface AuthContextType {

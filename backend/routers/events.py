@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from auth import get_current_user, require_role
 import models
+import schemas
 from time_utils import utcnow
 
 logger = logging.getLogger("product.analytics")
@@ -27,20 +28,20 @@ router = APIRouter(prefix="/events", tags=["product-analytics"])
 
 @router.post("/track")
 async def track_event(
-    body: dict,
+    body: schemas.ProductEventTrack,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
     Record one product event for the current user. Body: {event_name, properties?}.
-    Best-effort — a bad/oversized properties blob is dropped, never 500s, so
+    Best-effort — an oversized properties blob is truncated, never 500s, so
     analytics can never break a user flow.
     """
-    event_name = (body or {}).get("event_name", "").strip()[:120]
+    event_name = body.event_name.strip()[:120]
     if not event_name:
         return {"tracked": False, "error": "event_name is required"}
     try:
-        props = json.dumps((body or {}).get("properties", {}))[:2000]
+        props = json.dumps(body.properties)[:2000]
     except (TypeError, ValueError):
         props = ""
     db.add(models.ProductEvent(

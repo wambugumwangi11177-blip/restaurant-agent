@@ -75,6 +75,18 @@ def db_env(tmp_path, monkeypatch):
     except ImportError:
         pass
 
+    # Same hazard as executive.py above, for the second event-bus subscriber
+    # (ai/orchestrator/push_notifier.py) added alongside it: it also does
+    # `from database import SessionLocal` at module level, so it must be
+    # reloaded here too or it keeps querying whatever DATABASE_URL was live
+    # at its first import (real risk: that can be the real .env DB if a test
+    # module imports it at collection time, before this fixture has run).
+    try:
+        import ai.orchestrator.push_notifier as push_notifier
+        importlib.reload(push_notifier)
+    except ImportError:
+        pass
+
     from events.bus import clear_handlers
     clear_handlers()
 

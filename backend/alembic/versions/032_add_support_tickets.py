@@ -35,8 +35,15 @@ def _table_exists(name: str) -> bool:
 
 def upgrade():
     if not _table_exists("support_tickets"):
+        # No separate .create(checkfirst=True) call — op.create_table below
+        # creates this Enum type itself as a side effect of the column
+        # definition, and (found running migration 025 live against real
+        # Postgres) that auto-creation does not respect checkfirst: a prior
+        # explicit .create() here would collide with it (DuplicateObject),
+        # since op.create_table's own attempt runs right after and finds the
+        # type already there. See 025's stock_transfers block for the full
+        # writeup of this SQLAlchemy behavior.
         status_enum = sa.Enum(*STATUS_VALUES, name="supportticketstatus")
-        status_enum.create(op.get_bind(), checkfirst=True)
         op.create_table(
             "support_tickets",
             sa.Column("id", sa.Integer(), primary_key=True),

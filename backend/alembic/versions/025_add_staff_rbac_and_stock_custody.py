@@ -67,8 +67,26 @@ def upgrade():
                                                      sa.ForeignKey("users.id"), nullable=True))
 
     if not _table_exists("stock_transfers"):
+        # BUG FIX (found running this migration live against real Postgres —
+        # the SQLite-only test suite never exercises this path, since SQLite
+        # has no named CREATE TYPE at all): op.create_table's automatic
+        # enum-creation-on-table-create does NOT respect checkfirst in this
+        # SQLAlchemy version — it unconditionally issues CREATE TYPE for any
+        # Enum-typed column, ignoring whether the type already exists. That
+        # collided with the explicit `.create(checkfirst=True)` call this
+        # block used to make first (DuplicateObject, since op.create_table's
+        # own unconditional attempt ran right after and found it already
+        # there). Fix: drop the explicit pre-creation and let op.create_table
+        # be the SOLE creator — but first clear any orphaned type left behind
+        # by an earlier partial/interrupted run of this exact migration
+        # (confirmed live: alembic_version was still at 024, yet this type
+        # already existed) — since the table is confirmed absent right here,
+        # any existing type by this name is definitionally orphaned garbage.
+        bind = op.get_bind()
+        if bind.dialect.name == "postgresql":
+            op.execute("DROP TYPE IF EXISTS stocktransferstatus")
+
         transfer_status_enum = sa.Enum(*TRANSFER_STATUS_VALUES, name="stocktransferstatus")
-        transfer_status_enum.create(op.get_bind(), checkfirst=True)
         op.create_table(
             "stock_transfers",
             sa.Column("id", sa.Integer(), primary_key=True),

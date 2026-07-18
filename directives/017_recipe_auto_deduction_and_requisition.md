@@ -142,6 +142,33 @@ is flagged as a follow-up, not decided here.
   "who's on kitchen/store duty right now" to notify proactively. The
   inbound half (`NEED`/`SEND`/`CONFIRM`/`COUNT`) works today regardless of
   how someone learns a request exists.
+  **2026-07-17**: the in-app/push half of this (not Twilio, which is still
+  open) is now closed — see directive 016's 2026-07-17 update. More
+  importantly, a bigger gap than the notification itself was found while
+  verifying this: **Kitchen had no frontend page for any of this at all.**
+  `/staff/kitchen` only ever rendered `KDSBoard` — no way to call
+  `POST /stock/transfers/request` or `/confirm` even though the backend
+  (`_CAN_REQUEST`/`_CAN_CONFIRM` in `routers/stock_custody.py`) has allowed
+  Kitchen to do both since this directive shipped. Added
+  `frontend/src/app/staff/kitchen/stock/page.tsx` (new `KitchenStockPanel`
+  component — read-only stock levels + request/confirm only, not the full
+  `InventoryWorkspace`, since Kitchen's inventory access is read-only per
+  directive 015's matrix) and a "Stock" nav entry. This is the actual
+  end-to-end fix for "kitchen can tell the store they're running low" — the
+  API existed, the UI to reach it didn't.
+- **Supervisor could approve a purchase order but never see one** — found
+  while verifying the same communication chain end-to-end.
+  `routers/purchase_orders.py`'s `_CAN_APPROVE` already included
+  `SUPERVISOR` (directive 018), but `_CAN_READ` (gating `GET
+  /purchase-orders/`) didn't — so the one page that lists orders to approve
+  403'd for the one extra role allowed to approve them. Fixed `_CAN_READ` to
+  match, and added the missing `/staff/supervisor/purchasing` page + nav
+  entry (frontend `permissions.ts` already listed `supervisor: "rw"` for
+  `purchasing` — the route just didn't exist). Also added
+  `PURCHASE_ORDER_CREATED` to `push_notifier.py`'s target roles (Owner,
+  Manager, Supervisor, Controller) — previously only Owner's WhatsApp
+  (`executive.py`) heard about a drafted PO, so Supervisor had no way to
+  learn one was waiting for approval through either channel.
 - **Par-level / reorder-point automated purchasing** — the next planned
   phase (demand-adjusted par levels, draft PO generation, supplier Twilio
   contact), not started here.

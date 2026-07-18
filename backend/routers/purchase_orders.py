@@ -23,7 +23,12 @@ router = APIRouter(prefix="/purchase-orders", tags=["purchase-orders"])
 
 _CAN_APPROVE = (models.StaffRole.MANAGER, models.StaffRole.SUPERVISOR)
 _CAN_RECEIVE = (models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER)
-_CAN_READ = (models.StaffRole.MANAGER, models.StaffRole.CONTROLLER, models.StaffRole.STOCKKEEPER)
+# Supervisor must be able to list orders to approve them — was missing here
+# even though _CAN_APPROVE already included Supervisor, which meant an
+# approver could never actually see what needed approving (verified: the
+# frontend's PurchasingWorkspace fetches this endpoint on load and shows a
+# hard "forbidden" screen on any 403).
+_CAN_READ = (models.StaffRole.MANAGER, models.StaffRole.SUPERVISOR, models.StaffRole.CONTROLLER, models.StaffRole.STOCKKEEPER)
 
 
 def _po_out(po: models.PurchaseOrder, db: Session) -> dict:

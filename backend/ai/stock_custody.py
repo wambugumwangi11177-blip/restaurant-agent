@@ -292,6 +292,21 @@ def request_transfer(
     db.add(transfer)
     db.commit()
     db.refresh(transfer)
+
+    # Unlike confirm_transfer/submit_count above, this fires on every request
+    # (not just an exception) — someone has to learn a request exists before
+    # they can act on it. See EventType.STOCK_TRANSFER_REQUESTED's docstring
+    # in events/bus.py for why that's not the same alert-fatigue risk.
+    from events.bus import emit_async, EventType
+    emit_async(EventType.STOCK_TRANSFER_REQUESTED, {
+        "restaurant_id": restaurant_id,
+        "transfer_id": transfer.id,
+        "item_name": item.item_name,
+        "unit": transfer.unit,
+        "from_location": from_location,
+        "to_location": to_location,
+    })
+
     return transfer
 
 
@@ -329,6 +344,24 @@ def fulfill_transfer(
 
     db.commit()
     db.refresh(transfer)
+
+    # Tell the requester (and whoever else is watching the log) it's ready to
+    # collect — same "fires on every happy-path step" reasoning as
+    # request_transfer above, not just on mismatch.
+    item = db.query(models.InventoryItem).filter(
+        models.InventoryItem.id == transfer.inventory_item_id
+    ).first()
+    from events.bus import emit_async, EventType
+    emit_async(EventType.STOCK_TRANSFER_FULFILLED, {
+        "restaurant_id": restaurant_id,
+        "transfer_id": transfer.id,
+        "item_name": item.item_name if item else "Unknown item",
+        "quantity": quantity,
+        "unit": transfer.unit,
+        "from_location": transfer.from_location,
+        "to_location": transfer.to_location,
+    })
+
     return transfer
 
 

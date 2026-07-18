@@ -211,7 +211,7 @@ async def add_message(
     }
 
 
-@router.post("/tickets/{ticket_id}/status", response_model=schemas.SupportTicketOut)
+@router.patch("/tickets/{ticket_id}/status", response_model=schemas.SupportTicketOut)
 async def update_status(
     ticket_id: int,
     body: schemas.SupportTicketStatusUpdate,

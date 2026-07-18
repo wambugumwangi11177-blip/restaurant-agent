@@ -37,6 +37,11 @@ from time_utils import utcnow
 
 logger = logging.getLogger("ai.orchestrator")
 
+# Reliability score (0–100) at/below which a supplier is worth watching. A
+# late delivery costs 5 points; crossing this line fires SUPPLIER_RELIABILITY_
+# DROPPED once (see on_purchase_order_late), rather than re-alerting per lateness.
+SUPPLIER_WATCH_THRESHOLD = 70
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STARTUP REGISTRATION
@@ -560,10 +565,20 @@ def on_purchase_order_late(payload: dict) -> None:
             models.Supplier.id == supplier_id,
             models.Supplier.restaurant_id == restaurant_id,
         ).first()
+        crossed_watch_threshold = False
         if supplier:
             # Penalise reliability: each late delivery -5 points, min 0
-            supplier.reliability_score = max(0, (supplier.reliability_score or 100) - 5)
+            before_score = supplier.reliability_score or 100
+            supplier.reliability_score = max(0, before_score - 5)
             db.commit()
+            # 2026-07-18 event-map pass: surface the *crossing* into "watch"
+            # territory once (map §1 "Supplier rating dropped / consistently
+            # late"), not on every late delivery — before was above, now at/
+            # below SUPPLIER_WATCH_THRESHOLD.
+            crossed_watch_threshold = (
+                before_score > SUPPLIER_WATCH_THRESHOLD
+                and supplier.reliability_score <= SUPPLIER_WATCH_THRESHOLD
+            )
 
         # Bug found 2026-07-16 while extending this same alerting pattern
         # for directive 018: this read OWNER_PHONE_{id}/OWNER_PHONE env vars
@@ -585,6 +600,14 @@ def on_purchase_order_late(payload: dict) -> None:
             )
             send_whatsapp_message(owner_phone, msg, db=db,
                                   restaurant_id=restaurant_id, message_type="supplier_late")
+
+        if crossed_watch_threshold and supplier:
+            emit_async(EventType.SUPPLIER_RELIABILITY_DROPPED, {
+                "restaurant_id": restaurant_id,
+                "supplier_id": supplier.id,
+                "supplier_name": supplier_name or supplier.name,
+                "reliability_score": supplier.reliability_score,
+            })
 
     except Exception as exc:
         logger.error(f"[Orchestrator] on_purchase_order_late failed: {exc}")

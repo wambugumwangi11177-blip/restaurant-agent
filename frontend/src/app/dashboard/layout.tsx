@@ -5,6 +5,8 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import NotificationBell from "@/components/NotificationBell";
+import VerifyEmailBanner from "@/components/VerifyEmailBanner";
+import { tierHome, StaffTier } from "@/lib/permissions";
 import {
     Home,
     UtensilsCrossed,
@@ -26,58 +28,34 @@ import {
     LifeBuoy,
 } from "lucide-react";
 
-// Directive 015's permission matrix, by nav route. `access` lists the
-// staff_role tiers that can see this route at all (R or RW — the backend is
-// what actually distinguishes read-only from mutate, per route; this list is
-// purely "show the nav entry or don't"). Owner and Manager-tier ADMIN/
-// SUPERADMIN accounts (role !== "staff") always see everything — see
-// `visible()` below — so they're intentionally omitted from every list.
+// Owner-only now: every staff_role tier has its own dedicated frontend under
+// /staff/<tier> (see frontend/src/lib/permissions.ts and
+// frontend/src/app/staff/*) — a staff account is redirected out of this
+// dashboard entirely below, so there's no per-route access filtering left to
+// maintain here (that hand-maintained `access` array is what caused the
+// Manager nav-visibility bug this replaced).
 const navItems = [
-    { href: "/dashboard",              label: "Home",     icon: Home,          access: ["manager", "controller"] },
-    { href: "/dashboard/pos",          label: "POS",      icon: CreditCard,    access: ["supervisor", "waiter"] },
-    { href: "/dashboard/kitchen",      label: "Kitchen",  icon: ChefHat,       access: ["supervisor", "kitchen"] },
-    { href: "/dashboard/orders",       label: "Orders",   icon: ShoppingBag,   access: ["supervisor", "controller", "kitchen", "waiter"] },
-    { href: "/dashboard/menu",         label: "Menu",     icon: UtensilsCrossed, access: ["supervisor", "kitchen", "waiter"] },
-    { href: "/dashboard/inventory",    label: "Stock",    icon: Package,       access: ["controller", "stockkeeper", "kitchen"] },
-    { href: "/dashboard/reservations", label: "Bookings", icon: CalendarDays,  access: ["supervisor", "waiter"] },
-    { href: "/dashboard/sales",        label: "Sales",    icon: DollarSign,    access: ["supervisor", "controller"] },
+    { href: "/dashboard", label: "Home", icon: Home },
+    { href: "/dashboard/pos", label: "POS", icon: CreditCard },
+    { href: "/dashboard/kitchen", label: "Kitchen", icon: ChefHat },
+    { href: "/dashboard/orders", label: "Orders", icon: ShoppingBag },
+    { href: "/dashboard/menu", label: "Menu", icon: UtensilsCrossed },
+    { href: "/dashboard/inventory", label: "Stock", icon: Package },
+    { href: "/dashboard/reservations", label: "Bookings", icon: CalendarDays },
+    { href: "/dashboard/sales", label: "Sales", icon: DollarSign },
     // The AI Command Center. Superseded /dashboard/insights, which served a
     // hardcoded Lavy demo and was deleted 2026-07-08.
-    { href: "/dashboard/ai",           label: "AI",       icon: Brain,         access: ["manager", "controller"] },
-    { href: "/dashboard/marketing",    label: "Growth",   icon: Megaphone,     access: ["manager"] },
-    // routers/staff.py gates this to Owner/Manager only (require_staff_role(MANAGER)).
-    { href: "/dashboard/staff",        label: "Staff",    icon: Users,         access: ["manager"] },
-    // Backend (routers/purchase_orders.py, suppliers.py) further splits
-    // read/approve/receive by role — this just governs who sees the nav
-    // entry at all: Manager/Controller read, Supervisor approves, Stockkeeper receives.
-    { href: "/dashboard/purchasing",   label: "Purchasing", icon: Truck,       access: ["manager", "controller", "supervisor", "stockkeeper"] },
-    { href: "/dashboard/roi",          label: "ROI",      icon: Clock,         access: ["manager", "controller"] },
-    // AI Ops shows this restaurant's OWN AI cost/reliability (reads /ai/usage) —
-    // same access group as the rest of /ai/*.
-    { href: "/dashboard/ai-ops",       label: "AI Ops",   icon: Cpu,           access: ["manager", "controller"] },
-    // Every staff tier can raise/view a support ticket — the in-app channel
-    // that exists because Twilio (the "call/WhatsApp the owner" fallback) is
-    // unfunded. routers/support.py further scopes list_tickets to "own
-    // tickets only" for non-Owner/Manager; this just governs nav visibility.
-    { href: "/dashboard/support",      label: "Support",  icon: LifeBuoy,      access: ["manager", "supervisor", "controller", "stockkeeper", "kitchen", "waiter"] },
+    { href: "/dashboard/ai", label: "AI", icon: Brain },
+    { href: "/dashboard/marketing", label: "Growth", icon: Megaphone },
+    { href: "/dashboard/staff", label: "Staff", icon: Users },
+    { href: "/dashboard/purchasing", label: "Purchasing", icon: Truck },
+    { href: "/dashboard/roi", label: "ROI", icon: Clock },
+    { href: "/dashboard/ai-ops", label: "AI Ops", icon: Cpu },
+    // Every staff tier can raise/view a support ticket from their own tier's
+    // frontend too — the in-app channel that exists because Twilio (the
+    // "call/WhatsApp the owner" fallback) is unfunded.
+    { href: "/dashboard/support", label: "Support", icon: LifeBuoy },
 ];
-
-// Per-tier landing page when a staff_role account hits a route it can't see
-// (or "/dashboard" itself, which only Manager/Controller can see). Falls
-// back to the first nav entry that tier can reach if it isn't listed here.
-const TIER_HOME: Record<string, string> = {
-    waiter: "/dashboard/pos",
-    kitchen: "/dashboard/kitchen",
-    stockkeeper: "/dashboard/inventory",
-    supervisor: "/dashboard/pos",
-    controller: "/dashboard/sales",
-};
-
-function isRouteAllowed(href: string, staffRole: string | null): boolean {
-    const item = navItems.find((i) => i.href === href);
-    if (!item) return true;   // Not a matrix-governed route — don't block navigation to it here.
-    return !!staffRole && item.access.includes(staffRole);
-}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { user, logout, isLoading } = useAuth();
@@ -85,40 +63,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const pathname = usePathname();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    // Owner/Manager-tier system accounts (role === "admin"/"superadmin") pass
-    // through every check below — an Owner IS an ADMIN user (directive 015),
-    // never gated by staff_role. Only role === "staff" accounts are subject
-    // to the matrix at all.
+    // Owner/superadmin system accounts (role !== "staff") own this dashboard —
+    // an Owner IS an ADMIN user (directive 015). Any role === "staff" account
+    // belongs on its own tier's frontend under /staff/<tier>, never here.
     const isStaffAccount = ((user as any)?.role || "").toLowerCase() === "staff";
-    const staffRole: string | null = (user as any)?.staff_role || null;
+    const staffRole = (user?.staff_role || null) as StaffTier | null;
     const roleUnassigned = isStaffAccount && !staffRole;
 
-    const visibleNavItems = navItems.filter(
-        (item) => !isStaffAccount || isRouteAllowed(item.href, staffRole)
-    );
-
     useEffect(() => {
-        if (!isLoading && !user) {
+        if (isLoading) return;
+        if (!user) {
             router.push("/login");
             return;
         }
-        if (!isLoading && user && isStaffAccount && staffRole && !roleUnassigned) {
-            const onDisallowedPage = navItems.some(
-                (i) =>
-                    !isRouteAllowed(i.href, staffRole) &&
-                    // Match "/dashboard" exactly, never as a prefix, or it would
-                    // swallow every /dashboard/* path (incl. POS).
-                    (pathname === i.href ||
-                        (i.href !== "/dashboard" && pathname.startsWith(i.href + "/")))
-            );
-            if (onDisallowedPage) {
-                const fallback = TIER_HOME[staffRole] || visibleNavItems[0]?.href || "/dashboard/pos";
-                router.push(fallback);
-            }
+        if (isStaffAccount && staffRole) {
+            router.push(tierHome(staffRole));
         }
-    }, [user, isLoading, isStaffAccount, staffRole, roleUnassigned, pathname, router]);
+    }, [user, isLoading, isStaffAccount, staffRole, router]);
 
-    if (isLoading) {
+    if (isLoading || (user && isStaffAccount && staffRole)) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
@@ -171,7 +134,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                 {/* Nav */}
                 <nav className="p-3 space-y-0.5">
-                    {visibleNavItems.map((item) => {
+                    {navItems.map((item) => {
                         const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
                         return (
                             <Link
@@ -226,6 +189,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         <div className="text-xs text-[#525252]">{user.role}</div>
                     </div>
                 </header>
+
+                <VerifyEmailBanner />
 
                 <div className="p-5 max-w-6xl">
                     {children}

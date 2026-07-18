@@ -57,11 +57,39 @@ async def update_menu_item(
     if not db_item:
         raise HTTPException(status_code=404, detail="Menu item not found")
 
+    was_available = db_item.is_available
+    old_price = db_item.price
     for key, value in item_update.dict(exclude_unset=True).items():
         setattr(db_item, key, value)
-        
+
     db.commit()
     db.refresh(db_item)
+
+    # POS-facing staff need to stop selling this immediately — fires only on
+    # the True->False transition, not every update to the item (price edits,
+    # etc. don't warrant an alert). See EventType.MENU_ITEM_UNAVAILABLE.
+    if was_available and not db_item.is_available:
+        from events.bus import emit_async, EventType
+        emit_async(EventType.MENU_ITEM_UNAVAILABLE, {
+            "restaurant_id": restaurant.id,
+            "item_name": db_item.name,
+        })
+
+    # 2026-07-18 event-map pass: the *manual* counterpart to
+    # recommendation.approved — POS staff quoting from memory need to know a
+    # price they set by hand just changed too. Fires only on a real price
+    # delta; the actor (Owner/Manager who edited it) is excluded.
+    if db_item.price != old_price:
+        from events.bus import emit_async, EventType
+        emit_async(EventType.PRICE_CHANGED, {
+            "restaurant_id": restaurant.id,
+            "menu_item_id": db_item.id,
+            "item_name": db_item.name,
+            "old_price": old_price,
+            "new_price": db_item.price,
+            "actor_user_id": current_user.id,
+        })
+
     return db_item
 
 @router.delete("/{item_id}")

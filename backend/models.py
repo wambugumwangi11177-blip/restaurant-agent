@@ -124,6 +124,14 @@ class User(Base):
     # alongside token_version, so deactivation takes effect on the very next
     # request rather than just hiding a nav link.
     is_active = Column(Boolean, default=True, nullable=False)
+    # Email verification (migration 034). Defaults False for new signups;
+    # existing accounts are backfilled True (they were already trusted before
+    # this feature existed — retroactively flagging them unverified would just
+    # lock real users out of nothing, since nothing currently gates on this
+    # flag). Not enforced at login — surfaced to the frontend as a banner
+    # (directive: don't lock out staff invited without email access to their
+    # own inbox at signup time).
+    is_email_verified = Column(Boolean, default=False, nullable=False)
 
     tenant = relationship("Tenant", back_populates="users")
 
@@ -295,7 +303,13 @@ class InventoryItem(Base):
     item_name = Column(String)
     quantity = Column(Float, default=0)
     unit = Column(String)
-    cost_per_unit = Column(Float, default=0)  # For procurement cost tracking
+    # Stored as integer cents (migration 035 — was a Float storing whole KES,
+    # the one money column in this schema not in cents like PurchaseOrder's).
+    # Exposed as `cost_per_unit` (KES) via the property below so every
+    # existing consumer — schemas.py, routers/inventory.py, ai/reorder.py,
+    # ai/inventory_predictor.py, the frontend's `KES {cost_per_unit}` display —
+    # keeps reading/writing plain KES floats unchanged.
+    cost_per_unit_cents = Column(Integer, default=0)
     low_stock_threshold = Column(Integer)
     expiry_days = Column(Integer, default=30)  # Avg shelf life — for spoilage prediction
     # When the owner was last WhatsApped that this item is low/out. The stock
@@ -318,6 +332,18 @@ class InventoryItem(Base):
     # the ORM proactively nulling stock_movements.inventory_item_id.
     movements = relationship("StockMovement", back_populates="inventory_item", passive_deletes=True)
     default_supplier = relationship("Supplier", foreign_keys=[default_supplier_id])
+
+    @property
+    def cost_per_unit(self) -> float:
+        """KES, computed from cost_per_unit_cents. Not SQL-queryable (a plain
+        Python property, not a hybrid_property) — verified nothing in this
+        codebase filters/orders/aggregates on InventoryItem.cost_per_unit at
+        the query level, only plain attribute access."""
+        return (self.cost_per_unit_cents or 0) / 100
+
+    @cost_per_unit.setter
+    def cost_per_unit(self, kes_value) -> None:
+        self.cost_per_unit_cents = round((kes_value or 0) * 100)
 
 class StockMovement(Base):
     """Tracks inventory in/out — powers depletion prediction and reorder intelligence."""
@@ -577,7 +603,7 @@ class StaffMember(Base):
 
     id            = Column(Integer, primary_key=True, index=True)
     restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
-    user_id       = Column(Integer, ForeignKey("users.id"), nullable=True)   # Optional
+    user_id       = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)   # Optional
     name          = Column(String, nullable=False)
     role_title    = Column(String, default="")   # "Head Chef", "Waiter", "Cashier"
     hourly_rate   = Column(Integer, default=0)   # In cents
@@ -605,6 +631,62 @@ class StaffMember(Base):
             sqlite_where=text("phone IS NOT NULL"),
         ),
     )
+
+
+class ImpersonationSession(Base):
+    """
+    Live/historical record of an Owner "view as" session (real impersonation,
+    not a UI-only preview — see the staff-roles-permissions skill). A row is
+    the sole source of truth for whether an impersonation token is still
+    valid: JWTs alone can't support "end this session right now" without also
+    bumping the target's token_version, which would kick the target out of
+    their OWN concurrent session too — wrong. get_current_user checks this
+    table (via the token's imp_session_id claim) on every request.
+    """
+    __tablename__ = "impersonation_sessions"
+
+    id                    = Column(Integer, primary_key=True, index=True)
+    tenant_id             = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
+    restaurant_id         = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    impersonator_user_id  = Column(Integer, ForeignKey("users.id"), nullable=False)
+    target_user_id        = Column(Integer, ForeignKey("users.id"), nullable=False)
+    started_at            = Column(DateTime, default=utcnow)
+    expires_at            = Column(DateTime, nullable=False)
+    ended_at              = Column(DateTime, nullable=True)
+    # "manual" (Owner clicked End) | "target_revoked" | null while active.
+    end_reason            = Column(String, nullable=True)
+
+    __table_args__ = (
+        Index("ix_impersonation_sessions_target", "target_user_id"),
+        Index("ix_impersonation_sessions_impersonator", "impersonator_user_id"),
+    )
+
+
+class AuthTokenPurpose(enum.Enum):
+    PASSWORD_RESET = "password_reset"
+    EMAIL_VERIFY = "email_verify"
+
+
+class AuthToken(Base):
+    """
+    Single-use, short-lived tokens backing password reset and email
+    verification (migration 034). Stores a SHA-256 hash of the token, never
+    the raw value — same "don't store the secret itself" principle as
+    hashed_password, so a DB read (backup leak, SQLi) can't be replayed as a
+    valid reset/verify link. The raw token only ever exists in the emailed
+    link and the requester's memory of it.
+    """
+    __tablename__ = "auth_tokens"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    user_id     = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token_hash  = Column(String, nullable=False, index=True)
+    purpose     = Column(SqEnum(AuthTokenPurpose), nullable=False)
+    expires_at  = Column(DateTime, nullable=False)
+    used_at     = Column(DateTime, nullable=True)
+    created_at  = Column(DateTime, default=utcnow)
+
+    user = relationship("User")
 
 
 class LaborShift(Base):

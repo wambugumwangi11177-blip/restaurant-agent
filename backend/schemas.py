@@ -234,6 +234,29 @@ class StaffRoleAssign(StrictModel):
     staff_role: str   # one of StaffRole's values
 
 
+class ImpersonateTarget(StrictModel):
+    id: int
+    email: str
+    staff_role: Optional[str] = None
+
+
+class ImpersonateResponse(StrictModel):
+    access_token: str
+    token_type: str = "bearer"
+    target: ImpersonateTarget
+    expires_in_minutes: int
+
+
+class ImpersonationLogEntry(StrictModel):
+    session_id: int
+    impersonator_email: str
+    target_email: str
+    started_at: datetime
+    expires_at: datetime
+    ended_at: Optional[datetime] = None
+    status: str   # "active" | "expired" | "ended"
+
+
 # ──────────────────────────────────────────────
 # STOCK CUSTODY (directive 016)
 # ──────────────────────────────────────────────

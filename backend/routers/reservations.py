@@ -13,12 +13,19 @@ from routers.deps import get_or_create_restaurant
 
 router = APIRouter(prefix="/reservations", tags=["reservations"])
 
+# Directive 015's permission matrix for `reservations`: RW = Owner, Manager,
+# Supervisor, Waiter; nothing for Controller/Stockkeeper/Kitchen — there's no
+# read-only tier for this route, it's RW or hidden entirely. Owner passes
+# through every require_staff_role() call automatically (Role.ADMIN bypass),
+# so it isn't listed explicitly below.
+_CAN_WRITE = (models.StaffRole.MANAGER, models.StaffRole.SUPERVISOR, models.StaffRole.WAITER)
+
 
 @router.get("/", response_model=List[schemas.ReservationOut])
 async def get_reservations(
     date_filter: Optional[date] = Query(None, alias="date"),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     q = db.query(models.Reservation).filter(
@@ -39,7 +46,7 @@ async def get_reservations(
 async def create_reservation(
     reservation: schemas.ReservationCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
 
@@ -111,6 +118,20 @@ async def create_reservation(
             detail="Table is already booked for an overlapping time slot",
         )
     db.refresh(db_res)
+
+    # 2026-07-18 event-map pass: front-of-house shouldn't have to keep
+    # re-opening the bookings list to notice a new one. Actor excluded (the
+    # staff member who took the booking already knows). Push-only, role-scoped.
+    from events.bus import emit_async, EventType
+    emit_async(EventType.RESERVATION_CREATED, {
+        "restaurant_id": restaurant.id,
+        "reservation_id": db_res.id,
+        "customer_name": db_res.customer_name or "",
+        "party_size": db_res.party_size or 0,
+        "reservation_date": str(db_res.reservation_date) if db_res.reservation_date else "",
+        "reservation_time": str(db_res.reservation_time) if db_res.reservation_time else "",
+        "actor_user_id": current_user.id,
+    })
     return _res_to_dict(db_res)
 
 
@@ -119,7 +140,7 @@ async def update_reservation_status(
     reservation_id: int,
     update: schemas.ReservationStatusUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     reservation = db.query(models.Reservation).filter(
@@ -135,6 +156,7 @@ async def update_reservation_status(
         raise HTTPException(status_code=400, detail=f"Invalid status: {update.status}")
 
     was_no_show = reservation.status == models.ReservationStatus.NO_SHOW
+    was_cancelled = reservation.status == models.ReservationStatus.CANCELLED
 
     # Re-confirming a reservation (e.g. undoing a NO_SHOW/CANCELLED) re-occupies
     # its table/slot, so it must pass the same overlap check create_reservation()
@@ -190,6 +212,21 @@ async def update_reservation_status(
             "party_size": reservation.party_size or 0,
         })
 
+    # A booking freed by cancellation (2026-07-18 event-map pass) — the table/
+    # slot is back, front-of-house should know without polling. Only on the
+    # real transition into CANCELLED; actor excluded.
+    if new_status == models.ReservationStatus.CANCELLED and not was_cancelled:
+        from events.bus import emit_async, EventType
+        emit_async(EventType.RESERVATION_CANCELLED, {
+            "restaurant_id": restaurant.id,
+            "reservation_id": reservation.id,
+            "customer_name": reservation.customer_name or "",
+            "party_size": reservation.party_size or 0,
+            "reservation_date": str(reservation.reservation_date) if reservation.reservation_date else "",
+            "reservation_time": str(reservation.reservation_time) if reservation.reservation_time else "",
+            "actor_user_id": current_user.id,
+        })
+
     return _res_to_dict(reservation)
 
 
@@ -197,7 +234,7 @@ async def update_reservation_status(
 async def delete_reservation(
     reservation_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     reservation = db.query(models.Reservation).filter(
@@ -207,8 +244,28 @@ async def delete_reservation(
     if not reservation:
         raise HTTPException(status_code=404, detail="Reservation not found")
 
+    # Capture before delete — the row is gone after commit but the booking is
+    # just as cancelled as one flipped to CANCELLED via the status endpoint, so
+    # it emits the same event. Skip it for an already-cancelled booking being
+    # hard-deleted (a cleanup, not a new cancellation).
+    was_cancelled = reservation.status == models.ReservationStatus.CANCELLED
+    cancelled_payload = {
+        "restaurant_id": restaurant.id,
+        "reservation_id": reservation.id,
+        "customer_name": reservation.customer_name or "",
+        "party_size": reservation.party_size or 0,
+        "reservation_date": str(reservation.reservation_date) if reservation.reservation_date else "",
+        "reservation_time": str(reservation.reservation_time) if reservation.reservation_time else "",
+        "actor_user_id": current_user.id,
+    }
+
     db.delete(reservation)
     db.commit()
+
+    if not was_cancelled:
+        from events.bus import emit_async, EventType
+        emit_async(EventType.RESERVATION_CANCELLED, cancelled_payload)
+
     return {"message": "Reservation deleted"}
 
 

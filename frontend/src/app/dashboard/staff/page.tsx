@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { tierHome } from "@/lib/permissions";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Plus, X, Check, ShieldAlert } from "lucide-react";
+import { Users, Plus, X, Check, ShieldAlert, Eye } from "lucide-react";
 
 const STAFF_ROLES = [
     { value: "manager", label: "Manager" },
@@ -15,11 +18,19 @@ const STAFF_ROLES = [
 ];
 
 export default function StaffPage() {
+    const { user, startImpersonation } = useAuth();
+    const router = useRouter();
+    // /staff/{id}/impersonate is require_role(ADMIN) server-side — an Owner
+    // capability, not part of the 7-tier matrix. A Manager can also reach
+    // this page (directive 015: `staff` = RW for Manager too), so the button
+    // must not render for them — it would always 403 with a confusing error.
+    const canImpersonate = ["admin", "superadmin"].includes((user?.role || "").toLowerCase());
     const [staff, setStaff] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [forbidden, setForbidden] = useState(false);
     const [showAddForm, setShowAddForm] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [impersonatingId, setImpersonatingId] = useState<number | null>(null);
     const [toast, setToast] = useState("");
 
     const [name, setName] = useState("");
@@ -91,6 +102,17 @@ export default function StaffPage() {
             showToast(err?.response?.data?.detail || "Failed to update");
         }
         setSubmitting(false);
+    };
+
+    const handleViewAs = async (member: any) => {
+        setImpersonatingId(member.id);
+        try {
+            await startImpersonation(member.id);
+            router.push(tierHome(member.staff_role));
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Failed to start impersonation");
+            setImpersonatingId(null);
+        }
     };
 
     const handleAssignRole = async (memberId: number) => {
@@ -233,6 +255,16 @@ export default function StaffPage() {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1">
+                                        {canImpersonate && member.user_id && member.staff_role && member.is_active && (
+                                            <button
+                                                onClick={() => handleViewAs(member)}
+                                                disabled={impersonatingId === member.id}
+                                                title="Sign in as this staff member (real session, audit-logged, ends automatically)"
+                                                className="flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-[#1a1a1a] text-[#737373] hover:text-amber-400 transition-all disabled:opacity-50">
+                                                <Eye className="w-3 h-3" />
+                                                {impersonatingId === member.id ? "..." : "View as"}
+                                            </button>
+                                        )}
                                         {member.user_id && (
                                             <button
                                                 onClick={() => { setAssigningId(assigningId === member.id ? null : member.id); setAssignRole(member.staff_role || "waiter"); }}

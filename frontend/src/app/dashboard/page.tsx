@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
-import { demoData, isDashboardEmpty } from "@/lib/demo-data";
+import { demoData, isDashboardEmpty, isDemoMode } from "@/lib/demo-data";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -82,7 +82,34 @@ export default function DashboardPage() {
         );
     }
 
-    const isDemo = isDashboardEmpty(data);
+    // Demo (Lavy showcase) only when explicitly enabled. A real account with no
+    // data gets an honest empty state below — never another restaurant's numbers.
+    const isDemo = isDemoMode() && isDashboardEmpty(data);
+    if (!isDemo && isDashboardEmpty(data)) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-4 px-6">
+                <div className="w-14 h-14 rounded-2xl bg-[var(--accent)]/10 flex items-center justify-center">
+                    <TrendingUp className="w-7 h-7 text-[var(--accent)]" />
+                </div>
+                <div className="space-y-1.5 max-w-md">
+                    <h1 className="text-xl font-bold text-[#e5e5e5]">{getGreeting()} 👋</h1>
+                    <p className="text-sm text-[#737373]">
+                        Your dashboard is ready. Once you add menu items and start taking orders,
+                        your restaurant health score, revenue trends, alerts, and AI opportunities
+                        will show up here.
+                    </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <Link href="/dashboard/menu" className="flex items-center gap-1.5 px-3 py-2 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-lg text-xs text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-all">
+                        Add menu items <ArrowRight className="w-3 h-3" />
+                    </Link>
+                    <Link href="/dashboard/pos" className="flex items-center gap-1.5 px-3 py-2 bg-[#1a1a1a] border border-[#262626] rounded-lg text-xs text-[#e5e5e5] hover:bg-[#222] transition-all">
+                        Take an order <ArrowRight className="w-3 h-3" />
+                    </Link>
+                </div>
+            </div>
+        );
+    }
     const activeData = isDemo ? demoData.dashboard : data;
 
     const qs = activeData?.quick_stats || {};

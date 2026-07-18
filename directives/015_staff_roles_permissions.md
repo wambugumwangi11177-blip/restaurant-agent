@@ -21,10 +21,36 @@ verification). Notes specific to this directive:
   `reservations.py` were deliberately left on their pre-existing
   any-authenticated-user gate rather than tightened to the matrix exactly —
   real remaining work, tracked in 016's as-built notes, not silently done.
+- **2026-07-17 update**: the `orders.py`/`reservations.py` gap above is now
+  closed. Both routers gained `_CAN_WRITE`/`_CAN_READ` tuples matching this
+  matrix, mirroring `inventory.py`'s existing pattern. One nuance:
+  `orders.py`'s `PATCH /{id}/status` uses a broader `_CAN_UPDATE_STATUS`
+  tuple (`_CAN_WRITE` + `KITCHEN`) rather than the plain `orders` read/write
+  split — the `kitchen` page is RW for Kitchen-tier staff and that page
+  advances orders through exactly this endpoint, even though `orders` itself
+  is R-only for Kitchen. Don't "fix" this to match the matrix literally; it
+  would break the KDS for Kitchen-tier accounts.
+- **2026-07-17**: the dashboard nav's hand-maintained `access` arrays (see
+  below) turned out to have drifted — `"manager"` was missing from most of
+  them, so Manager-tier accounts couldn't see routes the backend already
+  permitted them to use. Rather than re-patch that array, every tier now has
+  its own dedicated frontend under `frontend/src/app/staff/<tier>/*`
+  (separate route tree + nav per tier, built from shared components in
+  `frontend/src/components/features/*`), driven by
+  `frontend/src/lib/permissions.ts` — a single matrix module replacing the
+  per-route arrays. `dashboard/layout.tsx` is now Owner-only; any staff
+  account is redirected to its own tier's frontend on load. Also added: real
+  Owner impersonation ("view as" a staff member's actual session — see
+  `backend/routers/staff.py`'s `/impersonate` endpoints and
+  `models.ImpersonationSession`) and a create/status-update UI for
+  reservations (previously read-only in the UI despite the backend
+  supporting it).
 - `frontend/dashboard/layout.tsx`'s nav is now driven by the `access` array
   per route (matching the table below) instead of the old `isStaff`/
   `adminOnly` boolean; a `staff_role IS NULL` account gets a dedicated
-  "role not assigned yet" screen instead of a broken nav.
+  "role not assigned yet" screen instead of a broken nav. **Superseded
+  2026-07-17** — see the note above; this file is now Owner-only and no
+  longer has per-route `access` arrays at all.
 
 ## Current state (verified in this codebase, corrected 2026-07-15)
 

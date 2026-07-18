@@ -66,6 +66,20 @@ def collect_problems() -> tuple[list[str], list[str]]:
     if prod and not os.getenv("CORS_ORIGINS"):
         soft.append("CORS_ORIGINS is not set — using built-in default origins in production")
 
+    # email_utils.py: unconfigured SMTP means password-reset/email-verify
+    # links are logged instead of emailed — fine in dev, but in production
+    # that puts a working account-takeover token in plaintext application
+    # logs instead of a user's inbox. Soft, not hard: the reset/verify flow
+    # still works end-to-end via the logged link (see email_utils.py), so a
+    # business that hasn't set up SMTP yet shouldn't be locked out of booting.
+    if prod and not (os.getenv("SMTP_HOST") and os.getenv("SMTP_USER") and os.getenv("SMTP_PASSWORD")):
+        soft.append(
+            "SMTP is not configured in production — password reset / email "
+            "verification links will be logged instead of emailed, exposing "
+            "them in application logs instead of the user's inbox. Set "
+            "SMTP_HOST/SMTP_USER/SMTP_PASSWORD/SMTP_FROM."
+        )
+
     # storage.py defaults to writing to the container's own disk. That's fine
     # until something is actually uploaded through it — but Railway's
     # filesystem is ephemeral, so any file saved there is lost on the next

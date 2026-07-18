@@ -126,6 +126,14 @@ function ConfirmSend({
     const [sending, setSending] = useState(false);
     const [error, setError] = useState("");
 
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") onClose();
+        };
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [onClose]);
+
     const send = async () => {
         setSending(true);
         setError("");
@@ -147,7 +155,7 @@ function ConfirmSend({
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
-            <div className="w-full max-w-md rounded-xl border border-[#262626] bg-[#0f0f0f] p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div role="dialog" aria-modal="true" aria-label="Send this campaign?" className="w-full max-w-md rounded-xl border border-[#262626] bg-[#0f0f0f] p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2">
                         <Send className="w-4 h-4 text-[var(--accent)]" />

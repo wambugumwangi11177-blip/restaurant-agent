@@ -138,6 +138,25 @@ async def adjust_stock(
     db.add(movement)
     db.commit()
     db.refresh(db_item)
+
+    # 2026-07-18 event-map pass: a manual *downward* adjustment is, by
+    # elimination (sales are auto-deducted, directive 017), either waste or
+    # loss — the shrinkage signal directive 016's stock-loss-prevention posture
+    # wants surfaced to custody oversight. Positive corrections don't fire.
+    if adjust.quantity < 0:
+        from events.bus import emit_async, EventType
+        emit_async(EventType.INVENTORY_ADJUSTMENT_FLAGGED, {
+            "restaurant_id": restaurant.id,
+            "inventory_item_id": db_item.id,
+            "item_name": db_item.item_name,
+            "quantity": abs(adjust.quantity),
+            "unit": db_item.unit or "",
+            "reason": adjust.reason or "Manual adjustment",
+            "value_cents": abs(int((db_item.cost_per_unit or 0) * abs(adjust.quantity))),
+            "performed_by": current_user.email,
+            "actor_user_id": current_user.id,
+        })
+
     return {"message": f"Adjusted {db_item.item_name}", "new_quantity": db_item.quantity}
 
 

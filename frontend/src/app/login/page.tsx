@@ -142,18 +142,26 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    <div className="mt-5 text-center">
+                    <div className="mt-5 text-center space-y-2">
                         <button
                             onClick={() => {
                                 setIsRegister(!isRegister);
                                 setError("");
                             }}
-                            className="text-sm text-[#737373] hover:text-[var(--accent)]"
+                            className="block w-full text-sm text-[#737373] hover:text-[var(--accent)]"
                         >
                             {isRegister
                                 ? "Already have an account? Sign in"
                                 : "New restaurant? Create account"}
                         </button>
+                        {!isRegister && (
+                            <a
+                                href="/forgot-password"
+                                className="block text-sm text-[#525252] hover:text-[var(--accent)]"
+                            >
+                                Forgot password?
+                            </a>
+                        )}
                     </div>
                 </div>
 

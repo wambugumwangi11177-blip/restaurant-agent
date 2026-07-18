@@ -13,11 +13,13 @@ FIXES:
     from the onboarding wizard.
 """
 
+import os
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from database import get_db
 import models, auth
+import email_utils
 from schemas import StrictModel
 from routers.deps import get_restaurant_or_none
 from rate_limit import limiter
@@ -32,6 +34,53 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 # (per-IP), lockout is the second (per-account, survives IP rotation).
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
+
+# Password reset / email verification (security pass 2026-07-17: neither
+# existed at all — see audit). Tokens are single-use and short-lived; see
+# models.AuthToken.
+PASSWORD_RESET_TOKEN_EXPIRE_MINUTES = int(os.getenv("PASSWORD_RESET_TOKEN_EXPIRE_MINUTES", "30"))
+EMAIL_VERIFY_TOKEN_EXPIRE_HOURS = int(os.getenv("EMAIL_VERIFY_TOKEN_EXPIRE_HOURS", "48"))
+# Base URL of the deployed frontend, used to build the links emailed to users.
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").rstrip("/")
+
+
+def _issue_auth_token(
+    db: Session, user: "models.User", purpose: "models.AuthTokenPurpose", expires_delta: timedelta
+) -> str:
+    """Mint a single-use token, persist only its hash, return the raw value
+    (which the caller emails — it is never stored or logged in full)."""
+    raw = auth.generate_auth_token()
+    db.add(models.AuthToken(
+        user_id=user.id,
+        token_hash=auth.hash_auth_token(raw),
+        purpose=purpose,
+        expires_at=utcnow() + expires_delta,
+    ))
+    db.commit()
+    return raw
+
+
+def _consume_auth_token(
+    db: Session, raw_token: str, purpose: "models.AuthTokenPurpose"
+) -> "models.User":
+    """Validate a reset/verify token (right purpose, unused, unexpired) and
+    mark it used. Raises 400 with a deliberately generic message on any
+    failure — an attacker probing tokens shouldn't learn whether a token
+    exists, was already used, or expired."""
+    invalid = HTTPException(status_code=400, detail="This link is invalid or has expired.")
+    token_hash = auth.hash_auth_token(raw_token)
+    record = db.query(models.AuthToken).filter(
+        models.AuthToken.token_hash == token_hash,
+        models.AuthToken.purpose == purpose,
+    ).first()
+    if not record or record.used_at is not None or record.expires_at < utcnow():
+        raise invalid
+    user = db.query(models.User).filter(models.User.id == record.user_id).first()
+    if not user:
+        raise invalid
+    record.used_at = utcnow()
+    db.commit()
+    return user
 
 
 # ── Request / Response schemas ────────────────────────────────────────────────
@@ -63,6 +112,19 @@ class RestaurantUpdate(StrictModel):
     currency: str | None = None
     timezone: str | None = None
     owner_phone: str | None = None   # E.164, e.g. +2547...; used for WhatsApp owner routing
+
+
+class PasswordResetRequest(StrictModel):
+    email: str
+
+
+class PasswordResetConfirm(StrictModel):
+    token: str
+    new_password: str
+
+
+class EmailVerifyConfirm(StrictModel):
+    token: str
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -121,6 +183,20 @@ async def register(request: Request, user_data: UserCreate, db: Session = Depend
         ))
     db.commit()
 
+    # 5. Email verification link — best-effort; a mail-server hiccup must
+    #    never fail the signup itself (see email_utils.send_email).
+    verify_token = _issue_auth_token(
+        db, new_user, models.AuthTokenPurpose.EMAIL_VERIFY,
+        timedelta(hours=EMAIL_VERIFY_TOKEN_EXPIRE_HOURS),
+    )
+    email_utils.send_email(
+        new_user.email,
+        "Verify your email",
+        f"Welcome to Chakula! Verify your email address here:\n"
+        f"{FRONTEND_BASE_URL}/verify-email?token={verify_token}\n\n"
+        f"This link expires in {EMAIL_VERIFY_TOKEN_EXPIRE_HOURS} hours.",
+    )
+
     access_token = auth.create_access_token(
         data={"sub": new_user.email, "ver": new_user.token_version or 0}
     )
@@ -144,9 +220,24 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
     if not user or not auth.verify_password(login_data.password, user.hashed_password):
         if user:
             user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
-            if user.failed_login_attempts >= MAX_FAILED_ATTEMPTS:
+            just_locked = user.failed_login_attempts >= MAX_FAILED_ATTEMPTS
+            if just_locked:
                 user.locked_until = utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
             db.commit()
+            # Fires exactly once, at the moment of transition into lockout —
+            # the early-return above (line ~213) short-circuits every
+            # subsequent attempt while already locked, so this can't re-fire
+            # per retry. A possible brute-force attempt is a risk signal the
+            # Owner should see in real time, not just in the audit trail.
+            if just_locked:
+                restaurant = get_restaurant_or_none(db, user)
+                if restaurant:
+                    from events.bus import emit_async, EventType
+                    emit_async(EventType.ACCOUNT_LOCKED, {
+                        "restaurant_id": restaurant.id,
+                        "email": user.email,
+                        "lockout_minutes": LOCKOUT_MINUTES,
+                    })
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -194,8 +285,20 @@ async def read_users_me(
         # "unassigned" state) is reflected on the user's very next request
         # instead of only after their token expires/refreshes.
         "staff_role": current_user.staff_role,
+        "is_email_verified": current_user.is_email_verified,
         "restaurant_name": restaurant.name if restaurant else None,
         "restaurant_id": restaurant.id if restaurant else None,
+        # Real Owner impersonation (see routers/staff.py /impersonate):
+        # non-null only when this request is running as the target of an
+        # active session. Lets the frontend show the "Viewing as..." banner
+        # without ever decoding the JWT itself.
+        "impersonation": (
+            {
+                "session_id": current_user.impersonated_by["session_id"],
+                "impersonator_email": current_user.impersonated_by["impersonator_email"],
+            }
+            if getattr(current_user, "impersonated_by", None) else None
+        ),
     }
 
 
@@ -218,6 +321,91 @@ async def logout_all(
     user.token_version = (user.token_version or 0) + 1
     db.commit()
     return {"status": "all_sessions_revoked", "token_version": user.token_version}
+
+
+@router.post("/password-reset/request")
+@limiter.limit("3/hour")
+async def request_password_reset(
+    request: Request, body: PasswordResetRequest, db: Session = Depends(get_db)
+):
+    """
+    Always returns the same generic response whether or not the email is
+    registered — an attacker probing this endpoint must not be able to tell
+    a real account from a non-existent one (account-enumeration prevention).
+    """
+    user = db.query(models.User).filter(models.User.email == body.email).first()
+    if user and user.is_active:
+        raw = _issue_auth_token(
+            db, user, models.AuthTokenPurpose.PASSWORD_RESET,
+            timedelta(minutes=PASSWORD_RESET_TOKEN_EXPIRE_MINUTES),
+        )
+        email_utils.send_email(
+            user.email,
+            "Reset your password",
+            f"Reset your password here:\n{FRONTEND_BASE_URL}/reset-password?token={raw}\n\n"
+            f"This link expires in {PASSWORD_RESET_TOKEN_EXPIRE_MINUTES} minutes and can "
+            f"only be used once. If you didn't request this, you can ignore this email.",
+        )
+    return {"status": "if_account_exists_a_reset_email_was_sent"}
+
+
+@router.post("/password-reset/confirm")
+@limiter.limit("10/hour")
+async def confirm_password_reset(
+    request: Request, body: PasswordResetConfirm, db: Session = Depends(get_db)
+):
+    auth.require_strong_password(body.new_password)
+    user = _consume_auth_token(db, body.token, models.AuthTokenPurpose.PASSWORD_RESET)
+
+    user.hashed_password = auth.get_password_hash(body.new_password)
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    # A password reset must invalidate every outstanding session — otherwise
+    # a session opened with the OLD (possibly compromised) password survives
+    # the very reset meant to kill it off.
+    user.token_version = (user.token_version or 0) + 1
+    db.commit()
+
+    email_utils.send_email(
+        user.email,
+        "Your password was changed",
+        "Your password was just changed. If this wasn't you, contact support immediately.",
+    )
+    return {"status": "password_reset"}
+
+
+@router.post("/verify-email")
+@limiter.limit("10/hour")
+async def verify_email(
+    request: Request, body: EmailVerifyConfirm, db: Session = Depends(get_db)
+):
+    user = _consume_auth_token(db, body.token, models.AuthTokenPurpose.EMAIL_VERIFY)
+    user.is_email_verified = True
+    db.commit()
+    return {"status": "email_verified"}
+
+
+@router.post("/resend-verification")
+@limiter.limit("3/hour")
+async def resend_verification(
+    request: Request,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    if user.is_email_verified:
+        raise HTTPException(status_code=400, detail="Email is already verified.")
+    raw = _issue_auth_token(
+        db, user, models.AuthTokenPurpose.EMAIL_VERIFY,
+        timedelta(hours=EMAIL_VERIFY_TOKEN_EXPIRE_HOURS),
+    )
+    email_utils.send_email(
+        user.email,
+        "Verify your email",
+        f"Verify your email address here:\n{FRONTEND_BASE_URL}/verify-email?token={raw}\n\n"
+        f"This link expires in {EMAIL_VERIFY_TOKEN_EXPIRE_HOURS} hours.",
+    )
+    return {"status": "verification_email_sent"}
 
 
 @router.post("/mfa/setup")

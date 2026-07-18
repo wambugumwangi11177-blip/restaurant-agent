@@ -201,6 +201,29 @@ made during implementation (each is a real decision, not a rubber-stamp):
   works today for anyone who already knows a transfer id exists. Closing this
   loop needs a real "who's on duty right now" signal this codebase doesn't
   have yet — flagged as follow-up, not silently dropped.
+- **2026-07-17 update**: the *Twilio* nudge above is still open (needs
+  "who's on duty"), but the **in-app** half of this same gap didn't actually
+  need that signal and was closed: `ai/notify.py`'s `notify_users` already
+  fans out by `staff_role`, not by a specific person, which is exactly what
+  role-based events need. `request_transfer`/`fulfill_transfer`
+  (`ai/stock_custody.py`) now emit `STOCK_TRANSFER_REQUESTED` /
+  `STOCK_TRANSFER_FULFILLED` (new in `events/bus.py`), handled in
+  `ai/orchestrator/push_notifier.py` — see that directive's notes in
+  017/018 below for the full chain this unblocked (Kitchen had no page to
+  request from at all until the same pass added one).
+- **A separate, pre-existing bug found and fixed in the same pass**:
+  every `push_notifier.py` deep link was still hardcoded to
+  `/dashboard/<route>`. Since directive 015's 2026-07-17 nav rework made
+  `/dashboard/*` Owner-only (any `staff_role` account gets redirected off it
+  on load), every notification sent to a non-Owner tier — stock critical,
+  stock depleted, transfer discrepancy, variance flagged, count discrepancy,
+  purchase order late, reservation no-show — deep-linked to a page that
+  immediately bounced the recipient back to their own tier home. Fixed by
+  resolving the link per-recipient's `staff_role` against a `_TIER_URLS` map
+  (mirrors `frontend/src/lib/permissions.ts` + each tier's `layout.tsx` nav)
+  instead of one link for everyone. Keep `_TIER_URLS` in sync with the
+  frontend route tree the same way `permissions.ts`'s own docstring already
+  warns about for its matrix.
 - **Backend RBAC matrix applied to inventory, menu, ai.py, and analytics.py's
   6 GET routes** — orders.py and reservations.py were deliberately left on
   their pre-existing "any authenticated user" gate rather than tightened to
@@ -222,3 +245,142 @@ made during implementation (each is a real decision, not a rubber-stamp):
   same audience. Both panels are best-effort (`null` response = hidden
   panel, not an error state) so a role without `/stock/*` access sees a
   normal inventory page instead of a broken one.
+
+## 2026-07-17 incident: this branch and production share one database
+
+While setting up test logins for the notification work above, discovered
+`backend/.env`'s `DATABASE_URL` is the **same Neon database the live
+Railway/master backend uses** — there is no separate branch/dev DB. Running
+this branch's pending migrations (034-036) against it broke live production:
+migration 035 (`convert_inventory_cost_to_cents`) renamed
+`inventory_items.cost_per_unit` to `cost_per_unit_cents`, but `master`'s
+deployed `models.py` still reads `cost_per_unit` as a raw column — confirmed
+`GET /inventory/` 500ing on the live Railway API within minutes of the
+migration. Rolled back to `034_add_auth_tokens_and_email_verified`
+immediately (`alembic downgrade`) and re-verified the live endpoint returned
+200 again. **This is exactly the anti-pattern [[restaurant-agent-deploy-facts]]
+already warned about** ("never let a preview/branch/local env share the prod
+DATABASE_URL") — it just hadn't bitten a feature branch's *local dev* usage
+before, only preview deploys.
+
+**Resolution for local dev/testing going forward**: `execution/seed_local_dev_db.py`
+builds a throwaway SQLite file (`backend/dev_local.db`) via
+`database.init_db()` (schema from current `models.py` directly, no migration
+ambiguity) and seeds one login per staff tier. Run it, then start the backend
+with `DATABASE_URL=sqlite:///dev_local.db` — `backend/.env`'s real
+`DATABASE_URL` is never touched. **Do not run `alembic upgrade`/`downgrade`
+against the real `DATABASE_URL` again without explicit, named user
+confirmation** — this incident is why.
+
+**Still true and unresolved**: this branch's `models.py` (the
+`cost_per_unit_cents` property) has not been merged to `master`/deployed, so
+the *real* database is intentionally left stamped at `034`, one migration
+behind this branch's code. Whoever merges this branch to `master` must run
+migrations 035/036 as part of that deploy, not before it.
+
+## 2026-07-17: notification-coverage audit ("automate everything")
+
+Audited every `EventType` against `events/bus.py`'s registry, every actual
+`emit`/`emit_async` call site, and `push_notifier.py`'s subscriber list, to
+find events that fire but notify nobody, and real actions with no event at
+all. Verified each gap by reading the code, not guessing — several
+plausible-looking gaps turned out to be intentional and were left alone:
+
+- `RESERVATION_CREATED`/`RESERVATION_CANCELLED` are never emitted — correctly:
+  `routers/reservations.py` has no public/unauthenticated creation endpoint,
+  so every reservation is staff-created. Notifying staff about their own
+  action would be noise, not signal.
+- `ORDER_CREATED`/`ORDER_COMPLETED`/`ORDER_CANCELLED` are never emitted —
+  left alone: Kitchen already watches a real-time KDS board for new orders;
+  a push notification on top would duplicate a screen already being looked
+  at, the exact alert-fatigue pattern this workstream has avoided elsewhere.
+- `RECOMMENDATION_GENERATED` is never emitted — correct: pricing
+  recommendations are generated on-demand when a human opens `GET
+  /ai/pricing` (`sync_pending_recommendations`), not by a background job, so
+  there's no "silent recommendation nobody knows about" moment to notify.
+- `STOCK_LOW` is dead code, superseded by the two-tier `STOCK_CRITICAL`/
+  `STOCK_DEPLETED` design (documented in `ai/whatsapp/brain.py`'s
+  `run_stock_check` docstring from the 2026-07-07/08 audit) — not a gap.
+
+Real gaps closed (all additive, no new DB columns/migrations):
+
+- **`ORDER_PAID` via the M-Pesa webhook only** — new push handler
+  (`_on_order_paid`), gated on `mpesa_reference` being present in the
+  payload so the POS "mark as paid" emit (`routers/orders.py`, a staff
+  member's own synchronous action) is correctly excluded. Closes a real gap:
+  M-Pesa settles asynchronously (customer approves on their own phone,
+  sometimes minutes later) and Waiter/Supervisor had no signal it landed —
+  confirmed by reading `POSWorkspace.tsx`, which has no payment-status
+  polling at all.
+- **`PURCHASE_ORDER_DELIVERED`** (short delivery) — had a WhatsApp handler
+  (Owner-only) but no push handler, so Manager/Controller/Stockkeeper never
+  learned of a shortfall through any channel.
+- **`RECOMMENDATION_APPROVED`** — `approve_pricing_rec()` updates the live
+  menu price immediately; the existing WhatsApp handler only records
+  memory/audit bookkeeping, notifies nobody. Added a push handler targeting
+  the POS-facing tiers (Waiter/Supervisor/Manager/Owner) so nobody quotes a
+  stale price.
+- **New `ACCOUNT_LOCKED`** (`events/bus.py`) — emitted once, exactly at the
+  failed-login-attempt threshold transition (`routers/auth.py`'s login
+  endpoint), Owner-only. A brute-force signal that previously existed only
+  as silent `locked_until` state in the DB.
+- **New `STAFF_ROLE_CHANGED`** — emitted from `routers/staff.py`'s
+  `assign_role`, Owner-only, excludes the actor (`exclude_user_id` param
+  added to `push_notifier._fan_out`) so the Manager who made the change
+  doesn't get told about their own action. Real-time companion to the
+  `AgentAuditLog` entry that already existed — audit trail answers "what
+  happened," this answers "did anyone notice right now."
+- **Two matrix-vs-reality frontend gaps found in the same pass** (same class
+  as the Supervisor-purchasing gap found 2026-07-17 earlier the same day):
+  `permissions.ts` granted Supervisor `menu: "r"` but no
+  `/staff/supervisor/menu` page existed. Added it (reuses `MenuReadView`,
+  same as Kitchen/Waiter) + nav entry.
+- Added `orders`, `menu`, `staff` domains to `push_notifier.py`'s
+  `_TIER_URLS` map (previously only `inventory`/`purchasing`/
+  `reservations`/`ai-ops` existed) to support the deep links above.
+
+**Deliberately not added** (considered, rejected with a reason, not silently
+skipped): `MFA disable` notification — self-only action requiring proof of
+the current TOTP code first, so it's neither a stolen-session vector nor
+something the account owner doesn't already know about. Adding it would be
+notification volume without a real signal, the opposite of this
+workstream's own stated philosophy.
+
+## 2026-07-17: second pass, same audit continued
+
+Three more gaps closed, same verify-before-building discipline as above:
+
+- **New `STAFF_DEACTIVATED`** — `routers/staff.py`'s `update_staff` already
+  revoked a deactivated login's session (directive 016's original build) and
+  wrote an audit-log entry, but nobody was told it happened in real time.
+  Owner-only, excludes the actor (reuses `_fan_out`'s `exclude_user_id`).
+  Directive 016's own risk table names "ex-staff retaining access" as the
+  exact risk this closes the loop on — the person revoking access now gets
+  it confirmed back, not just logged.
+- **`STAFF_ROLE_CHANGED` reused (not a new event) for brand-new logins** —
+  `create_staff`'s `create_login` path grants a role to a new account
+  through the same `_require_grant_allowed` boundary as `assign_role`; from
+  a "who has access" standpoint a new grant is the same signal as a changed
+  one. Emits with `before_role=None`, which the handler already renders as
+  "unassigned -> <role>" — reused the existing event/handler rather than
+  adding a near-duplicate.
+- **New `MENU_ITEM_UNAVAILABLE`** — `routers/menu.py`'s `update_menu_item`
+  captures `is_available` before applying the update and fires only on the
+  True->False transition (an item going back available is lower urgency and
+  deliberately not notified — one-directional by design, see the event's
+  docstring in `events/bus.py`). Targets every POS-facing tier
+  (Waiter/Supervisor/Manager/Owner): a manager 86ing an item mid-shift
+  previously had no way to tell whoever's on the floor to stop selling it
+  except walking over and saying so.
+
+**Verified working end-to-end against the isolated local dev stack** (not
+just unit tests): triggered a real account lockout and a real role
+reassignment through the running API and confirmed the right notification
+landed in the right account's feed with the actor correctly excluded.
+
+**Considered and explicitly left out of this pass**: notifying on
+`StaffMember` reactivation (asymmetric with deactivation — reactivating is a
+deliberate, already-visible action to whoever does it, lower urgency than
+"did the revocation I just did actually happen"); a "menu item back in
+stock" notification (same reasoning). Both are cheap to add later if this
+judgment call turns out wrong in practice — flagged, not silently dropped.

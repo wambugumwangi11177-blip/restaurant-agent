@@ -218,6 +218,20 @@ def approve_and_send(db: Session, po_id: int, restaurant_id: int, approved_by_em
         approved_by=approved_by_email,
     )
 
+    # 2026-07-18 event-map pass: the receiving side (Stockkeeper/Controller)
+    # now learns a delivery is inbound to expect and reconcile against, rather
+    # than only when the truck shows up. Push-only, role-scoped.
+    from events.bus import emit_async, EventType
+    emit_async(EventType.PURCHASE_ORDER_APPROVED, {
+        "restaurant_id": restaurant_id,
+        "po_id": po.id,
+        "item_name": item.item_name if item else "Unknown item",
+        "quantity": po.quantity_ordered,
+        "unit": po.unit,
+        "supplier_name": supplier.name if supplier else "",
+        "approved_by": approved_by_email,
+    })
+
     return po
 
 

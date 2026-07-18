@@ -12,6 +12,11 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import api from "@/lib/api";
 
+interface Impersonation {
+  session_id: number;
+  impersonator_email: string;
+}
+
 interface User {
   id: number;
   email: string;
@@ -21,6 +26,15 @@ interface User {
   // /auth/me on every load rather than cached in a JWT claim, so a role
   // change or the "unassigned" state shows up on the very next page load.
   staff_role: string | null;
+  // Real Owner impersonation (not a UI preview): non-null only when the
+  // CURRENT request is running as the target of an active session — see
+  // backend/routers/staff.py's /impersonate. Read fresh from /auth/me, same
+  // reasoning as staff_role above.
+  impersonation: Impersonation | null;
+  // Informational only — never gates login or access (see backend
+  // models.User.is_email_verified docstring). Drives the dashboard's
+  // dismissible "verify your email" banner.
+  is_email_verified: boolean;
 }
 
 interface AuthContextType {
@@ -30,7 +44,15 @@ interface AuthContextType {
   register: (email: string, password: string, tenantName: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
+  startImpersonation: (staffId: number) => Promise<string>;
+  endImpersonation: () => Promise<void>;
 }
+
+// A second, independent localStorage slot for the Owner's own token while
+// impersonating. Needed (not just an in-memory variable) so a page refresh
+// mid-impersonation doesn't strand the Owner in the target's session with no
+// way back — see ImpersonationBanner / dashboard/staff's "View as" button.
+const OWNER_TOKEN_KEY = "owner_access_token";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -87,12 +109,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem("access_token");
+    localStorage.removeItem(OWNER_TOKEN_KEY);
     setToken(null);
     setUser(null);
   };
 
+  // Owner-only (enforced server-side by require_role(ADMIN) on the
+  // /impersonate endpoint) — starts a real, bounded-lifetime session as the
+  // target staff member. Stashes the Owner's own token first so it can be
+  // restored by endImpersonation() even across a refresh.
+  const startImpersonation = async (staffId: number): Promise<string> => {
+    const currentToken = localStorage.getItem("access_token");
+    if (currentToken) localStorage.setItem(OWNER_TOKEN_KEY, currentToken);
+
+    const res = await api.post(`/staff/${staffId}/impersonate`);
+    const impToken = res.data.access_token;
+    localStorage.setItem("access_token", impToken);
+    setToken(impToken);
+    await fetchUser(impToken);
+    return impToken;
+  };
+
+  // Ends the live session server-side (audit-logged) and restores the
+  // Owner's own token client-side. Safe to call even if the end-of-session
+  // request fails — the Owner's own token is restored regardless, since a
+  // network hiccup shouldn't be able to strand them in the target's account.
+  const endImpersonation = async (): Promise<void> => {
+    try {
+      await api.post("/staff/end-impersonation");
+    } catch {
+      // Session may have already expired server-side — restoring the
+      // Owner's own token below is what actually matters here.
+    }
+    const ownerToken = localStorage.getItem(OWNER_TOKEN_KEY);
+    localStorage.removeItem(OWNER_TOKEN_KEY);
+    if (ownerToken) {
+      localStorage.setItem("access_token", ownerToken);
+      setToken(ownerToken);
+      await fetchUser(ownerToken);
+    } else {
+      logout();
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, isLoading }}>
+    <AuthContext.Provider
+      value={{ user, token, login, register, logout, isLoading, startImpersonation, endImpersonation }}
+    >
       {children}
     </AuthContext.Provider>
   );

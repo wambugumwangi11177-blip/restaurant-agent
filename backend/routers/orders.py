@@ -16,12 +16,27 @@ logger = logging.getLogger("orders.router")
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
+# Directive 015's permission matrix for `orders`: RW = Owner, Manager,
+# Supervisor, Waiter; R = Controller, Kitchen; nothing for Stockkeeper. Owner
+# passes through every require_staff_role() call automatically (Role.ADMIN
+# bypass), so it isn't listed explicitly below.
+#
+# Status updates get their own, broader tuple: the `kitchen` page/route is RW
+# for Kitchen-tier staff (they advance orders through the KDS via exactly this
+# endpoint), even though `orders` itself is read-only for that tier — the
+# matrix distinguishes the two *pages*, but they share this one backend
+# endpoint, so the endpoint must permit whichever tier needs to write to it.
+_CAN_WRITE = (models.StaffRole.MANAGER, models.StaffRole.SUPERVISOR, models.StaffRole.WAITER)
+_CAN_UPDATE_STATUS = _CAN_WRITE + (models.StaffRole.KITCHEN,)
+_CAN_READ = (models.StaffRole.MANAGER, models.StaffRole.SUPERVISOR, models.StaffRole.WAITER,
+             models.StaffRole.CONTROLLER, models.StaffRole.KITCHEN)
+
 
 @router.post("/", response_model=schemas.OrderOut)
 async def create_order(
     order: schemas.OrderCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
 
@@ -95,7 +110,7 @@ async def create_order(
 async def list_orders(
     status_filter: Optional[str] = Query(None, alias="status"),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_READ)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     q = db.query(models.Order).options(
@@ -115,7 +130,7 @@ async def list_orders(
 @router.get("/active", response_model=List[schemas.OrderOut])
 async def active_orders(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_READ)),
 ):
     """Orders for the KDS — pending, cooking, or ready."""
     restaurant = get_or_create_restaurant(db, current_user)
@@ -134,7 +149,7 @@ async def update_order_status(
     order_id: int,
     update: schemas.OrderStatusUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_UPDATE_STATUS)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     order = db.query(models.Order).filter(
@@ -155,6 +170,29 @@ async def update_order_status(
         order.completed_at = utcnow()
 
     db.commit()
+
+    # 2026-07-18 event-map pass. Both fire once, only on the real transition
+    # into the target status (guarded on old_status), and exclude the actor
+    # (whoever advanced the ticket already knows). Push-only, role-scoped —
+    # see the ORDER_READY / ORDER_CANCELLED docstrings in events/bus.py.
+    if new_status == models.OrderStatus.READY and old_status != models.OrderStatus.READY:
+        from events.bus import emit_async, EventType
+        emit_async(EventType.ORDER_READY, {
+            "restaurant_id": restaurant.id,
+            "order_id": order.id,
+            "table_number": order.table_number,
+            "customer_name": order.customer_name or "",
+            "actor_user_id": current_user.id,
+        })
+    elif new_status == models.OrderStatus.CANCELLED and old_status != models.OrderStatus.CANCELLED:
+        from events.bus import emit_async, EventType
+        emit_async(EventType.ORDER_CANCELLED, {
+            "restaurant_id": restaurant.id,
+            "order_id": order.id,
+            "table_number": order.table_number,
+            "customer_name": order.customer_name or "",
+            "actor_user_id": current_user.id,
+        })
 
     # Directive 017's reversal rule: cancelling before the food was ever
     # served credits the deducted ingredients back — cancelling AFTER served
@@ -182,7 +220,7 @@ async def update_order_payment(
     order_id: int,
     update: schemas.OrderPaymentUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     order = db.query(models.Order).filter(
@@ -313,6 +351,19 @@ async def create_public_order(
 
     if payment_method == models.PaymentMethod.MPESA:
         _trigger_mpesa_stk_push(db, db_order)
+
+    # 2026-07-18 event-map pass: unlike a staff-rung dine-in order (the waiter
+    # is right there, the KDS shows it), an online order arrives with *no staff
+    # involved* — during a lull nobody may be watching the KDS. Scoped to this
+    # public path only, so it's a real gap-closer, not per-order noise.
+    from events.bus import emit_async, EventType
+    emit_async(EventType.ORDER_CREATED, {
+        "restaurant_id": restaurant.id,
+        "order_id": db_order.id,
+        "customer_name": db_order.customer_name or "",
+        "total_cents": db_order.total or 0,
+        "channel": "online",
+    })
 
     return _order_to_dict(db_order)
 

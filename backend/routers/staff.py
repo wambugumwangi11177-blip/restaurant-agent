@@ -13,6 +13,7 @@ self-escalate peers indefinitely. Documented here so it isn't re-litigated
 per call site.
 """
 
+from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -25,6 +26,7 @@ import auth
 from routers.deps import get_or_create_restaurant
 from ai.evaluation.tracker import write_audit_log
 from phone_utils import normalize_phone
+from time_utils import utcnow
 
 router = APIRouter(prefix="/staff", tags=["staff"])
 
@@ -152,6 +154,20 @@ async def create_staff(
     db.refresh(member)
 
     if linked_user:
+        # Real-time visibility alongside the audit-log write below — reuses
+        # STAFF_ROLE_CHANGED rather than a new event type: a brand-new login
+        # is, from a "who has access" standpoint, the same signal as a role
+        # change (before_role=None makes the notification read as "granted",
+        # not "changed"). Excludes the actor.
+        from events.bus import emit_async, EventType
+        emit_async(EventType.STAFF_ROLE_CHANGED, {
+            "restaurant_id": restaurant.id,
+            "staff_name": member.name,
+            "before_role": None,
+            "after_role": target_role.value,
+            "changed_by": current_user.email,
+            "changed_by_user_id": current_user.id,
+        })
         write_audit_log(
             db, restaurant.id, "staff_role_assigned", "staff_router",
             entity_type="user", entity_id=linked_user.id,
@@ -202,10 +218,38 @@ async def update_staff(
                 reasoning=f"Staff member '{member.name}' deactivated — login revoked immediately.",
                 approved_by=current_user.email,
             )
+            # Real-time companion to the audit log, same reasoning as
+            # STAFF_ROLE_CHANGED — directive 016's own risk table names this
+            # exact scenario ("ex-staff retaining access") as a risk to catch,
+            # so the person revoking access should have that action confirmed
+            # back to an owner, not just written to a log nobody's watching.
+            from events.bus import emit_async, EventType
+            emit_async(EventType.STAFF_DEACTIVATED, {
+                "restaurant_id": restaurant.id,
+                "staff_name": member.name,
+                "deactivated_by": current_user.email,
+                "deactivated_by_user_id": current_user.id,
+            })
     elif not was_active and member.is_active and member.user_id:
         linked_user = db.query(models.User).filter(models.User.id == member.user_id).first()
         if linked_user:
             linked_user.is_active = True
+            write_audit_log(
+                db, restaurant.id, "staff_reactivated", "staff_router",
+                entity_type="user", entity_id=linked_user.id,
+                reasoning=f"Staff member '{member.name}' reactivated — login restored.",
+                approved_by=current_user.email,
+            )
+            # Symmetric companion to STAFF_DEACTIVATED — restoring access is a
+            # "who has access" change worth surfacing to an owner in real time,
+            # not just on a later audit review. Excludes the actor.
+            from events.bus import emit_async, EventType
+            emit_async(EventType.STAFF_REACTIVATED, {
+                "restaurant_id": restaurant.id,
+                "staff_name": member.name,
+                "reactivated_by": current_user.email,
+                "reactivated_by_user_id": current_user.id,
+            })
 
     try:
         db.commit()
@@ -267,5 +311,173 @@ async def assign_role(
         approved_by=current_user.email,
     )
 
+    # Real-time risk signal alongside the audit trail above — a privilege
+    # change is worth surfacing immediately, not just on a later audit-log
+    # review. Excludes the actor (current_user): a Manager who just made the
+    # change doesn't need to be told about their own action; an Owner making
+    # the change already sees it happen. push_notifier's handler filters
+    # ACCOUNT_LOCKED-style role targets minus this one user.
+    from events.bus import emit_async, EventType
+    emit_async(EventType.STAFF_ROLE_CHANGED, {
+        "restaurant_id": restaurant.id,
+        "staff_name": member.name,
+        "before_role": before_role,
+        "after_role": target_role.value,
+        "changed_by": current_user.email,
+        "changed_by_user_id": current_user.id,
+    })
+
     db.refresh(member)
     return _staff_out(member, db)
+
+
+# ── Owner "view as" — real impersonation, not a UI-only preview ─────────────
+# An Owner-tier capability (require_role(ADMIN), not the 7-tier matrix), kept
+# in this file since it operates on the same roster. See auth.get_current_user
+# for how imp_session_id resolves back to the target on every request.
+
+@router.post("/{staff_id}/impersonate", response_model=schemas.ImpersonateResponse)
+async def impersonate_staff(
+    staff_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+    member = db.query(models.StaffMember).filter(
+        models.StaffMember.id == staff_id,
+        models.StaffMember.restaurant_id == restaurant.id,
+    ).first()
+    # 404, not 403: a staff member belonging to another tenant must be
+    # indistinguishable from one that doesn't exist (same id-enumeration
+    # reasoning as reservations.py's table lookup).
+    if not member:
+        raise HTTPException(status_code=404, detail="Staff member not found")
+    if not member.user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="This staff member has no login — nothing to impersonate.",
+        )
+
+    target = db.query(models.User).filter(models.User.id == member.user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Linked user account not found")
+    if target.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=404, detail="Staff member not found")
+    if target.role in (models.Role.ADMIN, models.Role.SUPERADMIN):
+        raise HTTPException(status_code=403, detail="Cannot impersonate an Owner or Admin account.")
+    if target.is_active is False:
+        raise HTTPException(status_code=400, detail="This staff member's login is deactivated.")
+
+    expires_at = utcnow() + timedelta(minutes=auth.IMPERSONATION_TOKEN_EXPIRE_MINUTES)
+    session = models.ImpersonationSession(
+        tenant_id=current_user.tenant_id,
+        restaurant_id=restaurant.id,
+        impersonator_user_id=current_user.id,
+        target_user_id=target.id,
+        expires_at=expires_at,
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    write_audit_log(
+        db, restaurant.id, "impersonation_started", "staff_router",
+        entity_type="user", entity_id=target.id,
+        after={
+            "impersonator_id": current_user.id,
+            "impersonator_email": current_user.email,
+            "session_id": session.id,
+            "target_staff_role": target.staff_role.value if target.staff_role else None,
+        },
+        reasoning=f"{current_user.email} started impersonating {target.email}.",
+        approved_by=current_user.email,
+    )
+
+    token = auth.create_access_token(
+        data={
+            "sub": target.email,
+            "ver": target.token_version or 0,
+            "imp_session_id": session.id,
+            "imp_by": current_user.id,
+        },
+        expires_delta=timedelta(minutes=auth.IMPERSONATION_TOKEN_EXPIRE_MINUTES),
+    )
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "target": {
+            "id": target.id,
+            "email": target.email,
+            "staff_role": target.staff_role.value if target.staff_role else None,
+        },
+        "expires_in_minutes": auth.IMPERSONATION_TOKEN_EXPIRE_MINUTES,
+    }
+
+
+@router.post("/end-impersonation")
+async def end_impersonation(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """Must accept a plain get_current_user dependency (not require_role) — this
+    is called WHILE holding an impersonation token, whose resolved current_user
+    is the target (role=STAFF), not the Owner."""
+    impersonated_by = getattr(current_user, "impersonated_by", None)
+    if not impersonated_by:
+        raise HTTPException(status_code=400, detail="Not currently impersonating.")
+
+    session = db.query(models.ImpersonationSession).filter(
+        models.ImpersonationSession.id == impersonated_by["session_id"]
+    ).first()
+    if session and session.ended_at is None:
+        session.ended_at = utcnow()
+        session.end_reason = "manual"
+        db.commit()
+
+        write_audit_log(
+            db, session.restaurant_id, "impersonation_ended", "staff_router",
+            entity_type="user", entity_id=current_user.id,
+            before={"session_id": session.id},
+            reasoning=f"{impersonated_by['impersonator_email']} ended impersonating {current_user.email}.",
+            approved_by=impersonated_by["impersonator_email"],
+        )
+
+    return {"status": "ended"}
+
+
+@router.get("/impersonation-log", response_model=List[schemas.ImpersonationLogEntry])
+async def impersonation_log(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+    sessions = db.query(models.ImpersonationSession).filter(
+        models.ImpersonationSession.restaurant_id == restaurant.id
+    ).order_by(models.ImpersonationSession.started_at.desc()).limit(50).all()
+
+    user_ids = {s.impersonator_user_id for s in sessions} | {s.target_user_id for s in sessions}
+    users_by_id = {
+        u.id: u for u in db.query(models.User).filter(models.User.id.in_(user_ids)).all()
+    } if user_ids else {}
+
+    now = utcnow()
+    out = []
+    for s in sessions:
+        impersonator = users_by_id.get(s.impersonator_user_id)
+        target = users_by_id.get(s.target_user_id)
+        if s.ended_at is not None:
+            computed_status = "ended"
+        elif s.expires_at < now:
+            computed_status = "expired"
+        else:
+            computed_status = "active"
+        out.append({
+            "session_id": s.id,
+            "impersonator_email": impersonator.email if impersonator else "unknown",
+            "target_email": target.email if target else "unknown",
+            "started_at": s.started_at,
+            "expires_at": s.expires_at,
+            "ended_at": s.ended_at,
+            "status": computed_status,
+        })
+    return out

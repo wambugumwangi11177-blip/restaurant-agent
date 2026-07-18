@@ -44,20 +44,47 @@ class EventType(str, Enum):
     ORDER_COMPLETED    = "order.completed"
     ORDER_CANCELLED    = "order.cancelled"
     ORDER_PAID         = "order.paid"
+    # A ticket the kitchen just marked READY — front-of-house (Waiter/
+    # Supervisor) has to *run* it, and until now had to watch the KDS to know.
+    # Same "shouldn't have to poll" justification as STOCK_TRANSFER_FULFILLED:
+    # fires on the happy path, but push-only + role-scoped, so it doesn't
+    # reintroduce the alert-fatigue the exception-only events guard against.
+    # ORDER_CANCELLED (above) was defined long ago but never emitted or
+    # subscribed — the 2026-07-18 event-map pass wires it: the kitchen needs to
+    # stop cooking a ticket that was pulled. Both fire once, on the actual
+    # status transition (not every PATCH), and exclude the actor.
+    ORDER_READY        = "order.ready"
 
     # Inventory
     STOCK_LOW          = "stock.low"
     STOCK_CRITICAL     = "stock.critical"
     STOCK_RECEIVED     = "stock.received"
     STOCK_DEPLETED     = "stock.depleted"
+    # A *manual* downward stock adjustment (waste/breakage/loss/correction) —
+    # the shrinkage vector directive 016's stock-loss-prevention skill exists
+    # for. Sales are auto-deducted (directive 017), so a hand-entered OUT is,
+    # by elimination, either waste or loss: exactly what custody oversight
+    # wants surfaced. Fires only on negative adjustments (routers/inventory.py),
+    # never on a positive correction, and carries who did it.
+    INVENTORY_ADJUSTMENT_FLAGGED = "inventory.adjustment_flagged"
 
-    # Pricing
+    # Pricing. PRICE_CHANGED and RECOMMENDATION_GENERATED were defined early but
+    # sat unemitted until the 2026-07-18 event-map pass wired them: a *manual*
+    # menu price edit (routers/menu.py) is the hand-driven twin of
+    # recommendation.approved, and a freshly-generated batch of AI
+    # recommendations (ai/pricing) should tell its approver one is waiting.
+    # RECOMMENDATION_REJECTED stays reserved (the rejecter is the only party who
+    # needs to know; no one to fan out to — see directive 019 §6).
     PRICE_CHANGED      = "price.changed"
     RECOMMENDATION_GENERATED = "recommendation.generated"
     RECOMMENDATION_APPROVED  = "recommendation.approved"
     RECOMMENDATION_REJECTED  = "recommendation.rejected"
 
-    # Reservations
+    # Reservations. CREATED/CANCELLED were defined early but sat unemitted and
+    # unsubscribed until the 2026-07-18 event-map pass wired them: front-of-
+    # house (Waiter/Supervisor) shouldn't have to keep re-opening the bookings
+    # list to notice a new/pulled booking. Push-only + role-scoped, actor
+    # excluded — same posture as ORDER_READY.
     RESERVATION_CREATED   = "reservation.created"
     RESERVATION_NO_SHOW   = "reservation.no_show"
     RESERVATION_CANCELLED = "reservation.cancelled"
@@ -70,6 +97,16 @@ class EventType(str, Enum):
     PURCHASE_ORDER_CREATED   = "purchase_order.created"
     PURCHASE_ORDER_DELIVERED = "purchase_order.delivered"
     PURCHASE_ORDER_LATE      = "purchase_order.late"
+    # A PO was approved and SENT to the supplier (reorder.approve_and_send) —
+    # the receiving side (Stockkeeper/Controller) now knows a delivery is
+    # inbound to expect and reconcile against, rather than learning only when
+    # the truck shows up. Fires once on the PENDING->SENT transition.
+    PURCHASE_ORDER_APPROVED  = "purchase_order.approved"
+    # A supplier's reliability score just crossed below the "watch" threshold
+    # (executive.py penalises it on every late delivery). Fires once, on the
+    # downward crossing — not every late delivery — so it reads as "this
+    # supplier has become a problem", not per-incident noise.
+    SUPPLIER_RELIABILITY_DROPPED = "supplier.reliability_dropped"
 
     # Stock chain-of-custody (directive 016). Both are inherently
     # non-repeating (a transfer confirm happens once; the variance job runs
@@ -81,6 +118,39 @@ class EventType(str, Enum):
     # system expected. Fires once per count submission that exceeds
     # tolerance — inherently non-repeating like STOCK_TRANSFER_DISCREPANCY.
     STOCK_COUNT_DISCREPANCY    = "stock_count.discrepancy"
+
+    # Kitchen "pull" requisition (directive 017), the routine (non-exception)
+    # half of the request/fulfil/confirm chain: unlike the discrepancy/
+    # variance events above, these fire on the normal happy path (every
+    # request, every fulfilment) because the whole point is that a
+    # Stockkeeper shouldn't have to poll the dashboard to learn the kitchen
+    # is asking for something, and the kitchen shouldn't have to poll to
+    # learn it's ready to collect. Fan-out is role-based (ai/notify.py), not
+    # per-movement Twilio, so this doesn't reintroduce the alert-fatigue
+    # problem the discrepancy/variance events were designed to avoid.
+    STOCK_TRANSFER_REQUESTED  = "stock_transfer.requested"
+    STOCK_TRANSFER_FULFILLED = "stock_transfer.fulfilled"
+
+    # Account/risk signals (2026-07-17 notification audit). Both are
+    # inherently non-repeating per occurrence (a lockout transition happens
+    # once; a role change happens once) — no cooldown needed, same reasoning
+    # as STOCK_TRANSFER_DISCREPANCY above.
+    ACCOUNT_LOCKED       = "account.locked"
+    STAFF_ROLE_CHANGED   = "staff.role_changed"
+    STAFF_DEACTIVATED    = "staff.deactivated"
+    # The symmetric partner of STAFF_DEACTIVATED (added 2026-07-18): re-enabling
+    # a previously-revoked login restores access, which is just as much a
+    # "who can get in" change as revoking it — arguably more of a risk (a
+    # dormant account brought back). Rare, so low-noise; Owner-only, actor
+    # excluded, same routing as its partner.
+    STAFF_REACTIVATED    = "staff.reactivated"
+
+    # A menu item just went unavailable mid-shift ("86'd") — POS-facing
+    # staff need to stop selling it immediately. Deliberately one-directional
+    # (fires True->False only, not the reverse) — matches this workstream's
+    # "alert on the exception, not the routine" posture; re-enabling an item
+    # is lower urgency than a live sale risk.
+    MENU_ITEM_UNAVAILABLE = "menu_item.unavailable"
 
     # Marketing: CAMPAIGN_LAUNCHED / WINBACK_TRIGGERED were removed 2026-07-08
     # along with ai/marketing/campaigns.py, their only emitter. Nothing ever

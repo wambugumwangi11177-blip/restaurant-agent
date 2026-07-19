@@ -619,11 +619,17 @@ def find_available_tables(
     reservation_date,
     reservation_time,
     duration_minutes: int = 90,
+    exclude_reservation_id: int | None = None,
 ) -> list[dict]:
     """
     Returns tables with enough capacity and no overlapping CONFIRMED
     reservation for the requested date/time/duration, smallest-capacity-first
     (best fit, avoids wasting a large table on a small party).
+
+    exclude_reservation_id: same purpose as is_table_available()'s param —
+    when suggesting tables for a booking that's being *edited* (not created),
+    that booking's own row would otherwise conflict with itself and make its
+    already-assigned table look unavailable.
     """
     requested_start, requested_end = _reservation_bounds(
         reservation_date, reservation_time, duration_minutes
@@ -645,7 +651,7 @@ def find_available_tables(
     # overlapping into this one) is still a conflict candidate — see the same
     # widening and rationale in is_table_available(). _intervals_overlap below
     # makes the exact decision.
-    same_day_reservations = (
+    q = (
         db.query(models.Reservation)
         .filter(
             models.Reservation.restaurant_id == restaurant_id,
@@ -654,8 +660,10 @@ def find_available_tables(
             models.Reservation.status == models.ReservationStatus.CONFIRMED,
             models.Reservation.table_id.isnot(None),
         )
-        .all()
     )
+    if exclude_reservation_id is not None:
+        q = q.filter(models.Reservation.id != exclude_reservation_id)
+    same_day_reservations = q.all()
 
     booked_intervals_by_table: dict[int, list[tuple[datetime, datetime]]] = defaultdict(list)
     for res in same_day_reservations:

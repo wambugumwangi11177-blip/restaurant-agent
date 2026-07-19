@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
-import { UtensilsCrossed, Plus, X, Loader2, TrendingUp, TrendingDown, ChefHat, Trash2, Check } from "lucide-react";
+import { UtensilsCrossed, Plus, X, Loader2, TrendingUp, TrendingDown, ChefHat, Trash2, Check, Pencil } from "lucide-react";
 
 interface MenuItem {
     id: number;
@@ -12,6 +12,8 @@ interface MenuItem {
     price: number;
     category: string;
     is_available: boolean;
+    image_url?: string;
+    avg_prep_minutes?: number;
 }
 
 /**
@@ -42,6 +44,12 @@ export default function MenuEditor() {
     const [newIngredientId, setNewIngredientId] = useState("");
     const [newIngredientQty, setNewIngredientQty] = useState("");
     const [recipeSaving, setRecipeSaving] = useState(false);
+
+    // Edit item — name/price/category/description/prep time/photo URL.
+    // Availability has its own dedicated toggle below; this covers everything else.
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [editForm, setEditForm] = useState({ name: "", price: "", category: "", description: "", avg_prep_minutes: "", image_url: "" });
+    const [editSaving, setEditSaving] = useState(false);
 
     useEffect(() => {
         Promise.all([
@@ -128,6 +136,39 @@ export default function MenuEditor() {
         } catch (err: any) {
             showToast(err?.response?.data?.detail || "Failed to update availability");
         }
+    };
+
+    const openEdit = (item: MenuItem) => {
+        if (editingId === item.id) { setEditingId(null); return; }
+        setEditingId(item.id);
+        setEditForm({
+            name: item.name,
+            price: String(item.price / 100),
+            category: item.category,
+            description: item.description || "",
+            avg_prep_minutes: item.avg_prep_minutes != null ? String(item.avg_prep_minutes) : "",
+            image_url: item.image_url || "",
+        });
+    };
+
+    const handleSaveEdit = async (itemId: number) => {
+        setEditSaving(true);
+        try {
+            await api.put(`/menu/${itemId}`, {
+                name: editForm.name,
+                price: Math.round(parseFloat(editForm.price) * 100),
+                category: editForm.category,
+                description: editForm.description,
+                avg_prep_minutes: editForm.avg_prep_minutes ? parseFloat(editForm.avg_prep_minutes) : undefined,
+                image_url: editForm.image_url,
+            });
+            showToast("Saved");
+            setEditingId(null);
+            fetchMenu();
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Failed to save changes");
+        }
+        setEditSaving(false);
     };
 
     const categories = [...new Set(items.map((i) => i.category).filter(Boolean))];
@@ -322,6 +363,12 @@ export default function MenuEditor() {
                                                     <span className="text-sm font-semibold text-[var(--accent)]">
                                                         KES {(item.price / 100).toLocaleString()}
                                                     </span>
+                                                    <button onClick={() => openEdit(item)}
+                                                        title="Edit — name, price, category, prep time, photo"
+                                                        className={`text-[10px] px-2 py-1 rounded flex items-center gap-1 transition-all ${editingId === item.id ? "bg-[var(--accent)]/10 text-[var(--accent)]" : "bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--accent)]"}`}>
+                                                        <Pencil className="w-3 h-3" />
+                                                        Edit
+                                                    </button>
                                                     <button onClick={() => toggleRecipe(item.id)}
                                                         title="Recipe — what this dish is made of"
                                                         className={`text-[10px] px-2 py-1 rounded flex items-center gap-1 transition-all ${recipeOpen ? "bg-[var(--accent)]/10 text-[var(--accent)]" : "bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--accent)]"}`}>
@@ -337,6 +384,42 @@ export default function MenuEditor() {
                                                     </button>
                                                 </div>
                                             </div>
+
+                                            {editingId === item.id && (
+                                                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+                                                    className="border-t border-[var(--surface-hover)] px-4 py-3 bg-[#0f0f0f] space-y-2">
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <input placeholder="Name" value={editForm.name}
+                                                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                                                            className="bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] placeholder-[var(--text-dim)] focus:outline-none" />
+                                                        <input placeholder="Price (KES)" value={editForm.price} type="number"
+                                                            onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                                                            className="bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] placeholder-[var(--text-dim)] focus:outline-none" />
+                                                        <input placeholder="Category" value={editForm.category}
+                                                            onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                                                            className="bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] placeholder-[var(--text-dim)] focus:outline-none" />
+                                                        <input placeholder="Prep time (minutes)" value={editForm.avg_prep_minutes} type="number"
+                                                            onChange={(e) => setEditForm({ ...editForm, avg_prep_minutes: e.target.value })}
+                                                            className="bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] placeholder-[var(--text-dim)] focus:outline-none" />
+                                                        <input placeholder="Description" value={editForm.description}
+                                                            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                                                            className="col-span-2 bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] placeholder-[var(--text-dim)] focus:outline-none" />
+                                                        <input placeholder="Photo URL" value={editForm.image_url}
+                                                            onChange={(e) => setEditForm({ ...editForm, image_url: e.target.value })}
+                                                            className="col-span-2 bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] placeholder-[var(--text-dim)] focus:outline-none" />
+                                                    </div>
+                                                    <div className="flex justify-end gap-2 pt-1">
+                                                        <button onClick={() => setEditingId(null)}
+                                                            className="text-xs px-3 py-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
+                                                            Cancel
+                                                        </button>
+                                                        <button onClick={() => handleSaveEdit(item.id)} disabled={!editForm.name || !editForm.price || editSaving}
+                                                            className="bg-[var(--accent)] text-black rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
+                                                            {editSaving ? "Saving..." : "Save"}
+                                                        </button>
+                                                    </div>
+                                                </motion.div>
+                                            )}
 
                                             {recipeOpen && (
                                                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}

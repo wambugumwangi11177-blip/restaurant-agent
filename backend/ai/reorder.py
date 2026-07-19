@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 
 import models
 from time_utils import utcnow
+from ai.supply_chain.intelligence import RELIABILITY_THRESHOLD
 
 # Purchase orders in either of these statuses are still "in flight" — don't
 # draft a second one for the same item while one is already outstanding.
@@ -49,6 +50,7 @@ class ReorderCandidate:
     supplier_id: int
     supplier_name: str
     cost_per_unit: float        # InventoryItem's cost_per_unit (KES, not cents)
+    supplier_reliability_score: float = 100.0
 
 
 def find_reorder_candidates(db: Session, restaurant_id: int, on_date: date | None = None) -> list[ReorderCandidate]:
@@ -111,6 +113,7 @@ def find_reorder_candidates(db: Session, restaurant_id: int, on_date: date | Non
             supplier_id=supplier.id,
             supplier_name=supplier.name,
             cost_per_unit=item.cost_per_unit or 0.0,
+            supplier_reliability_score=supplier.reliability_score,
         ))
 
     return candidates
@@ -138,6 +141,20 @@ def draft_purchase_order(db: Session, restaurant_id: int, candidate: ReorderCand
         f"on hand {candidate.on_hand}{candidate.unit}, "
         f"demand factor {candidate.demand_factor}{reason_note}."
     )
+    # Surface the supplier's own reliability score (ai/supply_chain/
+    # intelligence.py already computes it, but nothing at draft time ever
+    # showed it to the approver — this doesn't pick a different supplier
+    # (there's only ever one default_supplier_id per item, no alternatives
+    # to choose between), it just makes sure the score isn't sitting
+    # unread in a separate report the moment someone's about to approve
+    # against a supplier who's been slipping.
+    if candidate.supplier_reliability_score < RELIABILITY_THRESHOLD:
+        notes += (
+            f" ⚠️ {candidate.supplier_name}'s reliability is at "
+            f"{candidate.supplier_reliability_score:.0f}% (below the "
+            f"{RELIABILITY_THRESHOLD:.0f}% threshold) — consider an "
+            f"alternative before approving."
+        )
 
     po = models.PurchaseOrder(
         restaurant_id=restaurant_id,
@@ -162,6 +179,7 @@ def draft_purchase_order(db: Session, restaurant_id: int, candidate: ReorderCand
         "quantity": candidate.adjusted_quantity,
         "unit": candidate.unit,
         "supplier_name": candidate.supplier_name,
+        "supplier_reliability_score": candidate.supplier_reliability_score,
     })
 
     return po

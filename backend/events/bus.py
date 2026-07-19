@@ -80,6 +80,11 @@ class EventType(str, Enum):
     RECOMMENDATION_APPROVED  = "recommendation.approved"
     RECOMMENDATION_REJECTED  = "recommendation.rejected"
 
+    # A weekly unattended strategist review (ai/orchestrator/strategist.py,
+    # gated by the autonomous_strategist flag) just produced a headline —
+    # nudge OWNER/MANAGER to read it, same posture as RECOMMENDATION_GENERATED.
+    STRATEGY_REVIEW_GENERATED = "strategy.review_generated"
+
     # Reservations. CREATED/CANCELLED were defined early but sat unemitted and
     # unsubscribed until the 2026-07-18 event-map pass wired them: front-of-
     # house (Waiter/Supervisor) shouldn't have to keep re-opening the bookings
@@ -89,9 +94,18 @@ class EventType(str, Enum):
     RESERVATION_NO_SHOW   = "reservation.no_show"
     RESERVATION_CANCELLED = "reservation.cancelled"
 
-    # Labor
+    # Labor. SHIFT_STARTED/SHIFT_ENDED were defined early but sat unemitted —
+    # LaborShift had no router at all until routers/attendance.py (2026-07-19
+    # walkthrough-notes pass). Both fire on every clock-in/out (routine, not
+    # exception — same posture as STOCK_TRANSFER_REQUESTED), scoped to
+    # oversight tiers only, not the whole floor.
     SHIFT_STARTED  = "shift.started"
     SHIFT_ENDED    = "shift.ended"
+    # A clock-in's GPS coordinates were farther than the proximity threshold
+    # from the restaurant's own (routers/attendance.py) — never blocks the
+    # clock-in itself, just flags it for oversight. Exception-class, not
+    # routine, unlike SHIFT_STARTED above.
+    SHIFT_CLOCK_IN_FLAGGED = "shift.clock_in_flagged"
 
     # Supply chain
     PURCHASE_ORDER_CREATED   = "purchase_order.created"
@@ -151,6 +165,13 @@ class EventType(str, Enum):
     # "alert on the exception, not the routine" posture; re-enabling an item
     # is lower urgency than a live sale risk.
     MENU_ITEM_UNAVAILABLE = "menu_item.unavailable"
+
+    # A remake or kitchen quality issue was logged against an order
+    # (routers/orders.py, 2026-07-19 walkthrough-notes pass) — oversight
+    # tiers should see the pattern building, not just the reporter who
+    # already knows. Fires on every log (routine volume is low enough this
+    # doesn't reintroduce alert fatigue), actor excluded.
+    KITCHEN_INCIDENT_LOGGED = "kitchen.incident_logged"
 
     # Marketing: CAMPAIGN_LAUNCHED / WINBACK_TRIGGERED were removed 2026-07-08
     # along with ai/marketing/campaigns.py, their only emitter. Nothing ever

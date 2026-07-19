@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
-import { CalendarDays, DollarSign, Plus, X, Check } from "lucide-react";
+import { CalendarDays, DollarSign, Plus, X, Check, Pencil, LayoutGrid, Brush } from "lucide-react";
 
 /**
  * Bookings workspace — extends the original dashboard/reservations/page.tsx
@@ -28,6 +28,23 @@ export default function ReservationsWorkspace() {
     const [reservationDate, setReservationDate] = useState("");
     const [reservationTime, setReservationTime] = useState("");
     const [notes, setNotes] = useState("");
+    const [tableId, setTableId] = useState("");
+    const [suggestedTables, setSuggestedTables] = useState<any[] | null>(null);
+
+    // Floor/tables — directive 015 treats table management as part of the
+    // reservations domain (no separate matrix row), so it lives here rather
+    // than as its own dashboard section.
+    const [floorTables, setFloorTables] = useState<any[]>([]);
+    const [showTablesPanel, setShowTablesPanel] = useState(false);
+    const [newTableNumber, setNewTableNumber] = useState("");
+    const [newTableCapacity, setNewTableCapacity] = useState("4");
+
+    // Edit an existing booking — date/time/party size/notes/table.
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [editForm, setEditForm] = useState({
+        party_size: "", reservation_date: "", reservation_time: "", notes: "", table_id: "",
+    });
+    const [editSuggestedTables, setEditSuggestedTables] = useState<any[] | null>(null);
 
     const showToast = (msg: string) => {
         setToast(msg);
@@ -35,20 +52,47 @@ export default function ReservationsWorkspace() {
     };
 
     const fetchData = async () => {
-        const [resRes, aiRes] = await Promise.all([
+        const [resRes, aiRes, tablesRes] = await Promise.all([
             api.get("/reservations/").catch(() => ({ data: [] })),
             api.get("/ai/reservation-insights").catch(() => ({ data: null })),
+            api.get("/tables/").catch(() => ({ data: [] })),
         ]);
         setReservations(Array.isArray(resRes.data) ? resRes.data : []);
         setAiData(aiRes.data);
+        setFloorTables(Array.isArray(tablesRes.data) ? tablesRes.data : []);
         setLoading(false);
     };
 
     useEffect(() => { fetchData(); }, []);
 
+    // Best-fit table suggestions — re-queried whenever the fields that
+    // affect availability change, for the New Booking form.
+    useEffect(() => {
+        if (!showForm || !reservationDate || !reservationTime || !partySize) { setSuggestedTables(null); return; }
+        api.get("/reservations/available-tables", {
+            params: { party_size: parseInt(partySize) || 1, reservation_date: reservationDate, reservation_time: reservationTime },
+        }).then((res) => setSuggestedTables(res.data)).catch(() => setSuggestedTables(null));
+    }, [showForm, reservationDate, reservationTime, partySize]);
+
+    // Same, for the inline Edit form.
+    useEffect(() => {
+        if (!editingId || !editForm.reservation_date || !editForm.reservation_time || !editForm.party_size) {
+            setEditSuggestedTables(null);
+            return;
+        }
+        api.get("/reservations/available-tables", {
+            params: {
+                party_size: parseInt(editForm.party_size) || 1,
+                reservation_date: editForm.reservation_date,
+                reservation_time: editForm.reservation_time,
+                exclude_reservation_id: editingId,
+            },
+        }).then((res) => setEditSuggestedTables(res.data)).catch(() => setEditSuggestedTables(null));
+    }, [editingId, editForm.reservation_date, editForm.reservation_time, editForm.party_size]);
+
     const resetForm = () => {
         setCustomerName(""); setCustomerPhone(""); setPartySize("2");
-        setReservationDate(""); setReservationTime(""); setNotes("");
+        setReservationDate(""); setReservationTime(""); setNotes(""); setTableId("");
     };
 
     const handleCreate = async () => {
@@ -62,6 +106,7 @@ export default function ReservationsWorkspace() {
                 reservation_date: reservationDate,
                 reservation_time: reservationTime,
                 notes,
+                table_id: tableId ? parseInt(tableId) : null,
             });
             showToast(`Booked for ${customerName}`);
             setShowForm(false);
@@ -80,6 +125,65 @@ export default function ReservationsWorkspace() {
             await fetchData();
         } catch (err: any) {
             showToast(err?.response?.data?.detail || "Failed to update booking");
+        }
+        setSubmitting(false);
+    };
+
+    const openEdit = (res: any) => {
+        if (editingId === res.id) { setEditingId(null); return; }
+        setEditingId(res.id);
+        setEditForm({
+            party_size: String(res.party_size ?? ""),
+            reservation_date: res.reservation_date || "",
+            reservation_time: (res.reservation_time || "").slice(0, 5),
+            notes: res.notes || "",
+            table_id: res.table_id != null ? String(res.table_id) : "",
+        });
+    };
+
+    const handleSaveEdit = async (id: number) => {
+        setSubmitting(true);
+        try {
+            await api.put(`/reservations/${id}`, {
+                party_size: editForm.party_size ? parseInt(editForm.party_size) : undefined,
+                reservation_date: editForm.reservation_date || undefined,
+                reservation_time: editForm.reservation_time || undefined,
+                notes: editForm.notes,
+                table_id: editForm.table_id ? parseInt(editForm.table_id) : null,
+            });
+            showToast("Booking updated");
+            setEditingId(null);
+            await fetchData();
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Failed to update booking");
+        }
+        setSubmitting(false);
+    };
+
+    const handleAddTable = async () => {
+        if (!newTableNumber) return;
+        setSubmitting(true);
+        try {
+            await api.post("/tables/", {
+                table_number: parseInt(newTableNumber),
+                capacity: parseInt(newTableCapacity) || 4,
+            });
+            showToast(`Added Table ${newTableNumber}`);
+            setNewTableNumber(""); setNewTableCapacity("4");
+            await fetchData();
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Failed to add table");
+        }
+        setSubmitting(false);
+    };
+
+    const handleTableStatus = async (tableId: number, status: string) => {
+        setSubmitting(true);
+        try {
+            await api.patch(`/tables/${tableId}/status`, { status });
+            await fetchData();
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Failed to update table");
         }
         setSubmitting(false);
     };
@@ -137,12 +241,78 @@ export default function ReservationsWorkspace() {
                         {todayBookings.length} today · {upcoming.length} coming up
                     </p>
                 </div>
-                <button onClick={() => setShowForm(!showForm)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-lg text-xs text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-all">
-                    <Plus className="w-3 h-3" />
-                    New Booking
-                </button>
+                <div className="flex gap-2">
+                    <button onClick={() => setShowTablesPanel(!showTablesPanel)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1a1a] border border-[#262626] rounded-lg text-xs text-[#737373] hover:text-[#e5e5e5] transition-all">
+                        <LayoutGrid className="w-3 h-3" />
+                        Tables
+                    </button>
+                    <button onClick={() => setShowForm(!showForm)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-lg text-xs text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-all">
+                        <Plus className="w-3 h-3" />
+                        New Booking
+                    </button>
+                </div>
             </div>
+
+            {/* Tables panel — open/close (available/occupied), mark cleaning
+                needed / cleaned, add new tables to the floor. */}
+            <AnimatePresence>
+                {showTablesPanel && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                        className="bg-[#141414] border border-[#262626] rounded-xl overflow-hidden">
+                        <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
+                            <span className="text-xs font-semibold text-[#e5e5e5]">Tables</span>
+                            <div className="flex gap-2 items-center">
+                                <input placeholder="Table #" value={newTableNumber} onChange={(e) => setNewTableNumber(e.target.value)}
+                                    type="number" className="w-20 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1 text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
+                                <input placeholder="Seats" value={newTableCapacity} onChange={(e) => setNewTableCapacity(e.target.value)}
+                                    type="number" className="w-16 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1 text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
+                                <button onClick={handleAddTable} disabled={!newTableNumber || submitting}
+                                    className="bg-[var(--accent)] text-black rounded-lg px-3 py-1 text-xs font-semibold disabled:opacity-50">
+                                    Add
+                                </button>
+                            </div>
+                        </div>
+                        {floorTables.length === 0 ? (
+                            <p className="text-xs text-[#525252] text-center py-6">No tables set up yet</p>
+                        ) : (
+                            <div className="p-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                {floorTables.map((t) => {
+                                    const tableStatusStyles: Record<string, string> = {
+                                        available: "border-[#22c55e]/30 text-[#22c55e]",
+                                        occupied: "border-[#eab308]/30 text-[#eab308]",
+                                        reserved: "border-[#3b82f6]/30 text-[#3b82f6]",
+                                        cleaning: "border-[#ef4444]/30 text-[#ef4444]",
+                                    };
+                                    return (
+                                        <div key={t.id} className={`border rounded-lg p-2.5 ${tableStatusStyles[t.status] || "border-[#262626]"}`}>
+                                            <p className="text-xs font-semibold text-[#e5e5e5]">Table {t.table_number}</p>
+                                            <p className="text-[10px] text-[#525252]">{t.capacity} seats · {t.status}</p>
+                                            <div className="flex gap-1 mt-1.5">
+                                                {t.status !== "occupied" && (
+                                                    <button onClick={() => handleTableStatus(t.id, "occupied")} title="Open / seat"
+                                                        className="text-[9px] px-1.5 py-0.5 rounded bg-[#1a1a1a] text-[#737373] hover:text-[#eab308]">Open</button>
+                                                )}
+                                                {t.status !== "available" && (
+                                                    <button onClick={() => handleTableStatus(t.id, "available")} title="Close / free up"
+                                                        className="text-[9px] px-1.5 py-0.5 rounded bg-[#1a1a1a] text-[#737373] hover:text-[#22c55e]">Close</button>
+                                                )}
+                                                {t.status !== "cleaning" && (
+                                                    <button onClick={() => handleTableStatus(t.id, "cleaning")} title="Mark cleaning needed"
+                                                        className="text-[9px] px-1.5 py-0.5 rounded bg-[#1a1a1a] text-[#737373] hover:text-[#ef4444]" aria-label="Mark cleaning needed">
+                                                        <Brush className="w-2.5 h-2.5 inline" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <AnimatePresence>
                 {showForm && (
@@ -165,6 +335,25 @@ export default function ReservationsWorkspace() {
                                 className="bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] focus:border-[var(--accent)]/50 focus:outline-none" />
                             <input placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)}
                                 className="col-span-2 bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[var(--accent)]/50 focus:outline-none" />
+                            <select value={tableId} onChange={(e) => setTableId(e.target.value)}
+                                className="bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] focus:border-[var(--accent)]/50 focus:outline-none">
+                                <option value="">No table assigned</option>
+                                {suggestedTables !== null ? (
+                                    <>
+                                        <optgroup label="Suggested (best fit, available)">
+                                            {suggestedTables.map((t) => <option key={t.table_id} value={t.table_id}>Table {t.table_number} (seats {t.capacity})</option>)}
+                                        </optgroup>
+                                        {floorTables.filter((t) => !suggestedTables.some((s) => s.table_id === t.id)).length > 0 && (
+                                            <optgroup label="Other tables">
+                                                {floorTables.filter((t) => !suggestedTables.some((s) => s.table_id === t.id))
+                                                    .map((t) => <option key={t.id} value={t.id}>Table {t.table_number} (seats {t.capacity})</option>)}
+                                            </optgroup>
+                                        )}
+                                    </>
+                                ) : (
+                                    floorTables.map((t) => <option key={t.id} value={t.id}>Table {t.table_number} (seats {t.capacity})</option>)
+                                )}
+                            </select>
                             <button onClick={handleCreate} disabled={!customerName || !reservationDate || !reservationTime || submitting}
                                 className="bg-[var(--accent)] text-black rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-50">
                                 {submitting ? "Booking..." : "Book"}
@@ -266,38 +455,95 @@ export default function ReservationsWorkspace() {
                             {reservations.map((res, i) => (
                                 <motion.div key={res.id || i} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                                     transition={{ delay: i * 0.03 }}
-                                    className="px-4 py-3 flex items-center justify-between hover:bg-[#1a1a1a] transition-colors">
-                                    <div>
-                                        <p className="text-sm text-[#e5e5e5]">{res.customer_name}</p>
-                                        <p className="text-xs text-[#525252] mt-0.5">
-                                            {res.party_size} guest{res.party_size !== 1 ? "s" : ""}{res.customer_phone && ` · ${res.customer_phone}`}
-                                        </p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm text-[#737373]">{res.reservation_date}</p>
-                                        <p className="text-xs text-[#525252] mt-0.5">{res.reservation_time}</p>
-                                        <div className="flex items-center gap-1.5 mt-1">
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${statusStyles[res.status] || statusStyles.confirmed}`}>
-                                                {statusLabels[res.status] || res.status}
-                                            </span>
-                                            {res.status === "confirmed" && (
-                                                <>
-                                                    <button onClick={() => handleStatusChange(res.id, "completed")} disabled={submitting}
-                                                        className="text-[9px] px-1.5 py-0.5 rounded bg-[#1a1a1a] text-[#737373] hover:text-[#22c55e] transition-all">
-                                                        Done
-                                                    </button>
-                                                    <button onClick={() => handleStatusChange(res.id, "no_show")} disabled={submitting}
-                                                        className="text-[9px] px-1.5 py-0.5 rounded bg-[#1a1a1a] text-[#737373] hover:text-[#eab308] transition-all">
-                                                        No-show
-                                                    </button>
-                                                    <button onClick={() => handleStatusChange(res.id, "cancelled")} disabled={submitting}
-                                                        className="text-[9px] px-1.5 py-0.5 rounded bg-[#1a1a1a] text-[#737373] hover:text-[#ef4444] transition-all">
-                                                        Cancel
-                                                    </button>
-                                                </>
-                                            )}
+                                    className="px-4 py-3 hover:bg-[#1a1a1a] transition-colors">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm text-[#e5e5e5]">{res.customer_name}</p>
+                                            <p className="text-xs text-[#525252] mt-0.5">
+                                                {res.party_size} guest{res.party_size !== 1 ? "s" : ""}{res.customer_phone && ` · ${res.customer_phone}`}
+                                                {res.table_id && ` · Table ${floorTables.find((t) => t.id === res.table_id)?.table_number ?? res.table_id}`}
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm text-[#737373]">{res.reservation_date}</p>
+                                            <p className="text-xs text-[#525252] mt-0.5">{res.reservation_time}</p>
+                                            <div className="flex items-center gap-1.5 mt-1">
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${statusStyles[res.status] || statusStyles.confirmed}`}>
+                                                    {statusLabels[res.status] || res.status}
+                                                </span>
+                                                {res.status === "confirmed" && (
+                                                    <>
+                                                        <button onClick={() => openEdit(res)} disabled={submitting}
+                                                            className="text-[9px] px-1.5 py-0.5 rounded bg-[#1a1a1a] text-[#737373] hover:text-[var(--accent)] transition-all flex items-center gap-0.5">
+                                                            <Pencil className="w-2.5 h-2.5" />
+                                                            Edit
+                                                        </button>
+                                                        <button onClick={() => handleStatusChange(res.id, "completed")} disabled={submitting}
+                                                            className="text-[9px] px-1.5 py-0.5 rounded bg-[#1a1a1a] text-[#737373] hover:text-[#22c55e] transition-all">
+                                                            Done
+                                                        </button>
+                                                        <button onClick={() => handleStatusChange(res.id, "no_show")} disabled={submitting}
+                                                            className="text-[9px] px-1.5 py-0.5 rounded bg-[#1a1a1a] text-[#737373] hover:text-[#eab308] transition-all">
+                                                            No-show
+                                                        </button>
+                                                        <button onClick={() => handleStatusChange(res.id, "cancelled")} disabled={submitting}
+                                                            className="text-[9px] px-1.5 py-0.5 rounded bg-[#1a1a1a] text-[#737373] hover:text-[#ef4444] transition-all">
+                                                            Cancel
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
+
+                                    <AnimatePresence>
+                                        {editingId === res.id && (
+                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                                                className="mt-2 grid grid-cols-2 sm:grid-cols-5 gap-2 overflow-hidden">
+                                                <input placeholder="Party size" value={editForm.party_size} type="number"
+                                                    onChange={(e) => setEditForm({ ...editForm, party_size: e.target.value })}
+                                                    className="bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
+                                                <input value={editForm.reservation_date} type="date"
+                                                    onChange={(e) => setEditForm({ ...editForm, reservation_date: e.target.value })}
+                                                    className="bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] focus:outline-none" />
+                                                <input value={editForm.reservation_time} type="time"
+                                                    onChange={(e) => setEditForm({ ...editForm, reservation_time: e.target.value })}
+                                                    className="bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] focus:outline-none" />
+                                                <select value={editForm.table_id} onChange={(e) => setEditForm({ ...editForm, table_id: e.target.value })}
+                                                    className="bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] focus:outline-none">
+                                                    <option value="">No table</option>
+                                                    {editSuggestedTables !== null ? (
+                                                        <>
+                                                            <optgroup label="Suggested">
+                                                                {editSuggestedTables.map((t) => <option key={t.table_id} value={t.table_id}>Table {t.table_number}</option>)}
+                                                            </optgroup>
+                                                            {floorTables.filter((t) => !editSuggestedTables.some((s) => s.table_id === t.id)).length > 0 && (
+                                                                <optgroup label="Other">
+                                                                    {floorTables.filter((t) => !editSuggestedTables.some((s) => s.table_id === t.id))
+                                                                        .map((t) => <option key={t.id} value={t.id}>Table {t.table_number}</option>)}
+                                                                </optgroup>
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        floorTables.map((t) => <option key={t.id} value={t.id}>Table {t.table_number}</option>)
+                                                    )}
+                                                </select>
+                                                <input placeholder="Notes" value={editForm.notes}
+                                                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                                                    className="bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
+                                                <div className="col-span-2 sm:col-span-5 flex justify-end gap-2">
+                                                    <button onClick={() => setEditingId(null)}
+                                                        className="text-xs px-3 py-1.5 rounded-lg text-[#737373] hover:text-[#e5e5e5] transition-colors">
+                                                        Cancel
+                                                    </button>
+                                                    <button onClick={() => handleSaveEdit(res.id)} disabled={submitting}
+                                                        className="bg-[var(--accent)] text-black rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
+                                                        {submitting ? "Saving..." : "Save"}
+                                                    </button>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </motion.div>
                             ))}
                         </div>

@@ -16,7 +16,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from logging_config import configure_logging
-from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support
+from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support, tables, attendance
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
@@ -170,6 +170,18 @@ def _start_scheduler():
             _run_learning_cycle_job,
             CronTrigger(hour=2, minute=0),   # 05:00 EAT
             id="learning_cycle",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+
+        # Weekly unattended strategist review — off by default (see
+        # autonomous_strategist in feature_flags.py); registered unconditionally
+        # so a redeploy-free env flip turns it on. Monday, after learning_cycle
+        # has refreshed the accuracy numbers the strategist reads about itself.
+        scheduler.add_job(
+            _run_strategist_review_job,
+            CronTrigger(day_of_week="mon", hour=5, minute=0),   # 08:00 EAT Monday
+            id="strategist_review",
             replace_existing=True,
             misfire_grace_time=3600,
         )
@@ -329,6 +341,42 @@ def _run_reservation_reminders_job():
         logger.error(f"[Reservation Reminders] Scheduler job failed: {exc}")
 
 
+def _run_strategist_review_job():
+    """Weekly unattended strategy review — the strategist looks at each
+    restaurant on its own standing goal, no owner-initiated request. Gated
+    behind autonomous_strategist so opting in is explicit (spends LLM tokens
+    same as the on-demand endpoint). Narrate-only: pushes the headline via
+    WhatsApp + in-app notification, never writes/approves anything itself —
+    applying a step still goes through the existing approval endpoints."""
+    try:
+        import feature_flags
+        if not feature_flags.is_enabled("autonomous_strategist"):
+            return
+
+        from database import SessionLocal
+        from ai.orchestrator.strategist import run_strategy, format_for_whatsapp, STANDING_GOAL
+        from ai.whatsapp.brain import send_to_owner
+        from events.bus import emit_async, EventType
+        import models
+
+        db = SessionLocal()
+        try:
+            for restaurant in db.query(models.Restaurant).all():
+                result = run_strategy(db, restaurant.id, STANDING_GOAL, triggered_by="scheduler")
+                if not result.get("available") or result.get("mode") != "llm":
+                    continue  # nothing to say if it fell back to deterministic
+                strategy = result["strategy"]
+                send_to_owner(db, restaurant, format_for_whatsapp(strategy), message_type="strategy_review")
+                emit_async(EventType.STRATEGY_REVIEW_GENERATED, {
+                    "restaurant_id": restaurant.id,
+                    "headline": strategy.get("headline", ""),
+                })
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Strategist Review] Scheduler job failed: {exc}")
+
+
 # ── CORS ──────────────────────────────────────────────────────────────────────
 # Real Vercel production domain is included as a fallback default (not just
 # localhost) — found 2026-07-07 that a misconfigured/placeholder CORS_ORIGINS
@@ -379,6 +427,7 @@ _VERSIONED_ROUTERS = [
     reservations.router, ai.router, export.router, flags.router, events.router,
     billing.router, enterprise.router, staff.router, stock_custody.router,
     suppliers.router, purchase_orders.router, notifications.router, support.router,
+    tables.router, attendance.router,
 ]
 
 app.include_router(auth.router)

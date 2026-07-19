@@ -65,7 +65,51 @@ def deduct_ingredients_for_order(db: Session, order: models.Order, performed_by_
                 performed_by_user_id=performed_by_user_id,
             ))
 
+            if item.quantity <= 0:
+                _autohide_menu_items_for_depleted_ingredient(db, order.restaurant_id, item.id)
+
     return missing_recipes
+
+
+def _autohide_menu_items_for_depleted_ingredient(db: Session, restaurant_id: int, inventory_item_id: int) -> None:
+    """
+    Owner's operational walkthrough (2026-07-19): "if stock is zero on
+    something and the supplier hasn't brought [more], it's pulled from the
+    menu and they tell the kitchen and the POS and the waiters." The
+    traversal that knows which dishes are affected already existed
+    (executive.py's _get_affected_menu_items, used only to compose an
+    owner WhatsApp alert) — this is the same traversal, now also used to
+    act. Only is_critical links 86 the dish; a non-critical ingredient
+    (garnish, optional topping) running out doesn't take the whole item
+    off the menu. Deliberately one-directional, same posture as
+    MENU_ITEM_UNAVAILABLE generally — restocking doesn't auto-restore
+    availability, a human confirms the dish is actually ready to sell
+    again.
+    """
+    links = db.query(models.MenuIngredient).filter(
+        models.MenuIngredient.inventory_item_id == inventory_item_id,
+        models.MenuIngredient.is_critical.is_(True),
+    ).all()
+    if not links:
+        return
+
+    for link in links:
+        menu_item = db.query(models.MenuItem).filter(
+            models.MenuItem.id == link.menu_item_id,
+            models.MenuItem.restaurant_id == restaurant_id,
+            models.MenuItem.is_available.is_(True),
+        ).first()
+        if not menu_item:
+            continue
+
+        menu_item.is_available = False
+
+        from events.bus import emit_async, EventType
+        emit_async(EventType.MENU_ITEM_UNAVAILABLE, {
+            "restaurant_id": restaurant_id,
+            "item_name": menu_item.name,
+            "reason": "stock_depleted",
+        })
 
 
 def reverse_ingredients_for_order(db: Session, order: models.Order, performed_by_user_id: int) -> None:

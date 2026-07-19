@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import date
+from datetime import date, time
 
 from database import get_db
 import models
 import schemas
 import auth
-from ai.reservation_optimizer import is_table_available
+from ai.reservation_optimizer import is_table_available, find_available_tables
 from routers.deps import get_or_create_restaurant
 
 router = APIRouter(prefix="/reservations", tags=["reservations"])
@@ -40,6 +40,35 @@ async def get_reservations(
     ).limit(200).all()
 
     return [_res_to_dict(r) for r in reservations]
+
+
+@router.get("/available-tables", response_model=List[schemas.AvailableTableOut])
+async def get_available_tables(
+    party_size: int = Query(..., gt=0),
+    reservation_date: date = Query(...),
+    reservation_time: time = Query(...),
+    duration_minutes: int = Query(90, gt=0),
+    exclude_reservation_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
+):
+    """Best-fit-first table suggestions for a host — reuses the exact same
+    availability/capacity logic create_reservation() already runs to reject
+    a conflicting table_id, just exposed ahead of time so a host isn't
+    guessing which table to assign. exclude_reservation_id lets the edit
+    form suggest tables for a booking being rescheduled without that
+    booking's own row shadowing its already-assigned table."""
+    restaurant = get_or_create_restaurant(db, current_user)
+    tables = find_available_tables(
+        db,
+        restaurant_id=restaurant.id,
+        party_size=party_size,
+        reservation_date=reservation_date,
+        reservation_time=reservation_time,
+        duration_minutes=duration_minutes,
+        exclude_reservation_id=exclude_reservation_id,
+    )
+    return tables
 
 
 @router.post("/", response_model=schemas.ReservationOut)
@@ -133,6 +162,82 @@ async def create_reservation(
         "actor_user_id": current_user.id,
     })
     return _res_to_dict(db_res)
+
+
+@router.put("/{reservation_id}", response_model=schemas.ReservationOut)
+async def update_reservation(
+    reservation_id: int,
+    update: schemas.ReservationUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
+):
+    """General edit — party size grew, the customer called to move the time,
+    or front-of-house is assigning/moving which table it's seated at.
+    Distinct from update_reservation_status, which only ever flips `status`.
+    Re-runs the same table/overlap validation create_reservation() does
+    whenever the edit touches table_id, date, time, or duration — otherwise
+    an edit could quietly create the double-booking creation already guards
+    against."""
+    restaurant = get_or_create_restaurant(db, current_user)
+    reservation = db.query(models.Reservation).filter(
+        models.Reservation.id == reservation_id,
+        models.Reservation.restaurant_id == restaurant.id,
+    ).first()
+    if not reservation:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+
+    updates = update.dict(exclude_unset=True)
+
+    new_table_id = updates.get("table_id", reservation.table_id)
+    new_date = updates.get("reservation_date", reservation.reservation_date)
+    new_time = updates.get("reservation_time", reservation.reservation_time)
+    new_duration = updates.get("duration_minutes", reservation.duration_minutes)
+    new_party_size = updates.get("party_size", reservation.party_size)
+
+    touches_scheduling = any(
+        k in updates for k in ("table_id", "reservation_date", "reservation_time", "duration_minutes")
+    )
+
+    if new_table_id is not None and touches_scheduling:
+        table = db.query(models.Table).filter(
+            models.Table.id == new_table_id,
+            models.Table.restaurant_id == restaurant.id,
+        ).first()
+        # 404, not 403 — same id-enumeration reasoning as create_reservation().
+        if not table:
+            raise HTTPException(status_code=404, detail="Table not found")
+        if table.capacity < new_party_size:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Table seats {table.capacity}, party size is {new_party_size}",
+            )
+        if not is_table_available(
+            db,
+            restaurant_id=restaurant.id,
+            table_id=new_table_id,
+            reservation_date=new_date,
+            reservation_time=new_time,
+            duration_minutes=new_duration,
+            exclude_reservation_id=reservation.id,
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Table is already booked for an overlapping time slot",
+            )
+
+    for key, value in updates.items():
+        setattr(reservation, key, value)
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Table is already booked for an overlapping time slot",
+        )
+    db.refresh(reservation)
+    return _res_to_dict(reservation)
 
 
 @router.patch("/{reservation_id}/status", response_model=schemas.ReservationOut)

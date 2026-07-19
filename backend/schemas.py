@@ -45,6 +45,8 @@ class MenuItemBase(StrictModel):
     category: str
     description: str = ""
     is_available: bool = True
+    image_url: str = ""
+    avg_prep_minutes: float = Field(default=10.0, ge=0)
 
 class MenuItemCreate(MenuItemBase):
     pass
@@ -55,6 +57,8 @@ class MenuItemUpdate(StrictModel):
     category: Optional[str] = None
     description: Optional[str] = None
     is_available: Optional[bool] = None
+    image_url: Optional[str] = None
+    avg_prep_minutes: Optional[float] = Field(default=None, ge=0)
 
 class MenuItem(MenuItemBase):
     id: int
@@ -86,6 +90,7 @@ class OrderItemOut(StrictModel):
     quantity: int
     unit_price: int
     item_name: str = ""
+    prep_station: str = "main"
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
@@ -113,6 +118,36 @@ class OrderStatusUpdate(StrictModel):
 class OrderPaymentUpdate(StrictModel):
     payment_method: str  # cash, mpesa, card
     is_paid: bool = True
+
+class OrderDetailsUpdate(StrictModel):
+    """Covers the manual edits that don't change status/payment: correcting
+    customer details taken down wrong at order time, and appending staff
+    notes (kitchen call-outs, void/cancel reasons) to an existing order."""
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    notes: Optional[str] = None
+
+
+# ──────────────────────────────────────────────
+# KITCHEN INCIDENTS — remakes / quality issues (migration 037)
+# ──────────────────────────────────────────────
+class KitchenIncidentCreate(StrictModel):
+    order_id: Optional[int] = None
+    order_item_id: Optional[int] = None
+    incident_type: str = Field(pattern="^(remake|quality_issue|other)$")
+    reason: str = ""
+
+class KitchenIncidentOut(StrictModel):
+    id: int
+    restaurant_id: int
+    order_id: Optional[int]
+    order_item_id: Optional[int]
+    incident_type: str
+    reason: str
+    reported_by_user_id: Optional[int]
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 # ──────────────────────────────────────────────
 # INVENTORY
@@ -194,6 +229,56 @@ class ReservationOut(StrictModel):
 class ReservationStatusUpdate(StrictModel):
     status: str  # confirmed, cancelled, completed, no_show
 
+class AvailableTableOut(StrictModel):
+    """Best-fit-first suggestion — same ranking find_available_tables()
+    already used server-side for the create-time conflict check, now also
+    exposed for a host to browse before booking."""
+    table_id: int
+    table_number: int
+    capacity: int
+
+class ReservationUpdate(StrictModel):
+    """General edit — changing details of a booking that's already on the
+    books (party size grew, customer called to move the time, assigning/
+    moving which table it's seated at). Distinct from
+    ReservationStatusUpdate, which only ever changes `status`."""
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    party_size: Optional[int] = Field(default=None, gt=0)
+    reservation_date: Optional[date] = None
+    reservation_time: Optional[time] = None
+    duration_minutes: Optional[int] = Field(default=None, gt=0)
+    table_id: Optional[int] = None
+    deposit_paid: Optional[bool] = None
+    notes: Optional[str] = None
+
+
+# ──────────────────────────────────────────────
+# TABLES — floor management (part of the `reservations` domain; directive
+# 015 has no separate matrix row for tables, so these reuse reservations'
+# RW tuple: Owner, Manager, Supervisor, Waiter).
+# ──────────────────────────────────────────────
+class TableCreate(StrictModel):
+    table_number: int = Field(gt=0)
+    capacity: int = Field(default=4, gt=0)
+
+class TableUpdate(StrictModel):
+    table_number: Optional[int] = Field(default=None, gt=0)
+    capacity: Optional[int] = Field(default=None, gt=0)
+
+class TableStatusUpdate(StrictModel):
+    status: str  # available, occupied, reserved, cleaning
+
+class TableOut(StrictModel):
+    id: int
+    restaurant_id: int
+    table_number: int
+    capacity: int
+    status: str
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
 # ──────────────────────────────────────────────
 # STAFF ROSTER & ROLES (directive 015)
 # ──────────────────────────────────────────────
@@ -232,6 +317,36 @@ class StaffMemberOut(StrictModel):
 
 class StaffRoleAssign(StrictModel):
     staff_role: str   # one of StaffRole's values
+
+
+# ──────────────────────────────────────────────
+# ATTENDANCE — clock in/out (+ optional GPS), migration 037
+# ──────────────────────────────────────────────
+class ClockInBody(StrictModel):
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+
+class ClockOutBody(StrictModel):
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+
+class LaborShiftOut(StrictModel):
+    id: int
+    restaurant_id: int
+    staff_member_id: int
+    staff_name: Optional[str] = None
+    shift_date: date
+    actual_start: Optional[datetime] = None
+    actual_end: Optional[datetime] = None
+    actual_hours: Optional[float] = None
+    labor_cost: Optional[int] = None
+    clock_in_flagged: bool = False
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+class AttendanceStatusOut(StrictModel):
+    clocked_in: bool
+    shift: Optional[LaborShiftOut] = None
 
 
 class ImpersonateTarget(StrictModel):

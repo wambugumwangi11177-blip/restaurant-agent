@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
-import { Truck, Plus, Check, ShieldAlert, Settings2 } from "lucide-react";
+import { Truck, Plus, Check, ShieldAlert, Settings2, Pencil } from "lucide-react";
 
 /**
  * Purchasing/supplier workspace — extracted from the original
@@ -33,6 +33,9 @@ export default function PurchasingWorkspace() {
 
     const [receivingId, setReceivingId] = useState<number | null>(null);
     const [receiveQty, setReceiveQty] = useState("");
+
+    const [editingSupplierId, setEditingSupplierId] = useState<number | null>(null);
+    const [editSupplier, setEditSupplier] = useState({ name: "", contact_phone: "", avg_lead_days: "", notes: "" });
 
     const showToast = (msg: string) => {
         setToast(msg);
@@ -96,6 +99,35 @@ export default function PurchasingWorkspace() {
             await fetchAll();
         } catch (err: any) {
             showToast(err?.response?.data?.detail || "Failed to save settings");
+        }
+        setSubmitting(false);
+    };
+
+    const openEditSupplier = (s: any) => {
+        if (editingSupplierId === s.id) { setEditingSupplierId(null); return; }
+        setEditingSupplierId(s.id);
+        setEditSupplier({
+            name: s.name,
+            contact_phone: s.contact_phone || "",
+            avg_lead_days: String(s.avg_lead_days ?? ""),
+            notes: s.notes || "",
+        });
+    };
+
+    const handleSaveSupplier = async (supplierId: number) => {
+        setSubmitting(true);
+        try {
+            await api.put(`/suppliers/${supplierId}`, {
+                name: editSupplier.name,
+                contact_phone: editSupplier.contact_phone,
+                avg_lead_days: editSupplier.avg_lead_days ? parseFloat(editSupplier.avg_lead_days) : undefined,
+                notes: editSupplier.notes,
+            });
+            showToast("Supplier updated");
+            setEditingSupplierId(null);
+            await fetchAll();
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Failed to update supplier");
         }
         setSubmitting(false);
     };
@@ -323,13 +355,43 @@ export default function PurchasingWorkspace() {
                         <p className="text-xs text-[var(--text-dim)] text-center py-6">No suppliers yet</p>
                     ) : (
                         (suppliers || []).map((s) => (
-                            <div key={s.id} className="px-4 py-3 flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-[var(--text)]">{s.name}</p>
-                                    <p className="text-[10px] text-[var(--text-dim)] mt-0.5">
-                                        {s.contact_phone || "No phone on file"} · reliability {s.reliability_score.toFixed(0)}%
-                                    </p>
+                            <div key={s.id} className="px-4 py-3">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-[var(--text)]">{s.name}</p>
+                                        <p className="text-[10px] text-[var(--text-dim)] mt-0.5">
+                                            {s.contact_phone || "No phone on file"} · reliability {s.reliability_score.toFixed(0)}%
+                                        </p>
+                                    </div>
+                                    <button onClick={() => openEditSupplier(s)}
+                                        className="text-[10px] px-2 py-1 rounded bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--accent)] transition-all flex items-center gap-1">
+                                        <Pencil className="w-3 h-3" />
+                                        {editingSupplierId === s.id ? "Close" : "Edit"}
+                                    </button>
                                 </div>
+                                <AnimatePresence>
+                                    {editingSupplierId === s.id && (
+                                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                                            className="mt-2 flex gap-2 items-center flex-wrap overflow-hidden">
+                                            <input placeholder="Name" value={editSupplier.name}
+                                                onChange={(e) => setEditSupplier({ ...editSupplier, name: e.target.value })}
+                                                className="flex-1 min-w-[140px] bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] placeholder-[var(--text-dim)] focus:outline-none" />
+                                            <input placeholder="Phone" value={editSupplier.contact_phone}
+                                                onChange={(e) => setEditSupplier({ ...editSupplier, contact_phone: e.target.value })}
+                                                className="flex-1 min-w-[140px] bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] placeholder-[var(--text-dim)] focus:outline-none" />
+                                            <input placeholder="Lead days" value={editSupplier.avg_lead_days} type="number"
+                                                onChange={(e) => setEditSupplier({ ...editSupplier, avg_lead_days: e.target.value })}
+                                                className="w-24 bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] placeholder-[var(--text-dim)] focus:outline-none" />
+                                            <input placeholder="Notes" value={editSupplier.notes}
+                                                onChange={(e) => setEditSupplier({ ...editSupplier, notes: e.target.value })}
+                                                className="flex-1 min-w-[140px] bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] placeholder-[var(--text-dim)] focus:outline-none" />
+                                            <button onClick={() => handleSaveSupplier(s.id)} disabled={!editSupplier.name || submitting}
+                                                className="bg-[var(--accent)] text-black rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
+                                                {submitting ? "..." : "Save"}
+                                            </button>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </div>
                         ))
                     )}

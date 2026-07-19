@@ -87,8 +87,11 @@ _EVENT_TARGET_ROLES: dict[EventType, list[StaffRole]] = {
     EventType.STAFF_DEACTIVATED:          [StaffRole.OWNER],
     EventType.STAFF_REACTIVATED:          [StaffRole.OWNER],
     # A menu item just went unavailable mid-shift — every POS-facing tier
-    # needs to stop selling it, not just Owner.
-    EventType.MENU_ITEM_UNAVAILABLE:      [StaffRole.OWNER, StaffRole.MANAGER, StaffRole.SUPERVISOR, StaffRole.WAITER],
+    # needs to stop selling it, not just Owner. Kitchen added 2026-07-19 (was
+    # missing): the owner's walkthrough notes are explicit that an auto-86
+    # on stock depletion must tell "the kitchen and the POS and the
+    # waiters", not just front-of-house.
+    EventType.MENU_ITEM_UNAVAILABLE:      [StaffRole.OWNER, StaffRole.MANAGER, StaffRole.SUPERVISOR, StaffRole.WAITER, StaffRole.KITCHEN],
     # 2026-07-18 event-map pass. These four are high-frequency *operational*
     # events (every ready ticket, every booking), so unlike almost every event
     # above they deliberately EXCLUDE the Owner: the owner's feed is for the
@@ -124,6 +127,25 @@ _EVENT_TARGET_ROLES: dict[EventType, list[StaffRole]] = {
     EventType.PRICE_CHANGED:              [StaffRole.OWNER, StaffRole.MANAGER, StaffRole.SUPERVISOR, StaffRole.WAITER],
     # A batch of AI pricing recommendations is waiting -> the approvers.
     EventType.RECOMMENDATION_GENERATED:   [StaffRole.OWNER, StaffRole.MANAGER],
+    # The weekly unattended strategist review produced a headline -> same
+    # audience as RECOMMENDATION_GENERATED (they decide whether to act on it).
+    EventType.STRATEGY_REVIEW_GENERATED:  [StaffRole.OWNER, StaffRole.MANAGER],
+    # 2026-07-19 walkthrough-notes pass — remake/quality issue logged ->
+    # oversight tiers, not the whole floor (same posture as
+    # INVENTORY_ADJUSTMENT_FLAGGED). Actor (the reporter) excluded in the
+    # handler.
+    EventType.KITCHEN_INCIDENT_LOGGED:    [StaffRole.OWNER, StaffRole.MANAGER, StaffRole.SUPERVISOR],
+    # Clock-in/out — routine, high-frequency, so scoped to the tiers that
+    # actually manage labor (not the whole floor, and not Owner directly —
+    # matches ORDER_READY/RESERVATION_CREATED's "operational, not
+    # exception" posture above).
+    EventType.SHIFT_STARTED:              [StaffRole.MANAGER, StaffRole.SUPERVISOR],
+    EventType.SHIFT_ENDED:                [StaffRole.MANAGER, StaffRole.SUPERVISOR],
+    # A clock-in was farther than the proximity threshold from the
+    # restaurant — an exception, unlike the two above, so it does reach
+    # Owner (same posture as ACCOUNT_LOCKED: a possible attendance-fraud
+    # signal is exactly the kind of thing one accountable person should see).
+    EventType.SHIFT_CLOCK_IN_FLAGGED:     [StaffRole.OWNER, StaffRole.MANAGER],
 }
 
 # Where each domain actually lives per tier, post-2026-07-17 (every staff
@@ -234,6 +256,11 @@ def register_push_handlers() -> None:
     subscribe(EventType.PRICE_CHANGED, _on_price_changed)
     subscribe(EventType.RECOMMENDATION_GENERATED, _on_recommendation_generated)
     subscribe(EventType.STAFF_REACTIVATED, _on_staff_reactivated)
+    subscribe(EventType.STRATEGY_REVIEW_GENERATED, _on_strategy_review_generated)
+    subscribe(EventType.KITCHEN_INCIDENT_LOGGED, _on_kitchen_incident_logged)
+    subscribe(EventType.SHIFT_STARTED, _on_shift_started)
+    subscribe(EventType.SHIFT_ENDED, _on_shift_ended)
+    subscribe(EventType.SHIFT_CLOCK_IN_FLAGGED, _on_shift_clock_in_flagged)
 
     logger.info("[PushNotifier] All handlers registered")
 
@@ -945,6 +972,29 @@ def _on_price_changed(payload: dict) -> None:
         db.close()
 
 
+def _on_strategy_review_generated(payload: dict) -> None:
+    """A weekly unattended strategist review (main.py's strategist_review job)
+    just produced a headline — nudge the owner/manager to read it. One
+    summary per run (see the emit site)."""
+    restaurant_id = payload.get("restaurant_id")
+    headline = (payload.get("headline") or "").strip()
+    if not headline:
+        return
+
+    db = SessionLocal()
+    try:
+        restaurant = _get_restaurant(db, restaurant_id)
+        if not restaurant:
+            return
+        title = "Weekly strategy review ready"
+        body = headline
+        _fan_out(db, restaurant, EventType.STRATEGY_REVIEW_GENERATED, title, body, "ai-ops")
+    except Exception as exc:
+        logger.error(f"[PushNotifier] strategy_review_generated failed: {exc}")
+    finally:
+        db.close()
+
+
 def _on_recommendation_generated(payload: dict) -> None:
     """A batch of AI pricing recommendations was just generated — nudge the
     approver to review them. One summary per run (see the emit site)."""
@@ -963,5 +1013,90 @@ def _on_recommendation_generated(payload: dict) -> None:
         _fan_out(db, restaurant, EventType.RECOMMENDATION_GENERATED, title, body, "menu")
     except Exception as exc:
         logger.error(f"[PushNotifier] recommendation_generated failed: {exc}")
+    finally:
+        db.close()
+
+
+def _on_kitchen_incident_logged(payload: dict) -> None:
+    """A remake or quality issue was logged — oversight tiers should see the
+    pattern building. Actor (the reporter) excluded."""
+    restaurant_id = payload.get("restaurant_id")
+    incident_type = (payload.get("incident_type") or "other").replace("_", " ")
+    reason = (payload.get("reason") or "").strip()
+    order_id = payload.get("order_id")
+
+    db = SessionLocal()
+    try:
+        restaurant = _get_restaurant(db, restaurant_id)
+        if not restaurant:
+            return
+        where = f" (Order #{order_id})" if order_id else ""
+        title = f"Kitchen {incident_type}{where}"
+        body = reason if reason else f"A {incident_type} was logged in the kitchen."
+        _fan_out(db, restaurant, EventType.KITCHEN_INCIDENT_LOGGED, title, body, "orders",
+                 exclude_user_id=payload.get("actor_user_id"))
+    except Exception as exc:
+        logger.error(f"[PushNotifier] kitchen_incident_logged failed: {exc}")
+    finally:
+        db.close()
+
+
+def _on_shift_started(payload: dict) -> None:
+    """A staff member clocked in — routine, scoped to labor-managing tiers."""
+    restaurant_id = payload.get("restaurant_id")
+    staff_name = payload.get("staff_name", "A staff member")
+
+    db = SessionLocal()
+    try:
+        restaurant = _get_restaurant(db, restaurant_id)
+        if not restaurant:
+            return
+        title = f"Clocked in: {staff_name}"
+        body = f"{staff_name} just clocked in."
+        _fan_out(db, restaurant, EventType.SHIFT_STARTED, title, body, "staff")
+    except Exception as exc:
+        logger.error(f"[PushNotifier] shift_started failed: {exc}")
+    finally:
+        db.close()
+
+
+def _on_shift_ended(payload: dict) -> None:
+    """A staff member clocked out — routine, scoped to labor-managing tiers."""
+    restaurant_id = payload.get("restaurant_id")
+    staff_name = payload.get("staff_name", "A staff member")
+    hours = payload.get("actual_hours")
+
+    db = SessionLocal()
+    try:
+        restaurant = _get_restaurant(db, restaurant_id)
+        if not restaurant:
+            return
+        title = f"Clocked out: {staff_name}"
+        body = f"{staff_name} worked {hours:.1f}h." if hours is not None else f"{staff_name} just clocked out."
+        _fan_out(db, restaurant, EventType.SHIFT_ENDED, title, body, "staff")
+    except Exception as exc:
+        logger.error(f"[PushNotifier] shift_ended failed: {exc}")
+    finally:
+        db.close()
+
+
+def _on_shift_clock_in_flagged(payload: dict) -> None:
+    """A clock-in's GPS was farther than the proximity threshold from the
+    restaurant — a possible attendance-fraud signal, reaches Owner."""
+    restaurant_id = payload.get("restaurant_id")
+    staff_name = payload.get("staff_name", "A staff member")
+    distance_m = payload.get("distance_meters")
+
+    db = SessionLocal()
+    try:
+        restaurant = _get_restaurant(db, restaurant_id)
+        if not restaurant:
+            return
+        title = f"Clock-in location flagged: {staff_name}"
+        body = (f"{staff_name} clocked in ~{distance_m:.0f}m from the restaurant." if distance_m is not None
+                else f"{staff_name} clocked in from an unexpected location.")
+        _fan_out(db, restaurant, EventType.SHIFT_CLOCK_IN_FLAGGED, title, body, "staff")
+    except Exception as exc:
+        logger.error(f"[PushNotifier] shift_clock_in_flagged failed: {exc}")
     finally:
         db.close()

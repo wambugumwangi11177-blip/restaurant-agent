@@ -50,12 +50,21 @@ SYSTEM_PROMPT = (
     "revenue_forecast gives the near-term revenue outlook.\n"
     "- NEVER invent numbers. Only cite figures the tools returned. Do the reasoning, not the "
     "arithmetic.\n"
+    "- You may be given PRIOR STRATEGY REVIEWS and YOUR TRACK RECORD context above the goal. "
+    "Use it: don't repeat a step you already flagged unless it's still unresolved, and weigh "
+    "figures from an agent with a poor recent track record more cautiously.\n"
     "- When you have enough, reply with a final JSON object ONLY, no prose around it:\n"
     '{"headline": "one-sentence strategy", '
     '"steps": [{"action": "what to do", "why": "reason citing tool data", '
     '"expected_impact": "e.g. +KES 40,000/mo or qualitative"}], '
     '"risks": ["key risk", "..."]}\n'
     "Order steps by priority (highest-impact, lowest-risk first). 3-6 steps."
+)
+
+# Standing goal used for unattended (scheduled) reviews — no owner-supplied goal.
+STANDING_GOAL = (
+    "Review recent performance and recommend the single highest-impact opportunity "
+    "or risk for the next 7 days."
 )
 
 
@@ -157,11 +166,14 @@ _DISPATCH = {
 # Entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_strategy(db: Session, restaurant_id: int, goal: str, timeframe: str = "") -> dict:
+def run_strategy(db: Session, restaurant_id: int, goal: str, timeframe: str = "", triggered_by: str = "api") -> dict:
     """
     Produce one prioritized strategy for `goal`. LLM-backed when a provider is
     configured and the feature is on; otherwise a deterministic fallback built
     from the ranked Decision Intelligence stream.
+
+    triggered_by distinguishes an owner-initiated call ("api", default) from
+    an unattended scheduled run ("scheduler") in the AgentExecution record.
     """
     goal = (goal or "").strip()
     if not goal:
@@ -178,7 +190,7 @@ def run_strategy(db: Session, restaurant_id: int, goal: str, timeframe: str = ""
     if not llm_ready:
         return _deterministic_strategy(db, restaurant_id, goal, timeframe)
 
-    return _llm_strategy(db, restaurant_id, goal, timeframe)
+    return _llm_strategy(db, restaurant_id, goal, timeframe, triggered_by)
 
 
 def plan(db: Session, restaurant_id: int, goal: str, horizon_weeks: int = 4) -> dict:
@@ -272,14 +284,30 @@ def _deterministic_strategy(db: Session, restaurant_id: int, goal: str, timefram
     }
 
 
-def _llm_strategy(db: Session, restaurant_id: int, goal: str, timeframe: str) -> dict:
+def _llm_strategy(db: Session, restaurant_id: int, goal: str, timeframe: str, triggered_by: str = "api") -> dict:
     from ai import llm_client, pii_scrub
+    from ai.memory import store as memory
+    from ai.evaluation.feedback import reliability_summary_text
     from ai.reasoning import grounding
     from ai.llm_client import TIER_HIGH
 
     user_msg = f"GOAL: {goal}"
     if timeframe:
         user_msg += f"\nTIMEFRAME: {timeframe}"
+
+    # Self-knowledge: what this agent concluded before, and how trustworthy
+    # its inputs have recently been — both invisible to it until now.
+    preamble = ""
+    reflections = memory.recall_recent_reflections(db, restaurant_id, limit=3)
+    if reflections:
+        lines = [f"- {r['event_date']}: {r['agent_notes']}" for r in reflections]
+        preamble += "PRIOR STRATEGY REVIEWS (what you concluded before):\n" + "\n".join(lines) + "\n\n"
+    reliability_text = reliability_summary_text(db, restaurant_id)
+    if reliability_text:
+        preamble += "YOUR TRACK RECORD (recent forecast accuracy by agent):\n" + reliability_text + "\n\n"
+    if preamble:
+        user_msg = preamble + user_msg
+
     messages = [{"role": "user", "content": pii_scrub.scrub_for_llm(user_msg)}]
 
     trace: list[dict] = []
@@ -331,9 +359,14 @@ def _llm_strategy(db: Session, restaurant_id: int, goal: str, timeframe: str) ->
     # Ground every step's free text against the numbers the tools returned.
     strategy = _ground_strategy(strategy, grounded_numbers, grounding)
 
+    try:
+        memory.record_strategy_reflection(db, restaurant_id, goal, strategy)
+    except Exception as exc:  # noqa: BLE001 — a memory-write failure must not break the response
+        logger.warning("strategy reflection write failed: %s", exc)
+
     elapsed_ms = int((time.perf_counter() - start) * 1000)
     _persist(db, restaurant_id, goal, strategy, trace, last_model,
-             tokens_in, tokens_out, elapsed_ms)
+             tokens_in, tokens_out, elapsed_ms, triggered_by)
 
     return {
         "available": True,
@@ -408,7 +441,31 @@ def _ground_strategy(strategy: dict, grounded: set, grounding) -> dict:
     return strategy
 
 
-def _persist(db, restaurant_id, goal, strategy, trace, model, tokens_in, tokens_out, elapsed_ms):
+def format_for_whatsapp(strategy: dict) -> str:
+    """Render a strategy dict as a WhatsApp-friendly text digest, mirroring
+    ai/whatsapp/brain.py's compose_*_briefing shape (headline + numbered
+    steps + risks)."""
+    lines = [f"📊 *Strategy review*", strategy.get("headline", "").strip() or "No headline."]
+    steps = strategy.get("steps", [])
+    if steps:
+        lines.append("")
+        for i, step in enumerate(steps, 1):
+            if not isinstance(step, dict):
+                continue
+            action = step.get("action", "").strip()
+            impact = step.get("expected_impact", "").strip()
+            line = f"{i}. {action}"
+            if impact:
+                line += f" ({impact})"
+            lines.append(line)
+    risks = strategy.get("risks", [])
+    if risks:
+        lines.append("")
+        lines.append("⚠️ Risks: " + "; ".join(r for r in risks if r))
+    return "\n".join(lines)
+
+
+def _persist(db, restaurant_id, goal, strategy, trace, model, tokens_in, tokens_out, elapsed_ms, triggered_by="api"):
     """Write the reasoning trace to the audit log + execution + token meter."""
     from ai.evaluation.tracker import write_audit_log
     try:
@@ -436,7 +493,7 @@ def _persist(db, restaurant_id, goal, strategy, trace, model, tokens_in, tokens_
                 restaurant_id=restaurant_id, agent_name="strategist",
                 function_name="run_strategy", success=True,
                 execution_ms=elapsed_ms, records_processed=len(trace),
-                triggered_by="api",
+                triggered_by=triggered_by,
             ))
             s.commit()
         finally:

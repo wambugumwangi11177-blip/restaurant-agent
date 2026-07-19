@@ -259,6 +259,95 @@ async def update_order_payment(
     return _order_to_dict(order)
 
 
+@router.patch("/{order_id}/details", response_model=schemas.OrderOut)
+async def update_order_details(
+    order_id: int,
+    update: schemas.OrderDetailsUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_UPDATE_STATUS)),
+):
+    """Manual corrections that aren't a status/payment transition: fixing a
+    customer's name/phone taken down wrong, or appending a note (a cancel/void
+    reason, a kitchen call-out) to an order already in flight. Same role gate
+    as status updates — Kitchen needs this too, to leave notes on a ticket."""
+    restaurant = get_or_create_restaurant(db, current_user)
+    order = db.query(models.Order).filter(
+        models.Order.id == order_id,
+        models.Order.restaurant_id == restaurant.id,
+    ).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    for key, value in update.dict(exclude_unset=True).items():
+        setattr(order, key, value)
+
+    db.commit()
+    db.refresh(order)
+    return _order_to_dict(order)
+
+
+# ── Kitchen incidents: remakes / quality issues (migration 037) ──
+# Owner's operational walkthrough (2026-07-19): "if there's any food that
+# needs to be remade, it's also put in the system manually" / "if any issue
+# happens in the kitchen, it's put in." Previously nowhere to log either.
+
+@router.post("/incidents", response_model=schemas.KitchenIncidentOut, status_code=201)
+async def log_kitchen_incident(
+    body: schemas.KitchenIncidentCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_UPDATE_STATUS)),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+
+    if body.order_id is not None:
+        order = db.query(models.Order).filter(
+            models.Order.id == body.order_id,
+            models.Order.restaurant_id == restaurant.id,
+        ).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+    try:
+        incident_type = models.IncidentType(body.incident_type)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid incident_type: {body.incident_type}")
+
+    incident = models.KitchenIncident(
+        restaurant_id=restaurant.id,
+        order_id=body.order_id,
+        order_item_id=body.order_item_id,
+        incident_type=incident_type,
+        reason=body.reason,
+        reported_by_user_id=current_user.id,
+    )
+    db.add(incident)
+    db.commit()
+    db.refresh(incident)
+
+    from events.bus import emit_async, EventType
+    emit_async(EventType.KITCHEN_INCIDENT_LOGGED, {
+        "restaurant_id": restaurant.id,
+        "incident_type": incident_type.value,
+        "order_id": body.order_id,
+        "reason": body.reason,
+        "reported_by": current_user.email,
+        "actor_user_id": current_user.id,
+    })
+
+    return incident
+
+
+@router.get("/incidents", response_model=List[schemas.KitchenIncidentOut])
+async def list_kitchen_incidents(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_READ)),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+    return db.query(models.KitchenIncident).filter(
+        models.KitchenIncident.restaurant_id == restaurant.id
+    ).order_by(models.KitchenIncident.created_at.desc()).limit(200).all()
+
+
 # ── Public endpoint (no auth) for customer ordering ──
 
 @router.post("/public", response_model=schemas.OrderOut)
@@ -396,14 +485,17 @@ def _order_to_dict(order: models.Order) -> dict:
     items_out = []
     for oi in (order.items or []):
         item_name = ""
+        prep_station = "main"
         if oi.menu_item:
             item_name = oi.menu_item.name
+            prep_station = oi.menu_item.prep_station or "main"
         items_out.append({
             "id": oi.id,
             "menu_item_id": oi.menu_item_id,
             "quantity": oi.quantity,
             "unit_price": oi.unit_price,
             "item_name": item_name,
+            "prep_station": prep_station,
         })
     return {
         "id": order.id,

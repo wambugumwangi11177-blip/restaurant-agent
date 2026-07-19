@@ -79,6 +79,11 @@ class PaymentMethod(enum.Enum):
     CARD = "card"
     PENDING = "pending"   # Not yet paid
 
+class IncidentType(enum.Enum):
+    REMAKE = "remake"
+    QUALITY_ISSUE = "quality_issue"
+    OTHER = "other"
+
 # ──────────────────────────────────────────────
 # TENANT & USER
 # ──────────────────────────────────────────────
@@ -153,6 +158,12 @@ class Restaurant(Base):
     # chain groups its sites under an Organization and (optionally) a Region.
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     region_id       = Column(Integer, ForeignKey("regions.id"), nullable=True, index=True)
+    # GPS staff check-in (migration 037). Nullable — until an owner sets these
+    # (via PUT /restaurant), GPS check-in proximity checks are simply skipped
+    # rather than guessed at (same "don't guess" posture as par_level/
+    # default_supplier_id in directive 018).
+    latitude        = Column(Float, nullable=True)
+    longitude       = Column(Float, nullable=True)
 
     tenant = relationship("Tenant", back_populates="restaurants")
     menu_items = relationship("MenuItem", back_populates="restaurant")
@@ -290,8 +301,36 @@ class PrepTime(Base):
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     actual_minutes = Column(Float, nullable=True)
-    
+
     order_item = relationship("OrderItem", back_populates="prep_time")
+
+
+class KitchenIncident(Base):
+    """
+    A remake or quality issue logged against an order (migration 037) —
+    previously nowhere to record either, per the owner's walkthrough notes:
+    "if there's any food that needs to be remade, it's also put in the
+    system manually" / "if any issue happens in the kitchen, it's put in."
+    order_item_id is nullable: some issues are order-level (wrong table),
+    not tied to one line item.
+    """
+    __tablename__ = "kitchen_incidents"
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=True, index=True)
+    order_item_id = Column(Integer, ForeignKey("order_items.id"), nullable=True)
+    incident_type = Column(SqEnum(IncidentType), nullable=False)
+    reason = Column(Text, default="")
+    reported_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+
+    restaurant = relationship("Restaurant")
+    order = relationship("Order")
+    order_item = relationship("OrderItem")
+
+    __table_args__ = (
+        Index("ix_kitchen_incidents_restaurant_created", "restaurant_id", "created_at"),
+    )
 
 # ──────────────────────────────────────────────
 # INVENTORY (Enhanced for AI)
@@ -709,6 +748,20 @@ class LaborShift(Base):
     labor_cost      = Column(Integer, nullable=True)    # Computed: hours * hourly_rate (cents)
     notes           = Column(Text, default="")
     created_at      = Column(DateTime, default=utcnow)
+    # GPS check-in (migration 037). Captured whenever the clocking-in device
+    # shares its location; nullable because it's opt-in (a device that denies
+    # location permission can still clock in). Distance-from-restaurant is
+    # only ever checked, never blocking — see routers/attendance.py — because
+    # Restaurant.latitude/longitude are themselves optional (an owner who
+    # hasn't set them yet gets no flag, not a false one).
+    clock_in_lat    = Column(Float, nullable=True)
+    clock_in_lng    = Column(Float, nullable=True)
+    clock_out_lat   = Column(Float, nullable=True)
+    clock_out_lng   = Column(Float, nullable=True)
+    # Set true when clock_in_lat/lng was farther than the proximity threshold
+    # from the restaurant's own coordinates — a visibility flag for managers,
+    # never a block on clocking in (see routers/attendance.py).
+    clock_in_flagged = Column(Boolean, default=False, nullable=False)
 
     staff_member = relationship("StaffMember", back_populates="shifts")
     restaurant   = relationship("Restaurant")

@@ -2,25 +2,39 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { motion } from "framer-motion";
-import { ShoppingBag } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ShoppingBag, Check, Banknote, Smartphone, CreditCard, Ban } from "lucide-react";
 
 /**
  * Order list + light analytics — extracted from the original
- * dashboard/orders/page.tsx. Purely a display surface (no status/payment
- * actions live here — those are KDSBoard's and POSWorkspace's jobs), so it's
- * reused unmodified by every tier with `orders` read access (directive 015:
- * Owner/Manager/Supervisor/Waiter RW, Controller/Kitchen R — RW vs R doesn't
- * matter here since this component never writes). /ai/revenue-forecast is
- * Manager/Controller-only server-side; other tiers simply see the insights
- * panel absent, handled by the existing .catch(() => ({ data: null })).
+ * dashboard/orders/page.tsx. Status advancement (pending -> prep -> ready ->
+ * served) stays KDSBoard's job and new-order entry stays POSWorkspace's job —
+ * this adds the two manual corrections that belong to an order already
+ * placed: recording how it was actually paid for, and cancelling one with a
+ * reason. Reused unmodified by every tier with `orders` access (directive
+ * 015: Owner/Manager/Supervisor/Waiter RW, Controller/Kitchen R); the write
+ * actions below simply 403 server-side for a read-only tier, matching every
+ * other workspace's pattern. /ai/revenue-forecast is Manager/Controller-only
+ * server-side; other tiers simply see the insights panel absent, handled by
+ * the existing .catch(() => ({ data: null })).
  */
 export default function OrderList() {
     const [orders, setOrders] = useState<any[]>([]);
     const [aiData, setAiData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [toast, setToast] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+    const [payingId, setPayingId] = useState<number | null>(null);
+    const [payMethod, setPayMethod] = useState("cash");
+    const [cancellingId, setCancellingId] = useState<number | null>(null);
+    const [cancelReason, setCancelReason] = useState("");
 
-    useEffect(() => {
+    const showToast = (msg: string) => {
+        setToast(msg);
+        setTimeout(() => setToast(""), 3000);
+    };
+
+    const fetchData = () => {
         Promise.all([
             api.get("/orders/").catch(() => ({ data: [] })),
             api.get("/ai/revenue-forecast").catch(() => ({ data: null })),
@@ -29,7 +43,43 @@ export default function OrderList() {
             setAiData(aiRes.data);
             setLoading(false);
         });
-    }, []);
+    };
+
+    useEffect(() => { fetchData(); }, []);
+
+    const handleRecordPayment = async (orderId: number) => {
+        setSubmitting(true);
+        try {
+            await api.patch(`/orders/${orderId}/payment`, { payment_method: payMethod, is_paid: true });
+            showToast("Payment recorded");
+            setPayingId(null);
+            fetchData();
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Failed to record payment");
+        }
+        setSubmitting(false);
+    };
+
+    const handleCancelOrder = async (orderId: number) => {
+        setSubmitting(true);
+        try {
+            if (cancelReason.trim()) {
+                const order = orders.find((o) => o.id === orderId);
+                const note = `Cancelled: ${cancelReason.trim()}`;
+                await api.patch(`/orders/${orderId}/details`, {
+                    notes: order?.notes ? `${order.notes} | ${note}` : note,
+                });
+            }
+            await api.patch(`/orders/${orderId}/status`, { status: "cancelled" });
+            showToast("Order cancelled");
+            setCancellingId(null);
+            setCancelReason("");
+            fetchData();
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Failed to cancel order");
+        }
+        setSubmitting(false);
+    };
 
     if (loading) {
         return (
@@ -158,6 +208,15 @@ export default function OrderList() {
 
             {/* Order List */}
             <div className="bg-[#141414] border border-[#262626] rounded-xl">
+                <AnimatePresence>
+                    {toast && (
+                        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+                            className="fixed top-4 right-4 z-50 bg-[#22c55e]/10 border border-[#22c55e]/30 rounded-xl px-5 py-3 flex items-center gap-2">
+                            <Check className="w-4 h-4 text-[#22c55e]" />
+                            <span className="text-sm text-[#22c55e]">{toast}</span>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
                 <div className="px-4 py-3 border-b border-[#1a1a1a]">
                     <h2 className="text-sm font-semibold text-[#e5e5e5]">Recent Orders</h2>
                 </div>
@@ -183,25 +242,89 @@ export default function OrderList() {
                                 served: "bg-[#737373]/10 text-[#737373]",
                                 cancelled: "bg-[#ef4444]/10 text-[#ef4444]",
                             };
+                            const canAct = order.status !== "cancelled" && order.status !== "served";
                             return (
                                 <motion.div key={order.id || i} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                                     transition={{ delay: i * 0.03 }}
-                                    className="px-4 py-3 flex items-center justify-between hover:bg-[#1a1a1a] transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-sm font-mono text-[#525252]">#{order.id}</span>
-                                        <div>
-                                            <p className="text-sm text-[#e5e5e5]">{order.customer_name || "Walk-in"}</p>
-                                            <p className="text-xs text-[#525252] mt-0.5">
-                                                {friendlyOrderType(order.order_type)}{order.table_number ? ` · Table ${order.table_number}` : ""}
-                                            </p>
+                                    className="px-4 py-3 hover:bg-[#1a1a1a] transition-colors">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-sm font-mono text-[#525252]">#{order.id}</span>
+                                            <div>
+                                                <p className="text-sm text-[#e5e5e5]">{order.customer_name || "Walk-in"}</p>
+                                                <p className="text-xs text-[#525252] mt-0.5">
+                                                    {friendlyOrderType(order.order_type)}{order.table_number ? ` · Table ${order.table_number}` : ""}
+                                                    {!order.is_paid && order.status !== "cancelled" ? " · Unpaid" : ""}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {canAct && (
+                                                <div className="flex items-center gap-1">
+                                                    {!order.is_paid && (
+                                                        <button
+                                                            onClick={() => { setPayingId(payingId === order.id ? null : order.id); setCancellingId(null); }}
+                                                            className="text-[10px] px-2 py-1 rounded bg-[#1a1a1a] text-[#737373] hover:text-[#22c55e] transition-all">
+                                                            Record payment
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => { setCancellingId(cancellingId === order.id ? null : order.id); setPayingId(null); }}
+                                                        className="text-[10px] px-2 py-1 rounded bg-[#1a1a1a] text-[#737373] hover:text-[#ef4444] transition-all">
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <div className="text-right">
+                                                <p className="text-sm font-medium text-[var(--accent)]">{formatKES(order.total)}</p>
+                                                <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-medium ${statusStyles[order.status] || statusStyles.pending}`}>
+                                                    {statusLabels[order.status] || order.status}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-medium text-[var(--accent)]">{formatKES(order.total)}</p>
-                                        <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-medium ${statusStyles[order.status] || statusStyles.pending}`}>
-                                            {statusLabels[order.status] || order.status}
-                                        </span>
-                                    </div>
+
+                                    <AnimatePresence>
+                                        {payingId === order.id && (
+                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                                                className="mt-2 flex gap-1.5 items-center overflow-hidden">
+                                                {[
+                                                    { v: "cash", label: "Cash", icon: Banknote },
+                                                    { v: "mpesa", label: "M-Pesa", icon: Smartphone },
+                                                    { v: "card", label: "Card", icon: CreditCard },
+                                                ].map((p) => (
+                                                    <button key={p.v} onClick={() => setPayMethod(p.v)}
+                                                        className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${payMethod === p.v
+                                                            ? "bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/30"
+                                                            : "bg-[#1a1a1a] text-[#737373] border border-transparent"
+                                                            }`}>
+                                                        <p.icon className="w-3 h-3" />
+                                                        {p.label}
+                                                    </button>
+                                                ))}
+                                                <button onClick={() => handleRecordPayment(order.id)} disabled={submitting}
+                                                    className="bg-[#22c55e] text-black rounded-lg px-3 py-1 text-xs font-semibold disabled:opacity-50">
+                                                    {submitting ? "..." : "Confirm"}
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+
+                                    <AnimatePresence>
+                                        {cancellingId === order.id && (
+                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                                                className="mt-2 flex gap-2 items-center overflow-hidden">
+                                                <input placeholder="Reason (optional)" value={cancelReason}
+                                                    onChange={(e) => setCancelReason(e.target.value)}
+                                                    className="flex-1 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
+                                                <button onClick={() => handleCancelOrder(order.id)} disabled={submitting}
+                                                    className="flex items-center gap-1 bg-[#ef4444] text-white rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
+                                                    <Ban className="w-3 h-3" />
+                                                    {submitting ? "..." : "Confirm Cancel"}
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </motion.div>
                             );
                         })}

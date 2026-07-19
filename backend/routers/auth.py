@@ -112,6 +112,11 @@ class RestaurantUpdate(StrictModel):
     currency: str | None = None
     timezone: str | None = None
     owner_phone: str | None = None   # E.164, e.g. +2547...; used for WhatsApp owner routing
+    # GPS staff check-in (migration 037) — set once so routers/attendance.py
+    # has something to compare a clock-in's coordinates against. Optional:
+    # leaving these unset simply means the proximity check never runs.
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class PasswordResetRequest(StrictModel):
@@ -487,6 +492,10 @@ async def update_restaurant(
         # raw form silently broke owner-command matching for any non-E.164 entry.
         from phone_utils import normalize_phone
         restaurant.owner_phone = normalize_phone(data.owner_phone)
+    if data.latitude is not None:
+        restaurant.latitude = data.latitude
+    if data.longitude is not None:
+        restaurant.longitude = data.longitude
     db.commit()
     db.refresh(restaurant)
     return {
@@ -494,4 +503,6 @@ async def update_restaurant(
         "name": restaurant.name,
         "address": restaurant.address,
         "owner_phone": restaurant.owner_phone,
+        "latitude": restaurant.latitude,
+        "longitude": restaurant.longitude,
     }

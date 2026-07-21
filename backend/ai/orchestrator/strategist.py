@@ -318,9 +318,38 @@ def _llm_strategy(db: Session, restaurant_id: int, goal: str, timeframe: str, tr
 
     final_text = ""
     for _turn in range(MAX_STRATEGY_TURNS):
+        # Reserve the last turn to force a conclusion: with tools still on
+        # offer every turn, the model can spend the *entire* budget calling
+        # tools and never produce a final answer, exhausting real LLM calls
+        # for zero output (tech-debt-register.md D14, reproduced live
+        # 2026-07-21 — 6 turns, ~130s, "No strategy produced."). Dropping
+        # tools on the final turn makes that structurally impossible: with
+        # nothing left to call, the model must respond in text.
+        is_last_turn = _turn == MAX_STRATEGY_TURNS - 1
+        turn_messages = messages
+        if is_last_turn:
+            turn_messages = messages + [{
+                "role": "user",
+                "content": (
+                    "This is your last turn — no more tools are available. "
+                    "Using only what you've already gathered above, respond "
+                    "now with the final strategy JSON (headline, steps, risks). "
+                    "Keep it concise: a short headline, at most 3 steps, at "
+                    "most 2 risks, so the JSON fits comfortably in this turn."
+                ),
+            }]
         response = llm_client.chat_with_tools(
-            messages=messages, tools=TOOLS, system=SYSTEM_PROMPT,
-            tier=TIER_HIGH, max_tokens=1500,
+            messages=turn_messages, tools=([] if is_last_turn else TOOLS),
+            system=SYSTEM_PROMPT, tier=TIER_HIGH,
+            # The concluding turn has to fit a full structured object
+            # (headline + steps[] with reasoning + risks[]) — 1500 tokens,
+            # fine for a tool-call turn, was cutting that off mid-JSON on
+            # live testing (2026-07-21: valid-looking JSON, but truncated
+            # before the closing brace, so _parse_strategy's json.loads
+            # failed and fell back to the raw-text headline path with empty
+            # steps/risks). Give the last turn more headroom; earlier turns
+            # (picking a tool) don't need it.
+            max_tokens=3000 if is_last_turn else 1500,
         )
         tokens_in += response.usage.input_tokens
         tokens_out += response.usage.output_tokens
@@ -352,8 +381,13 @@ def _llm_strategy(db: Session, restaurant_id: int, goal: str, timeframe: str, tr
                 "type": "tool_result", "tool_use_id": block.id, "content": result_text,
             })
         messages.append({"role": "user", "content": tool_results})
-    else:
-        final_text = final_text or ""
+
+    if not final_text.strip() and trace:
+        # Defensive fallback if even the forced final turn came back blank —
+        # surface what was actually gathered rather than a content-free
+        # "No strategy produced." banner that hides several real LLM calls
+        # of work.
+        final_text = "Reviewed: " + "; ".join(t["summary"] for t in trace[-3:])
 
     strategy = _parse_strategy(final_text)
     # Ground every step's free text against the numbers the tools returned.

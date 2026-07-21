@@ -322,23 +322,34 @@ def chat_with_tools(
             cached_tools[-1]["cache_control"] = {"type": "ephemeral"}
         system_blocks = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}] if system else []
 
-        return client.messages.create(
-            model=resolved or _ANTHROPIC_MODEL,
-            max_tokens=max_tokens,
-            system=system_blocks,
-            tools=cached_tools,
-            messages=messages,
-        )
+        kwargs = {
+            "model": resolved or _ANTHROPIC_MODEL,
+            "max_tokens": max_tokens,
+            "system": system_blocks,
+            "messages": messages,
+        }
+        # Mirror the Groq branch: omit `tools` entirely for a no-tools turn
+        # rather than sending an empty array, for the same reason.
+        if cached_tools:
+            kwargs["tools"] = cached_tools
+        return client.messages.create(**kwargs)
 
     # Groq / OpenAI-compatible — translate request and response at the boundary
     # so ai/whatsapp/orchestrator.py's loop logic stays provider-agnostic.
     openai_messages = ([{"role": "system", "content": system}] if system else []) + _canonical_messages_to_openai(messages)
-    response = client.chat.completions.create(
-        model=resolved or _GROQ_MODEL,
-        max_tokens=max_tokens,
-        messages=openai_messages,
-        tools=_tools_to_openai_format(tools),
-    )
+    kwargs = {
+        "model": resolved or _GROQ_MODEL,
+        "max_tokens": max_tokens,
+        "messages": openai_messages,
+    }
+    # Some OpenAI-compatible APIs reject an explicit empty `tools` array (400
+    # "must not be empty") rather than treating it the same as omitting the
+    # param. Omit it entirely for a no-tools turn (e.g. forcing a strategist
+    # loop to conclude) so callers can safely pass tools=[] regardless of
+    # provider quirks.
+    if tools:
+        kwargs["tools"] = _tools_to_openai_format(tools)
+    response = client.chat.completions.create(**kwargs)
     choice = response.choices[0]
 
     content = []

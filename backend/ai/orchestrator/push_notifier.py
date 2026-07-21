@@ -146,6 +146,16 @@ _EVENT_TARGET_ROLES: dict[EventType, list[StaffRole]] = {
     # Owner (same posture as ACCOUNT_LOCKED: a possible attendance-fraud
     # signal is exactly the kind of thing one accountable person should see).
     EventType.SHIFT_CLOCK_IN_FLAGGED:     [StaffRole.OWNER, StaffRole.MANAGER],
+    # Sprint 3 — suspicious-transaction pattern flagged (void spike, refund
+    # burst, payment mismatch, off-hours activity). Owner + Controller only,
+    # deliberately excluding Manager/Supervisor: the flagged actor could BE a
+    # manager-tier staff member, so this stays with the same oversight-only
+    # posture as ACCOUNT_LOCKED/STAFF_ROLE_CHANGED above, not a wide fan-out.
+    EventType.SUSPICIOUS_TRANSACTION_FLAGGED: [StaffRole.OWNER, StaffRole.CONTROLLER],
+    # Sprint 4 — drawer count landed outside tolerance. Same oversight-only
+    # posture as SUSPICIOUS_TRANSACTION_FLAGGED (the counting staff member
+    # could be the one the variance implicates).
+    EventType.CASH_RECONCILIATION_FLAGGED: [StaffRole.OWNER, StaffRole.CONTROLLER],
 }
 
 # Where each domain actually lives per tier, post-2026-07-17 (every staff
@@ -182,6 +192,14 @@ _TIER_URLS: dict[str, dict[StaffRole, str]] = {
         StaffRole.OWNER: "/dashboard/ai-ops",
         StaffRole.MANAGER: "/staff/manager/ai-ops",
         StaffRole.CONTROLLER: "/staff/controller/ai-ops",
+    },
+    # The actual StrategyAgent (headline/steps/risks) UI, distinct from
+    # "ai-ops" above (cost/token/reliability metrics only). Owner-only today
+    # — no /staff/manager/ai page exists yet, so a Manager notified of a
+    # strategy review falls back to _TIER_HOME (their dashboard home) rather
+    # than a page that can't show them anything, per _resolve_link's fallback.
+    "ai": {
+        StaffRole.OWNER: "/dashboard/ai",
     },
     "orders": {
         StaffRole.OWNER: "/dashboard/orders",
@@ -261,6 +279,8 @@ def register_push_handlers() -> None:
     subscribe(EventType.SHIFT_STARTED, _on_shift_started)
     subscribe(EventType.SHIFT_ENDED, _on_shift_ended)
     subscribe(EventType.SHIFT_CLOCK_IN_FLAGGED, _on_shift_clock_in_flagged)
+    subscribe(EventType.SUSPICIOUS_TRANSACTION_FLAGGED, _on_suspicious_transaction_flagged)
+    subscribe(EventType.CASH_RECONCILIATION_FLAGGED, _on_cash_reconciliation_flagged)
 
     logger.info("[PushNotifier] All handlers registered")
 
@@ -281,10 +301,19 @@ def _fan_out(db, restaurant, event_type: EventType, title: str, body: str, domai
     a page that role actually has (see _resolve_link) rather than one
     hardcoded link every role gets regardless of whether they can open it.
     exclude_user_id skips the actor of a self-triggered event (e.g. a Manager
-    who just changed someone's role doesn't need to be told about it)."""
+    who just changed someone's role doesn't need to be told about it).
+
+    Notifications are tagged with a severity (ai/escalation/engine.py's
+    EVENT_SEVERITY map) when the event type is one that should page a human
+    if left unacknowledged — every other event stays severity=None, an
+    ordinary in-app notification with no escalation clock (unchanged from
+    before Sprint 2)."""
     roles = _EVENT_TARGET_ROLES.get(event_type, [])
     if not roles:
         return
+
+    from ai.escalation.engine import severity_for
+    severity = severity_for(event_type.value)
 
     users = get_staff_users_for_restaurant(db, restaurant, roles)
     by_role: dict[StaffRole, list[int]] = defaultdict(list)
@@ -294,7 +323,8 @@ def _fan_out(db, restaurant, event_type: EventType, title: str, body: str, domai
         by_role[u.staff_role].append(u.id)
 
     for role, user_ids in by_role.items():
-        notify_users(db, user_ids, title, body, event_type.value, _resolve_link(role, domain))
+        notify_users(db, user_ids, title, body, event_type.value, _resolve_link(role, domain),
+                     severity=severity)
 
 
 def _get_restaurant(db, restaurant_id):
@@ -988,7 +1018,10 @@ def _on_strategy_review_generated(payload: dict) -> None:
             return
         title = "Weekly strategy review ready"
         body = headline
-        _fan_out(db, restaurant, EventType.STRATEGY_REVIEW_GENERATED, title, body, "ai-ops")
+        # Was "ai-ops" (tech-debt-register.md D15) — that domain is the cost/
+        # token/reliability metrics page (GET /ai/usage), which never rendered
+        # a headline/steps/risks at all. "ai" is the actual StrategyAgent page.
+        _fan_out(db, restaurant, EventType.STRATEGY_REVIEW_GENERATED, title, body, "ai")
     except Exception as exc:
         logger.error(f"[PushNotifier] strategy_review_generated failed: {exc}")
     finally:
@@ -1098,5 +1131,59 @@ def _on_shift_clock_in_flagged(payload: dict) -> None:
         _fan_out(db, restaurant, EventType.SHIFT_CLOCK_IN_FLAGGED, title, body, "staff")
     except Exception as exc:
         logger.error(f"[PushNotifier] shift_clock_in_flagged failed: {exc}")
+    finally:
+        db.close()
+
+
+def _on_suspicious_transaction_flagged(payload: dict) -> None:
+    """Sprint 3: at least one fraud pattern flagged for this restaurant in the
+    trailing 24h scan. Owner/Controller only (see _EVENT_TARGET_ROLES's
+    comment) — the flagged actor could be a Manager-tier staff member."""
+    restaurant_id = payload.get("restaurant_id")
+
+    db = SessionLocal()
+    try:
+        restaurant = _get_restaurant(db, restaurant_id)
+        if not restaurant:
+            return
+        parts = []
+        if payload.get("void_spike_count"):
+            parts.append(f"{payload['void_spike_count']} staff cancel/refund spike(s)")
+        if payload.get("refund_velocity_count"):
+            parts.append(f"{payload['refund_velocity_count']} rapid refund burst(s)")
+        if payload.get("payment_mismatch_count"):
+            parts.append(f"{payload['payment_mismatch_count']} unmatched M-Pesa payment(s)")
+        if payload.get("off_hours_count"):
+            parts.append(f"{payload['off_hours_count']} off-hours order change(s)")
+        title = "Suspicious transaction activity flagged"
+        body = "Flagged in the last 24h: " + ", ".join(parts) + ". Review the Fraud report for evidence."
+        _fan_out(db, restaurant, EventType.SUSPICIOUS_TRANSACTION_FLAGGED, title, body, None)
+    except Exception as exc:
+        logger.error(f"[PushNotifier] suspicious_transaction_flagged failed: {exc}")
+    finally:
+        db.close()
+
+
+def _on_cash_reconciliation_flagged(payload: dict) -> None:
+    """Sprint 4: a drawer count landed outside tolerance."""
+    restaurant_id = payload.get("restaurant_id")
+    expected = payload.get("expected_amount_cents", 0)
+    counted = payload.get("counted_amount_cents", 0)
+    variance = payload.get("variance_cents", 0)
+
+    db = SessionLocal()
+    try:
+        restaurant = _get_restaurant(db, restaurant_id)
+        if not restaurant:
+            return
+        title = "Cash drawer variance flagged"
+        direction = "short" if variance < 0 else "over"
+        body = (
+            f"Drawer count is {direction} by KES {abs(variance) / 100:.2f} "
+            f"(expected KES {expected / 100:.2f}, counted KES {counted / 100:.2f})."
+        )
+        _fan_out(db, restaurant, EventType.CASH_RECONCILIATION_FLAGGED, title, body, None)
+    except Exception as exc:
+        logger.error(f"[PushNotifier] cash_reconciliation_flagged failed: {exc}")
     finally:
         db.close()

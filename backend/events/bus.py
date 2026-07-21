@@ -188,6 +188,19 @@ class EventType(str, Enum):
     MPESA_PAYMENT_RECEIVED = "mpesa.payment_received"
     MPESA_PAYMENT_FAILED   = "mpesa.payment_failed"
 
+    # Fraud / suspicious-transaction detection (Sprint 3) — ai/fraud/detection.py.
+    # Fires once per scheduled scan that finds at least one flagged pattern
+    # (void spike, refund velocity burst, M-Pesa payment mismatch, off-hours
+    # register activity), not once per pattern — same "alert on the report,
+    # not on every signal" posture as STOCK_VARIANCE_FLAGGED.
+    SUSPICIOUS_TRANSACTION_FLAGGED = "fraud.suspicious_transaction_flagged"
+
+    # Cash reconciliation (Sprint 4) — ai/cash_reconciliation/intelligence.py.
+    # Fires once per drawer count that lands outside tolerance (not on every
+    # count — most will match closely, same "alert on the exception"
+    # philosophy as STOCK_COUNT_DISCREPANCY).
+    CASH_RECONCILIATION_FLAGGED = "cash.reconciliation_flagged"
+
 
 # ── In-Process Bus ────────────────────────────────────────────────────────────
 

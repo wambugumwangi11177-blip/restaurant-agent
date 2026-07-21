@@ -114,6 +114,7 @@ class OrderOut(StrictModel):
 
 class OrderStatusUpdate(StrictModel):
     status: str   # pending, prep, ready, served, cancelled
+    reason: Optional[str] = None  # optional cancel/void reason, stored on OrderAudit
 
 class OrderPaymentUpdate(StrictModel):
     payment_method: str  # cash, mpesa, card
@@ -468,6 +469,27 @@ class StockCountOut(StrictModel):
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
+class CashDrawerCountCreate(StrictModel):
+    counted_amount_cents: int
+    window_start: datetime
+    window_end: datetime
+    labor_shift_id: Optional[int] = None
+    notes: str = ""
+
+class CashDrawerCountOut(StrictModel):
+    id: int
+    restaurant_id: int
+    labor_shift_id: Optional[int] = None
+    window_start: datetime
+    window_end: datetime
+    expected_amount_cents: int
+    counted_amount_cents: int
+    counted_by_user_id: int
+    counted_at: Optional[datetime]
+    notes: str
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
 
 # ──────────────────────────────────────────────
 # SUPPLIERS & PURCHASE ORDERS (directive 018) — par-level reordering
@@ -605,6 +627,9 @@ class NotificationOut(StrictModel):
     url: Optional[str] = None
     is_read: bool
     created_at: datetime
+    severity: Optional[str] = None
+    acknowledged_at: Optional[datetime] = None
+    escalation_level: int = 0
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 

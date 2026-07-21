@@ -339,7 +339,8 @@ async def ai_workflow_resume(
     if _workflow_belongs(db, run_id, restaurant.id) is False:
         return {"available": False, "error": "Workflow run not found."}
     from ai.workflows import resume
-    return _safe_run("workflow_engine", restaurant.id, resume, db, run_id, body.decision, body.payload)
+    return _safe_run("workflow_engine", restaurant.id, resume, db, run_id, body.decision, body.payload,
+                     current_user.email)
 
 
 @router.post("/workflows/{run_id}/cancel")

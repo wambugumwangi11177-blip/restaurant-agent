@@ -265,6 +265,46 @@ class Order(Base):
         ),
     )
 
+
+class OrderAuditAction(enum.Enum):
+    VOID = "void"
+    CANCEL = "cancel"
+    REFUND = "refund"
+    PAYMENT_CHANGE = "payment_change"
+
+
+class OrderAudit(Base):
+    """
+    Who did what to an order and when — persisted actor trail for status/payment
+    changes. Previously this only existed transiently as `actor_user_id` on the
+    event-bus payload (events/bus.py EventType.ORDER_CANCELLED etc.), never
+    written to a row, which made void/refund pattern detection (fraud) impossible.
+    This table is the source of truth for that; fraud detection (ai/fraud/) reads
+    from it directly rather than replaying the event bus.
+    """
+    __tablename__ = "order_audits"
+
+    id             = Column(Integer, primary_key=True, index=True)
+    order_id       = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    restaurant_id  = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
+    action         = Column(SqEnum(OrderAuditAction), nullable=False)
+    actor_user_id  = Column(Integer, ForeignKey("users.id"), nullable=True)
+    reason         = Column(Text, nullable=True)
+    created_at     = Column(DateTime, default=utcnow)
+
+    order      = relationship("Order")
+    restaurant = relationship("Restaurant")
+    actor      = relationship("User")
+
+    __table_args__ = (
+        # Fraud detection's hot path is "this staff member's actions in a
+        # window" and "this order's history" — both need their own index,
+        # a composite on (actor, created_at) doesn't serve the order_id lookup.
+        Index("ix_order_audits_restaurant_actor_created", "restaurant_id", "actor_user_id", "created_at"),
+        Index("ix_order_audits_order", "order_id"),
+    )
+
+
 class OrderItem(Base):
     """Links orders to menu items — critical for menu performance analysis."""
     __tablename__ = "order_items"
@@ -807,10 +847,24 @@ class Notification(Base):
     url        = Column(String, nullable=True)   # deep link, e.g. /dashboard/inventory
     is_read    = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=utcnow)
+    # Escalation engine fields (ai/escalation/engine.py). severity/escalation_level
+    # default to the "no escalation" case so every pre-existing notify_users() call
+    # site keeps working unchanged — only events routed through escalate() opt in.
+    # is_read (above) is a UI concept ("have I seen this"); acknowledged_at is a
+    # distinct escalation concept ("has a human confirmed they're handling this") —
+    # a manager can read a critical alert without acknowledging it, and the
+    # escalation clock only cares about the latter.
+    severity          = Column(String, nullable=True)   # "critical" | "high" | "medium" | None
+    acknowledged_at   = Column(DateTime, nullable=True)
+    escalation_level  = Column(Integer, default=0, nullable=False)
 
     __table_args__ = (
         Index("ix_notifications_user_unread", "user_id", "is_read"),
         Index("ix_notifications_user_created", "user_id", "created_at"),
+        # Escalation job's hot query: unacknowledged severe notifications past a
+        # timeout, scanned every 5 min — needs its own index, not covered by the
+        # two above (neither includes severity or acknowledged_at).
+        Index("ix_notifications_escalation_scan", "severity", "acknowledged_at"),
     )
 
 
@@ -906,6 +960,13 @@ class Supplier(Base):
     contact_email     = Column(String, default="")
     avg_lead_days     = Column(Float, default=1.0)    # Avg days from order to delivery
     reliability_score = Column(Float, default=100.0)  # 0-100, computed from history
+    # Tiered PO auto-approval override (ai/workflows/engine.py). NULL (default)
+    # means "derive trust from reliability_score >= AUTO_APPROVE_RELIABILITY_MIN"
+    # (see ai/reorder.py). True/False is an explicit owner override that always
+    # wins over the score — e.g. a brand-new high-score supplier the owner
+    # doesn't yet trust, or a long-standing supplier the owner has vetted below
+    # the auto threshold.
+    requires_approval = Column(Boolean, nullable=True)
     is_active         = Column(Boolean, default=True)
     notes             = Column(Text, default="")
     created_at        = Column(DateTime, default=utcnow)
@@ -1048,6 +1109,44 @@ class StockCount(Base):
 
     __table_args__ = (
         Index("ix_stock_counts_restaurant_item", "restaurant_id", "inventory_item_id"),
+    )
+
+
+class CashDrawerCount(Base):
+    """
+    Cash-drawer reconciliation (Sprint 4). Scoped honestly: there's no bank
+    feed in this codebase, so a three-way till/M-Pesa/bank reconciliation
+    isn't buildable yet. This is the buildable half — a staff member enters
+    what they physically counted in the drawer at shift end; expected_amount
+    is computed from Order rows (payment_method=CASH, is_paid=True) for the
+    same window, same "independent physical check vs system belief" pattern
+    as StockCount above. See ai/cash_reconciliation/intelligence.py.
+    """
+    __tablename__ = "cash_drawer_counts"
+
+    id               = Column(Integer, primary_key=True, index=True)
+    restaurant_id    = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
+    # Optional — a count doesn't require a formal clocked LaborShift to exist
+    # (some restaurants reconcile per-till, not per-person). RESTRICT: an
+    # audit record must not silently lose its shift reference.
+    labor_shift_id   = Column(Integer, ForeignKey("labor_shifts.id", ondelete="RESTRICT"), nullable=True)
+    window_start     = Column(DateTime, nullable=False)
+    window_end       = Column(DateTime, nullable=False)
+    # Snapshot at count time, same reasoning as StockCount.expected_quantity —
+    # captured explicitly so a later query can't silently change what this
+    # count "found" as more orders land.
+    expected_amount_cents = Column(Integer, nullable=False)
+    counted_amount_cents  = Column(Integer, nullable=False)
+    counted_by_user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
+    counted_at            = Column(DateTime, default=utcnow)
+    notes                 = Column(Text, default="")
+
+    restaurant   = relationship("Restaurant")
+    labor_shift  = relationship("LaborShift")
+    counted_by   = relationship("User")
+
+    __table_args__ = (
+        Index("ix_cash_drawer_counts_restaurant_window", "restaurant_id", "window_start"),
     )
 
 

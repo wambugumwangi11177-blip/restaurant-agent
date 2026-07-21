@@ -51,15 +51,22 @@ def notify_user(
     body: str,
     event_type: str,
     url: str | None = None,
+    severity: str | None = None,
 ) -> models.Notification:
     """
     Write an in-app Notification row for user_id and best-effort push it to
     every device that user has subscribed. Returns the persisted row.
     Never raises — a push-delivery failure must not break the caller
     (mirrors send_whatsapp_message's best-effort contract).
+
+    severity ("critical" | "high" | "medium" | None) opts this notification
+    into the manager-escalation engine (ai/escalation/engine.py) — leave it
+    None (the default) for ordinary operational notifications that shouldn't
+    page anyone if left unread.
     """
     notif = models.Notification(
         user_id=user_id, title=title, body=body, event_type=event_type, url=url,
+        severity=severity,
     )
     db.add(notif)
     db.commit()
@@ -76,11 +83,12 @@ def notify_users(
     body: str,
     event_type: str,
     url: str | None = None,
+    severity: str | None = None,
 ) -> None:
     """Fan out notify_user() to several recipients (role-based alerts)."""
     for uid in user_ids:
         try:
-            notify_user(db, uid, title, body, event_type, url)
+            notify_user(db, uid, title, body, event_type, url, severity=severity)
         except Exception as exc:
             logger.error(f"[notify] Failed to notify user {uid}: {exc}")
 

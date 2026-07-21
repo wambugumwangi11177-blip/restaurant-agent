@@ -193,6 +193,21 @@ async def update_order_status(
             "customer_name": order.customer_name or "",
             "actor_user_id": current_user.id,
         })
+        # Persist the actor — previously only broadcast on the event bus above,
+        # never written to a row. Fraud pattern detection (void spikes by staff,
+        # refund velocity) reads this table directly. A served order being
+        # cancelled (refund-after-service) is recorded as REFUND, not VOID/CANCEL,
+        # since real money already moved and that's the pattern fraud detection
+        # cares about most.
+        db.add(models.OrderAudit(
+            order_id=order.id,
+            restaurant_id=restaurant.id,
+            action=models.OrderAuditAction.REFUND if old_status == models.OrderStatus.SERVED
+                   else models.OrderAuditAction.CANCEL,
+            actor_user_id=current_user.id,
+            reason=update.reason,
+        ))
+        db.commit()
 
     # Directive 017's reversal rule: cancelling before the food was ever
     # served credits the deducted ingredients back — cancelling AFTER served
@@ -239,7 +254,20 @@ async def update_order_payment(
     # actually moves unpaid -> paid. Re-marking an already-paid order (or a paid
     # M-Pesa order the webhook already settled + receipted) must not re-send.
     was_paid = bool(order.is_paid)
+    was_method = order.payment_method
     order.is_paid = update.is_paid
+    # Manual payment overrides are a real fraud signal (a staff member changing
+    # how an already-settled order is recorded) — every one is persisted, not
+    # just the paid/unpaid flips that trigger a receipt below.
+    if was_method != order.payment_method or was_paid != update.is_paid:
+        db.add(models.OrderAudit(
+            order_id=order.id,
+            restaurant_id=restaurant.id,
+            action=models.OrderAuditAction.PAYMENT_CHANGE,
+            actor_user_id=current_user.id,
+            reason=f"payment_method {was_method.value if was_method else 'none'} -> "
+                   f"{order.payment_method.value}, is_paid {was_paid} -> {update.is_paid}",
+        ))
     db.commit()
     db.refresh(order)
 

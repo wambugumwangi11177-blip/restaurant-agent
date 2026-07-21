@@ -16,7 +16,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from logging_config import configure_logging
-from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support, tables, attendance
+from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support, tables, attendance, fraud, cash_reconciliation
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
@@ -186,6 +186,29 @@ def _start_scheduler():
             misfire_grace_time=3600,
         )
 
+        # Sprint 3 — suspicious-transaction (fraud) scan. Every 2h, same
+        # cadence as po_late_check/stock_check above — frequent enough to
+        # catch a same-shift burst, not so frequent it re-scans the same
+        # 24h window pointlessly.
+        scheduler.add_job(
+            _run_fraud_check_job,
+            CronTrigger(hour="*/2"),
+            id="fraud_check",
+            replace_existing=True,
+        )
+
+        # Sprint 2 — manager escalation sweep. Every 5 min, not daily/hourly
+        # like everything else above: the whole point is catching an
+        # unacknowledged critical alert within its 15-minute timeout, so the
+        # poll interval has to be short relative to that.
+        from apscheduler.triggers.interval import IntervalTrigger
+        scheduler.add_job(
+            _run_escalation_sweep_job,
+            IntervalTrigger(minutes=5),
+            id="escalation_sweep",
+            replace_existing=True,
+        )
+
         scheduler.start()
         logger.info("[OK] Scheduler started (morning briefing: 07:00 EAT)")
     except ImportError:
@@ -283,6 +306,64 @@ def _run_variance_check_job():
             db.close()
     except Exception as exc:
         logger.error(f"[Variance Check] Scheduler job failed: {exc}")
+
+
+def _run_fraud_check_job():
+    """Sprint 3: run the suspicious-transaction report for every restaurant,
+    emit SUSPICIOUS_TRANSACTION_FLAGGED only for ones with at least one
+    flagged pattern — mirrors _run_variance_check_job's "alert on the report,
+    not a daily no-op ping" shape exactly."""
+    try:
+        from database import SessionLocal
+        from events.bus import emit_async, EventType
+        from ai.fraud.detection import compute_fraud_report
+        import models
+
+        db = SessionLocal()
+        try:
+            for restaurant in db.query(models.Restaurant).all():
+                report = compute_fraud_report(db, restaurant.id, window_hours=24)
+                if not report.flagged:
+                    continue
+                emit_async(EventType.SUSPICIOUS_TRANSACTION_FLAGGED, {
+                    "restaurant_id": restaurant.id,
+                    "void_spike_count": len(report.void_spikes),
+                    "refund_velocity_count": len(report.refund_velocity),
+                    "payment_mismatch_count": len(report.payment_mismatches),
+                    "off_hours_count": len(report.off_hours),
+                    "void_spikes": [
+                        {"actor_email": f.actor_email, "window_count": f.window_count}
+                        for f in report.void_spikes
+                    ],
+                    "refund_velocity": [
+                        {"actor_email": f.actor_email, "count": f.count}
+                        for f in report.refund_velocity
+                    ],
+                })
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Fraud Check] Scheduler job failed: {exc}")
+
+
+def _run_escalation_sweep_job():
+    """Sprint 2: advance the manager-escalation ladder for every unacknowledged
+    severity-tagged Notification, across all restaurants — a single global
+    scan (not per-restaurant like the jobs above) since it's keyed off the
+    Notification table directly, not restaurant-scoped source data."""
+    try:
+        from database import SessionLocal
+        from ai.escalation.engine import run_escalation_sweep
+
+        db = SessionLocal()
+        try:
+            result = run_escalation_sweep(db)
+            if result["escalated_to_managers"] or result["escalated_to_call"]:
+                logger.info(f"[Escalation Sweep] {result}")
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Escalation Sweep] Scheduler job failed: {exc}")
 
 
 def _run_reorder_check_job():
@@ -427,7 +508,7 @@ _VERSIONED_ROUTERS = [
     reservations.router, ai.router, export.router, flags.router, events.router,
     billing.router, enterprise.router, staff.router, stock_custody.router,
     suppliers.router, purchase_orders.router, notifications.router, support.router,
-    tables.router, attendance.router,
+    tables.router, attendance.router, fraud.router, cash_reconciliation.router,
 ]
 
 app.include_router(auth.router)

@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from database import get_db
+from time_utils import utcnow
 import models
 import schemas
 import auth
@@ -56,6 +57,33 @@ async def mark_read(
     notif.is_read = True
     db.commit()
     db.refresh(notif)
+    return notif
+
+
+@router.post("/{notification_id}/acknowledge", response_model=schemas.NotificationOut)
+async def acknowledge(
+    notification_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """
+    Distinct from /read: is_read means "I've seen this" (a UI concept);
+    acknowledged_at means "a human is on it" and is what
+    ai/escalation/engine.py's sweep checks before re-paging. A manager can
+    read a critical alert without acknowledging it — the escalation clock
+    only stops on an explicit acknowledge.
+    """
+    notif = db.query(models.Notification).filter(
+        models.Notification.id == notification_id,
+        models.Notification.user_id == current_user.id,
+    ).first()
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    if notif.acknowledged_at is None:
+        notif.acknowledged_at = utcnow()
+        notif.is_read = True
+        db.commit()
+        db.refresh(notif)
     return notif
 
 

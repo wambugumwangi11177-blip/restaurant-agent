@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 import os
 import logging
 
+import schemas
+
 logger = logging.getLogger("health")
 
 router = APIRouter(
@@ -12,14 +14,14 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-@router.get("/")
+@router.get("/", response_model=schemas.HealthOut)
 async def health_check():
     return {"status": "ok", "message": "Service is healthy"}
 
 from sqlalchemy import text
 from database import get_db
 
-@router.get("/db")
+@router.get("/db", response_model=schemas.DbHealthOut)
 async def db_health_check(db: Session = Depends(get_db)):
     try:
         # Execute a simple query to check connection

@@ -9,15 +9,16 @@
  * not rendered as undefined fields.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
+import { getErrorMessage } from "@/lib/errors";
 
 export function useAiModule<T>(endpoint: string) {
     const [data, setData] = useState<T | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         setError("");
         try {
@@ -27,14 +28,14 @@ export function useAiModule<T>(endpoint: string) {
             } else {
                 setData(res.data);
             }
-        } catch (e: any) {
-            setError(e?.response?.data?.detail || e?.message || "Could not load this module");
+        } catch (e) {
+            setError(getErrorMessage(e, "Could not load this module"));
         } finally {
             setLoading(false);
         }
-    };
+    }, [endpoint]);
 
-    useEffect(() => { fetchData(); }, [endpoint]);
+    useEffect(() => { fetchData(); }, [fetchData]);
 
     return { data, loading, error, retry: fetchData };
 }

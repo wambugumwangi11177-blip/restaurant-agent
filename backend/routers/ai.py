@@ -34,6 +34,7 @@ after finding it was still being read/edited as if live.
 import logging
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from database import get_db
 from auth import require_role, require_staff_role
@@ -97,7 +98,7 @@ async def ai_pricing(
     restaurant = get_or_create_restaurant(db, current_user)
 
     from ai.pricing.recommendations import get_pricing_intelligence, sync_pending_recommendations
-    data = _safe_run("pricing_intelligence", restaurant.id, get_pricing_intelligence, db, restaurant.id)
+    data = await run_in_threadpool(_safe_run, "pricing_intelligence", restaurant.id, get_pricing_intelligence, db, restaurant.id)
 
     # The analysis above is read-only and its recommendations carry no persisted
     # id — so nothing could be approved. Materialize them into PENDING rows and
@@ -115,7 +116,6 @@ async def ai_pricing(
 
     # narrate() drives a synchronous, blocking LLM SDK call. This route is async,
     # so run it off the event loop or the whole worker stalls for the round-trip.
-    from starlette.concurrency import run_in_threadpool
     from ai.reasoning import attach_narrative
     data = await run_in_threadpool(attach_narrative, data, "pricing", restaurant.id, narrate)
 
@@ -170,9 +170,8 @@ async def ai_decisions(
     restaurant = get_or_create_restaurant(db, current_user)
 
     from ai.decisions import get_ranked_decisions
-    data = _safe_run("decision_intelligence", restaurant.id, get_ranked_decisions, db, restaurant.id)
+    data = await run_in_threadpool(_safe_run, "decision_intelligence", restaurant.id, get_ranked_decisions, db, restaurant.id)
 
-    from starlette.concurrency import run_in_threadpool
     from ai.reasoning import attach_narrative
     data = await run_in_threadpool(attach_narrative, data, "decisions", restaurant.id, narrate)
 
@@ -204,7 +203,6 @@ async def ai_strategy(
     timeframe = body.timeframe
 
     # Blocking LLM tool loop → keep it off the event loop (see /ai/pricing).
-    from starlette.concurrency import run_in_threadpool
     from ai.orchestrator.strategist import run_strategy
     return await run_in_threadpool(
         _safe_run, "strategist", restaurant.id, run_strategy, db, restaurant.id, goal, timeframe
@@ -462,7 +460,7 @@ async def ai_labor(
     restaurant = get_or_create_restaurant(db, current_user)
 
     from ai.labor.intelligence import get_labor_intelligence
-    return _safe_run("labor_intelligence", restaurant.id, get_labor_intelligence, db, restaurant.id)
+    return await run_in_threadpool(_safe_run, "labor_intelligence", restaurant.id, get_labor_intelligence, db, restaurant.id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -485,7 +483,7 @@ async def ai_inventory(
     # {"error": ...} response — nothing had ever exercised this route with a
     # real request before to catch it.
     from ai.inventory_predictor import get_inventory_predictions
-    return _safe_run("inventory_predictor", restaurant.id, get_inventory_predictions, db, restaurant.id)
+    return await run_in_threadpool(_safe_run, "inventory_predictor", restaurant.id, get_inventory_predictions, db, restaurant.id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -510,10 +508,9 @@ async def ai_profit(
     restaurant = get_or_create_restaurant(db, current_user)
 
     from ai.profit.intelligence import get_profit_intelligence
-    data = _safe_run("profit_intelligence", restaurant.id, get_profit_intelligence, db, restaurant.id)
+    data = await run_in_threadpool(_safe_run, "profit_intelligence", restaurant.id, get_profit_intelligence, db, restaurant.id)
 
     # Offload the blocking LLM narration off the event loop — see /ai/pricing.
-    from starlette.concurrency import run_in_threadpool
     from ai.reasoning import attach_narrative
     data = await run_in_threadpool(attach_narrative, data, "profit", restaurant.id, narrate)
 
@@ -540,9 +537,8 @@ async def ai_roi(
     restaurant = get_or_create_restaurant(db, current_user)
 
     from ai.roi.savings import get_roi_savings
-    data = _safe_run("roi_savings", restaurant.id, get_roi_savings, db, restaurant.id)
+    data = await run_in_threadpool(_safe_run, "roi_savings", restaurant.id, get_roi_savings, db, restaurant.id)
 
-    from starlette.concurrency import run_in_threadpool
     from ai.reasoning import attach_narrative
     data = await run_in_threadpool(attach_narrative, data, "roi", restaurant.id, narrate)
 
@@ -568,9 +564,8 @@ async def ai_marketing(
     restaurant = get_or_create_restaurant(db, current_user)
 
     from ai.marketing import get_marketing_insights
-    data = _safe_run("marketing", restaurant.id, get_marketing_insights, db, restaurant.id)
+    data = await run_in_threadpool(_safe_run, "marketing", restaurant.id, get_marketing_insights, db, restaurant.id)
 
-    from starlette.concurrency import run_in_threadpool
     from ai.reasoning import attach_narrative
     data = await run_in_threadpool(attach_narrative, data, "marketing", restaurant.id, narrate)
 
@@ -703,7 +698,7 @@ async def ai_data_quality(
     restaurant = get_or_create_restaurant(db, current_user)
 
     from ai.data_quality import get_cost_price_quality
-    return _safe_run("data_quality", restaurant.id, get_cost_price_quality, db, restaurant.id)
+    return await run_in_threadpool(_safe_run, "data_quality", restaurant.id, get_cost_price_quality, db, restaurant.id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -719,7 +714,7 @@ async def ai_supply_chain(
     restaurant = get_or_create_restaurant(db, current_user)
 
     from ai.supply_chain.intelligence import get_supply_chain_intelligence
-    return _safe_run("supply_chain_intelligence", restaurant.id, get_supply_chain_intelligence, db, restaurant.id)
+    return await run_in_threadpool(_safe_run, "supply_chain_intelligence", restaurant.id, get_supply_chain_intelligence, db, restaurant.id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

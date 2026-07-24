@@ -39,7 +39,7 @@ def _serialize(sub: models.Subscription) -> dict:
     }
 
 
-@router.get("/")
+@router.get("/", response_model=schemas.SubscriptionOut)
 async def get_subscription(
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
@@ -48,7 +48,7 @@ async def get_subscription(
     return _serialize(_get_or_create(db, current_user.tenant_id))
 
 
-@router.post("/plan")
+@router.post("/plan", response_model=schemas.SubscriptionOut)
 async def set_plan(
     body: schemas.PlanUpdate,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),

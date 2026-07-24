@@ -15,6 +15,7 @@ import { FlaskConical } from "lucide-react";
 import api from "@/lib/api";
 import { formatKES } from "@/lib/format";
 import { HowItWorks } from "./HowItWorks";
+import { getErrorMessage } from "@/lib/errors";
 
 interface MenuItem { id: number; name: string; price: number; cost_price?: number; category?: string; }
 
@@ -86,8 +87,8 @@ export function WhatIfSimulator() {
             });
             if (res.data?.available === false) setError(res.data.error || "Simulation unavailable.");
             else setResult(res.data);
-        } catch (e: any) {
-            setError(e?.response?.data?.detail || e?.message || "Simulation failed.");
+        } catch (e) {
+            setError(getErrorMessage(e, "Simulation failed."));
         } finally {
             setLoading(false);
         }

@@ -350,9 +350,18 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
             media_type="application/xml",
         )
 
+    # brain.handle_* calls below are wrapped: an exception here must still
+    # produce a valid TwiML reply — Twilio expects XML back regardless, and an
+    # unhandled 500 would surface as a broken delivery rather than a graceful
+    # "something went wrong" reply (unlike the M-Pesa webhook path above,
+    # which was already defensively coded end-to-end).
     restaurant = _resolve_restaurant_by_phone(db, from_number)
     if restaurant:
-        reply_text = brain.handle_owner_command(db, restaurant.id, body)
+        try:
+            reply_text = brain.handle_owner_command(db, restaurant.id, body)
+        except Exception:
+            logger.exception("[WhatsApp Webhook] handle_owner_command failed")
+            reply_text = "Sorry, something went wrong processing that. Please try again."
         twiml = f"<Response><Message>{escape(reply_text)}</Message></Response>"
         return PlainTextResponse(twiml, media_type="application/xml")
 
@@ -361,7 +370,11 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
     # diner's just because it also appears somewhere in order history.
     staff_member = _resolve_staff_by_phone(db, from_number)
     if staff_member:
-        reply_text = brain.handle_staff_command(db, staff_member, body)
+        try:
+            reply_text = brain.handle_staff_command(db, staff_member, body)
+        except Exception:
+            logger.exception("[WhatsApp Webhook] handle_staff_command failed")
+            reply_text = "Sorry, something went wrong processing that. Please try again."
         twiml = f"<Response><Message>{escape(reply_text)}</Message></Response>"
         return PlainTextResponse(twiml, media_type="application/xml")
 
@@ -369,7 +382,11 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
     # customer replies (REORDER, 1–5 rating from the receipt) work too.
     customer_restaurant = _resolve_restaurant_for_customer(db, from_number)
     if customer_restaurant:
-        reply_text = brain.handle_customer_message(db, customer_restaurant.id, from_number, body)
+        try:
+            reply_text = brain.handle_customer_message(db, customer_restaurant.id, from_number, body)
+        except Exception:
+            logger.exception("[WhatsApp Webhook] handle_customer_message failed")
+            reply_text = "Sorry, something went wrong processing that. Please try again."
         twiml = f"<Response><Message>{escape(reply_text)}</Message></Response>"
         return PlainTextResponse(twiml, media_type="application/xml")
 

@@ -40,7 +40,7 @@ async def list_suppliers(
     ).order_by(models.Supplier.name).all()
 
 
-@router.post("/", response_model=schemas.SupplierOut)
+@router.post("/", response_model=schemas.SupplierOut, status_code=201)
 async def create_supplier(
     body: schemas.SupplierCreate,
     db: Session = Depends(get_db),

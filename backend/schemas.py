@@ -1,6 +1,29 @@
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, List
+from pydantic import BaseModel, ConfigDict, Field, EmailStr, AfterValidator
+from typing import Optional, List, Annotated
 from datetime import datetime, date, time
+import email_validator
+
+
+def _validate_email_if_present(v: Optional[str]) -> Optional[str]:
+    """Format-validates non-empty emails, leaves ``""``/``None`` untouched.
+
+    Several optional contact-email fields (reservations, suppliers) default
+    to `""` rather than `None` and are genuinely optional — a customer/
+    supplier without an email on file is normal. Plain `EmailStr` would
+    reject `""` outright, so this validates format only when a value was
+    actually supplied, preserving the existing empty-default contract.
+    """
+    if v:
+        try:
+            email_validator.validate_email(v, check_deliverability=False)
+        except email_validator.EmailNotValidError as e:
+            raise ValueError(str(e))
+    return v
+
+
+# For `str = ""` and `Optional[str] = None` contact-email fields alike —
+# the validator's `if v:` check treats both falsy defaults as "not provided".
+OptionalEmailStr = Annotated[str, AfterValidator(_validate_email_if_present)]
 
 
 class StrictModel(BaseModel):
@@ -16,7 +39,7 @@ class StrictModel(BaseModel):
 # AUTH
 # ──────────────────────────────────────────────
 class UserBase(StrictModel):
-    email: str
+    email: EmailStr
 
 class UserCreate(UserBase):
     password: str
@@ -191,13 +214,19 @@ class StockAdjust(StrictModel):
     quantity: float     # Positive = add, negative = remove
     reason: str = ""    # waste, breakage, correction
 
+class StockQuantityChangeOut(StrictModel):
+    """Response for /{item_id}/receive and /{item_id}/adjust — a short
+    confirmation message plus the item's new on-hand quantity."""
+    message: str
+    new_quantity: float
+
 # ──────────────────────────────────────────────
 # RESERVATIONS
 # ──────────────────────────────────────────────
 class ReservationCreate(StrictModel):
     customer_name: str
     customer_phone: str = ""
-    customer_email: str = ""
+    customer_email: OptionalEmailStr = ""
     party_size: int = Field(default=2, gt=0)
     reservation_date: date
     reservation_time: time
@@ -245,7 +274,7 @@ class ReservationUpdate(StrictModel):
     ReservationStatusUpdate, which only ever changes `status`."""
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
-    customer_email: Optional[str] = None
+    customer_email: Optional[OptionalEmailStr] = None
     party_size: Optional[int] = Field(default=None, gt=0)
     reservation_date: Optional[date] = None
     reservation_time: Optional[time] = None
@@ -292,7 +321,7 @@ class StaffMemberCreate(StrictModel):
     # whenever a login is granted — no default that silently grants more
     # access than intended (directive 015).
     create_login: bool = False
-    email: Optional[str] = None
+    email: Optional[OptionalEmailStr] = None
     password: Optional[str] = None
     staff_role: Optional[str] = None   # one of StaffRole's values, required if create_login
 
@@ -497,14 +526,14 @@ class CashDrawerCountOut(StrictModel):
 class SupplierCreate(StrictModel):
     name: str
     contact_phone: str = ""
-    contact_email: str = ""
+    contact_email: OptionalEmailStr = ""
     avg_lead_days: float = Field(default=1.0, ge=0)
     notes: str = ""
 
 class SupplierUpdate(StrictModel):
     name: Optional[str] = None
     contact_phone: Optional[str] = None
-    contact_email: Optional[str] = None
+    contact_email: Optional[OptionalEmailStr] = None
     avg_lead_days: Optional[float] = Field(default=None, ge=0)
     is_active: Optional[bool] = None
     notes: Optional[str] = None
@@ -682,3 +711,105 @@ class SupportTicketDetailOut(StrictModel):
 
 class SupportTicketStatusUpdate(StrictModel):
     status: str
+
+
+# ──────────────────────────────────────────────
+# HEALTH
+# ──────────────────────────────────────────────
+class HealthOut(StrictModel):
+    status: str
+    message: str
+
+class DbHealthOut(StrictModel):
+    status: str
+    database: str
+
+
+# ──────────────────────────────────────────────
+# PRODUCT EVENTS (backend/routers/events.py)
+# ──────────────────────────────────────────────
+class ProductEventTrackOut(StrictModel):
+    tracked: bool
+    error: Optional[str] = None
+
+class ProductEventSummaryOut(StrictModel):
+    window_days: int
+    total_events: int
+    active_users: int
+    events_by_name: dict[str, int]
+
+
+# ──────────────────────────────────────────────
+# FEATURE FLAGS
+# ──────────────────────────────────────────────
+class FlagsOut(StrictModel):
+    flags: dict[str, bool]
+
+class FlagDetail(StrictModel):
+    name: str
+    enabled: bool
+    description: str
+
+class FlagDetailsOut(StrictModel):
+    flags: List[FlagDetail]
+
+
+# ──────────────────────────────────────────────
+# BILLING
+# ──────────────────────────────────────────────
+class SubscriptionOut(StrictModel):
+    plan: str
+    status: str
+    provider: str
+    current_period_end: Optional[str] = None
+
+
+# ──────────────────────────────────────────────
+# ENTERPRISE
+# ──────────────────────────────────────────────
+class OrganizationSummary(StrictModel):
+    id: int
+    name: str
+
+class OrganizationsListOut(StrictModel):
+    organizations: List[OrganizationSummary]
+
+
+# ──────────────────────────────────────────────
+# FRAUD
+# ──────────────────────────────────────────────
+class VoidSpikeFlag(StrictModel):
+    actor_user_id: int
+    actor_email: str
+    window_count: int
+    baseline_mean: float
+    baseline_stddev: float
+
+class RefundVelocityFlag(StrictModel):
+    actor_user_id: int
+    actor_email: str
+    count: int
+    window_minutes: int
+    order_ids: List[int]
+
+class PaymentMismatchFlag(StrictModel):
+    order_id: int
+    payment_method: str
+    total_cents: int
+    reason: str
+
+class OffHoursFlag(StrictModel):
+    order_id: int
+    action: str
+    actor_user_id: int
+    created_at: Optional[str] = None
+    normal_hour_range: List[int]
+
+class FraudReportOut(StrictModel):
+    restaurant_id: int
+    window_hours: int
+    flagged: bool
+    void_spikes: List[VoidSpikeFlag]
+    refund_velocity: List[RefundVelocityFlag]
+    payment_mismatches: List[PaymentMismatchFlag]
+    off_hours: List[OffHoursFlag]

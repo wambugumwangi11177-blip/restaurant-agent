@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import api from "@/lib/api";
+import { getErrorMessage } from "@/lib/errors";
 
 function VerifyEmailContent() {
     const searchParams = useSearchParams();
@@ -22,7 +23,7 @@ function VerifyEmailContent() {
             .then(() => setStatus("success"))
             .catch((err) => {
                 setStatus("error");
-                setMessage(err?.response?.data?.detail || "This link is invalid or has expired.");
+                setMessage(getErrorMessage(err, "This link is invalid or has expired."));
             });
     }, [token]);
 
@@ -49,7 +50,7 @@ function VerifyEmailContent() {
                         <>
                             <CheckCircle2 className="w-8 h-8 text-[var(--accent)] mx-auto" />
                             <p className="text-sm text-[#e5e5e5] font-medium">Email verified</p>
-                            <p className="text-sm text-[#737373]">You're all set.</p>
+                            <p className="text-sm text-[#737373]">You&apos;re all set.</p>
                         </>
                     )}
                     {status === "error" && (

@@ -8,11 +8,12 @@
  */
 
 import { HowItWorks } from "./HowItWorks";
+import type { LucideIcon } from "lucide-react";
 
 export function ModuleShell({
     icon: Icon, title, subtitle, explainKey, loading, error, onRetry, children,
 }: {
-    icon: any;
+    icon: LucideIcon;
     title: string;
     subtitle?: string;
     explainKey?: string;

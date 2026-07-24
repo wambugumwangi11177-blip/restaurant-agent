@@ -236,7 +236,7 @@ def test_manager_can_create_supplier(client, db_session):
     token, user, restaurant = _user_with_staff_role(db_session, "mgr2", models.StaffRole.MANAGER)
     r = client.post("/suppliers/", json={"name": "Fresh Veg Ltd", "contact_phone": "0712345678"},
                      headers={"Authorization": f"Bearer {token}"})
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     assert r.json()["name"] == "Fresh Veg Ltd"
 
 

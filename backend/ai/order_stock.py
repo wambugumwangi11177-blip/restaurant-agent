@@ -39,20 +39,47 @@ def deduct_ingredients_for_order(db: Session, order: models.Order, performed_by_
     """
     missing_recipes: list[str] = []
 
-    for oi in order.items:
-        ingredients = db.query(models.MenuIngredient).filter(
-            models.MenuIngredient.menu_item_id == oi.menu_item_id
+    # Batched up front — one query per table instead of one per order line/
+    # ingredient. A 5-item order with 5 ingredients each was issuing ~15
+    # queries just in this function (plus one more per missing recipe).
+    menu_item_ids = {oi.menu_item_id for oi in order.items}
+    ingredients_by_menu_item: dict[int, list[models.MenuIngredient]] = {}
+    for ing in db.query(models.MenuIngredient).filter(
+        models.MenuIngredient.menu_item_id.in_(menu_item_ids)
+    ).all():
+        ingredients_by_menu_item.setdefault(ing.menu_item_id, []).append(ing)
+
+    inventory_item_ids = {
+        ing.inventory_item_id
+        for ings in ingredients_by_menu_item.values()
+        for ing in ings
+    }
+    inventory_items_by_id = {
+        item.id: item
+        for item in db.query(models.InventoryItem).filter(
+            models.InventoryItem.id.in_(inventory_item_ids)
         ).all()
+    } if inventory_item_ids else {}
+
+    # Only needed for the "no recipe" message, but batched regardless of
+    # whether any item ends up missing one — cheap, and avoids a second
+    # conditional query path.
+    menu_items_by_id = {
+        m.id: m for m in db.query(models.MenuItem).filter(
+            models.MenuItem.id.in_(menu_item_ids)
+        ).all()
+    }
+
+    for oi in order.items:
+        ingredients = ingredients_by_menu_item.get(oi.menu_item_id, [])
         if not ingredients:
-            menu_item = db.query(models.MenuItem).filter(models.MenuItem.id == oi.menu_item_id).first()
+            menu_item = menu_items_by_id.get(oi.menu_item_id)
             missing_recipes.append(menu_item.name if menu_item else f"item #{oi.menu_item_id}")
             continue
 
         for ingredient in ingredients:
             qty = ingredient.quantity_per_serving * oi.quantity
-            item = db.query(models.InventoryItem).filter(
-                models.InventoryItem.id == ingredient.inventory_item_id
-            ).first()
+            item = inventory_items_by_id.get(ingredient.inventory_item_id)
             if not item:
                 continue   # Recipe references a since-deleted inventory item — nothing to deduct from.
 
@@ -123,15 +150,30 @@ def reverse_ingredients_for_order(db: Session, order: models.Order, performed_by
 
     Does not commit — same convention as deduct_ingredients_for_order.
     """
-    for oi in order.items:
-        ingredients = db.query(models.MenuIngredient).filter(
-            models.MenuIngredient.menu_item_id == oi.menu_item_id
+    menu_item_ids = {oi.menu_item_id for oi in order.items}
+    ingredients_by_menu_item: dict[int, list[models.MenuIngredient]] = {}
+    for ing in db.query(models.MenuIngredient).filter(
+        models.MenuIngredient.menu_item_id.in_(menu_item_ids)
+    ).all():
+        ingredients_by_menu_item.setdefault(ing.menu_item_id, []).append(ing)
+
+    inventory_item_ids = {
+        ing.inventory_item_id
+        for ings in ingredients_by_menu_item.values()
+        for ing in ings
+    }
+    inventory_items_by_id = {
+        item.id: item
+        for item in db.query(models.InventoryItem).filter(
+            models.InventoryItem.id.in_(inventory_item_ids)
         ).all()
+    } if inventory_item_ids else {}
+
+    for oi in order.items:
+        ingredients = ingredients_by_menu_item.get(oi.menu_item_id, [])
         for ingredient in ingredients:
             qty = ingredient.quantity_per_serving * oi.quantity
-            item = db.query(models.InventoryItem).filter(
-                models.InventoryItem.id == ingredient.inventory_item_id
-            ).first()
+            item = inventory_items_by_id.get(ingredient.inventory_item_id)
             if not item:
                 continue
 

@@ -137,7 +137,7 @@ async def list_tickets(
         if status_filter.upper() not in _VALID_STATUSES:
             raise HTTPException(status_code=400, detail=f"Unknown status: {status_filter}")
         q = q.filter(models.SupportTicket.status == models.SupportTicketStatus[status_filter.upper()])
-    tickets = q.order_by(models.SupportTicket.updated_at.desc()).all()
+    tickets = q.order_by(models.SupportTicket.updated_at.desc()).limit(200).all()
     return [_ticket_out(t, db) for t in tickets]
 
 
@@ -161,7 +161,7 @@ async def get_ticket(
     }
 
 
-@router.post("/tickets/{ticket_id}/messages", response_model=schemas.SupportTicketDetailOut)
+@router.post("/tickets/{ticket_id}/messages", response_model=schemas.SupportTicketDetailOut, status_code=201)
 async def add_message(
     ticket_id: int,
     body: schemas.SupportTicketMessageCreate,
@@ -211,7 +211,7 @@ async def add_message(
     }
 
 
-@router.patch("/tickets/{ticket_id}/status", response_model=schemas.SupportTicketOut)
+@router.post("/tickets/{ticket_id}/status", response_model=schemas.SupportTicketOut)
 async def update_status(
     ticket_id: int,
     body: schemas.SupportTicketStatusUpdate,

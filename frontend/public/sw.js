@@ -63,7 +63,7 @@ self.addEventListener('push', (event) => {
     let data = {};
     try {
         data = event.data ? event.data.json() : {};
-    } catch (e) {
+    } catch {
         data = { title: 'Chakula', body: event.data ? event.data.text() : '' };
     }
     event.waitUntil(

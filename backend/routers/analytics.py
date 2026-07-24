@@ -14,7 +14,7 @@ from ai import menu_engineer, revenue_forecaster, kds_intelligence, inventory_pr
 from ai.analysis_clock import data_freshness
 from routers.deps import get_restaurant_or_none
 
-router = APIRouter(prefix="/ai", tags=["Analytics"])
+router = APIRouter(prefix="/ai", tags=["analytics"])
 
 # Directive 015: these are all read-only AI insight routes, matching the
 # `ai` matrix row's R group (Manager + Controller); Owner passes through

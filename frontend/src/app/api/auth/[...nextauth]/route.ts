@@ -9,7 +9,7 @@ const handler = NextAuth({
         username: { label: "Username", type: "text", placeholder: "jsmith" },
         password: { label: "Password", type: "password" }
       },
-      async authorize(credentials, req) {
+      async authorize(credentials) {
         // Post to backend login endpoint
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/login`, {
           method: 'POST',
@@ -36,12 +36,12 @@ const handler = NextAuth({
   callbacks: {
       async jwt({ token, user }) {
           if (user) {
-              token.accessToken = (user as any).accessToken
+              token.accessToken = user.accessToken
           }
           return token
       },
       async session({ session, token }) {
-          (session as any).accessToken = token.accessToken
+          session.accessToken = token.accessToken
           return session
       }
   }

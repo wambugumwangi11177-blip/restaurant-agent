@@ -26,7 +26,7 @@ logger = logging.getLogger("product.analytics")
 router = APIRouter(prefix="/events", tags=["product-analytics"])
 
 
-@router.post("/track")
+@router.post("/track", response_model=schemas.ProductEventTrackOut)
 async def track_event(
     body: schemas.ProductEventTrack,
     current_user: models.User = Depends(get_current_user),
@@ -54,7 +54,7 @@ async def track_event(
     return {"tracked": True}
 
 
-@router.get("/summary")
+@router.get("/summary", response_model=schemas.ProductEventSummaryOut)
 async def events_summary(
     days: int = 30,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),

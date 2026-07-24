@@ -187,7 +187,7 @@ export default function LoginPage() {
                         </li>
                         <li className="flex items-start gap-2 text-xs text-[#a3a3a3]">
                             <Lock className="w-3.5 h-3.5 text-[#525252] mt-0.5 flex-shrink-0" />
-                            <span>Your restaurant's data is isolated per account — never mixed with, or trained on across, other tenants.</span>
+                            <span>Your restaurant&apos;s data is isolated per account — never mixed with, or trained on across, other tenants.</span>
                         </li>
                     </ul>
                 </div>

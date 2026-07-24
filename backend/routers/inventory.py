@@ -29,10 +29,10 @@ async def get_inventory(
     restaurant = get_or_create_restaurant(db, current_user)
     return db.query(models.InventoryItem).filter(
         models.InventoryItem.restaurant_id == restaurant.id
-    ).order_by(models.InventoryItem.item_name).all()
+    ).order_by(models.InventoryItem.item_name).limit(200).all()
 
 
-@router.post("/", response_model=schemas.InventoryItemOut)
+@router.post("/", response_model=schemas.InventoryItemOut, status_code=201)
 async def create_inventory_item(
     item: schemas.InventoryItemCreate,
     db: Session = Depends(get_db),
@@ -77,7 +77,7 @@ async def update_inventory_item(
     return db_item
 
 
-@router.post("/{item_id}/receive")
+@router.post("/{item_id}/receive", response_model=schemas.StockQuantityChangeOut)
 async def receive_stock(
     item_id: int,
     receive: schemas.StockReceive,
@@ -110,7 +110,7 @@ async def receive_stock(
     return {"message": f"Received {receive.quantity} {db_item.unit} of {db_item.item_name}", "new_quantity": db_item.quantity}
 
 
-@router.post("/{item_id}/adjust")
+@router.post("/{item_id}/adjust", response_model=schemas.StockQuantityChangeOut)
 async def adjust_stock(
     item_id: int,
     adjust: schemas.StockAdjust,
@@ -126,7 +126,13 @@ async def adjust_stock(
     if not db_item:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    db_item.quantity += adjust.quantity  # Can be negative
+    new_quantity = db_item.quantity + adjust.quantity  # adjust.quantity can be negative
+    if new_quantity < 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Adjustment would result in negative stock ({new_quantity} {db_item.unit})",
+        )
+    db_item.quantity = new_quantity
 
     movement = models.StockMovement(
         inventory_item_id=db_item.id,

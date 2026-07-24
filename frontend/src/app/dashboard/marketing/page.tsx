@@ -17,6 +17,7 @@
  */
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { formatKES } from "@/lib/format";
@@ -24,8 +25,14 @@ import { HowItWorks } from "@/components/ai/HowItWorks";
 import { NarrativeBlock, type Narrative } from "@/components/ai/NarrativeBlock";
 import {
     Megaphone, RefreshCw, AlertTriangle, Users, ShieldCheck, Gift,
-    Sparkles, Send, X, CheckCircle, Clock, BookOpen, TrendingUp,
+    Sparkles, Send, CheckCircle, Clock, BookOpen, TrendingUp,
 } from "lucide-react";
+import EmptyState from "@/components/ui/EmptyState";
+import type { ConfirmTarget } from "./_components/CampaignForm";
+import { getErrorMessage } from "@/lib/errors";
+
+const ConfirmSend = dynamic(() => import("./_components/ConfirmSend"));
+const CampaignForm = dynamic(() => import("./_components/CampaignForm"));
 
 interface Offer {
     id: string;
@@ -116,112 +123,16 @@ const PLAYBOOK = [
     },
 ];
 
-function ConfirmSend({
-    offer, onClose, onSent,
-}: {
-    offer: { title: string; offer_text: string; audience_label: string; action: "winback" | "promo" };
-    onClose: () => void;
-    onSent: (msg: string) => void;
-}) {
-    const [sending, setSending] = useState(false);
-    const [error, setError] = useState("");
-
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") onClose();
-        };
-        document.addEventListener("keydown", handleKeyDown);
-        return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [onClose]);
-
-    const send = async () => {
-        setSending(true);
-        setError("");
-        try {
-            const res = offer.action === "winback"
-                ? await api.post("/ai/marketing/winback")
-                : await api.post("/ai/marketing/promo", { offer_text: offer.offer_text });
-            if (res.data?.started) {
-                onSent(res.data.message || "Your campaign is sending.");
-            } else {
-                setError(res.data?.error || "Nothing was sent.");
-            }
-        } catch (e: any) {
-            setError(e?.response?.data?.detail || e?.message || "Could not send the campaign.");
-        } finally {
-            setSending(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
-            <div role="dialog" aria-modal="true" aria-label="Send this campaign?" className="w-full max-w-md rounded-xl border border-[#262626] bg-[#0f0f0f] p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                        <Send className="w-4 h-4 text-[var(--accent)]" />
-                        <h3 className="text-sm font-semibold text-[#e5e5e5]">Send this campaign?</h3>
-                    </div>
-                    <button onClick={onClose} aria-label="Close dialog" className="text-[#525252] hover:text-[#e5e5e5]"><X className="w-4 h-4" /></button>
-                </div>
-
-                <div className="rounded-lg border border-[#1a1a1a] bg-[#0a0a0a] p-3 space-y-1.5">
-                    <p className="text-sm text-[#e5e5e5]">{offer.title}</p>
-                    <p className="text-xs text-[#a3a3a3] italic">“{offer.offer_text}”</p>
-                    <p className="text-[11px] text-[#737373]">Audience: {offer.audience_label}</p>
-                </div>
-
-                <p className="text-[11px] text-amber-400/90 flex gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                    <span>This sends real WhatsApp messages now. Only customers who gave consent and haven&apos;t opted out are contacted.</span>
-                </p>
-
-                {error && <p className="text-xs text-red-400">{error}</p>}
-
-                <div className="flex items-center justify-end gap-2">
-                    <button onClick={onClose} className="px-3 py-2 rounded-lg text-sm text-[#737373] hover:text-[#e5e5e5]">Cancel</button>
-                    <button
-                        onClick={send}
-                        disabled={sending}
-                        className="px-4 py-2 rounded-lg bg-[var(--accent)] text-[#0a0a0a] font-semibold text-sm hover:bg-[var(--accent-hover)] disabled:opacity-60"
-                    >
-                        {sending ? "Sending…" : "Yes, send it"}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function EmptyState() {
-    return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold text-[#e5e5e5]">Growth — Campaigns & Win-back</h1>
-                <p className="text-[#525252] mt-1 text-sm">Getting started</p>
-            </div>
-            <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-8 text-center space-y-4">
-                <Megaphone className="w-12 h-12 text-[var(--accent)] mx-auto" />
-                <h2 className="text-[#e5e5e5] font-semibold text-lg">No campaign audience yet</h2>
-                <p className="text-[#525252] text-sm max-w-md mx-auto">
-                    Once customers order and opt in at checkout, the AI will suggest offers to run,
-                    find lapsed regulars to win back, and show exactly who each campaign can reach —
-                    all consent-gated, and never sent without your approval.
-                </p>
-            </div>
-        </div>
-    );
-}
-
 export default function MarketingPage() {
     const { user } = useAuth();
     const [data, setData] = useState<MarketingData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-    const [confirm, setConfirm] = useState<{ title: string; offer_text: string; audience_label: string; action: "winback" | "promo" } | null>(null);
+    const [confirm, setConfirm] = useState<ConfirmTarget | null>(null);
     const [banner, setBanner] = useState("");
 
-    const restaurantName = (user as any)?.restaurant_name || "Your Restaurant";
+    const restaurantName = user?.restaurant_name || "Your Restaurant";
 
     const fetchData = async () => {
         setLoading(true);
@@ -230,8 +141,8 @@ export default function MarketingPage() {
             const res = await api.get("/ai/marketing");
             setData(res.data);
             setLastUpdated(new Date());
-        } catch (e: any) {
-            setError(e?.response?.data?.detail || e?.message || "Could not load marketing data");
+        } catch (e) {
+            setError(getErrorMessage(e, "Could not load marketing data"));
         } finally {
             setLoading(false);
         }
@@ -242,10 +153,10 @@ export default function MarketingPage() {
     if (loading) {
         return (
             <div className="space-y-4">
-                <div className="bg-[#141414] rounded-xl h-8 w-56 animate-pulse" />
-                <div className="bg-[#141414] rounded-xl h-24 animate-pulse" />
+                <div className="bg-surface rounded-xl h-8 w-56 animate-pulse" />
+                <div className="bg-surface rounded-xl h-24 animate-pulse" />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[...Array(2)].map((_, i) => <div key={i} className="bg-[#141414] rounded-xl h-40 animate-pulse" />)}
+                    {[...Array(2)].map((_, i) => <div key={i} className="bg-surface rounded-xl h-40 animate-pulse" />)}
                 </div>
             </div>
         );
@@ -255,9 +166,9 @@ export default function MarketingPage() {
         return (
             <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
                 <AlertTriangle className="w-10 h-10 text-amber-400" />
-                <p className="text-[#e5e5e5] font-medium">Could not load marketing data</p>
-                <p className="text-[#525252] text-sm text-center max-w-sm">{error}</p>
-                <button onClick={fetchData} className="px-4 py-2 bg-[var(--accent)] text-[#0a0a0a] font-semibold rounded-lg text-sm hover:bg-[var(--accent-hover)]">Retry</button>
+                <p className="text-text font-medium">Could not load marketing data</p>
+                <p className="text-text-dim text-sm text-center max-w-sm">{error}</p>
+                <button onClick={fetchData} className="px-4 py-2 bg-[var(--accent)] text-bg font-semibold rounded-lg text-sm hover:bg-[var(--accent-hover)]">Retry</button>
             </div>
         );
     }
@@ -270,16 +181,26 @@ export default function MarketingPage() {
         d.history.length === 0 &&
         d.audience.promo_reachable === 0 &&
         d.audience.consented_customers === 0;
-    if (isEmpty) return <EmptyState />;
+    if (isEmpty) {
+        return (
+            <EmptyState
+                pageTitle="Growth — Campaigns & Win-back"
+                pageSubtitle="Getting started"
+                icon={Megaphone}
+                title="No campaign audience yet"
+                description="Once customers order and opt in at checkout, the AI will suggest offers to run, find lapsed regulars to win back, and show exactly who each campaign can reach — all consent-gated, and never sent without your approval."
+            />
+        );
+    }
 
     return (
         <div className="space-y-6">
             <div className="flex items-start justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-[#e5e5e5]">Growth — Campaigns & Win-back</h1>
-                    <p className="text-[#525252] mt-1 text-sm">{restaurantName} — offers the AI suggests, ready for your approval</p>
+                    <h1 className="text-2xl font-bold text-text">Growth — Campaigns & Win-back</h1>
+                    <p className="text-text-dim mt-1 text-sm">{restaurantName} — offers the AI suggests, ready for your approval</p>
                 </div>
-                <button onClick={fetchData} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#141414] border border-[#262626] text-[#737373] hover:text-[#e5e5e5] text-sm transition-colors">
+                <button onClick={fetchData} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface border border-border text-text-muted hover:text-text text-sm transition-colors">
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>{lastUpdated ? lastUpdated.toLocaleTimeString() : "Refresh"}</span>
                 </button>
@@ -289,7 +210,7 @@ export default function MarketingPage() {
             {banner && (
                 <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
                     <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                    <p className="text-sm text-[#e5e5e5]">{banner}</p>
+                    <p className="text-sm text-text">{banner}</p>
                 </div>
             )}
 
@@ -297,11 +218,11 @@ export default function MarketingPage() {
             <div className="rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/[0.04] p-5">
                 <div className="flex items-center gap-2 text-[var(--accent)] mb-1">
                     <Sparkles className="w-4 h-4" />
-                    <p className="text-sm font-semibold text-[#e5e5e5]">Where these campaigns come from</p>
+                    <p className="text-sm font-semibold text-text">Where these campaigns come from</p>
                 </div>
                 <p className="text-sm text-[#a3a3a3] leading-relaxed">
                     The AI reads your menu, your stock and your customers, then suggests specific offers worth
-                    running — and tells you <span className="text-[#e5e5e5] font-medium">why</span> each one makes sense.
+                    running — and tells you <span className="text-text font-medium">why</span> each one makes sense.
                     Nothing is sent automatically: you approve every campaign, and only customers who gave consent
                     at checkout and haven&apos;t opted out are ever contacted.
                 </p>
@@ -312,55 +233,16 @@ export default function MarketingPage() {
             <NarrativeBlock n={d.narrative} />
 
             {/* Suggested offers */}
-            <div>
-                <h2 className="text-sm font-semibold text-[#e5e5e5] mb-1 flex items-center gap-2">
-                    <Gift className="w-4 h-4 text-[var(--accent)]" /> Offers worth running now
-                </h2>
-                <p className="text-xs text-[#525252] mb-3">Each offer shows the exact deal, who it reaches, and why it&apos;s worth it.</p>
-                {d.suggested_offers.length === 0 ? (
-                    <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5 text-sm text-[#525252]">
-                        No offers to suggest right now — add cost prices and let a few more orders come in, and suggestions will appear here.
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {d.suggested_offers.map((o) => (
-                            <div key={o.id} className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5 flex flex-col">
-                                <div className="flex items-start justify-between gap-2">
-                                    <p className="text-sm font-semibold text-[#e5e5e5]">{o.title}</p>
-                                    {o.margin_safe && (
-                                        <span title={o.margin_note || "Margin stays healthy"} className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded px-1.5 py-0.5 whitespace-nowrap">
-                                            <ShieldCheck className="w-3 h-3" /> Margin-safe
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="text-xs text-[#a3a3a3] italic mt-2">“{o.offer_text}”</p>
-                                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-[#737373]">
-                                    <Users className="w-3 h-3" /> {o.audience_label}
-                                </div>
-                                <p className="text-xs text-[#525252] mt-2 leading-relaxed flex-1">
-                                    <span className="text-[#737373] font-medium">Why: </span>{o.why}
-                                </p>
-                                {o.margin_note && <p className="text-[11px] text-[#525252] mt-2">💡 {o.margin_note}</p>}
-                                <button
-                                    onClick={() => setConfirm({ title: o.title, offer_text: o.offer_text, audience_label: o.audience_label, action: o.action })}
-                                    className="mt-4 self-start flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent)] text-[#0a0a0a] font-semibold text-sm hover:bg-[var(--accent-hover)] transition-colors"
-                                >
-                                    <Send className="w-3.5 h-3.5" /> Send this
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
+            <CampaignForm offers={d.suggested_offers} onPick={setConfirm} />
 
             {/* Win-back */}
-            <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
+            <div className="rounded-xl border border-surface-hover bg-[#0f0f0f] p-5">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2">
+                        <h2 className="text-sm font-semibold text-text flex items-center gap-2">
                             <Users className="w-4 h-4 text-[var(--accent)]" /> Win back your lapsed regulars
                         </h2>
-                        <p className="text-xs text-[#525252] mt-1">
+                        <p className="text-xs text-text-dim mt-1">
                             Customers who used to visit but have gone quiet for {wb.lapse_days}+ days.
                         </p>
                     </div>
@@ -372,7 +254,7 @@ export default function MarketingPage() {
                                 audience_label: `${wb.reachable} reachable now`,
                                 action: "winback",
                             })}
-                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent)] text-[#0a0a0a] font-semibold text-sm hover:bg-[var(--accent-hover)] transition-colors"
+                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent)] text-bg font-semibold text-sm hover:bg-[var(--accent-hover)] transition-colors"
                         >
                             <Send className="w-3.5 h-3.5" /> Send win-back
                         </button>
@@ -382,22 +264,22 @@ export default function MarketingPage() {
                 <HowItWorks id="winback" />
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 my-4">
-                    <div className="rounded-lg bg-[#141414] border border-[#1a1a1a] p-3">
-                        <p className="text-xs text-[#525252] mb-1">Lapsed regulars</p>
-                        <p className="text-sm font-bold text-[#e5e5e5]">{wb.count}</p>
+                    <div className="rounded-lg bg-surface border border-surface-hover p-3">
+                        <p className="text-xs text-text-dim mb-1">Lapsed regulars</p>
+                        <p className="text-sm font-bold text-text">{wb.count}</p>
                     </div>
-                    <div className="rounded-lg bg-[#141414] border border-[#1a1a1a] p-3">
-                        <p className="text-xs text-[#525252] mb-1">Reachable now</p>
+                    <div className="rounded-lg bg-surface border border-surface-hover p-3">
+                        <p className="text-xs text-text-dim mb-1">Reachable now</p>
                         <p className="text-sm font-bold text-emerald-400">{wb.reachable}</p>
                     </div>
-                    <div className="rounded-lg bg-[#141414] border border-[#1a1a1a] p-3">
-                        <p className="text-xs text-[#525252] mb-1">Their past spend</p>
-                        <p className="text-sm font-bold text-[#e5e5e5]">{formatKES(wb.past_spend_cents)}</p>
+                    <div className="rounded-lg bg-surface border border-surface-hover p-3">
+                        <p className="text-xs text-text-dim mb-1">Their past spend</p>
+                        <p className="text-sm font-bold text-text">{formatKES(wb.past_spend_cents)}</p>
                     </div>
                 </div>
 
                 {wb.count > wb.reachable && (
-                    <p className="text-[11px] text-[#525252] mb-3">
+                    <p className="text-[11px] text-text-dim mb-3">
                         {wb.count - wb.reachable} of these haven&apos;t opted in to marketing, so they can&apos;t be contacted — they&apos;re shown for context only.
                     </p>
                 )}
@@ -407,12 +289,12 @@ export default function MarketingPage() {
                 ) : (
                     <div className="space-y-2">
                         {wb.candidates.map((c, i) => (
-                            <div key={i} className="rounded-lg bg-[#141414] border border-[#1a1a1a] p-3">
+                            <div key={i} className="rounded-lg bg-surface border border-surface-hover p-3">
                                 <div className="flex items-center justify-between gap-2 text-sm">
-                                    <span className="text-[#e5e5e5] font-medium">{c.name}</span>
-                                    <span className="text-[#525252] text-xs whitespace-nowrap">{c.days_away} days away · {formatKES(c.total_spend_cents)} spent</span>
+                                    <span className="text-text font-medium">{c.name}</span>
+                                    <span className="text-text-dim text-xs whitespace-nowrap">{c.days_away} days away · {formatKES(c.total_spend_cents)} spent</span>
                                 </div>
-                                <p className="text-xs text-[#737373] mt-1">
+                                <p className="text-xs text-text-muted mt-1">
                                     {c.fav_item ? <>Favourite: <span className="text-[#a3a3a3]">{c.fav_item}</span> · </> : null}
                                     {c.order_count} past order{c.order_count === 1 ? "" : "s"}
                                 </p>
@@ -421,7 +303,7 @@ export default function MarketingPage() {
                         {wb.candidates[0]?.message && (
                             <details className="mt-2">
                                 <summary className="text-xs text-[var(--accent)] cursor-pointer hover:underline">Preview the message they&apos;ll receive</summary>
-                                <pre className="mt-2 whitespace-pre-wrap text-[11px] text-[#a3a3a3] bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg p-3 font-sans">{wb.candidates[0].message}</pre>
+                                <pre className="mt-2 whitespace-pre-wrap text-[11px] text-[#a3a3a3] bg-bg border border-surface-hover rounded-lg p-3 font-sans">{wb.candidates[0].message}</pre>
                             </details>
                         )}
                     </div>
@@ -429,35 +311,35 @@ export default function MarketingPage() {
             </div>
 
             {/* Audience & consent */}
-            <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
-                <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2">
+            <div className="rounded-xl border border-surface-hover bg-[#0f0f0f] p-5">
+                <h2 className="text-sm font-semibold text-text flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-[var(--accent)]" /> Who you can reach — and how customers are protected
                 </h2>
                 <HowItWorks id="consent" />
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-                    <div className="rounded-lg bg-[#141414] border border-[#1a1a1a] p-3">
-                        <p className="text-xs text-[#525252] mb-1">Promo reach now</p>
-                        <p className="text-sm font-bold text-[#e5e5e5]">{d.audience.promo_reachable}</p>
+                    <div className="rounded-lg bg-surface border border-surface-hover p-3">
+                        <p className="text-xs text-text-dim mb-1">Promo reach now</p>
+                        <p className="text-sm font-bold text-text">{d.audience.promo_reachable}</p>
                     </div>
-                    <div className="rounded-lg bg-[#141414] border border-[#1a1a1a] p-3">
-                        <p className="text-xs text-[#525252] mb-1">Consented customers</p>
-                        <p className="text-sm font-bold text-[#e5e5e5]">{d.audience.consented_customers}</p>
+                    <div className="rounded-lg bg-surface border border-surface-hover p-3">
+                        <p className="text-xs text-text-dim mb-1">Consented customers</p>
+                        <p className="text-sm font-bold text-text">{d.audience.consented_customers}</p>
                     </div>
-                    <div className="rounded-lg bg-[#141414] border border-[#1a1a1a] p-3">
-                        <p className="text-xs text-[#525252] mb-1">Order window</p>
-                        <p className="text-sm font-bold text-[#e5e5e5]">{d.audience.order_window_days} days</p>
+                    <div className="rounded-lg bg-surface border border-surface-hover p-3">
+                        <p className="text-xs text-text-dim mb-1">Order window</p>
+                        <p className="text-sm font-bold text-text">{d.audience.order_window_days} days</p>
                     </div>
-                    <div className="rounded-lg bg-[#141414] border border-[#1a1a1a] p-3">
-                        <p className="text-xs text-[#525252] mb-1">Per-send cap</p>
-                        <p className="text-sm font-bold text-[#e5e5e5]">{d.audience.send_cap}</p>
+                    <div className="rounded-lg bg-surface border border-surface-hover p-3">
+                        <p className="text-xs text-text-dim mb-1">Per-send cap</p>
+                        <p className="text-sm font-bold text-text">{d.audience.send_cap}</p>
                     </div>
                 </div>
             </div>
 
             {/* Campaign history */}
             {d.history.length > 0 && (
-                <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
-                    <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2 mb-4">
+                <div className="rounded-xl border border-surface-hover bg-[#0f0f0f] p-5">
+                    <h2 className="text-sm font-semibold text-text flex items-center gap-2 mb-4">
                         <Clock className="w-4 h-4 text-[var(--accent)]" /> What&apos;s gone out (last 90 days)
                     </h2>
                     <div className="space-y-2">
@@ -468,9 +350,9 @@ export default function MarketingPage() {
                                 <div key={h.type} className="text-sm">
                                     <div className="flex items-center justify-between gap-2">
                                         <span className="text-[#a3a3a3]">{h.label}</span>
-                                        <span className="text-[#525252] text-xs whitespace-nowrap">{h.sent} delivered{h.not_delivered ? ` · ${h.not_delivered} not delivered` : ""}</span>
+                                        <span className="text-text-dim text-xs whitespace-nowrap">{h.sent} delivered{h.not_delivered ? ` · ${h.not_delivered} not delivered` : ""}</span>
                                     </div>
-                                    <div className="mt-1 h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
+                                    <div className="mt-1 h-1.5 bg-surface-hover rounded-full overflow-hidden">
                                         <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${pct}%` }} />
                                     </div>
                                 </div>
@@ -481,22 +363,22 @@ export default function MarketingPage() {
             )}
 
             {/* Offer playbook library */}
-            <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
-                <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2 mb-1">
+            <div className="rounded-xl border border-surface-hover bg-[#0f0f0f] p-5">
+                <h2 className="text-sm font-semibold text-text flex items-center gap-2 mb-1">
                     <BookOpen className="w-4 h-4 text-[var(--accent)]" /> Offer playbook
                 </h2>
-                <p className="text-xs text-[#525252] mb-4">The main campaign types, when to use each, and how to keep the margin safe.</p>
+                <p className="text-xs text-text-dim mb-4">The main campaign types, when to use each, and how to keep the margin safe.</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {PLAYBOOK.map((p) => (
-                        <div key={p.name} className="rounded-lg bg-[#141414] border border-[#1a1a1a] p-4">
+                        <div key={p.name} className="rounded-lg bg-surface border border-surface-hover p-4">
                             <div className="flex items-center gap-2 mb-2">
                                 <p.icon className="w-4 h-4 text-[var(--accent)]" />
-                                <p className="text-sm font-medium text-[#e5e5e5]">{p.name}</p>
+                                <p className="text-sm font-medium text-text">{p.name}</p>
                             </div>
-                            <p className="text-[11px] text-[#737373]"><span className="text-[#525252]">When:</span> {p.when}</p>
-                            <p className="text-[11px] text-[#737373] mt-1"><span className="text-[#525252]">Offer:</span> {p.offer}</p>
+                            <p className="text-[11px] text-text-muted"><span className="text-text-dim">When:</span> {p.when}</p>
+                            <p className="text-[11px] text-text-muted mt-1"><span className="text-text-dim">Offer:</span> {p.offer}</p>
                             <p className="text-[11px] text-emerald-400/80 mt-1">📈 {p.impact}</p>
-                            <p className="text-[11px] text-[#525252] mt-1">🛡 {p.margin}</p>
+                            <p className="text-[11px] text-text-dim mt-1">🛡 {p.margin}</p>
                         </div>
                     ))}
                 </div>

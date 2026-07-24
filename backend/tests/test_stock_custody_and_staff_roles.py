@@ -140,7 +140,7 @@ def test_matching_transfer_confirms_and_writes_movement_pair(client, db_session,
         json={"inventory_item_id": item.id, "quantity": 10.0, "from_location": "store", "to_location": "kitchen"},
         headers={"Authorization": f"Bearer {sender_token}"},
     )
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     transfer_id = r.json()["id"]
 
     before_movements = db_session.query(models.StockMovement).filter(

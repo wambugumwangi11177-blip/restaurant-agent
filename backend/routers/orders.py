@@ -32,7 +32,7 @@ _CAN_READ = (models.StaffRole.MANAGER, models.StaffRole.SUPERVISOR, models.Staff
              models.StaffRole.CONTROLLER, models.StaffRole.KITCHEN)
 
 
-@router.post("/", response_model=schemas.OrderOut)
+@router.post("/", response_model=schemas.OrderOut, status_code=201)
 async def create_order(
     order: schemas.OrderCreate,
     db: Session = Depends(get_db),
@@ -40,14 +40,22 @@ async def create_order(
 ):
     restaurant = get_or_create_restaurant(db, current_user)
 
-    # Look up menu items and calculate total
+    # Look up menu items and calculate total — one batched query instead of
+    # one query per cart line (this is the highest-frequency write endpoint
+    # in the app; a 5-item cart was issuing 5 separate MenuItem queries).
+    requested_ids = {oi.menu_item_id for oi in order.items}
+    menu_items_by_id = {
+        m.id: m
+        for m in db.query(models.MenuItem).filter(
+            models.MenuItem.id.in_(requested_ids),
+            models.MenuItem.restaurant_id == restaurant.id,
+        ).all()
+    }
+
     total = 0
     order_items = []
     for oi in order.items:
-        menu_item = db.query(models.MenuItem).filter(
-            models.MenuItem.id == oi.menu_item_id,
-            models.MenuItem.restaurant_id == restaurant.id,
-        ).first()
+        menu_item = menu_items_by_id.get(oi.menu_item_id)
         if not menu_item:
             raise HTTPException(status_code=404, detail=f"Menu item {oi.menu_item_id} not found")
         line_total = menu_item.price * oi.quantity
@@ -144,7 +152,7 @@ async def active_orders(
     return [_order_to_dict(o) for o in orders]
 
 
-@router.patch("/{order_id}/status", response_model=schemas.OrderOut)
+@router.post("/{order_id}/status", response_model=schemas.OrderOut)
 async def update_order_status(
     order_id: int,
     update: schemas.OrderStatusUpdate,
@@ -230,7 +238,7 @@ async def update_order_status(
     return _order_to_dict(order)
 
 
-@router.patch("/{order_id}/payment", response_model=schemas.OrderOut)
+@router.post("/{order_id}/payment", response_model=schemas.OrderOut)
 async def update_order_payment(
     order_id: int,
     update: schemas.OrderPaymentUpdate,
@@ -287,7 +295,7 @@ async def update_order_payment(
     return _order_to_dict(order)
 
 
-@router.patch("/{order_id}/details", response_model=schemas.OrderOut)
+@router.post("/{order_id}/details", response_model=schemas.OrderOut)
 async def update_order_details(
     order_id: int,
     update: schemas.OrderDetailsUpdate,
@@ -378,7 +386,7 @@ async def list_kitchen_incidents(
 
 # ── Public endpoint (no auth) for customer ordering ──
 
-@router.post("/public", response_model=schemas.OrderOut)
+@router.post("/public", response_model=schemas.OrderOut, status_code=201)
 @limiter.limit("20/minute")
 async def create_public_order(
     request: Request,
@@ -413,14 +421,20 @@ async def create_public_order(
             purpose="order_checkout",
         ))
 
+    requested_ids = {oi.menu_item_id for oi in order.items}
+    menu_items_by_id = {
+        m.id: m
+        for m in db.query(models.MenuItem).filter(
+            models.MenuItem.id.in_(requested_ids),
+            models.MenuItem.restaurant_id == restaurant.id,
+            models.MenuItem.is_available == True,
+        ).all()
+    }
+
     total = 0
     order_items = []
     for oi in order.items:
-        menu_item = db.query(models.MenuItem).filter(
-            models.MenuItem.id == oi.menu_item_id,
-            models.MenuItem.restaurant_id == restaurant.id,
-            models.MenuItem.is_available == True,
-        ).first()
+        menu_item = menu_items_by_id.get(oi.menu_item_id)
         if not menu_item:
             raise HTTPException(status_code=404, detail=f"Menu item {oi.menu_item_id} not found or unavailable")
         line_total = menu_item.price * oi.quantity

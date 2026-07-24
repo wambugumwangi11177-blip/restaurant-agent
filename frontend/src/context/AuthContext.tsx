@@ -21,6 +21,7 @@ interface User {
   id: number;
   email: string;
   role: string;
+  restaurant_name?: string;
   // Directive 015 — fine-grained tier (owner/manager/supervisor/controller/
   // stockkeeper/kitchen/waiter), or null if not yet assigned. Read fresh from
   // /auth/me on every load rather than cached in a JWT claim, so a role

@@ -5,11 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     Plus,
     Minus,
-    Trash2,
     ShoppingCart,
     Phone,
     User,
-    MapPin,
     ArrowLeft,
     Check,
     Smartphone,

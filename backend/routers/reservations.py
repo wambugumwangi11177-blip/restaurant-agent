@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import date, time
+from datetime import date, time, datetime
 
 from database import get_db
 import models
@@ -12,6 +12,15 @@ from ai.reservation_optimizer import is_table_available, find_available_tables
 from routers.deps import get_or_create_restaurant
 
 router = APIRouter(prefix="/reservations", tags=["reservations"])
+
+
+def _reject_if_in_past(reservation_date: date, reservation_time: time) -> None:
+    """Shared by create/update — a booking dated/timed before the current
+    moment (local wall-clock, matching this codebase's existing naive-local
+    convention for reservation_date/reservation_time; see time_utils.py for
+    why that's the deliberate house style rather than UTC here)."""
+    if datetime.combine(reservation_date, reservation_time) < datetime.now():
+        raise HTTPException(status_code=400, detail="Reservation date/time is in the past")
 
 # Directive 015's permission matrix for `reservations`: RW = Owner, Manager,
 # Supervisor, Waiter; nothing for Controller/Stockkeeper/Kitchen — there's no
@@ -71,13 +80,15 @@ async def get_available_tables(
     return tables
 
 
-@router.post("/", response_model=schemas.ReservationOut)
+@router.post("/", response_model=schemas.ReservationOut, status_code=201)
 async def create_reservation(
     reservation: schemas.ReservationCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
+
+    _reject_if_in_past(reservation.reservation_date, reservation.reservation_time)
 
     # Both checks below were entirely absent until 2026-07-08: `table_id` was
     # taken from the request body and written straight to the row. That allowed
@@ -198,6 +209,9 @@ async def update_reservation(
         k in updates for k in ("table_id", "reservation_date", "reservation_time", "duration_minutes")
     )
 
+    if "reservation_date" in updates or "reservation_time" in updates:
+        _reject_if_in_past(new_date, new_time)
+
     if new_table_id is not None and touches_scheduling:
         table = db.query(models.Table).filter(
             models.Table.id == new_table_id,
@@ -240,7 +254,7 @@ async def update_reservation(
     return _res_to_dict(reservation)
 
 
-@router.patch("/{reservation_id}/status", response_model=schemas.ReservationOut)
+@router.post("/{reservation_id}/status", response_model=schemas.ReservationOut)
 async def update_reservation_status(
     reservation_id: int,
     update: schemas.ReservationStatusUpdate,

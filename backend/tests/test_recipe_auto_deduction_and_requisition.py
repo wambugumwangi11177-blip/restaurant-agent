@@ -81,7 +81,7 @@ def test_manager_can_add_and_remove_recipe_ingredient(client, db_session):
         json={"inventory_item_id": inv_item.id, "quantity_per_serving": 0.25},
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     ingredient_id = r.json()["id"]
 
     r2 = client.get(f"/menu/{menu_item.id}/ingredients", headers={"Authorization": f"Bearer {token}"})
@@ -122,7 +122,7 @@ def test_order_creation_deducts_recipe_ingredients(client, db_session, recipe_se
         json={"items": [{"menu_item_id": menu_item.id, "quantity": 2}]},
         headers={"Authorization": f"Bearer {owner_token}"},
     )
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
 
     db_session.refresh(inv_item)
     # 2 servings x 0.3kg/serving = 0.6kg deducted
@@ -149,7 +149,7 @@ def test_order_with_no_recipe_does_not_crash_or_deduct(client, db_session, recip
         json={"items": [{"menu_item_id": no_recipe_item.id, "quantity": 3}]},
         headers={"Authorization": f"Bearer {owner_token}"},
     )
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
 
     db_session.refresh(inv_item)
     assert inv_item.quantity == before_qty   # untouched — no recipe references it
@@ -166,7 +166,7 @@ def test_going_negative_is_allowed_not_blocked(client, db_session, recipe_setup)
         json={"items": [{"menu_item_id": menu_item.id, "quantity": 5}]},
         headers={"Authorization": f"Bearer {owner_token}"},
     )
-    assert r.status_code == 200   # order still succeeds
+    assert r.status_code == 201   # order still succeeds
 
     db_session.refresh(inv_item)
     assert inv_item.quantity < 0   # allowed to go negative
@@ -187,7 +187,7 @@ def test_cancel_before_served_reverses_deduction(client, db_session, recipe_setu
     db_session.refresh(inv_item)
     assert inv_item.quantity == pytest.approx(before_qty - 0.3)   # deducted
 
-    r2 = client.patch(
+    r2 = client.post(
         f"/orders/{order_id}/status",
         json={"status": "cancelled"},
         headers={"Authorization": f"Bearer {owner_token}"},
@@ -209,13 +209,13 @@ def test_cancel_after_served_does_not_reverse(client, db_session, recipe_setup):
     )
     order_id = r.json()["id"]
 
-    client.patch(f"/orders/{order_id}/status", json={"status": "served"},
+    client.post(f"/orders/{order_id}/status", json={"status": "served"},
                  headers={"Authorization": f"Bearer {owner_token}"})
     db_session.refresh(inv_item)
     after_served = inv_item.quantity
     assert after_served == pytest.approx(before_qty - 0.3)
 
-    r3 = client.patch(f"/orders/{order_id}/status", json={"status": "cancelled"},
+    r3 = client.post(f"/orders/{order_id}/status", json={"status": "cancelled"},
                        headers={"Authorization": f"Bearer {owner_token}"})
     assert r3.status_code == 200
 
@@ -260,7 +260,7 @@ def test_kitchen_requisition_full_pull_flow(client, db_session, requisition_setu
     r1 = client.post("/stock/transfers/request",
                       json={"inventory_item_id": item.id},
                       headers={"Authorization": f"Bearer {kitchen_token}"})
-    assert r1.status_code == 200, r1.text
+    assert r1.status_code == 201, r1.text
     assert r1.json()["status"] == "requested"
     assert r1.json()["quantity"] is None
     transfer_id = r1.json()["id"]
@@ -311,7 +311,7 @@ def test_stock_count_reconciles_quantity(client, db_session):
 
     r = client.post("/stock/counts", json={"inventory_item_id": item.id, "counted_quantity": 15.0},
                      headers={"Authorization": f"Bearer {token}"})
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     assert r.json()["expected_quantity"] == 20.0
     assert r.json()["counted_quantity"] == 15.0
 
@@ -331,7 +331,7 @@ def test_stock_count_within_tolerance_no_event(client, db_session):
 
     r = client.post("/stock/counts", json={"inventory_item_id": item.id, "counted_quantity": 99.5},
                      headers={"Authorization": f"Bearer {token}"})
-    assert r.status_code == 200
+    assert r.status_code == 201
     assert received == []   # 0.5% gap, well under the 3% threshold
 
 
@@ -347,7 +347,7 @@ def test_stock_count_beyond_tolerance_flags_event(client, db_session):
 
     r = client.post("/stock/counts", json={"inventory_item_id": item.id, "counted_quantity": 35.0},
                      headers={"Authorization": f"Bearer {token}"})
-    assert r.status_code == 200
+    assert r.status_code == 201
 
     # emit_async runs in a background thread — give it a moment (same
     # pattern as tests/test_event_orchestration.py).

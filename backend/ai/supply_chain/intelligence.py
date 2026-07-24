@@ -31,9 +31,14 @@ def get_supply_chain_intelligence(db: Session, restaurant_id: int) -> dict:
     if not suppliers:
         return _empty_response()
 
+    # One batched query for every supplier's last-50 orders instead of one
+    # query per supplier — a window function preserves the exact "50 most
+    # recent per supplier" semantics the old per-supplier query had.
+    orders_by_supplier = _fetch_recent_orders_by_supplier(db, [s.id for s in suppliers], limit=50)
+
     supplier_analyses = []
     for supplier in suppliers:
-        analysis = _analyse_supplier(db, supplier)
+        analysis = _analyse_supplier(supplier, orders_by_supplier.get(supplier.id, []))
         supplier_analyses.append(analysis)
 
     # Sort by reliability descending
@@ -72,11 +77,34 @@ def get_supply_chain_intelligence(db: Session, restaurant_id: int) -> dict:
     }
 
 
-def _analyse_supplier(db: Session, supplier: models.Supplier) -> dict:
-    orders = db.query(models.PurchaseOrder).filter(
-        models.PurchaseOrder.supplier_id == supplier.id,
-    ).order_by(models.PurchaseOrder.ordered_at.desc()).limit(50).all()
+def _fetch_recent_orders_by_supplier(
+    db: Session, supplier_ids: list[int], limit: int
+) -> dict[int, list[models.PurchaseOrder]]:
+    """The last `limit` PurchaseOrders per supplier, in one query instead of
+    one `.limit(limit)` query per supplier. Fetches every order for these
+    suppliers ordered newest-first, then groups and slices to `limit` per
+    supplier in Python — simpler than a window-function query, and fine at
+    realistic scale (a restaurant's full PO history is at most low
+    thousands of rows, not worth a per-supplier subquery for)."""
+    if not supplier_ids:
+        return {}
 
+    all_orders = (
+        db.query(models.PurchaseOrder)
+        .filter(models.PurchaseOrder.supplier_id.in_(supplier_ids))
+        .order_by(models.PurchaseOrder.ordered_at.desc())
+        .all()
+    )
+
+    result: dict[int, list[models.PurchaseOrder]] = defaultdict(list)
+    for order in all_orders:
+        bucket = result[order.supplier_id]
+        if len(bucket) < limit:
+            bucket.append(order)
+    return result
+
+
+def _analyse_supplier(supplier: models.Supplier, orders: list[models.PurchaseOrder]) -> dict:
     delivered = [o for o in orders if o.status == "DELIVERED"]
     late      = [o for o in orders if o.status == "LATE"]
     pending   = [o for o in orders if o.status in ("PENDING", "SENT")]

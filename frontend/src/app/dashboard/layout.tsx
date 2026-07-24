@@ -67,7 +67,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     // Owner/superadmin system accounts (role !== "staff") own this dashboard —
     // an Owner IS an ADMIN user (directive 015). Any role === "staff" account
     // belongs on its own tier's frontend under /staff/<tier>, never here.
-    const isStaffAccount = ((user as any)?.role || "").toLowerCase() === "staff";
+    const isStaffAccount = (user?.role || "").toLowerCase() === "staff";
     const staffRole = (user?.staff_role || null) as StaffTier | null;
     const roleUnassigned = isStaffAccount && !staffRole;
 
@@ -92,7 +92,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     if (!user) return null;
 
-    const restaurantName = (user as any).restaurant_name || "Your Restaurant";
+    const restaurantName = user?.restaurant_name || "Your Restaurant";
 
     // Directive 015's Edge Cases: don't guess a tier for an unassigned staff
     // account — surface it plainly instead of a confusing empty nav / string

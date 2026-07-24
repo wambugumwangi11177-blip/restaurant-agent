@@ -12,6 +12,8 @@ import { useState } from "react";
 import { Target, ChevronDown } from "lucide-react";
 import api from "@/lib/api";
 import { HowItWorks } from "./HowItWorks";
+import FormField from "@/components/ui/FormField";
+import { getErrorMessage } from "@/lib/errors";
 
 interface Step { action: string; why?: string; expected_impact?: string; priority_score?: number; category?: string; }
 interface StrategyResult {
@@ -47,37 +49,39 @@ export function StrategyAgent() {
             const res = await api.post("/ai/strategy", { goal: g });
             if (res.data?.available === false) setError(res.data.error || "Strategy unavailable.");
             else setResult(res.data);
-        } catch (e: any) {
-            setError(e?.response?.data?.detail || e?.message || "Strategy failed.");
+        } catch (e) {
+            setError(getErrorMessage(e, "Strategy failed."));
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="rounded-xl border border-[var(--accent)]/25 bg-gradient-to-b from-[var(--accent)]/[0.05] to-[#0f0f0f] p-5">
-            <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2">
-                <Target className="w-4 h-4 text-[var(--accent)]" />
+        <div className="rounded-xl border border-accent/25 bg-gradient-to-b from-accent/[0.05] to-[#0f0f0f] p-5">
+            <h2 className="text-sm font-semibold text-text flex items-center gap-2">
+                <Target className="w-4 h-4 text-accent" />
                 CEO Strategy Agent
             </h2>
-            <p className="text-xs text-[#525252] mt-1">
+            <p className="text-xs text-text-dim mt-1">
                 Set a goal — the agent consults every specialist brain and returns one prioritized plan.
             </p>
             <HowItWorks id="strategy" />
             <div className="mb-4" />
 
-            <div className="flex gap-2">
-                <input
+            <div className="flex gap-2 items-end">
+                <FormField
+                    label="Goal"
+                    srOnlyLabel
                     value={goal}
                     onChange={(e) => setGoal(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && run(goal)}
                     placeholder="e.g. Increase monthly profit by KES 100,000"
-                    className="flex-1 bg-[#0a0a0a] border border-[#262626] rounded-lg text-sm text-[#e5e5e5] px-3 py-2"
+                    className="flex-1 bg-bg border border-border rounded-lg text-sm text-text px-3 py-2"
                 />
                 <button
                     onClick={() => run(goal)}
                     disabled={loading || !goal.trim()}
-                    className="bg-[var(--accent)] text-[#0a0a0a] font-medium text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity whitespace-nowrap"
+                    className="bg-accent text-bg font-medium text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity whitespace-nowrap"
                 >
                     {loading ? "Thinking…" : "Build plan"}
                 </button>
@@ -87,7 +91,7 @@ export function StrategyAgent() {
                     <button
                         key={s}
                         onClick={() => { setGoal(s); run(s); }}
-                        className="text-[11px] text-[#737373] hover:text-[var(--accent)] border border-[#1a1a1a] rounded-full px-2.5 py-1 transition-colors"
+                        className="text-[11px] text-text-muted hover:text-accent border border-surface-hover rounded-full px-2.5 py-1 transition-colors"
                     >
                         {s}
                     </button>
@@ -99,9 +103,9 @@ export function StrategyAgent() {
             {result?.available && result.strategy && (
                 <div className="mt-4 space-y-3">
                     <div className="flex items-start gap-2">
-                        <p className="text-[#e5e5e5] font-medium text-sm">{result.strategy.headline}</p>
+                        <p className="text-text font-medium text-sm">{result.strategy.headline}</p>
                         {result.mode === "deterministic" && (
-                            <span className="text-[9px] uppercase tracking-wide text-[#737373] border border-[#262626] rounded px-1.5 py-0.5 whitespace-nowrap">
+                            <span className="text-[9px] uppercase tracking-wide text-text-muted border border-border rounded px-1.5 py-0.5 whitespace-nowrap">
                                 ranked
                             </span>
                         )}
@@ -109,14 +113,14 @@ export function StrategyAgent() {
 
                     <ol className="space-y-2">
                         {result.strategy.steps.map((s, i) => (
-                            <li key={i} className="rounded-lg border border-[#1a1a1a] bg-[#0a0a0a] p-3">
+                            <li key={i} className="rounded-lg border border-surface-hover bg-bg p-3">
                                 <div className="flex items-start gap-2">
-                                    <span className="text-[10px] font-bold text-[#0a0a0a] bg-[var(--accent)] rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
+                                    <span className="text-[10px] font-bold text-bg bg-accent rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
                                         {i + 1}
                                     </span>
                                     <div className="min-w-0">
-                                        <p className="text-sm text-[#e5e5e5]">{s.action}</p>
-                                        {s.why && <p className="text-xs text-[#525252] mt-0.5">{s.why}</p>}
+                                        <p className="text-sm text-text">{s.action}</p>
+                                        {s.why && <p className="text-xs text-text-dim mt-0.5">{s.why}</p>}
                                         {s.expected_impact && (
                                             <p className="text-xs text-emerald-400 mt-0.5">{s.expected_impact}</p>
                                         )}
@@ -132,13 +136,13 @@ export function StrategyAgent() {
                         </div>
                     )}
 
-                    {result.note && <p className="text-[11px] text-[#525252]">{result.note}</p>}
+                    {result.note && <p className="text-[11px] text-text-dim">{result.note}</p>}
 
                     {result.trace && result.trace.length > 0 && (
                         <div>
                             <button
                                 onClick={() => setShowTrace((v) => !v)}
-                                className="flex items-center gap-1 text-[11px] text-[#737373] hover:text-[var(--accent)] transition-colors"
+                                className="flex items-center gap-1 text-[11px] text-text-muted hover:text-accent transition-colors"
                             >
                                 <span>Reasoning trace ({result.trace.length})</span>
                                 <ChevronDown className={`w-3 h-3 transition-transform ${showTrace ? "rotate-180" : ""}`} />
@@ -146,8 +150,8 @@ export function StrategyAgent() {
                             {showTrace && (
                                 <ol className="mt-2 space-y-1">
                                     {result.trace.map((t, i) => (
-                                        <li key={i} className="text-[11px] text-[#525252]">
-                                            <span className="text-[#737373]">{t.tool}</span>
+                                        <li key={i} className="text-[11px] text-text-dim">
+                                            <span className="text-text-muted">{t.tool}</span>
                                             {t.summary ? ` — ${t.summary}` : ""}
                                         </li>
                                     ))}

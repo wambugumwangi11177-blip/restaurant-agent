@@ -75,7 +75,7 @@ def test_reservation_no_show_transition_emits_event(client, db_session, monkeypa
     subscribe(EventType.RESERVATION_NO_SHOW, lambda payload: received.append(payload))
 
     token = auth.create_access_token({"sub": user.email})
-    resp = client.patch(
+    resp = client.post(
         f"/reservations/{reservation.id}/status",
         json={"status": "no_show"},
         headers={"Authorization": f"Bearer {token}"},

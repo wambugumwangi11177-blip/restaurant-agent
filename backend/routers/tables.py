@@ -41,7 +41,7 @@ async def list_tables(
     ).order_by(models.Table.table_number).all()
 
 
-@router.post("/", response_model=schemas.TableOut)
+@router.post("/", response_model=schemas.TableOut, status_code=201)
 async def create_table(
     body: schemas.TableCreate,
     db: Session = Depends(get_db),
@@ -91,7 +91,7 @@ async def update_table(
     return table
 
 
-@router.patch("/{table_id}/status", response_model=schemas.TableOut)
+@router.post("/{table_id}/status", response_model=schemas.TableOut)
 async def update_table_status(
     table_id: int,
     body: schemas.TableStatusUpdate,

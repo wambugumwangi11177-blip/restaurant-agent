@@ -296,7 +296,7 @@ def test_kitchen_can_advance_order_status(client, db_session):
     db_session.add(order)
     db_session.commit()
 
-    r = client.patch(
+    r = client.post(
         f"/orders/{order.id}/status", json={"status": "prep"},
         headers={"Authorization": f"Bearer {token}"},
     )

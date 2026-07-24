@@ -2,25 +2,21 @@
 
 import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
-import { motion, AnimatePresence } from "framer-motion";
 import {
-    Clock,
     ChefHat,
     CheckCircle2,
-    ArrowRight,
     RefreshCw,
     Bell,
     Truck,
     UtensilsCrossed,
     ShoppingBag,
-    XCircle,
-    StickyNote,
-    RotateCcw,
-    AlertOctagon,
     LayoutGrid,
 } from "lucide-react";
+import KDSColumn from "./KDSColumn";
+import { useToast } from "@/components/ui/Toast";
+import { getErrorMessage } from "@/lib/errors";
 
-interface OrderItem {
+export interface OrderItem {
     id: number;
     menu_item_id: number;
     quantity: number;
@@ -38,7 +34,7 @@ const STATIONS = [
     { v: "main", label: "Main" },
 ];
 
-interface Order {
+export interface Order {
     id: number;
     status: string;
     order_type: string;
@@ -71,6 +67,8 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
     const [incidentId, setIncidentId] = useState<number | null>(null);
     const [incidentType, setIncidentType] = useState<"remake" | "quality_issue">("remake");
     const [incidentReason, setIncidentReason] = useState("");
+    const [now, setNow] = useState(() => Date.now());
+    const { showToast, toastNode } = useToast();
 
     const fetchOrders = useCallback(async () => {
         try {
@@ -80,6 +78,7 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
             // Silently retry
         }
         setLoading(false);
+        setNow(Date.now());
     }, []);
 
     useEffect(() => {
@@ -91,10 +90,10 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
     const moveOrder = async (orderId: number, newStatus: string) => {
         setUpdating(orderId);
         try {
-            await api.patch(`/orders/${orderId}/status`, { status: newStatus });
+            await api.post(`/orders/${orderId}/status`, { status: newStatus });
             await fetchOrders();
         } catch (err) {
-            console.error("Failed to update order:", err);
+            showToast(getErrorMessage(err, "Failed to update order"), "error");
         }
         setUpdating(null);
     };
@@ -105,16 +104,16 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
             if (rejectReason.trim()) {
                 const order = orders.find((o) => o.id === orderId);
                 const note = `Rejected: ${rejectReason.trim()}`;
-                await api.patch(`/orders/${orderId}/details`, {
+                await api.post(`/orders/${orderId}/details`, {
                     notes: order?.notes ? `${order.notes} | ${note}` : note,
                 });
             }
-            await api.patch(`/orders/${orderId}/status`, { status: "cancelled" });
+            await api.post(`/orders/${orderId}/status`, { status: "cancelled" });
             setRejectingId(null);
             setRejectReason("");
             await fetchOrders();
         } catch (err) {
-            console.error("Failed to reject order:", err);
+            showToast(getErrorMessage(err, "Failed to reject order"), "error");
         }
         setUpdating(null);
     };
@@ -125,12 +124,12 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
         try {
             const order = orders.find((o) => o.id === orderId);
             const combined = order?.notes ? `${order.notes} | ${noteText.trim()}` : noteText.trim();
-            await api.patch(`/orders/${orderId}/details`, { notes: combined });
+            await api.post(`/orders/${orderId}/details`, { notes: combined });
             setNotingId(null);
             setNoteText("");
             await fetchOrders();
         } catch (err) {
-            console.error("Failed to add note:", err);
+            showToast(getErrorMessage(err, "Failed to add note"), "error");
         }
         setUpdating(null);
     };
@@ -147,7 +146,7 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
             setIncidentReason("");
             await fetchOrders();
         } catch (err) {
-            console.error("Failed to log incident:", err);
+            showToast(getErrorMessage(err, "Failed to log incident"), "error");
         }
         setUpdating(null);
     };
@@ -195,7 +194,7 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
         return (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-120px)]">
                 {[...Array(3)].map((_, i) => (
-                    <div key={i} className="bg-[#141414] rounded-xl animate-pulse" />
+                    <div key={i} className="bg-surface rounded-xl animate-pulse" />
                 ))}
             </div>
         );
@@ -203,26 +202,27 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
 
     return (
         <div className="flex flex-col h-[calc(100vh-120px)]">
+            {toastNode}
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
                 <div>
-                    <h1 className="text-xl font-bold text-[#e5e5e5]">Kitchen</h1>
-                    <p className="text-xs text-[#525252]">
+                    <h1 className="text-xl font-bold text-text">Kitchen</h1>
+                    <p className="text-xs text-text-dim">
                         {orders.length > 0
                             ? `${orders.length} order${orders.length > 1 ? "s" : ""} right now`
                             : "No orders right now — take a breather"}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="hidden sm:flex items-center gap-1 bg-[#1a1a1a] border border-[#262626] rounded-lg p-0.5">
-                        <LayoutGrid className="w-3 h-3 text-[#525252] ml-1.5" />
+                    <div className="hidden sm:flex items-center gap-1 bg-surface-hover border border-border rounded-lg p-0.5">
+                        <LayoutGrid className="w-3 h-3 text-text-dim ml-1.5" />
                         {STATIONS.map((s) => (
                             <button
                                 key={s.v}
                                 onClick={() => setStationFilter(s.v)}
                                 className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${stationFilter === s.v
-                                    ? "bg-[var(--accent)] text-black"
-                                    : "text-[#737373] hover:text-[#e5e5e5]"
+                                    ? "bg-accent text-black"
+                                    : "text-text-muted hover:text-text"
                                     }`}
                             >
                                 {s.label}
@@ -231,7 +231,7 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
                     </div>
                     <button
                         onClick={fetchOrders}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1a1a] border border-[#262626] rounded-lg text-xs text-[#737373] hover:text-[#e5e5e5] transition-all"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-hover border border-border rounded-lg text-xs text-text-muted hover:text-text transition-all"
                     >
                         <RefreshCw className="w-3 h-3" />
                         Refresh
@@ -242,13 +242,14 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
             {/* Three-column board */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-1 min-h-0">
                 {/* Incoming */}
-                <Column
+                <KDSColumn
                     title="Incoming"
                     subtitle="New orders"
                     count={pending.length}
-                    color="#eab308"
+                    color="var(--warning)"
                     icon={Bell}
                     orders={pending}
+                    now={now}
                     actionLabel="Start Cooking"
                     actionStatus="prep"
                     onAction={moveOrder}
@@ -278,13 +279,14 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
                 />
 
                 {/* Cooking */}
-                <Column
+                <KDSColumn
                     title="Cooking"
                     subtitle="Being prepared"
                     count={cooking.length}
-                    color="#d4a853"
+                    color="var(--accent)"
                     icon={ChefHat}
                     orders={cooking}
+                    now={now}
                     actionLabel="Ready"
                     actionStatus="ready"
                     onAction={moveOrder}
@@ -308,13 +310,14 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
                 />
 
                 {/* Ready */}
-                <Column
+                <KDSColumn
                     title="Ready"
                     subtitle="Waiting for pickup"
                     count={ready.length}
-                    color="#22c55e"
+                    color="var(--success)"
                     icon={CheckCircle2}
                     orders={ready}
+                    now={now}
                     actionLabel="Served"
                     actionStatus="served"
                     onAction={moveOrder}
@@ -336,229 +339,6 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
                     channelLabel={channelLabel}
                     readOnly={readOnly}
                 />
-            </div>
-        </div>
-    );
-}
-
-function Column({
-    title, subtitle, count, color, icon: Icon, orders, actionLabel, actionStatus,
-    onAction, updating, minutesAgo, orderTypeIcon, channelLabel, readOnly,
-    allowReject = false, rejectingId = null, setRejectingId, rejectReason = "", setRejectReason, onReject,
-    notingId = null, setNotingId, noteText = "", setNoteText, onAddNote,
-    incidentId = null, setIncidentId, incidentType = "remake", setIncidentType,
-    incidentReason = "", setIncidentReason, onLogIncident,
-}: {
-    title: string; subtitle: string; count: number; color: string;
-    icon: any; orders: Order[]; actionLabel: string; actionStatus: string;
-    onAction: (id: number, status: string) => void;
-    updating: number | null;
-    minutesAgo: (d: string) => string;
-    orderTypeIcon: (t: string) => any;
-    channelLabel: (c: string) => string;
-    readOnly: boolean;
-    allowReject?: boolean;
-    rejectingId?: number | null;
-    setRejectingId?: (id: number | null) => void;
-    rejectReason?: string;
-    setRejectReason?: (s: string) => void;
-    onReject?: (id: number) => void;
-    notingId?: number | null;
-    setNotingId?: (id: number | null) => void;
-    noteText?: string;
-    setNoteText?: (s: string) => void;
-    onAddNote?: (id: number) => void;
-    incidentId?: number | null;
-    setIncidentId?: (id: number | null) => void;
-    incidentType?: "remake" | "quality_issue";
-    setIncidentType?: (t: "remake" | "quality_issue") => void;
-    incidentReason?: string;
-    setIncidentReason?: (s: string) => void;
-    onLogIncident?: (id: number) => void;
-}) {
-    return (
-        <div className="bg-[#0f0f0f] border border-[#262626] rounded-xl flex flex-col min-h-0">
-            <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Icon className="w-4 h-4" style={{ color }} />
-                    <div>
-                        <span className="text-sm font-semibold text-[#e5e5e5]">{title}</span>
-                        <span className="text-[10px] text-[#525252] ml-2">{subtitle}</span>
-                    </div>
-                </div>
-                {count > 0 && (
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                        style={{ backgroundColor: `${color}15`, color }}>
-                        {count}
-                    </span>
-                )}
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                <AnimatePresence>
-                    {orders.length === 0 ? (
-                        <p className="text-xs text-[#525252] text-center py-8">Nothing here</p>
-                    ) : (
-                        orders.map((order) => {
-                            const TypeIcon = orderTypeIcon(order.order_type);
-                            const channel = channelLabel(order.delivery_channel);
-                            const isOld = Date.now() - new Date(order.created_at).getTime() > 15 * 60000;
-
-                            return (
-                                <motion.div
-                                    key={order.id}
-                                    layout
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.95 }}
-                                    className={`bg-[#141414] border rounded-xl p-3 ${isOld ? "border-[#ef4444]/30" : "border-[#262626]"
-                                        }`}
-                                >
-                                    {/* Order header */}
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold text-[#e5e5e5]">#{order.id}</span>
-                                            <TypeIcon className="w-3 h-3 text-[#525252]" />
-                                            {order.table_number && (
-                                                <span className="text-[10px] text-[#737373]">Table {order.table_number}</span>
-                                            )}
-                                            {channel && (
-                                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#3b82f6]/10 text-[#3b82f6]">{channel}</span>
-                                            )}
-                                        </div>
-                                        <span className={`text-[10px] ${isOld ? "text-[#ef4444]" : "text-[#525252]"}`}>
-                                            <Clock className="w-2.5 h-2.5 inline mr-0.5" />
-                                            {minutesAgo(order.created_at)}
-                                        </span>
-                                    </div>
-
-                                    {/* Customer */}
-                                    {order.customer_name && (
-                                        <p className="text-[10px] text-[#737373] mb-1.5">{order.customer_name}</p>
-                                    )}
-
-                                    {/* Items */}
-                                    <div className="space-y-0.5 mb-2">
-                                        {order.items.map((item) => (
-                                            <div key={item.id} className="flex items-center gap-2">
-                                                <span className="text-xs font-semibold text-[var(--accent)] w-4">{item.quantity}×</span>
-                                                <span className="text-xs text-[#e5e5e5]">{item.item_name || `Item #${item.menu_item_id}`}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {/* Notes */}
-                                    {order.notes && (
-                                        <p className="text-[10px] text-[#eab308] bg-[#eab308]/5 rounded px-2 py-1 mb-2">
-                                            📝 {order.notes}
-                                        </p>
-                                    )}
-
-                                    {/* Action button */}
-                                    {!readOnly && (
-                                        <button
-                                            onClick={() => onAction(order.id, actionStatus)}
-                                            disabled={updating === order.id}
-                                            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all"
-                                            style={{
-                                                backgroundColor: `${color}15`,
-                                                color,
-                                            }}
-                                        >
-                                            {updating === order.id ? "Updating..." : (
-                                                <>
-                                                    {actionLabel}
-                                                    <ArrowRight className="w-3 h-3" />
-                                                </>
-                                            )}
-                                        </button>
-                                    )}
-
-                                    {/* Reject (Incoming column only) + Add note */}
-                                    {!readOnly && (allowReject || onAddNote) && (
-                                        <div className="flex gap-1.5 mt-1.5">
-                                            {allowReject && (
-                                                <button
-                                                    onClick={() => { setRejectingId?.(rejectingId === order.id ? null : order.id); setNotingId?.(null); }}
-                                                    disabled={updating === order.id}
-                                                    className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium bg-[#ef4444]/10 text-[#ef4444] hover:bg-[#ef4444]/20 transition-all">
-                                                    <XCircle className="w-3 h-3" />
-                                                    Reject
-                                                </button>
-                                            )}
-                                            {onAddNote && (
-                                                <button
-                                                    onClick={() => { setNotingId?.(notingId === order.id ? null : order.id); setRejectingId?.(null); setIncidentId?.(null); }}
-                                                    disabled={updating === order.id}
-                                                    className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5] transition-all">
-                                                    <StickyNote className="w-3 h-3" />
-                                                    Note
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* Remake / quality issue */}
-                                    {!readOnly && onLogIncident && (
-                                        <div className="flex gap-1.5 mt-1.5">
-                                            <button
-                                                onClick={() => { setIncidentId?.(incidentId === order.id ? null : order.id); setIncidentType?.("remake"); setRejectingId?.(null); setNotingId?.(null); }}
-                                                disabled={updating === order.id}
-                                                className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium bg-[#1a1a1a] text-[#737373] hover:text-[var(--accent)] transition-all">
-                                                <RotateCcw className="w-3 h-3" />
-                                                Remake
-                                            </button>
-                                            <button
-                                                onClick={() => { setIncidentId?.(incidentId === order.id ? null : order.id); setIncidentType?.("quality_issue"); setRejectingId?.(null); setNotingId?.(null); }}
-                                                disabled={updating === order.id}
-                                                className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium bg-[#1a1a1a] text-[#737373] hover:text-[#eab308] transition-all">
-                                                <AlertOctagon className="w-3 h-3" />
-                                                Issue
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {incidentId === order.id && (
-                                        <div className="mt-1.5 flex gap-1.5 items-center">
-                                            <input placeholder={incidentType === "remake" ? "Why is it being remade?" : "What happened?"}
-                                                value={incidentReason}
-                                                onChange={(e) => setIncidentReason?.(e.target.value)}
-                                                className="flex-1 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1 text-[10px] text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
-                                            <button onClick={() => onLogIncident?.(order.id)} disabled={updating === order.id}
-                                                className="bg-[var(--accent)] text-black rounded-lg px-2 py-1 text-[10px] font-semibold disabled:opacity-50">
-                                                Log
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {rejectingId === order.id && (
-                                        <div className="mt-1.5 flex gap-1.5 items-center">
-                                            <input placeholder="Reason (optional)" value={rejectReason}
-                                                onChange={(e) => setRejectReason?.(e.target.value)}
-                                                className="flex-1 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1 text-[10px] text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
-                                            <button onClick={() => onReject?.(order.id)} disabled={updating === order.id}
-                                                className="bg-[#ef4444] text-white rounded-lg px-2 py-1 text-[10px] font-semibold disabled:opacity-50">
-                                                Confirm
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {notingId === order.id && (
-                                        <div className="mt-1.5 flex gap-1.5 items-center">
-                                            <input placeholder="Note for this order" value={noteText}
-                                                onChange={(e) => setNoteText?.(e.target.value)}
-                                                className="flex-1 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1 text-[10px] text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
-                                            <button onClick={() => onAddNote?.(order.id)} disabled={updating === order.id || !noteText.trim()}
-                                                className="bg-[var(--accent)] text-black rounded-lg px-2 py-1 text-[10px] font-semibold disabled:opacity-50">
-                                                Add
-                                            </button>
-                                        </div>
-                                    )}
-                                </motion.div>
-                            );
-                        })
-                    )}
-                </AnimatePresence>
             </div>
         </div>
     );

@@ -24,7 +24,7 @@ async def read_menu_items(
     items = db.query(models.MenuItem).filter(models.MenuItem.restaurant_id == restaurant.id).offset(skip).limit(limit).all()
     return items
 
-@router.post("/", response_model=schemas.MenuItem)
+@router.post("/", response_model=schemas.MenuItem, status_code=201)
 async def create_menu_item(
     item: schemas.MenuItemCreate,
     db: Session = Depends(get_db),
@@ -163,7 +163,7 @@ async def list_ingredients(
     return [_ingredient_out(r, items_by_id.get(r.inventory_item_id)) for r in rows]
 
 
-@router.post("/{item_id}/ingredients", response_model=schemas.MenuIngredientOut)
+@router.post("/{item_id}/ingredients", response_model=schemas.MenuIngredientOut, status_code=201)
 async def add_ingredient(
     item_id: int,
     body: schemas.MenuIngredientCreate,

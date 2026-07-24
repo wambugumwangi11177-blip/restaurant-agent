@@ -21,6 +21,7 @@ from database import get_db
 import models, auth
 import email_utils
 from schemas import StrictModel
+from pydantic import EmailStr
 from routers.deps import get_restaurant_or_none
 from rate_limit import limiter
 from time_utils import utcnow
@@ -86,7 +87,7 @@ def _consume_auth_token(
 # ── Request / Response schemas ────────────────────────────────────────────────
 
 class UserCreate(StrictModel):
-    email: str
+    email: EmailStr
     password: str
     tenant_name: str   # used as restaurant name on signup
 
@@ -128,13 +129,50 @@ class PasswordResetConfirm(StrictModel):
     new_password: str
 
 
+class ImpersonationBanner(StrictModel):
+    session_id: int
+    impersonator_email: str
+
+
+class MeOut(StrictModel):
+    id: int
+    email: str
+    role: str
+    staff_role: str | None = None
+    is_email_verified: bool
+    restaurant_name: str | None = None
+    restaurant_id: int | None = None
+    impersonation: ImpersonationBanner | None = None
+
+
+class StatusMessageOut(StrictModel):
+    """Generic {"status": "..."} acknowledgement — logout-all, password-reset,
+    verify-email, resend-verification, mfa enable/disable."""
+    status: str
+    token_version: int | None = None
+
+
+class MfaSetupOut(StrictModel):
+    secret: str
+    otpauth_uri: str
+
+
+class RestaurantOut(StrictModel):
+    id: int
+    name: str
+    address: str | None = None
+    owner_phone: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+
+
 class EmailVerifyConfirm(StrictModel):
     token: str
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
-@router.post("/register", response_model=Token)
+@router.post("/register", response_model=Token, status_code=201)
 @limiter.limit("5/hour")
 async def register(request: Request, user_data: UserCreate, db: Session = Depends(get_db)):
     # Enforce minimum password strength before anything else.
@@ -274,7 +312,7 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@router.get("/me")
+@router.get("/me", response_model=MeOut)
 async def read_users_me(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
@@ -307,7 +345,7 @@ async def read_users_me(
     }
 
 
-@router.post("/logout-all")
+@router.post("/logout-all", response_model=StatusMessageOut)
 async def logout_all(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
@@ -328,7 +366,7 @@ async def logout_all(
     return {"status": "all_sessions_revoked", "token_version": user.token_version}
 
 
-@router.post("/password-reset/request")
+@router.post("/password-reset/request", response_model=StatusMessageOut)
 @limiter.limit("3/hour")
 async def request_password_reset(
     request: Request, body: PasswordResetRequest, db: Session = Depends(get_db)
@@ -354,7 +392,7 @@ async def request_password_reset(
     return {"status": "if_account_exists_a_reset_email_was_sent"}
 
 
-@router.post("/password-reset/confirm")
+@router.post("/password-reset/confirm", response_model=StatusMessageOut)
 @limiter.limit("10/hour")
 async def confirm_password_reset(
     request: Request, body: PasswordResetConfirm, db: Session = Depends(get_db)
@@ -379,7 +417,7 @@ async def confirm_password_reset(
     return {"status": "password_reset"}
 
 
-@router.post("/verify-email")
+@router.post("/verify-email", response_model=StatusMessageOut)
 @limiter.limit("10/hour")
 async def verify_email(
     request: Request, body: EmailVerifyConfirm, db: Session = Depends(get_db)
@@ -390,7 +428,7 @@ async def verify_email(
     return {"status": "email_verified"}
 
 
-@router.post("/resend-verification")
+@router.post("/resend-verification", response_model=StatusMessageOut)
 @limiter.limit("3/hour")
 async def resend_verification(
     request: Request,
@@ -413,7 +451,7 @@ async def resend_verification(
     return {"status": "verification_email_sent"}
 
 
-@router.post("/mfa/setup")
+@router.post("/mfa/setup", response_model=MfaSetupOut)
 async def mfa_setup(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
@@ -435,7 +473,7 @@ async def mfa_setup(
     }
 
 
-@router.post("/mfa/enable")
+@router.post("/mfa/enable", response_model=StatusMessageOut)
 async def mfa_enable(
     body: MfaCode,
     current_user: models.User = Depends(auth.get_current_user),
@@ -452,7 +490,7 @@ async def mfa_enable(
     return {"status": "mfa_enabled"}
 
 
-@router.post("/mfa/disable")
+@router.post("/mfa/disable", response_model=StatusMessageOut)
 async def mfa_disable(
     body: MfaCode,
     current_user: models.User = Depends(auth.get_current_user),
@@ -471,7 +509,7 @@ async def mfa_disable(
     return {"status": "mfa_disabled"}
 
 
-@router.put("/restaurant")
+@router.put("/restaurant", response_model=RestaurantOut)
 async def update_restaurant(
     data: RestaurantUpdate,
     current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),

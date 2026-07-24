@@ -12,7 +12,7 @@ import { useState } from "react";
 import { Info } from "lucide-react";
 import api from "@/lib/api";
 
-export function ExplainButton({ item, label }: { item: Record<string, any>; label?: string }) {
+export function ExplainButton({ item, label }: { item: object; label?: string }) {
     const [state, setState] = useState<"idle" | "loading" | "done" | "none">("idle");
     const [text, setText] = useState("");
 
@@ -23,7 +23,7 @@ export function ExplainButton({ item, label }: { item: Record<string, any>; labe
             const res = await api.post("/ai/explain", { item, label });
             if (res.data?.available && res.data.explanation) {
                 const n = res.data.explanation;
-                const extra = (n.actions || []).slice(0, 1).map((a: any) => a.action).join(" ");
+                const extra = (n.actions || []).slice(0, 1).map((a: { action?: string }) => a.action).join(" ");
                 setText([n.headline, extra].filter(Boolean).join(" — "));
                 setState("done");
             } else {

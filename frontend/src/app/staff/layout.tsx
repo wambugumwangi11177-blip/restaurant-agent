@@ -3,7 +3,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { tierHome, StaffTier } from "@/lib/permissions";
+import { StaffTier } from "@/lib/permissions";
 
 /**
  * Root guard for every tier-specific frontend under /staff/<tier>/*.
@@ -17,7 +17,7 @@ export default function StaffRootLayout({ children }: { children: React.ReactNod
     const { user, logout, isLoading } = useAuth();
     const router = useRouter();
 
-    const isStaffAccount = ((user as any)?.role || "").toLowerCase() === "staff";
+    const isStaffAccount = (user?.role || "").toLowerCase() === "staff";
     const staffRole = (user?.staff_role || null) as StaffTier | null;
     const roleUnassigned = isStaffAccount && !staffRole;
 

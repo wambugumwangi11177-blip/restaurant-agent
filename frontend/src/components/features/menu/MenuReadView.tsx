@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { UtensilsCrossed, ChefHat, ChevronDown, ChevronUp } from "lucide-react";
+import type { RecipeIngredient } from "./types";
 
 interface MenuItem {
     id: number;
@@ -23,7 +24,7 @@ export default function MenuReadView() {
     const [items, setItems] = useState<MenuItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [openId, setOpenId] = useState<number | null>(null);
-    const [ingredientsByItem, setIngredientsByItem] = useState<Record<number, any[]>>({});
+    const [ingredientsByItem, setIngredientsByItem] = useState<Record<number, RecipeIngredient[]>>({});
 
     useEffect(() => {
         api.get("/menu/").then((res) => setItems(res.data || [])).finally(() => setLoading(false));
@@ -80,7 +81,7 @@ export default function MenuReadView() {
                                 >
                                     <div className="flex items-center gap-2">
                                         {!item.is_available && (
-                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#ef4444]/10 text-[#ef4444] uppercase">86'd</span>
+                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#ef4444]/10 text-[#ef4444] uppercase">86&apos;d</span>
                                         )}
                                         <div>
                                             <p className="text-sm text-[#e5e5e5]">{item.name}</p>
@@ -109,9 +110,9 @@ export default function MenuReadView() {
                                             <p className="text-xs text-[#525252]">No recipe set for this item.</p>
                                         ) : (
                                             <ul className="space-y-0.5">
-                                                {ingredients.map((ing: any) => (
+                                                {ingredients.map((ing) => (
                                                     <li key={ing.id} className="text-xs text-[#e5e5e5]">
-                                                        {ing.quantity_per_serving} {ing.unit || ""} {ing.inventory_item_name || `Item #${ing.inventory_item_id}`}
+                                                        {ing.quantity_per_serving} {ing.unit || ""} {ing.item_name || `Item #${ing.inventory_item_id}`}
                                                     </li>
                                                 ))}
                                             </ul>

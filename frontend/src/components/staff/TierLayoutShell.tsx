@@ -6,13 +6,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import NotificationBell from "@/components/NotificationBell";
 import AttendanceWidget from "@/components/staff/AttendanceWidget";
-import { LogOut, Menu as MenuIcon, X } from "lucide-react";
+import { LogOut, Menu as MenuIcon, X, type LucideIcon } from "lucide-react";
 import { tierHome, StaffTier } from "@/lib/permissions";
 
 export interface TierNavItem {
     href: string;
     label: string;
-    icon: any;
+    icon: LucideIcon;
 }
 
 /**
@@ -48,9 +48,18 @@ export default function TierLayoutShell({
         }
     }, [staffRole, tier, router]);
 
+    useEffect(() => {
+        if (!sidebarOpen) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setSidebarOpen(false);
+        };
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [sidebarOpen]);
+
     if (!user || staffRole !== tier) return null;
 
-    const restaurantName = (user as any).restaurant_name || "Your Restaurant";
+    const restaurantName = user?.restaurant_name || "Your Restaurant";
 
     return (
         <div className="min-h-screen flex">
@@ -98,7 +107,12 @@ export default function TierLayoutShell({
             </aside>
 
             {sidebarOpen && (
-                <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
+                <button
+                    type="button"
+                    aria-label="Close sidebar"
+                    className="fixed inset-0 bg-black/60 z-40 lg:hidden appearance-none cursor-default"
+                    onClick={() => setSidebarOpen(false)}
+                />
             )}
 
             <main className="flex-1 lg:ml-56 min-h-screen">

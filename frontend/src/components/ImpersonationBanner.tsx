@@ -24,12 +24,13 @@ export default function ImpersonationBanner() {
     // cosmetic (server-side expiry is what's actually enforced); we just
     // don't want to promise a number we don't have. Show elapsed instead.
     const [secondsSinceStart, setSecondsSinceStart] = useState(0);
+    const sessionId = impersonation?.session_id ?? null;
     useEffect(() => {
-        if (!impersonation) return;
+        if (!sessionId) return;
         setSecondsSinceStart(0);
         const id = setInterval(() => setSecondsSinceStart((s) => s + 1), 1000);
         return () => clearInterval(id);
-    }, [impersonation?.session_id]);
+    }, [sessionId]);
 
     if (!impersonation) return null;
 

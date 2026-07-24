@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 import models
+import schemas
 import auth
 from routers.deps import get_or_create_restaurant
 from ai.fraud import detection as fraud_engine
@@ -25,7 +26,7 @@ router = APIRouter(prefix="/fraud", tags=["fraud"])
 _CAN_READ = (models.StaffRole.OWNER, models.StaffRole.MANAGER, models.StaffRole.CONTROLLER)
 
 
-@router.get("/report")
+@router.get("/report", response_model=schemas.FraudReportOut)
 async def fraud_report(
     hours: int = 24,
     db: Session = Depends(get_db),

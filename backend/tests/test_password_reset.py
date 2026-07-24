@@ -15,7 +15,7 @@ import models
 def _register(client, email="reset@e.com", password="GoodPass1"):
     r = client.post("/api/v1/auth/register",
                      json={"email": email, "password": password, "tenant_name": "T"})
-    assert r.status_code == 200
+    assert r.status_code == 201
     return r.json()["access_token"]
 
 

@@ -19,6 +19,8 @@ import {
     Hash,
     StickyNote,
 } from "lucide-react";
+import FormField from "@/components/ui/FormField";
+import { getErrorMessage } from "@/lib/errors";
 
 interface MenuItem {
     id: number;
@@ -55,6 +57,7 @@ export default function POSWorkspace() {
     const [submitting, setSubmitting] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [lastOrderId, setLastOrderId] = useState<number | null>(null);
+    const [orderError, setOrderError] = useState("");
 
     useEffect(() => {
         api.get("/menu/").then((res) => {
@@ -102,6 +105,7 @@ export default function POSWorkspace() {
     const handleSubmit = async () => {
         if (cart.length === 0) return;
         setSubmitting(true);
+        setOrderError("");
         try {
             const res = await api.post("/orders/", {
                 items: cart.map((c) => ({
@@ -127,7 +131,7 @@ export default function POSWorkspace() {
             setPaymentMethod("pending");
             setTimeout(() => setShowSuccess(false), 3000);
         } catch (err) {
-            console.error("Order failed:", err);
+            setOrderError(getErrorMessage(err, "Order failed — please try again."));
         }
         setSubmitting(false);
     };
@@ -138,8 +142,8 @@ export default function POSWorkspace() {
     if (loading) {
         return (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-120px)]">
-                <div className="lg:col-span-2 bg-[#141414] rounded-xl animate-pulse" />
-                <div className="bg-[#141414] rounded-xl animate-pulse" />
+                <div className="lg:col-span-2 bg-surface rounded-xl animate-pulse" />
+                <div className="bg-surface rounded-xl animate-pulse" />
             </div>
         );
     }
@@ -153,10 +157,26 @@ export default function POSWorkspace() {
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
-                        className="fixed top-4 right-4 z-50 bg-[#22c55e]/10 border border-[#22c55e]/30 rounded-xl px-5 py-3 flex items-center gap-2"
+                        className="fixed top-4 right-4 z-50 bg-success/10 border border-success/30 rounded-xl px-5 py-3 flex items-center gap-2"
                     >
-                        <Check className="w-4 h-4 text-[#22c55e]" />
-                        <span className="text-sm text-[#22c55e]">Order #{lastOrderId} sent to kitchen!</span>
+                        <Check className="w-4 h-4 text-success" />
+                        <span className="text-sm text-success">Order #{lastOrderId} sent to kitchen!</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Error toast */}
+            <AnimatePresence>
+                {orderError && (
+                    <motion.div
+                        role="status"
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="fixed top-4 right-4 z-50 bg-danger/10 border border-danger/30 rounded-xl px-5 py-3 flex items-center gap-2"
+                    >
+                        <X className="w-4 h-4 text-danger" />
+                        <span className="text-sm text-danger">{orderError}</span>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -164,8 +184,8 @@ export default function POSWorkspace() {
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
                 <div>
-                    <h1 className="text-xl font-bold text-[#e5e5e5]">New Order</h1>
-                    <p className="text-xs text-[#525252]">Tap items to add, then send to kitchen</p>
+                    <h1 className="text-xl font-bold text-text">New Order</h1>
+                    <p className="text-xs text-text-dim">Tap items to add, then send to kitchen</p>
                 </div>
             </div>
 
@@ -179,8 +199,8 @@ export default function POSWorkspace() {
                                 key={cat}
                                 onClick={() => setSelectedCategory(cat)}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${selectedCategory === cat
-                                        ? "bg-[var(--accent)] text-black"
-                                        : "bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5]"
+                                        ? "bg-accent text-black"
+                                        : "bg-surface-hover text-text-muted hover:text-text"
                                     }`}
                             >
                                 {cat}
@@ -197,17 +217,17 @@ export default function POSWorkspace() {
                                     key={item.id}
                                     whileTap={{ scale: 0.95 }}
                                     onClick={() => addToCart(item)}
-                                    className={`relative bg-[#141414] border rounded-xl p-3 text-left transition-all hover:border-[var(--accent)]/50 ${inCart ? "border-[var(--accent)]/40" : "border-[#262626]"
+                                    className={`relative bg-surface border rounded-xl p-3 text-left transition-all hover:border-accent/50 ${inCart ? "border-accent/40" : "border-border"
                                         }`}
                                 >
                                     {inCart && (
-                                        <span className="absolute -top-1.5 -right-1.5 bg-[var(--accent)] text-black text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                                        <span className="absolute -top-1.5 -right-1.5 bg-accent text-black text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
                                             {inCart.quantity}
                                         </span>
                                     )}
-                                    <p className="text-sm font-medium text-[#e5e5e5] truncate">{item.name}</p>
-                                    <p className="text-xs text-[var(--accent)] mt-1">{formatKES(item.price)}</p>
-                                    <p className="text-[10px] text-[#525252] mt-0.5">{item.category}</p>
+                                    <p className="text-sm font-medium text-text truncate">{item.name}</p>
+                                    <p className="text-xs text-accent mt-1">{formatKES(item.price)}</p>
+                                    <p className="text-[10px] text-text-dim mt-0.5">{item.category}</p>
                                 </motion.button>
                             );
                         })}
@@ -215,40 +235,40 @@ export default function POSWorkspace() {
                 </div>
 
                 {/* Right: Cart & order details */}
-                <div className="bg-[#141414] border border-[#262626] rounded-xl flex flex-col min-h-0">
-                    <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
+                <div className="bg-surface border border-border rounded-xl flex flex-col min-h-0">
+                    <div className="px-4 py-3 border-b border-surface-hover flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <ShoppingBag className="w-4 h-4 text-[var(--accent)]" />
-                            <span className="text-sm font-semibold text-[#e5e5e5]">Cart</span>
+                            <ShoppingBag className="w-4 h-4 text-accent" />
+                            <span className="text-sm font-semibold text-text">Cart</span>
                         </div>
-                        <span className="text-[10px] text-[#525252]">{itemCount} item{itemCount !== 1 ? "s" : ""}</span>
+                        <span className="text-[10px] text-text-dim">{itemCount} item{itemCount !== 1 ? "s" : ""}</span>
                     </div>
 
                     <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2">
                         {cart.length === 0 ? (
-                            <p className="text-xs text-[#525252] text-center py-8">Tap items to add them here</p>
+                            <p className="text-xs text-text-dim text-center py-8">Tap items to add them here</p>
                         ) : (
                             cart.map((c) => (
                                 <div key={c.menuItem.id} className="flex items-center gap-2 py-1.5">
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-xs text-[#e5e5e5] truncate">{c.menuItem.name}</p>
-                                        <p className="text-[10px] text-[var(--accent)]">{formatKES(c.menuItem.price * c.quantity)}</p>
+                                        <p className="text-xs text-text truncate">{c.menuItem.name}</p>
+                                        <p className="text-[10px] text-accent">{formatKES(c.menuItem.price * c.quantity)}</p>
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <button onClick={() => updateQty(c.menuItem.id, -1)}
                                             aria-label={`Decrease quantity of ${c.menuItem.name}`}
-                                            className="w-6 h-6 rounded bg-[#1a1a1a] flex items-center justify-center text-[#737373] hover:text-[#e5e5e5]">
+                                            className="w-6 h-6 rounded bg-surface-hover flex items-center justify-center text-text-muted hover:text-text">
                                             <Minus className="w-3 h-3" />
                                         </button>
-                                        <span className="text-xs text-[#e5e5e5] w-5 text-center">{c.quantity}</span>
+                                        <span className="text-xs text-text w-5 text-center">{c.quantity}</span>
                                         <button onClick={() => updateQty(c.menuItem.id, 1)}
                                             aria-label={`Increase quantity of ${c.menuItem.name}`}
-                                            className="w-6 h-6 rounded bg-[#1a1a1a] flex items-center justify-center text-[#737373] hover:text-[#e5e5e5]">
+                                            className="w-6 h-6 rounded bg-surface-hover flex items-center justify-center text-text-muted hover:text-text">
                                             <Plus className="w-3 h-3" />
                                         </button>
                                         <button onClick={() => removeFromCart(c.menuItem.id)}
                                             aria-label={`Remove ${c.menuItem.name} from cart`}
-                                            className="w-6 h-6 rounded flex items-center justify-center text-[#525252] hover:text-[#ef4444]">
+                                            className="w-6 h-6 rounded flex items-center justify-center text-text-dim hover:text-danger">
                                             <Trash2 className="w-3 h-3" />
                                         </button>
                                     </div>
@@ -258,7 +278,7 @@ export default function POSWorkspace() {
                     </div>
 
                     {/* Order details */}
-                    <div className="border-t border-[#1a1a1a] px-4 py-3 space-y-3">
+                    <div className="border-t border-surface-hover px-4 py-3 space-y-3">
                         {/* Order type */}
                         <div className="flex gap-1.5">
                             {[
@@ -268,8 +288,8 @@ export default function POSWorkspace() {
                             ].map((t) => (
                                 <button key={t.v} onClick={() => setOrderType(t.v)}
                                     className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium transition-all ${orderType === t.v
-                                            ? "bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/30"
-                                            : "bg-[#1a1a1a] text-[#737373] border border-transparent"
+                                            ? "bg-accent/10 text-accent border border-accent/30"
+                                            : "bg-surface-hover text-text-muted border border-transparent"
                                         }`}>
                                     <t.icon className="w-3 h-3" />
                                     {t.label}
@@ -288,8 +308,8 @@ export default function POSWorkspace() {
                                 ].map((ch) => (
                                     <button key={ch.v} onClick={() => setDeliveryChannel(ch.v)}
                                         className={`flex-1 py-1.5 rounded-lg text-[10px] font-medium transition-all ${deliveryChannel === ch.v
-                                                ? "bg-[#3b82f6]/10 text-[#3b82f6] border border-[#3b82f6]/30"
-                                                : "bg-[#1a1a1a] text-[#737373] border border-transparent"
+                                                ? "bg-info/10 text-info border border-info/30"
+                                                : "bg-surface-hover text-text-muted border border-transparent"
                                             }`}>
                                         {ch.label}
                                     </button>
@@ -300,29 +320,35 @@ export default function POSWorkspace() {
                         {/* Customer info */}
                         <div className="grid grid-cols-2 gap-2">
                             <div className="relative">
-                                <User className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#525252]" />
-                                <input
+                                <User className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-text-dim" />
+                                <FormField
+                                    label="Customer name"
+                                    srOnlyLabel
                                     type="text" placeholder="Name" value={customerName}
                                     onChange={(e) => setCustomerName(e.target.value)}
-                                    className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[var(--accent)]/50 focus:outline-none"
+                                    className="w-full bg-surface-hover border border-border rounded-lg pl-7 pr-2 py-1.5 text-xs text-text placeholder-text-dim focus:border-accent/50 focus:outline-none"
                                 />
                             </div>
                             {orderType === "dine_in" ? (
                                 <div className="relative">
-                                    <Hash className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#525252]" />
-                                    <input
+                                    <Hash className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-text-dim" />
+                                    <FormField
+                                        label="Table number"
+                                        srOnlyLabel
                                         type="text" placeholder="Table #" value={tableNumber}
                                         onChange={(e) => setTableNumber(e.target.value)}
-                                        className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[var(--accent)]/50 focus:outline-none"
+                                        className="w-full bg-surface-hover border border-border rounded-lg pl-7 pr-2 py-1.5 text-xs text-text placeholder-text-dim focus:border-accent/50 focus:outline-none"
                                     />
                                 </div>
                             ) : (
                                 <div className="relative">
-                                    <Smartphone className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#525252]" />
-                                    <input
+                                    <Smartphone className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-text-dim" />
+                                    <FormField
+                                        label="Customer phone"
+                                        srOnlyLabel
                                         type="text" placeholder="Phone" value={customerPhone}
                                         onChange={(e) => setCustomerPhone(e.target.value)}
-                                        className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[var(--accent)]/50 focus:outline-none"
+                                        className="w-full bg-surface-hover border border-border rounded-lg pl-7 pr-2 py-1.5 text-xs text-text placeholder-text-dim focus:border-accent/50 focus:outline-none"
                                     />
                                 </div>
                             )}
@@ -330,11 +356,13 @@ export default function POSWorkspace() {
 
                         {/* Notes */}
                         <div className="relative">
-                            <StickyNote className="absolute left-2 top-2 w-3 h-3 text-[#525252]" />
-                            <input
+                            <StickyNote className="absolute left-2 top-2 w-3 h-3 text-text-dim" />
+                            <FormField
+                                label="Order notes"
+                                srOnlyLabel
                                 type="text" placeholder="Notes (e.g. no onions, extra spicy)" value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
-                                className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[var(--accent)]/50 focus:outline-none"
+                                className="w-full bg-surface-hover border border-border rounded-lg pl-7 pr-2 py-1.5 text-xs text-text placeholder-text-dim focus:border-accent/50 focus:outline-none"
                             />
                         </div>
 
@@ -348,8 +376,8 @@ export default function POSWorkspace() {
                             ].map((p) => (
                                 <button key={p.v} onClick={() => setPaymentMethod(p.v)}
                                     className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium transition-all ${paymentMethod === p.v
-                                            ? "bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/30"
-                                            : "bg-[#1a1a1a] text-[#737373] border border-transparent"
+                                            ? "bg-success/10 text-success border border-success/30"
+                                            : "bg-surface-hover text-text-muted border border-transparent"
                                         }`}>
                                     <p.icon className="w-3 h-3" />
                                     {p.label}
@@ -358,17 +386,17 @@ export default function POSWorkspace() {
                         </div>
 
                         {/* Total & submit */}
-                        <div className="flex items-center justify-between pt-2 border-t border-[#1a1a1a]">
+                        <div className="flex items-center justify-between pt-2 border-t border-surface-hover">
                             <div>
-                                <p className="text-[10px] text-[#525252]">Total</p>
-                                <p className="text-lg font-bold text-[var(--accent)]">{formatKES(subtotal)}</p>
+                                <p className="text-[10px] text-text-dim">Total</p>
+                                <p className="text-lg font-bold text-accent">{formatKES(subtotal)}</p>
                             </div>
                             <button
                                 onClick={handleSubmit}
                                 disabled={cart.length === 0 || submitting}
                                 className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${cart.length > 0 && !submitting
-                                        ? "bg-[var(--accent)] text-black hover:bg-[#c49843]"
-                                        : "bg-[#262626] text-[#525252] cursor-not-allowed"
+                                        ? "bg-accent text-black hover:bg-[#c49843]"
+                                        : "bg-border text-text-dim cursor-not-allowed"
                                     }`}
                             >
                                 {submitting ? "Sending..." : "Send to Kitchen"}

@@ -187,6 +187,14 @@ class EraseCustomerRequest(StrictModel):
     customer_phone: str
 
 
+class EraseCustomerResult(StrictModel):
+    status: str   # "no_data" | "erased"
+    customer_phone: str
+    orders_scrubbed: int
+    reservations_scrubbed: int
+    consents_deleted: int
+
+
 def _restaurant_knows_phone(db: Session, restaurant_id: int, variants: list[str]) -> bool:
     """
     True iff this restaurant holds at least one order, reservation, or consent
@@ -207,7 +215,7 @@ def _restaurant_knows_phone(db: Session, restaurant_id: int, variants: list[str]
     return False
 
 
-@router.post("/erase-customer")
+@router.post("/erase-customer", response_model=EraseCustomerResult)
 async def erase_customer(
     body: EraseCustomerRequest,
     db: Session = Depends(get_db),

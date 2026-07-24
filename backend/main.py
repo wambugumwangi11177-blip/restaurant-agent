@@ -51,6 +51,22 @@ if SLOWAPI_AVAILABLE:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
+# ── Global exception handler ─────────────────────────────────────────────────
+# Catches anything a route/dependency didn't handle itself (FastAPI's own
+# HTTPException/RequestValidationError handling still takes precedence —
+# this only fires for genuinely unexpected exceptions) so a client always
+# gets a clean JSON error instead of whatever the default framework/server
+# error page would otherwise return.
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
 # ── Startup ───────────────────────────────────────────────────────────────────
 
 @app.on_event("startup")

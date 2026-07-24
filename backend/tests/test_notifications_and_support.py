@@ -222,12 +222,12 @@ def test_reply_reopens_resolved_ticket_and_notifies_creator(client, db_session):
     created = client.post("/support/tickets", json={"subject": "Fridge broken", "message": "m"}, headers=_auth(tok_w)).json()
     tid = created["id"]
 
-    client.patch(f"/support/tickets/{tid}/status", json={"status": "resolved"}, headers=_auth(token_owner))
+    client.post(f"/support/tickets/{tid}/status", json={"status": "resolved"}, headers=_auth(token_owner))
     resolved = client.get(f"/support/tickets/{tid}", headers=_auth(tok_w)).json()
     assert resolved["status"] == "resolved"
 
     reply = client.post(f"/support/tickets/{tid}/messages", json={"body": "Still broken!"}, headers=_auth(tok_w))
-    assert reply.status_code == 200
+    assert reply.status_code == 201
     assert reply.json()["status"] == "in_progress"
     assert len(reply.json()["messages"]) == 2
 
@@ -250,12 +250,12 @@ def test_update_status_requires_owner_or_manager(client, db_session):
     tok_w = auth.create_access_token({"sub": waiter.email, "ver": 0})
 
     created = client.post("/support/tickets", json={"subject": "X", "message": "m"}, headers=_auth(tok_w)).json()
-    r = client.patch(f"/support/tickets/{created['id']}/status", json={"status": "resolved"}, headers=_auth(tok_w))
+    r = client.post(f"/support/tickets/{created['id']}/status", json={"status": "resolved"}, headers=_auth(tok_w))
     assert r.status_code == 403
 
 
 def test_update_status_rejects_unknown_status(client, db_session):
     token_owner, owner, restaurant = _user_with_staff_role(db_session, "supC", role=models.Role.ADMIN, staff_role=models.StaffRole.OWNER)
     created = client.post("/support/tickets", json={"subject": "X", "message": "m"}, headers=_auth(token_owner)).json()
-    r = client.patch(f"/support/tickets/{created['id']}/status", json={"status": "not_a_real_status"}, headers=_auth(token_owner))
+    r = client.post(f"/support/tickets/{created['id']}/status", json={"status": "not_a_real_status"}, headers=_auth(token_owner))
     assert r.status_code == 400

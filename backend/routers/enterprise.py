@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from auth import require_role
 import models
+import schemas
 
 logger = logging.getLogger("enterprise.router")
 
@@ -31,7 +32,7 @@ def _org_in_tenant(db: Session, organization_id: int, tenant_id: int) -> bool:
     return org is not None
 
 
-@router.get("/organizations")
+@router.get("/organizations", response_model=schemas.OrganizationsListOut)
 async def list_organizations(
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),

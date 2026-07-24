@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Cpu, RefreshCw, AlertTriangle, ShieldCheck, Activity, Gauge } from "lucide-react";
+import { getErrorMessage, isHttpStatus } from "@/lib/errors";
 
 interface UsageData {
     window_days: number;
@@ -44,7 +45,7 @@ interface UsageData {
         approved?: number;
         rejected?: number;
     }[];
-    grounding: Record<string, any>;
+    grounding: Record<string, unknown>;
 }
 
 function kes(cents: number | null | undefined): string {
@@ -72,9 +73,9 @@ export default function AiOpsPage() {
             const res = await api.get("/ai/usage?days=30");
             setData(res.data);
             setLastUpdated(new Date());
-        } catch (e: any) {
-            if (e?.response?.status === 403) setForbidden(true);
-            else setError(e?.response?.data?.detail || e?.message || "Could not load AI operations data");
+        } catch (e) {
+            if (isHttpStatus(e, 403)) setForbidden(true);
+            else setError(getErrorMessage(e, "Could not load AI operations data"));
         } finally {
             setLoading(false);
         }

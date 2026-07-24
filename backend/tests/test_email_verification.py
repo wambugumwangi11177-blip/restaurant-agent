@@ -37,7 +37,7 @@ def test_register_sends_verification_email_and_defaults_unverified(client, db_se
     sent = _capture_sent_email(monkeypatch)
     resp = client.post("/api/v1/auth/register",
                         json={"email": "verify1@e.com", "password": "GoodPass1", "tenant_name": "T"})
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     assert len(sent) == 1
     assert "verify" in sent[0][1].lower()
 

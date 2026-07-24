@@ -94,7 +94,7 @@ async def list_staff(
     return [_staff_out(m, db) for m in members]
 
 
-@router.post("/", response_model=schemas.StaffMemberOut)
+@router.post("/", response_model=schemas.StaffMemberOut, status_code=201)
 async def create_staff(
     body: schemas.StaffMemberCreate,
     db: Session = Depends(get_db),

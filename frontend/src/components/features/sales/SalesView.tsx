@@ -8,6 +8,9 @@ import {
     TrendingUp, Banknote, Smartphone, CreditCard,
     UtensilsCrossed, ShoppingBag, Truck, Crown,
 } from "lucide-react";
+import StatCard from "@/components/ui/StatCard";
+import PaymentRow from "./PaymentRow";
+import ChannelRow from "./ChannelRow";
 
 interface Order {
     id: number;
@@ -42,10 +45,10 @@ export default function SalesView() {
     if (loading) {
         return (
             <div className="space-y-4">
-                <div className="bg-[#141414] rounded-xl h-28 animate-pulse" />
+                <div className="bg-surface rounded-xl h-28 animate-pulse" />
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {[...Array(4)].map((_, i) => (
-                        <div key={i} className="bg-[#141414] rounded-xl h-24 animate-pulse" />
+                        <div key={i} className="bg-surface rounded-xl h-24 animate-pulse" />
                     ))}
                 </div>
             </div>
@@ -61,7 +64,7 @@ export default function SalesView() {
                 <div className="w-12 h-12 rounded-2xl bg-[var(--accent)]/10 flex items-center justify-center">
                     <TrendingUp className="w-6 h-6 text-[var(--accent)]" />
                 </div>
-                <p className="text-sm text-[#737373] max-w-sm">
+                <p className="text-sm text-text-muted max-w-sm">
                     No sales yet. Your revenue, payment breakdown, hourly trends, and top sellers
                     will appear here once you start recording orders.
                 </p>
@@ -131,8 +134,8 @@ export default function SalesView() {
         <div className="space-y-5">
             {/* Header */}
             <div>
-                <h1 className="text-xl font-bold text-[#e5e5e5]">Sales</h1>
-                <p className="text-sm text-[#525252] mt-0.5">
+                <h1 className="text-xl font-bold text-text">Sales</h1>
+                <p className="text-sm text-text-dim mt-0.5">
                     {isDemo ? "Last 7 days performance" : "Today's performance"}
                 </p>
             </div>
@@ -163,10 +166,10 @@ export default function SalesView() {
 
             {/* Demo: Weekly Revenue Chart */}
             {isDemo && (
-                <div className="bg-[#141414] border border-[#262626] rounded-xl">
-                    <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center gap-2">
+                <div className="bg-surface border border-border rounded-xl">
+                    <div className="px-4 py-3 border-b border-surface-hover flex items-center gap-2">
                         <TrendingUp className="w-3.5 h-3.5 text-[var(--accent)]" />
-                        <h2 className="text-sm font-semibold text-[#e5e5e5]">Revenue — Last 7 Days</h2>
+                        <h2 className="text-sm font-semibold text-text">Revenue — Last 7 Days</h2>
                     </div>
                     <div className="px-4 py-4">
                         <div className="flex items-end gap-2 h-40">
@@ -181,14 +184,14 @@ export default function SalesView() {
                                         transition={{ delay: i * 0.06, duration: 0.4 }}
                                         className="flex-1 flex flex-col items-center gap-1 justify-end h-full"
                                     >
-                                        <span className="text-[9px] text-[#525252]">
+                                        <span className="text-[9px] text-text-dim">
                                             {(day.revenue / 1000).toFixed(0)}k
                                         </span>
                                         <div
                                             className={`w-full rounded-t transition-all ${isBest ? "bg-[var(--accent)]" : "bg-[var(--accent)]/25"}`}
                                             style={{ height: `${pct}%` }}
                                         />
-                                        <span className={`text-[10px] ${isBest ? "text-[var(--accent)] font-semibold" : "text-[#525252]"}`}>
+                                        <span className={`text-[10px] ${isBest ? "text-[var(--accent)] font-semibold" : "text-text-dim"}`}>
                                             {day.date}
                                         </span>
                                     </motion.div>
@@ -202,9 +205,9 @@ export default function SalesView() {
             {/* Real: Payment & Channel breakdown */}
             {!isDemo && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="bg-[#141414] border border-[#262626] rounded-xl">
-                        <div className="px-4 py-3 border-b border-[#1a1a1a]">
-                            <h2 className="text-sm font-semibold text-[#e5e5e5]">Payment Breakdown</h2>
+                    <div className="bg-surface border border-border rounded-xl">
+                        <div className="px-4 py-3 border-b border-surface-hover">
+                            <h2 className="text-sm font-semibold text-text">Payment Breakdown</h2>
                         </div>
                         <div className="px-4 py-3 space-y-3">
                             <PaymentRow icon={Banknote} label="Cash" count={byCash.length} total={byCash.reduce((s, o) => s + o.total, 0)} color="#22c55e" formatKES={formatKES} />
@@ -215,9 +218,9 @@ export default function SalesView() {
                             )}
                         </div>
                     </div>
-                    <div className="bg-[#141414] border border-[#262626] rounded-xl">
-                        <div className="px-4 py-3 border-b border-[#1a1a1a]">
-                            <h2 className="text-sm font-semibold text-[#e5e5e5]">Order Channels</h2>
+                    <div className="bg-surface border border-border rounded-xl">
+                        <div className="px-4 py-3 border-b border-surface-hover">
+                            <h2 className="text-sm font-semibold text-text">Order Channels</h2>
                         </div>
                         <div className="px-4 py-3 space-y-3">
                             <ChannelRow icon={UtensilsCrossed} label="Dine In" count={byDineIn.length} total={byDineIn.reduce((s, o) => s + o.total, 0)} color="#d4a853" formatKES={formatKES} />
@@ -234,9 +237,9 @@ export default function SalesView() {
 
             {/* Real: Hourly chart */}
             {!isDemo && Object.keys(hourlyData).length > 0 && (
-                <div className="bg-[#141414] border border-[#262626] rounded-xl">
-                    <div className="px-4 py-3 border-b border-[#1a1a1a]">
-                        <h2 className="text-sm font-semibold text-[#e5e5e5]">Sales by Hour</h2>
+                <div className="bg-surface border border-border rounded-xl">
+                    <div className="px-4 py-3 border-b border-surface-hover">
+                        <h2 className="text-sm font-semibold text-text">Sales by Hour</h2>
                     </div>
                     <div className="px-4 py-4">
                         <div className="flex items-end gap-1 h-32">
@@ -249,7 +252,7 @@ export default function SalesView() {
                                         <div className="w-full relative" style={{ height: `${Math.max(pct, 2)}%` }}>
                                             <div className={`w-full h-full rounded-t ${isNow ? "bg-[var(--accent)]" : "bg-[var(--accent)]/20"}`} />
                                         </div>
-                                        <span className={`text-[8px] ${isNow ? "text-[var(--accent)]" : "text-[#525252]"}`}>
+                                        <span className={`text-[8px] ${isNow ? "text-[var(--accent)]" : "text-text-dim"}`}>
                                             {hour > 12 ? `${hour - 12}p` : hour === 12 ? "12p" : `${hour}a`}
                                         </span>
                                     </div>
@@ -262,14 +265,14 @@ export default function SalesView() {
 
             {/* Top Sellers — demo or real */}
             {(isDemo || topItems.length > 0) && (
-                <div className="bg-[#141414] border border-[#262626] rounded-xl">
-                    <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center gap-2">
+                <div className="bg-surface border border-border rounded-xl">
+                    <div className="px-4 py-3 border-b border-surface-hover flex items-center gap-2">
                         <Crown className="w-3.5 h-3.5 text-[var(--accent)]" />
-                        <h2 className="text-sm font-semibold text-[#e5e5e5]">
+                        <h2 className="text-sm font-semibold text-text">
                             {isDemo ? "Top Sellers — This Week" : "Top Sellers Today"}
                         </h2>
                     </div>
-                    <div className="divide-y divide-[#1a1a1a]">
+                    <div className="divide-y divide-surface-hover">
                         {isDemo
                             ? demoTopSellers.map((item, i) => (
                                 <motion.div
@@ -279,10 +282,10 @@ export default function SalesView() {
                                     transition={{ delay: i * 0.06 }}
                                     className="px-4 py-2.5 flex items-center gap-3"
                                 >
-                                    <span className="text-xs font-bold text-[#525252] w-4">{i + 1}</span>
+                                    <span className="text-xs font-bold text-text-dim w-4">{i + 1}</span>
                                     <div className="flex-1">
-                                        <p className="text-xs text-[#e5e5e5]">{item.name}</p>
-                                        <p className="text-[10px] text-[#525252]">{item.orders} sold · {item.margin}% margin</p>
+                                        <p className="text-xs text-text">{item.name}</p>
+                                        <p className="text-[10px] text-text-dim">{item.orders} sold · {item.margin}% margin</p>
                                     </div>
                                     <span className="text-xs font-semibold text-[var(--accent)]">
                                         KES {item.revenue.toLocaleString("en-KE")}
@@ -291,10 +294,10 @@ export default function SalesView() {
                             ))
                             : topItems.map((item, i) => (
                                 <div key={item.name} className="px-4 py-2.5 flex items-center gap-3">
-                                    <span className="text-xs font-bold text-[#525252] w-4">{i + 1}</span>
+                                    <span className="text-xs font-bold text-text-dim w-4">{i + 1}</span>
                                     <div className="flex-1">
-                                        <p className="text-xs text-[#e5e5e5]">{item.name}</p>
-                                        <p className="text-[10px] text-[#525252]">{item.qty} sold</p>
+                                        <p className="text-xs text-text">{item.name}</p>
+                                        <p className="text-[10px] text-text-dim">{item.qty} sold</p>
                                     </div>
                                     <span className="text-xs font-semibold text-[var(--accent)]">{formatKES(item.revenue)}</span>
                                 </div>
@@ -303,38 +306,6 @@ export default function SalesView() {
                     </div>
                 </div>
             )}
-        </div>
-    );
-}
-
-function StatCard({ label, value, color }: { label: string; value: string; color: string }) {
-    return (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3">
-            <p className="text-[10px] text-[#525252] uppercase tracking-wider">{label}</p>
-            <p className="text-lg font-bold mt-0.5" style={{ color }}>{value}</p>
-        </motion.div>
-    );
-}
-
-function PaymentRow({ icon: Icon, label, count, total, color, formatKES }: any) {
-    return (
-        <div className="flex items-center gap-3">
-            <Icon className="w-4 h-4" style={{ color }} />
-            <div className="flex-1"><p className="text-xs text-[#e5e5e5]">{label}</p></div>
-            <span className="text-[10px] text-[#525252]">{count} orders</span>
-            <span className="text-xs font-semibold text-[#e5e5e5] w-24 text-right">{formatKES(total)}</span>
-        </div>
-    );
-}
-
-function ChannelRow({ icon: Icon, label, count, total, color, formatKES, nested }: any) {
-    return (
-        <div className={`flex items-center gap-3 ${nested ? "pl-4 opacity-70" : ""}`}>
-            <Icon className="w-3.5 h-3.5" style={{ color }} />
-            <div className="flex-1"><p className="text-xs text-[#e5e5e5]">{label}</p></div>
-            <span className="text-[10px] text-[#525252]">{count}</span>
-            <span className="text-xs font-semibold text-[#e5e5e5] w-24 text-right">{formatKES(total)}</span>
         </div>
     );
 }

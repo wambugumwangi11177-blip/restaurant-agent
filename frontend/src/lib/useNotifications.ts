@@ -42,7 +42,7 @@ function detectIOSNotStandalone(): boolean {
     if (typeof window === "undefined" || typeof navigator === "undefined") return false;
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     // navigator.standalone is Safari-specific (not in the TS lib DOM types).
-    const standalone = (window.navigator as any).standalone === true;
+    const standalone = (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
     return isIOS && !standalone;
 }
 

@@ -55,7 +55,7 @@ def test_cancel_before_served_writes_cancel_audit_row(client, db_session, recipe
     )
     order_id = r.json()["id"]
 
-    r2 = client.patch(
+    r2 = client.post(
         f"/orders/{order_id}/status",
         json={"status": "cancelled", "reason": "customer changed mind"},
         headers={"Authorization": f"Bearer {owner_token}"},
@@ -82,9 +82,9 @@ def test_cancel_after_served_writes_refund_audit_row(client, db_session, recipe_
     )
     order_id = r.json()["id"]
 
-    client.patch(f"/orders/{order_id}/status", json={"status": "served"},
+    client.post(f"/orders/{order_id}/status", json={"status": "served"},
                  headers={"Authorization": f"Bearer {owner_token}"})
-    client.patch(f"/orders/{order_id}/status", json={"status": "cancelled"},
+    client.post(f"/orders/{order_id}/status", json={"status": "cancelled"},
                  headers={"Authorization": f"Bearer {owner_token}"})
 
     rows = db_session.query(models.OrderAudit).filter(
@@ -104,11 +104,11 @@ def test_cancelling_twice_only_writes_one_audit_row(client, db_session, recipe_s
     )
     order_id = r.json()["id"]
 
-    client.patch(f"/orders/{order_id}/status", json={"status": "cancelled"},
+    client.post(f"/orders/{order_id}/status", json={"status": "cancelled"},
                  headers={"Authorization": f"Bearer {owner_token}"})
     # Re-cancelling an already-cancelled order must not double-log — mirrors the
     # existing ingredient-reversal guard (old_status != CANCELLED) on the same endpoint.
-    client.patch(f"/orders/{order_id}/status", json={"status": "cancelled"},
+    client.post(f"/orders/{order_id}/status", json={"status": "cancelled"},
                  headers={"Authorization": f"Bearer {owner_token}"})
 
     rows = db_session.query(models.OrderAudit).filter(
@@ -127,7 +127,7 @@ def test_payment_method_override_writes_audit_row(client, db_session, recipe_set
     )
     order_id = r.json()["id"]
 
-    r2 = client.patch(
+    r2 = client.post(
         f"/orders/{order_id}/payment",
         json={"payment_method": "cash", "is_paid": True},
         headers={"Authorization": f"Bearer {owner_token}"},
@@ -153,10 +153,10 @@ def test_repeating_identical_payment_update_does_not_duplicate_audit(client, db_
     )
     order_id = r.json()["id"]
 
-    client.patch(f"/orders/{order_id}/payment", json={"payment_method": "cash", "is_paid": True},
+    client.post(f"/orders/{order_id}/payment", json={"payment_method": "cash", "is_paid": True},
                  headers={"Authorization": f"Bearer {owner_token}"})
     # Same payload again — no actual change, should not add a second audit row.
-    client.patch(f"/orders/{order_id}/payment", json={"payment_method": "cash", "is_paid": True},
+    client.post(f"/orders/{order_id}/payment", json={"payment_method": "cash", "is_paid": True},
                  headers={"Authorization": f"Bearer {owner_token}"})
 
     rows = db_session.query(models.OrderAudit).filter(

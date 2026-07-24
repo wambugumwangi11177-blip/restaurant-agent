@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "@/context/AuthContext";
+import dynamic from "next/dynamic";
 import api from "@/lib/api";
 import { demoData, isDashboardEmpty, isDemoMode } from "@/lib/demo-data";
 import { motion } from "framer-motion";
@@ -22,10 +22,29 @@ import {
     Brain,
     ArrowRight,
 } from "lucide-react";
+import StatCard from "@/components/ui/StatCard";
+
+const SystemStatus = dynamic(() => import("./_components/SystemStatus"));
+
+interface DashboardData {
+    health_score: number;
+    health_breakdown: { category: string; score: number }[];
+    alerts: { severity: string; message: string; source: string; action?: string }[];
+    opportunities: { opportunity: string; detail: string }[];
+    risks: { risk: string; severity: string; detail: string }[];
+    quick_stats: {
+        today_revenue: number;
+        today_orders: number;
+        avg_order_value: number;
+        active_alerts: number;
+        pending_orders: number;
+        menu_items: number;
+        day_over_day_change: number;
+    };
+}
 
 export default function DashboardPage() {
-    const { user } = useAuth();
-    const [data, setData] = useState<any>(null);
+    const [data, setData] = useState<DashboardData | null>(null);
     const [loading, setLoading] = useState(true);
     const [trustStats, setTrustStats] = useState<{ grounded_pct: number | null; narratives_generated: number } | null>(null);
     const [glance, setGlance] = useState<{
@@ -51,7 +70,9 @@ export default function DashboardPage() {
             const days = rd?.window_days || 30;
             const hours = rd?.time_saved?.hours_saved_30d || 0;
             const moneyCents = rd?.time_saved?.money_saved_cents || 0;
-            const opps = (rd?.opportunities || []).reduce((s: number, o: any) => s + (o.monthly_value_cents || 0), 0);
+            const opps = (rd?.opportunities || []).reduce(
+                (s: number, o: { monthly_value_cents?: number }) => s + (o.monthly_value_cents || 0), 0
+            );
             setGlance({
                 hoursPerDay: Math.round((hours / days) * 10) / 10,
                 moneyPerDayCents: Math.round(moneyCents / days),
@@ -72,10 +93,10 @@ export default function DashboardPage() {
     if (loading) {
         return (
             <div className="space-y-4">
-                <div className="bg-[#141414] rounded-xl h-24 animate-pulse" />
+                <div className="bg-surface rounded-xl h-24 animate-pulse" />
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     {[...Array(4)].map((_, i) => (
-                        <div key={i} className="bg-[#141414] rounded-xl h-24 animate-pulse" />
+                        <div key={i} className="bg-surface rounded-xl h-24 animate-pulse" />
                     ))}
                 </div>
             </div>
@@ -92,8 +113,8 @@ export default function DashboardPage() {
                     <TrendingUp className="w-7 h-7 text-[var(--accent)]" />
                 </div>
                 <div className="space-y-1.5 max-w-md">
-                    <h1 className="text-xl font-bold text-[#e5e5e5]">{getGreeting()} 👋</h1>
-                    <p className="text-sm text-[#737373]">
+                    <h1 className="text-xl font-bold text-text">{getGreeting()} 👋</h1>
+                    <p className="text-sm text-text-muted">
                         Your dashboard is ready. Once you add menu items and start taking orders,
                         your restaurant health score, revenue trends, alerts, and AI opportunities
                         will show up here.
@@ -103,16 +124,19 @@ export default function DashboardPage() {
                     <Link href="/dashboard/menu" className="flex items-center gap-1.5 px-3 py-2 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-lg text-xs text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-all">
                         Add menu items <ArrowRight className="w-3 h-3" />
                     </Link>
-                    <Link href="/dashboard/pos" className="flex items-center gap-1.5 px-3 py-2 bg-[#1a1a1a] border border-[#262626] rounded-lg text-xs text-[#e5e5e5] hover:bg-[#222] transition-all">
+                    <Link href="/dashboard/pos" className="flex items-center gap-1.5 px-3 py-2 bg-surface-hover border border-border rounded-lg text-xs text-text hover:bg-[#222] transition-all">
                         Take an order <ArrowRight className="w-3 h-3" />
                     </Link>
                 </div>
             </div>
         );
     }
-    const activeData = isDemo ? demoData.dashboard : data;
+    const activeData: DashboardData | null = isDemo ? demoData.dashboard : data;
 
-    const qs = activeData?.quick_stats || {};
+    const qs = activeData?.quick_stats || {
+        today_revenue: 0, today_orders: 0, avg_order_value: 0, active_alerts: 0,
+        pending_orders: 0, menu_items: 0, day_over_day_change: 0,
+    };
     const healthScore = activeData?.health_score ?? 0;
     const breakdown = activeData?.health_breakdown || [];
     const alerts = activeData?.alerts || [];
@@ -133,10 +157,10 @@ export default function DashboardPage() {
             {/* Greeting */}
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-xl font-bold text-[#e5e5e5]">
+                    <h1 className="text-xl font-bold text-text">
                         {getGreeting()} 👋
                     </h1>
-                    <p className="text-sm text-[#525252] mt-1">
+                    <p className="text-sm text-text-dim mt-1">
                         Here&apos;s how your restaurant is doing right now
                     </p>
                 </div>
@@ -144,7 +168,7 @@ export default function DashboardPage() {
                 <motion.div
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="flex items-center gap-3 bg-[#141414] border border-[#262626] rounded-xl px-4 py-3"
+                    className="flex items-center gap-3 bg-surface border border-border rounded-xl px-4 py-3"
                 >
                     <div className="relative w-14 h-14">
                         <svg viewBox="0 0 36 36" className="w-14 h-14 -rotate-90">
@@ -157,19 +181,19 @@ export default function DashboardPage() {
                                 strokeLinecap="round"
                             />
                         </svg>
-                        <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-[#e5e5e5]">
+                        <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-text">
                             {healthScore}
                         </span>
                     </div>
                     <div>
-                        <p className="text-sm font-semibold text-[#e5e5e5]">Overall Health</p>
-                        <p className="text-xs text-[#525252]">{healthLabel}</p>
+                        <p className="text-sm font-semibold text-text">Overall Health</p>
+                        <p className="text-xs text-text-dim">{healthLabel}</p>
                     </div>
                 </motion.div>
             </div>
 
             {/* Connected Systems */}
-            <div className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3">
+            <div className="bg-surface border border-border rounded-xl px-4 py-3">
                 <div className="flex items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2">
                         <span className="flex h-2 w-2">
@@ -198,35 +222,35 @@ export default function DashboardPage() {
 
             {/* What your AI is doing — launchpad into ROI / AI / Growth */}
             {glance && (glance.moneyPerDayCents > 0 || glance.capturedCents > 0 || glance.oppsCents > 0 || glance.winbackReachable > 0) && (
-                <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
+                <div className="bg-surface border border-border rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
                         <Zap className="w-3.5 h-3.5 text-[var(--accent)]" />
-                        <p className="text-xs font-semibold text-[#e5e5e5]">What your AI is doing for you</p>
+                        <p className="text-xs font-semibold text-text">What your AI is doing for you</p>
                     </div>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                        <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[var(--accent)]/40 transition-colors">
-                            <p className="text-lg font-bold text-emerald-400">{formatKES(glance.moneyPerDayCents)}<span className="text-xs text-[#525252] font-normal">/day</span></p>
-                            <p className="text-[10px] text-[#525252] mt-0.5">saved in staff time (≈ {glance.hoursPerDay} hrs/day)</p>
+                        <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-surface-hover p-3 hover:border-[var(--accent)]/40 transition-colors">
+                            <p className="text-lg font-bold text-emerald-400">{formatKES(glance.moneyPerDayCents)}<span className="text-xs text-text-dim font-normal">/day</span></p>
+                            <p className="text-[10px] text-text-dim mt-0.5">saved in staff time (≈ {glance.hoursPerDay} hrs/day)</p>
                         </Link>
-                        <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[var(--accent)]/40 transition-colors">
+                        <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-surface-hover p-3 hover:border-[var(--accent)]/40 transition-colors">
                             <p className="text-lg font-bold text-[var(--accent)]">{formatKES(glance.capturedCents)}</p>
-                            <p className="text-[10px] text-[#525252] mt-0.5">extra profit captured this month</p>
+                            <p className="text-[10px] text-text-dim mt-0.5">extra profit captured this month</p>
                         </Link>
-                        <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[var(--accent)]/40 transition-colors">
+                        <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-surface-hover p-3 hover:border-[var(--accent)]/40 transition-colors">
                             <p className="text-lg font-bold text-amber-400">{formatKES(glance.oppsCents)}</p>
-                            <p className="text-[10px] text-[#525252] mt-0.5">opportunities flagged, not yet actioned</p>
+                            <p className="text-[10px] text-text-dim mt-0.5">opportunities flagged, not yet actioned</p>
                         </Link>
-                        <Link href="/dashboard/marketing" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[var(--accent)]/40 transition-colors">
-                            <p className="text-lg font-bold text-[#e5e5e5]">{glance.winbackReachable}</p>
-                            <p className="text-[10px] text-[#525252] mt-0.5">lapsed regulars ready to win back</p>
+                        <Link href="/dashboard/marketing" className="group rounded-lg bg-[#0f0f0f] border border-surface-hover p-3 hover:border-[var(--accent)]/40 transition-colors">
+                            <p className="text-lg font-bold text-text">{glance.winbackReachable}</p>
+                            <p className="text-[10px] text-text-dim mt-0.5">lapsed regulars ready to win back</p>
                         </Link>
                     </div>
                     <div className="flex flex-wrap gap-2 mt-3">
-                        <Link href="/dashboard/ai" className="flex items-center gap-1.5 text-[11px] text-[#737373] hover:text-[var(--accent)] transition-colors"><Brain className="w-3 h-3" /> AI Command Center</Link>
-                        <span className="text-[#262626]">·</span>
-                        <Link href="/dashboard/roi" className="flex items-center gap-1.5 text-[11px] text-[#737373] hover:text-[var(--accent)] transition-colors"><Clock className="w-3 h-3" /> Time & Money Saved</Link>
-                        <span className="text-[#262626]">·</span>
-                        <Link href="/dashboard/marketing" className="flex items-center gap-1.5 text-[11px] text-[#737373] hover:text-[var(--accent)] transition-colors"><Megaphone className="w-3 h-3" /> Campaigns & Win-back <ArrowRight className="w-3 h-3" /></Link>
+                        <Link href="/dashboard/ai" className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-[var(--accent)] transition-colors"><Brain className="w-3 h-3" /> AI Command Center</Link>
+                        <span className="text-border">·</span>
+                        <Link href="/dashboard/roi" className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-[var(--accent)] transition-colors"><Clock className="w-3 h-3" /> Time & Money Saved</Link>
+                        <span className="text-border">·</span>
+                        <Link href="/dashboard/marketing" className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-[var(--accent)] transition-colors"><Megaphone className="w-3 h-3" /> Campaigns & Win-back <ArrowRight className="w-3 h-3" /></Link>
                     </div>
                 </div>
             )}
@@ -260,10 +284,10 @@ export default function DashboardPage() {
             </div>
 
             {/* Breakdown — how each area is doing */}
-            <div className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3">
-                <p className="text-xs font-semibold text-[#e5e5e5] mb-3">How each area is doing</p>
+            <div className="bg-surface border border-border rounded-xl px-4 py-3">
+                <p className="text-xs font-semibold text-text mb-3">How each area is doing</p>
                 <div className="space-y-2">
-                    {breakdown.map((b: any, i: number) => {
+                    {breakdown.map((b, i: number) => {
                         const friendlyNames: Record<string, string> = {
                             "Menu Health": "Your Menu",
                             "Revenue Trend": "Sales Trend",
@@ -275,10 +299,10 @@ export default function DashboardPage() {
                         const cat = b.category ?? b;
                         return (
                             <div key={i} className="flex items-center gap-3">
-                                <span className="text-xs text-[#737373] w-28 flex-shrink-0">
+                                <span className="text-xs text-text-muted w-28 flex-shrink-0">
                                     {friendlyNames[cat] || cat}
                                 </span>
-                                <div className="flex-1 h-2 bg-[#1a1a1a] rounded-full overflow-hidden">
+                                <div className="flex-1 h-2 bg-surface-hover rounded-full overflow-hidden">
                                     <motion.div
                                         initial={{ width: 0 }}
                                         animate={{ width: `${score}%` }}
@@ -298,26 +322,26 @@ export default function DashboardPage() {
             {/* Risks & Opportunities side by side */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 {/* Watch out for */}
-                <div className="bg-[#141414] border border-[#262626] rounded-xl">
-                    <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center gap-2">
+                <div className="bg-surface border border-border rounded-xl">
+                    <div className="px-4 py-3 border-b border-surface-hover flex items-center gap-2">
                         <Shield className="w-3.5 h-3.5 text-[#ef4444]" />
-                        <h2 className="text-sm font-semibold text-[#e5e5e5]">Watch Out For</h2>
+                        <h2 className="text-sm font-semibold text-text">Watch Out For</h2>
                     </div>
                     {risks.length === 0 ? (
-                        <div className="px-4 py-6 text-center text-xs text-[#525252]">Everything looks good right now ✓</div>
+                        <div className="px-4 py-6 text-center text-xs text-text-dim">Everything looks good right now ✓</div>
                     ) : (
-                        <div className="divide-y divide-[#1a1a1a]">
-                            {risks.map((r: any, i: number) => (
+                        <div className="divide-y divide-surface-hover">
+                            {risks.map((r, i: number) => (
                                 <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                                     transition={{ delay: i * 0.05 }} className="px-4 py-3">
                                     <div className="flex items-center gap-2">
                                         <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${r.severity === "critical" ? "bg-[#ef4444]/10 text-[#ef4444]"
                                                 : r.severity === "high" ? "bg-[#eab308]/10 text-[#eab308]"
-                                                    : "bg-[#3b82f6]/10 text-[#3b82f6]"
+                                                    : "bg-info/10 text-info"
                                             }`}>{r.severity === "critical" ? "urgent" : r.severity}</span>
-                                        <p className="text-sm text-[#e5e5e5]">{friendlyRisk(r.risk)}</p>
+                                        <p className="text-sm text-text">{friendlyRisk(r.risk)}</p>
                                     </div>
-                                    <p className="text-xs text-[#525252] mt-1">{friendlyDetail(r.detail)}</p>
+                                    <p className="text-xs text-text-dim mt-1">{friendlyDetail(r.detail)}</p>
                                 </motion.div>
                             ))}
                         </div>
@@ -325,23 +349,23 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Ways to earn more */}
-                <div className="bg-[#141414] border border-[#262626] rounded-xl">
-                    <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center gap-2">
+                <div className="bg-surface border border-border rounded-xl">
+                    <div className="px-4 py-3 border-b border-surface-hover flex items-center gap-2">
                         <Zap className="w-3.5 h-3.5 text-[var(--accent)]" />
-                        <h2 className="text-sm font-semibold text-[#e5e5e5]">Ways to Earn More</h2>
+                        <h2 className="text-sm font-semibold text-text">Ways to Earn More</h2>
                     </div>
                     {opportunities.length === 0 ? (
-                        <div className="px-4 py-6 text-center text-xs text-[#525252]">We&apos;re looking for opportunities...</div>
+                        <div className="px-4 py-6 text-center text-xs text-text-dim">We&apos;re looking for opportunities...</div>
                     ) : (
-                        <div className="divide-y divide-[#1a1a1a]">
-                            {opportunities.map((o: any, i: number) => (
+                        <div className="divide-y divide-surface-hover">
+                            {opportunities.map((o, i: number) => (
                                 <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                                     transition={{ delay: i * 0.05 }} className="px-4 py-3">
                                     <div className="flex items-center gap-2">
                                         <Zap className="w-3 h-3 text-[var(--accent)]" />
-                                        <p className="text-sm text-[#e5e5e5]">{friendlyOpportunity(o.opportunity || o)}</p>
+                                        <p className="text-sm text-text">{friendlyOpportunity(o.opportunity)}</p>
                                     </div>
-                                    <p className="text-xs text-[#525252] mt-1">{friendlyDetail(o.detail || "")}</p>
+                                    <p className="text-xs text-text-dim mt-1">{friendlyDetail(o.detail || "")}</p>
                                 </motion.div>
                             ))}
                         </div>
@@ -351,14 +375,14 @@ export default function DashboardPage() {
 
             {/* Alerts */}
             {alerts.length > 0 && (
-                <div className="bg-[#141414] border border-[#262626] rounded-xl">
-                    <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center gap-2">
+                <div className="bg-surface border border-border rounded-xl">
+                    <div className="px-4 py-3 border-b border-surface-hover flex items-center gap-2">
                         <AlertTriangle className="w-3.5 h-3.5 text-[#eab308]" />
-                        <h2 className="text-sm font-semibold text-[#e5e5e5]">Alerts From Your Systems</h2>
-                        <span className="text-[10px] text-[#525252] ml-auto">{alerts.length} active</span>
+                        <h2 className="text-sm font-semibold text-text">Alerts From Your Systems</h2>
+                        <span className="text-[10px] text-text-dim ml-auto">{alerts.length} active</span>
                     </div>
-                    <div className="divide-y divide-[#1a1a1a] max-h-64 overflow-y-auto">
-                        {alerts.map((a: any, i: number) => {
+                    <div className="divide-y divide-surface-hover max-h-64 overflow-y-auto">
+                        {alerts.map((a, i: number) => {
                             const sourceLabels: Record<string, string> = {
                                 inventory: "Stock", kitchen: "Kitchen", menu: "Menu", reservations: "Bookings",
                             };
@@ -371,7 +395,7 @@ export default function DashboardPage() {
                                                     : "bg-[#8b5cf6]/10 text-[#8b5cf6]"
                                         }`}>{sourceLabels[a.source] || a.source || a.severity}</span>
                                     <div>
-                                        <p className="text-sm text-[#e5e5e5]">{a.message}</p>
+                                        <p className="text-sm text-text">{a.message}</p>
                                         {a.action && (
                                             <p className="text-xs text-[var(--accent)] mt-1">💡 {a.action}</p>
                                         )}
@@ -383,29 +407,6 @@ export default function DashboardPage() {
                 </div>
             )}
         </div>
-    );
-}
-
-/* Helper Components */
-function SystemStatus({ icon: Icon, label, status }: { icon: any; label: string; status: string }) {
-    return (
-        <div className="flex items-center gap-2">
-            <Icon className="w-3 h-3 text-[#525252]" />
-            <span className="text-xs text-[#737373]">{label}</span>
-            <span className={`w-1.5 h-1.5 rounded-full ml-auto ${status === "connected" ? "bg-[#22c55e]" : "bg-[#ef4444]"
-                }`} />
-        </div>
-    );
-}
-
-function StatCard({ label, value, sub, color }: { label: string; value: any; sub?: string; color: string; }) {
-    return (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-[#141414] border border-[#262626] rounded-xl p-4">
-            <p className="text-lg font-bold text-[#e5e5e5]">{value}</p>
-            <p className="text-xs text-[#525252] mt-0.5">{label}</p>
-            {sub && <p className="text-[10px] mt-1" style={{ color }}>{sub}</p>}
-        </motion.div>
     );
 }
 

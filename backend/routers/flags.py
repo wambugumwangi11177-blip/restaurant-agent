@@ -10,19 +10,20 @@ from fastapi import APIRouter, Depends
 
 from auth import get_current_user, require_role
 import models
+import schemas
 import feature_flags
 
 router = APIRouter(prefix="/flags", tags=["flags"])
 
 
-@router.get("/")
+@router.get("/", response_model=schemas.FlagsOut)
 async def get_flags(current_user: models.User = Depends(get_current_user)):
     """Current on/off state of every feature flag — for UI gating. Any signed-in
     user (the flags themselves carry no sensitive data)."""
     return {"flags": feature_flags.all_flags()}
 
 
-@router.get("/details")
+@router.get("/details", response_model=schemas.FlagDetailsOut)
 async def get_flag_details(
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
 ):

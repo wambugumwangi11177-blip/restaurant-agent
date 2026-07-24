@@ -12,7 +12,6 @@ import { Sparkles } from "lucide-react";
 import { useAiModule } from "@/lib/useAiModule";
 import { formatKES } from "@/lib/format";
 import { MiniStat } from "./MiniStat";
-import { HowItWorks } from "./HowItWorks";
 import { ModuleShell } from "./ModuleShell";
 
 interface TwinData {

@@ -45,7 +45,7 @@ _CAN_FULFILL = (models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER)
 _CAN_COUNT = (models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER)
 
 
-@router.post("/transfers", response_model=schemas.StockTransferOut)
+@router.post("/transfers", response_model=schemas.StockTransferOut, status_code=201)
 async def initiate_transfer(
     body: schemas.StockTransferCreate,
     db: Session = Depends(get_db),
@@ -104,7 +104,7 @@ async def confirm_transfer(
         raise HTTPException(status_code=status_code, detail=str(exc))
 
 
-@router.post("/transfers/request", response_model=schemas.StockTransferOut)
+@router.post("/transfers/request", response_model=schemas.StockTransferOut, status_code=201)
 async def request_transfer(
     body: schemas.StockTransferRequest,
     db: Session = Depends(get_db),
@@ -164,7 +164,7 @@ async def list_transfers(
     return q.order_by(models.StockTransfer.id.desc()).limit(200).all()
 
 
-@router.post("/counts", response_model=schemas.StockCountOut)
+@router.post("/counts", response_model=schemas.StockCountOut, status_code=201)
 async def submit_stock_count(
     body: schemas.StockCountCreate,
     db: Session = Depends(get_db),

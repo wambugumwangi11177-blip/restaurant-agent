@@ -71,7 +71,7 @@ def test_overlapping_booking_on_same_table_is_rejected(client, db_session):
     table = _add_table(db_session, restaurant, "T1")
 
     first = client.post("/reservations/", json=_booking(table.id, hour=18), headers=_auth_headers(token))
-    assert first.status_code == 200, first.text
+    assert first.status_code == 201, first.text
 
     # 18:45 starts inside the 18:00–19:30 window already booked.
     second = client.post("/reservations/", json=_booking(table.id, hour=18, minute=45), headers=_auth_headers(token))
@@ -87,10 +87,10 @@ def test_adjacent_booking_is_allowed(client, db_session):
     table = _add_table(db_session, restaurant, "T1")
 
     first = client.post("/reservations/", json=_booking(table.id, hour=18, minute=0), headers=_auth_headers(token))
-    assert first.status_code == 200, first.text
+    assert first.status_code == 201, first.text
 
     second = client.post("/reservations/", json=_booking(table.id, hour=19, minute=30), headers=_auth_headers(token))
-    assert second.status_code == 200, second.text
+    assert second.status_code == 201, second.text
 
     assert db_session.query(models.Reservation).count() == 2
 
@@ -100,16 +100,16 @@ def test_cancelled_reservation_does_not_block_the_slot(client, db_session):
     table = _add_table(db_session, restaurant, "T1")
 
     first = client.post("/reservations/", json=_booking(table.id, hour=18), headers=_auth_headers(token))
-    assert first.status_code == 200
+    assert first.status_code == 201
     res_id = first.json()["id"]
 
-    cancel = client.patch(
+    cancel = client.post(
         f"/reservations/{res_id}/status", json={"status": "cancelled"}, headers=_auth_headers(token)
     )
     assert cancel.status_code == 200, cancel.text
 
     retry = client.post("/reservations/", json=_booking(table.id, hour=18), headers=_auth_headers(token))
-    assert retry.status_code == 200, retry.text
+    assert retry.status_code == 201, retry.text
 
 
 def test_reconfirming_a_reservation_into_an_occupied_slot_is_rejected(client, db_session):
@@ -123,20 +123,20 @@ def test_reconfirming_a_reservation_into_an_occupied_slot_is_rejected(client, db
     table = _add_table(db_session, restaurant, "T1")
 
     first = client.post("/reservations/", json=_booking(table.id, hour=18), headers=_auth_headers(token))
-    assert first.status_code == 200, first.text
+    assert first.status_code == 201, first.text
     first_id = first.json()["id"]
 
     # Free the slot, then let a second booking take the same table/time.
-    no_show = client.patch(
+    no_show = client.post(
         f"/reservations/{first_id}/status", json={"status": "no_show"}, headers=_auth_headers(token)
     )
     assert no_show.status_code == 200, no_show.text
 
     second = client.post("/reservations/", json=_booking(table.id, hour=18), headers=_auth_headers(token))
-    assert second.status_code == 200, second.text
+    assert second.status_code == 201, second.text
 
     # Undoing the no-show would collide with the second booking.
-    reconfirm = client.patch(
+    reconfirm = client.post(
         f"/reservations/{first_id}/status", json={"status": "confirmed"}, headers=_auth_headers(token)
     )
     assert reconfirm.status_code == 409, reconfirm.text
@@ -154,11 +154,11 @@ def test_reconfirming_when_slot_is_free_succeeds(client, db_session):
     table = _add_table(db_session, restaurant, "T1")
 
     booked = client.post("/reservations/", json=_booking(table.id, hour=18), headers=_auth_headers(token))
-    assert booked.status_code == 200
+    assert booked.status_code == 201
     res_id = booked.json()["id"]
 
-    client.patch(f"/reservations/{res_id}/status", json={"status": "cancelled"}, headers=_auth_headers(token))
-    reconfirm = client.patch(
+    client.post(f"/reservations/{res_id}/status", json={"status": "cancelled"}, headers=_auth_headers(token))
+    reconfirm = client.post(
         f"/reservations/{res_id}/status", json={"status": "confirmed"}, headers=_auth_headers(token)
     )
     assert reconfirm.status_code == 200, reconfirm.text
@@ -186,7 +186,7 @@ def test_cross_midnight_reservation_blocks_next_day_overlap(client, db_session):
         "table_id": table.id,
     }
     resp = client.post("/reservations/", json=late, headers=_auth_headers(token))
-    assert resp.status_code == 200, resp.text
+    assert resp.status_code == 201, resp.text
 
     # A 00:00 booking on 2026-08-02 overlaps the 23:00–01:00 window from 08-01.
     assert is_table_available(
@@ -224,7 +224,7 @@ def test_booking_without_a_table_still_works(client, db_session):
     _restaurant, token = _make_tenant_with_user_and_restaurant(db_session, "e")
 
     resp = client.post("/reservations/", json=_booking(None), headers=_auth_headers(token))
-    assert resp.status_code == 200, resp.text
+    assert resp.status_code == 201, resp.text
 
 
 def _load_migration_009():

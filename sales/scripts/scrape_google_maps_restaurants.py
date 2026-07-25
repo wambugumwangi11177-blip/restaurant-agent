@@ -2,8 +2,8 @@
 Scrape restaurant listings from Google Maps search results for lead generation.
 
 Usage:
-    python scrape_google_maps_restaurants.py --areas "Karen" "Lavington" --per-area 40
-    python scrape_google_maps_restaurants.py --areas-file areas.txt --per-area 60 --out .tmp/restaurants.csv
+    python sales/scripts/scrape_google_maps_restaurants.py --areas "Karen" "Lavington" --per-area 40
+    python sales/scripts/scrape_google_maps_restaurants.py --areas-file areas.txt --per-area 60 --out .tmp/restaurants.csv
 
 Notes:
 - Uses Scrapling's DynamicFetcher (Chromium via patchright) to render Google Maps'

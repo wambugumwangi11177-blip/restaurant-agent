@@ -4,7 +4,7 @@ phone numbers and websites, by visiting each restaurant's individual Google Maps
 place page (the list/search view never includes phone numbers).
 
 Usage:
-    python enrich_phone_numbers.py --in leads/kenya_restaurants.csv --concurrency 8
+    python sales/scripts/enrich_phone_numbers.py --in leads/kenya_restaurants.csv --concurrency 8
 
 Resumable: rows already carrying a phone value (including the "N/A" sentinel for
 "we checked and this place has none listed") are skipped on rerun. Progress is

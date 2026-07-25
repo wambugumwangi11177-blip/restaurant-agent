@@ -7,8 +7,8 @@ this opens a browser for one-time consent and caches the result in token.json
 (both are gitignored — see .gitignore) so later runs are non-interactive.
 
 Usage:
-    python upload_to_google_doc.py --in leads/kenya_restaurants.csv --title "Kenya Restaurant Leads"
-    python upload_to_google_doc.py --in leads/kenya_restaurants.csv --doc-id <existing_doc_id>  # update in place
+    python sales/scripts/upload_to_google_doc.py --in leads/kenya_restaurants.csv --title "Kenya Restaurant Leads"
+    python sales/scripts/upload_to_google_doc.py --in leads/kenya_restaurants.csv --doc-id <existing_doc_id>  # update in place
 """
 
 from __future__ import annotations

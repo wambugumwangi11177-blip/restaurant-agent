@@ -3,7 +3,7 @@ Build a PDF of the restaurant leads (name, rating, phone, address), grouped by
 area, from leads/kenya_restaurants.csv.
 
 Usage:
-    python build_pdf.py --in leads/kenya_restaurants.csv --out leads/kenya_restaurants.pdf
+    python sales/scripts/build_pdf.py --in leads/kenya_restaurants.csv --out leads/kenya_restaurants.pdf
 """
 
 from __future__ import annotations

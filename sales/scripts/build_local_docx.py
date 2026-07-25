@@ -6,7 +6,7 @@ the user can drag this straight into Google Drive and it auto-converts to a
 native Google Doc (Drive > New > File upload > right-click > Open with Google Docs).
 
 Usage:
-    python build_local_docx.py --in leads/kenya_restaurants.csv --out leads/kenya_restaurants.docx
+    python sales/scripts/build_local_docx.py --in leads/kenya_restaurants.csv --out leads/kenya_restaurants.docx
 """
 
 from __future__ import annotations

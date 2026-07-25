@@ -21,6 +21,12 @@ import {
 } from "lucide-react";
 import FormField from "@/components/ui/FormField";
 import { getErrorMessage } from "@/lib/errors";
+import {
+    queueOrder,
+    replayPendingOrders,
+    isNetworkFailure,
+    getPendingOrders,
+} from "@/lib/offlineOrderOutbox";
 
 interface MenuItem {
     id: number;
@@ -58,12 +64,34 @@ export default function POSWorkspace() {
     const [showSuccess, setShowSuccess] = useState(false);
     const [lastOrderId, setLastOrderId] = useState<number | null>(null);
     const [orderError, setOrderError] = useState("");
+    const [showQueuedOffline, setShowQueuedOffline] = useState(false);
+    const [pendingOfflineCount, setPendingOfflineCount] = useState(0);
+
+    const refreshPendingCount = useCallback(() => {
+        getPendingOrders().then((orders) => setPendingOfflineCount(orders.length)).catch(() => {});
+    }, []);
+
+    const syncPendingOrders = useCallback(async () => {
+        const result = await replayPendingOrders((payload) => api.post("/orders/", payload));
+        refreshPendingCount();
+        return result;
+    }, [refreshPendingCount]);
 
     useEffect(() => {
         api.get("/menu/").then((res) => {
             setMenuItems(res.data.filter((i: MenuItem) => i.is_available !== false));
             setLoading(false);
         }).catch(() => setLoading(false));
+
+        // Audit remediation, Tier 4 item 10: replay anything queued from a
+        // prior offline session on mount (covers the PWA being reopened after
+        // connectivity returns), and again the moment the browser reports
+        // it's back online (covers staying on this screen through a drop).
+        refreshPendingCount();
+        syncPendingOrders();
+        window.addEventListener("online", syncPendingOrders);
+        return () => window.removeEventListener("online", syncPendingOrders);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const categories = ["All", ...Array.from(new Set(menuItems.map((i) => i.category)))];
@@ -106,32 +134,47 @@ export default function POSWorkspace() {
         if (cart.length === 0) return;
         setSubmitting(true);
         setOrderError("");
-        try {
-            const res = await api.post("/orders/", {
-                items: cart.map((c) => ({
-                    menu_item_id: c.menuItem.id,
-                    quantity: c.quantity,
-                })),
-                order_type: orderType,
-                delivery_channel: deliveryChannel,
-                payment_method: paymentMethod,
-                customer_name: customerName,
-                customer_phone: customerPhone,
-                table_number: tableNumber ? parseInt(tableNumber) : null,
-                notes,
-            });
-            setLastOrderId(res.data.id);
-            setShowSuccess(true);
-            // Reset
+        const payload = {
+            items: cart.map((c) => ({
+                menu_item_id: c.menuItem.id,
+                quantity: c.quantity,
+            })),
+            order_type: orderType,
+            delivery_channel: deliveryChannel,
+            payment_method: paymentMethod,
+            customer_name: customerName,
+            customer_phone: customerPhone,
+            table_number: tableNumber ? parseInt(tableNumber) : null,
+            notes,
+        };
+        const resetForm = () => {
             setCart([]);
             setCustomerName("");
             setCustomerPhone("");
             setTableNumber("");
             setNotes("");
             setPaymentMethod("pending");
+        };
+        try {
+            const res = await api.post("/orders/", payload);
+            setLastOrderId(res.data.id);
+            setShowSuccess(true);
+            resetForm();
             setTimeout(() => setShowSuccess(false), 3000);
         } catch (err) {
-            setOrderError(getErrorMessage(err, "Order failed — please try again."));
+            if (isNetworkFailure(err)) {
+                // Audit remediation, Tier 4 item 10: no connectivity — queue
+                // instead of dropping the order. The cart still clears (the
+                // order IS captured, just not yet delivered), matching the
+                // success path's UX rather than leaving a confusing half-state.
+                await queueOrder(payload);
+                refreshPendingCount();
+                resetForm();
+                setShowQueuedOffline(true);
+                setTimeout(() => setShowQueuedOffline(false), 4000);
+            } else {
+                setOrderError(getErrorMessage(err, "Order failed — please try again."));
+            }
         }
         setSubmitting(false);
     };
@@ -181,12 +224,36 @@ export default function POSWorkspace() {
                 )}
             </AnimatePresence>
 
+            {/* Queued-offline toast — audit remediation, Tier 4 item 10 */}
+            <AnimatePresence>
+                {showQueuedOffline && (
+                    <motion.div
+                        role="status"
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="fixed top-4 right-4 z-50 bg-warning/10 border border-warning/30 rounded-xl px-5 py-3 flex items-center gap-2"
+                    >
+                        <ShoppingBag className="w-4 h-4 text-warning" />
+                        <span className="text-sm text-warning">No connection — order saved, will send automatically once you&apos;re back online.</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
                 <div>
                     <h1 className="text-xl font-bold text-text">New Order</h1>
                     <p className="text-xs text-text-dim">Tap items to add, then send to kitchen</p>
                 </div>
+                {pendingOfflineCount > 0 && (
+                    <div
+                        role="status"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-warning/10 border border-warning/30 text-warning text-xs font-medium"
+                    >
+                        {pendingOfflineCount} order{pendingOfflineCount !== 1 ? "s" : ""} waiting to send
+                    </div>
+                )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">

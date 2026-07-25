@@ -47,6 +47,7 @@ interface AuthContextType {
   isLoading: boolean;
   startImpersonation: (staffId: number) => Promise<string>;
   endImpersonation: () => Promise<void>;
+  loginWithPin: (userId: number, pin: string) => Promise<void>;
 }
 
 // A second, independent localStorage slot for the Owner's own token while
@@ -108,6 +109,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetchUser(accessToken);
   };
 
+  // Shared-device quick-switch (audit remediation, Tier 5 item 12) — mirrors
+  // login()'s shape exactly (same token-storage/fetchUser flow), just a
+  // different endpoint and no password. Fully replaces the current session
+  // rather than stashing it like startImpersonation does — this is meant to
+  // hand the device to a different person, not "view as" and come back.
+  const loginWithPin = async (userId: number, pin: string) => {
+    const res = await api.post("/api/v1/auth/quick-switch", { user_id: userId, pin });
+    const accessToken = res.data.access_token;
+    localStorage.removeItem(OWNER_TOKEN_KEY);
+    localStorage.setItem("access_token", accessToken);
+    setToken(accessToken);
+    await fetchUser(accessToken);
+  };
+
   const logout = () => {
     localStorage.removeItem("access_token");
     localStorage.removeItem(OWNER_TOKEN_KEY);
@@ -155,7 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, login, register, logout, isLoading, startImpersonation, endImpersonation }}
+      value={{ user, token, login, register, logout, isLoading, startImpersonation, endImpersonation, loginWithPin }}
     >
       {children}
     </AuthContext.Provider>

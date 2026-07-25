@@ -141,6 +141,32 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
+# ── Shared-device quick-switch PIN (audit remediation, Tier 5 item 12) ───────
+# Same pwd_context (Argon2id) as passwords — a short PIN doesn't mean a weaker
+# hash; brute-force resistance comes from lockout (see routers/auth.py's
+# MAX_FAILED_ATTEMPTS reuse for PIN attempts), not the hash algorithm.
+PIN_MIN_LENGTH = 4
+PIN_MAX_LENGTH = 6
+
+
+def require_valid_pin_format(pin: str) -> None:
+    """Raise HTTP 400 unless `pin` is 4-6 digits. Digits only, deliberately —
+    this is a quick-entry code for a shared touchscreen, not a password."""
+    if not pin.isdigit() or not (PIN_MIN_LENGTH <= len(pin) <= PIN_MAX_LENGTH):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"PIN must be {PIN_MIN_LENGTH}-{PIN_MAX_LENGTH} digits.",
+        )
+
+
+def verify_pin(plain_pin: str, hashed_pin: str) -> bool:
+    return pwd_context.verify(plain_pin, hashed_pin)
+
+
+def get_pin_hash(pin: str) -> str:
+    return pwd_context.hash(pin)
+
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     expire = utcnow() + (

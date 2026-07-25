@@ -6,7 +6,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import NotificationBell from "@/components/NotificationBell";
 import AttendanceWidget from "@/components/staff/AttendanceWidget";
-import { LogOut, Menu as MenuIcon, X, type LucideIcon } from "lucide-react";
+import QuickSwitchModal from "@/components/QuickSwitchModal";
+import PinSetupModal from "@/components/PinSetupModal";
+import { LogOut, Repeat, Menu as MenuIcon, X, type LucideIcon } from "lucide-react";
 import { tierHome, StaffTier } from "@/lib/permissions";
 
 export interface TierNavItem {
@@ -39,6 +41,8 @@ export default function TierLayoutShell({
     const router = useRouter();
     const pathname = usePathname();
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [showQuickSwitch, setShowQuickSwitch] = useState(false);
+    const [showPinSetup, setShowPinSetup] = useState(false);
 
     const staffRole = user?.staff_role || null;
 
@@ -95,7 +99,14 @@ export default function TierLayoutShell({
                     })}
                 </nav>
 
-                <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-[#1a1a1a]">
+                <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-[#1a1a1a] space-y-0.5">
+                    <button
+                        onClick={() => setShowQuickSwitch(true)}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[#737373] hover:text-[var(--accent)] hover:bg-[#141414] w-full transition-colors"
+                    >
+                        <Repeat className="w-4 h-4" />
+                        <span className="font-medium">Switch user</span>
+                    </button>
                     <button
                         onClick={() => { logout(); router.push("/login"); }}
                         className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[#737373] hover:text-red-400 hover:bg-red-500/5 w-full transition-colors"
@@ -105,6 +116,14 @@ export default function TierLayoutShell({
                     </button>
                 </div>
             </aside>
+
+            {showQuickSwitch && (
+                <QuickSwitchModal
+                    onClose={() => setShowQuickSwitch(false)}
+                    onSetUpOwnPin={() => { setShowQuickSwitch(false); setShowPinSetup(true); }}
+                />
+            )}
+            {showPinSetup && <PinSetupModal onClose={() => setShowPinSetup(false)} />}
 
             {sidebarOpen && (
                 <button

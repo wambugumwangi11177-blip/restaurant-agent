@@ -118,6 +118,16 @@ class User(Base):
     # users are unaffected until they opt in.
     mfa_secret = Column(String, nullable=True)
     mfa_enabled = Column(Boolean, default=False, nullable=False)
+    # Shared-device quick-switch PIN (audit remediation, Tier 5 item 12).
+    # Argon2id-hashed like hashed_password, via the same pwd_context — NOT a
+    # separate weaker scheme just because it's a shorter PIN. NULL means "not
+    # set up" (self-service opt-in via POST /auth/pin/set); a user with no
+    # PIN simply doesn't appear in the quick-switch roster. On StaffMember
+    # was the plan's original placement, but StaffMember.user_id is optional
+    # (roster-only entries exist with no login) while every login-having
+    # account already has exactly one User row — this is the simpler,
+    # unambiguous home for it.
+    hashed_pin = Column(String, nullable=True)
     # Fine-grained tier layered on top of `role` (directive 015). NULL means
     # "not yet assigned" — deliberately not defaulted, see directive's Edge
     # Cases: guessing a tier for a pre-existing STAFF user could grant access

@@ -107,6 +107,22 @@ class MfaCode(StrictModel):
     code: str
 
 
+class PinSetBody(StrictModel):
+    pin: str
+
+
+class QuickSwitchBody(StrictModel):
+    user_id: int
+    pin: str
+
+
+class QuickSwitchRosterEntry(StrictModel):
+    user_id: int
+    name: str
+    role_title: str | None = None
+    staff_role: str | None = None
+
+
 class RestaurantUpdate(StrictModel):
     name: str | None = None
     address: str | None = None
@@ -507,6 +523,119 @@ async def mfa_disable(
     user.mfa_secret = None
     db.commit()
     return {"status": "mfa_disabled"}
+
+
+# ── Shared-device quick-switch (audit remediation, Tier 5 item 12) ──────────
+# No PIN/badge login existed at all — every staff account needed a full
+# email+password re-auth, friction on a POS/KDS tablet passed between waiters
+# mid-shift. This is opt-in (a user sets their own PIN), teammate-visible only
+# to people already authenticated at the same tenant, and reuses the exact
+# lockout mechanism /login already has (MAX_FAILED_ATTEMPTS/LOCKOUT_MINUTES)
+# rather than inventing a second one — a 4-6 digit PIN needs that protection
+# more than a real password does, not less.
+
+@router.post("/pin/set", response_model=StatusMessageOut)
+async def pin_set(
+    body: PinSetBody,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Self-service opt-in: set or change your own quick-switch PIN. Requires
+    only being logged in already — same trust level as changing your own MFA
+    enrollment, no separate re-auth demanded."""
+    auth.require_valid_pin_format(body.pin)
+    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    user.hashed_pin = auth.get_pin_hash(body.pin)
+    db.commit()
+    return {"status": "pin_set"}
+
+
+@router.post("/pin/clear", response_model=StatusMessageOut)
+async def pin_clear(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Opt back out — removes you from every teammate's quick-switch roster."""
+    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    user.hashed_pin = None
+    db.commit()
+    return {"status": "pin_cleared"}
+
+
+@router.get("/quick-switch/roster", response_model=list[QuickSwitchRosterEntry])
+async def quick_switch_roster(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Teammates at the same tenant who've opted into a PIN — the picker list
+    for a shared device. Excludes the caller (switching to yourself is a
+    no-op) and anyone without a PIN set (they still need a full login)."""
+    rows = (
+        db.query(models.StaffMember, models.User)
+        .join(models.User, models.StaffMember.user_id == models.User.id)
+        .filter(
+            models.User.tenant_id == current_user.tenant_id,
+            models.User.hashed_pin.isnot(None),
+            models.User.is_active == True,  # noqa: E712 - SQLAlchemy filter
+            models.User.id != current_user.id,
+        )
+        .all()
+    )
+    return [
+        {
+            "user_id": u.id,
+            "name": m.name,
+            "role_title": m.role_title,
+            "staff_role": u.staff_role.value if u.staff_role else None,
+        }
+        for m, u in rows
+    ]
+
+
+@router.post("/quick-switch", response_model=Token)
+@limiter.limit("10/minute")
+async def quick_switch(
+    request: Request,
+    body: QuickSwitchBody,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Swap the device's session to `user_id` after verifying their PIN — no
+    password re-entry. Being authenticated as ANYONE at the tenant is what
+    establishes trust that this is a legitimate shared device, not an
+    open door: the target must belong to the same tenant as the caller, have
+    already opted in with a PIN, and pass the same lockout gate /login uses.
+    """
+    target = db.query(models.User).filter(
+        models.User.id == body.user_id,
+        models.User.tenant_id == current_user.tenant_id,
+    ).first()
+    if not target or not target.hashed_pin or not target.is_active:
+        raise HTTPException(status_code=404, detail="Not available for quick switch.")
+
+    if target.locked_until and target.locked_until > utcnow():
+        remaining = int((target.locked_until - utcnow()).total_seconds() / 60) + 1
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Account temporarily locked due to repeated failed PIN attempts. Try again in {remaining} minute(s).",
+        )
+
+    if not auth.verify_pin(body.pin, target.hashed_pin):
+        target.failed_login_attempts = (target.failed_login_attempts or 0) + 1
+        just_locked = target.failed_login_attempts >= MAX_FAILED_ATTEMPTS
+        if just_locked:
+            target.locked_until = utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect PIN")
+
+    target.failed_login_attempts = 0
+    target.locked_until = None
+    target.last_login_at = utcnow()
+    db.commit()
+
+    access_token = auth.create_access_token(data={"sub": target.email, "ver": target.token_version or 0})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.put("/restaurant", response_model=RestaurantOut)

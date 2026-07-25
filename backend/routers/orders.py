@@ -148,7 +148,7 @@ async def active_orders(
     ).filter(
         models.Order.restaurant_id == restaurant.id,
         models.Order.status.in_(active_statuses),
-    ).order_by(models.Order.created_at.asc()).all()
+    ).order_by(models.Order.created_at.asc()).limit(200).all()
     return [_order_to_dict(o) for o in orders]
 
 

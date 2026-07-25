@@ -14,7 +14,7 @@ per call site.
 """
 
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List
@@ -82,6 +82,8 @@ def _require_grant_allowed(granter: models.User, target_role: models.StaffRole) 
 
 @router.get("/", response_model=List[schemas.StaffMemberOut])
 async def list_staff(
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(
         auth.require_staff_role(models.StaffRole.MANAGER)
@@ -90,7 +92,7 @@ async def list_staff(
     restaurant = get_or_create_restaurant(db, current_user)
     members = db.query(models.StaffMember).filter(
         models.StaffMember.restaurant_id == restaurant.id
-    ).order_by(models.StaffMember.name).all()
+    ).order_by(models.StaffMember.name).offset(offset).limit(limit).all()
     return [_staff_out(m, db) for m in members]
 
 

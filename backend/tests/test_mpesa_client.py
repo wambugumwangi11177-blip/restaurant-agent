@@ -28,6 +28,23 @@ def test_not_configured_degrades_without_crashing(monkeypatch):
     assert result["status"] == "not_configured"
 
 
+def test_not_configured_masks_phone_in_log(monkeypatch, caplog):
+    """Audit remediation: this line used to log the raw customer phone number
+    in plaintext (mpesa_client.py:86). Only the last 3 digits should appear."""
+    import importlib
+    import logging
+    from payments import mpesa_client
+    monkeypatch.delenv("MPESA_CONSUMER_KEY", raising=False)
+    importlib.reload(mpesa_client)
+
+    with caplog.at_level(logging.WARNING):
+        mpesa_client.initiate_stk_push("254712345678", 50000, "ORDER-1", "Test order")
+
+    log_text = caplog.text
+    assert "254712345678" not in log_text
+    assert "***678" in log_text
+
+
 def test_configured_builds_correct_daraja_payload(monkeypatch):
     import importlib
     from payments import mpesa_client

@@ -29,18 +29,27 @@ routers/analytics.py (registered first in main.py, so it wins routing ties).
 This file used to duplicate those 4 routes with a second, divergent
 implementation that was silently unreachable dead code — removed 2026-07-07
 after finding it was still being read/edited as if live.
+
+Rate limiting + spend cap (audit remediation, 2026-07-25): this whole router had
+zero throttling despite being the only place a request can trigger a paid LLM
+call. Every route now carries a rate limit; the subset that actually calls
+attach_narrative()/narrate() (i.e. can hit an LLM) additionally checks
+ai.spend_cap.check_spend_cap() first, so a runaway loop or abusive caller can't
+run up an unbounded bill. See ai/spend_cap.py.
 """
 
 import logging
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from database import get_db
 from auth import require_role, require_staff_role
+from rate_limit import limiter
 import models
 import schemas
 from routers.deps import get_or_create_restaurant
+from ai.spend_cap import check_spend_cap
 
 logger = logging.getLogger("ai.router")
 
@@ -82,7 +91,9 @@ def _safe_run(agent_name: str, restaurant_id: int, fn, *args, **kwargs):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/pricing")
+@limiter.limit("20/minute")
 async def ai_pricing(
+    request: Request,
     narrate: bool = True,
     current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
@@ -96,6 +107,8 @@ async def ai_pricing(
     every figure it cites is grounding-checked before it's returned.
     """
     restaurant = get_or_create_restaurant(db, current_user)
+    if narrate:
+        check_spend_cap(current_user, db)
 
     from ai.pricing.recommendations import get_pricing_intelligence, sync_pending_recommendations
     data = await run_in_threadpool(_safe_run, "pricing_intelligence", restaurant.id, get_pricing_intelligence, db, restaurant.id)
@@ -123,7 +136,9 @@ async def ai_pricing(
 
 
 @router.post("/pricing/{rec_id}/approve")
+@limiter.limit("30/minute")
 async def approve_pricing_rec(
+    request: Request,
     rec_id: int,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
@@ -135,7 +150,9 @@ async def approve_pricing_rec(
 
 
 @router.post("/pricing/{rec_id}/reject")
+@limiter.limit("30/minute")
 async def reject_pricing_rec(
+    request: Request,
     rec_id: int,
     body: schemas.PricingRejectBody = schemas.PricingRejectBody(),
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
@@ -152,7 +169,9 @@ async def reject_pricing_rec(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/decisions")
+@limiter.limit("20/minute")
 async def ai_decisions(
+    request: Request,
     narrate: bool = True,
     current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
@@ -168,6 +187,8 @@ async def ai_decisions(
     recomputes the scores or invents figures.
     """
     restaurant = get_or_create_restaurant(db, current_user)
+    if narrate:
+        check_spend_cap(current_user, db)
 
     from ai.decisions import get_ranked_decisions
     data = await run_in_threadpool(_safe_run, "decision_intelligence", restaurant.id, get_ranked_decisions, db, restaurant.id)
@@ -183,7 +204,9 @@ async def ai_decisions(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.post("/strategy")
+@limiter.limit("5/minute")
 async def ai_strategy(
+    request: Request,
     body: schemas.StrategyGoalBody,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
@@ -199,6 +222,9 @@ async def ai_strategy(
     Body: {"goal": "...", "timeframe": "this quarter"}
     """
     restaurant = get_or_create_restaurant(db, current_user)
+    # The most expensive route in this router — a full multi-tool agentic loop,
+    # not a single narration call — so it's spend-capped unconditionally.
+    check_spend_cap(current_user, db)
     goal = body.goal
     timeframe = body.timeframe
 
@@ -210,7 +236,9 @@ async def ai_strategy(
 
 
 @router.post("/strategy/plan")
+@limiter.limit("30/minute")
 async def ai_strategy_plan(
+    request: Request,
     body: schemas.StrategyPlanBody,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
@@ -230,7 +258,9 @@ async def ai_strategy_plan(
 
 
 @router.get("/feedback")
+@limiter.limit("60/minute")
 async def ai_feedback(
+    request: Request,
     days: int = 14,
     current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
@@ -251,7 +281,9 @@ async def ai_feedback(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/plugins")
+@limiter.limit("60/minute")
 async def ai_plugins_list(
+    request: Request,
     current_user: models.User = Depends(require_staff_role(*_AI_READ)),
 ):
     """List registered marketplace plugins (name, author, capabilities, scopes)."""
@@ -260,7 +292,9 @@ async def ai_plugins_list(
 
 
 @router.post("/plugins/{name}/invoke")
+@limiter.limit("30/minute")
 async def ai_plugin_invoke(
+    request: Request,
     name: str,
     body: schemas.PluginInvokeBody = schemas.PluginInvokeBody(),
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
@@ -281,7 +315,9 @@ async def ai_plugin_invoke(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/workflows/templates")
+@limiter.limit("60/minute")
 async def ai_workflow_templates(
+    request: Request,
     current_user: models.User = Depends(require_staff_role(*_AI_READ)),
 ):
     """List the available workflow templates that can be started."""
@@ -290,7 +326,9 @@ async def ai_workflow_templates(
 
 
 @router.post("/workflows/{template}/start")
+@limiter.limit("30/minute")
 async def ai_workflow_start(
+    request: Request,
     template: str,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
@@ -306,7 +344,9 @@ async def ai_workflow_start(
 
 
 @router.get("/workflows/{run_id}")
+@limiter.limit("60/minute")
 async def ai_workflow_get(
+    request: Request,
     run_id: int,
     current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
@@ -322,7 +362,9 @@ async def ai_workflow_get(
 
 
 @router.post("/workflows/{run_id}/resume")
+@limiter.limit("30/minute")
 async def ai_workflow_resume(
+    request: Request,
     run_id: int,
     body: schemas.WorkflowResumeBody = schemas.WorkflowResumeBody(),
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
@@ -342,7 +384,9 @@ async def ai_workflow_resume(
 
 
 @router.post("/workflows/{run_id}/cancel")
+@limiter.limit("30/minute")
 async def ai_workflow_cancel(
+    request: Request,
     run_id: int,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
@@ -373,7 +417,9 @@ def _workflow_belongs(db: Session, run_id: int, restaurant_id: int) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/graph/impact")
+@limiter.limit("60/minute")
 async def ai_graph_impact(
+    request: Request,
     entity: str,
     id: int,
     current_user: models.User = Depends(require_staff_role(*_AI_READ)),
@@ -401,7 +447,9 @@ async def ai_graph_impact(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.post("/simulate")
+@limiter.limit("30/minute")
 async def ai_simulate(
+    request: Request,
     body: schemas.SimulateBody,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
@@ -427,7 +475,9 @@ async def ai_simulate(
 
 
 @router.get("/forecast/twin")
+@limiter.limit("60/minute")
 async def ai_forecast_twin(
+    request: Request,
     horizon: int = 30,
     current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
@@ -452,7 +502,9 @@ async def ai_forecast_twin(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/labor")
+@limiter.limit("60/minute")
 async def ai_labor(
+    request: Request,
     current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
@@ -468,7 +520,9 @@ async def ai_labor(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/inventory")
+@limiter.limit("60/minute")
 async def ai_inventory(
+    request: Request,
     current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
@@ -491,7 +545,9 @@ async def ai_inventory(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/profit")
+@limiter.limit("20/minute")
 async def ai_profit(
+    request: Request,
     narrate: bool = True,
     current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
@@ -506,6 +562,8 @@ async def ai_profit(
     means no provider is set or narration was skipped.
     """
     restaurant = get_or_create_restaurant(db, current_user)
+    if narrate:
+        check_spend_cap(current_user, db)
 
     from ai.profit.intelligence import get_profit_intelligence
     data = await run_in_threadpool(_safe_run, "profit_intelligence", restaurant.id, get_profit_intelligence, db, restaurant.id)
@@ -522,7 +580,9 @@ async def ai_profit(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/roi")
+@limiter.limit("20/minute")
 async def ai_roi(
+    request: Request,
     narrate: bool = True,
     current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
@@ -535,6 +595,8 @@ async def ai_roi(
     ai/roi/savings.py's docstring for why they must never be summed.
     """
     restaurant = get_or_create_restaurant(db, current_user)
+    if narrate:
+        check_spend_cap(current_user, db)
 
     from ai.roi.savings import get_roi_savings
     data = await run_in_threadpool(_safe_run, "roi_savings", restaurant.id, get_roi_savings, db, restaurant.id)
@@ -550,7 +612,9 @@ async def ai_roi(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/marketing")
+@limiter.limit("20/minute")
 async def ai_marketing(
+    request: Request,
     narrate: bool = True,
     current_user: models.User = Depends(require_staff_role(*_MARKETING_WRITE)),
     db: Session = Depends(get_db),
@@ -562,6 +626,8 @@ async def ai_marketing(
     see the POST routes below, which the owner triggers explicitly.
     """
     restaurant = get_or_create_restaurant(db, current_user)
+    if narrate:
+        check_spend_cap(current_user, db)
 
     from ai.marketing import get_marketing_insights
     data = await run_in_threadpool(_safe_run, "marketing", restaurant.id, get_marketing_insights, db, restaurant.id)
@@ -594,7 +660,9 @@ def _background_send(fn, *args) -> None:
 
 
 @router.post("/marketing/promo")
+@limiter.limit("30/minute")
 async def ai_marketing_promo(
+    request: Request,
     body: schemas.MarketingPromoBody,
     current_user: models.User = Depends(require_staff_role(*_MARKETING_WRITE)),
     db: Session = Depends(get_db),
@@ -625,7 +693,9 @@ async def ai_marketing_promo(
 
 
 @router.post("/marketing/winback")
+@limiter.limit("30/minute")
 async def ai_marketing_winback(
+    request: Request,
     current_user: models.User = Depends(require_staff_role(*_MARKETING_WRITE)),
     db: Session = Depends(get_db),
 ):
@@ -656,7 +726,9 @@ async def ai_marketing_winback(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.post("/explain")
+@limiter.limit("20/minute")
 async def ai_explain(
+    request: Request,
     body: schemas.ExplainBody,
     current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
@@ -670,6 +742,7 @@ async def ai_explain(
     restaurant = get_or_create_restaurant(db, current_user)
     if not isinstance(body.item, dict):
         return {"available": False, "error": "Provide an 'item' object to explain."}
+    check_spend_cap(current_user, db)
 
     payload = {"item": body.item, "context": body.label}
 
@@ -686,7 +759,9 @@ async def ai_explain(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/data-quality")
+@limiter.limit("60/minute")
 async def ai_data_quality(
+    request: Request,
     current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
@@ -706,7 +781,9 @@ async def ai_data_quality(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/supply-chain")
+@limiter.limit("60/minute")
 async def ai_supply_chain(
+    request: Request,
     current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),
 ):
@@ -722,7 +799,9 @@ async def ai_supply_chain(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/usage")
+@limiter.limit("60/minute")
 async def ai_usage(
+    request: Request,
     days: int = 30,
     current_user: models.User = Depends(require_staff_role(*_AI_READ)),
     db: Session = Depends(get_db),

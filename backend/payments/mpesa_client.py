@@ -83,7 +83,8 @@ def initiate_stk_push(phone_number: str, amount_cents: int, account_reference: s
     {"status": "error", "detail": str} on failure.
     """
     if not CONFIGURED:
-        logger.warning(f"[MPesa] NOT CONFIGURED — would push KES {amount_cents // 100} to {phone_number}")
+        masked_phone = f"***{phone_number[-3:]}" if phone_number and len(phone_number) >= 3 else "***"
+        logger.warning(f"[MPesa] NOT CONFIGURED — would push KES {amount_cents // 100} to {masked_phone}")
         return {"status": "not_configured", "checkout_request_id": None}
 
     amount_shillings = max(amount_cents // 100, 1)

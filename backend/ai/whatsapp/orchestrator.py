@@ -84,7 +84,10 @@ def handle_natural_language(db: Session, restaurant_id: int, message: str) -> st
         return "I didn't understand that. Reply HELP to see all commands."
 
     # Redact PII before the owner's free text leaves the process for the LLM.
-    scrubbed = pii_scrub.scrub_for_llm(message)
+    # known_names extends the phone/M-Pesa/PIN patterns to this restaurant's
+    # on-record customer/staff names (audit remediation, Tier 3 item 8).
+    known_names = pii_scrub.known_names_for_restaurant(db, restaurant_id)
+    scrubbed = pii_scrub.scrub_for_llm(message, known_names)
 
     # Short-term memory (Phase 6), flag-gated. When on, prepend the recent
     # owner<->assistant turns so a follow-up ("and last week?") has context.
@@ -140,7 +143,7 @@ def handle_natural_language(db: Session, restaurant_id: int, message: str) -> st
             # BEFORE it's grounded and appended to the next LLM turn. Runs before
             # collect_payload_numbers so money/percent figures still survive for
             # grounding — only phone/code/PIN/ID patterns are stripped.
-            result_text = pii_scrub.scrub_for_llm(result_text)
+            result_text = pii_scrub.scrub_for_llm(result_text, known_names)
             grounded_numbers |= grounding.collect_payload_numbers(result_text)
             tool_results.append({
                 "type": "tool_result",

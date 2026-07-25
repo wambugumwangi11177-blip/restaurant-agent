@@ -308,7 +308,10 @@ def _llm_strategy(db: Session, restaurant_id: int, goal: str, timeframe: str, tr
     if preamble:
         user_msg = preamble + user_msg
 
-    messages = [{"role": "user", "content": pii_scrub.scrub_for_llm(user_msg)}]
+    # known_names extends the phone/M-Pesa/PIN patterns to this restaurant's
+    # on-record customer/staff names (audit remediation, Tier 3 item 8).
+    known_names = pii_scrub.known_names_for_restaurant(db, restaurant_id)
+    messages = [{"role": "user", "content": pii_scrub.scrub_for_llm(user_msg, known_names)}]
 
     trace: list[dict] = []
     grounded_numbers: set = set()
@@ -370,7 +373,7 @@ def _llm_strategy(db: Session, restaurant_id: int, goal: str, timeframe: str, tr
             except Exception as exc:  # noqa: BLE001 — a bad tool call must not kill the run
                 result = {"error": str(exc)}
             result_text = json.dumps(result, default=str)
-            result_text = pii_scrub.scrub_for_llm(result_text)
+            result_text = pii_scrub.scrub_for_llm(result_text, known_names)
             grounded_numbers |= grounding.collect_payload_numbers(result_text)
             trace.append({
                 "tool": block.name,

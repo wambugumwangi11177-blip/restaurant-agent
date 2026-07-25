@@ -65,7 +65,7 @@ or the legal pack.
 | Post-termination | 30 days → permanent deletion | DPA §04 / SLA §08 |
 | Backups | 30 days rolling (Neon) | BCP §04 |
 | Customer PII on erasure | Scrubbed; financial record retained | DPA §03; KRA note |
-| AI-action audit log | **Append-only (no auto-purge today)** — reconcile vs DPA "90-day rolling" | Tech-debt item |
+| AI-action audit log | 90-day rolling — daily purge job (`audit_log_purge`, `backend/main.py`) hard-deletes rows older than 90 days | DPA §04 |
 | Aggregated analytics | Anonymised, indefinite | DPA §04 |
 
 ## 4. Sub-processor register (from LAI-SUB-001)

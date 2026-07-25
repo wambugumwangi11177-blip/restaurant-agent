@@ -1257,6 +1257,40 @@ class AgentAuditLog(Base):
     )
 
 
+class NotificationOutbox(Base):
+    """
+    Durable record of a FAILED event-bus handler delivery (audit remediation,
+    Tier 2 item 5). events/bus.py's emit() previously logged and dropped a
+    failed handler call — a WhatsApp/push notification that failed to send was
+    gone for good, and emit_async()'s fire-and-forget daemon thread lost
+    anything in flight on a process restart. A row here is written only when a
+    handler raises (not on every successful delivery, which stays purely
+    in-process as before); main.py's scheduler retries pending/failed rows
+    every 5 minutes via events.bus.sweep_outbox(), looking the handler back up
+    by (event_type, handler_name) from the live subscription registry.
+
+    Handlers are not guaranteed idempotent — a handler that partially acted
+    before raising (e.g. sent a message, then failed on a follow-up DB write)
+    can double-fire on retry. Documented, accepted tradeoff: at-least-once
+    delivery without a full transactional-outbox rewrite of every handler.
+    """
+    __tablename__ = "notification_outbox"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    event_type    = Column(String, nullable=False)
+    handler_name  = Column(String, nullable=False)
+    payload       = Column(Text, nullable=False)   # JSON
+    status        = Column(String, nullable=False, default="pending")  # pending | failed | delivered | dead
+    attempts      = Column(Integer, nullable=False, default=1)
+    last_error    = Column(Text, nullable=True)
+    created_at    = Column(DateTime, default=utcnow)
+    last_attempt_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_notification_outbox_status_created", "status", "created_at"),
+    )
+
+
 class CustomerConsent(Base):
     """
     Minimal consent record for customer-facing data collection (public order

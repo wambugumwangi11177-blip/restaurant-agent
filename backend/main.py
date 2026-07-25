@@ -225,6 +225,29 @@ def _start_scheduler():
             replace_existing=True,
         )
 
+        # Audit remediation, Tier 2 item 5 — retry failed event-bus deliveries
+        # (see events/bus.py's NotificationOutbox). Same 5-min cadence as
+        # escalation_sweep above, for the same reason: this is the one job in
+        # this scheduler where "someone didn't get notified" degrades with
+        # every extra minute of delay, unlike the once-daily analytics jobs.
+        scheduler.add_job(
+            _run_outbox_sweep_job,
+            IntervalTrigger(minutes=5),
+            id="outbox_sweep",
+            replace_existing=True,
+        )
+
+        # Audit remediation, Tier 2 item 6 — purge AgentAuditLog rows older
+        # than 90 days, closing the gap docs/compliance-matrix.md flagged as
+        # open ("Append-only (no auto-purge today) — reconcile vs DPA
+        # '90-day rolling'"). Once daily, off-peak.
+        scheduler.add_job(
+            _run_audit_log_purge_job,
+            CronTrigger(hour=1, minute=30),  # 04:30 EAT
+            id="audit_log_purge",
+            replace_existing=True,
+        )
+
         scheduler.start()
         logger.info("[OK] Scheduler started (morning briefing: 07:00 EAT)")
     except ImportError:
@@ -380,6 +403,54 @@ def _run_escalation_sweep_job():
             db.close()
     except Exception as exc:
         logger.error(f"[Escalation Sweep] Scheduler job failed: {exc}")
+
+
+def _run_outbox_sweep_job():
+    """Audit remediation, Tier 2 item 5: retry NotificationOutbox rows left
+    behind by a failed events/bus.py handler call. events.bus.sweep_outbox()
+    owns its own DB session (it's called from a bare scheduler tick, not a
+    request), so this wrapper only needs the standard log-don't-crash guard
+    every job in this file uses."""
+    try:
+        from events.bus import sweep_outbox
+        result = sweep_outbox()
+        if result["delivered"] or result["still_failed"] or result["dead"]:
+            logger.info(f"[Outbox Sweep] {result}")
+    except Exception as exc:
+        logger.error(f"[Outbox Sweep] Scheduler job failed: {exc}")
+
+
+def _run_audit_log_purge_job():
+    """Audit remediation, Tier 2 item 6: delete AgentAuditLog rows older than
+    90 days, closing the gap docs/compliance-matrix.md flags as open ("DPA
+    '90-day rolling'" vs "no auto-purge today"). Hard delete, not
+    anonymization — AgentAuditLog's own docstring frames it as an immutable
+    audit trail of AI-driven actions (what changed, why, who approved), not a
+    customer PII store; the 90-day retention line is about not keeping that
+    operational trail forever, unlike Order/Reservation rows (see
+    routers/export.py's erasure path), which stay for tax integrity and are
+    pseudonymized instead of deleted."""
+    try:
+        from database import SessionLocal
+        from time_utils import utcnow
+        from datetime import timedelta
+        import models
+
+        db = SessionLocal()
+        try:
+            cutoff = utcnow() - timedelta(days=90)
+            deleted = (
+                db.query(models.AgentAuditLog)
+                .filter(models.AgentAuditLog.created_at < cutoff)
+                .delete(synchronize_session=False)
+            )
+            db.commit()
+            if deleted:
+                logger.info(f"[Audit Log Purge] Deleted {deleted} row(s) older than 90 days")
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Audit Log Purge] Scheduler job failed: {exc}")
 
 
 def _run_reorder_check_job():

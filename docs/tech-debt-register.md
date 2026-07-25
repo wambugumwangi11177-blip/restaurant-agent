@@ -4,8 +4,8 @@
 |---|---|
 | **Reference** | LAI-DEBT-001 |
 | **Classification** | Internal |
-| **Version** | 1.2 |
-| **Last Updated** | 2026-07-21 |
+| **Version** | 1.3 |
+| **Last Updated** | 2026-07-25 |
 | **Owner** | Engineering (Leviii AI Technologies) |
 | **Contact** | leviiiaikenya@gmail.com |
 
@@ -15,8 +15,6 @@ Tracked, honest list of known gaps. Each links to where it's discussed. Priority
 | ID | Item | Pri | Detail | Source |
 |---|---|---|---|---|
 | D1 | RBAC coverage incomplete | P1 | `require_role` gates admin-sensitive routes; extend to all operational routes so "STAFF = POS/KDS only" is literally true | [threat-model.md](security/threat-model.md) R1; [ADR 0006](adr/0006-rbac-via-require-role-dependency.md) |
-| D2 | Audit-log retention vs DPA wording | P2 | `AgentAuditLog` is append-only with no purge; DPA §04 says "90-day rolling" — implement purge or reconcile wording | [compliance-matrix.md](compliance-matrix.md) §3; redline R-06 |
-| D3 | Request schemas allow extra fields | P2 | Add `extra="forbid"` to make "strict validation" literal | [control-evidence-matrix.md](trust/control-evidence-matrix.md) §3 |
 | D4 | Multi-restaurant tenant scoping | P2 | `get_or_create_restaurant` returns the first restaurant; add explicit selection for multi-restaurant tenants | [ADR 0004](adr/0004-query-layer-tenant-isolation.md) |
 | D5 | Coverage floor not gated | P3 | Set `--cov-fail-under` once baseline coverage characterised | [engineering-standards.md](engineering-standards.md) §2 |
 | D6 | Branch protection unverified | P2 | Confirm/enable required-PR + required-CI on `master` in GitHub settings | [engineering-standards.md](engineering-standards.md) §1 |
@@ -40,3 +38,4 @@ Tracked, honest list of known gaps. Each links to where it's discussed. Priority
 | 1.0 | 2026-07-11 | Engineering | Initial register consolidated from all trust docs |
 | 1.1 | 2026-07-21 | Engineering | Added D14/D15 — two live-reproduced strategist-agent bugs (empty-output turn exhaustion; notification deep-link to the wrong page) found during multi-role staff + AI reasoning layer testing on the Lavy showcase data |
 | 1.2 | 2026-07-21 | Engineering | D14 and D15 fixed and verified (45 tests + one live re-run — see CHANGELOG.md), removed from the open list. Renumbered the remaining, distinct product gap D15 surfaced (no Manager strategy UI, no review history) as D16 |
+| 1.3 | 2026-07-25 | Engineering | D2 fixed and verified: daily `audit_log_purge` job now hard-deletes `AgentAuditLog` rows older than 90 days (`backend/main.py`), reconciling code with DPA §04. D3 found already resolved on inspection — `backend/schemas.py`'s `StrictModel` base has set `extra="forbid"` on all ~80 request/response schemas since before this register entry was written; the item was stale, not open. Both removed from the open list. |

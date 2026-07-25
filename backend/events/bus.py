@@ -223,7 +223,10 @@ def emit(event_type: EventType | str, payload: dict) -> None:
 
     We run handlers in a try/except so one bad handler doesn't break
     the emitting code path (e.g., a stock alert failure doesn't
-    prevent an order from being saved).
+    prevent an order from being saved). A handler that raises is
+    additionally persisted to NotificationOutbox (audit remediation, Tier 2
+    item 5) so main.py's scheduled sweep can retry it — a successful call
+    stays purely in-process as before, nothing is written for the common case.
     """
     key = event_type.value if isinstance(event_type, EventType) else event_type
     with _lock:
@@ -234,6 +237,7 @@ def emit(event_type: EventType | str, payload: dict) -> None:
             handler(payload)
         except Exception as exc:
             logger.error(f"[EventBus] Handler {handler.__name__} failed for {key}: {exc}")
+            _record_failed_delivery(key, handler.__name__, payload, str(exc))
 
 
 def emit_async(event_type: EventType | str, payload: dict) -> None:
@@ -255,3 +259,113 @@ def list_subscriptions() -> dict:
     """Returns a summary of all registered handlers by event type."""
     with _lock:
         return {k: [h.__name__ for h in v] for k, v in _handlers.items()}
+
+
+# ── Notification Outbox (audit remediation, Tier 2 item 5) ────────────────────
+# Local imports throughout this section, matching this module's existing
+# zero-project-imports-at-top-level convention (many ai/* modules import
+# events.bus; importing models/database at module scope here risks a circular
+# import at process startup).
+
+def _handler_by_name(event_key: str, handler_name: str):
+    """Look a handler back up by name from the live subscription registry —
+    used by sweep_outbox() to retry a specific failed handler, not every
+    handler subscribed to the event (the others already succeeded)."""
+    with _lock:
+        handlers = list(_handlers.get(event_key, []))
+    for h in handlers:
+        if h.__name__ == handler_name:
+            return h
+    return None
+
+
+def _record_failed_delivery(event_key: str, handler_name: str, payload: dict, error: str) -> None:
+    """Persist one failed handler call. Uses its own short-lived session,
+    independent of whatever transaction the emitting caller is in — emit()
+    has no db parameter today and is called from ~40 sites across the
+    codebase, so threading a session through every call site was out of
+    scope for this fix; the outbox write is therefore not atomic with the
+    triggering business write, an accepted tradeoff (see models.py's
+    NotificationOutbox docstring). Swallows its own failures — a DB hiccup
+    while persisting the failure record must never raise back into emit()'s
+    caller, which is the one invariant this whole module exists to protect."""
+    try:
+        import json
+        from database import SessionLocal
+        import models
+
+        db = SessionLocal()
+        try:
+            db.add(models.NotificationOutbox(
+                event_type=event_key,
+                handler_name=handler_name,
+                payload=json.dumps(payload, default=str),
+                status="pending",
+                attempts=1,
+                last_error=error[:2000],
+            ))
+            db.commit()
+        finally:
+            db.close()
+    except Exception:
+        logger.exception(f"[EventBus] Failed to persist outbox row for {event_key}/{handler_name}")
+
+
+def sweep_outbox(max_attempts: int = 5, batch_size: int = 200) -> dict:
+    """
+    Retry pending/failed NotificationOutbox rows, oldest first. Called by
+    main.py's `outbox_sweep` scheduled job every 5 minutes — not invoked
+    automatically by anything in this module.
+
+    A row whose handler is no longer registered (e.g. after a redeploy
+    renamed/removed it) or that has exceeded max_attempts is marked "dead"
+    rather than retried forever. Commits per-row so a crash mid-sweep loses
+    at most the in-flight row's progress, not the whole batch.
+    """
+    import json
+    from database import SessionLocal
+    import models
+    from time_utils import utcnow
+
+    db = SessionLocal()
+    delivered = still_failed = dead = 0
+    try:
+        rows = (
+            db.query(models.NotificationOutbox)
+            .filter(models.NotificationOutbox.status.in_(["pending", "failed"]))
+            .order_by(models.NotificationOutbox.created_at.asc())
+            .limit(batch_size)
+            .all()
+        )
+        for row in rows:
+            row.attempts += 1
+            row.last_attempt_at = utcnow()
+
+            if row.attempts > max_attempts:
+                row.status = "dead"
+                row.last_error = (row.last_error or "") + " | exceeded max_attempts"
+                dead += 1
+                db.commit()
+                continue
+
+            handler = _handler_by_name(row.event_type, row.handler_name)
+            if handler is None:
+                row.status = "dead"
+                row.last_error = "handler no longer registered"
+                dead += 1
+                db.commit()
+                continue
+
+            try:
+                handler(json.loads(row.payload))
+                row.status = "delivered"
+                delivered += 1
+            except Exception as exc:
+                row.status = "failed"
+                row.last_error = str(exc)[:2000]
+                still_failed += 1
+            db.commit()
+    finally:
+        db.close()
+
+    return {"delivered": delivered, "still_failed": still_failed, "dead": dead}

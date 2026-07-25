@@ -348,6 +348,20 @@ class StaffMemberOut(StrictModel):
 class StaffRoleAssign(StrictModel):
     staff_role: str   # one of StaffRole's values
 
+# ──────────────────────────────────────────────
+# RESTAURANTS — audit remediation, Tier 5 item 11 (multi-restaurant switcher)
+# ──────────────────────────────────────────────
+class RestaurantOut(StrictModel):
+    id: int
+    name: str
+    address: Optional[str] = None
+    is_active: bool   # True for whichever one get_restaurant_or_none would resolve to right now
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+class RestaurantSelectBody(StrictModel):
+    restaurant_id: int
+
 
 # ──────────────────────────────────────────────
 # ATTENDANCE — clock in/out (+ optional GPS), migration 037

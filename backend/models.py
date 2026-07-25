@@ -137,6 +137,17 @@ class User(Base):
     # (directive: don't lock out staff invited without email access to their
     # own inbox at signup time).
     is_email_verified = Column(Boolean, default=False, nullable=False)
+    # Which of the tenant's restaurants this user is currently viewing (audit
+    # remediation, Tier 5 item 11 — multi-restaurant switcher). NULL for the
+    # overwhelming majority of tenants (single restaurant, nothing to pick)
+    # and is the correct default even for a chain until the owner explicitly
+    # switches — deps.py's get_or_create_restaurant falls back to the
+    # tenant's first restaurant when this is unset or points at a restaurant
+    # outside the user's own tenant, exactly matching pre-existing behavior.
+    # No ondelete cascade: if the selected restaurant is ever removed, the
+    # user simply falls back to that same default next request rather than
+    # erroring — see deps.py.
+    active_restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=True)
 
     tenant = relationship("Tenant", back_populates="users")
 

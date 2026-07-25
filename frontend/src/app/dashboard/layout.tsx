@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import NotificationBell from "@/components/NotificationBell";
+import RestaurantSwitcher from "@/components/RestaurantSwitcher";
 import AttendanceWidget from "@/components/staff/AttendanceWidget";
 import VerifyEmailBanner from "@/components/VerifyEmailBanner";
 import { tierHome, StaffTier } from "@/lib/permissions";
@@ -186,6 +187,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         {sidebarOpen ? <X className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
                     </button>
                     <div className="flex items-center gap-4">
+                        <RestaurantSwitcher />
                         <AttendanceWidget />
                         <NotificationBell />
                         <div className="text-xs text-[#525252]">{user.role}</div>

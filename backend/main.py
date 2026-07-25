@@ -16,7 +16,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from logging_config import configure_logging
-from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support, tables, attendance, fraud, cash_reconciliation
+from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support, tables, attendance, fraud, cash_reconciliation, restaurants
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
@@ -596,6 +596,7 @@ _VERSIONED_ROUTERS = [
     billing.router, enterprise.router, staff.router, stock_custody.router,
     suppliers.router, purchase_orders.router, notifications.router, support.router,
     tables.router, attendance.router, fraud.router, cash_reconciliation.router,
+    restaurants.router,
 ]
 
 app.include_router(auth.router)

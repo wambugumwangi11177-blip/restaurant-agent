@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime, date, time
 
@@ -67,7 +67,7 @@ class MenuItem(MenuItemBase):
 # ──────────────────────────────────────────────
 class OrderItemCreate(StrictModel):
     menu_item_id: int
-    quantity: int = 1
+    quantity: int = Field(default=1, gt=0)
 
 class OrderCreate(StrictModel):
     items: List[OrderItemCreate]
@@ -145,7 +145,7 @@ class InventoryItemOut(StrictModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 class StockReceive(StrictModel):
-    quantity: float
+    quantity: float = Field(gt=0)
     cost_per_unit: Optional[float] = None
     supplier: str = ""
 
@@ -160,10 +160,10 @@ class ReservationCreate(StrictModel):
     customer_name: str
     customer_phone: str = ""
     customer_email: str = ""
-    party_size: int = 2
+    party_size: int = Field(default=2, gt=0)
     reservation_date: date
     reservation_time: time
-    duration_minutes: int = 90
+    duration_minutes: int = Field(default=90, gt=0)
     table_id: Optional[int] = None
     deposit_paid: bool = False
     notes: str = ""

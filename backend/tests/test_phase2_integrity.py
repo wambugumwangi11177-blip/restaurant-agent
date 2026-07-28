@@ -83,3 +83,58 @@ def test_same_table_number_allowed_across_restaurants(db_session):
     db_session.add(models.Table(restaurant_id=r1.id, table_number=1))
     db_session.add(models.Table(restaurant_id=r2.id, table_number=1))
     db_session.commit()  # unique is (restaurant_id, table_number), not table_number alone
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HTTP-level validation (Field(gt=0) on schemas.py) — catches bad input as a
+# clean 422 at the API boundary, before it ever reaches the DB-level CHECK
+# constraints exercised above. Same invariants, different layer.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_order_item_zero_quantity_is_rejected_as_422(client, db_session):
+    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x")
+    item = models.MenuItem(id=1, restaurant_id=1, name="Burger", price=50000, is_available=True)
+    db_session.add_all([r, item])
+    db_session.commit()
+
+    resp = client.post("/orders/public?restaurant_id=1", json={
+        "items": [{"menu_item_id": 1, "quantity": 0}],
+        "payment_method": "cash",
+    })
+    assert resp.status_code == 422
+
+
+def test_order_item_negative_quantity_is_rejected_as_422(client, db_session):
+    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x")
+    item = models.MenuItem(id=1, restaurant_id=1, name="Burger", price=50000, is_available=True)
+    db_session.add_all([r, item])
+    db_session.commit()
+
+    resp = client.post("/orders/public?restaurant_id=1", json={
+        "items": [{"menu_item_id": 1, "quantity": -1}],
+        "payment_method": "cash",
+    })
+    assert resp.status_code == 422
+
+
+def test_reservation_zero_party_size_is_rejected_as_422(client, db_session):
+    import auth
+    tenant = models.Tenant(name="T2")
+    db_session.add(tenant)
+    db_session.commit()
+    user = models.User(
+        tenant_id=tenant.id, email="owner_422@example.com",
+        hashed_password=auth.get_password_hash("x"), role=models.Role.ADMIN,
+    )
+    restaurant = models.Restaurant(tenant_id=tenant.id, name="R2", address="x")
+    db_session.add_all([user, restaurant])
+    db_session.commit()
+    token = auth.create_access_token({"sub": user.email})
+
+    resp = client.post("/reservations/", json={
+        "customer_name": "Test Customer",
+        "party_size": 0,
+        "reservation_date": str(date(2026, 8, 1)),
+        "reservation_time": "19:00:00",
+    }, headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 422

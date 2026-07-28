@@ -20,14 +20,29 @@ from sqlalchemy import func
 from datetime import timedelta
 import models
 from ai import menu_engineer, revenue_forecaster, kds_intelligence, inventory_predictor, reservation_optimizer
+from ai import cache
 from time_utils import utcnow
+
+# Dashboard tolerates slight staleness in exchange for not recomputing this
+# whole aggregation (5 sub-module calls + several queries) on every request —
+# see ai/cache.py's docstring for why an in-process cache is the correct fit
+# for this deployment's single-worker constraint.
+_DASHBOARD_CACHE_TTL_S = 60
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
 def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
-    """Complete AI Operations Manager dashboard — exhaustive."""
+    """Complete AI Operations Manager dashboard — exhaustive. Cached per-restaurant."""
+    return cache.cached(
+        f"ops_dashboard:{restaurant_id}",
+        _DASHBOARD_CACHE_TTL_S,
+        lambda: _get_operations_dashboard_impl(db, restaurant_id),
+    )
+
+
+def _get_operations_dashboard_impl(db: Session, restaurant_id: int) -> dict:
     # "Today" for the snapshot = the most recent day the restaurant actually
     # had orders, not wall-clock UTC. For a live restaurant that IS today; for
     # data that doesn't reach the current wall-clock day (historical/imported,

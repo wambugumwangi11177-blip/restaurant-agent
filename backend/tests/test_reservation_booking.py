@@ -310,3 +310,28 @@ def test_migration_009_is_idempotent_when_constraint_exists(monkeypatch):
     module.upgrade()
 
     assert not any("EXCLUDE USING gist" in s for s in statements)
+
+
+def test_reservations_list_pagination_limits_and_offsets(client, db_session):
+    """GET /reservations/ used to hardcode .limit(200) with no offset."""
+    restaurant, token = _make_tenant_with_user_and_restaurant(db_session, "resv-pg")
+
+    for i in range(55):
+        db_session.add(models.Reservation(
+            restaurant_id=restaurant.id, customer_name=f"Guest {i}", party_size=2,
+            reservation_date=date(2026, 8, 1), reservation_time=time(12 + (i % 10), 0),
+        ))
+    db_session.commit()
+
+    default_page = client.get("/reservations/", headers=_auth_headers(token))
+    assert default_page.status_code == 200
+    assert len(default_page.json()) == 50
+
+    capped = client.get("/reservations/?limit=10", headers=_auth_headers(token))
+    assert len(capped.json()) == 10
+
+    first_page = client.get("/reservations/?limit=10&skip=0", headers=_auth_headers(token))
+    second_page = client.get("/reservations/?limit=10&skip=10", headers=_auth_headers(token))
+    first_ids = {r["id"] for r in first_page.json()}
+    second_ids = {r["id"] for r in second_page.json()}
+    assert first_ids.isdisjoint(second_ids)

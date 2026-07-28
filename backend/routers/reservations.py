@@ -17,6 +17,8 @@ router = APIRouter(prefix="/reservations", tags=["reservations"])
 @router.get("/", response_model=List[schemas.ReservationOut])
 async def get_reservations(
     date_filter: Optional[date] = Query(None, alias="date"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
@@ -30,7 +32,7 @@ async def get_reservations(
     reservations = q.order_by(
         models.Reservation.reservation_date.desc(),
         models.Reservation.reservation_time.asc(),
-    ).limit(200).all()
+    ).offset(skip).limit(limit).all()
 
     return [_res_to_dict(r) for r in reservations]
 

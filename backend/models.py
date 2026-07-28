@@ -122,7 +122,7 @@ class Table(Base):
     """Physical tables in the restaurant — required for reservation intelligence."""
     __tablename__ = "tables"
     id = Column(Integer, primary_key=True, index=True)
-    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), index=True, nullable=False)
     table_number = Column(Integer)
     capacity = Column(Integer, default=4)
     status = Column(SqEnum(TableStatus), default=TableStatus.AVAILABLE)
@@ -141,7 +141,7 @@ class Table(Base):
 class MenuItem(Base):
     __tablename__ = "menu_items"
     id = Column(Integer, primary_key=True, index=True)
-    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), index=True, nullable=False)
     name = Column(String)
     description = Column(Text, default="")
     price = Column(Integer)           # Sale price in cents
@@ -166,7 +166,7 @@ class MenuItem(Base):
 class Order(Base):
     __tablename__ = "orders"
     id = Column(Integer, primary_key=True, index=True)
-    restaurant_id = Column(Integer, ForeignKey("restaurants.id"))
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
     status = Column(SqEnum(OrderStatus), default=OrderStatus.PENDING)
     order_type = Column(SqEnum(OrderType), default=OrderType.DINE_IN)
     delivery_channel = Column(SqEnum(DeliveryChannel), default=DeliveryChannel.WALK_IN)
@@ -235,7 +235,7 @@ class PrepTime(Base):
 class InventoryItem(Base):
     __tablename__ = "inventory_items"
     id = Column(Integer, primary_key=True, index=True)
-    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), index=True, nullable=False)
     item_name = Column(String)
     quantity = Column(Float, default=0)
     unit = Column(String)
@@ -270,7 +270,7 @@ class Reservation(Base):
     """Reservation system — powers no-show prediction and revenue-per-seat optimization."""
     __tablename__ = "reservations"
     id = Column(Integer, primary_key=True, index=True)
-    restaurant_id = Column(Integer, ForeignKey("restaurants.id"))
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
     table_id = Column(Integer, ForeignKey("tables.id"), nullable=True, index=True)
     customer_name = Column(String)
     customer_phone = Column(String, default="")

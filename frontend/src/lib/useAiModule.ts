@@ -38,3 +38,39 @@ export function useAiModule<T>(endpoint: string) {
 
     return { data, loading, error, retry: fetchData };
 }
+
+/**
+ * Sibling to useAiModule for plain (non-AI) CRUD list/detail fetches — /orders/,
+ * /menu/, /reservations/, etc. Same loading/error/retry contract, minus the
+ * `available===false` special-case those AI endpoints use (plain resources
+ * don't have that convention). `fallback` is what `data` holds before the
+ * first successful fetch and on error, so callers can keep rendering a list
+ * (e.g. `[]`) without null-checking everywhere.
+ *
+ * Replaces the previous per-page pattern of raw useState/useEffect +
+ * `.catch(() => ({ data: [] }))`, which silently rendered a failed fetch
+ * identically to "genuinely zero records" — the failure was invisible.
+ */
+export function useResource<T>(endpoint: string, fallback: T) {
+    const [data, setData] = useState<T>(fallback);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    const fetchData = async () => {
+        setLoading(true);
+        setError("");
+        try {
+            const res = await api.get(endpoint);
+            setData(res.data);
+        } catch (e: any) {
+            setError(e?.response?.data?.detail || e?.message || "Could not load this");
+            setData(fallback);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchData(); }, [endpoint]);
+
+    return { data, loading, error, retry: fetchData };
+}

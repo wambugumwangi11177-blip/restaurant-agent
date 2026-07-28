@@ -1,25 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import api from "@/lib/api";
+import { useAiModule, useResource } from "@/lib/useAiModule";
 import { motion } from "framer-motion";
-import { CalendarDays, DollarSign } from "lucide-react";
+import { CalendarDays, DollarSign, AlertTriangle } from "lucide-react";
 
 export default function ReservationsPage() {
-    const [reservations, setReservations] = useState<any[]>([]);
-    const [aiData, setAiData] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        Promise.all([
-            api.get("/reservations/").catch(() => ({ data: [] })),
-            api.get("/ai/reservation-insights").catch(() => ({ data: null })),
-        ]).then(([resRes, aiRes]) => {
-            setReservations(Array.isArray(resRes.data) ? resRes.data : []);
-            setAiData(aiRes.data);
-            setLoading(false);
-        });
-    }, []);
+    const { data: reservations, loading: resLoading, error: resError, retry: retryRes } =
+        useResource<any[]>("/reservations/", []);
+    const { data: aiData, loading: aiLoading } = useAiModule<any>("/ai/reservation-insights");
+    const loading = resLoading || aiLoading;
 
     if (loading) {
         return (
@@ -27,6 +16,22 @@ export default function ReservationsPage() {
                 {[...Array(4)].map((_, i) => (
                     <div key={i} className="bg-[#141414] rounded-xl h-16 animate-pulse" />
                 ))}
+            </div>
+        );
+    }
+
+    if (resError) {
+        return (
+            <div className="bg-[#141414] border border-[#262626] rounded-xl px-5 py-10 text-center">
+                <AlertTriangle className="w-8 h-8 text-[#ef4444] mx-auto mb-3" />
+                <p className="text-sm text-[#e5e5e5] mb-1">Couldn&apos;t load bookings</p>
+                <p className="text-xs text-[#525252] mb-4">{resError}</p>
+                <button
+                    onClick={retryRes}
+                    className="px-3 py-1.5 text-xs rounded-lg bg-[#1a1a1a] border border-[#262626] text-[#e5e5e5] hover:bg-[#262626] transition-colors"
+                >
+                    Retry
+                </button>
             </div>
         );
     }

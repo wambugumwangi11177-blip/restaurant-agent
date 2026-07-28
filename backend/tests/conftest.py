@@ -44,6 +44,13 @@ Two hazards specific to this codebase, handled explicitly below:
    touched it. A later test that monkeypatches those env vars would still get
    the stale client. Reset to None so the next call rebuilds it under that
    test's environment.
+
+7. `ai/cache._store` (the TTL cache in front of ops_manager/revenue_forecaster)
+   is keyed by restaurant_id alone, not by DB identity — and restaurant_id=1 is
+   reused across many unrelated test functions, each with its own fresh SQLite
+   file. Without clearing it, a later test can be served an earlier test's
+   cached dashboard/forecast instead of computing against its own data. Cleared
+   per test, same treatment as narrator._cache above.
 """
 
 import importlib
@@ -91,6 +98,11 @@ def db_env(tmp_path, monkeypatch):
     try:
         import ai.llm_client as llm_client
         llm_client._client = None
+    except Exception:
+        pass
+    try:
+        from ai import cache as ai_cache
+        ai_cache.clear()
     except Exception:
         pass
 

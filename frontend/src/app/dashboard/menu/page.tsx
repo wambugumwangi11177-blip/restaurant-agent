@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import api from "@/lib/api";
+import { useAiModule, useResource } from "@/lib/useAiModule";
 import { motion } from "framer-motion";
-import { UtensilsCrossed, Plus, X, Loader2, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { UtensilsCrossed, Plus, X, Loader2, TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
 
 interface MenuItem {
     id: number;
@@ -15,26 +16,16 @@ interface MenuItem {
 }
 
 export default function MenuPage() {
-    const [items, setItems] = useState<MenuItem[]>([]);
-    const [aiData, setAiData] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const { data: items, loading: itemsLoading, error: itemsError, retry: retryItems } =
+        useResource<MenuItem[]>("/menu/", []);
+    const { data: aiData, loading: aiLoading } = useAiModule<any>("/ai/menu-engineering");
+    const loading = itemsLoading || aiLoading;
     const [showForm, setShowForm] = useState(false);
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({ name: "", price: "", category: "", description: "" });
 
-    useEffect(() => {
-        Promise.all([
-            api.get("/menu/").catch(() => ({ data: [] })),
-            api.get("/ai/menu-engineering").catch(() => ({ data: null })),
-        ]).then(([menuRes, aiRes]) => {
-            setItems(menuRes.data || []);
-            setAiData(aiRes.data);
-            setLoading(false);
-        });
-    }, []);
-
     const fetchMenu = () => {
-        api.get("/menu/").then((r) => setItems(r.data)).catch(() => { });
+        retryItems();
     };
 
     const handleAdd = async (e: React.FormEvent) => {
@@ -93,6 +84,22 @@ export default function MenuPage() {
                 {[...Array(4)].map((_, i) => (
                     <div key={i} className="bg-[#141414] rounded-xl h-16 animate-pulse" />
                 ))}
+            </div>
+        );
+    }
+
+    if (itemsError) {
+        return (
+            <div className="bg-[#141414] border border-[#262626] rounded-xl px-5 py-10 text-center">
+                <AlertTriangle className="w-8 h-8 text-[#ef4444] mx-auto mb-3" />
+                <p className="text-sm text-[#e5e5e5] mb-1">Couldn&apos;t load your menu</p>
+                <p className="text-xs text-[#525252] mb-4">{itemsError}</p>
+                <button
+                    onClick={retryItems}
+                    className="px-3 py-1.5 text-xs rounded-lg bg-[#1a1a1a] border border-[#262626] text-[#e5e5e5] hover:bg-[#262626] transition-colors"
+                >
+                    Retry
+                </button>
             </div>
         );
     }

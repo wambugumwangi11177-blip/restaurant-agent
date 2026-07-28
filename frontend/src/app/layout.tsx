@@ -39,17 +39,8 @@ export default function RootLayout({
       </head>
       <body className={`${outfit.variable} font-sans antialiased bg-[#0a0a0a] text-[#e5e5e5]`}>
         <Providers>{children}</Providers>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                  navigator.serviceWorker.register('/sw.js').catch(() => {});
-                });
-              }
-            `,
-          }}
-        />
+        {/* Static file, not inline -- lets the CSP drop 'unsafe-inline' from script-src. */}
+        <script src="/register-sw.js" defer />
       </body>
     </html>
   );

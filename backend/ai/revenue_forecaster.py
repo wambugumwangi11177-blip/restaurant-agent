@@ -25,14 +25,27 @@ from datetime import timedelta
 import math
 import models
 from ai.analysis_clock import analysis_anchor
+from ai import cache
 from time_utils import utcnow
+
+# See ai/cache.py's docstring for why an in-process, per-restaurant TTL cache
+# is the correct fit for this deployment (single gunicorn worker, no Redis).
+_FORECAST_CACHE_TTL_S = 120
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
 def get_revenue_forecast(db: Session, restaurant_id: int) -> dict:
-    """Exhaustive revenue intelligence."""
+    """Exhaustive revenue intelligence. Cached per-restaurant."""
+    return cache.cached(
+        f"revenue_forecast:{restaurant_id}",
+        _FORECAST_CACHE_TTL_S,
+        lambda: _get_revenue_forecast_impl(db, restaurant_id),
+    )
+
+
+def _get_revenue_forecast_impl(db: Session, restaurant_id: int) -> dict:
     # Anchored to the restaurant's most recent order, not wall-clock time —
     # see ai/analysis_clock.py. Historical/imported data that doesn't extend
     # to today would otherwise make this "last 30 days" window empty.

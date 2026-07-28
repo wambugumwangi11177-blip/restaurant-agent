@@ -259,8 +259,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Explicit set matching what the frontend actually sends/needs (frontend/src/lib/api.ts
+    # sends only Content-Type + Authorization) — narrower than "*" now that origins are
+    # already a locked-down allowlist; minimal-by-default rather than wide-open-by-default.
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.add_middleware(TimingMiddleware)

@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import api from "@/lib/api";
+import { useResource } from "@/lib/useAiModule";
 import { demoData, isOrdersEmpty } from "@/lib/demo-data";
 import { motion } from "framer-motion";
 import {
     TrendingUp, Banknote, Smartphone, CreditCard,
-    UtensilsCrossed, ShoppingBag, Truck, Crown,
+    UtensilsCrossed, ShoppingBag, Truck, Crown, AlertTriangle,
 } from "lucide-react";
 
 interface Order {
@@ -22,15 +21,7 @@ interface Order {
 }
 
 export default function SalesPage() {
-    const [orders, setOrders] = useState<Order[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        api.get("/orders/").then((res) => {
-            setOrders(res.data);
-            setLoading(false);
-        }).catch(() => setLoading(false));
-    }, []);
+    const { data: orders, loading, error, retry } = useResource<Order[]>("/orders/", []);
 
     if (loading) {
         return (
@@ -41,6 +32,22 @@ export default function SalesPage() {
                         <div key={i} className="bg-[#141414] rounded-xl h-24 animate-pulse" />
                     ))}
                 </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="bg-[#141414] border border-[#262626] rounded-xl px-5 py-10 text-center">
+                <AlertTriangle className="w-8 h-8 text-[#ef4444] mx-auto mb-3" />
+                <p className="text-sm text-[#e5e5e5] mb-1">Couldn&apos;t load sales</p>
+                <p className="text-xs text-[#525252] mb-4">{error}</p>
+                <button
+                    onClick={retry}
+                    className="px-3 py-1.5 text-xs rounded-lg bg-[#1a1a1a] border border-[#262626] text-[#e5e5e5] hover:bg-[#262626] transition-colors"
+                >
+                    Retry
+                </button>
             </div>
         );
     }

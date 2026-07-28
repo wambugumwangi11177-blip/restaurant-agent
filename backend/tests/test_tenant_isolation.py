@@ -122,3 +122,34 @@ def test_cannot_adjust_another_tenants_inventory(client, db_session):
 
     db_session.refresh(item_b)
     assert item_b.quantity == 100  # untouched
+
+
+def test_orders_list_pagination_limits_and_offsets(client, db_session):
+    """GET /orders/ used to hardcode .limit(200) with no offset — a restaurant
+    with >200 orders had no way to page past the first 200. skip/limit now
+    control the window explicitly."""
+    restaurant, token = _make_tenant_with_user_and_restaurant(db_session, "pg")
+
+    from time_utils import utcnow
+    from datetime import timedelta
+    base = utcnow()
+    for i in range(55):
+        db_session.add(models.Order(
+            restaurant_id=restaurant.id, status=models.OrderStatus.SERVED,
+            payment_method=models.PaymentMethod.CASH, is_paid=True,
+            total=1000, created_at=base - timedelta(minutes=i),
+        ))
+    db_session.commit()
+
+    default_page = client.get("/orders/", headers=_auth_headers(token))
+    assert default_page.status_code == 200
+    assert len(default_page.json()) == 50  # default limit, not all 55
+
+    capped = client.get("/orders/?limit=10", headers=_auth_headers(token))
+    assert len(capped.json()) == 10
+
+    first_page = client.get("/orders/?limit=10&skip=0", headers=_auth_headers(token))
+    second_page = client.get("/orders/?limit=10&skip=10", headers=_auth_headers(token))
+    first_ids = {o["id"] for o in first_page.json()}
+    second_ids = {o["id"] for o in second_page.json()}
+    assert first_ids.isdisjoint(second_ids)  # skip actually moved the window

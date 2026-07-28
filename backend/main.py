@@ -27,13 +27,22 @@ configure_logging()
 logger = logging.getLogger(__name__)
 
 # ── Sentry (optional) ─────────────────────────────────────────────────────────
+# Kept non-fatal: no error reporting is bad, but refusing to serve traffic over
+# it is worse. It is NOT kept silent, though — this used to be a bare
+# `except Exception: pass`, so a bad DSN or a network hiccup would disable all
+# production error reporting with nothing anywhere to say so. Losing your
+# ability to see failures is exactly the failure you most need to see.
 try:
     import sentry_sdk
     sentry_dsn = os.getenv("SENTRY_DSN")
     if sentry_dsn:
         sentry_sdk.init(dsn=sentry_dsn, traces_sample_rate=0.2)
-except Exception:
-    pass
+        logger.info("[OK] Sentry error reporting initialised")
+except Exception as exc:
+    logger.error(
+        "[WARN] Sentry init FAILED — this process has no error reporting: %s",
+        exc, exc_info=True,
+    )
 
 # ── Rate limiting ───────────────────────────────────────────────────────────
 # limiter now lives in rate_limit.py so routers can import it too — see that
@@ -51,6 +60,45 @@ if SLOWAPI_AVAILABLE:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
+# ── Unhandled errors ─────────────────────────────────────────────────────────
+#
+# RateLimitExceeded above was the ONLY registered handler, so anything else that
+# escaped a route got Starlette's default 500: a bare
+# {"detail": "Internal Server Error"} with no correlation id in the body. The id
+# existed — CorrelationIdMiddleware had already minted one and put it in the
+# X-Request-ID response header — but support can't reasonably ask a user to read
+# response headers off a failed request, so in practice a reported failure could
+# not be tied back to its log lines.
+#
+# Two things worth knowing about this handler:
+#
+#   • It reads request.state.request_id, NOT the logging contextvar. This runs
+#     inside ServerErrorMiddleware, which is outside all user middleware, so by
+#     now CorrelationIdMiddleware's `finally` has already reset the contextvar
+#     and it would read "-". See middleware/correlation.py.
+#   • It logs the traceback itself. Returning a response here suppresses the
+#     re-raise that would otherwise have produced uvicorn's traceback, so
+#     without this line a 500 would become LESS visible than before.
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request, exc: Exception):
+    from fastapi.responses import JSONResponse
+
+    request_id = getattr(request.state, "request_id", "-")
+    logger.error(
+        "Unhandled exception on %s %s",
+        request.method, request.url.path,
+        exc_info=exc,
+        extra={"request_id": request_id, "path": request.url.path},
+    )
+    # Deliberately no exception detail in the body — the client gets the id to
+    # quote, the operator gets the traceback in the logs.
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error", "request_id": request_id},
+        headers={"X-Request-ID": request_id},
+    )
+
+
 # ── Startup ───────────────────────────────────────────────────────────────────
 
 @app.on_event("startup")
@@ -60,22 +108,41 @@ def on_startup():
     from startup_checks import enforce_startup_checks
     enforce_startup_checks()
 
-    # 1. Init DB tables
+    from environment import is_production
+
+    # 1. Init DB tables.
+    #    Outside production this stays best-effort (a local dev DB that isn't up
+    #    yet shouldn't stop you working). In production, a database we cannot
+    #    initialise is not a degraded app, it is a broken one — and booting
+    #    anyway means the health check passes while every request fails.
     from database import init_db
     try:
         init_db()
         logger.info("[OK] Database tables initialised")
     except Exception as e:
+        if is_production():
+            logger.error("[FATAL] DB init failed in production: %s", e, exc_info=True)
+            raise
         logger.warning(f"[WARN] DB init deferred: {e}")
 
     # 2. Wire the event bus — THIS WAS MISSING.
     #    Without this call, all orchestrator handlers were registered as
     #    functions but never subscribed to the bus. Events fired into void.
+    #
+    #    That is also why this now re-raises in production rather than warning:
+    #    an empty event bus is a TOTAL, SILENT failure of the orchestration
+    #    layer — no stock alerts, no payment notifications, no audit writes from
+    #    handlers — while the app reports itself healthy. This exact bug shipped
+    #    once already (see the module docstring above); a warning-level log was
+    #    not enough to catch it then.
     try:
         from ai.orchestrator.executive import register_all_handlers
         register_all_handlers()
         logger.info("[OK] Orchestrator event handlers registered")
     except Exception as e:
+        if is_production():
+            logger.error("[FATAL] Orchestrator registration failed in production: %s", e, exc_info=True)
+            raise
         logger.warning(f"[WARN] Orchestrator registration failed: {e}")
 
     # 3. Schedule morning WhatsApp briefing (07:00 EAT = 04:00 UTC)

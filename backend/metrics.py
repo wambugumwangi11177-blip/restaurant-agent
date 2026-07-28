@@ -17,6 +17,7 @@ _lock = threading.Lock()
 _requests_total: dict[tuple[str, str], int] = {}   # (method, status_class) -> count
 _latency_sum = 0.0
 _latency_count = 0
+_degradations_total: dict[str, int] = {}           # component -> count
 
 
 def record_request(method: str, status_code: int, duration_s: float) -> None:
@@ -27,6 +28,21 @@ def record_request(method: str, status_code: int, duration_s: float) -> None:
         _requests_total[key] = _requests_total.get(key, 0) + 1
         _latency_sum += duration_s
         _latency_count += 1
+
+
+def record_degradation(component: str) -> None:
+    """Count one 'optional path failed, we continued without it' event.
+
+    Fed by observability.degraded(). This is the metric that makes silent
+    partial failure visible — e.g. a ROI category throwing and contributing
+    zero to a customer-facing number used to leave no trace anywhere."""
+    with _lock:
+        _degradations_total[component] = _degradations_total.get(component, 0) + 1
+
+
+def _escape_label(value: str) -> str:
+    """Prometheus label values escape backslash, double-quote and newline."""
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
 def render() -> str:
@@ -46,6 +62,13 @@ def render() -> str:
         lines.append("# HELP app_request_latency_seconds_count Number of requests measured.")
         lines.append("# TYPE app_request_latency_seconds_count counter")
         lines.append(f"app_request_latency_seconds_count {_latency_count}")
+
+        lines.append("# HELP app_degradations_total Optional paths that failed and were skipped.")
+        lines.append("# TYPE app_degradations_total counter")
+        for component, count in sorted(_degradations_total.items()):
+            lines.append(
+                f'app_degradations_total{{component="{_escape_label(component)}"}} {count}'
+            )
     return "\n".join(lines) + "\n"
 
 

@@ -32,6 +32,7 @@ from datetime import timedelta
 from collections import defaultdict
 import models
 from ai.analysis_clock import analysis_anchor
+from observability import degraded
 
 # ── Minutes-saved benchmarks ────────────────────────────────────────────────
 # Conservative estimates of the manual-staff-time each automated action
@@ -257,8 +258,8 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
         ).all()
         _add("pricing_pending", "Uncaptured margin in pending pricing recs",
              sum(r.monthly_impact_cents for r in pending_recs))
-    except Exception:  # noqa: BLE001 — ROI must degrade, not crash
-        pass
+    except Exception as exc:  # noqa: BLE001 — ROI must degrade, not crash
+        degraded("roi.pricing_pending", exc, restaurant_id=restaurant_id)
 
     # Profit leaks + portion drift (already in cents).
     try:
@@ -268,8 +269,8 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
              (profit.get("summary") or {}).get("total_leak_amount"))
         _add("portion_drift", "Lost to portion / discount drift",
              sum(d.get("estimated_monthly_leak", 0) for d in (profit.get("portion_drift") or [])))
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        degraded("roi.profit_leaks", exc, restaurant_id=restaurant_id)
 
     # Inventory waste (cost_per_unit is a Float in KES → ×100 to cents).
     try:
@@ -280,8 +281,8 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
             for p in (inv.get("predictions") or [])
         )
         _add("inventory_waste", "Stock lost to waste / spoilage", round(waste_kes * 100))
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        degraded("roi.inventory_waste", exc, restaurant_id=restaurant_id)
 
     # Reservation no-shows + overbooking recovery (already in cents).
     try:
@@ -291,8 +292,8 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
              (res.get("revenue_impact") or {}).get("estimated_revenue_lost"))
         _add("overbooking_recovery", "Recoverable via smarter overbooking",
              (res.get("overbooking") or {}).get("potential_monthly_recovery"))
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        degraded("roi.reservations", exc, restaurant_id=restaurant_id)
 
     # Overtime cost flagged (already in cents).
     try:
@@ -300,8 +301,8 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
         labor = get_labor_intelligence(db, restaurant_id)
         _add("overtime_reduction", "Overtime cost flagged for review",
              (labor.get("summary") or {}).get("overtime_cost_30d"))
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        degraded("roi.overtime", exc, restaurant_id=restaurant_id)
 
     opportunities.sort(key=lambda o: -o["monthly_value_cents"])
 
@@ -323,8 +324,8 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
                 # Total systemic delay the AI has flagged as reclaimable.
                 "reclaimable_delay_minutes": round(sum(b.get("impact_score", 0) for b in bottlenecks), 1),
             }
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        degraded("roi.kitchen_capacity", exc, restaurant_id=restaurant_id)
 
     # ── 5. NET ROI (is the AI worth what it costs?) ──────────────────────────
     # AI cost = this restaurant's LLM token spend over the window, priced by the
@@ -343,8 +344,8 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
             cost_kes_cents(t.llm_model, t.input_tokens or 0, t.output_tokens or 0)
             for t in token_rows
         )
-    except Exception:  # noqa: BLE001 — ROI must degrade, not crash
-        pass
+    except Exception as exc:  # noqa: BLE001 — ROI must degrade, not crash
+        degraded("roi.ai_cost", exc, restaurant_id=restaurant_id)
 
     value_delivered_cents = money_saved_from_time_cents + monthly_impact_cents
     economics = {

@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from .model import Decision  # noqa: F401
 from .ranking import rank, score, impact_stars  # noqa: F401
 from .adapters import collect_decisions  # noqa: F401
+from observability import degraded
 
 
 def get_ranked_decisions(
@@ -37,8 +38,8 @@ def get_ranked_decisions(
     try:
         from ai.plugins import collect_plugin_decisions
         decisions.extend(collect_plugin_decisions(db, restaurant_id))
-    except Exception:  # noqa: BLE001 — a plugin issue never breaks core decisions
-        pass
+    except Exception as exc:  # noqa: BLE001 — a plugin issue never breaks core decisions
+        degraded("decisions.plugins", exc, restaurant_id=restaurant_id)
     if apply_reliability:
         _apply_reliability(db, restaurant_id, decisions)
     ranked = rank(decisions)

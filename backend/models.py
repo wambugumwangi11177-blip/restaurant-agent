@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum as SqEnum, DateTime, Float, Text, Date, Time, Index, UniqueConstraint, CheckConstraint
+from sqlalchemy import Column, Integer, BigInteger, String, Boolean, ForeignKey, Enum as SqEnum, DateTime, Float, Text, Date, Time, Index, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship, declarative_base
 import enum
 from time_utils import utcnow
@@ -89,6 +89,11 @@ class User(Base):
     # users are unaffected until they opt in.
     mfa_secret = Column(String, nullable=True)
     mfa_enabled = Column(Boolean, default=False, nullable=False)
+    # Highest TOTP 30-second step already spent by this user (migration 026).
+    # RFC 6238 §5.2: a code must be accepted at most once. Without this, the
+    # +/-1-step skew window meant a captured code stayed replayable for ~90s.
+    # BigInteger: the step is unix-seconds/30, which outgrows int32 in 2038.
+    mfa_last_used_step = Column(BigInteger, nullable=True)
 
     tenant = relationship("Tenant", back_populates="users")
 

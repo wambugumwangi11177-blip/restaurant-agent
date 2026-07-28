@@ -307,6 +307,8 @@ export default function POSPage() {
                                 <User className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#525252]" />
                                 <input
                                     type="text" placeholder="Name" value={customerName}
+                                    aria-label="Customer name"
+                                    autoComplete="name"
                                     onChange={(e) => setCustomerName(e.target.value)}
                                     className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none"
                                 />
@@ -316,6 +318,8 @@ export default function POSPage() {
                                     <Hash className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#525252]" />
                                     <input
                                         type="text" placeholder="Table #" value={tableNumber}
+                                        aria-label="Table number"
+                                        inputMode="numeric"
                                         onChange={(e) => setTableNumber(e.target.value)}
                                         className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none"
                                     />
@@ -324,7 +328,9 @@ export default function POSPage() {
                                 <div className="relative">
                                     <Smartphone className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#525252]" />
                                     <input
-                                        type="text" placeholder="Phone" value={customerPhone}
+                                        type="tel" placeholder="Phone" value={customerPhone}
+                                        aria-label="Customer phone number"
+                                        autoComplete="tel"
                                         onChange={(e) => setCustomerPhone(e.target.value)}
                                         className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none"
                                     />
@@ -337,6 +343,7 @@ export default function POSPage() {
                             <StickyNote className="absolute left-2 top-2 w-3 h-3 text-[#525252]" />
                             <input
                                 type="text" placeholder="Notes (e.g. no onions, extra spicy)" value={notes}
+                                aria-label="Order notes"
                                 onChange={(e) => setNotes(e.target.value)}
                                 className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none"
                             />

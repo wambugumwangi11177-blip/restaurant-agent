@@ -154,12 +154,18 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
     # count toward brute-force lockout differently — but a wrong code still fails
     # the login. The client resubmits email+password+mfa_code together.
     if user.mfa_enabled:
-        if not login_data.mfa_code or not auth.verify_totp(user.mfa_secret, login_data.mfa_code):
+        step = auth.verify_totp_step(user.mfa_secret, login_data.mfa_code) if login_data.mfa_code else None
+        # Single-use enforcement (RFC 6238 §5.2): a code is burned once spent.
+        # Without this the +/-1-step skew window left a captured code replayable
+        # for ~90s. Same 401 for "wrong code" and "already-used code" — telling
+        # them apart would confirm to an attacker that they hold a real code.
+        if step is None or auth.totp_step_is_replay(user.mfa_last_used_step, step):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="A valid authenticator code is required.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        user.mfa_last_used_step = step
 
     # Successful login — reset the counter and record the login timestamp
     # (staff-activity record referenced in the DPA).
@@ -243,9 +249,11 @@ async def mfa_enable(
     user = db.query(models.User).filter(models.User.id == current_user.id).first()
     if not user.mfa_secret:
         raise HTTPException(status_code=400, detail="Call /mfa/setup first.")
-    if not auth.verify_totp(user.mfa_secret, body.code):
+    step = auth.verify_totp_step(user.mfa_secret, body.code)
+    if step is None or auth.totp_step_is_replay(user.mfa_last_used_step, step):
         raise HTTPException(status_code=400, detail="Invalid code — try again.")
     user.mfa_enabled = True
+    user.mfa_last_used_step = step
     db.commit()
     return {"status": "mfa_enabled"}
 
@@ -261,10 +269,15 @@ async def mfa_disable(
     user = db.query(models.User).filter(models.User.id == current_user.id).first()
     if not user.mfa_enabled:
         raise HTTPException(status_code=400, detail="MFA is not enabled.")
-    if not auth.verify_totp(user.mfa_secret, body.code):
+    step = auth.verify_totp_step(user.mfa_secret, body.code)
+    if step is None or auth.totp_step_is_replay(user.mfa_last_used_step, step):
         raise HTTPException(status_code=400, detail="Invalid code.")
     user.mfa_enabled = False
     user.mfa_secret = None
+    # Keep the spent step recorded even though the secret is cleared: if MFA is
+    # re-enrolled later a fresh secret is generated, and leaving a stale low
+    # value here would let an old code from this window be spent again.
+    user.mfa_last_used_step = step
     db.commit()
     return {"status": "mfa_disabled"}
 

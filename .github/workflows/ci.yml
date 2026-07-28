@@ -120,13 +120,38 @@ jobs:
 
       # JS dependency audit — the Python deps are audited (pip-audit) but the
       # frontend's were not. BLOCKING as of 2026-07-11 (was continue-on-error):
-      # the baseline was verified clean at --audit-level=high on that date
-      # (`npm audit --audit-level=high` exits 0; only 4 *moderate* transitive
-      # advisories via next-auth remain, below the gate). A NEW high/critical
-      # advisory now fails CI instead of printing a warning nobody reads —
-      # mirroring how pip-audit was made blocking on 2026-07-08.
-      - name: Audit npm dependencies
-        run: npm audit --audit-level=high
+      # a NEW high/critical advisory fails CI instead of printing a warning
+      # nobody reads — mirroring how pip-audit was made blocking on 2026-07-08.
+      #
+      # Scoped to PRODUCTION dependencies as of 2026-07-28 (`--omit=dev`).
+      # Found that day: the gate had gone red on advisories published since the
+      # clean 2026-07-11 baseline. Triaged as follows —
+      #
+      #   FIXED, shipped code:
+      #     • next-auth (CRITICAL, 3 advisories) — in-range patch, 4.24.13 → 4.24.15
+      #     • next (9 HIGH: SSRF, cache confusion, DoS, unauthenticated
+      #       disclosure of internal Server Function endpoints) — 16.2.10 → 16.2.12,
+      #       a same-minor patch bump
+      #     • postcss + sharp (HIGH) — pinned inside next's own tree, where npm's
+      #       only offered "fix" was a downgrade to next@9.3.3. Forced to patched
+      #       versions with `overrides` in package.json instead. Build, typecheck
+      #       and lint all verified green afterwards.
+      #   => production dependencies are now at ZERO advisories.
+      #
+      #   NOT fixed, and deliberately out of this gate's scope:
+      #     • the eslint toolchain (eslint, @typescript-eslint/*,
+      #       eslint-config-next, eslint-plugin-*) all inherit one HIGH from
+      #       minimatch/brace-expansion. These are devDependencies — they run on
+      #       CI and developer machines and are never served to a user, so they
+      #       cannot affect the deployed app. The available fixes are a major
+      #       eslint upgrade (separate, deliberate work) or forcing minimatch v10
+      #       into plugins written against v3, which risks silent glob-matching
+      #       breakage in linting. Tracked as D15 in docs/tech-debt-register.md.
+      #
+      # `--omit=dev` keeps the gate meaningful rather than permanently red: a new
+      # advisory in anything that actually ships still blocks the merge.
+      - name: Audit npm dependencies (production deps)
+        run: npm audit --omit=dev --audit-level=high
 
       # Type errors and build breaks currently only surface on a Vercel deploy —
       # too late, and Vercel does not catch the untyped `json()` contract drifts

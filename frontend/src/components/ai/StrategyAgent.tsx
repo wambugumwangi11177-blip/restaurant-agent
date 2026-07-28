@@ -138,7 +138,8 @@ export function StrategyAgent() {
                         <div>
                             <button
                                 onClick={() => setShowTrace((v) => !v)}
-                                className="flex items-center gap-1 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"
+                                aria-expanded={showTrace}
+                                className="flex items-center gap-1 py-1.5 -my-1.5 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"
                             >
                                 <span>Reasoning trace ({result.trace.length})</span>
                                 <ChevronDown className={`w-3 h-3 transition-transform ${showTrace ? "rotate-180" : ""}`} />

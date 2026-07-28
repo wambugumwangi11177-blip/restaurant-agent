@@ -148,7 +148,12 @@ def test_clean_database_gets_every_constraint_and_index(pg_engine):
 @pytestmark_pg
 def test_downgrade_removes_every_constraint_and_index(pg_engine):
     _run_alembic_upgrade_head(_POSTGRES_TEST_URL)
-    _run_alembic(["downgrade", "-1"], _POSTGRES_TEST_URL)
+    # Downgrade to 025's PARENT by name, not by "-1". A relative step is only
+    # equivalent while 025 happens to be head — migration 026 landing on top
+    # immediately broke that assumption (the -1 reverted 026 and left 025's
+    # constraints in place, failing this test for the wrong reason). Naming the
+    # target keeps this test about 025 no matter what stacks above it later.
+    _run_alembic(["downgrade", "024_add_enterprise_hierarchy"], _POSTGRES_TEST_URL)
 
     with pg_engine.connect() as conn:
         remaining_checks = conn.execute(text(

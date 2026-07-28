@@ -261,7 +261,10 @@ export function HowItWorks({ id }: { id: keyof typeof AI_EXPLAIN | string }) {
         <div className="mt-1">
             <button
                 onClick={() => setOpen((v) => !v)}
-                className="flex items-center gap-1 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"
+                aria-expanded={open}
+                // py-1.5/-my-1.5 lifts the touch target past the 24px WCAG 2.5.8
+                // floor (measured 17px tall) without shifting the layout.
+                className="flex items-center gap-1 py-1.5 -my-1.5 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"
             >
                 <Info className="w-3 h-3" />
                 <span>How this works</span>

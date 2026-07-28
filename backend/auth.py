@@ -87,21 +87,51 @@ def _hotp(key: bytes, counter: int) -> str:
     return str(binary % 1_000_000).zfill(6)
 
 
-def verify_totp(secret_b32: str, code: str, window: int = 1) -> bool:
-    """True if `code` matches the TOTP for `secret_b32` within +/- `window`
-    30-second steps (tolerates minor clock skew)."""
+def verify_totp_step(secret_b32: str, code: str, window: int = 1) -> "int | None":
+    """The matching 30-second TOTP step for `code`, or None if it doesn't match
+    within +/- `window` steps.
+
+    Returning the step (rather than just a bool) is what makes single-use
+    enforcement possible: RFC 6238 §5.2 requires that a code be accepted only
+    once, and you can't enforce that without knowing WHICH step was accepted.
+    See `totp_step_is_replay` and the callers in routers/auth.py.
+    """
     if not secret_b32 or not code:
-        return False
+        return None
     code = str(code).strip()
     if not code.isdigit() or len(code) != 6:
-        return False
+        return None
     try:
         key = base64.b32decode(secret_b32, casefold=True)
     except Exception:
-        return False
-    step = int(_time.time() // 30)
-    return any(hmac.compare_digest(_hotp(key, step + w), code)
-               for w in range(-window, window + 1))
+        return None
+    now_step = int(_time.time() // 30)
+    for w in range(-window, window + 1):
+        candidate = now_step + w
+        if hmac.compare_digest(_hotp(key, candidate), code):
+            return candidate
+    return None
+
+
+def verify_totp(secret_b32: str, code: str, window: int = 1) -> bool:
+    """True if `code` matches the TOTP for `secret_b32` within +/- `window`
+    30-second steps (tolerates minor clock skew).
+
+    NOTE: this alone does NOT prevent replay — with window=1 a captured code
+    stays valid for ~90 seconds. Authentication paths must use
+    `verify_totp_step` + `totp_step_is_replay` so each code is burned after use.
+    """
+    return verify_totp_step(secret_b32, code, window) is not None
+
+
+def totp_step_is_replay(last_used_step, step: int) -> bool:
+    """True if `step` has already been used (or precedes the last used one).
+
+    Rejecting `<=` rather than `==` also closes the backward-skew half of the
+    window: once step N is spent, an attacker replaying an older N-1 code is
+    refused too.
+    """
+    return last_used_step is not None and step <= last_used_step
 
 
 def mfa_provisioning_uri(email: str, secret_b32: str, issuer: str = "RestaurantAgent") -> str:

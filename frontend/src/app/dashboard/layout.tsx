@@ -102,9 +102,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     sidebarOpen ? "translate-x-0" : "-translate-x-full"
                 }`}
             >
-                {/* Brand */}
+                {/* Brand — deliberately NOT an <h1>: each page supplies its own
+                    single <h1> (its title). A brand heading here made every
+                    dashboard page ship two h1s, which breaks the document
+                    outline screen readers navigate by. */}
                 <div className="px-5 py-5 border-b border-[#1a1a1a]">
-                    <h1 className="text-lg font-bold text-[#e5e5e5] tracking-tight">Chakula</h1>
+                    <p className="text-lg font-bold text-[#e5e5e5] tracking-tight">Chakula</p>
                     <p className="text-xs text-[#d4a853] mt-0.5 truncate font-medium">{restaurantName}</p>
                     <p className="text-xs text-[#525252] truncate">{user?.email || "—"}</p>
                 </div>
@@ -156,9 +159,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Main */}
             <main className="flex-1 lg:ml-56 min-h-screen">
                 <header className="sticky top-0 z-30 bg-[#0a0a0a]/90 backdrop-blur-sm border-b border-[#1a1a1a] px-5 py-3 flex items-center justify-between">
+                    {/* Icon-only control: needs an explicit accessible name, and a
+                        min-44px hit area — the bare 20x20 icon was below the 24px
+                        WCAG 2.5.8 floor on a 375px phone, which is exactly where
+                        this button is the only way to open the nav. */}
                     <button
                         onClick={() => setSidebarOpen(!sidebarOpen)}
-                        className="lg:hidden text-[#737373] hover:text-[#e5e5e5]"
+                        aria-label={sidebarOpen ? "Close navigation menu" : "Open navigation menu"}
+                        aria-expanded={sidebarOpen}
+                        className="lg:hidden -m-2 p-2 min-w-11 min-h-11 flex items-center justify-center text-[#737373] hover:text-[#e5e5e5]"
                     >
                         {sidebarOpen ? <X className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
                     </button>

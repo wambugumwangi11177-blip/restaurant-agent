@@ -44,7 +44,9 @@ export function ExplainButton({ item, label }: { item: Record<string, any>; labe
         <button
             onClick={explain}
             disabled={state === "loading"}
-            className="mt-1 flex items-center gap-1 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors disabled:opacity-60"
+            // -my-1.5/py-1.5 expands the touch target past the 24px WCAG 2.5.8
+            // floor (it measured 17px tall) without shifting the visual layout.
+            className="mt-1 -my-1.5 py-1.5 flex items-center gap-1 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors disabled:opacity-60"
         >
             <Info className="w-3 h-3" />
             {state === "loading" ? "Explaining…" : "Explain this to me"}

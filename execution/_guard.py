@@ -28,6 +28,18 @@ import os
 import sys
 from urllib.parse import urlparse
 
+# backend/ is on sys.path by the time these scripts call in (each one inserts it
+# before importing database/auth), but this module can also be imported first —
+# so resolve the environment defensively rather than assuming.
+def _current_env() -> str:
+    try:
+        sys.path.insert(0, os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "backend"))
+        from environment import current_env
+        return current_env()
+    except Exception:
+        return "unknown"
+
 
 def _safe_target() -> str:
     """`DATABASE_URL` with credentials stripped — never print the password."""
@@ -83,5 +95,75 @@ def require_destructive_confirmation(what_it_destroys: str, argv: list[str] | No
     print("", file=sys.stderr)
     print("  Nothing was written. Check the target above is NOT production, then:", file=sys.stderr)
     print(f"      ALLOW_DESTRUCTIVE=1 py execution/{script} --yes", file=sys.stderr)
+    print("=" * 72, file=sys.stderr)
+    sys.exit(1)
+
+
+def require_write_confirmation(what_it_writes: str, argv: list[str] | None = None) -> None:
+    """
+    Lighter gate for scripts that WRITE but do not destroy.
+
+    Nine scripts in `execution/` insert, update, or create schema against
+    whatever `DATABASE_URL` is in `backend/.env` — which, per this module's
+    docstring, is the live Neon Postgres — with no confirmation at all. They
+    aren't destructive enough to deserve the two-factor gate above (nothing is
+    dropped or mass-deleted), but "I didn't realise that would hit production"
+    is just as easy here, and a stray `deploy_schema.py` or `migrate_orders.py`
+    still mutates the live database.
+
+    So this requires ONE affirmation (`--yes`) rather than two, and always shows
+    the resolved target and environment first. The point is not to make the
+    script hard to run; it is to make it impossible to run without having seen
+    which database you are pointing at.
+    """
+    argv = sys.argv if argv is None else argv
+    script = os.path.basename(argv[0]) if argv else "<script>"
+    target = _safe_target()
+    env = _current_env()
+
+    if "--yes" in argv:
+        print("=" * 72)
+        print(f"WRITES DATA: {script}")
+        print(f"  target : {target}")
+        print(f"  env    : {env}")
+        print(f"  effect : {what_it_writes}")
+        print("  confirmed via --yes — proceeding.")
+        print("=" * 72)
+        return
+
+    print("=" * 72, file=sys.stderr)
+    print(f"[ABORT] {script} writes to the database and was not confirmed.", file=sys.stderr)
+    print(f"  target : {target}", file=sys.stderr)
+    print(f"  env    : {env}", file=sys.stderr)
+    print(f"  effect : {what_it_writes}", file=sys.stderr)
+    print("", file=sys.stderr)
+    print("  Nothing was written. Check the target above, then re-run with --yes:", file=sys.stderr)
+    print(f"      py execution/{script} --yes", file=sys.stderr)
+    print("=" * 72, file=sys.stderr)
+    sys.exit(1)
+
+
+def require_non_production(reason: str = "") -> None:
+    """
+    Refuse to run at all when the resolved environment is production.
+
+    For scripts that are only ever meant for local/demo data — seeding fake
+    orders, provisioning showcase logins, resetting a known password. `--yes`
+    cannot override this: the answer to "should this run against production" is
+    no, not "confirm harder".
+    """
+    env = _current_env()
+    if env != "production":
+        return
+
+    script = os.path.basename(sys.argv[0]) if sys.argv else "<script>"
+    print("=" * 72, file=sys.stderr)
+    print(f"[ABORT] {script} must never run against production.", file=sys.stderr)
+    print(f"  target : {_safe_target()}", file=sys.stderr)
+    print(f"  env    : {env}", file=sys.stderr)
+    if reason:
+        print(f"  reason : {reason}", file=sys.stderr)
+    print("", file=sys.stderr)
+    print("  Point DATABASE_URL at a non-production database and try again.", file=sys.stderr)
     print("=" * 72, file=sys.stderr)
     sys.exit(1)

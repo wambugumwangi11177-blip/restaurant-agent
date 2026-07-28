@@ -220,4 +220,8 @@ def run():
 
 
 if __name__ == "__main__":
+    import sys as _sys, os as _os
+    _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+    from _guard import require_write_confirmation
+    require_write_confirmation("creates the payments table and payment_status column")
     run()

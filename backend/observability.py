@@ -49,7 +49,11 @@ def degraded(component: str, exc: BaseException, **context) -> None:
         logger.warning(
             "degraded: %s unavailable (%s: %s)",
             component, exc.__class__.__name__, exc,
-            exc_info=True,
+            # exc_info=exc, not exc_info=True: the latter reads the *currently
+            # handled* exception, so a call made outside an `except` block logs
+            # "NoneType: None" instead of a traceback. Passing the object works
+            # in both cases.
+            exc_info=exc,
             extra={"component": component, **context},
         )
     except Exception:  # pragma: no cover — logging itself is broken

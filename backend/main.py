@@ -241,17 +241,21 @@ def _run_reservation_reminders_job():
 
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
-# Real Vercel production domain is included as a fallback default (not just
-# localhost) — found 2026-07-07 that a misconfigured/placeholder CORS_ORIGINS
-# on Railway silently breaks frontend login with a browser-side "network
-# error" (CORS preflight is rejected before the request body is ever sent,
-# so the backend logs show nothing — this is invisible without checking the
-# preflight response directly). CORS_ORIGINS env var still takes priority
-# when set correctly; this is a safety net, not a replacement for setting it.
-default_origins = (
-    "http://localhost:3000,http://127.0.0.1:3000,http://192.168.100.4:3000,"
-    "https://restaurant-agent-o38i.vercel.app"
-)
+# The fallback list is LOCAL DEV ORIGINS ONLY, deliberately.
+#
+# It previously also contained the real Vercel production domain, added
+# 2026-07-07 after a misconfigured CORS_ORIGINS on Railway silently broke
+# frontend login with a browser-side "network error" (a CORS preflight is
+# rejected before the request body is ever sent, so the backend logs show
+# nothing). That safety net worked, but it also meant every environment —
+# local, CI, staging — accepted the production frontend origin, which is
+# precisely the environment bleed this pass is closing.
+#
+# The failure it guarded against is now handled the right way round:
+# startup_checks treats an unset CORS_ORIGINS as a HARD problem in production,
+# so a misconfigured deploy fails loudly at boot instead of succeeding into a
+# state where the browser silently can't talk to it.
+default_origins = "http://localhost:3000,http://127.0.0.1:3000,http://192.168.100.4:3000"
 cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", default_origins).split(",")]
 logger.info(f"[CORS] Allowed origins: {cors_origins}")
 

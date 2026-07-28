@@ -5,8 +5,26 @@ from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
-# Fallback to sqlite if no DATABASE_URL
-DATABASE_URL = os.getenv("DATABASE_URL") or "sqlite:///./restaurant.db"
+# Fallback to sqlite if no DATABASE_URL.
+#
+# This fallback is a local-dev convenience and a production hazard: without the
+# guard below, a deploy with an absent or typo'd DATABASE_URL boots perfectly
+# happily against an empty throwaway SQLite file — /health returns 200, every
+# query succeeds, and the real data is simply not there. Failing at import is the
+# only honest response, and it must live HERE rather than only in
+# startup_checks.py because every script in execution/ imports this module
+# directly and never runs the app's startup hook.
+DATABASE_URL = os.getenv("DATABASE_URL") or ""
+if not DATABASE_URL:
+    from environment import current_env, is_production
+
+    if is_production():
+        raise RuntimeError(
+            "DATABASE_URL is not set and this process resolved to the production "
+            f"environment ({current_env()!r}). Refusing to fall back to a local "
+            "SQLite file — set DATABASE_URL to the real database."
+        )
+    DATABASE_URL = "sqlite:///./restaurant.db"
 
 # Fix for Neon/Render: postgres:// → postgresql:// (SQLAlchemy 2.x requirement)
 if DATABASE_URL.startswith("postgres://"):

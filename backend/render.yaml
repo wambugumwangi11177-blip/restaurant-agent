@@ -6,12 +6,23 @@ services:
     buildCommand: pip install -r requirements.txt && python -c "from database import init_db; init_db()" && alembic upgrade head
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
+      # Declares the environment to backend/environment.py. WITHOUT this the app
+      # cannot tell production from a laptop: is_production() falls back to
+      # inference, and every fail-closed check in startup_checks.py (forgeable
+      # M-Pesa callback, SQLite fallback, dev CORS origins) silently degrades
+      # from "refuse to boot" to "log a warning". Must be set on every
+      # production service.
+      - key: APP_ENV
+        value: production
+      # Required in production — startup_checks.py refuses to boot without it,
+      # because database.py would otherwise fall back to a local SQLite file.
       - key: DATABASE_URL
         sync: false
       - key: SECRET_KEY
         generateValue: true
       - key: PYTHON_VERSION
         value: "3.12.0"
+      # Required in production — the built-in fallback is localhost dev origins.
       - key: CORS_ORIGINS
         sync: false
       # LLM provider for the reasoning layer (ai/reasoning/narrator.py). WITHOUT

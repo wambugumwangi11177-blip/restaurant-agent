@@ -18,7 +18,7 @@ export or erase its own data.
 
 import csv
 import io
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from schemas import StrictModel
 from sqlalchemy.orm import Session, selectinload
@@ -29,6 +29,7 @@ import models
 import auth
 from routers.deps import get_or_create_restaurant
 from payments.mpesa_client import normalize_phone
+from audit import record_security_event, hash_identifier, SUCCESS
 
 router = APIRouter(prefix="/data", tags=["data-rights"])
 
@@ -91,6 +92,7 @@ def _phone_variants(phone: str) -> list[str]:
 
 @router.get("/export/orders.csv")
 async def export_orders_csv(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
 ):
@@ -128,6 +130,17 @@ async def export_orders_csv(
                 items,
             ]
 
+    # Recorded BEFORE the response is returned. The rows() generator below runs
+    # while the response streams, after this function has returned, so an audit
+    # write attempted from inside it would race the session teardown. commit=True
+    # because a read-only endpoint has no write of its own to ride along with.
+    record_security_event(
+        db, request, "data.export.orders", SUCCESS,
+        actor=current_user, restaurant_id=restaurant.id,
+        target_type="restaurant", target_ref=str(restaurant.id),
+        includes_pii=True, commit=True,
+    )
+
     filename = f"orders_restaurant_{restaurant.id}.csv"
     return StreamingResponse(
         _csv_stream(header, rows()),
@@ -138,6 +151,7 @@ async def export_orders_csv(
 
 @router.get("/export/customers.csv")
 async def export_customers_csv(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
 ):
@@ -172,6 +186,17 @@ async def export_customers_csv(
                 (r.total_spend or 0) / 100,
                 r.last_order.isoformat() if r.last_order else "",
             ]
+
+    # This endpoint hands over every customer's name, phone, spend and last-order
+    # date for the tenant. It is the single largest PII egress in the app, and
+    # until now it left no trace at all — "who exported the customer list, and
+    # when" had no answer. Row count is recorded; the rows themselves are not.
+    record_security_event(
+        db, request, "data.export.customers", SUCCESS,
+        actor=current_user, restaurant_id=restaurant.id,
+        target_type="restaurant", target_ref=str(restaurant.id),
+        rows_exported=len(customer_rows), includes_pii=True, commit=True,
+    )
 
     filename = f"customers_restaurant_{restaurant.id}.csv"
     return StreamingResponse(
@@ -210,6 +235,7 @@ def _restaurant_knows_phone(db: Session, restaurant_id: int, variants: list[str]
 @router.post("/erase-customer")
 async def erase_customer(
     body: EraseCustomerRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
 ):
@@ -230,7 +256,24 @@ async def erase_customer(
     restaurant = get_or_create_restaurant(db, current_user)
     variants = _phone_variants(body.customer_phone)
 
+    # The hashed reference is computed once and reused: it is what makes the
+    # trail useful (correlate repeated actions on one target, match a number
+    # from a complaint) without ever storing the number itself. Storing it raw
+    # would mean this endpoint permanently records the phone number the customer
+    # asked to have forgotten.
+    phone_ref = hash_identifier(normalize_phone(body.customer_phone) or body.customer_phone)
+
     if not _restaurant_knows_phone(db, restaurant.id, variants):
+        # Worth recording, not just returning. The docstring above reasons about
+        # a tenant submitting another tenant's customer's number to poison the
+        # phone-global opt-out; a run of these is what that abuse looks like, and
+        # without a row there is nothing to detect it with.
+        record_security_event(
+            db, request, "data.erase_customer.no_data", SUCCESS,
+            actor=current_user, restaurant_id=restaurant.id,
+            target_type="customer", target_ref=phone_ref,
+            commit=True,
+        )
         return {
             "status": "no_data",
             "customer_phone": body.customer_phone,
@@ -268,6 +311,18 @@ async def erase_customer(
             models.CustomerConsent.customer_phone.in_(variants),
         )
         .delete(synchronize_session=False)
+    )
+
+    # Same transaction as the scrub above: if the audit row cannot be written the
+    # erasure rolls back with it, so there is no irreversible PII deletion that
+    # nobody can account for afterwards.
+    record_security_event(
+        db, request, "data.erase_customer", SUCCESS,
+        actor=current_user, restaurant_id=restaurant.id,
+        target_type="customer", target_ref=phone_ref,
+        orders_scrubbed=orders_scrubbed,
+        reservations_scrubbed=reservations_scrubbed,
+        consents_deleted=consents_deleted,
     )
 
     db.commit()

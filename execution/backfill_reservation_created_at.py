@@ -15,6 +15,10 @@ _backend = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 sys.path.insert(0, _backend)
 from dotenv import load_dotenv
 load_dotenv(os.path.join(_backend, ".env"))
+import sys as _sys, os as _os
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from _guard import require_write_confirmation
+require_write_confirmation("backfills created_at on existing reservation rows")
 
 from database import engine
 from sqlalchemy import text

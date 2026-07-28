@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 import models
 from time_utils import utcnow
+from observability import degraded
 
 logger = logging.getLogger("ai.enterprise")
 
@@ -58,8 +59,8 @@ def _site_kpis(db: Session, restaurant: models.Restaurant) -> dict:
     try:
         from ai.ops_manager import get_operations_dashboard
         health = get_operations_dashboard(db, restaurant.id).get("health_score")
-    except Exception:  # noqa: BLE001 — one site's failure never sinks the roll-up
-        pass
+    except Exception as exc:  # noqa: BLE001 — one site's failure never sinks the roll-up
+        degraded("benchmarking.health_score", exc, restaurant_id=restaurant.id)
 
     return {
         "restaurant_id": restaurant.id,

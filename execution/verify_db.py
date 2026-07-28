@@ -3,8 +3,26 @@ import os
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-# Add project root to sys.path
-sys.path.append(os.getcwd())
+# The guard runs BEFORE any project import, deliberately. It used to sit at the
+# __main__ block, which never ran: the imports below failed first (see the
+# sys.path note), so the script aborted with a ModuleNotFoundError instead of
+# telling you which database it was about to write a test tenant into. A gate
+# that only fires when the rest of the module already imported cleanly is not a
+# gate.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _guard import require_non_production
+
+require_non_production(
+    "inserts a 'Test Restaurant' tenant as a side effect of verifying"
+)
+
+# backend/ must be on sys.path, not just the repo root: models.py does
+# `from time_utils import utcnow`, a sibling-module import that only resolves
+# when backend/ itself is importable. Relying on os.getcwd() also meant the
+# script only worked when invoked from the repo root.
+_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _root)
+sys.path.insert(0, os.path.join(_root, "backend"))
 
 # Import models and db session
 from backend.database import SessionLocal, engine

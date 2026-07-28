@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 
 import models
 from ai.analysis_clock import analysis_anchor
+from observability import degraded
 
 # Outbound message types that count as "a campaign" for the history view. The
 # send choke point logs message_type as "<type>:<channel>" (e.g. promo:whatsapp)
@@ -212,8 +213,8 @@ def _suggested_offers(db: Session, restaurant_id: int, winback: dict) -> list[di
                 "source": "menu_puzzle",
                 "action": "promo",
             })
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        degraded("marketing.menu_puzzle_offer", exc, restaurant_id=restaurant_id)
 
     # ── Offer 3: Move stock at spoilage risk before it's wasted ───────────────
     try:
@@ -243,7 +244,7 @@ def _suggested_offers(db: Session, restaurant_id: int, winback: dict) -> list[di
                 "source": "inventory_spoilage",
                 "action": "promo",
             })
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        degraded("marketing.spoilage_offer", exc, restaurant_id=restaurant_id)
 
     return offers

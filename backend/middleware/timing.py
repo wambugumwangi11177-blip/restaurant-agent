@@ -19,8 +19,9 @@ class TimingMiddleware(BaseHTTPMiddleware):
         try:
             import metrics
             metrics.record_request(request.method, response.status_code, process_time)
-        except Exception:
-            pass
+        except Exception as exc:
+            from observability import degraded
+            degraded("metrics.record_request", exc)
 
         # Add custom header
         response.headers["X-Process-Time"] = str(process_time)

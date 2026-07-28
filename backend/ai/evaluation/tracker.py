@@ -48,6 +48,7 @@ from typing import Callable
 from sqlalchemy.orm import Session
 import models
 from time_utils import utcnow
+from observability import degraded
 
 logger = logging.getLogger("ai.evaluation")
 
@@ -287,7 +288,17 @@ def write_audit_log(
         db.add(log)
         db.commit()
     except Exception as exc:
+        # The rollback is not optional. Without it a failed commit leaves this
+        # session in a failed-transaction state, so the NEXT write on the same
+        # session — which has nothing to do with auditing — also fails, and the
+        # audit failure gets misattributed to unrelated code downstream.
+        try:
+            db.rollback()
+        except Exception:  # pragma: no cover — session already unusable
+            pass
         logger.error(f"[AuditLog] Failed to write audit record: {exc}")
+        degraded("audit.agent_audit_log", exc, restaurant_id=restaurant_id,
+                 action_type=action_type)
 
 
 def _percentile(sorted_values: list[int], pct: int) -> int | None:
@@ -391,8 +402,8 @@ def get_ai_ops_summary(db: Session, restaurant_id: int, days: int = 30) -> dict:
         from ai.roi.savings import get_roi_savings
         money_captured_cents = get_roi_savings(db, restaurant_id).get(
             "money_captured", {}).get("monthly_impact_cents", 0)
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        degraded("ai_ops.money_captured", exc, restaurant_id=restaurant_id)
 
     return {
         "window_days": days,

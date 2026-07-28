@@ -22,6 +22,7 @@ from schemas import StrictModel
 from routers.deps import get_restaurant_or_none
 from rate_limit import limiter
 from time_utils import utcnow
+from audit import record_security_event, hash_identifier, SUCCESS, FAILURE
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -117,6 +118,14 @@ async def register(request: Request, user_data: UserCreate, db: Session = Depend
         ))
     db.commit()
 
+    record_security_event(
+        db, request, "auth.register", SUCCESS,
+        actor=new_user, restaurant_id=restaurant.id,
+        target_type="user", target_ref=str(new_user.id),
+        role=new_user.role.value if new_user.role else None,
+    )
+    db.commit()
+
     access_token = auth.create_access_token(
         data={"sub": new_user.email, "ver": new_user.token_version or 0}
     )
@@ -132,17 +141,42 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
     # locked accounts without a password-verification timing signal.
     if user and user.locked_until and user.locked_until > utcnow():
         remaining = int((user.locked_until - utcnow()).total_seconds() / 60) + 1
+        # Recorded on every rejected attempt, not just the one that tripped the
+        # lock: repeated hits against an already-locked account is what a
+        # credential-stuffing run looks like from the outside.
+        record_security_event(
+            db, request, "auth.login.locked_out", FAILURE,
+            actor=user, minutes_remaining=remaining, commit=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Account temporarily locked due to repeated failed logins. Try again in {remaining} minute(s).",
         )
 
     if not user or not auth.verify_password(login_data.password, user.hashed_password):
+        locked_now = False
         if user:
             user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
             if user.failed_login_attempts >= MAX_FAILED_ATTEMPTS:
                 user.locked_until = utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
-            db.commit()
+                locked_now = True
+        # actor is None when the email has no account — the audit row still
+        # records the attempt and the source IP, which is the whole point:
+        # enumeration of non-existent addresses is a signal, and it is exactly
+        # the case AgentAuditLog's non-null columns could not represent.
+        record_security_event(
+            db, request, "auth.login.failed", FAILURE,
+            actor=user,
+            actor_email=login_data.email if user is None else None,
+            attempt=(user.failed_login_attempts if user else None),
+            account_exists=user is not None,
+        )
+        if locked_now:
+            record_security_event(
+                db, request, "auth.login.account_locked", FAILURE,
+                actor=user, lockout_minutes=LOCKOUT_MINUTES,
+            )
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -155,6 +189,12 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
     # the login. The client resubmits email+password+mfa_code together.
     if user.mfa_enabled:
         if not login_data.mfa_code or not auth.verify_totp(user.mfa_secret, login_data.mfa_code):
+            # Password correct, second factor not — the signature of a stolen
+            # or phished password meeting a factor the attacker doesn't have.
+            record_security_event(
+                db, request, "auth.login.mfa_failed", FAILURE,
+                actor=user, code_supplied=bool(login_data.mfa_code), commit=True,
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="A valid authenticator code is required.",
@@ -166,6 +206,10 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
     user.failed_login_attempts = 0
     user.locked_until = None
     user.last_login_at = utcnow()
+    record_security_event(
+        db, request, "auth.login.success", SUCCESS,
+        actor=user, mfa_used=bool(user.mfa_enabled),
+    )
     db.commit()
 
     access_token = auth.create_access_token(
@@ -192,6 +236,7 @@ async def read_users_me(
 
 @router.post("/logout-all")
 async def logout_all(
+    request: Request,
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -207,12 +252,18 @@ async def logout_all(
     # happen to be the same object, an implicit coupling we don't want to rely on.
     user = db.query(models.User).filter(models.User.id == current_user.id).first()
     user.token_version = (user.token_version or 0) + 1
+    record_security_event(
+        db, request, "auth.sessions.revoked", SUCCESS,
+        actor=user, target_type="user", target_ref=str(user.id),
+        new_token_version=user.token_version,
+    )
     db.commit()
     return {"status": "all_sessions_revoked", "token_version": user.token_version}
 
 
 @router.post("/mfa/setup")
 async def mfa_setup(
+    request: Request,
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -226,6 +277,10 @@ async def mfa_setup(
     if user.mfa_enabled:
         raise HTTPException(status_code=400, detail="MFA is already enabled.")
     user.mfa_secret = auth.generate_mfa_secret()
+    record_security_event(
+        db, request, "auth.mfa.secret_issued", SUCCESS,
+        actor=user, target_type="user", target_ref=str(user.id),
+    )
     db.commit()
     return {
         "secret": user.mfa_secret,
@@ -236,6 +291,7 @@ async def mfa_setup(
 @router.post("/mfa/enable")
 async def mfa_enable(
     body: MfaCode,
+    request: Request,
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -244,8 +300,16 @@ async def mfa_enable(
     if not user.mfa_secret:
         raise HTTPException(status_code=400, detail="Call /mfa/setup first.")
     if not auth.verify_totp(user.mfa_secret, body.code):
+        record_security_event(
+            db, request, "auth.mfa.enable_failed", FAILURE,
+            actor=user, commit=True,
+        )
         raise HTTPException(status_code=400, detail="Invalid code — try again.")
     user.mfa_enabled = True
+    record_security_event(
+        db, request, "auth.mfa.enabled", SUCCESS,
+        actor=user, target_type="user", target_ref=str(user.id),
+    )
     db.commit()
     return {"status": "mfa_enabled"}
 
@@ -253,6 +317,7 @@ async def mfa_enable(
 @router.post("/mfa/disable")
 async def mfa_disable(
     body: MfaCode,
+    request: Request,
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -262,9 +327,19 @@ async def mfa_disable(
     if not user.mfa_enabled:
         raise HTTPException(status_code=400, detail="MFA is not enabled.")
     if not auth.verify_totp(user.mfa_secret, body.code):
+        record_security_event(
+            db, request, "auth.mfa.disable_failed", FAILURE,
+            actor=user, commit=True,
+        )
         raise HTTPException(status_code=400, detail="Invalid code.")
     user.mfa_enabled = False
     user.mfa_secret = None
+    # The action an attacker holding a stolen session most wants, and until now
+    # the one that left no trace whatsoever.
+    record_security_event(
+        db, request, "auth.mfa.disabled", SUCCESS,
+        actor=user, target_type="user", target_ref=str(user.id),
+    )
     db.commit()
     return {"status": "mfa_disabled"}
 
@@ -272,6 +347,7 @@ async def mfa_disable(
 @router.put("/restaurant")
 async def update_restaurant(
     data: RestaurantUpdate,
+    request: Request,
     current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
@@ -289,7 +365,19 @@ async def update_restaurant(
         # at compare time (see routers/webhooks.py / phone_utils.py). Storing the
         # raw form silently broke owner-command matching for any non-E.164 entry.
         from phone_utils import normalize_phone
+        previous_phone = restaurant.owner_phone
         restaurant.owner_phone = normalize_phone(data.owner_phone)
+        # owner_phone is the number that receives WhatsApp briefings and is
+        # matched for owner commands — repointing it redirects the owner channel.
+        # Hashed both sides: the audit trail records THAT it changed and lets you
+        # match a candidate number, without storing the numbers themselves.
+        record_security_event(
+            db, request, "restaurant.owner_phone.changed", SUCCESS,
+            actor=current_user, restaurant_id=restaurant.id,
+            target_type="restaurant", target_ref=str(restaurant.id),
+            previous_ref=hash_identifier(previous_phone),
+            new_ref=hash_identifier(restaurant.owner_phone),
+        )
     db.commit()
     db.refresh(restaurant)
     return {

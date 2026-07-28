@@ -903,3 +903,66 @@ class Region(Base):
     created_at      = Column(DateTime, default=utcnow)
 
     organization = relationship("Organization")
+
+
+class SecurityAuditLog(Base):
+    """
+    Audit trail for SENSITIVE ACTIONS TAKEN BY HUMANS.
+
+    This is deliberately a separate table from AgentAuditLog, which records what
+    the AI did. That table requires a non-null restaurant_id and agent_name, and
+    the events most worth recording here cannot supply either: a failed login
+    against an unknown email has no user, no tenant, and no restaurant. Forcing
+    the two trails into one table would mean relaxing exactly the constraints
+    that make the AI trail trustworthy, and teaching every existing AgentAuditLog
+    query to filter out rows it was never written to expect.
+
+    What was previously unrecorded, and is now: routers/auth.py and
+    routers/export.py between them contained zero logger calls, so login,
+    lockout, MFA disable, bulk customer-PII export and irreversible erasure all
+    happened without a trace. MFA disable is the action an attacker holding a
+    stolen session most wants; bulk export is how customer data leaves the
+    system. Neither left any evidence at all.
+
+    PII discipline: `target_ref` holds a keyed HMAC of the identifier, never the
+    raw value — see audit.hash_identifier(). Writing a raw phone number here
+    would mean the erasure endpoint permanently records the number it was asked
+    to forget, turning the compliance control into a compliance breach, while
+    still letting an investigator correlate repeated actions on one target.
+
+    Append-only by convention, like AgentAuditLog and CustomerConsent: never
+    UPDATE or DELETE a row.
+    """
+    __tablename__ = "security_audit_log"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    created_at    = Column(DateTime, default=utcnow, nullable=False, index=True)
+
+    # e.g. "auth.login.failed", "data.export.customers", "data.erase_customer"
+    event_type    = Column(String, nullable=False, index=True)
+    outcome       = Column(String, nullable=False, default="success")  # success|failure|denied
+
+    # Actor. Nullable throughout: a failed login for an address with no account
+    # has no user to point at, and that is precisely a case worth recording.
+    # actor_email is stored verbatim alongside the FK so the trail survives the
+    # user row being deleted.
+    actor_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    actor_email   = Column(String, nullable=True, index=True)
+    tenant_id     = Column(Integer, nullable=True, index=True)
+    restaurant_id = Column(Integer, nullable=True, index=True)
+
+    # What was acted on. target_ref is HASHED — never raw PII.
+    target_type   = Column(String, nullable=True)   # "customer" | "user" | "restaurant"
+    target_ref    = Column(String, nullable=True)
+
+    # Where it came from, and how to find the rest of the story in the logs.
+    source_ip     = Column(String, nullable=True)
+    request_id    = Column(String, nullable=True, index=True)
+
+    # JSON: non-PII counts and metadata (rows_exported, orders_scrubbed, ...).
+    detail        = Column(Text, default="{}")
+
+    __table_args__ = (
+        Index("ix_security_audit_event_created",  "event_type", "created_at"),
+        Index("ix_security_audit_actor_created",  "actor_email", "created_at"),
+    )

@@ -13,8 +13,15 @@ import models
 from events.bus import emit, subscribe, clear_handlers, EventType
 
 
+def _tenant_id(db) -> int:
+    tenant = models.Tenant(name="Events Tenant")
+    db.add(tenant)
+    db.commit()
+    return tenant.id
+
+
 def _seed_restaurant_with_table(db_session):
-    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x")
+    r = models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="Test Bistro", address="x")
     item = models.InventoryItem(
         id=1, restaurant_id=1, item_name="Chicken", quantity=0, unit="kg", low_stock_threshold=5,
     )
@@ -95,7 +102,7 @@ def test_reservation_no_show_transition_emits_event(client, db_session, monkeypa
 
 
 def test_approve_recommendation_emits_recommendation_approved(db_session):
-    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x")
+    r = models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="Test Bistro", address="x")
     item = models.MenuItem(id=1, restaurant_id=1, name="Burger", price=50000, is_available=True)
     rec = models.PricingRecommendation(
         id=1, restaurant_id=1, menu_item_id=1, recommendation_type="SURGE",
@@ -126,7 +133,7 @@ def test_approve_recommendation_emits_recommendation_approved(db_session):
 # told nobody, and the order silently stayed unpaid.
 
 def _seed_restaurant_with_owner(db_session, owner_phone="+254712345678"):
-    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x",
+    r = models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="Test Bistro", address="x",
                           owner_phone=owner_phone)
     order = models.Order(
         id=7, restaurant_id=1, status=models.OrderStatus.PENDING,

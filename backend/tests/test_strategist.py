@@ -26,7 +26,10 @@ from ai.orchestrator import strategist
 @pytest.fixture
 def seeded(db_session):
     db = db_session
-    db.add(models.Restaurant(id=1, tenant_id=None, name="Strat", address="x"))
+    tenant = models.Tenant(name="Strategist Tenant")
+    db.add(tenant)
+    db.commit()
+    db.add(models.Restaurant(id=1, tenant_id=tenant.id, name="Strat", address="x"))
     # one below-floor item → a deterministic REPRICE decision exists
     db.add(models.MenuItem(id=1, restaurant_id=1, name="ThinBurger",
                            price=1000, cost_price=900, category="main"))

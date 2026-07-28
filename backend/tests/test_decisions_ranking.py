@@ -15,6 +15,13 @@ from ai.decisions.model import Decision
 from ai.decisions import ranking, get_ranked_decisions
 
 
+def _tenant_id(db) -> int:
+    tenant = models.Tenant(name="Decisions Tenant")
+    db.add(tenant)
+    db.commit()
+    return tenant.id
+
+
 def _d(**kw) -> Decision:
     base = dict(
         agent="a", category="c", action="do x", rationale="because",
@@ -93,7 +100,7 @@ def test_impact_stars_scale():
 def _seed_restaurant_with_below_floor_item(db):
     """A restaurant with one item priced below the 40% margin floor + enough
     order history to trigger a deterministic REPRICE decision from pricing."""
-    db.add(models.Restaurant(id=1, tenant_id=None, name="Kibanda", address="x"))
+    db.add(models.Restaurant(id=1, tenant_id=_tenant_id(db), name="Kibanda", address="x"))
     # cost 900 on price 1000 → 10% margin, far below the 40% floor → REPRICE.
     db.add(models.MenuItem(id=1, restaurant_id=1, name="ThinBurger",
                            price=1000, cost_price=900, category="main"))
@@ -126,7 +133,7 @@ def test_collect_decisions_surfaces_a_pricing_reprice(db_session):
 
 
 def test_empty_restaurant_yields_no_decisions_without_crashing(db_session):
-    db_session.add(models.Restaurant(id=1, tenant_id=None, name="Empty", address="x"))
+    db_session.add(models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="Empty", address="x"))
     db_session.commit()
     payload = get_ranked_decisions(db_session, 1)
     assert payload["summary"]["total_decisions"] == 0

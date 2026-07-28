@@ -62,7 +62,9 @@ def test_summary_is_tenant_scoped(client, db_session):
     client.post("/api/v1/events/track", headers={"Authorization": f"Bearer {atoken}"},
                 json={"event_name": "secret_action"})
 
-    userb = models.User(tenant_id=None, email="b@e.com",
+    tenant_b = models.Tenant(name="OtherCo")
+    db_session.add(tenant_b); db_session.commit()
+    userb = models.User(tenant_id=tenant_b.id, email="b@e.com",
                         hashed_password=auth.get_password_hash("x"), role=models.Role.ADMIN)
     db_session.add(userb); db_session.commit()
     btoken = auth.create_access_token({"sub": userb.email, "ver": 0})

@@ -88,6 +88,7 @@ export default function LoginPage() {
                                     onChange={(e) => setTenantName(e.target.value)}
                                     className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm"
                                     placeholder="e.g. Mama Ngina's Kitchen"
+                                    autoComplete="organization"
                                     required
                                 />
                             </div>
@@ -101,6 +102,7 @@ export default function LoginPage() {
                                 onChange={(e) => setEmail(e.target.value)}
                                 className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm"
                                 placeholder="you@restaurant.com"
+                                autoComplete="email"
                                 required
                             />
                         </div>
@@ -114,6 +116,8 @@ export default function LoginPage() {
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm pr-10"
                                     placeholder="••••••••"
+                                    autoComplete={isRegister ? "new-password" : "current-password"}
+                                    minLength={isRegister ? 8 : undefined}
                                     required
                                 />
                                 <button
@@ -124,6 +128,11 @@ export default function LoginPage() {
                                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                 </button>
                             </div>
+                            {isRegister && (
+                                <p className="text-xs text-[#525252] mt-1.5">
+                                    At least 8 characters, with a letter and a number.
+                                </p>
+                            )}
                         </div>
 
                         <button

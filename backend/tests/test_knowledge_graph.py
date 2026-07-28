@@ -19,11 +19,18 @@ from ai.graph.build import node_key
 from ai.graph.traverse import downstream, upstream
 
 
+def _tenant_id(db) -> int:
+    tenant = models.Tenant(name="Graph Tenant")
+    db.add(tenant)
+    db.commit()
+    return tenant.id
+
+
 @pytest.fixture
 def wired(db_session):
     """supplier → chicken → {ChickenBurger (critical), Garnished (non-critical)}."""
     db = db_session
-    db.add(models.Restaurant(id=1, tenant_id=None, name="Graph", address="x"))
+    db.add(models.Restaurant(id=1, tenant_id=_tenant_id(db), name="Graph", address="x"))
     db.add_all([
         models.MenuItem(id=1, restaurant_id=1, name="ChickenBurger", price=1000, cost_price=400, category="mains"),
         models.MenuItem(id=2, restaurant_id=1, name="GarnishedDish", price=800, cost_price=300, category="mains"),

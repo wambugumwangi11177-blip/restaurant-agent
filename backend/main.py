@@ -259,8 +259,16 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Narrowed from "*" to what this API actually exposes — verified against
+    # frontend/src/lib/api.ts and every fetch/axios call site (no custom X-*
+    # headers) PLUS the real router surface (routers/menu.py, reservations.py,
+    # inventory.py all define DELETE routes the frontend doesn't call yet, but
+    # excluding DELETE here would silently break the first delete-button
+    # feature — the exact invisible-CORS-preflight failure this file's own
+    # CORS_ORIGINS comment above already warns about). Origins are already a
+    # real allowlist; this only closes the remaining wildcard.
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.add_middleware(TimingMiddleware)

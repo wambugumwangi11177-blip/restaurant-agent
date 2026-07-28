@@ -8,7 +8,10 @@ import models
 
 
 def _seed(db_session):
-    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x")
+    tenant = models.Tenant(name="Mpesa Tenant")
+    db_session.add(tenant)
+    db_session.commit()
+    r = models.Restaurant(id=1, tenant_id=tenant.id, name="Test Bistro", address="x")
     order = models.Order(
         id=1, restaurant_id=1, status=models.OrderStatus.PENDING,
         payment_method=models.PaymentMethod.PENDING, is_paid=False,

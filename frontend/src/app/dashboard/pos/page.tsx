@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import api from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -19,6 +19,7 @@ import {
     Hash,
     StickyNote,
 } from "lucide-react";
+import { useResource } from "@/lib/useAiModule";
 
 interface MenuItem {
     id: number;
@@ -35,7 +36,7 @@ interface CartItem {
 }
 
 export default function POSPage() {
-    const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+    const { data: menuData, loading, error: menuError, retry: retryMenu } = useResource<MenuItem[]>("/menu/");
     const [cart, setCart] = useState<CartItem[]>([]);
     const [selectedCategory, setSelectedCategory] = useState("All");
     const [orderType, setOrderType] = useState("dine_in");
@@ -45,17 +46,13 @@ export default function POSPage() {
     const [customerPhone, setCustomerPhone] = useState("");
     const [tableNumber, setTableNumber] = useState("");
     const [notes, setNotes] = useState("");
-    const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [lastOrderId, setLastOrderId] = useState<number | null>(null);
 
-    useEffect(() => {
-        api.get("/menu/").then((res) => {
-            setMenuItems(res.data.filter((i: MenuItem) => i.is_available !== false));
-            setLoading(false);
-        }).catch(() => setLoading(false));
-    }, []);
+    const menuItems = Array.isArray(menuData)
+        ? menuData.filter((i) => i.is_available !== false)
+        : [];
 
     const categories = ["All", ...Array.from(new Set(menuItems.map((i) => i.category)))];
     const filteredItems = selectedCategory === "All"
@@ -134,6 +131,22 @@ export default function POSPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-120px)]">
                 <div className="lg:col-span-2 bg-[#141414] rounded-xl animate-pulse" />
                 <div className="bg-[#141414] rounded-xl animate-pulse" />
+            </div>
+        );
+    }
+
+    if (menuError) {
+        return (
+            <div className="bg-[#141414] border border-[#262626] rounded-xl p-8 text-center">
+                <UtensilsCrossed className="w-8 h-8 text-[#ef4444] mx-auto mb-3" />
+                <p className="text-sm text-[#e5e5e5] mb-1">Couldn&apos;t load the menu</p>
+                <p className="text-xs text-[#525252] mb-4">{menuError}</p>
+                <button
+                    onClick={retryMenu}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-[#e5e5e5] hover:bg-[#222]"
+                >
+                    Try again
+                </button>
             </div>
         );
     }

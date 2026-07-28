@@ -21,7 +21,10 @@ def stocked(db_session):
     """A restaurant with a low-stock item + an active supplier so the reorder
     workflow has real work to do."""
     db = db_session
-    db.add(models.Restaurant(id=1, tenant_id=None, name="WF", address="x"))
+    tenant = models.Tenant(name="Workflow Tenant")
+    db.add(tenant)
+    db.commit()
+    db.add(models.Restaurant(id=1, tenant_id=tenant.id, name="WF", address="x"))
     db.add(models.InventoryItem(id=1, restaurant_id=1, item_name="Chicken",
                                 quantity=1.0, unit="kg", low_stock_threshold=10))
     db.add(models.Supplier(id=1, restaurant_id=1, name="Supplier A", is_active=True))

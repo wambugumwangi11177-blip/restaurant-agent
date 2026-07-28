@@ -93,6 +93,11 @@ def db_env(tmp_path, monkeypatch):
         llm_client._client = None
     except Exception:
         pass
+    try:
+        import ai.cache as ai_cache
+        ai_cache.clear()
+    except Exception:
+        pass
 
     # Phase 11: the marketplace plugin registry is a process-wide singleton, like
     # the event bus. A plugin registered in one test would otherwise leak into a

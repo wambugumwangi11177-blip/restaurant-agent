@@ -122,3 +122,29 @@ def test_cannot_adjust_another_tenants_inventory(client, db_session):
 
     db_session.refresh(item_b)
     assert item_b.quantity == 100  # untouched
+
+
+def test_orders_list_is_paginated(client, db_session):
+    """GET /orders/ used to hard-cap at 200 with no way to page past it or ask
+    for fewer — now skip/limit are real query params."""
+    restaurant, token = _make_tenant_with_user_and_restaurant(db_session, "pg")
+    for i in range(60):
+        db_session.add(models.Order(
+            restaurant_id=restaurant.id, total=1000 + i,
+            status=models.OrderStatus.PENDING, payment_method=models.PaymentMethod.CASH,
+        ))
+    db_session.commit()
+
+    default_page = client.get("/orders/", headers=_auth_headers(token))
+    assert default_page.status_code == 200
+    assert len(default_page.json()) == 50   # new default limit, not all 60
+
+    capped = client.get("/orders/?limit=10", headers=_auth_headers(token))
+    assert len(capped.json()) == 10
+
+    page_two = client.get("/orders/?limit=10&skip=10", headers=_auth_headers(token))
+    assert len(page_two.json()) == 10
+    assert {o["id"] for o in page_two.json()}.isdisjoint({o["id"] for o in capped.json()})
+
+    over_max = client.get("/orders/?limit=500", headers=_auth_headers(token))
+    assert over_max.status_code == 422   # le=200 rejects a request past the ceiling

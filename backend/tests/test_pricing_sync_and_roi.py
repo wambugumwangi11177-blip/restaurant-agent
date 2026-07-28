@@ -20,7 +20,10 @@ from ai.roi.savings import get_roi_savings
 
 
 def _seed(db):
-    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x")
+    tenant = models.Tenant(name="Pricing Tenant")
+    db.add(tenant)
+    db.commit()
+    r = models.Restaurant(id=1, tenant_id=tenant.id, name="Test Bistro", address="x")
     item = models.MenuItem(id=1, restaurant_id=1, name="Burger", price=50000, is_available=True)
     db.add_all([r, item])
     db.commit()

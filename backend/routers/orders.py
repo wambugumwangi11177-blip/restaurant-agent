@@ -77,6 +77,8 @@ async def create_order(
 @router.get("/", response_model=List[schemas.OrderOut])
 async def list_orders(
     status_filter: Optional[str] = Query(None, alias="status"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
@@ -91,7 +93,7 @@ async def list_orders(
         except ValueError:
             pass
 
-    orders = q.order_by(models.Order.created_at.desc()).limit(200).all()
+    orders = q.order_by(models.Order.created_at.desc()).offset(skip).limit(limit).all()
     return [_order_to_dict(o) for o in orders]
 
 
@@ -108,7 +110,10 @@ async def active_orders(
     ).filter(
         models.Order.restaurant_id == restaurant.id,
         models.Order.status.in_(active_statuses),
-    ).order_by(models.Order.created_at.asc()).all()
+    # No unbounded query here — in-flight orders are naturally small in practice,
+    # but nothing enforced that until now (500 is a generous backstop, not a
+    # real-world ceiling for a single KDS screen).
+    ).order_by(models.Order.created_at.asc()).limit(500).all()
     return [_order_to_dict(o) for o in orders]
 
 

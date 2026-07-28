@@ -8,6 +8,13 @@ import models
 from ai.whatsapp import orchestrator
 
 
+def _tenant_id(db) -> int:
+    tenant = models.Tenant(name="Metering Tenant")
+    db.add(tenant)
+    db.commit()
+    return tenant.id
+
+
 def _fake_end_turn_response():
     return SimpleNamespace(
         stop_reason="end_turn",
@@ -18,7 +25,7 @@ def _fake_end_turn_response():
 
 
 def test_metering_writes_token_usage_not_agent_messages(db_session, monkeypatch):
-    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x")
+    r = models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="Test Bistro", address="x")
     db_session.add(r)
     db_session.commit()
 
@@ -44,7 +51,7 @@ def test_metering_writes_token_usage_not_agent_messages(db_session, monkeypatch)
 
 def test_pii_scrubbed_before_reaching_llm(db_session, monkeypatch):
     """A phone number in the owner's message must never reach the LLM (P4)."""
-    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x")
+    r = models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="Test Bistro", address="x")
     db_session.add(r)
     db_session.commit()
 

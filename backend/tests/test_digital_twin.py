@@ -17,6 +17,13 @@ from ai.simulation import forecast_twin
 from ai.simulation import signals
 
 
+def _tenant_id(db) -> int:
+    tenant = models.Tenant(name="Twin Tenant")
+    db.add(tenant)
+    db.commit()
+    return tenant.id
+
+
 # ── signal providers ───────────────────────────────────────────────────────────
 
 def test_holiday_signal_fires_on_a_known_holiday():
@@ -54,7 +61,7 @@ def revenue_history(db_session):
     """A restaurant with ~30 days of steady revenue so the forecaster has a
     baseline to build on."""
     db = db_session
-    db.add(models.Restaurant(id=1, tenant_id=None, name="Twin", address="x"))
+    db.add(models.Restaurant(id=1, tenant_id=_tenant_id(db), name="Twin", address="x"))
     db.add(models.MenuItem(id=1, restaurant_id=1, name="Plate", price=1000, cost_price=400, category="main"))
     db.commit()
     now = utcnow()
@@ -97,7 +104,7 @@ def test_twin_flags_signal_days(revenue_history):
 
 
 def test_twin_needs_history(db_session):
-    db_session.add(models.Restaurant(id=1, tenant_id=None, name="Empty", address="x"))
+    db_session.add(models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="Empty", address="x"))
     db_session.commit()
     out = forecast_twin(db_session, 1, horizon_days=30)
     assert out["available"] is False

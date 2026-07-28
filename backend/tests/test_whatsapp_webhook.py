@@ -25,8 +25,11 @@ def _seed_restaurant(db_session, owner_phone="+15559999999"):
 
     # Store the normalized form, exactly as onboarding (routers/auth.py) now
     # does — the inbound resolver compares against the canonical value.
+    tenant = models.Tenant(name="WhatsApp Tenant")
+    db_session.add(tenant)
+    db_session.commit()
     r = models.Restaurant(
-        id=1, tenant_id=None, name="Test Bistro", address="x",
+        id=1, tenant_id=tenant.id, name="Test Bistro", address="x",
         owner_phone=normalize_phone(owner_phone),
     )
     db_session.add(r)

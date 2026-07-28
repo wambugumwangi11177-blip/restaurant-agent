@@ -17,6 +17,13 @@ from ai import cost_model
 from ai.evaluation import learning, tracker
 
 
+def _tenant_id(db) -> int:
+    tenant = models.Tenant(name="Learning Tenant")
+    db.add(tenant)
+    db.commit()
+    return tenant.id
+
+
 # ── cost model ──────────────────────────────────────────────────────────────────
 
 def test_cost_resolves_known_models_by_substring():
@@ -46,7 +53,7 @@ def test_kes_conversion_is_positive_integer_cents():
 @pytest.fixture
 def restaurant_with_history(db_session):
     db = db_session
-    db.add(models.Restaurant(id=1, tenant_id=None, name="Learn", address="x"))
+    db.add(models.Restaurant(id=1, tenant_id=_tenant_id(db), name="Learn", address="x"))
     db.add(models.MenuItem(id=1, restaurant_id=1, name="Plate", price=1000, cost_price=400, category="main"))
     db.commit()
     now = utcnow()
@@ -72,7 +79,7 @@ def test_record_revenue_forecast_is_idempotent(restaurant_with_history):
 
 def test_evaluate_due_predictions_scores_against_actual(db_session):
     db = db_session
-    db.add(models.Restaurant(id=1, tenant_id=None, name="Learn", address="x"))
+    db.add(models.Restaurant(id=1, tenant_id=_tenant_id(db), name="Learn", address="x"))
     db.commit()
     yesterday = (utcnow() - timedelta(days=1)).date()
     # a matured prediction for yesterday
@@ -96,7 +103,7 @@ def test_evaluate_due_predictions_scores_against_actual(db_session):
 
 def test_future_prediction_not_yet_due(db_session):
     db = db_session
-    db.add(models.Restaurant(id=1, tenant_id=None, name="Learn", address="x"))
+    db.add(models.Restaurant(id=1, tenant_id=_tenant_id(db), name="Learn", address="x"))
     db.commit()
     tomorrow = (utcnow() + timedelta(days=1)).date()
     tracker.record_prediction(db, 1, learning.REVENUE_AGENT, learning.DAILY_REVENUE,
@@ -113,7 +120,7 @@ def test_run_learning_cycle_records_and_evaluates(restaurant_with_history):
 
 def test_scorecards_surface_accuracy_and_acceptance(db_session):
     db = db_session
-    db.add(models.Restaurant(id=1, tenant_id=None, name="Score", address="x"))
+    db.add(models.Restaurant(id=1, tenant_id=_tenant_id(db), name="Score", address="x"))
     db.add(models.MenuItem(id=1, restaurant_id=1, name="X", price=1000, cost_price=400, category="m"))
     db.commit()
     # an evaluated prediction → accuracy card

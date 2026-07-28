@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import List
 from database import get_db
@@ -11,8 +11,8 @@ router = APIRouter(prefix="/menu", tags=["menu"])
 
 @router.get("/", response_model=List[schemas.MenuItem])
 async def read_menu_items(
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
@@ -87,9 +87,12 @@ async def get_public_menu(
     db: Session = Depends(get_db),
 ):
     """Public menu for customer ordering — no login required."""
+    # The only unauthenticated unbounded query in the app before this cap — a
+    # real menu is at most a few hundred items, so 500 is a defensive backstop,
+    # not a real-world ceiling.
     items = db.query(models.MenuItem).filter(
         models.MenuItem.restaurant_id == restaurant_id,
         models.MenuItem.is_available == True,
-    ).all()
+    ).limit(500).all()
     return items
 

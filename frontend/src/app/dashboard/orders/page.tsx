@@ -1,25 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import api from "@/lib/api";
 import { motion } from "framer-motion";
 import { ShoppingBag, Clock, TrendingUp } from "lucide-react";
+import { useAiModule, useResource } from "@/lib/useAiModule";
 
 export default function OrdersPage() {
-    const [orders, setOrders] = useState<any[]>([]);
-    const [aiData, setAiData] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const { data: ordersData, loading: ordersLoading, error: ordersError, retry: retryOrders } = useResource<any[]>("/orders/");
+    const { data: aiData, loading: aiLoading, error: aiError } = useAiModule<any>("/ai/revenue-forecast");
 
-    useEffect(() => {
-        Promise.all([
-            api.get("/orders/").catch(() => ({ data: [] })),
-            api.get("/ai/revenue-forecast").catch(() => ({ data: null })),
-        ]).then(([ordersRes, aiRes]) => {
-            setOrders(Array.isArray(ordersRes.data) ? ordersRes.data : []);
-            setAiData(aiRes.data);
-            setLoading(false);
-        });
-    }, []);
+    const orders = Array.isArray(ordersData) ? ordersData : [];
+    const loading = ordersLoading || aiLoading;
 
     if (loading) {
         return (
@@ -27,6 +17,22 @@ export default function OrdersPage() {
                 {[...Array(5)].map((_, i) => (
                     <div key={i} className="bg-[#141414] rounded-xl h-16 animate-pulse" />
                 ))}
+            </div>
+        );
+    }
+
+    if (ordersError) {
+        return (
+            <div className="bg-[#141414] border border-[#262626] rounded-xl px-5 py-10 text-center">
+                <ShoppingBag className="w-8 h-8 text-[#ef4444] mx-auto mb-3" />
+                <p className="text-sm text-[#e5e5e5] mb-1">Couldn&apos;t load orders</p>
+                <p className="text-xs text-[#525252] mb-4">{ordersError}</p>
+                <button
+                    onClick={retryOrders}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-[#e5e5e5] hover:bg-[#222]"
+                >
+                    Try again
+                </button>
             </div>
         );
     }
@@ -67,6 +73,12 @@ export default function OrdersPage() {
                     <p className="text-lg font-bold text-[#d4a853] mt-1">{pendingCount}</p>
                 </div>
             </div>
+
+            {aiError && (
+                <div className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3">
+                    <p className="text-xs text-[#525252]">Sales insights unavailable right now — {aiError}</p>
+                </div>
+            )}
 
             {/* What we're seeing with your sales */}
             {(trends.total_revenue || forecast.length > 0) && (

@@ -18,9 +18,16 @@ from ai.evaluation import feedback, tracker
 from ai.orchestrator import strategist
 
 
+def _tenant_id(db) -> int:
+    tenant = models.Tenant(name="Feedback Tenant")
+    db.add(tenant)
+    db.commit()
+    return tenant.id
+
+
 @pytest.fixture
 def restaurant(db_session):
-    db_session.add(models.Restaurant(id=1, tenant_id=None, name="FB", address="x"))
+    db_session.add(models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="FB", address="x"))
     db_session.commit()
     return db_session
 
@@ -89,7 +96,7 @@ def test_low_reliability_downweights_decisions(db_session):
     poor track record."""
     from datetime import timedelta as td
     db = db_session
-    db.add(models.Restaurant(id=1, tenant_id=None, name="R", address="x"))
+    db.add(models.Restaurant(id=1, tenant_id=_tenant_id(db), name="R", address="x"))
     db.add(models.MenuItem(id=1, restaurant_id=1, name="ThinBurger", price=1000, cost_price=900, category="m"))
     db.commit()
     for i in range(8):
@@ -120,7 +127,7 @@ def test_low_reliability_downweights_decisions(db_session):
 
 def test_plan_produces_monitored_weeks(db_session):
     db = db_session
-    db.add(models.Restaurant(id=1, tenant_id=None, name="P", address="x"))
+    db.add(models.Restaurant(id=1, tenant_id=_tenant_id(db), name="P", address="x"))
     db.add(models.MenuItem(id=1, restaurant_id=1, name="ThinBurger", price=1000, cost_price=900, category="m"))
     db.commit()
     for i in range(8):

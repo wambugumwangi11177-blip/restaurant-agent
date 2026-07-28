@@ -4,8 +4,8 @@
 |---|---|
 | **Reference** | LAI-DEBT-001 |
 | **Classification** | Internal |
-| **Version** | 1.0 |
-| **Last Updated** | 2026-07-11 |
+| **Version** | 1.1 |
+| **Last Updated** | 2026-07-28 |
 | **Owner** | Engineering (Leviii AI Technologies) |
 | **Contact** | leviiiaikenya@gmail.com |
 
@@ -27,6 +27,7 @@ Tracked, honest list of known gaps. Each links to where it's discussed. Priority
 | D11 | Starlette CVEs pending fastapi major | P3 | 5 advisories require starlette ≥1.0 (fastapi pins <1.0); tracked, ignored by id with reason | `.github/workflows/ci.yml` |
 | D12 | Legal-pack metadata not applied | P2 | Apply owner/revision-history (R-12) at the external source of the 12 legal docs | [legal-doc-redlines.md](trust/legal-doc-redlines.md) R-12 |
 | D13 | Pydantic v1-style `class Config` | P3 | Migrate to `ConfigDict` (deprecation warnings) | `backend/schemas.py` |
+| D14 | CSP `'unsafe-inline'` won't-fix (documented, not silently accepted) | P3 | `frontend/vercel.json`'s CSP carries `'unsafe-inline'` in both `script-src` and `style-src`. `style-src` cannot be tightened at all: `next/font/google` emits an inline `@font-face`/CSS-variable `<style>` block, and the app has inline `style={{...}}` attributes across several pages — nonces don't apply to `style=` attributes, only to `<script>`/`<style>` tags. `script-src` could in principle drop it, but only via new infrastructure: a `middleware.ts` minting a per-request nonce, the CSP header moved out of the static `vercel.json` into that middleware, and Next.js's own injected inline bootstrap scripts (RSC flight chunks, hydration payload) adopting the nonce — none of which exists today. Moving the one app-authored inline script (the service-worker registration in `layout.tsx`) into a static file, on its own, changes nothing, since Next's own inline scripts are the larger source of the requirement. Deliberately not attempted in the 2026-07-28 hardening pass: origins are already a real allowlist (no wildcard), and this is the audit's lowest-severity finding — the nonce-middleware rewrite is real, standalone work, not a quick fix bundled into a security pass. | `frontend/vercel.json`; `frontend/src/app/layout.tsx` |
 
 ## How this list is used
 - New debt is added here when discovered; items are removed when resolved (with a CHANGELOG
@@ -37,3 +38,4 @@ Tracked, honest list of known gaps. Each links to where it's discussed. Priority
 | Version | Date | Author | Change |
 |---|---|---|---|
 | 1.0 | 2026-07-11 | Engineering | Initial register consolidated from all trust docs |
+| 1.1 | 2026-07-28 | Engineering | Add D14 (CSP `'unsafe-inline'` won't-fix, from the full-stack audit hardening pass) |

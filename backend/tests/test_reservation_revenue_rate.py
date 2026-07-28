@@ -33,7 +33,10 @@ CHECK_CENTS = 24_400                      # KES 244 average check
 
 
 def _restaurant(db):
-    db.add(models.Restaurant(id=1, tenant_id=None, name="Covers", address="x"))
+    tenant = models.Tenant(name="Revenue Rate Tenant")
+    db.add(tenant)
+    db.commit()
+    db.add(models.Restaurant(id=1, tenant_id=tenant.id, name="Covers", address="x"))
     db.commit()
 
 

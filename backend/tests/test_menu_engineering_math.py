@@ -29,6 +29,13 @@ from ai import menu_engineer
 from ai.menu_engineer import _menu_optimization_score, POPULARITY_INDEX
 
 
+def _tenant_id(db) -> int:
+    tenant = models.Tenant(name="Menu Eng Tenant")
+    db.add(tenant)
+    db.commit()
+    return tenant.id
+
+
 # ── 1. Popularity cutoff ──────────────────────────────────────────────────────
 #
 # Five items, all with identical margins (so profitability never decides the
@@ -46,7 +53,7 @@ MIDLIST_QTY = 40
 
 @pytest.fixture
 def skewed_menu(db_session):
-    db_session.add(models.Restaurant(id=1, tenant_id=None, name="Skewed", address="x"))
+    db_session.add(models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="Skewed", address="x"))
     # price 1000, cost 400 -> identical margin 600 for every item
     for i in range(1, 6):
         db_session.add(models.MenuItem(
@@ -207,7 +214,7 @@ def test_low_volume_day_reports_real_movement(db_session):
     """
     from ai import ops_manager
 
-    db_session.add(models.Restaurant(id=1, tenant_id=None, name="Kibanda", address="x"))
+    db_session.add(models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="Kibanda", address="x"))
     db_session.commit()
 
     now = utcnow()
@@ -228,7 +235,7 @@ def test_low_volume_day_reports_real_movement(db_session):
 def test_zero_yesterday_still_guards_divide_by_zero(db_session):
     from ai import ops_manager
 
-    db_session.add(models.Restaurant(id=1, tenant_id=None, name="Kibanda", address="x"))
+    db_session.add(models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="Kibanda", address="x"))
     db_session.add(models.Order(
         restaurant_id=1, status=models.OrderStatus.SERVED,
         payment_method=models.PaymentMethod.CASH, is_paid=True,

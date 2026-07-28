@@ -14,7 +14,10 @@ from time_utils import utcnow
 
 
 def _restaurant(db):
-    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x")
+    tenant = models.Tenant(name="Marketing Tenant")
+    db.add(tenant)
+    db.commit()
+    r = models.Restaurant(id=1, tenant_id=tenant.id, name="Test Bistro", address="x")
     db.add(r)
     db.commit()
     return r

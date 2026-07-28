@@ -50,7 +50,7 @@ const navItems = [
 const STAFF_HOME = "/dashboard/pos";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-    const { user, logout, isLoading } = useAuth();
+    const { user, token, logout, isLoading } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -58,7 +58,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const isStaff = ((user as any)?.role || "").toLowerCase() === "staff";
 
     useEffect(() => {
-        if (!isLoading && !user) {
+        // Redirect only when there's truly no session (no token at all) — a
+        // token whose /me lookup failed because the backend is unreachable
+        // still has a token, and must stay on the page so it can show its own
+        // error state instead of getting silently bounced to /login.
+        if (!isLoading && !token) {
             router.push("/login");
             return;
         }
@@ -76,7 +80,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             );
             if (onAdminPage) router.push(STAFF_HOME);
         }
-    }, [user, isLoading, isStaff, pathname, router]);
+    }, [user, token, isLoading, isStaff, pathname, router]);
 
     if (isLoading) {
         return (
@@ -86,9 +90,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         );
     }
 
-    if (!user) return null;
+    if (!token) return null;
 
-    const restaurantName = (user as any).restaurant_name || "Your Restaurant";
+    const restaurantName = (user as any)?.restaurant_name || "Your Restaurant";
 
     return (
         <div className="min-h-screen flex">
@@ -102,7 +106,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="px-5 py-5 border-b border-[#1a1a1a]">
                     <h1 className="text-lg font-bold text-[#e5e5e5] tracking-tight">Chakula</h1>
                     <p className="text-xs text-[#d4a853] mt-0.5 truncate font-medium">{restaurantName}</p>
-                    <p className="text-xs text-[#525252] truncate">{user.email}</p>
+                    <p className="text-xs text-[#525252] truncate">{user?.email || "—"}</p>
                 </div>
 
                 {/* Nav */}
@@ -158,7 +162,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     >
                         {sidebarOpen ? <X className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
                     </button>
-                    <div className="text-xs text-[#525252]">{user.role}</div>
+                    <div className="text-xs text-[#525252]">{user?.role || "offline"}</div>
                 </header>
 
                 <div className="p-5 max-w-6xl">

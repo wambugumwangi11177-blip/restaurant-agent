@@ -35,6 +35,13 @@ ANCIENT_ORDERS = 50
 ANCIENT_QTY = 10                          # 500 units of long-dead popularity
 
 
+def _tenant_id(db) -> int:
+    tenant = models.Tenant(name="Windowing Tenant")
+    db.add(tenant)
+    db.commit()
+    return tenant.id
+
+
 def _add_order(db, days_ago: int, qty: int, unit_price: int = 1000):
     o = models.Order(
         restaurant_id=1, status=models.OrderStatus.SERVED,
@@ -50,8 +57,9 @@ def _add_order(db, days_ago: int, qty: int, unit_price: int = 1000):
 @pytest.fixture
 def seeded(db_session):
     """A restaurant with a big ancient block and a smaller recent one."""
+    tid = _tenant_id(db_session)
     db_session.add_all([
-        models.Restaurant(id=1, tenant_id=None, name="Windowed Bistro", address="x"),
+        models.Restaurant(id=1, tenant_id=tid, name="Windowed Bistro", address="x"),
         models.MenuItem(id=1, restaurant_id=1, name="Nyama Choma", price=1000, category="main"),
     ])
     db_session.commit()
@@ -152,8 +160,9 @@ def test_degenerate_window_falls_back_to_all_time_rate(db_session):
     reservation is 300 days old — so the windowed guest count is 0 and the rate
     must fall back to the all-time ratio instead of dividing by max(...,1).
     """
+    tid = _tenant_id(db_session)
     db_session.add_all([
-        models.Restaurant(id=1, tenant_id=None, name="Imported", address="x"),
+        models.Restaurant(id=1, tenant_id=tid, name="Imported", address="x"),
         models.MenuItem(id=1, restaurant_id=1, name="X", price=1000, category="main"),
     ])
     db_session.commit()
@@ -206,8 +215,9 @@ def test_kds_throughput_counts_only_the_recent_window(db_session):
     divided by days-since-the-first-order, so a long-lived kitchen's throughput
     was diluted across its whole lifetime. Both halves are now windowed.
     """
+    tid = _tenant_id(db_session)
     db_session.add_all([
-        models.Restaurant(id=1, tenant_id=None, name="KDS Bistro", address="x"),
+        models.Restaurant(id=1, tenant_id=tid, name="KDS Bistro", address="x"),
         models.MenuItem(id=1, restaurant_id=1, name="Nyama Choma", price=1000, category="main"),
     ])
     db_session.commit()

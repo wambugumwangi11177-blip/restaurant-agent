@@ -5,13 +5,14 @@ Rule-based statistics and thresholds, not LLM-backed — see
 directives/012_agentic_roadmap.md's standing rule on labeling honestly.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from database import get_db
 from auth import require_role
 import models
 from ai import menu_engineer, revenue_forecaster, kds_intelligence, inventory_predictor, reservation_optimizer, ops_manager
 from ai.analysis_clock import data_freshness
+from rate_limit import limiter
 from routers.deps import get_restaurant_or_none
 
 router = APIRouter(prefix="/ai", tags=["Analytics"])
@@ -58,16 +59,18 @@ def ai_trust_stats():
 
 
 @router.get("/dashboard")
-def ai_dashboard(db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
+@limiter.limit("10/minute")
+def ai_dashboard(request: Request, db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
     """AI Operations Manager — central intelligence dashboard."""
     rid = _get_restaurant_id(db, user)
     if not rid:
-        return {"error": "No restaurant found"}
+        return {"error": "No restaurant found", "available": False}
     return _with_freshness(db, rid, ops_manager.get_operations_dashboard(db, rid))
 
 
 @router.get("/menu-engineering")
-def menu_engineering(narrate: bool = True, db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
+@limiter.limit("20/minute")
+def menu_engineering(request: Request, narrate: bool = True, db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
     """
     Menu Engineering Matrix — Star/Plowhorse/Puzzle/Dog classification.
     Numbers are deterministic; when an LLM provider is set (and narrate=true) a
@@ -75,7 +78,7 @@ def menu_engineering(narrate: bool = True, db: Session = Depends(get_db), user: 
     """
     rid = _get_restaurant_id(db, user)
     if not rid:
-        return {"error": "No restaurant found"}
+        return {"error": "No restaurant found", "available": False}
     data = menu_engineer.get_menu_engineering(db, rid)
     data["upsell_pairs"] = menu_engineer.get_upsell_pairs(db, rid)
     # Shared narrate-attach helper — this route is a plain `def`, so FastAPI
@@ -87,36 +90,40 @@ def menu_engineering(narrate: bool = True, db: Session = Depends(get_db), user: 
 
 
 @router.get("/revenue-forecast")
-def revenue_forecast(db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
+@limiter.limit("10/minute")
+def revenue_forecast(request: Request, db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
     """Revenue forecasting with trends and predictions."""
     rid = _get_restaurant_id(db, user)
     if not rid:
-        return {"error": "No restaurant found"}
+        return {"error": "No restaurant found", "available": False}
     return _with_freshness(db, rid, revenue_forecaster.get_revenue_forecast(db, rid))
 
 
 @router.get("/kds-intelligence")
-def kds_intel(db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
+@limiter.limit("10/minute")
+def kds_intel(request: Request, db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
     """Kitchen Display System intelligence — prep times, bottlenecks, throughput."""
     rid = _get_restaurant_id(db, user)
     if not rid:
-        return {"error": "No restaurant found"}
+        return {"error": "No restaurant found", "available": False}
     return _with_freshness(db, rid, kds_intelligence.get_kds_intelligence(db, rid))
 
 
 @router.get("/inventory-predictions")
-def inventory_intel(db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
+@limiter.limit("10/minute")
+def inventory_intel(request: Request, db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
     """Inventory intelligence — depletion forecasts, reorder alerts, spoilage risk."""
     rid = _get_restaurant_id(db, user)
     if not rid:
-        return {"error": "No restaurant found"}
+        return {"error": "No restaurant found", "available": False}
     return _with_freshness(db, rid, inventory_predictor.get_inventory_predictions(db, rid))
 
 
 @router.get("/reservation-insights")
-def reservation_intel(db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
+@limiter.limit("10/minute")
+def reservation_intel(request: Request, db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
     """Reservation intelligence — no-show analysis, table utilization, revenue per seat."""
     rid = _get_restaurant_id(db, user)
     if not rid:
-        return {"error": "No restaurant found"}
+        return {"error": "No restaurant found", "available": False}
     return _with_freshness(db, rid, reservation_optimizer.get_reservation_insights(db, rid))

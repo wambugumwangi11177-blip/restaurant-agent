@@ -25,6 +25,7 @@ from datetime import timedelta
 import math
 import models
 from ai.analysis_clock import analysis_anchor
+from ai.cache import cached
 from time_utils import utcnow
 
 
@@ -32,7 +33,20 @@ from time_utils import utcnow
 # MAIN ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
 def get_revenue_forecast(db: Session, restaurant_id: int) -> dict:
-    """Exhaustive revenue intelligence."""
+    """Exhaustive revenue intelligence.
+
+    Cached for 120s to avoid recomputing from 100k+ orders on every request —
+    also cheapens ops_manager.get_operations_dashboard, which calls this
+    function as part of its own fanout. See ai/cache.py.
+    """
+    return cached(
+        f"get_revenue_forecast:{restaurant_id}",
+        120,
+        lambda: _get_revenue_forecast_uncached(db, restaurant_id),
+    )
+
+
+def _get_revenue_forecast_uncached(db: Session, restaurant_id: int) -> dict:
     # Anchored to the restaurant's most recent order, not wall-clock time —
     # see ai/analysis_clock.py. Historical/imported data that doesn't extend
     # to today would otherwise make this "last 30 days" window empty.

@@ -50,7 +50,10 @@ def test_confidence_penalises_large_moves_and_thin_history():
 
 @pytest.fixture
 def seeded(db_session):
-    db_session.add(models.Restaurant(id=1, tenant_id=None, name="Sim", address="x"))
+    tenant = models.Tenant(name="Sim Tenant")
+    db_session.add(tenant)
+    db_session.commit()
+    db_session.add(models.Restaurant(id=1, tenant_id=tenant.id, name="Sim", address="x"))
     # price 1000, cost 400 → 60% margin, comfortably above the 40% floor.
     db_session.add(models.MenuItem(id=1, restaurant_id=1, name="Burger",
                                    price=1000, cost_price=400, category="main"))

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import api from "@/lib/api";
 import { motion } from "framer-motion";
 import { UtensilsCrossed, Plus, X, Loader2, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { useAiModule, useResource } from "@/lib/useAiModule";
 
 interface MenuItem {
     id: number;
@@ -15,27 +16,14 @@ interface MenuItem {
 }
 
 export default function MenuPage() {
-    const [items, setItems] = useState<MenuItem[]>([]);
-    const [aiData, setAiData] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const { data: itemsData, loading: itemsLoading, error: itemsError, retry: retryItems } = useResource<MenuItem[]>("/menu/");
+    const { data: aiData, loading: aiLoading, error: aiError } = useAiModule<any>("/ai/menu-engineering");
     const [showForm, setShowForm] = useState(false);
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({ name: "", price: "", category: "", description: "" });
 
-    useEffect(() => {
-        Promise.all([
-            api.get("/menu/").catch(() => ({ data: [] })),
-            api.get("/ai/menu-engineering").catch(() => ({ data: null })),
-        ]).then(([menuRes, aiRes]) => {
-            setItems(menuRes.data || []);
-            setAiData(aiRes.data);
-            setLoading(false);
-        });
-    }, []);
-
-    const fetchMenu = () => {
-        api.get("/menu/").then((r) => setItems(r.data)).catch(() => { });
-    };
+    const items = Array.isArray(itemsData) ? itemsData : [];
+    const loading = itemsLoading || aiLoading;
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -49,7 +37,7 @@ export default function MenuPage() {
             });
             setForm({ name: "", price: "", category: "", description: "" });
             setShowForm(false);
-            fetchMenu();
+            retryItems();
         } catch { }
         setSaving(false);
     };
@@ -57,7 +45,7 @@ export default function MenuPage() {
     const toggleAvailability = async (item: MenuItem) => {
         try {
             await api.put(`/menu/${item.id}`, { is_available: !item.is_available });
-            fetchMenu();
+            retryItems();
         } catch { }
     };
 
@@ -97,6 +85,22 @@ export default function MenuPage() {
         );
     }
 
+    if (itemsError) {
+        return (
+            <div className="bg-[#141414] border border-[#262626] rounded-xl p-8 text-center">
+                <UtensilsCrossed className="w-8 h-8 text-[#ef4444] mx-auto mb-3" />
+                <p className="text-sm text-[#e5e5e5] mb-1">Couldn&apos;t load your menu</p>
+                <p className="text-xs text-[#525252] mb-4">{itemsError}</p>
+                <button
+                    onClick={retryItems}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-[#e5e5e5] hover:bg-[#222]"
+                >
+                    Try again
+                </button>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-5">
             {/* Header */}
@@ -113,6 +117,12 @@ export default function MenuPage() {
                     {showForm ? "Cancel" : "Add Item"}
                 </button>
             </div>
+
+            {aiError && (
+                <div className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3">
+                    <p className="text-xs text-[#525252]">Menu insights unavailable right now — {aiError}</p>
+                </div>
+            )}
 
             {/* What we found about your menu */}
             {(summary.stars > 0 || summary.dogs > 0 || recommendations.length > 0) && (

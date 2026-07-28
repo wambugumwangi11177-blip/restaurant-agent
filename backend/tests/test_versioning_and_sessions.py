@@ -61,8 +61,11 @@ def test_logout_all_revokes_existing_tokens(client):
 
 def test_token_with_stale_version_is_rejected(client, db_session):
     # Mint a token whose ver is behind the user's current token_version.
+    tenant = models.Tenant(name="Stale Tenant")
+    db_session.add(tenant)
+    db_session.commit()
     user = models.User(
-        tenant_id=None, email="stale@example.com",
+        tenant_id=tenant.id, email="stale@example.com",
         hashed_password=auth.get_password_hash("x"),
         role=models.Role.ADMIN, token_version=3,
     )
@@ -80,8 +83,11 @@ def test_token_with_stale_version_is_rejected(client, db_session):
 def test_legacy_token_without_ver_claim_still_valid(client, db_session):
     # Backward compat: a pre-feature token carries no "ver" → treated as 0, which
     # matches a fresh user's default token_version.
+    tenant = models.Tenant(name="Legacy Tenant")
+    db_session.add(tenant)
+    db_session.commit()
     user = models.User(
-        tenant_id=None, email="legacy@example.com",
+        tenant_id=tenant.id, email="legacy@example.com",
         hashed_password=auth.get_password_hash("x"), role=models.Role.ADMIN,
     )
     db_session.add(user)

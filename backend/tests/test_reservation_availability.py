@@ -9,7 +9,10 @@ from ai.reservation_optimizer import find_available_tables
 
 
 def _seed(db_session):
-    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x")
+    tenant = models.Tenant(name="Availability Tenant")
+    db_session.add(tenant)
+    db_session.commit()
+    r = models.Restaurant(id=1, tenant_id=tenant.id, name="Test Bistro", address="x")
     t_small = models.Table(restaurant_id=1, table_number=1, capacity=2)
     t_big = models.Table(restaurant_id=1, table_number=2, capacity=6)
     db_session.add_all([r, t_small, t_big])

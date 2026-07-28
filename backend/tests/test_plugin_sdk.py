@@ -18,7 +18,10 @@ from ai.plugins.examples import register_examples, HAPPY_HOUR
 
 @pytest.fixture
 def resto(db_session):
-    db_session.add(models.Restaurant(id=1, tenant_id=None, name="Plg", address="x"))
+    tenant = models.Tenant(name="Plugin Tenant")
+    db_session.add(tenant)
+    db_session.commit()
+    db_session.add(models.Restaurant(id=1, tenant_id=tenant.id, name="Plg", address="x"))
     db_session.add(models.MenuItem(id=1, restaurant_id=1, name="Cola",
                                    price=300, cost_price=60, category="drinks"))
     db_session.add(models.MenuItem(id=2, restaurant_id=1, name="Beef",

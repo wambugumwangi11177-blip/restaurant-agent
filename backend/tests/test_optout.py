@@ -10,6 +10,13 @@ from ai.whatsapp import optout, brain
 from time_utils import utcnow
 
 
+def _tenant_id(db) -> int:
+    tenant = models.Tenant(name="Optout Tenant")
+    db.add(tenant)
+    db.commit()
+    return tenant.id
+
+
 def test_record_and_check_opt_out_normalizes(db_session):
     # Stored order phone shape vs. inbound WhatsApp shape — must match.
     assert optout.record_opt_out(db_session, "whatsapp:+254712345678") is True
@@ -30,7 +37,7 @@ def test_start_removes_opt_out(db_session):
 
 
 def test_send_engine_suppresses_opted_out_number(db_session):
-    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x")
+    r = models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="Test Bistro", address="x")
     db_session.add(r)
     db_session.commit()
 
@@ -50,7 +57,7 @@ def test_send_engine_suppresses_opted_out_number(db_session):
 
 def test_winback_candidates_exclude_opted_out(db_session):
     from datetime import timedelta
-    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x")
+    r = models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="Test Bistro", address="x")
     db_session.add(r)
     db_session.commit()
 
@@ -75,7 +82,7 @@ def test_winback_reachable_requires_consent_and_honours_optout(db_session):
     """A win-back is marketing: it may only reach a lapsed regular who gave
     positive consent AND hasn't opted out — the same bar broadcast_promo uses."""
     from datetime import timedelta
-    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x")
+    r = models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="Test Bistro", address="x")
     db_session.add(r)
     db_session.commit()
 

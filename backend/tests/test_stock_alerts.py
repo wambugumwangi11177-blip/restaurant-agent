@@ -23,10 +23,17 @@ from time_utils import utcnow
 from events.bus import clear_handlers
 
 
+def _tenant_id(db) -> int:
+    tenant = models.Tenant(name="Stock Alerts Tenant")
+    db.add(tenant)
+    db.commit()
+    return tenant.id
+
+
 @pytest.fixture
 def stocked(db_session):
     """A restaurant whose 'Chicken' is critically low and actively selling."""
-    r = models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x",
+    r = models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="Test Bistro", address="x",
                           owner_phone="+254712345678")
     item = models.InventoryItem(
         id=1, restaurant_id=1, item_name="Chicken", quantity=2.0, unit="kg",
@@ -143,7 +150,7 @@ def test_depleted_item_with_no_usage_still_reaches_the_owner(db_session, monkeyp
     on_stock_depleted learned to send, this item was reported to nobody.
     """
     db_session.add_all([
-        models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x",
+        models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="Test Bistro", address="x",
                           owner_phone="+254712345678"),
         models.InventoryItem(id=1, restaurant_id=1, item_name="Saffron",
                              quantity=0.0, unit="g", low_stock_threshold=5),
@@ -160,7 +167,7 @@ def test_depleted_item_with_no_usage_still_reaches_the_owner(db_session, monkeyp
 def test_depleted_item_is_not_reported_twice(db_session, monkeypatch):
     """A depleted item is depleted, not *also* merely critical — one event each."""
     db_session.add_all([
-        models.Restaurant(id=1, tenant_id=None, name="Test Bistro", address="x",
+        models.Restaurant(id=1, tenant_id=_tenant_id(db_session), name="Test Bistro", address="x",
                           owner_phone="+254712345678"),
         models.InventoryItem(id=1, restaurant_id=1, item_name="Chicken",
                              quantity=0.0, unit="kg", low_stock_threshold=10),

@@ -50,9 +50,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       setUser(res.data);
-    } catch {
-      localStorage.removeItem("access_token");
-      setToken(null);
+    } catch (err: any) {
+      // Only a real 401 means the token itself is invalid — clear it and force
+      // a fresh login. Any other failure (network error from an unreachable
+      // backend, a 5xx, a timeout) is NOT proof the session is invalid, and
+      // must not log the user out — DashboardLayout used to redirect to
+      // /login on ANY fetchUser failure, which meant a backend outage always
+      // bounced the user to the login screen before any page's own error
+      // state (useResource/useAiModule) ever got a chance to render.
+      if (err?.response?.status === 401) {
+        localStorage.removeItem("access_token");
+        setToken(null);
+      }
     } finally {
       setIsLoading(false);
     }

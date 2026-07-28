@@ -1,25 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import api from "@/lib/api";
 import { motion } from "framer-motion";
 import { CalendarDays, DollarSign } from "lucide-react";
+import { useAiModule, useResource } from "@/lib/useAiModule";
 
 export default function ReservationsPage() {
-    const [reservations, setReservations] = useState<any[]>([]);
-    const [aiData, setAiData] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const { data: reservationsData, loading: resLoading, error: resError, retry: retryReservations } = useResource<any[]>("/reservations/");
+    const { data: aiData, loading: aiLoading, error: aiError } = useAiModule<any>("/ai/reservation-insights");
 
-    useEffect(() => {
-        Promise.all([
-            api.get("/reservations/").catch(() => ({ data: [] })),
-            api.get("/ai/reservation-insights").catch(() => ({ data: null })),
-        ]).then(([resRes, aiRes]) => {
-            setReservations(Array.isArray(resRes.data) ? resRes.data : []);
-            setAiData(aiRes.data);
-            setLoading(false);
-        });
-    }, []);
+    const reservations = Array.isArray(reservationsData) ? reservationsData : [];
+    const loading = resLoading || aiLoading;
 
     if (loading) {
         return (
@@ -27,6 +17,22 @@ export default function ReservationsPage() {
                 {[...Array(4)].map((_, i) => (
                     <div key={i} className="bg-[#141414] rounded-xl h-16 animate-pulse" />
                 ))}
+            </div>
+        );
+    }
+
+    if (resError) {
+        return (
+            <div className="bg-[#141414] border border-[#262626] rounded-xl px-5 py-10 text-center">
+                <CalendarDays className="w-8 h-8 text-[#ef4444] mx-auto mb-3" />
+                <p className="text-sm text-[#e5e5e5] mb-1">Couldn&apos;t load bookings</p>
+                <p className="text-xs text-[#525252] mb-4">{resError}</p>
+                <button
+                    onClick={retryReservations}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-[#e5e5e5] hover:bg-[#222]"
+                >
+                    Try again
+                </button>
             </div>
         );
     }
@@ -66,6 +72,12 @@ export default function ReservationsPage() {
                     <p className="text-lg font-bold text-[#737373] mt-1">{reservations.length}</p>
                 </div>
             </div>
+
+            {aiError && (
+                <div className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3">
+                    <p className="text-xs text-[#525252]">Booking insights unavailable right now — {aiError}</p>
+                </div>
+            )}
 
             {/* What we're seeing about bookings */}
             {(noShow.no_show_rate > 0 || revenue.estimated_revenue_lost > 0 || recommendations.length > 0) && (

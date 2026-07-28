@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import api from "@/lib/api";
 import { demoData } from "@/lib/demo-data";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,11 +8,11 @@ import {
     Package, AlertTriangle, Plus, TruckIcon,
     Minus, X, Check,
 } from "lucide-react";
+import { useAiModule, useResource } from "@/lib/useAiModule";
 
 export default function InventoryPage() {
-    const [items, setItems] = useState<any[]>([]);
-    const [aiData, setAiData] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const { data: itemsData, loading: itemsLoading, error: itemsError, retry: retryItems } = useResource<any[]>("/inventory/");
+    const { data: aiData, loading: aiLoading, error: aiError } = useAiModule<any>("/ai/inventory-predictions");
     const [showAddForm, setShowAddForm] = useState(false);
     const [showReceiveForm, setShowReceiveForm] = useState<number | null>(null);
     const [showAdjustForm, setShowAdjustForm] = useState<number | null>(null);
@@ -33,17 +33,8 @@ export default function InventoryPage() {
     const [submitting, setSubmitting] = useState(false);
     const [toast, setToast] = useState("");
 
-    const fetchData = async () => {
-        const [invRes, aiRes] = await Promise.all([
-            api.get("/inventory/").catch(() => ({ data: [] })),
-            api.get("/ai/inventory-predictions").catch(() => ({ data: null })),
-        ]);
-        setItems(Array.isArray(invRes.data) ? invRes.data : []);
-        setAiData(aiRes.data);
-        setLoading(false);
-    };
-
-    useEffect(() => { fetchData(); }, []);
+    const items = Array.isArray(itemsData) ? itemsData : [];
+    const loading = itemsLoading || aiLoading;
 
     const showToast = (msg: string) => {
         setToast(msg);
@@ -64,7 +55,7 @@ export default function InventoryPage() {
             showToast(`Added ${newName}`);
             setShowAddForm(false);
             setNewName(""); setNewQty(""); setNewCost("");
-            await fetchData();
+            await retryItems();
         } catch (err) { console.error(err); }
         setSubmitting(false);
     };
@@ -81,7 +72,7 @@ export default function InventoryPage() {
             showToast(res.data.message);
             setShowReceiveForm(null);
             setReceiveQty(""); setReceiveCost(""); setReceiveSupplier("");
-            await fetchData();
+            await retryItems();
         } catch (err) { console.error(err); }
         setSubmitting(false);
     };
@@ -97,7 +88,7 @@ export default function InventoryPage() {
             showToast(res.data.message);
             setShowAdjustForm(null);
             setAdjustQty(""); setAdjustReason("");
-            await fetchData();
+            await retryItems();
         } catch (err) { console.error(err); }
         setSubmitting(false);
     };
@@ -108,6 +99,22 @@ export default function InventoryPage() {
                 {[...Array(4)].map((_, i) => (
                     <div key={i} className="bg-[#141414] rounded-xl h-14 animate-pulse" />
                 ))}
+            </div>
+        );
+    }
+
+    if (itemsError) {
+        return (
+            <div className="bg-[#141414] border border-[#262626] rounded-xl p-8 text-center">
+                <Package className="w-8 h-8 text-[#ef4444] mx-auto mb-3" />
+                <p className="text-sm text-[#e5e5e5] mb-1">Couldn&apos;t load your stock</p>
+                <p className="text-xs text-[#525252] mb-4">{itemsError}</p>
+                <button
+                    onClick={retryItems}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-[#e5e5e5] hover:bg-[#222]"
+                >
+                    Try again
+                </button>
             </div>
         );
     }
@@ -245,6 +252,12 @@ export default function InventoryPage() {
                             );
                         })}
                     </div>
+                </div>
+            )}
+
+            {!isDemo && aiError && (
+                <div className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3">
+                    <p className="text-xs text-[#525252]">Stock insights unavailable right now — {aiError}</p>
                 </div>
             )}
 

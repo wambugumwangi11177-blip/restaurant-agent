@@ -21,7 +21,9 @@ def _end_turn(text="Here you go."):
 
 
 def _restaurant(db):
-    r = models.Restaurant(id=1, tenant_id=None, name="Mem Bistro", address="x")
+    tenant = models.Tenant(name="Mem Tenant")
+    db.add(tenant); db.commit()
+    r = models.Restaurant(id=1, tenant_id=tenant.id, name="Mem Bistro", address="x")
     db.add(r); db.commit()
     return r
 

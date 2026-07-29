@@ -264,7 +264,7 @@ export function HowItWorks({ id }: { id: keyof typeof AI_EXPLAIN | string }) {
                 aria-expanded={open}
                 // py-1.5/-my-1.5 lifts the touch target past the 24px WCAG 2.5.8
                 // floor (measured 17px tall) without shifting the layout.
-                className="flex items-center gap-1 py-1.5 -my-1.5 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"
+                className="flex items-center gap-1 py-1.5 -my-1.5 text-[11px] text-[#8a8a8a] hover:text-[#d4a853] transition-colors"
             >
                 <Info className="w-3 h-3" />
                 <span>How this works</span>
@@ -273,8 +273,8 @@ export function HowItWorks({ id }: { id: keyof typeof AI_EXPLAIN | string }) {
             {open && (
                 <div className="mt-2 rounded-lg border border-[#1a1a1a] bg-[#0a0a0a] p-3 space-y-2.5">
                     <p className="text-xs text-[#a3a3a3] leading-relaxed">{e.what}</p>
-                    <p className="text-[11px] text-[#525252]">
-                        <span className="text-[#737373] font-medium">Where this comes from:</span> {e.where}
+                    <p className="text-[11px] text-[#7e7e7e]">
+                        <span className="text-[#8a8a8a] font-medium">Where this comes from:</span> {e.where}
                     </p>
                     {e.caveat && (
                         <p className="text-[11px] text-amber-400/80 flex gap-1.5">
@@ -283,9 +283,9 @@ export function HowItWorks({ id }: { id: keyof typeof AI_EXPLAIN | string }) {
                         </p>
                     )}
                     <div className="pt-1 border-t border-[#1a1a1a] space-y-1.5">
-                        <p className="text-[10px] uppercase tracking-wide text-[#525252] font-semibold">What the words mean</p>
+                        <p className="text-[10px] uppercase tracking-wide text-[#7e7e7e] font-semibold">What the words mean</p>
                         {e.terms.map((term) => (
-                            <p key={term.t} className="text-[11px] text-[#737373] leading-snug">
+                            <p key={term.t} className="text-[11px] text-[#8a8a8a] leading-snug">
                                 <span className="text-[#e5e5e5] font-medium">{term.t}</span> — {term.d}
                             </p>
                         ))}

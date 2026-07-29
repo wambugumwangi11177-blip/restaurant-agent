@@ -117,7 +117,7 @@ export default function CustomerOrderPage() {
                 <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
                     <div>
                         <h1 className="text-lg font-bold text-[#d4a853]">Chakula</h1>
-                        <p className="text-[10px] text-[#525252]">Order fresh food, delivered or pickup</p>
+                        <p className="text-[10px] text-[#7e7e7e]">Order fresh food, delivered or pickup</p>
                     </div>
                     {step === "menu" && itemCount > 0 && (
                         <button
@@ -129,7 +129,7 @@ export default function CustomerOrderPage() {
                         </button>
                     )}
                     {step === "checkout" && (
-                        <button onClick={() => setStep("menu")} className="flex items-center gap-1 text-sm text-[#737373]">
+                        <button onClick={() => setStep("menu")} className="flex items-center gap-1 text-sm text-[#8a8a8a]">
                             <ArrowLeft className="w-4 h-4" />
                             Back
                         </button>
@@ -147,7 +147,7 @@ export default function CustomerOrderPage() {
                                     <button key={cat} onClick={() => setSelectedCategory(cat)}
                                         className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${selectedCategory === cat
                                                 ? "bg-[#d4a853] text-black"
-                                                : "bg-[#1a1a1a] text-[#737373]"
+                                                : "bg-[#1a1a1a] text-[#8a8a8a]"
                                             }`}>
                                         {cat}
                                     </button>
@@ -164,7 +164,7 @@ export default function CustomerOrderPage() {
                                             <div className="flex-1">
                                                 <p className="text-sm font-medium text-[#e5e5e5]">{item.name}</p>
                                                 {item.description && (
-                                                    <p className="text-xs text-[#525252] mt-0.5">{item.description}</p>
+                                                    <p className="text-xs text-[#7e7e7e] mt-0.5">{item.description}</p>
                                                 )}
                                                 <p className="text-sm font-semibold text-[#d4a853] mt-1">{formatKES(item.price)}</p>
                                             </div>
@@ -172,7 +172,7 @@ export default function CustomerOrderPage() {
                                                 {inCart ? (
                                                     <div className="flex items-center gap-2">
                                                         <button onClick={() => updateQty(item.id, -1)}
-                                                            className="w-8 h-8 rounded-full bg-[#1a1a1a] flex items-center justify-center text-[#737373]">
+                                                            className="w-8 h-8 rounded-full bg-[#1a1a1a] flex items-center justify-center text-[#8a8a8a]">
                                                             <Minus className="w-4 h-4" />
                                                         </button>
                                                         <span className="text-sm font-bold w-4 text-center">{inCart.quantity}</span>
@@ -209,11 +209,11 @@ export default function CustomerOrderPage() {
                                         </div>
                                         <div className="flex items-center gap-1">
                                             <button onClick={() => updateQty(c.menuItem.id, -1)}
-                                                className="w-6 h-6 rounded bg-[#1a1a1a] flex items-center justify-center text-[#737373]">
+                                                className="w-6 h-6 rounded bg-[#1a1a1a] flex items-center justify-center text-[#8a8a8a]">
                                                 <Minus className="w-3 h-3" />
                                             </button>
                                             <button onClick={() => updateQty(c.menuItem.id, 1)}
-                                                className="w-6 h-6 rounded bg-[#1a1a1a] flex items-center justify-center text-[#737373]">
+                                                className="w-6 h-6 rounded bg-[#1a1a1a] flex items-center justify-center text-[#8a8a8a]">
                                                 <Plus className="w-3 h-3" />
                                             </button>
                                         </div>
@@ -235,7 +235,7 @@ export default function CustomerOrderPage() {
                                     <button key={t.v} onClick={() => setOrderType(t.v)}
                                         className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${orderType === t.v
                                                 ? "bg-[#d4a853]/10 text-[#d4a853] border border-[#d4a853]/30"
-                                                : "bg-[#1a1a1a] text-[#737373] border border-[#262626]"
+                                                : "bg-[#1a1a1a] text-[#8a8a8a] border border-[#262626]"
                                             }`}>
                                         {t.label}
                                     </button>
@@ -245,22 +245,22 @@ export default function CustomerOrderPage() {
                             {/* Customer details */}
                             <div className="space-y-3 mb-4">
                                 <div className="relative">
-                                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#525252]" />
+                                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#7e7e7e]" />
                                     <input type="text" placeholder="Your name" value={customerName}
                                         onChange={(e) => setCustomerName(e.target.value)}
-                                        className="w-full bg-[#141414] border border-[#262626] rounded-xl pl-10 pr-4 py-3 text-sm text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none"
+                                        className="w-full bg-[#141414] border border-[#262626] rounded-xl pl-10 pr-4 py-3 text-sm text-[#e5e5e5] placeholder-[#7e7e7e] focus:border-[#d4a853]/50 focus:outline-none"
                                     />
                                 </div>
                                 <div className="relative">
-                                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#525252]" />
+                                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#7e7e7e]" />
                                     <input type="tel" placeholder="Phone number (e.g. 0712 345 678)" value={customerPhone}
                                         onChange={(e) => setCustomerPhone(e.target.value)}
-                                        className="w-full bg-[#141414] border border-[#262626] rounded-xl pl-10 pr-4 py-3 text-sm text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none"
+                                        className="w-full bg-[#141414] border border-[#262626] rounded-xl pl-10 pr-4 py-3 text-sm text-[#e5e5e5] placeholder-[#7e7e7e] focus:border-[#d4a853]/50 focus:outline-none"
                                     />
                                 </div>
                                 <input type="text" placeholder="Any special requests? (optional)" value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
-                                    className="w-full bg-[#141414] border border-[#262626] rounded-xl px-4 py-3 text-sm text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none"
+                                    className="w-full bg-[#141414] border border-[#262626] rounded-xl px-4 py-3 text-sm text-[#e5e5e5] placeholder-[#7e7e7e] focus:border-[#d4a853]/50 focus:outline-none"
                                 />
                             </div>
 
@@ -282,7 +282,7 @@ export default function CustomerOrderPage() {
                                     onChange={(e) => setConsentGiven(e.target.checked)}
                                     className="mt-0.5 w-4 h-4 rounded border-[#262626] bg-[#141414] accent-[#d4a853]"
                                 />
-                                <span className="text-xs text-[#737373]">
+                                <span className="text-xs text-[#8a8a8a]">
                                     I agree to be contacted about this order via phone or WhatsApp,
                                     including for order updates and payment confirmation.
                                 </span>
@@ -294,7 +294,7 @@ export default function CustomerOrderPage() {
                                 disabled={!customerName || !customerPhone || !consentGiven || submitting}
                                 className={`w-full py-3.5 rounded-xl text-sm font-semibold transition-all ${customerName && customerPhone && consentGiven && !submitting
                                         ? "bg-[#d4a853] text-black hover:bg-[#c49843]"
-                                        : "bg-[#262626] text-[#525252] cursor-not-allowed"
+                                        : "bg-[#262626] text-[#7e7e7e] cursor-not-allowed"
                                     }`}
                             >
                                 {submitting ? "Placing Order..." : `Place Order · ${formatKES(subtotal)}`}
@@ -309,10 +309,10 @@ export default function CustomerOrderPage() {
                                 <Check className="w-8 h-8 text-[#22c55e]" />
                             </div>
                             <h2 className="text-xl font-bold text-[#e5e5e5] mb-2">Order Placed!</h2>
-                            <p className="text-sm text-[#737373] mb-1">Your order #{orderId} is being prepared</p>
-                            <p className="text-xs text-[#525252] mb-6">We&apos;ll let you know when it&apos;s ready</p>
+                            <p className="text-sm text-[#8a8a8a] mb-1">Your order #{orderId} is being prepared</p>
+                            <p className="text-xs text-[#7e7e7e] mb-6">We&apos;ll let you know when it&apos;s ready</p>
                             <button onClick={() => { setStep("menu"); setCart([]); setOrderId(null); }}
-                                className="px-6 py-2.5 bg-[#1a1a1a] border border-[#262626] rounded-xl text-sm text-[#737373] hover:text-[#e5e5e5]">
+                                className="px-6 py-2.5 bg-[#1a1a1a] border border-[#262626] rounded-xl text-sm text-[#8a8a8a] hover:text-[#e5e5e5]">
                                 Order Again
                             </button>
                         </motion.div>

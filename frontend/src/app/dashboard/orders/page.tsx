@@ -26,7 +26,7 @@ export default function OrdersPage() {
             <div className="bg-[#141414] border border-[#262626] rounded-xl px-5 py-10 text-center">
                 <ShoppingBag className="w-8 h-8 text-[#ef4444] mx-auto mb-3" />
                 <p className="text-sm text-[#e5e5e5] mb-1">Couldn&apos;t load orders</p>
-                <p className="text-xs text-[#525252] mb-4">{ordersError}</p>
+                <p className="text-xs text-[#7e7e7e] mb-4">{ordersError}</p>
                 <button
                     onClick={retryOrders}
                     className="text-xs px-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-[#e5e5e5] hover:bg-[#222]"
@@ -53,7 +53,7 @@ export default function OrdersPage() {
         <div className="space-y-5">
             <div>
                 <h1 className="text-xl font-bold text-[#e5e5e5]">Orders</h1>
-                <p className="text-sm text-[#525252] mt-0.5">
+                <p className="text-sm text-[#7e7e7e] mt-0.5">
                     Live from your POS &amp; KDS
                 </p>
             </div>
@@ -61,22 +61,22 @@ export default function OrdersPage() {
             {/* Today at a glance */}
             <div className="grid grid-cols-3 gap-3">
                 <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
-                    <p className="text-xs text-[#525252]">Today&apos;s Sales</p>
+                    <p className="text-xs text-[#7e7e7e]">Today&apos;s Sales</p>
                     <p className="text-lg font-bold text-[#22c55e] mt-1">{formatKES(todayRevenue)}</p>
                 </div>
                 <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
-                    <p className="text-xs text-[#525252]">Orders</p>
+                    <p className="text-xs text-[#7e7e7e]">Orders</p>
                     <p className="text-lg font-bold text-[#e5e5e5] mt-1">{todayOrders.length}</p>
                 </div>
                 <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
-                    <p className="text-xs text-[#525252]">In the Kitchen</p>
+                    <p className="text-xs text-[#7e7e7e]">In the Kitchen</p>
                     <p className="text-lg font-bold text-[#d4a853] mt-1">{pendingCount}</p>
                 </div>
             </div>
 
             {aiError && (
                 <div className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3">
-                    <p className="text-xs text-[#525252]">Sales insights unavailable right now — {aiError}</p>
+                    <p className="text-xs text-[#7e7e7e]">Sales insights unavailable right now — {aiError}</p>
                 </div>
             )}
 
@@ -90,17 +90,17 @@ export default function OrdersPage() {
                         {/* Natural language insights */}
                         <div className="space-y-2">
                             {trends.total_revenue > 0 && (
-                                <p className="text-xs text-[#737373]">
+                                <p className="text-xs text-[#8a8a8a]">
                                     You&apos;ve made <span className="text-[#e5e5e5] font-semibold">{formatKES(trends.total_revenue)}</span> in the last 30 days
                                 </p>
                             )}
                             {trends.avg_order_value > 0 && (
-                                <p className="text-xs text-[#737373]">
+                                <p className="text-xs text-[#8a8a8a]">
                                     Customers spend about <span className="text-[#e5e5e5] font-semibold">{formatKES(trends.avg_order_value)}</span> per order on average
                                 </p>
                             )}
                             {wowGrowth !== undefined && wowGrowth !== 0 && (
-                                <p className="text-xs text-[#737373]">
+                                <p className="text-xs text-[#8a8a8a]">
                                     Compared to last week, sales are{" "}
                                     <span className={`font-semibold ${wowGrowth >= 0 ? "text-[#22c55e]" : "text-[#ef4444]"}`}>
                                         {wowGrowth > 0 ? "up" : "down"} {Math.abs(wowGrowth).toFixed(1)}%
@@ -108,7 +108,7 @@ export default function OrdersPage() {
                                 </p>
                             )}
                             {peakDay && (
-                                <p className="text-xs text-[#737373]">
+                                <p className="text-xs text-[#8a8a8a]">
                                     Your busiest day is usually <span className="text-[#d4a853] font-semibold">{peakDay}</span>
                                     {peakHour !== undefined && (
                                         <>, and the rush comes around <span className="text-[#d4a853] font-semibold">{formatHour(peakHour)}</span></>
@@ -120,7 +120,7 @@ export default function OrdersPage() {
                         {/* Next 7 days forecast */}
                         {forecast.length > 0 && (
                             <div>
-                                <p className="text-[10px] text-[#525252] mb-2">Expected sales this coming week</p>
+                                <p className="text-[10px] text-[#7e7e7e] mb-2">Expected sales this coming week</p>
                                 <div className="flex gap-1 items-end h-14">
                                     {forecast.map((f: any, i: number) => {
                                         const max = Math.max(...forecast.map((ff: any) => ff.predicted || ff.amount || 0));
@@ -131,7 +131,7 @@ export default function OrdersPage() {
                                                 <div className="w-full rounded-sm relative overflow-hidden" style={{ height: `${Math.max(pct, 8)}%` }}>
                                                     <div className="absolute inset-0 bg-[#d4a853]/30 rounded-sm" />
                                                 </div>
-                                                <span className="text-[8px] text-[#525252]">{f.day_name?.slice(0, 3) || `Day ${i + 1}`}</span>
+                                                <span className="text-[8px] text-[#7e7e7e]">{f.day_name?.slice(0, 3) || `Day ${i + 1}`}</span>
                                             </div>
                                         );
                                     })}
@@ -142,9 +142,9 @@ export default function OrdersPage() {
                         {/* Unusual days */}
                         {anomalies.length > 0 && (
                             <div className="space-y-1 pt-2 border-t border-[#1a1a1a]">
-                                <p className="text-[10px] text-[#525252] uppercase tracking-wider">Unusual days we noticed</p>
+                                <p className="text-[10px] text-[#7e7e7e] uppercase tracking-wider">Unusual days we noticed</p>
                                 {anomalies.slice(0, 2).map((a: any, i: number) => (
-                                    <p key={i} className="text-xs text-[#737373]">
+                                    <p key={i} className="text-xs text-[#8a8a8a]">
                                         {a.date}: sales were{" "}
                                         <span className={a.type === "high" ? "text-[#22c55e]" : "text-[#ef4444]"}>
                                             {a.type === "high" ? "higher than normal" : "lower than usual"}
@@ -166,7 +166,7 @@ export default function OrdersPage() {
                 {orders.length === 0 ? (
                     <div className="px-5 py-10 text-center">
                         <ShoppingBag className="w-8 h-8 text-[#333] mx-auto mb-3" />
-                        <p className="text-sm text-[#525252]">No orders yet — they&apos;ll show up here from your POS</p>
+                        <p className="text-sm text-[#7e7e7e]">No orders yet — they&apos;ll show up here from your POS</p>
                     </div>
                 ) : (
                     <div className="divide-y divide-[#1a1a1a]">
@@ -182,7 +182,7 @@ export default function OrdersPage() {
                                 pending: "bg-[#eab308]/10 text-[#eab308]",
                                 prep: "bg-[#3b82f6]/10 text-[#3b82f6]",
                                 ready: "bg-[#22c55e]/10 text-[#22c55e]",
-                                served: "bg-[#737373]/10 text-[#737373]",
+                                served: "bg-[#8a8a8a]/10 text-[#8a8a8a]",
                                 cancelled: "bg-[#ef4444]/10 text-[#ef4444]",
                             };
                             return (
@@ -190,10 +190,10 @@ export default function OrdersPage() {
                                     transition={{ delay: i * 0.03 }}
                                     className="px-4 py-3 flex items-center justify-between hover:bg-[#1a1a1a] transition-colors">
                                     <div className="flex items-center gap-3">
-                                        <span className="text-sm font-mono text-[#525252]">#{order.id}</span>
+                                        <span className="text-sm font-mono text-[#7e7e7e]">#{order.id}</span>
                                         <div>
                                             <p className="text-sm text-[#e5e5e5]">{order.customer_name || "Walk-in"}</p>
-                                            <p className="text-xs text-[#525252] mt-0.5">
+                                            <p className="text-xs text-[#7e7e7e] mt-0.5">
                                                 {friendlyOrderType(order.order_type)}{order.table_number ? ` · Table ${order.table_number}` : ""}
                                             </p>
                                         </div>

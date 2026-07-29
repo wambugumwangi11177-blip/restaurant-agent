@@ -63,7 +63,7 @@ export default function LoginPage() {
                     <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">
                         Chakula
                     </h1>
-                    <p className="text-sm text-[#737373] mt-1">Restaurant Manager</p>
+                    <p className="text-sm text-[#8a8a8a] mt-1">Restaurant Manager</p>
                 </div>
 
                 {/* Card */}
@@ -81,13 +81,13 @@ export default function LoginPage() {
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {isRegister && (
                             <div>
-                                <label htmlFor="tenant-name" className="block text-sm text-[#737373] mb-1.5">Restaurant Name</label>
+                                <label htmlFor="tenant-name" className="block text-sm text-[#8a8a8a] mb-1.5">Restaurant Name</label>
                                 <input
                                     id="tenant-name"
                                     type="text"
                                     value={tenantName}
                                     onChange={(e) => setTenantName(e.target.value)}
-                                    className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm"
+                                    className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-[#e5e5e5] placeholder-[#7e7e7e] text-sm"
                                     placeholder="e.g. Mama Ngina's Kitchen"
                                     autoComplete="organization"
                                     required
@@ -96,13 +96,13 @@ export default function LoginPage() {
                         )}
 
                         <div>
-                            <label htmlFor="email" className="block text-sm text-[#737373] mb-1.5">Email</label>
+                            <label htmlFor="email" className="block text-sm text-[#8a8a8a] mb-1.5">Email</label>
                             <input
                                 id="email"
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm"
+                                className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-[#e5e5e5] placeholder-[#7e7e7e] text-sm"
                                 placeholder="you@restaurant.com"
                                 autoComplete="email"
                                 required
@@ -110,14 +110,14 @@ export default function LoginPage() {
                         </div>
 
                         <div>
-                            <label htmlFor="password" className="block text-sm text-[#737373] mb-1.5">Password</label>
+                            <label htmlFor="password" className="block text-sm text-[#8a8a8a] mb-1.5">Password</label>
                             <div className="relative">
                                 <input
                                     id="password"
                                     type={showPassword ? "text" : "password"}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm pr-10"
+                                    className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-[#e5e5e5] placeholder-[#7e7e7e] text-sm pr-10"
                                     placeholder="••••••••"
                                     autoComplete={isRegister ? "new-password" : "current-password"}
                                     minLength={isRegister ? 8 : undefined}
@@ -128,13 +128,13 @@ export default function LoginPage() {
                                     onClick={() => setShowPassword(!showPassword)}
                                     aria-label={showPassword ? "Hide password" : "Show password"}
                                     aria-pressed={showPassword}
-                                    className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-[#525252] hover:text-[#737373]"
+                                    className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-[#7e7e7e] hover:text-[#8a8a8a]"
                                 >
                                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                 </button>
                             </div>
                             {isRegister && (
-                                <p className="text-xs text-[#525252] mt-1.5">
+                                <p className="text-xs text-[#7e7e7e] mt-1.5">
                                     At least 8 characters, with a letter and a number.
                                 </p>
                             )}
@@ -161,7 +161,7 @@ export default function LoginPage() {
                                 setIsRegister(!isRegister);
                                 setError("");
                             }}
-                            className="text-sm text-[#737373] hover:text-[#d4a853] py-1.5 -my-1.5"
+                            className="text-sm text-[#8a8a8a] hover:text-[#d4a853] py-1.5 -my-1.5"
                         >
                             {isRegister
                                 ? "Already have an account? Sign in"
@@ -178,11 +178,11 @@ export default function LoginPage() {
                     </div>
                     <ul className="space-y-2">
                         <li className="flex items-start gap-2 text-xs text-[#a3a3a3]">
-                            <GitBranch className="w-3.5 h-3.5 text-[#525252] mt-0.5 flex-shrink-0" />
+                            <GitBranch className="w-3.5 h-3.5 text-[#7e7e7e] mt-0.5 flex-shrink-0" />
                             <span>Every number comes from deterministic math over your real data — AI only interprets it, never computes it.</span>
                         </li>
                         <li className="flex items-start gap-2 text-xs text-[#a3a3a3]">
-                            <ShieldCheck className="w-3.5 h-3.5 text-[#525252] mt-0.5 flex-shrink-0" />
+                            <ShieldCheck className="w-3.5 h-3.5 text-[#7e7e7e] mt-0.5 flex-shrink-0" />
                             <span>
                                 Every figure the AI writes is checked against your data before you see it
                                 {trustStats?.grounded_pct != null && (
@@ -191,7 +191,7 @@ export default function LoginPage() {
                             </span>
                         </li>
                         <li className="flex items-start gap-2 text-xs text-[#a3a3a3]">
-                            <Lock className="w-3.5 h-3.5 text-[#525252] mt-0.5 flex-shrink-0" />
+                            <Lock className="w-3.5 h-3.5 text-[#7e7e7e] mt-0.5 flex-shrink-0" />
                             <span>Your restaurant's data is isolated per account — never mixed with, or trained on across, other tenants.</span>
                         </li>
                     </ul>

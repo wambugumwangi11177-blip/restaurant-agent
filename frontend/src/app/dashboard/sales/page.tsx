@@ -42,7 +42,7 @@ export default function SalesPage() {
             <div className="bg-[#141414] border border-[#262626] rounded-xl px-5 py-10 text-center">
                 <TrendingUp className="w-8 h-8 text-[#ef4444] mx-auto mb-3" />
                 <p className="text-sm text-[#e5e5e5] mb-1">Couldn&apos;t load sales data</p>
-                <p className="text-xs text-[#525252] mb-4">{ordersError}</p>
+                <p className="text-xs text-[#7e7e7e] mb-4">{ordersError}</p>
                 <button
                     onClick={retryOrders}
                     className="text-xs px-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-[#e5e5e5] hover:bg-[#222]"
@@ -118,7 +118,7 @@ export default function SalesPage() {
             {/* Header */}
             <div>
                 <h1 className="text-xl font-bold text-[#e5e5e5]">Sales</h1>
-                <p className="text-sm text-[#525252] mt-0.5">
+                <p className="text-sm text-[#7e7e7e] mt-0.5">
                     {isDemo ? "Last 7 days performance" : "Today's performance"}
                 </p>
             </div>
@@ -167,14 +167,14 @@ export default function SalesPage() {
                                         transition={{ delay: i * 0.06, duration: 0.4 }}
                                         className="flex-1 flex flex-col items-center gap-1 justify-end h-full"
                                     >
-                                        <span className="text-[9px] text-[#525252]">
+                                        <span className="text-[9px] text-[#7e7e7e]">
                                             {(day.revenue / 1000).toFixed(0)}k
                                         </span>
                                         <div
                                             className={`w-full rounded-t transition-all ${isBest ? "bg-[#d4a853]" : "bg-[#d4a853]/25"}`}
                                             style={{ height: `${pct}%` }}
                                         />
-                                        <span className={`text-[10px] ${isBest ? "text-[#d4a853] font-semibold" : "text-[#525252]"}`}>
+                                        <span className={`text-[10px] ${isBest ? "text-[#d4a853] font-semibold" : "text-[#7e7e7e]"}`}>
                                             {day.date}
                                         </span>
                                     </motion.div>
@@ -209,10 +209,10 @@ export default function SalesPage() {
                             <ChannelRow icon={UtensilsCrossed} label="Dine In" count={byDineIn.length} total={byDineIn.reduce((s, o) => s + o.total, 0)} color="#d4a853" formatKES={formatKES} />
                             <ChannelRow icon={ShoppingBag} label="Takeaway" count={byTakeout.length} total={byTakeout.reduce((s, o) => s + o.total, 0)} color="#3b82f6" formatKES={formatKES} />
                             <ChannelRow icon={Truck} label="Delivery" count={byDelivery.length} total={byDelivery.reduce((s, o) => s + o.total, 0)} color="#eab308" formatKES={formatKES} />
-                            {byUber.length > 0 && <ChannelRow icon={Truck} label="  ↳ Uber Eats" count={byUber.length} total={byUber.reduce((s, o) => s + o.total, 0)} color="#525252" formatKES={formatKES} nested />}
-                            {byBolt.length > 0 && <ChannelRow icon={Truck} label="  ↳ Bolt Food" count={byBolt.length} total={byBolt.reduce((s, o) => s + o.total, 0)} color="#525252" formatKES={formatKES} nested />}
-                            {byGlovo.length > 0 && <ChannelRow icon={Truck} label="  ↳ Glovo" count={byGlovo.length} total={byGlovo.reduce((s, o) => s + o.total, 0)} color="#525252" formatKES={formatKES} nested />}
-                            {byApp.length > 0 && <ChannelRow icon={Smartphone} label="  ↳ App Orders" count={byApp.length} total={byApp.reduce((s, o) => s + o.total, 0)} color="#525252" formatKES={formatKES} nested />}
+                            {byUber.length > 0 && <ChannelRow icon={Truck} label="  ↳ Uber Eats" count={byUber.length} total={byUber.reduce((s, o) => s + o.total, 0)} color="#7e7e7e" formatKES={formatKES} nested />}
+                            {byBolt.length > 0 && <ChannelRow icon={Truck} label="  ↳ Bolt Food" count={byBolt.length} total={byBolt.reduce((s, o) => s + o.total, 0)} color="#7e7e7e" formatKES={formatKES} nested />}
+                            {byGlovo.length > 0 && <ChannelRow icon={Truck} label="  ↳ Glovo" count={byGlovo.length} total={byGlovo.reduce((s, o) => s + o.total, 0)} color="#7e7e7e" formatKES={formatKES} nested />}
+                            {byApp.length > 0 && <ChannelRow icon={Smartphone} label="  ↳ App Orders" count={byApp.length} total={byApp.reduce((s, o) => s + o.total, 0)} color="#7e7e7e" formatKES={formatKES} nested />}
                         </div>
                     </div>
                 </div>
@@ -235,7 +235,7 @@ export default function SalesPage() {
                                         <div className="w-full relative" style={{ height: `${Math.max(pct, 2)}%` }}>
                                             <div className={`w-full h-full rounded-t ${isNow ? "bg-[#d4a853]" : "bg-[#d4a853]/20"}`} />
                                         </div>
-                                        <span className={`text-[8px] ${isNow ? "text-[#d4a853]" : "text-[#525252]"}`}>
+                                        <span className={`text-[8px] ${isNow ? "text-[#d4a853]" : "text-[#7e7e7e]"}`}>
                                             {hour > 12 ? `${hour - 12}p` : hour === 12 ? "12p" : `${hour}a`}
                                         </span>
                                     </div>
@@ -265,10 +265,10 @@ export default function SalesPage() {
                                     transition={{ delay: i * 0.06 }}
                                     className="px-4 py-2.5 flex items-center gap-3"
                                 >
-                                    <span className="text-xs font-bold text-[#525252] w-4">{i + 1}</span>
+                                    <span className="text-xs font-bold text-[#7e7e7e] w-4">{i + 1}</span>
                                     <div className="flex-1">
                                         <p className="text-xs text-[#e5e5e5]">{item.name}</p>
-                                        <p className="text-[10px] text-[#525252]">{item.orders} sold · {item.margin}% margin</p>
+                                        <p className="text-[10px] text-[#7e7e7e]">{item.orders} sold · {item.margin}% margin</p>
                                     </div>
                                     <span className="text-xs font-semibold text-[#d4a853]">
                                         KES {item.revenue.toLocaleString("en-KE")}
@@ -277,10 +277,10 @@ export default function SalesPage() {
                             ))
                             : topItems.map((item, i) => (
                                 <div key={item.name} className="px-4 py-2.5 flex items-center gap-3">
-                                    <span className="text-xs font-bold text-[#525252] w-4">{i + 1}</span>
+                                    <span className="text-xs font-bold text-[#7e7e7e] w-4">{i + 1}</span>
                                     <div className="flex-1">
                                         <p className="text-xs text-[#e5e5e5]">{item.name}</p>
-                                        <p className="text-[10px] text-[#525252]">{item.qty} sold</p>
+                                        <p className="text-[10px] text-[#7e7e7e]">{item.qty} sold</p>
                                     </div>
                                     <span className="text-xs font-semibold text-[#d4a853]">{formatKES(item.revenue)}</span>
                                 </div>
@@ -297,7 +297,7 @@ function StatCard({ label, value, color }: { label: string; value: string; color
     return (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3">
-            <p className="text-[10px] text-[#525252] uppercase tracking-wider">{label}</p>
+            <p className="text-[10px] text-[#7e7e7e] uppercase tracking-wider">{label}</p>
             <p className="text-lg font-bold mt-0.5" style={{ color }}>{value}</p>
         </motion.div>
     );
@@ -308,7 +308,7 @@ function PaymentRow({ icon: Icon, label, count, total, color, formatKES }: any) 
         <div className="flex items-center gap-3">
             <Icon className="w-4 h-4" style={{ color }} />
             <div className="flex-1"><p className="text-xs text-[#e5e5e5]">{label}</p></div>
-            <span className="text-[10px] text-[#525252]">{count} orders</span>
+            <span className="text-[10px] text-[#7e7e7e]">{count} orders</span>
             <span className="text-xs font-semibold text-[#e5e5e5] w-24 text-right">{formatKES(total)}</span>
         </div>
     );
@@ -319,7 +319,7 @@ function ChannelRow({ icon: Icon, label, count, total, color, formatKES, nested 
         <div className={`flex items-center gap-3 ${nested ? "pl-4 opacity-70" : ""}`}>
             <Icon className="w-3.5 h-3.5" style={{ color }} />
             <div className="flex-1"><p className="text-xs text-[#e5e5e5]">{label}</p></div>
-            <span className="text-[10px] text-[#525252]">{count}</span>
+            <span className="text-[10px] text-[#7e7e7e]">{count}</span>
             <span className="text-xs font-semibold text-[#e5e5e5] w-24 text-right">{formatKES(total)}</span>
         </div>
     );

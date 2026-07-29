@@ -42,7 +42,7 @@ const verdictStyle: Record<string, string> = {
 function Delta({ label, value, good }: { label: string; value: string; good: boolean }) {
     return (
         <div className="rounded-lg border border-[#1a1a1a] bg-[#0a0a0a] p-3">
-            <p className="text-[10px] uppercase tracking-wide text-[#525252]">{label}</p>
+            <p className="text-[10px] uppercase tracking-wide text-[#7e7e7e]">{label}</p>
             <p className={`text-sm font-semibold ${good ? "text-emerald-400" : "text-red-400"}`}>{value}</p>
         </div>
     );
@@ -99,7 +99,7 @@ export function WhatIfSimulator() {
                 <FlaskConical className="w-4 h-4 text-[#d4a853]" />
                 What-If Simulator
             </h2>
-            <p className="text-xs text-[#525252] mt-1">
+            <p className="text-xs text-[#7e7e7e] mt-1">
                 Test a price change before you make it — projected on your own sales history.
             </p>
             <HowItWorks id="simulate" />
@@ -107,7 +107,7 @@ export function WhatIfSimulator() {
 
             <div className="flex flex-wrap items-end gap-3">
                 <label className="flex flex-col gap-1">
-                    <span className="text-[10px] uppercase tracking-wide text-[#525252]">Dish</span>
+                    <span className="text-[10px] uppercase tracking-wide text-[#7e7e7e]">Dish</span>
                     <select
                         value={itemId ?? ""}
                         onChange={(e) => onSelect(Number(e.target.value))}
@@ -119,7 +119,7 @@ export function WhatIfSimulator() {
                     </select>
                 </label>
                 <label className="flex flex-col gap-1">
-                    <span className="text-[10px] uppercase tracking-wide text-[#525252]">
+                    <span className="text-[10px] uppercase tracking-wide text-[#7e7e7e]">
                         New price (cents){selected ? ` — now KES ${(selected.price / 100).toLocaleString()}` : ""}
                     </span>
                     <input
@@ -146,8 +146,8 @@ export function WhatIfSimulator() {
                         <span className={`text-xs font-bold px-2.5 py-1 rounded-md border ${verdictStyle[result.verdict || "CAUTION"]}`}>
                             {result.verdict}
                         </span>
-                        <span className="text-xs text-[#737373]">{result.verdict_reason}</span>
-                        <span className="text-xs text-[#525252] ml-auto">{result.confidence_pct}% confidence</span>
+                        <span className="text-xs text-[#8a8a8a]">{result.verdict_reason}</span>
+                        <span className="text-xs text-[#7e7e7e] ml-auto">{result.confidence_pct}% confidence</span>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <Delta label="Sales" value={`${result.deltas.sales_pct > 0 ? "+" : ""}${result.deltas.sales_pct}%`} good={result.deltas.sales_pct >= 0} />
@@ -156,7 +156,7 @@ export function WhatIfSimulator() {
                         <Delta label="Satisfaction" value={`${result.deltas.satisfaction_pct_points >= 0 ? "+" : ""}${result.deltas.satisfaction_pct_points} pts`} good={result.deltas.satisfaction_pct_points >= 0} />
                     </div>
                     {result.assumptions && (
-                        <ul className="text-[11px] text-[#525252] space-y-0.5 pt-1">
+                        <ul className="text-[11px] text-[#7e7e7e] space-y-0.5 pt-1">
                             {result.assumptions.map((a, i) => <li key={i}>• {a}</li>)}
                         </ul>
                     )}

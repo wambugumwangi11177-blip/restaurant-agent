@@ -23,8 +23,13 @@ export const viewport: Viewport = {
   themeColor: "#0a0a0a",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // maximumScale/userScalable deliberately NOT set. They were `1` and `false`,
+  // which disables pinch-zoom entirely — a WCAG 1.4.4 failure flagged by
+  // Lighthouse on 2026-07-28. Anyone with low vision relying on screen
+  // magnification could not zoom this app at all. The usual motive for locking
+  // scale is stopping iOS from zooming on focused inputs, but that is caused by
+  // sub-16px input font sizes, not by the user, and shouldn't be paid for by
+  // removing zoom from everyone who needs it.
 };
 
 export default function RootLayout({

@@ -60,7 +60,7 @@ export function StrategyAgent() {
                 <Target className="w-4 h-4 text-[#d4a853]" />
                 CEO Strategy Agent
             </h2>
-            <p className="text-xs text-[#525252] mt-1">
+            <p className="text-xs text-[#7e7e7e] mt-1">
                 Set a goal — the agent consults every specialist brain and returns one prioritized plan.
             </p>
             <HowItWorks id="strategy" />
@@ -87,7 +87,7 @@ export function StrategyAgent() {
                     <button
                         key={s}
                         onClick={() => { setGoal(s); run(s); }}
-                        className="text-[11px] text-[#737373] hover:text-[#d4a853] border border-[#1a1a1a] rounded-full px-2.5 py-1 transition-colors"
+                        className="text-[11px] text-[#8a8a8a] hover:text-[#d4a853] border border-[#1a1a1a] rounded-full px-2.5 py-1 transition-colors"
                     >
                         {s}
                     </button>
@@ -101,7 +101,7 @@ export function StrategyAgent() {
                     <div className="flex items-start gap-2">
                         <p className="text-[#e5e5e5] font-medium text-sm">{result.strategy.headline}</p>
                         {result.mode === "deterministic" && (
-                            <span className="text-[9px] uppercase tracking-wide text-[#737373] border border-[#262626] rounded px-1.5 py-0.5 whitespace-nowrap">
+                            <span className="text-[9px] uppercase tracking-wide text-[#8a8a8a] border border-[#262626] rounded px-1.5 py-0.5 whitespace-nowrap">
                                 ranked
                             </span>
                         )}
@@ -116,7 +116,7 @@ export function StrategyAgent() {
                                     </span>
                                     <div className="min-w-0">
                                         <p className="text-sm text-[#e5e5e5]">{s.action}</p>
-                                        {s.why && <p className="text-xs text-[#525252] mt-0.5">{s.why}</p>}
+                                        {s.why && <p className="text-xs text-[#7e7e7e] mt-0.5">{s.why}</p>}
                                         {s.expected_impact && (
                                             <p className="text-xs text-emerald-400 mt-0.5">{s.expected_impact}</p>
                                         )}
@@ -132,14 +132,14 @@ export function StrategyAgent() {
                         </div>
                     )}
 
-                    {result.note && <p className="text-[11px] text-[#525252]">{result.note}</p>}
+                    {result.note && <p className="text-[11px] text-[#7e7e7e]">{result.note}</p>}
 
                     {result.trace && result.trace.length > 0 && (
                         <div>
                             <button
                                 onClick={() => setShowTrace((v) => !v)}
                                 aria-expanded={showTrace}
-                                className="flex items-center gap-1 py-1.5 -my-1.5 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"
+                                className="flex items-center gap-1 py-1.5 -my-1.5 text-[11px] text-[#8a8a8a] hover:text-[#d4a853] transition-colors"
                             >
                                 <span>Reasoning trace ({result.trace.length})</span>
                                 <ChevronDown className={`w-3 h-3 transition-transform ${showTrace ? "rotate-180" : ""}`} />
@@ -147,8 +147,8 @@ export function StrategyAgent() {
                             {showTrace && (
                                 <ol className="mt-2 space-y-1">
                                     {result.trace.map((t, i) => (
-                                        <li key={i} className="text-[11px] text-[#525252]">
-                                            <span className="text-[#737373]">{t.tool}</span>
+                                        <li key={i} className="text-[11px] text-[#7e7e7e]">
+                                            <span className="text-[#8a8a8a]">{t.tool}</span>
                                             {t.summary ? ` — ${t.summary}` : ""}
                                         </li>
                                     ))}

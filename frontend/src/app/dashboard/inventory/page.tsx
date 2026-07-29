@@ -108,7 +108,7 @@ export default function InventoryPage() {
             <div className="bg-[#141414] border border-[#262626] rounded-xl p-8 text-center">
                 <Package className="w-8 h-8 text-[#ef4444] mx-auto mb-3" />
                 <p className="text-sm text-[#e5e5e5] mb-1">Couldn&apos;t load your stock</p>
-                <p className="text-xs text-[#525252] mb-4">{itemsError}</p>
+                <p className="text-xs text-[#7e7e7e] mb-4">{itemsError}</p>
                 <button
                     onClick={retryItems}
                     className="text-xs px-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-[#e5e5e5] hover:bg-[#222]"
@@ -134,9 +134,9 @@ export default function InventoryPage() {
         const map: Record<string, string> = {
             A: "bg-[#22c55e]/10 text-[#22c55e]",
             B: "bg-[#eab308]/10 text-[#eab308]",
-            C: "bg-[#737373]/10 text-[#737373]",
+            C: "bg-[#8a8a8a]/10 text-[#8a8a8a]",
         };
-        return map[c] || "bg-[#737373]/10 text-[#737373]";
+        return map[c] || "bg-[#8a8a8a]/10 text-[#8a8a8a]";
     };
 
     const getPrediction = (name: string) => predictions.find((p: any) =>
@@ -160,7 +160,7 @@ export default function InventoryPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-xl font-bold text-[#e5e5e5]">Stock</h1>
-                    <p className="text-sm text-[#525252] mt-0.5">
+                    <p className="text-sm text-[#7e7e7e] mt-0.5">
                         {isDemo ? "Demo stock alerts" : `${items.length} item${items.length !== 1 ? "s" : ""} tracked from your store`}
                     </p>
                 </div>
@@ -187,13 +187,13 @@ export default function InventoryPage() {
                         className="bg-[#141414] border border-[#d4a853]/20 rounded-xl overflow-hidden">
                         <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
                             <span className="text-xs font-semibold text-[#e5e5e5]">New Stock Item</span>
-                            <button onClick={() => setShowAddForm(false)}><X className="w-4 h-4 text-[#525252]" /></button>
+                            <button onClick={() => setShowAddForm(false)}><X className="w-4 h-4 text-[#7e7e7e]" /></button>
                         </div>
                         <div className="p-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
                             <input placeholder="Item name" value={newName} onChange={(e) => setNewName(e.target.value)}
-                                className="col-span-2 bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none" />
+                                className="col-span-2 bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] placeholder-[#7e7e7e] focus:border-[#d4a853]/50 focus:outline-none" />
                             <input placeholder="Quantity" value={newQty} onChange={(e) => setNewQty(e.target.value)} type="number"
-                                className="bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none" />
+                                className="bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] placeholder-[#7e7e7e] focus:border-[#d4a853]/50 focus:outline-none" />
                             <select value={newUnit} onChange={(e) => setNewUnit(e.target.value)}
                                 className="bg-[#1a1a1a] border border-[#262626] rounded-lg px-3 py-2 text-xs text-[#e5e5e5] focus:border-[#d4a853]/50 focus:outline-none">
                                 <option value="kg">kg</option>
@@ -241,7 +241,7 @@ export default function InventoryPage() {
                                                 {alert.urgency}
                                             </span>
                                         </div>
-                                        <p className="text-[10px] text-[#525252] mt-0.5">
+                                        <p className="text-[10px] text-[#7e7e7e] mt-0.5">
                                             {alert.quantity} remaining · ~{alert.hours_left}h left
                                         </p>
                                     </div>
@@ -257,7 +257,7 @@ export default function InventoryPage() {
 
             {!isDemo && aiError && (
                 <div className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3">
-                    <p className="text-xs text-[#525252]">Stock insights unavailable right now — {aiError}</p>
+                    <p className="text-xs text-[#7e7e7e]">Stock insights unavailable right now — {aiError}</p>
                 </div>
             )}
 
@@ -279,12 +279,12 @@ export default function InventoryPage() {
                             </p>
                         )}
                         {summary.high_spoilage_items > 0 && (
-                            <p className="text-xs text-[#737373]">
+                            <p className="text-xs text-[#8a8a8a]">
                                 🗑️ {summary.high_spoilage_items} item{summary.high_spoilage_items > 1 ? "s" : ""} might spoil soon
                             </p>
                         )}
                         {summary.monthly_spend > 0 && (
-                            <p className="text-xs text-[#737373]">
+                            <p className="text-xs text-[#8a8a8a]">
                                 💰 Spending about KES {(summary.monthly_spend / 100).toLocaleString("en-KE")}/month on stock
                             </p>
                         )}
@@ -300,7 +300,7 @@ export default function InventoryPage() {
                     </div>
                     <div className="divide-y divide-[#1a1a1a]">
                         {items.length === 0 ? (
-                            <p className="text-xs text-[#525252] text-center py-8">No stock items yet — add your first one</p>
+                            <p className="text-xs text-[#7e7e7e] text-center py-8">No stock items yet — add your first one</p>
                         ) : (
                             items.map((item) => {
                                 const pred = getPrediction(item.item_name);
@@ -324,7 +324,7 @@ export default function InventoryPage() {
                                                         )}
                                                     </div>
                                                     <div className="flex items-center gap-3 mt-0.5">
-                                                        <span className={`text-xs ${isLow ? "text-[#eab308]" : "text-[#737373]"}`}>
+                                                        <span className={`text-xs ${isLow ? "text-[#eab308]" : "text-[#8a8a8a]"}`}>
                                                             {item.quantity} {item.unit}
                                                         </span>
                                                         {pred?.days_until_stockout != null && pred.days_until_stockout <= 14 && (
@@ -333,7 +333,7 @@ export default function InventoryPage() {
                                                             </span>
                                                         )}
                                                         {item.cost_per_unit > 0 && (
-                                                            <span className="text-[10px] text-[#525252]">
+                                                            <span className="text-[10px] text-[#7e7e7e]">
                                                                 KES {item.cost_per_unit}/{item.unit}
                                                             </span>
                                                         )}
@@ -342,12 +342,12 @@ export default function InventoryPage() {
                                             </div>
                                             <div className="flex items-center gap-1">
                                                 <button onClick={() => { setShowReceiveForm(isReceiving ? null : item.id); setShowAdjustForm(null); }}
-                                                    className={`text-[10px] px-2 py-1 rounded transition-all ${isReceiving ? "bg-[#22c55e]/10 text-[#22c55e]" : "bg-[#1a1a1a] text-[#737373] hover:text-[#22c55e]"}`}>
+                                                    className={`text-[10px] px-2 py-1 rounded transition-all ${isReceiving ? "bg-[#22c55e]/10 text-[#22c55e]" : "bg-[#1a1a1a] text-[#8a8a8a] hover:text-[#22c55e]"}`}>
                                                     <TruckIcon className="w-3 h-3 inline mr-0.5" />
                                                     Receive
                                                 </button>
                                                 <button onClick={() => { setShowAdjustForm(isAdjusting ? null : item.id); setShowReceiveForm(null); }}
-                                                    className={`text-[10px] px-2 py-1 rounded transition-all ${isAdjusting ? "bg-[#ef4444]/10 text-[#ef4444]" : "bg-[#1a1a1a] text-[#737373] hover:text-[#eab308]"}`}>
+                                                    className={`text-[10px] px-2 py-1 rounded transition-all ${isAdjusting ? "bg-[#ef4444]/10 text-[#ef4444]" : "bg-[#1a1a1a] text-[#8a8a8a] hover:text-[#eab308]"}`}>
                                                     <Minus className="w-3 h-3 inline mr-0.5" />
                                                     Adjust
                                                 </button>
@@ -359,9 +359,9 @@ export default function InventoryPage() {
                                                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
                                                     className="mt-2 flex gap-2 items-center">
                                                     <input placeholder="Quantity" value={receiveQty} onChange={(e) => setReceiveQty(e.target.value)}
-                                                        type="number" className="w-20 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
+                                                        type="number" className="w-20 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#7e7e7e] focus:outline-none" />
                                                     <input placeholder="Supplier (optional)" value={receiveSupplier} onChange={(e) => setReceiveSupplier(e.target.value)}
-                                                        className="flex-1 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
+                                                        className="flex-1 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#7e7e7e] focus:outline-none" />
                                                     <button onClick={() => handleReceive(item.id)} disabled={!receiveQty || submitting}
                                                         className="bg-[#22c55e] text-black rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
                                                         {submitting ? "..." : "Receive"}
@@ -375,7 +375,7 @@ export default function InventoryPage() {
                                                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
                                                     className="mt-2 flex gap-2 items-center">
                                                     <input placeholder="Qty to remove" value={adjustQty} onChange={(e) => setAdjustQty(e.target.value)}
-                                                        type="number" className="w-24 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:outline-none" />
+                                                        type="number" className="w-24 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#7e7e7e] focus:outline-none" />
                                                     <select value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)}
                                                         className="flex-1 bg-[#1a1a1a] border border-[#262626] rounded-lg px-2 py-1.5 text-xs text-[#e5e5e5] focus:outline-none">
                                                         <option value="">Reason</option>

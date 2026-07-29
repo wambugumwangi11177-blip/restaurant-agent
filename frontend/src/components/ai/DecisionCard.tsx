@@ -50,7 +50,7 @@ function Stars({ filled, tone }: { filled: number; tone: string }) {
 function Meter({ label, filled, tone }: { label: string; filled: number; tone: string }) {
     return (
         <div className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase tracking-wide text-[#525252]">{label}</span>
+            <span className="text-[10px] uppercase tracking-wide text-[#7e7e7e]">{label}</span>
             <Stars filled={filled} tone={tone} />
         </div>
     );
@@ -78,18 +78,18 @@ export function DecisionCard({ d, highlight = false }: { d: Decision; highlight?
                         <span className="text-[10px] font-bold text-[#0a0a0a] bg-[#d4a853] rounded px-1.5 py-0.5">
                             #{d.rank}
                         </span>
-                        <span className={`text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded ${categoryTone[d.category] || "text-[#737373] bg-[#141414]"}`}>
+                        <span className={`text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded ${categoryTone[d.category] || "text-[#8a8a8a] bg-[#141414]"}`}>
                             {d.category.replace("_", " ")}
                         </span>
-                        <span className="text-[10px] text-[#525252]">{d.confidence_pct}% confidence</span>
+                        <span className="text-[10px] text-[#7e7e7e]">{d.confidence_pct}% confidence</span>
                     </div>
                     <p className="text-sm text-[#e5e5e5] font-medium">{d.action}</p>
-                    <p className="text-xs text-[#525252] mt-0.5">{d.rationale}</p>
+                    <p className="text-xs text-[#7e7e7e] mt-0.5">{d.rationale}</p>
                     <ExplainButton item={d} label={`${d.category} decision: ${d.action}`} />
                 </div>
                 <div className="text-right flex-shrink-0">
                     <p className="text-lg font-black text-[#e5e5e5] leading-none">{d.priority_score}</p>
-                    <p className="text-[10px] text-[#525252]">priority</p>
+                    <p className="text-[10px] text-[#7e7e7e]">priority</p>
                     {d.quantified && d.impact_cents_month ? (
                         <p className="text-emerald-400 text-xs font-medium mt-1 whitespace-nowrap">
                             +{formatKES(d.impact_cents_month)}/mo

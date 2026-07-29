@@ -38,7 +38,7 @@ export function ExplainButton({ item, label }: { item: Record<string, any>; labe
         return <p className="text-[11px] text-[#a3a3a3] mt-1 leading-relaxed bg-[#0a0a0a] border border-[#1a1a1a] rounded-md p-2">{text}</p>;
     }
     if (state === "none") {
-        return <p className="text-[11px] text-[#525252] mt-1 italic">Plain-language explainer isn’t available right now.</p>;
+        return <p className="text-[11px] text-[#7e7e7e] mt-1 italic">Plain-language explainer isn’t available right now.</p>;
     }
     return (
         <button
@@ -46,7 +46,7 @@ export function ExplainButton({ item, label }: { item: Record<string, any>; labe
             disabled={state === "loading"}
             // -my-1.5/py-1.5 expands the touch target past the 24px WCAG 2.5.8
             // floor (it measured 17px tall) without shifting the visual layout.
-            className="mt-1 -my-1.5 py-1.5 flex items-center gap-1 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors disabled:opacity-60"
+            className="mt-1 -my-1.5 py-1.5 flex items-center gap-1 text-[11px] text-[#8a8a8a] hover:text-[#d4a853] transition-colors disabled:opacity-60"
         >
             <Info className="w-3 h-3" />
             {state === "loading" ? "Explaining…" : "Explain this to me"}

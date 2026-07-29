@@ -26,7 +26,7 @@ export default function ReservationsPage() {
             <div className="bg-[#141414] border border-[#262626] rounded-xl px-5 py-10 text-center">
                 <CalendarDays className="w-8 h-8 text-[#ef4444] mx-auto mb-3" />
                 <p className="text-sm text-[#e5e5e5] mb-1">Couldn&apos;t load bookings</p>
-                <p className="text-xs text-[#525252] mb-4">{resError}</p>
+                <p className="text-xs text-[#7e7e7e] mb-4">{resError}</p>
                 <button
                     onClick={retryReservations}
                     className="text-xs px-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-[#e5e5e5] hover:bg-[#222]"
@@ -52,7 +52,7 @@ export default function ReservationsPage() {
         <div className="space-y-5">
             <div>
                 <h1 className="text-xl font-bold text-[#e5e5e5]">Bookings</h1>
-                <p className="text-sm text-[#525252] mt-0.5">
+                <p className="text-sm text-[#7e7e7e] mt-0.5">
                     {todayBookings.length} today · {upcoming.length} coming up
                 </p>
             </div>
@@ -60,22 +60,22 @@ export default function ReservationsPage() {
             {/* Today at a glance */}
             <div className="grid grid-cols-3 gap-3">
                 <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
-                    <p className="text-xs text-[#525252]">Today</p>
+                    <p className="text-xs text-[#7e7e7e]">Today</p>
                     <p className="text-lg font-bold text-[#d4a853] mt-1">{todayBookings.length}</p>
                 </div>
                 <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
-                    <p className="text-xs text-[#525252]">Coming Up</p>
+                    <p className="text-xs text-[#7e7e7e]">Coming Up</p>
                     <p className="text-lg font-bold text-[#e5e5e5] mt-1">{upcoming.length}</p>
                 </div>
                 <div className="bg-[#141414] border border-[#262626] rounded-xl p-4">
-                    <p className="text-xs text-[#525252]">Total</p>
-                    <p className="text-lg font-bold text-[#737373] mt-1">{reservations.length}</p>
+                    <p className="text-xs text-[#7e7e7e]">Total</p>
+                    <p className="text-lg font-bold text-[#8a8a8a] mt-1">{reservations.length}</p>
                 </div>
             </div>
 
             {aiError && (
                 <div className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3">
-                    <p className="text-xs text-[#525252]">Booking insights unavailable right now — {aiError}</p>
+                    <p className="text-xs text-[#7e7e7e]">Booking insights unavailable right now — {aiError}</p>
                 </div>
             )}
 
@@ -89,22 +89,22 @@ export default function ReservationsPage() {
                         {/* Natural language insights */}
                         <div className="space-y-2">
                             {noShow.no_show_rate > 0 && (
-                                <p className="text-xs text-[#737373]">
+                                <p className="text-xs text-[#8a8a8a]">
                                     About <span className="text-[#ef4444] font-semibold">{noShow.no_show_rate?.toFixed(0)}% of people who book don&apos;t show up</span>
                                 </p>
                             )}
                             {revenue.estimated_revenue_lost > 0 && (
-                                <p className="text-xs text-[#737373]">
+                                <p className="text-xs text-[#8a8a8a]">
                                     That&apos;s costing you roughly <span className="text-[#ef4444] font-semibold">{formatKES(revenue.estimated_revenue_lost)}</span> in lost sales
                                 </p>
                             )}
                             {tables.avg_utilization > 0 && (
-                                <p className="text-xs text-[#737373]">
+                                <p className="text-xs text-[#8a8a8a]">
                                     Your tables are being used about <span className="text-[#e5e5e5] font-semibold">{tables.avg_utilization?.toFixed(0)}% of the time</span>
                                 </p>
                             )}
                             {deposit.with_deposit_no_show_rate !== undefined && deposit.without_deposit_no_show_rate !== undefined && (
-                                <p className="text-xs text-[#737373]">
+                                <p className="text-xs text-[#8a8a8a]">
                                     When you collect a deposit, only <span className="text-[#22c55e] font-semibold">{deposit.with_deposit_no_show_rate?.toFixed(0)}% skip</span> compared to <span className="text-[#ef4444] font-semibold">{deposit.without_deposit_no_show_rate?.toFixed(0)}% without one</span>
                                 </p>
                             )}
@@ -123,13 +123,13 @@ export default function ReservationsPage() {
                         {/* Suggestions */}
                         {recommendations.length > 0 && (
                             <div className="space-y-1.5 pt-2 border-t border-[#1a1a1a]">
-                                <p className="text-[10px] text-[#525252] uppercase tracking-wider">Suggestions</p>
+                                <p className="text-[10px] text-[#7e7e7e] uppercase tracking-wider">Suggestions</p>
                                 {recommendations.slice(0, 3).map((rec: any, i: number) => (
                                     <div key={i} className="flex items-start gap-2 text-xs">
                                         <span className="text-[#d4a853] mt-0.5">💡</span>
                                         <div>
                                             <p className="text-[#e5e5e5]">{rec.message}</p>
-                                            {rec.action && <p className="text-[#525252] mt-0.5">{rec.action}</p>}
+                                            {rec.action && <p className="text-[#7e7e7e] mt-0.5">{rec.action}</p>}
                                             {rec.estimated_impact && (
                                                 <p className="text-[10px] text-[#22c55e] mt-0.5">Could save you {rec.estimated_impact}</p>
                                             )}
@@ -147,7 +147,7 @@ export default function ReservationsPage() {
                 {reservations.length === 0 ? (
                     <div className="px-5 py-10 text-center">
                         <CalendarDays className="w-8 h-8 text-[#333] mx-auto mb-3" />
-                        <p className="text-sm text-[#525252]">No bookings yet — they&apos;ll come in from your booking system</p>
+                        <p className="text-sm text-[#7e7e7e]">No bookings yet — they&apos;ll come in from your booking system</p>
                     </div>
                 ) : (
                     <>
@@ -165,7 +165,7 @@ export default function ReservationsPage() {
                                 const statusStyles: Record<string, string> = {
                                     confirmed: "bg-[#22c55e]/10 text-[#22c55e]",
                                     cancelled: "bg-[#ef4444]/10 text-[#ef4444]",
-                                    completed: "bg-[#737373]/10 text-[#737373]",
+                                    completed: "bg-[#8a8a8a]/10 text-[#8a8a8a]",
                                     no_show: "bg-[#eab308]/10 text-[#eab308]",
                                 };
                                 return (
@@ -174,13 +174,13 @@ export default function ReservationsPage() {
                                         className="px-4 py-3 flex items-center justify-between hover:bg-[#1a1a1a] transition-colors">
                                         <div>
                                             <p className="text-sm text-[#e5e5e5]">{res.customer_name}</p>
-                                            <p className="text-xs text-[#525252] mt-0.5">
+                                            <p className="text-xs text-[#7e7e7e] mt-0.5">
                                                 {res.party_size} guest{res.party_size !== 1 ? "s" : ""}{res.customer_phone && ` · ${res.customer_phone}`}
                                             </p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-sm text-[#737373]">{res.reservation_date}</p>
-                                            <p className="text-xs text-[#525252] mt-0.5">{res.reservation_time}</p>
+                                            <p className="text-sm text-[#8a8a8a]">{res.reservation_date}</p>
+                                            <p className="text-xs text-[#7e7e7e] mt-0.5">{res.reservation_time}</p>
                                             <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-medium ${statusStyles[res.status] || statusStyles.confirmed}`}>
                                                 {statusLabels[res.status] || res.status}
                                             </span>

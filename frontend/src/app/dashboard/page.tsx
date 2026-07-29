@@ -109,7 +109,7 @@ export default function DashboardPage() {
                     <h1 className="text-xl font-bold text-[#e5e5e5]">
                         {getGreeting()} 👋
                     </h1>
-                    <p className="text-sm text-[#525252] mt-1">
+                    <p className="text-sm text-[#7e7e7e] mt-1">
                         Here&apos;s how your restaurant is doing right now
                     </p>
                 </div>
@@ -136,7 +136,7 @@ export default function DashboardPage() {
                     </div>
                     <div>
                         <p className="text-sm font-semibold text-[#e5e5e5]">Overall Health</p>
-                        <p className="text-xs text-[#525252]">{healthLabel}</p>
+                        <p className="text-xs text-[#7e7e7e]">{healthLabel}</p>
                     </div>
                 </motion.div>
             </div>
@@ -178,28 +178,28 @@ export default function DashboardPage() {
                     </div>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                         <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[#d4a853]/40 transition-colors">
-                            <p className="text-lg font-bold text-emerald-400">{formatKES(glance.moneyPerDayCents)}<span className="text-xs text-[#525252] font-normal">/day</span></p>
-                            <p className="text-[10px] text-[#525252] mt-0.5">saved in staff time (≈ {glance.hoursPerDay} hrs/day)</p>
+                            <p className="text-lg font-bold text-emerald-400">{formatKES(glance.moneyPerDayCents)}<span className="text-xs text-[#7e7e7e] font-normal">/day</span></p>
+                            <p className="text-[10px] text-[#7e7e7e] mt-0.5">saved in staff time (≈ {glance.hoursPerDay} hrs/day)</p>
                         </Link>
                         <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[#d4a853]/40 transition-colors">
                             <p className="text-lg font-bold text-[#d4a853]">{formatKES(glance.capturedCents)}</p>
-                            <p className="text-[10px] text-[#525252] mt-0.5">extra profit captured this month</p>
+                            <p className="text-[10px] text-[#7e7e7e] mt-0.5">extra profit captured this month</p>
                         </Link>
                         <Link href="/dashboard/roi" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[#d4a853]/40 transition-colors">
                             <p className="text-lg font-bold text-amber-400">{formatKES(glance.oppsCents)}</p>
-                            <p className="text-[10px] text-[#525252] mt-0.5">opportunities flagged, not yet actioned</p>
+                            <p className="text-[10px] text-[#7e7e7e] mt-0.5">opportunities flagged, not yet actioned</p>
                         </Link>
                         <Link href="/dashboard/marketing" className="group rounded-lg bg-[#0f0f0f] border border-[#1a1a1a] p-3 hover:border-[#d4a853]/40 transition-colors">
                             <p className="text-lg font-bold text-[#e5e5e5]">{glance.winbackReachable}</p>
-                            <p className="text-[10px] text-[#525252] mt-0.5">lapsed regulars ready to win back</p>
+                            <p className="text-[10px] text-[#7e7e7e] mt-0.5">lapsed regulars ready to win back</p>
                         </Link>
                     </div>
                     <div className="flex flex-wrap gap-2 mt-3">
-                        <Link href="/dashboard/ai" className="flex items-center gap-1.5 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"><Brain className="w-3 h-3" /> AI Command Center</Link>
+                        <Link href="/dashboard/ai" className="flex items-center gap-1.5 text-[11px] text-[#8a8a8a] hover:text-[#d4a853] transition-colors"><Brain className="w-3 h-3" /> AI Command Center</Link>
                         <span className="text-[#262626]">·</span>
-                        <Link href="/dashboard/roi" className="flex items-center gap-1.5 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"><Clock className="w-3 h-3" /> Time & Money Saved</Link>
+                        <Link href="/dashboard/roi" className="flex items-center gap-1.5 text-[11px] text-[#8a8a8a] hover:text-[#d4a853] transition-colors"><Clock className="w-3 h-3" /> Time & Money Saved</Link>
                         <span className="text-[#262626]">·</span>
-                        <Link href="/dashboard/marketing" className="flex items-center gap-1.5 text-[11px] text-[#737373] hover:text-[#d4a853] transition-colors"><Megaphone className="w-3 h-3" /> Campaigns & Win-back <ArrowRight className="w-3 h-3" /></Link>
+                        <Link href="/dashboard/marketing" className="flex items-center gap-1.5 text-[11px] text-[#8a8a8a] hover:text-[#d4a853] transition-colors"><Megaphone className="w-3 h-3" /> Campaigns & Win-back <ArrowRight className="w-3 h-3" /></Link>
                     </div>
                 </div>
             )}
@@ -228,7 +228,7 @@ export default function DashboardPage() {
                     label="Things to Check"
                     value={qs.active_alerts || 0}
                     sub={qs.active_alerts === 0 ? "Nothing urgent" : "We've flagged a few things"}
-                    color={qs.active_alerts > 3 ? "#ef4444" : "#737373"}
+                    color={qs.active_alerts > 3 ? "#ef4444" : "#8a8a8a"}
                 />
             </div>
 
@@ -248,7 +248,7 @@ export default function DashboardPage() {
                         const cat = b.category ?? b;
                         return (
                             <div key={i} className="flex items-center gap-3">
-                                <span className="text-xs text-[#737373] w-28 flex-shrink-0">
+                                <span className="text-xs text-[#8a8a8a] w-28 flex-shrink-0">
                                     {friendlyNames[cat] || cat}
                                 </span>
                                 <div className="flex-1 h-2 bg-[#1a1a1a] rounded-full overflow-hidden">
@@ -277,7 +277,7 @@ export default function DashboardPage() {
                         <h2 className="text-sm font-semibold text-[#e5e5e5]">Watch Out For</h2>
                     </div>
                     {risks.length === 0 ? (
-                        <div className="px-4 py-6 text-center text-xs text-[#525252]">Everything looks good right now ✓</div>
+                        <div className="px-4 py-6 text-center text-xs text-[#7e7e7e]">Everything looks good right now ✓</div>
                     ) : (
                         <div className="divide-y divide-[#1a1a1a]">
                             {risks.map((r: any, i: number) => (
@@ -290,7 +290,7 @@ export default function DashboardPage() {
                                             }`}>{r.severity === "critical" ? "urgent" : r.severity}</span>
                                         <p className="text-sm text-[#e5e5e5]">{friendlyRisk(r.risk)}</p>
                                     </div>
-                                    <p className="text-xs text-[#525252] mt-1">{friendlyDetail(r.detail)}</p>
+                                    <p className="text-xs text-[#7e7e7e] mt-1">{friendlyDetail(r.detail)}</p>
                                 </motion.div>
                             ))}
                         </div>
@@ -304,7 +304,7 @@ export default function DashboardPage() {
                         <h2 className="text-sm font-semibold text-[#e5e5e5]">Ways to Earn More</h2>
                     </div>
                     {opportunities.length === 0 ? (
-                        <div className="px-4 py-6 text-center text-xs text-[#525252]">We&apos;re looking for opportunities...</div>
+                        <div className="px-4 py-6 text-center text-xs text-[#7e7e7e]">We&apos;re looking for opportunities...</div>
                     ) : (
                         <div className="divide-y divide-[#1a1a1a]">
                             {opportunities.map((o: any, i: number) => (
@@ -314,7 +314,7 @@ export default function DashboardPage() {
                                         <Zap className="w-3 h-3 text-[#d4a853]" />
                                         <p className="text-sm text-[#e5e5e5]">{friendlyOpportunity(o.opportunity || o)}</p>
                                     </div>
-                                    <p className="text-xs text-[#525252] mt-1">{friendlyDetail(o.detail || "")}</p>
+                                    <p className="text-xs text-[#7e7e7e] mt-1">{friendlyDetail(o.detail || "")}</p>
                                 </motion.div>
                             ))}
                         </div>
@@ -328,7 +328,7 @@ export default function DashboardPage() {
                     <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center gap-2">
                         <AlertTriangle className="w-3.5 h-3.5 text-[#eab308]" />
                         <h2 className="text-sm font-semibold text-[#e5e5e5]">Alerts From Your Systems</h2>
-                        <span className="text-[10px] text-[#525252] ml-auto">{alerts.length} active</span>
+                        <span className="text-[10px] text-[#7e7e7e] ml-auto">{alerts.length} active</span>
                     </div>
                     <div className="divide-y divide-[#1a1a1a] max-h-64 overflow-y-auto">
                         {alerts.map((a: any, i: number) => {
@@ -363,8 +363,8 @@ export default function DashboardPage() {
 function SystemStatus({ icon: Icon, label, status }: { icon: any; label: string; status: string }) {
     return (
         <div className="flex items-center gap-2">
-            <Icon className="w-3 h-3 text-[#525252]" />
-            <span className="text-xs text-[#737373]">{label}</span>
+            <Icon className="w-3 h-3 text-[#7e7e7e]" />
+            <span className="text-xs text-[#8a8a8a]">{label}</span>
             <span className={`w-1.5 h-1.5 rounded-full ml-auto ${status === "connected" ? "bg-[#22c55e]" : "bg-[#ef4444]"
                 }`} />
         </div>
@@ -376,7 +376,7 @@ function StatCard({ label, value, sub, color }: { label: string; value: any; sub
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             className="bg-[#141414] border border-[#262626] rounded-xl p-4">
             <p className="text-lg font-bold text-[#e5e5e5]">{value}</p>
-            <p className="text-xs text-[#525252] mt-0.5">{label}</p>
+            <p className="text-xs text-[#7e7e7e] mt-0.5">{label}</p>
             {sub && <p className="text-[10px] mt-1" style={{ color }}>{sub}</p>}
         </motion.div>
     );

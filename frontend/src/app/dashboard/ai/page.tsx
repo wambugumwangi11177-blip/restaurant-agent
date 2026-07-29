@@ -87,12 +87,12 @@ function EmptyState({ restaurantName }: { restaurantName: string }) {
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold text-[#e5e5e5]">AI Command Center</h1>
-                <p className="text-[#525252] mt-1 text-sm">{restaurantName} — Getting started</p>
+                <p className="text-[#7e7e7e] mt-1 text-sm">{restaurantName} — Getting started</p>
             </div>
             <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-8 text-center space-y-4">
                 <Brain className="w-12 h-12 text-[#d4a853] mx-auto" />
                 <h2 className="text-[#e5e5e5] font-semibold text-lg">Your AI agents are ready</h2>
-                <p className="text-[#525252] text-sm max-w-md mx-auto">
+                <p className="text-[#7e7e7e] text-sm max-w-md mx-auto">
                     Add menu items, record some orders, and your AI agents will start generating
                     real insights — pricing recommendations, inventory alerts, revenue forecasts.
                 </p>
@@ -120,7 +120,7 @@ function EmptyState({ restaurantName }: { restaurantName: string }) {
                     <div key={agent.label} className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
                         <agent.icon className="w-5 h-5 text-[#d4a853] mb-3" />
                         <p className="text-[#e5e5e5] font-medium text-sm">{agent.label}</p>
-                        <p className="text-[#525252] text-xs mt-1">{agent.desc}</p>
+                        <p className="text-[#7e7e7e] text-xs mt-1">{agent.desc}</p>
                     </div>
                 ))}
             </div>
@@ -182,7 +182,7 @@ export default function AiDashboard() {
             <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
                 <AlertTriangle className="w-10 h-10 text-amber-400" />
                 <p className="text-[#e5e5e5] font-medium">Could not load AI data</p>
-                <p className="text-[#525252] text-sm text-center max-w-sm">{error}</p>
+                <p className="text-[#7e7e7e] text-sm text-center max-w-sm">{error}</p>
                 <button
                     onClick={fetchData}
                     className="px-4 py-2 bg-[#d4a853] text-[#0a0a0a] font-semibold rounded-lg text-sm hover:bg-[#e0b96a]"
@@ -203,13 +203,13 @@ export default function AiDashboard() {
             <div className="flex items-start justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-[#e5e5e5]">AI Command Center</h1>
-                    <p className="text-[#525252] mt-1 text-sm">
+                    <p className="text-[#7e7e7e] mt-1 text-sm">
                         {restaurantName} — Real-time intelligence
                     </p>
                 </div>
                 <button
                     onClick={fetchData}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#141414] border border-[#262626] text-[#737373] hover:text-[#e5e5e5] text-sm transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#141414] border border-[#262626] text-[#8a8a8a] hover:text-[#e5e5e5] text-sm transition-colors"
                 >
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>{lastUpdated ? lastUpdated.toLocaleTimeString() : "Refresh"}</span>
@@ -220,9 +220,9 @@ export default function AiDashboard() {
             <div className={`rounded-xl border p-6 ${healthBg(hs)}`}>
                 <div className="flex items-center justify-between">
                     <div>
-                        <p className="text-[#525252] text-xs uppercase tracking-widest mb-1">System Health</p>
+                        <p className="text-[#7e7e7e] text-xs uppercase tracking-widest mb-1">System Health</p>
                         <p className={`text-6xl font-black ${healthColor(hs)}`}>{hs}</p>
-                        <p className="text-[#525252] text-xs mt-2">
+                        <p className="text-[#7e7e7e] text-xs mt-2">
                             WoW Revenue:{" "}
                             <span className={wowGrowth >= 0 ? "text-emerald-400" : "text-red-400"}>
                                 {wowGrowth >= 0 ? "+" : ""}
@@ -234,7 +234,7 @@ export default function AiDashboard() {
                     <div className="space-y-2 min-w-[180px]">
                         {data!.health_breakdown.map((b, i) => (
                             <div key={i}>
-                                <div className="flex justify-between text-xs text-[#525252] mb-1">
+                                <div className="flex justify-between text-xs text-[#7e7e7e] mb-1">
                                     <span>{b.category}</span>
                                     <span>{b.score}</span>
                                 </div>
@@ -259,7 +259,7 @@ export default function AiDashboard() {
                     { label: "30-Day Revenue", value: formatKES(qs.total_revenue_30d) },
                 ].map((stat) => (
                     <div key={stat.label} className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-4">
-                        <p className="text-xs text-[#525252] mb-1">{stat.label}</p>
+                        <p className="text-xs text-[#7e7e7e] mb-1">{stat.label}</p>
                         <p className="text-xl font-bold text-[#e5e5e5]">{stat.value}</p>
                     </div>
                 ))}
@@ -310,7 +310,7 @@ export default function AiDashboard() {
                     ) : (
                         <div className="space-y-2">
                             {data!.risks.slice(0, 5).map((r, i) => (
-                                <div key={i} className={`p-3 rounded-lg border text-sm ${severityStyle[r.severity] || "border-[#262626] text-[#737373]"}`}>
+                                <div key={i} className={`p-3 rounded-lg border text-sm ${severityStyle[r.severity] || "border-[#262626] text-[#8a8a8a]"}`}>
                                     <p className="font-medium">{r.risk}</p>
                                     <p className="text-xs opacity-70 mt-0.5">{r.detail}</p>
                                 </div>
@@ -326,14 +326,14 @@ export default function AiDashboard() {
                         Opportunities
                     </h2>
                     {data!.opportunities.length === 0 ? (
-                        <p className="text-[#525252] text-sm py-2">No opportunities flagged yet — keep adding data</p>
+                        <p className="text-[#7e7e7e] text-sm py-2">No opportunities flagged yet — keep adding data</p>
                     ) : (
                         <div className="space-y-2">
                             {data!.opportunities.map((o, i) => (
                                 <div key={i} className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
                                     <p className="text-sm font-medium text-[#e5e5e5]">{o.opportunity}</p>
                                     <p className="text-emerald-400 text-xs font-medium mt-0.5">{o.potential}</p>
-                                    <p className="text-[#525252] text-xs">{o.detail}</p>
+                                    <p className="text-[#7e7e7e] text-xs">{o.detail}</p>
                                 </div>
                             ))}
                         </div>
@@ -348,16 +348,16 @@ export default function AiDashboard() {
                     Recent AI Actions
                 </h2>
                 {data!.recent_ai_actions.length === 0 ? (
-                    <p className="text-[#525252] text-sm">No AI actions logged yet</p>
+                    <p className="text-[#7e7e7e] text-sm">No AI actions logged yet</p>
                 ) : (
                     <div className="space-y-2">
                         {data!.recent_ai_actions.map((log, i) => (
                             <div key={i} className="flex justify-between items-center py-2 border-b border-[#1a1a1a] last:border-0">
                                 <div>
                                     <p className="text-sm text-[#e5e5e5]">{log.action}</p>
-                                    <p className="text-xs text-[#525252]">{log.agent}</p>
+                                    <p className="text-xs text-[#7e7e7e]">{log.agent}</p>
                                 </div>
-                                <span className="text-xs text-[#525252] bg-[#141414] px-2 py-1 rounded-md whitespace-nowrap">{log.time}</span>
+                                <span className="text-xs text-[#7e7e7e] bg-[#141414] px-2 py-1 rounded-md whitespace-nowrap">{log.time}</span>
                             </div>
                         ))}
                     </div>
@@ -402,7 +402,7 @@ function DecisionsSection() {
                         <MiniStat label="Total Impact" value={formatKES(data.summary.total_monthly_impact_cents)} />
                     </div>
                     {data.decisions.length === 0 ? (
-                        <p className="text-[#525252] text-sm">
+                        <p className="text-[#7e7e7e] text-sm">
                             No open decisions right now — every agent is happy with the current setup.
                         </p>
                     ) : (
@@ -490,7 +490,7 @@ function PricingSection() {
                         </div>
                     )}
                     {data.recommendations.length === 0 ? (
-                        <p className="text-[#525252] text-sm">No pricing changes recommended right now — {data.summary.items_analysed} items analysed.</p>
+                        <p className="text-[#7e7e7e] text-sm">No pricing changes recommended right now — {data.summary.items_analysed} items analysed.</p>
                     ) : (
                         <div className="space-y-2">
                             {data.recommendations.slice(0, 5).map((r) => {
@@ -505,7 +505,7 @@ function PricingSection() {
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <p className="text-[#e5e5e5]">{r.item_name}</p>
                                                 {/* Worked example in the owner's own numbers */}
-                                                <span className="text-[11px] text-[#737373] whitespace-nowrap">
+                                                <span className="text-[11px] text-[#8a8a8a] whitespace-nowrap">
                                                     KES {(r.current_price / 100).toLocaleString()} → <span className="text-[#d4a853]">KES {(r.suggested_price / 100).toLocaleString()}</span>
                                                 </span>
                                                 {earlySignal && (
@@ -517,7 +517,7 @@ function PricingSection() {
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="text-xs text-[#525252] mt-0.5">{r.reason}</p>
+                                            <p className="text-xs text-[#7e7e7e] mt-0.5">{r.reason}</p>
                                             <ExplainButton item={r} label={`Pricing ${r.type} for ${r.item_name}`} />
                                         </div>
                                         <div className="flex items-center gap-3 flex-shrink-0">
@@ -536,7 +536,7 @@ function PricingSection() {
                                                         onClick={() => act(r, "reject")}
                                                         disabled={busy}
                                                         title="Dismiss this recommendation"
-                                                        className="flex items-center justify-center w-7 h-7 rounded-md bg-[#1a1a1a] text-[#737373] hover:text-red-300 hover:bg-red-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                        className="flex items-center justify-center w-7 h-7 rounded-md bg-[#1a1a1a] text-[#8a8a8a] hover:text-red-300 hover:bg-red-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                                     >
                                                         <X className="w-3.5 h-3.5" />
                                                     </button>
@@ -572,7 +572,7 @@ function LaborSection() {
                         <MiniStat label="Overtime Cost" value={formatKES(data.summary.overtime_cost_30d)} />
                     </div>
                     {data.recommendations.length === 0 ? (
-                        <p className="text-[#525252] text-sm">Staffing looks well balanced.</p>
+                        <p className="text-[#7e7e7e] text-sm">Staffing looks well balanced.</p>
                     ) : (
                         <div className="space-y-2">
                             {data.recommendations.slice(0, 4).map((r, i) => (
@@ -615,7 +615,7 @@ function SupplyChainSection() {
                         <MiniStat label="Overdue orders" value={data.summary.overdue_orders} tone={data.summary.overdue_orders > 0 ? "warn" : "ok"} />
                     </div>
                     {data.suppliers.length === 0 ? (
-                        <p className="text-[#525252] text-sm">No suppliers set up yet — add suppliers and purchase orders and this fills in.</p>
+                        <p className="text-[#7e7e7e] text-sm">No suppliers set up yet — add suppliers and purchase orders and this fills in.</p>
                     ) : (
                         <div className="space-y-2">
                             {data.suppliers.slice(0, 6).map((s) => (
@@ -627,7 +627,7 @@ function SupplyChainSection() {
                                         </div>
                                         <span className={`text-xs font-medium whitespace-nowrap ${s.reliability_score >= 85 ? "text-emerald-400" : "text-red-400"}`}>{s.reliability_score}% on time</span>
                                     </div>
-                                    <p className="text-xs text-[#525252] mt-1">
+                                    <p className="text-xs text-[#7e7e7e] mt-1">
                                         {s.delivered_on_time} on time · {s.delivered_late} late
                                         {s.pending_orders > 0 ? ` · ${s.pending_orders} pending` : ""}
                                         {" · "}avg lead {s.avg_lead_days}d
@@ -694,9 +694,9 @@ function DataQualitySection() {
                                             <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${i.severity === "HIGH" ? "bg-red-500/10 text-red-400" : i.severity === "MEDIUM" ? "bg-amber-500/10 text-amber-400" : "bg-[#3b82f6]/10 text-[#60a5fa]"}`}>{DQ_ISSUE_LABEL[i.issue] || i.issue}</span>
                                             <p className="text-[#e5e5e5]">{i.item_name}</p>
                                         </div>
-                                        {i.qty_30d > 0 && <span className="text-xs text-[#525252] whitespace-nowrap">{i.qty_30d} sold/30d</span>}
+                                        {i.qty_30d > 0 && <span className="text-xs text-[#7e7e7e] whitespace-nowrap">{i.qty_30d} sold/30d</span>}
                                     </div>
-                                    <p className="text-xs text-[#525252] mt-1">{i.explanation}</p>
+                                    <p className="text-xs text-[#7e7e7e] mt-1">{i.explanation}</p>
                                 </div>
                             ))}
                             <Link href="/dashboard/menu" className="inline-flex items-center gap-1 text-xs text-[#d4a853] hover:underline mt-1">
@@ -739,17 +739,17 @@ function MenuEngineeringSection() {
                           ["Puzzles", data.summary.puzzles], ["Dogs", data.summary.dogs]] as const).map(([k, v]) => (
                             <div key={k} className="rounded-lg bg-[#141414] border border-[#1a1a1a] p-3">
                                 <div className="flex items-center justify-between">
-                                    <p className="text-xs text-[#525252]">{k}</p>
+                                    <p className="text-xs text-[#7e7e7e]">{k}</p>
                                     <p className={`text-sm font-bold ${MENU_CLASS[k].tone === "ok" ? "text-emerald-400" : MENU_CLASS[k].tone === "warn" ? "text-red-400" : "text-[#e5e5e5]"}`}>{v}</p>
                                 </div>
-                                <p className="text-[10px] text-[#525252] mt-1 leading-snug">{MENU_CLASS[k].blurb}</p>
+                                <p className="text-[10px] text-[#7e7e7e] mt-1 leading-snug">{MENU_CLASS[k].blurb}</p>
                             </div>
                         ))}
                     </div>
 
                     {data.category_performance && data.category_performance.length > 0 && (
                         <div className="mb-4">
-                            <p className="text-xs font-semibold text-[#737373] mb-2">Category performance (share of revenue · margin)</p>
+                            <p className="text-xs font-semibold text-[#8a8a8a] mb-2">Category performance (share of revenue · margin)</p>
                             <div className="space-y-1.5">
                                 {data.category_performance.slice(0, 6).map((c, i) => (
                                     <div key={i} className="flex items-center gap-2 text-xs">
@@ -757,7 +757,7 @@ function MenuEngineeringSection() {
                                         <div className="flex-1 h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
                                             <div className="h-full bg-[#d4a853] rounded-full" style={{ width: `${Math.min(c.revenue_share_pct * 3, 100)}%` }} />
                                         </div>
-                                        <span className="text-[#737373] w-10 text-right">{c.revenue_share_pct}%</span>
+                                        <span className="text-[#8a8a8a] w-10 text-right">{c.revenue_share_pct}%</span>
                                         <span className={`w-12 text-right ${c.avg_margin_pct >= 55 ? "text-emerald-400" : c.avg_margin_pct >= 40 ? "text-amber-400" : "text-red-400"}`}>{c.avg_margin_pct}%</span>
                                     </div>
                                 ))}
@@ -767,7 +767,7 @@ function MenuEngineeringSection() {
 
                     {data.recommendations && data.recommendations.length > 0 && (
                         <>
-                            <p className="text-xs font-semibold text-[#737373] mb-2">Top menu actions</p>
+                            <p className="text-xs font-semibold text-[#8a8a8a] mb-2">Top menu actions</p>
                             <div className="space-y-2">
                                 {data.recommendations.slice(0, 5).map((r, i) => (
                                     <div key={i} className="p-3 rounded-lg bg-[#141414] border border-[#1a1a1a] text-sm">
@@ -775,7 +775,7 @@ function MenuEngineeringSection() {
                                             <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${r.priority === "high" ? "bg-red-500/10 text-red-400" : r.priority === "medium" ? "bg-amber-500/10 text-amber-400" : "bg-[#3b82f6]/10 text-[#3b82f6]"}`}>{r.priority}</span>
                                             <p className="text-[#e5e5e5]">{r.item} — {r.action}</p>
                                         </div>
-                                        <p className="text-xs text-[#525252] mt-1">{r.reason}</p>
+                                        <p className="text-xs text-[#7e7e7e] mt-1">{r.reason}</p>
                                         {r.impact && <p className="text-xs text-emerald-400 mt-0.5">📈 {r.impact}</p>}
                                     </div>
                                 ))}
@@ -827,7 +827,7 @@ function ProfitSection() {
                                         </div>
                                         <span className="text-red-400 text-xs font-medium whitespace-nowrap">-{formatKES(l.monthly_leak_cents)}/mo</span>
                                     </div>
-                                    <p className="text-xs text-[#525252] mt-1">Margin {l.current_margin_pct}% · food cost {l.food_cost_pct}%</p>
+                                    <p className="text-xs text-[#7e7e7e] mt-1">Margin {l.current_margin_pct}% · food cost {l.food_cost_pct}%</p>
                                     <p className="text-xs text-[#d4a853] mt-0.5">💡 {l.action}</p>
                                     <ExplainButton item={l} label={`Profit leak: ${l.item_name}`} />
                                 </div>
@@ -857,7 +857,7 @@ function HealthBoostSection({ breakdown, score }: { breakdown: { category: strin
                 <Zap className="w-4 h-4 text-[#d4a853]" />
                 How to raise your health score ({score} → higher)
             </h2>
-            <p className="text-xs text-[#525252] mb-4">Your biggest wins first — each item below is dragging the score and is fixable.</p>
+            <p className="text-xs text-[#7e7e7e] mb-4">Your biggest wins first — each item below is dragging the score and is fixable.</p>
             {weak.length === 0 ? (
                 <p className="text-emerald-400 text-sm flex items-center gap-2"><CheckCircle className="w-4 h-4" /> Every area is healthy — nice work.</p>
             ) : (
@@ -866,7 +866,7 @@ function HealthBoostSection({ breakdown, score }: { breakdown: { category: strin
                         <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-[#0f0f0f] border border-[#1a1a1a]">
                             <span className={`text-xs font-bold w-9 text-center flex-shrink-0 rounded px-1 py-0.5 ${b.score < 40 ? "bg-red-500/10 text-red-400" : "bg-amber-500/10 text-amber-400"}`}>{b.score}</span>
                             <div>
-                                <p className="text-sm text-[#e5e5e5] font-medium">{b.category} <span className="text-[#525252] font-normal">— {b.detail}</span></p>
+                                <p className="text-sm text-[#e5e5e5] font-medium">{b.category} <span className="text-[#7e7e7e] font-normal">— {b.detail}</span></p>
                                 <p className="text-xs text-[#d4a853] mt-1">→ {(HEALTH_ADVICE[b.category] || (() => "Review this area's details and act on the flagged items."))(b.detail)}</p>
                             </div>
                         </div>

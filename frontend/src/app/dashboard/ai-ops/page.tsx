@@ -102,7 +102,7 @@ export default function AiOpsPage() {
             <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-3 text-center">
                 <ShieldCheck className="w-10 h-10 text-[#d4a853]" />
                 <p className="text-[#e5e5e5] font-medium">Admins only</p>
-                <p className="text-[#525252] text-sm max-w-sm">
+                <p className="text-[#7e7e7e] text-sm max-w-sm">
                     AI Operations shows sensitive cost and reliability metrics, so it&apos;s limited to admin accounts.
                     You&apos;re signed in as <span className="text-[#a3a3a3]">{user?.role || "a non-admin"}</span>.
                 </p>
@@ -115,7 +115,7 @@ export default function AiOpsPage() {
             <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
                 <AlertTriangle className="w-10 h-10 text-amber-400" />
                 <p className="text-[#e5e5e5] font-medium">Could not load AI operations</p>
-                <p className="text-[#525252] text-sm text-center max-w-sm">{error}</p>
+                <p className="text-[#7e7e7e] text-sm text-center max-w-sm">{error}</p>
                 <button onClick={fetchData} className="px-4 py-2 bg-[#d4a853] text-[#0a0a0a] font-semibold rounded-lg text-sm hover:bg-[#e0b96a]">Retry</button>
             </div>
         );
@@ -132,9 +132,9 @@ export default function AiOpsPage() {
             <div className="flex items-start justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-[#e5e5e5]">AI Operations</h1>
-                    <p className="text-[#525252] mt-1 text-sm">What the AI costs and how well it&apos;s working — last {d.window_days} days</p>
+                    <p className="text-[#7e7e7e] mt-1 text-sm">What the AI costs and how well it&apos;s working — last {d.window_days} days</p>
                 </div>
-                <button onClick={fetchData} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#141414] border border-[#262626] text-[#737373] hover:text-[#e5e5e5] text-sm transition-colors">
+                <button onClick={fetchData} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#141414] border border-[#262626] text-[#8a8a8a] hover:text-[#e5e5e5] text-sm transition-colors">
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>{lastUpdated ? lastUpdated.toLocaleTimeString() : "Refresh"}</span>
                 </button>
@@ -161,27 +161,27 @@ export default function AiOpsPage() {
                 {d.economics && (
                     <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-4 mt-3 flex items-center justify-between flex-wrap gap-2">
                         <div className="text-sm">
-                            <span className="text-[#525252]">AI cost </span>
+                            <span className="text-[#7e7e7e]">AI cost </span>
                             <span className="text-[#e5e5e5] font-medium">{usd(d.economics.llm_cost_usd)}</span>
-                            <span className="text-[#525252]"> ({kes(d.economics.llm_cost_kes_cents)})</span>
-                            <span className="text-[#525252]"> vs. profit captured </span>
+                            <span className="text-[#7e7e7e]"> ({kes(d.economics.llm_cost_kes_cents)})</span>
+                            <span className="text-[#7e7e7e]"> vs. profit captured </span>
                             <span className="text-emerald-400 font-medium">{kes(d.economics.profit_generated_cents)}</span>
                         </div>
-                        <p className="text-[10px] text-[#525252]">Profit = approved pricing recommendations. Never summed with cost.</p>
+                        <p className="text-[10px] text-[#7e7e7e]">Profit = approved pricing recommendations. Never summed with cost.</p>
                     </div>
                 )}
                 {models.length > 0 && (
                     <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5 mt-3">
-                        <p className="text-xs font-semibold text-[#737373] mb-3">By model</p>
+                        <p className="text-xs font-semibold text-[#8a8a8a] mb-3">By model</p>
                         <div className="space-y-2">
                             {models.map(([model, m]) => (
                                 <div key={model} className="flex items-center justify-between text-sm py-1.5 border-b border-[#1a1a1a] last:border-0">
                                     <span className="text-[#e5e5e5] truncate">{model}</span>
-                                    <span className="text-[#525252] text-xs whitespace-nowrap">{fmt(m.calls)} calls · {fmt(m.input_tokens + m.output_tokens)} tokens · {usd(m.cost_usd)}</span>
+                                    <span className="text-[#7e7e7e] text-xs whitespace-nowrap">{fmt(m.calls)} calls · {fmt(m.input_tokens + m.output_tokens)} tokens · {usd(m.cost_usd)}</span>
                                 </div>
                             ))}
                         </div>
-                        <p className="text-[11px] text-[#525252] mt-3">Total {fmt(totalTokens)} tokens across {fmt(d.llm?.calls)} calls.</p>
+                        <p className="text-[11px] text-[#7e7e7e] mt-3">Total {fmt(totalTokens)} tokens across {fmt(d.llm?.calls)} calls.</p>
                     </div>
                 )}
             </div>
@@ -189,16 +189,16 @@ export default function AiOpsPage() {
             {/* Agent reliability */}
             <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
                 <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2 mb-1"><Activity className="w-4 h-4 text-[#d4a853]" /> Agent reliability</h2>
-                <p className="text-xs text-[#525252] mb-4">How often each analysis agent ran, how often it succeeded, and how fast it responded.</p>
+                <p className="text-xs text-[#7e7e7e] mb-4">How often each analysis agent ran, how often it succeeded, and how fast it responded.</p>
                 {(!d.agents || d.agents.length === 0) ? (
-                    <p className="text-[#525252] text-sm">No agent runs recorded in this window yet.</p>
+                    <p className="text-[#7e7e7e] text-sm">No agent runs recorded in this window yet.</p>
                 ) : (
                     <div className="space-y-3">
                         {d.agents.map((a) => (
                             <div key={a.agent} className="text-sm">
                                 <div className="flex items-center justify-between gap-2">
                                     <span className="text-[#e5e5e5]">{a.agent}</span>
-                                    <span className="text-[#525252] text-xs whitespace-nowrap flex items-center gap-2">
+                                    <span className="text-[#7e7e7e] text-xs whitespace-nowrap flex items-center gap-2">
                                         <span className={a.success_rate_pct >= 95 ? "text-emerald-400" : a.success_rate_pct >= 80 ? "text-amber-400" : "text-red-400"}>{a.success_rate_pct}% ok</span>
                                         <span className="flex items-center gap-1"><Gauge className="w-3 h-3" /> {fmt(a.p50_ms)}ms · p95 {fmt(a.p95_ms)}ms</span>
                                     </span>
@@ -206,7 +206,7 @@ export default function AiOpsPage() {
                                 <div className="mt-1 h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
                                     <div className="h-full bg-[#d4a853] rounded-full" style={{ width: `${Math.round((a.runs / maxRuns) * 100)}%` }} />
                                 </div>
-                                <p className="text-[10px] text-[#525252] mt-0.5">{fmt(a.runs)} runs</p>
+                                <p className="text-[10px] text-[#7e7e7e] mt-0.5">{fmt(a.runs)} runs</p>
                             </div>
                         ))}
                     </div>
@@ -219,12 +219,12 @@ export default function AiOpsPage() {
                     <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2 mb-1">
                         <ShieldCheck className="w-4 h-4 text-[#d4a853]" /> Agent scorecards
                     </h2>
-                    <p className="text-xs text-[#525252] mb-4">Forecast accuracy and how often you accept each agent&apos;s advice — measured against reality.</p>
+                    <p className="text-xs text-[#7e7e7e] mb-4">Forecast accuracy and how often you accept each agent&apos;s advice — measured against reality.</p>
                     <div className="space-y-2">
                         {d.scorecards.map((c) => (
                             <div key={c.agent} className="flex items-center justify-between text-sm py-1.5 border-b border-[#1a1a1a] last:border-0">
                                 <span className="text-[#e5e5e5]">{c.agent}</span>
-                                <span className="text-xs text-[#525252] flex items-center gap-3 whitespace-nowrap">
+                                <span className="text-xs text-[#7e7e7e] flex items-center gap-3 whitespace-nowrap">
                                     {typeof c.acceptance_rate_pct === "number" && (
                                         <span className={c.acceptance_rate_pct >= 60 ? "text-emerald-400" : "text-amber-400"}>
                                             {c.acceptance_rate_pct}% accepted ({c.approved}/{(c.approved || 0) + (c.rejected || 0)})
@@ -251,7 +251,7 @@ export default function AiOpsPage() {
 function Stat({ label, value, tone }: { label: string; value: string | number; tone?: "ok" }) {
     return (
         <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-4">
-            <p className="text-xs text-[#525252] mb-1">{label}</p>
+            <p className="text-xs text-[#7e7e7e] mb-1">{label}</p>
             <p className={`text-xl font-bold ${tone === "ok" ? "text-emerald-400" : "text-[#e5e5e5]"}`}>{value}</p>
         </div>
     );

@@ -113,7 +113,7 @@ export default function KitchenPage() {
             <div className="flex items-center justify-between mb-4">
                 <div>
                     <h1 className="text-xl font-bold text-[#e5e5e5]">Kitchen</h1>
-                    <p className="text-xs text-[#525252]">
+                    <p className="text-xs text-[#7e7e7e]">
                         {orders.length > 0
                             ? `${orders.length} order${orders.length > 1 ? "s" : ""} right now`
                             : "No orders right now — take a breather"}
@@ -121,7 +121,7 @@ export default function KitchenPage() {
                 </div>
                 <button
                     onClick={fetchOrders}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1a1a] border border-[#262626] rounded-lg text-xs text-[#737373] hover:text-[#e5e5e5] transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1a1a] border border-[#262626] rounded-lg text-xs text-[#8a8a8a] hover:text-[#e5e5e5] transition-all"
                 >
                     <RefreshCw className="w-3 h-3" />
                     Refresh
@@ -204,7 +204,7 @@ function Column({
                     <Icon className="w-4 h-4" style={{ color }} />
                     <div>
                         <span className="text-sm font-semibold text-[#e5e5e5]">{title}</span>
-                        <span className="text-[10px] text-[#525252] ml-2">{subtitle}</span>
+                        <span className="text-[10px] text-[#7e7e7e] ml-2">{subtitle}</span>
                     </div>
                 </div>
                 {count > 0 && (
@@ -218,7 +218,7 @@ function Column({
             <div className="flex-1 overflow-y-auto p-2 space-y-2">
                 <AnimatePresence>
                     {orders.length === 0 ? (
-                        <p className="text-xs text-[#525252] text-center py-8">Nothing here</p>
+                        <p className="text-xs text-[#7e7e7e] text-center py-8">Nothing here</p>
                     ) : (
                         orders.map((order) => {
                             const TypeIcon = orderTypeIcon(order.order_type);
@@ -239,15 +239,15 @@ function Column({
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-2">
                                             <span className="text-xs font-bold text-[#e5e5e5]">#{order.id}</span>
-                                            <TypeIcon className="w-3 h-3 text-[#525252]" />
+                                            <TypeIcon className="w-3 h-3 text-[#7e7e7e]" />
                                             {order.table_number && (
-                                                <span className="text-[10px] text-[#737373]">Table {order.table_number}</span>
+                                                <span className="text-[10px] text-[#8a8a8a]">Table {order.table_number}</span>
                                             )}
                                             {channel && (
                                                 <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#3b82f6]/10 text-[#3b82f6]">{channel}</span>
                                             )}
                                         </div>
-                                        <span className={`text-[10px] ${isOld ? "text-[#ef4444]" : "text-[#525252]"}`}>
+                                        <span className={`text-[10px] ${isOld ? "text-[#ef4444]" : "text-[#7e7e7e]"}`}>
                                             <Clock className="w-2.5 h-2.5 inline mr-0.5" />
                                             {minutesAgo(order.created_at)}
                                         </span>
@@ -255,7 +255,7 @@ function Column({
 
                                     {/* Customer */}
                                     {order.customer_name && (
-                                        <p className="text-[10px] text-[#737373] mb-1.5">{order.customer_name}</p>
+                                        <p className="text-[10px] text-[#8a8a8a] mb-1.5">{order.customer_name}</p>
                                     )}
 
                                     {/* Items */}

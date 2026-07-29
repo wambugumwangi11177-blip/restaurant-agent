@@ -146,12 +146,12 @@ function EmptyState() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold text-[#e5e5e5]">Time & Money Saved</h1>
-                <p className="text-[#525252] mt-1 text-sm">Getting started</p>
+                <p className="text-[#7e7e7e] mt-1 text-sm">Getting started</p>
             </div>
             <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-8 text-center space-y-4">
                 <Clock className="w-12 h-12 text-[#d4a853] mx-auto" />
                 <h2 className="text-[#e5e5e5] font-semibold text-lg">No automation activity yet</h2>
-                <p className="text-[#525252] text-sm max-w-md mx-auto">
+                <p className="text-[#7e7e7e] text-sm max-w-md mx-auto">
                     Once the AI starts sending WhatsApp messages, running analysis, or
                     you approve a pricing recommendation, this page will show exactly
                     how many hours and how much money it&apos;s saved you — and how much
@@ -205,7 +205,7 @@ export default function RoiDashboard() {
             <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
                 <AlertTriangle className="w-10 h-10 text-amber-400" />
                 <p className="text-[#e5e5e5] font-medium">Could not load ROI data</p>
-                <p className="text-[#525252] text-sm text-center max-w-sm">{error}</p>
+                <p className="text-[#7e7e7e] text-sm text-center max-w-sm">{error}</p>
                 <button
                     onClick={fetchData}
                     className="px-4 py-2 bg-[#d4a853] text-[#0a0a0a] font-semibold rounded-lg text-sm hover:bg-[#e0b96a]"
@@ -252,13 +252,13 @@ export default function RoiDashboard() {
             <div className="flex items-start justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-[#e5e5e5]">Time & Money Saved</h1>
-                    <p className="text-[#525252] mt-1 text-sm">
+                    <p className="text-[#7e7e7e] mt-1 text-sm">
                         {restaurantName} — last {days} days
                     </p>
                 </div>
                 <button
                     onClick={fetchData}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#141414] border border-[#262626] text-[#737373] hover:text-[#e5e5e5] text-sm transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#141414] border border-[#262626] text-[#8a8a8a] hover:text-[#e5e5e5] text-sm transition-colors"
                 >
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>{lastUpdated ? lastUpdated.toLocaleTimeString() : "Refresh"}</span>
@@ -272,7 +272,7 @@ export default function RoiDashboard() {
                     <Clock className="w-5 h-5 text-[#d4a853] flex-shrink-0 mt-0.5" />
                     <div>
                         <p className="text-sm font-medium text-[#e5e5e5]">Your ROI dashboard is still gathering data</p>
-                        <p className="text-[#737373] text-xs mt-1 max-w-xl">
+                        <p className="text-[#8a8a8a] text-xs mt-1 max-w-xl">
                             As the AI sends messages, runs analysis, and you approve pricing recommendations
                             on the AI page, these numbers start filling in — you&apos;ll see hours saved,
                             profit captured, and money left on the table, updated every day.
@@ -302,10 +302,10 @@ export default function RoiDashboard() {
                 <div>
                     <p className="text-xs uppercase tracking-widest text-emerald-400 mb-1">Saved every day, on average</p>
                     <p className="text-3xl font-black text-[#e5e5e5]">
-                        {hoursPerDay} hrs <span className="text-[#525252] text-xl font-bold">·</span> {formatKES(moneyPerDayCents)}
+                        {hoursPerDay} hrs <span className="text-[#7e7e7e] text-xl font-bold">·</span> {formatKES(moneyPerDayCents)}
                     </p>
                 </div>
-                <p className="text-[#737373] text-xs max-w-xs sm:text-right">
+                <p className="text-[#8a8a8a] text-xs max-w-xs sm:text-right">
                     Averaged from the last {days} days of automated work, priced at{" "}
                     {ts.hourly_rate_is_estimated ? "an estimated wage" : "your own staff wages"}.
                     That&apos;s time your team gets back to run the floor.
@@ -320,7 +320,7 @@ export default function RoiDashboard() {
                         <p className="text-xs uppercase tracking-widest">Time saved</p>
                     </div>
                     <p className="text-3xl font-black text-[#e5e5e5]">{ts.hours_saved_30d} hrs</p>
-                    <p className="text-[#525252] text-sm mt-1">
+                    <p className="text-[#7e7e7e] text-sm mt-1">
                         ≈ {formatKES(ts.money_saved_cents)}
                         {ts.hourly_rate_is_estimated ? " (estimated wage)" : " (your staff wages)"}
                     </p>
@@ -334,13 +334,13 @@ export default function RoiDashboard() {
                         <p className="text-xs uppercase tracking-widest">Profit captured</p>
                     </div>
                     <p className="text-3xl font-black text-[#e5e5e5]">{formatKES(mc.monthly_impact_cents)}</p>
-                    <p className="text-[#525252] text-sm mt-1">
+                    <p className="text-[#7e7e7e] text-sm mt-1">
                         from {mc.recommendations_approved} approved pricing recommendation
                         {mc.recommendations_approved === 1 ? "" : "s"}
                     </p>
                     <div className="mt-1"><TrendChip pct={mc.change_pct} /></div>
                     {!!mc.all_time_approved && mc.all_time_monthly_impact_cents !== undefined && (
-                        <p className="text-[11px] text-[#525252] mt-2 pt-2 border-t border-[#d4a853]/15">
+                        <p className="text-[11px] text-[#7e7e7e] mt-2 pt-2 border-t border-[#d4a853]/15">
                             All-time: <span className="text-[#a3a3a3]">{formatKES(mc.all_time_monthly_impact_cents)}/mo</span> standing uplift from {mc.all_time_approved} approved change{mc.all_time_approved === 1 ? "" : "s"}
                         </p>
                     )}
@@ -353,7 +353,7 @@ export default function RoiDashboard() {
                         <p className="text-xs uppercase tracking-widest">Opportunities flagged</p>
                     </div>
                     <p className="text-3xl font-black text-[#e5e5e5]">{formatKES(oppsTotal)}</p>
-                    <p className="text-[#525252] text-sm mt-1">not yet acted on</p>
+                    <p className="text-[#7e7e7e] text-sm mt-1">not yet acted on</p>
                     <HowItWorks id="roi_opportunities" />
                 </div>
             </div>
@@ -369,14 +369,14 @@ export default function RoiDashboard() {
                     </div>
                     <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
                         <p className="text-3xl font-black text-[#e5e5e5]">
-                            {econ.roi_multiple}× <span className="text-base font-bold text-[#737373]">return</span>
+                            {econ.roi_multiple}× <span className="text-base font-bold text-[#8a8a8a]">return</span>
                         </p>
                         <p className="text-[#a3a3a3] text-sm mb-1">
                             Every <span className="text-[#e5e5e5] font-medium">{formatKES(100)}</span> spent on AI returned{" "}
                             <span className="text-emerald-400 font-medium">{formatKES(Math.round(econ.roi_multiple * 100))}</span> in value.
                         </p>
                     </div>
-                    <p className="text-[11px] text-[#525252] mt-2">
+                    <p className="text-[11px] text-[#7e7e7e] mt-2">
                         {formatKES(econ.value_delivered_cents)} value delivered (time saved + profit captured) vs{" "}
                         {formatKES(econ.ai_cost_cents)} in AI cost, last {days} days. Opportunities not yet captured are excluded — this counts only real money.
                     </p>
@@ -392,12 +392,12 @@ export default function RoiDashboard() {
                 <p className="text-[#e5e5e5] font-semibold text-sm mb-1">
                     Where the {ts.hours_saved_30d} hours came from
                 </p>
-                <p className="text-[#525252] text-xs mb-4">
+                <p className="text-[#7e7e7e] text-xs mb-4">
                     Each row is work the AI did automatically. Hover the info dot to see what a
                     staff member would have done by hand.
                 </p>
                 {ts.breakdown.length === 0 ? (
-                    <p className="text-[#525252] text-sm">No automated activity in this window.</p>
+                    <p className="text-[#7e7e7e] text-sm">No automated activity in this window.</p>
                 ) : (
                     <div className="space-y-2">
                         {ts.breakdown.map((b, i) => (
@@ -406,10 +406,10 @@ export default function RoiDashboard() {
                                     <span className="truncate">{CATEGORY_LABELS[b.category] || b.category}</span>
                                     {CATEGORY_WHY[b.category] && (
                                         <span title={CATEGORY_WHY[b.category]} className="flex-shrink-0">
-                                            <Info className="w-3 h-3 text-[#525252]" />
+                                            <Info className="w-3 h-3 text-[#7e7e7e]" />
                                         </span>
                                     )}
-                                    <span className="text-[#525252] whitespace-nowrap"> · {b.count}× at {b.minutes_per_action} min</span>
+                                    <span className="text-[#7e7e7e] whitespace-nowrap"> · {b.count}× at {b.minutes_per_action} min</span>
                                 </span>
                                 <span className="text-[#e5e5e5] font-medium whitespace-nowrap">{Math.round(b.total_minutes / 60 * 10) / 10} hrs</span>
                             </div>
@@ -422,7 +422,7 @@ export default function RoiDashboard() {
             {opps.length > 0 && (
                 <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
                     <p className="text-[#e5e5e5] font-semibold text-sm mb-1">Money on the table the AI has found</p>
-                    <p className="text-[#525252] text-xs mb-4">Flagged but not yet acted on — approve or action these to capture it.</p>
+                    <p className="text-[#7e7e7e] text-xs mb-4">Flagged but not yet acted on — approve or action these to capture it.</p>
                     <div className="space-y-3">
                         {opps.map((o, i) => (
                             <div key={i} className="py-2 border-b border-[#1a1a1a] last:border-0">
@@ -431,7 +431,7 @@ export default function RoiDashboard() {
                                     <span className="text-amber-400 font-medium whitespace-nowrap">{formatKES(o.monthly_value_cents)}/mo</span>
                                 </div>
                                 {OPP_SOURCE_EXPLAIN[o.source] && (
-                                    <p className="text-[11px] text-[#525252] mt-1">{OPP_SOURCE_EXPLAIN[o.source]}</p>
+                                    <p className="text-[11px] text-[#7e7e7e] mt-1">{OPP_SOURCE_EXPLAIN[o.source]}</p>
                                 )}
                             </div>
                         ))}
@@ -446,26 +446,26 @@ export default function RoiDashboard() {
                         <ChefHat className="w-4 h-4 text-[#d4a853]" />
                         <p className="font-semibold text-sm">Kitchen capacity</p>
                     </div>
-                    <p className="text-[#525252] text-xs mb-2">
+                    <p className="text-[#7e7e7e] text-xs mb-2">
                         Serve more covers with the same staff — not counted as money above.
                     </p>
                     <HowItWorks id="roi_capacity" />
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                         <div>
-                            <p className="text-2xl font-bold text-[#e5e5e5]">{cap.avg_order_minutes}<span className="text-sm text-[#525252]"> min</span></p>
-                            <p className="text-[#525252] text-xs mt-1">avg order time</p>
+                            <p className="text-2xl font-bold text-[#e5e5e5]">{cap.avg_order_minutes}<span className="text-sm text-[#7e7e7e]"> min</span></p>
+                            <p className="text-[#7e7e7e] text-xs mt-1">avg order time</p>
                         </div>
                         <div>
                             <p className="text-2xl font-bold text-[#e5e5e5]">{cap.orders_per_day}</p>
-                            <p className="text-[#525252] text-xs mt-1">orders / day</p>
+                            <p className="text-[#7e7e7e] text-xs mt-1">orders / day</p>
                         </div>
                         <div>
                             <p className="text-2xl font-bold text-[#e5e5e5]">{cap.bottlenecks_found}</p>
-                            <p className="text-[#525252] text-xs mt-1">bottlenecks flagged</p>
+                            <p className="text-[#7e7e7e] text-xs mt-1">bottlenecks flagged</p>
                         </div>
                         <div>
-                            <p className="text-2xl font-bold text-[#e5e5e5]">{cap.reclaimable_delay_minutes}<span className="text-sm text-[#525252]"> min</span></p>
-                            <p className="text-[#525252] text-xs mt-1">reclaimable delay</p>
+                            <p className="text-2xl font-bold text-[#e5e5e5]">{cap.reclaimable_delay_minutes}<span className="text-sm text-[#7e7e7e]"> min</span></p>
+                            <p className="text-[#7e7e7e] text-xs mt-1">reclaimable delay</p>
                         </div>
                     </div>
                 </div>
@@ -479,21 +479,21 @@ export default function RoiDashboard() {
                         <CalendarClock className="w-4 h-4 text-[#d4a853]" />
                         <p className="font-semibold text-sm">At this pace, over a year</p>
                     </div>
-                    <p className="text-[#525252] text-xs mb-4">
+                    <p className="text-[#7e7e7e] text-xs mb-4">
                         A straight projection of your current monthly savings — shown to size the opportunity, not as a promise.
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
-                            <p className="text-2xl font-bold text-[#e5e5e5]">{proj.annual_hours_saved.toLocaleString()}<span className="text-sm text-[#525252]"> hrs</span></p>
-                            <p className="text-[#525252] text-xs mt-1">staff time saved / year</p>
+                            <p className="text-2xl font-bold text-[#e5e5e5]">{proj.annual_hours_saved.toLocaleString()}<span className="text-sm text-[#7e7e7e]"> hrs</span></p>
+                            <p className="text-[#7e7e7e] text-xs mt-1">staff time saved / year</p>
                         </div>
                         <div>
                             <p className="text-2xl font-bold text-emerald-400">{formatKES(proj.annual_money_saved_cents)}</p>
-                            <p className="text-[#525252] text-xs mt-1">labour value / year</p>
+                            <p className="text-[#7e7e7e] text-xs mt-1">labour value / year</p>
                         </div>
                         <div>
                             <p className="text-2xl font-bold text-[#d4a853]">{formatKES(proj.annual_captured_cents)}</p>
-                            <p className="text-[#525252] text-xs mt-1">captured profit / year</p>
+                            <p className="text-[#7e7e7e] text-xs mt-1">captured profit / year</p>
                         </div>
                     </div>
                 </div>

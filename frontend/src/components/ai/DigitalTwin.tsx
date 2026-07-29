@@ -55,7 +55,7 @@ export function DigitalTwin() {
                                 className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                                     horizon === h
                                         ? "border-[#d4a853]/40 text-[#d4a853] bg-[#d4a853]/10"
-                                        : "border-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5]"
+                                        : "border-[#1a1a1a] text-[#8a8a8a] hover:text-[#e5e5e5]"
                                 }`}
                             >
                                 {h}d
@@ -70,20 +70,20 @@ export function DigitalTwin() {
                         <MiniStat label="Confidence" value={`${data.summary.confidence_pct}%`} />
                     </div>
 
-                    <p className="text-[11px] text-[#525252] mb-3">
+                    <p className="text-[11px] text-[#7e7e7e] mb-3">
                         Range: {formatKES(data.summary.low_cents)} – {formatKES(data.summary.high_cents)} over {data.horizon_days} days
                     </p>
 
                     {data.contributing_factors.length === 0 ? (
-                        <p className="text-[#525252] text-sm">No holidays or school breaks in this window — steady as she goes.</p>
+                        <p className="text-[#7e7e7e] text-sm">No holidays or school breaks in this window — steady as she goes.</p>
                     ) : (
                         <div className="space-y-1.5">
-                            <p className="text-[10px] uppercase tracking-wide text-[#525252]">Upcoming demand movers</p>
+                            <p className="text-[10px] uppercase tracking-wide text-[#7e7e7e]">Upcoming demand movers</p>
                             {data.contributing_factors.slice(0, 6).map((f) => (
                                 <div key={f.date} className="flex items-center justify-between text-sm gap-3">
                                     <div className="min-w-0">
                                         <span className="text-[#e5e5e5]">{f.date}</span>
-                                        <span className="text-xs text-[#525252] ml-2">{f.reasons.join(", ")}</span>
+                                        <span className="text-xs text-[#7e7e7e] ml-2">{f.reasons.join(", ")}</span>
                                     </div>
                                     <span className="text-emerald-400 text-xs whitespace-nowrap">
                                         +{formatKES(f.projected_cents - f.baseline_cents)}

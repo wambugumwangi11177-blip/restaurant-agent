@@ -27,7 +27,7 @@ export function ModuleShell({
                 <Icon className="w-4 h-4 text-[#d4a853]" />
                 {title}
             </h2>
-            {subtitle && <p className="text-xs text-[#525252] mt-1">{subtitle}</p>}
+            {subtitle && <p className="text-xs text-[#7e7e7e] mt-1">{subtitle}</p>}
             {explainKey && <HowItWorks id={explainKey} />}
             <div className="mb-4" />
             {loading ? (
@@ -36,7 +36,7 @@ export function ModuleShell({
                 </div>
             ) : error ? (
                 <div className="flex items-center justify-between gap-3 py-2">
-                    <p className="text-[#525252] text-sm">{error}</p>
+                    <p className="text-[#7e7e7e] text-sm">{error}</p>
                     <button onClick={onRetry} className="text-xs text-[#d4a853] hover:underline flex-shrink-0">Retry</button>
                 </div>
             ) : (

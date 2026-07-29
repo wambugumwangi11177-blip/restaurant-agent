@@ -72,7 +72,7 @@ export default function MenuPage() {
             Puzzle: "bg-[#3b82f6]/10 text-[#3b82f6]",
             Dog: "bg-[#ef4444]/10 text-[#ef4444]",
         };
-        return map[c] || "bg-[#737373]/10 text-[#737373]";
+        return map[c] || "bg-[#8a8a8a]/10 text-[#8a8a8a]";
     };
 
     if (loading) {
@@ -90,7 +90,7 @@ export default function MenuPage() {
             <div className="bg-[#141414] border border-[#262626] rounded-xl p-8 text-center">
                 <UtensilsCrossed className="w-8 h-8 text-[#ef4444] mx-auto mb-3" />
                 <p className="text-sm text-[#e5e5e5] mb-1">Couldn&apos;t load your menu</p>
-                <p className="text-xs text-[#525252] mb-4">{itemsError}</p>
+                <p className="text-xs text-[#7e7e7e] mb-4">{itemsError}</p>
                 <button
                     onClick={retryItems}
                     className="text-xs px-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-[#e5e5e5] hover:bg-[#222]"
@@ -107,7 +107,7 @@ export default function MenuPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-xl font-bold text-[#e5e5e5]">Your Menu</h1>
-                    <p className="text-sm text-[#525252] mt-0.5">
+                    <p className="text-sm text-[#7e7e7e] mt-0.5">
                         {items.length} item{items.length !== 1 ? "s" : ""} · synced with your POS
                     </p>
                 </div>
@@ -120,7 +120,7 @@ export default function MenuPage() {
 
             {aiError && (
                 <div className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3">
-                    <p className="text-xs text-[#525252]">Menu insights unavailable right now — {aiError}</p>
+                    <p className="text-xs text-[#7e7e7e]">Menu insights unavailable right now — {aiError}</p>
                 </div>
             )}
 
@@ -153,7 +153,7 @@ export default function MenuPage() {
                             </span>
                         )}
                         {summary.avg_food_cost_pct > 0 && (
-                            <span className="text-[10px] px-2 py-1 rounded-full bg-[#737373]/10 text-[#737373]">
+                            <span className="text-[10px] px-2 py-1 rounded-full bg-[#8a8a8a]/10 text-[#8a8a8a]">
                                 Food costs around {summary.avg_food_cost_pct.toFixed(0)}% of your prices
                             </span>
                         )}
@@ -161,13 +161,13 @@ export default function MenuPage() {
                     {/* Suggestions */}
                     {recommendations.length > 0 && (
                         <div className="px-4 pb-3 space-y-2">
-                            <p className="text-[10px] text-[#525252] uppercase tracking-wider">Suggestions</p>
+                            <p className="text-[10px] text-[#7e7e7e] uppercase tracking-wider">Suggestions</p>
                             {recommendations.slice(0, 3).map((rec: any, i: number) => (
                                 <div key={i} className="flex items-start gap-2 text-xs">
                                     <span className="text-[#d4a853] mt-0.5">💡</span>
                                     <div>
                                         <p className="text-[#e5e5e5]">{friendlyRec(rec.reason || rec.message)}</p>
-                                        {rec.action && <p className="text-[#525252] mt-0.5">{rec.action}</p>}
+                                        {rec.action && <p className="text-[#7e7e7e] mt-0.5">{rec.action}</p>}
                                         {rec.estimated_impact && (
                                             <p className="text-[10px] text-[#22c55e] mt-0.5">Could mean {rec.estimated_impact}</p>
                                         )}
@@ -188,18 +188,18 @@ export default function MenuPage() {
                     <div className="grid grid-cols-2 gap-3">
                         <input type="text" placeholder="Name (e.g. Nyama Choma)" value={form.name}
                             onChange={(e) => setForm({ ...form, name: e.target.value })}
-                            className="px-3 py-2 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-sm text-[#e5e5e5] placeholder-[#525252]" required />
+                            className="px-3 py-2 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-sm text-[#e5e5e5] placeholder-[#7e7e7e]" required />
                         <input type="number" placeholder="Price in KES" value={form.price}
                             onChange={(e) => setForm({ ...form, price: e.target.value })}
-                            className="px-3 py-2 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-sm text-[#e5e5e5] placeholder-[#525252]" required />
+                            className="px-3 py-2 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-sm text-[#e5e5e5] placeholder-[#7e7e7e]" required />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <input type="text" placeholder="Category (e.g. Mains, Drinks)" value={form.category}
                             onChange={(e) => setForm({ ...form, category: e.target.value })}
-                            className="px-3 py-2 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-sm text-[#e5e5e5] placeholder-[#525252]" />
+                            className="px-3 py-2 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-sm text-[#e5e5e5] placeholder-[#7e7e7e]" />
                         <input type="text" placeholder="Short description" value={form.description}
                             onChange={(e) => setForm({ ...form, description: e.target.value })}
-                            className="px-3 py-2 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-sm text-[#e5e5e5] placeholder-[#525252]" />
+                            className="px-3 py-2 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[#d4a853] outline-none text-sm text-[#e5e5e5] placeholder-[#7e7e7e]" />
                     </div>
                     <button type="submit" disabled={saving}
                         className="px-4 py-2 rounded-lg bg-[#d4a853] hover:bg-[#e0b96a] text-[#0a0a0a] text-sm font-medium disabled:opacity-50 flex items-center gap-2 transition-colors">
@@ -212,13 +212,13 @@ export default function MenuPage() {
             {items.length === 0 ? (
                 <div className="bg-[#141414] border border-[#262626] rounded-xl p-8 text-center">
                     <UtensilsCrossed className="w-8 h-8 text-[#333] mx-auto mb-3" />
-                    <p className="text-sm text-[#525252]">Your menu is empty. Add your first item above.</p>
+                    <p className="text-sm text-[#7e7e7e]">Your menu is empty. Add your first item above.</p>
                 </div>
             ) : (
                 <div className="space-y-5">
                     {categories.map((cat) => (
                         <div key={cat}>
-                            <h3 className="text-xs font-semibold text-[#525252] uppercase tracking-wider mb-2 px-1">{cat}</h3>
+                            <h3 className="text-xs font-semibold text-[#7e7e7e] uppercase tracking-wider mb-2 px-1">{cat}</h3>
                             <div className="space-y-1">
                                 {items.filter((i) => i.category === cat).map((item, idx) => {
                                     const aiItem = matrix.find((m: any) => m.item_id === item.id);
@@ -233,17 +233,17 @@ export default function MenuPage() {
                                                     </span>
                                                 )}
                                                 <div>
-                                                    <p className={`text-sm font-medium ${item.is_available ? "text-[#e5e5e5]" : "text-[#525252] line-through"}`}>
+                                                    <p className={`text-sm font-medium ${item.is_available ? "text-[#e5e5e5]" : "text-[#7e7e7e] line-through"}`}>
                                                         {item.name}
                                                     </p>
                                                     {item.description && (
-                                                        <p className="text-xs text-[#525252] mt-0.5">{item.description}</p>
+                                                        <p className="text-xs text-[#7e7e7e] mt-0.5">{item.description}</p>
                                                     )}
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-3">
                                                 {aiItem?.margin_pct !== undefined && (
-                                                    <span className={`text-[10px] ${aiItem.margin_pct >= 60 ? "text-[#22c55e]" : aiItem.margin_pct >= 30 ? "text-[#737373]" : "text-[#ef4444]"
+                                                    <span className={`text-[10px] ${aiItem.margin_pct >= 60 ? "text-[#22c55e]" : aiItem.margin_pct >= 30 ? "text-[#8a8a8a]" : "text-[#ef4444]"
                                                         }`}>{aiItem.margin_pct.toFixed(0)}% profit</span>
                                                 )}
                                                 <span className="text-sm font-semibold text-[#d4a853]">

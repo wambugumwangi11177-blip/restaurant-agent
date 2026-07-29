@@ -109,7 +109,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="px-5 py-5 border-b border-[#1a1a1a]">
                     <p className="text-lg font-bold text-[#e5e5e5] tracking-tight">Chakula</p>
                     <p className="text-xs text-[#d4a853] mt-0.5 truncate font-medium">{restaurantName}</p>
-                    <p className="text-xs text-[#525252] truncate">{user?.email || "—"}</p>
+                    <p className="text-xs text-[#7e7e7e] truncate">{user?.email || "—"}</p>
                 </div>
 
                 {/* Nav */}
@@ -126,7 +126,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
                                     isActive
                                         ? "bg-[#1a1a1a] text-[#d4a853]"
-                                        : "text-[#737373] hover:text-[#e5e5e5] hover:bg-[#141414]"
+                                        : "text-[#8a8a8a] hover:text-[#e5e5e5] hover:bg-[#141414]"
                                 }`}
                             >
                                 <item.icon className="w-4 h-4" />
@@ -140,7 +140,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-[#1a1a1a]">
                     <button
                         onClick={() => { logout(); router.push("/login"); }}
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[#737373] hover:text-red-400 hover:bg-red-500/5 w-full transition-colors"
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[#8a8a8a] hover:text-red-400 hover:bg-red-500/5 w-full transition-colors"
                     >
                         <LogOut className="w-4 h-4" />
                         <span className="font-medium">Logout</span>
@@ -167,11 +167,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         onClick={() => setSidebarOpen(!sidebarOpen)}
                         aria-label={sidebarOpen ? "Close navigation menu" : "Open navigation menu"}
                         aria-expanded={sidebarOpen}
-                        className="lg:hidden -m-2 p-2 min-w-11 min-h-11 flex items-center justify-center text-[#737373] hover:text-[#e5e5e5]"
+                        className="lg:hidden -m-2 p-2 min-w-11 min-h-11 flex items-center justify-center text-[#8a8a8a] hover:text-[#e5e5e5]"
                     >
                         {sidebarOpen ? <X className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
                     </button>
-                    <div className="text-xs text-[#525252]">{user?.role || "offline"}</div>
+                    <div className="text-xs text-[#7e7e7e]">{user?.role || "offline"}</div>
                 </header>
 
                 <div className="p-5 max-w-6xl">

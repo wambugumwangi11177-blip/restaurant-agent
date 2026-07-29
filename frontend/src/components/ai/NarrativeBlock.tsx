@@ -65,7 +65,7 @@ export function NarrativeBlock({ n }: { n?: Narrative }) {
             {n.actions && n.actions.length > 0 && (
                 <div className="mt-2 space-y-1">
                     {n.actions.slice(0, 3).map((a, i) => (
-                        <p key={i} className="text-xs text-[#737373]">
+                        <p key={i} className="text-xs text-[#8a8a8a]">
                             <span className="text-[#e5e5e5]">→ {a.action}</span>
                             {a.why ? ` — ${a.why}` : ""}
                         </p>
@@ -74,7 +74,7 @@ export function NarrativeBlock({ n }: { n?: Narrative }) {
             )}
             <button
                 onClick={() => setShowTrust((v) => !v)}
-                className="mt-2 flex items-center gap-1 text-[10px] text-[#525252] italic hover:text-[#737373] transition-colors"
+                className="mt-2 flex items-center gap-1 text-[10px] text-[#7e7e7e] italic hover:text-[#8a8a8a] transition-colors"
             >
                 AI interpretation · the figures above are computed exactly, not by the AI.
                 <ChevronDown className={`w-2.5 h-2.5 transition-transform ${showTrust ? "rotate-180" : ""}`} />
@@ -85,11 +85,11 @@ export function NarrativeBlock({ n }: { n?: Narrative }) {
                         The &quot;AI reading&quot; is only the AI&apos;s opinion in words. Every number is calculated
                         exactly by the system — never made up by the AI.
                     </p>
-                    <p className="text-[11px] text-[#737373] leading-snug flex gap-1.5">
+                    <p className="text-[11px] text-[#8a8a8a] leading-snug flex gap-1.5">
                         <ShieldCheck className="w-3 h-3 flex-shrink-0 mt-0.5 text-emerald-400" />
                         <span><span className="text-[#e5e5e5] font-medium">Figures checked</span> — every number the AI wrote was found in your real data.</span>
                     </p>
-                    <p className="text-[11px] text-[#737373] leading-snug flex gap-1.5">
+                    <p className="text-[11px] text-[#8a8a8a] leading-snug flex gap-1.5">
                         <ShieldAlert className="w-3 h-3 flex-shrink-0 mt-0.5 text-amber-400" />
                         <span><span className="text-[#e5e5e5] font-medium">Figures removed</span> — a number couldn&apos;t be matched to your data, so it was taken out before you saw it.</span>
                     </p>

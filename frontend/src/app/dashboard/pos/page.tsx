@@ -140,7 +140,7 @@ export default function POSPage() {
             <div className="bg-[#141414] border border-[#262626] rounded-xl p-8 text-center">
                 <UtensilsCrossed className="w-8 h-8 text-[#ef4444] mx-auto mb-3" />
                 <p className="text-sm text-[#e5e5e5] mb-1">Couldn&apos;t load the menu</p>
-                <p className="text-xs text-[#525252] mb-4">{menuError}</p>
+                <p className="text-xs text-[#7e7e7e] mb-4">{menuError}</p>
                 <button
                     onClick={retryMenu}
                     className="text-xs px-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#262626] text-[#e5e5e5] hover:bg-[#222]"
@@ -172,7 +172,7 @@ export default function POSPage() {
             <div className="flex items-center justify-between mb-4">
                 <div>
                     <h1 className="text-xl font-bold text-[#e5e5e5]">New Order</h1>
-                    <p className="text-xs text-[#525252]">Tap items to add, then send to kitchen</p>
+                    <p className="text-xs text-[#7e7e7e]">Tap items to add, then send to kitchen</p>
                 </div>
             </div>
 
@@ -187,7 +187,7 @@ export default function POSPage() {
                                 onClick={() => setSelectedCategory(cat)}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${selectedCategory === cat
                                         ? "bg-[#d4a853] text-black"
-                                        : "bg-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5]"
+                                        : "bg-[#1a1a1a] text-[#8a8a8a] hover:text-[#e5e5e5]"
                                     }`}
                             >
                                 {cat}
@@ -214,7 +214,7 @@ export default function POSPage() {
                                     )}
                                     <p className="text-sm font-medium text-[#e5e5e5] truncate">{item.name}</p>
                                     <p className="text-xs text-[#d4a853] mt-1">{formatKES(item.price)}</p>
-                                    <p className="text-[10px] text-[#525252] mt-0.5">{item.category}</p>
+                                    <p className="text-[10px] text-[#7e7e7e] mt-0.5">{item.category}</p>
                                 </motion.button>
                             );
                         })}
@@ -228,12 +228,12 @@ export default function POSPage() {
                             <ShoppingBag className="w-4 h-4 text-[#d4a853]" />
                             <span className="text-sm font-semibold text-[#e5e5e5]">Cart</span>
                         </div>
-                        <span className="text-[10px] text-[#525252]">{itemCount} item{itemCount !== 1 ? "s" : ""}</span>
+                        <span className="text-[10px] text-[#7e7e7e]">{itemCount} item{itemCount !== 1 ? "s" : ""}</span>
                     </div>
 
                     <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2">
                         {cart.length === 0 ? (
-                            <p className="text-xs text-[#525252] text-center py-8">Tap items to add them here</p>
+                            <p className="text-xs text-[#7e7e7e] text-center py-8">Tap items to add them here</p>
                         ) : (
                             cart.map((c) => (
                                 <div key={c.menuItem.id} className="flex items-center gap-2 py-1.5">
@@ -243,16 +243,16 @@ export default function POSPage() {
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <button onClick={() => updateQty(c.menuItem.id, -1)}
-                                            className="w-6 h-6 rounded bg-[#1a1a1a] flex items-center justify-center text-[#737373] hover:text-[#e5e5e5]">
+                                            className="w-6 h-6 rounded bg-[#1a1a1a] flex items-center justify-center text-[#8a8a8a] hover:text-[#e5e5e5]">
                                             <Minus className="w-3 h-3" />
                                         </button>
                                         <span className="text-xs text-[#e5e5e5] w-5 text-center">{c.quantity}</span>
                                         <button onClick={() => updateQty(c.menuItem.id, 1)}
-                                            className="w-6 h-6 rounded bg-[#1a1a1a] flex items-center justify-center text-[#737373] hover:text-[#e5e5e5]">
+                                            className="w-6 h-6 rounded bg-[#1a1a1a] flex items-center justify-center text-[#8a8a8a] hover:text-[#e5e5e5]">
                                             <Plus className="w-3 h-3" />
                                         </button>
                                         <button onClick={() => removeFromCart(c.menuItem.id)}
-                                            className="w-6 h-6 rounded flex items-center justify-center text-[#525252] hover:text-[#ef4444]">
+                                            className="w-6 h-6 rounded flex items-center justify-center text-[#7e7e7e] hover:text-[#ef4444]">
                                             <Trash2 className="w-3 h-3" />
                                         </button>
                                     </div>
@@ -273,7 +273,7 @@ export default function POSPage() {
                                 <button key={t.v} onClick={() => setOrderType(t.v)}
                                     className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium transition-all ${orderType === t.v
                                             ? "bg-[#d4a853]/10 text-[#d4a853] border border-[#d4a853]/30"
-                                            : "bg-[#1a1a1a] text-[#737373] border border-transparent"
+                                            : "bg-[#1a1a1a] text-[#8a8a8a] border border-transparent"
                                         }`}>
                                     <t.icon className="w-3 h-3" />
                                     {t.label}
@@ -293,7 +293,7 @@ export default function POSPage() {
                                     <button key={ch.v} onClick={() => setDeliveryChannel(ch.v)}
                                         className={`flex-1 py-1.5 rounded-lg text-[10px] font-medium transition-all ${deliveryChannel === ch.v
                                                 ? "bg-[#3b82f6]/10 text-[#3b82f6] border border-[#3b82f6]/30"
-                                                : "bg-[#1a1a1a] text-[#737373] border border-transparent"
+                                                : "bg-[#1a1a1a] text-[#8a8a8a] border border-transparent"
                                             }`}>
                                         {ch.label}
                                     </button>
@@ -304,35 +304,35 @@ export default function POSPage() {
                         {/* Customer info */}
                         <div className="grid grid-cols-2 gap-2">
                             <div className="relative">
-                                <User className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#525252]" />
+                                <User className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#7e7e7e]" />
                                 <input
                                     type="text" placeholder="Name" value={customerName}
                                     aria-label="Customer name"
                                     autoComplete="name"
                                     onChange={(e) => setCustomerName(e.target.value)}
-                                    className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none"
+                                    className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#7e7e7e] focus:border-[#d4a853]/50 focus:outline-none"
                                 />
                             </div>
                             {orderType === "dine_in" ? (
                                 <div className="relative">
-                                    <Hash className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#525252]" />
+                                    <Hash className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#7e7e7e]" />
                                     <input
                                         type="text" placeholder="Table #" value={tableNumber}
                                         aria-label="Table number"
                                         inputMode="numeric"
                                         onChange={(e) => setTableNumber(e.target.value)}
-                                        className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none"
+                                        className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#7e7e7e] focus:border-[#d4a853]/50 focus:outline-none"
                                     />
                                 </div>
                             ) : (
                                 <div className="relative">
-                                    <Smartphone className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#525252]" />
+                                    <Smartphone className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#7e7e7e]" />
                                     <input
                                         type="tel" placeholder="Phone" value={customerPhone}
                                         aria-label="Customer phone number"
                                         autoComplete="tel"
                                         onChange={(e) => setCustomerPhone(e.target.value)}
-                                        className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none"
+                                        className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#7e7e7e] focus:border-[#d4a853]/50 focus:outline-none"
                                     />
                                 </div>
                             )}
@@ -340,12 +340,12 @@ export default function POSPage() {
 
                         {/* Notes */}
                         <div className="relative">
-                            <StickyNote className="absolute left-2 top-2 w-3 h-3 text-[#525252]" />
+                            <StickyNote className="absolute left-2 top-2 w-3 h-3 text-[#7e7e7e]" />
                             <input
                                 type="text" placeholder="Notes (e.g. no onions, extra spicy)" value={notes}
                                 aria-label="Order notes"
                                 onChange={(e) => setNotes(e.target.value)}
-                                className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#525252] focus:border-[#d4a853]/50 focus:outline-none"
+                                className="w-full bg-[#1a1a1a] border border-[#262626] rounded-lg pl-7 pr-2 py-1.5 text-xs text-[#e5e5e5] placeholder-[#7e7e7e] focus:border-[#d4a853]/50 focus:outline-none"
                             />
                         </div>
 
@@ -360,7 +360,7 @@ export default function POSPage() {
                                 <button key={p.v} onClick={() => setPaymentMethod(p.v)}
                                     className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium transition-all ${paymentMethod === p.v
                                             ? "bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/30"
-                                            : "bg-[#1a1a1a] text-[#737373] border border-transparent"
+                                            : "bg-[#1a1a1a] text-[#8a8a8a] border border-transparent"
                                         }`}>
                                     <p.icon className="w-3 h-3" />
                                     {p.label}
@@ -371,7 +371,7 @@ export default function POSPage() {
                         {/* Total & submit */}
                         <div className="flex items-center justify-between pt-2 border-t border-[#1a1a1a]">
                             <div>
-                                <p className="text-[10px] text-[#525252]">Total</p>
+                                <p className="text-[10px] text-[#7e7e7e]">Total</p>
                                 <p className="text-lg font-bold text-[#d4a853]">{formatKES(subtotal)}</p>
                             </div>
                             <button
@@ -379,7 +379,7 @@ export default function POSPage() {
                                 disabled={cart.length === 0 || submitting}
                                 className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${cart.length > 0 && !submitting
                                         ? "bg-[#d4a853] text-black hover:bg-[#c49843]"
-                                        : "bg-[#262626] text-[#525252] cursor-not-allowed"
+                                        : "bg-[#262626] text-[#7e7e7e] cursor-not-allowed"
                                     }`}
                             >
                                 {submitting ? "Sending..." : "Send to Kitchen"}

@@ -299,7 +299,17 @@ class StockMovement(Base):
     quantity = Column(Float)
     reason = Column(String, default="")  # "sale", "waste", "purchase", "adjustment"
     created_at = Column(DateTime, default=utcnow)
-    
+    # Who performed this movement (migration 029). Receive/adjust are open to
+    # any authenticated user — correct, since logging a delivery or waste is
+    # normal floor work, not an admin task — but until this column existed a
+    # negative adjustment with a free-text reason was completely anonymous.
+    # That is the classic shrinkage vector, and it sits directly under the
+    # profit-leak / portion-drift detection this product sells: the analytics
+    # could see stock vanish but never who wrote it off. Nullable: pre-existing
+    # rows and system-generated movements (sales depletion) have no user.
+    # SET NULL on delete — attribution is history, it must not block removing a user.
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
     inventory_item = relationship("InventoryItem", back_populates="movements")
 
 # ──────────────────────────────────────────────

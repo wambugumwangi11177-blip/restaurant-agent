@@ -93,6 +93,7 @@ async def receive_stock(
         movement_type=models.StockMovementType.IN,
         quantity=receive.quantity,
         reason=f"Received from {receive.supplier}" if receive.supplier else "Stock received",
+        user_id=current_user.id,
     )
     db.add(movement)
     db.commit()
@@ -123,6 +124,7 @@ async def adjust_stock(
         movement_type=models.StockMovementType.ADJUST if adjust.quantity >= 0 else models.StockMovementType.OUT,
         quantity=abs(adjust.quantity),
         reason=adjust.reason or "Manual adjustment",
+        user_id=current_user.id,
     )
     db.add(movement)
     db.commit()

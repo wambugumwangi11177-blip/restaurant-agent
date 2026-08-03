@@ -3,6 +3,38 @@
 Notable changes to the Leviii AI platform and its documentation. Newest first. Derived from
 git history on `feat/phase1-production-hardening`.
 
+## 2026-08-03 — Audit follow-up: CI gate unblocked, stock attribution
+
+### Security
+- **Stock movements now record who performed them** (`StockMovement.user_id`,
+  migration 029). `POST /inventory/{id}/receive` and `/adjust` are open to any
+  authenticated user — correct, since logging a delivery or writing off waste is
+  normal floor work — but the movement record captured only item/type/quantity/
+  reason. A negative adjustment with a free-text reason was therefore completely
+  anonymous: the textbook shrinkage vector, sitting directly beneath the
+  profit-leak and portion-drift detection this product sells. Fixed by
+  attribution rather than restriction, so kitchen workflow is unchanged.
+  Covered by `backend/tests/test_stock_attribution.py`.
+
+### Fixed
+- **Blocking `npm audit` CI gate is green again** (closes tech-debt D27). The 3
+  high-severity advisories were in `postcss`/`sharp` **bundled inside** Next.js,
+  not in direct dependencies — npm's suggested remedy was a downgrade to
+  `next@9.3.3`. Resolved properly instead: Next patch bump 16.2.10 → 16.2.12 plus
+  `overrides` pinning `postcss ^8.5.25` / `sharp ^0.35.0` inside Next's tree.
+  Verified with a full build, typecheck, and test run — the advisories are
+  actually resolved, not suppressed by loosening the threshold.
+
+### Changed
+- **Tech-debt D1 re-scoped P1 → P2** after a route-by-route RBAC audit. Its
+  original remedy ("STAFF = POS/KDS only") would have broken the POS: orders,
+  reservations, and inventory receive/adjust are legitimate floor work. The
+  admin surfaces (`ai`, `analytics`, `billing`, `enterprise`, `export`, and
+  menu/inventory CUD) are already gated. The residual gap is that floor routes
+  rely on implicit "any authenticated user" rather than an explicit
+  `require_role` declaration — a readability and fail-closed concern, not an
+  open privilege hole.
+
 ## 2026-08-02 — Platform audit & remediation
 
 Graded the codebase against a generic + construction + EdTech SaaS audit checklist

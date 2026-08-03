@@ -4,8 +4,8 @@
 |---|---|
 | **Reference** | LAI-DEBT-001 |
 | **Classification** | Internal |
-| **Version** | 1.1 |
-| **Last Updated** | 2026-08-02 |
+| **Version** | 1.2 |
+| **Last Updated** | 2026-08-03 |
 | **Owner** | Engineering (Leviii AI Technologies) |
 | **Contact** | leviiiaikenya@gmail.com |
 
@@ -14,7 +14,7 @@ Tracked, honest list of known gaps. Each links to where it's discussed. Priority
 
 | ID | Item | Pri | Detail | Source |
 |---|---|---|---|---|
-| D1 | RBAC coverage incomplete | P1 | `require_role` gates admin-sensitive routes; extend to all operational routes so "STAFF = POS/KDS only" is literally true | [threat-model.md](security/threat-model.md) R1; [ADR 0006](adr/0006-rbac-via-require-role-dependency.md) |
+| D1 | RBAC coverage: declare roles explicitly | P2 | **Re-scoped 2026-08-03 after a route-by-route audit.** The original remedy ("STAFF = POS/KDS only") is wrong for this product: orders, reservations, and inventory receive/adjust are legitimate floor work that STAFF must reach, so gating them to ADMIN would break the POS. Actual state: menu/inventory create-update-delete, and all of `ai`/`analytics`/`billing`/`enterprise`/`export` **are** ADMIN-gated; the remaining routes use bare `get_current_user`, i.e. any-authenticated-user. The real gap is that this is *implicit* — a new route defaults to "everyone" rather than failing closed. Remedy: declare `require_role(STAFF, ADMIN)` explicitly on floor routes so intent is readable and a future role tier (see D23) has a seam to slot into. The one concrete abuse path found — anonymous stock write-offs — is closed (see CHANGELOG 2026-08-03) | [threat-model.md](security/threat-model.md) R1; [ADR 0006](adr/0006-rbac-via-require-role-dependency.md) |
 | D2 | Audit-log retention vs DPA wording | P2 | `AgentAuditLog` is append-only with no purge; DPA §04 says "90-day rolling" — implement purge or reconcile wording | [compliance-matrix.md](compliance-matrix.md) §3; redline R-06 |
 | D3 | Request schemas allow extra fields | P2 | Add `extra="forbid"` to make "strict validation" literal | [control-evidence-matrix.md](trust/control-evidence-matrix.md) §3 |
 | D4 | Multi-restaurant tenant scoping | P2 | `get_or_create_restaurant` returns the first restaurant; add explicit selection for multi-restaurant tenants | [ADR 0004](adr/0004-query-layer-tenant-isolation.md) |
@@ -39,7 +39,6 @@ Tracked, honest list of known gaps. Each links to where it's discussed. Priority
 | D24 | No dynamic content/query caching layer | P3 | Every request hits the DB directly; blocked on Redis provisioning (same root cause as external-hardening-checklist.md #6) | `backend/rate_limit.py` |
 | D25 | No auto-scaling configuration | P3 | `railway.json`/`render.yaml` define a single fixed-size service, no replica/scaling block | `backend/railway.json`; `backend/render.yaml` |
 | D26 | AI cost not broken out per feature | P3 | `/ai/usage` shows aggregate spend by model, not per-feature-per-tenant — harder to see which capability drives cost | `backend/ai/cost_model.py`; `backend/routers/ai.py` |
-| D27 | Blocking `npm audit` gate is currently red | P2 | 3 new high-severity advisories in `next`/`postcss`/`sharp` (post-2026-07-11 disclosures) fail `frontend-ci`'s blocking `npm audit --audit-level=high` step on any PR touching frontend, unrelated to the change itself. Needs the same ignore-by-id-with-reason treatment as D11, or a Next.js upgrade | `.github/workflows/ci.yml`; `frontend/package.json` |
 
 ## How this list is used
 - New debt is added here when discovered; items are removed when resolved (with a CHANGELOG
@@ -51,3 +50,4 @@ Tracked, honest list of known gaps. Each links to where it's discussed. Priority
 |---|---|---|---|
 | 1.0 | 2026-07-11 | Engineering | Initial register consolidated from all trust docs |
 | 1.1 | 2026-08-02 | Engineering | Added D14–D26 from a platform audit graded against a generic + construction + EdTech SaaS checklist; removed D7 (found already resolved 2026-07-11, row never cleaned up); added D27 (blocking npm audit gate found red, discovered while adding frontend test scaffolding for D17) |
+| 1.2 | 2026-08-03 | Engineering | Removed D27 (resolved — Next 16.2.12 + postcss/sharp `overrides`, gate green with build/typecheck/tests passing). Re-scoped D1 from P1 to P2 after a route-by-route audit showed its original remedy would break the POS; the one concrete abuse path it implied (anonymous stock write-offs) is fixed |

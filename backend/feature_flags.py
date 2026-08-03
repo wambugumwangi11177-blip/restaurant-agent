@@ -38,6 +38,12 @@ _FLAGS: dict[str, tuple[bool, str]] = {
     # and is additionally gated by ai_narration + a configured provider.
     "simulation": (True, "What-if simulation engine (POST /ai/simulate) and digital twin."),
     "strategy_agent": (False, "Goal-driven CEO/Strategy agent (POST /ai/strategy); spends LLM tokens."),
+    # Emergency override for ai/spend_guard.py (tech-debt D14). Default ON —
+    # flip to false only to lift the spend cap in an emergency (e.g. the cap
+    # itself is misconfigured and blocking legitimate use); doing so removes
+    # the only backstop against unbounded LLM spend, so treat it like pulling
+    # a fuse, not a normal setting.
+    "ai_spend_cap": (True, "Enforce the per-tenant AI spend cap; off = unlimited spend (emergency override)."),
 }
 
 _TRUTHY = {"1", "true", "yes", "on"}

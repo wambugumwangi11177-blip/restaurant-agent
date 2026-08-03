@@ -5,7 +5,7 @@ Rule-based statistics and thresholds, not LLM-backed — see
 directives/012_agentic_roadmap.md's standing rule on labeling honestly.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from database import get_db
 from auth import require_role
@@ -13,6 +13,7 @@ import models
 from ai import menu_engineer, revenue_forecaster, kds_intelligence, inventory_predictor, reservation_optimizer, ops_manager
 from ai.analysis_clock import data_freshness
 from routers.deps import get_restaurant_or_none
+from rate_limit import limiter
 
 router = APIRouter(prefix="/ai", tags=["Analytics"])
 
@@ -67,7 +68,8 @@ def ai_dashboard(db: Session = Depends(get_db), user: models.User = Depends(requ
 
 
 @router.get("/menu-engineering")
-def menu_engineering(narrate: bool = True, db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
+@limiter.limit("20/minute")
+def menu_engineering(request: Request, narrate: bool = True, db: Session = Depends(get_db), user: models.User = Depends(require_role(models.Role.ADMIN))):
     """
     Menu Engineering Matrix — Star/Plowhorse/Puzzle/Dog classification.
     Numbers are deterministic; when an LLM provider is set (and narrate=true) a

@@ -5,8 +5,8 @@
 | **Reference** | LAI-ENG-001 |
 | **Classification** | Internal |
 | **Audience** | Engineers, technical due diligence |
-| **Version** | 1.0 |
-| **Last Updated** | 2026-07-11 |
+| **Version** | 1.1 |
+| **Last Updated** | 2026-08-02 |
 | **Owner** | Engineering (Leviii AI Technologies) |
 | **Contact** | leviiiaikenya@gmail.com |
 
@@ -73,7 +73,7 @@ Runs on every `push` to main/master and every `pull_request`. Four jobs:
 ## 5. Database migrations
 
 - All schema changes go through **Alembic** (`backend/alembic/versions/`), currently through
-  revision `017`. No ad-hoc schema edits.
+  revision `024`. No ad-hoc schema edits.
 - Data-integrity constraints are added via migration and back-filled safely (e.g.
   `016_add_integrity_constraints.py` applies CHECKs `NOT VALID` then validates).
 
@@ -105,10 +105,13 @@ Runs on every `push` to main/master and every `pull_request`. Four jobs:
 
 - Set `--cov-fail-under` once baseline coverage is known.
 - Confirm/enable GitHub branch protection on `master`.
-- Make `npm audit` blocking after baseline triage.
+- `npm audit` was made blocking 2026-07-11, but the gate is currently red on
+  new advisories unrelated to any given PR — see
+  [tech-debt-register.md](tech-debt-register.md) D27.
 
 ## Revision history
 
 | Version | Date | Author | Change |
 |---|---|---|---|
 | 1.0 | 2026-07-11 | Engineering | Initial standards from CI + repo audit |
+| 1.1 | 2026-08-02 | Engineering | Fixed stale Alembic revision reference (§5, was 017, actual 024); corrected the already-resolved npm-audit open item |

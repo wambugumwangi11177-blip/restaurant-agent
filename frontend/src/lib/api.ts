@@ -20,14 +20,28 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle 401 responses globally
+// Handle 401 responses globally, and retry once on 429 (audit finding §2.7 —
+// the backend's rate limiter returns a real 429 with a Retry-After header on
+// several routes, but nothing on the frontend ever honored it; a legitimate
+// user just saw a raw error).
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401 && typeof window !== "undefined") {
       localStorage.removeItem("access_token");
       window.location.href = "/login";
+      return Promise.reject(error);
     }
+
+    const config = error.config;
+    if (error.response?.status === 429 && config && !config.__retriedAfter429) {
+      config.__retriedAfter429 = true;
+      const retryAfterHeader = error.response.headers?.["retry-after"];
+      const retryAfterMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : 1000;
+      await new Promise((resolve) => setTimeout(resolve, Math.min(retryAfterMs, 10_000)));
+      return api(config);
+    }
+
     return Promise.reject(error);
   }
 );

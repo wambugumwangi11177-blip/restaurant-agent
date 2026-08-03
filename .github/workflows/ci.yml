@@ -139,6 +139,16 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      # Frontend test suite (Vitest), added 2026-08-02 — tech-debt D17. Runs
+      # 3 seed test files (cart math, money formatters, AuthContext) as a
+      # scaffolding proof, not full coverage. Non-blocking initially, same
+      # pattern this file already uses for a brand-new gate (see npm audit's
+      # history above, and container-scan below) — flip to blocking once a
+      # real baseline exists.
+      - name: Test
+        run: npm test
+        continue-on-error: true
+
   gitleaks:
     # Secret scanning — catches an API key / token / password committed to the
     # repo before it reaches history. Complements pip-audit/bandit (which cover

@@ -89,6 +89,26 @@ class User(Base):
     # users are unaffected until they opt in.
     mfa_secret = Column(String, nullable=True)
     mfa_enabled = Column(Boolean, default=False, nullable=False)
+    # Deprovisioning (migration 025, tech-debt D18): a departing employee's
+    # credentials used to remain valid indefinitely — no deactivate path existed
+    # anywhere. False blocks both new logins and existing tokens (see
+    # auth.py::get_current_user); distinct from deleting the row, which would
+    # break FK references from their historical orders/audit entries.
+    is_active = Column(Boolean, default=True, nullable=False)
+    # Shared-device PIN quick-switch (migration 027, tech-debt D16). Nullable —
+    # a staff member opts in via POST /auth/pin/set. ATTRIBUTION ONLY, not a
+    # second auth boundary: verifying a PIN never mints a token or changes what
+    # the device's existing JWT/role can do (see routers/auth.py::pin_verify
+    # and docs/security/threat-model.md's note on this). Reuses
+    # auth.get_password_hash — no second hashing scheme for a second secret.
+    pin_hash = Column(String, nullable=True)
+    display_name = Column(String, nullable=True)
+    # Deliberately separate from failed_login_attempts/locked_until above: PIN
+    # attempts happen many times a shift on a shared device, so sharing
+    # counters with the once-a-shift password login would cross-contaminate
+    # lockouts between two unrelated flows.
+    pin_failed_attempts = Column(Integer, default=0, nullable=False)
+    pin_locked_until = Column(DateTime, nullable=True)
 
     tenant = relationship("Tenant", back_populates="users")
 
@@ -181,6 +201,21 @@ class Order(Base):
     notes = Column(Text, default="")
     created_at = Column(DateTime, default=utcnow)
     completed_at = Column(DateTime, nullable=True)
+    # Client-generated key (migration 026, tech-debt D15): lets the POS offline
+    # queue safely replay a submission after a network drop without creating a
+    # duplicate order. Nullable: only orders submitted through the
+    # offline-aware POS flow set it. Unlike mpesa_checkout_request_id above —
+    # which really is globally unique (Safaricom issues it) — this is
+    # client-generated, so uniqueness is scoped to (restaurant_id,
+    # idempotency_key) in __table_args__, not global; a UUID collision across
+    # two different tenants must never 500 one of them.
+    idempotency_key = Column(String, nullable=True)
+    # Shared-device PIN quick-switch (migration 028, tech-debt D16): who rang
+    # this order up, when the device session itself is logged in as a shared
+    # account. ATTRIBUTION ONLY — never used for authorization (see the
+    # User.pin_hash comment). SET NULL on user delete: this is metadata about
+    # who acted, not a record that should vanish or block cleanup.
+    attributed_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     restaurant = relationship("Restaurant", back_populates="orders")
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
@@ -194,6 +229,10 @@ class Order(Base):
         # An order total is money in cents — never negative. Allows 0 (comped/
         # zero-total orders are legitimate). See migration 016.
         CheckConstraint("total >= 0", name="ck_orders_total_nonneg"),
+        # Per-tenant uniqueness (not global — see idempotency_key's comment).
+        # Postgres/SQLite both allow multiple NULLs through a unique
+        # constraint, so orders that never set the key are unaffected.
+        UniqueConstraint("restaurant_id", "idempotency_key", name="uq_orders_restaurant_idempotency_key"),
     )
 
 class OrderItem(Base):

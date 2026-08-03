@@ -2,6 +2,18 @@
 
 import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
+import {
+    addToCart as addToCartPure,
+    updateQty as updateQtyPure,
+    removeFromCart as removeFromCartPure,
+    cartSubtotal,
+    cartItemCount,
+    cartToOrderItems,
+    type MenuItem,
+    type CartItem,
+} from "@/lib/cart";
+import { enqueueOrder, watchOfflineQueue, getQueueLength } from "@/lib/offlineQueue";
+import { PinSwitcher, type PinOperator } from "@/components/pos/PinSwitcher";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Plus,
@@ -18,21 +30,9 @@ import {
     User,
     Hash,
     StickyNote,
+    AlertTriangle,
+    CloudOff,
 } from "lucide-react";
-
-interface MenuItem {
-    id: number;
-    name: string;
-    price: number;
-    category: string;
-    description?: string;
-    is_available?: boolean;
-}
-
-interface CartItem {
-    menuItem: MenuItem;
-    quantity: number;
-}
 
 export default function POSPage() {
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -49,6 +49,10 @@ export default function POSPage() {
     const [submitting, setSubmitting] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [lastOrderId, setLastOrderId] = useState<number | null>(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [queuedMessage, setQueuedMessage] = useState<string | null>(null);
+    const [queueLength, setQueueLength] = useState(0);
+    const [activeOperator, setActiveOperator] = useState<PinOperator | null>(null);
 
     useEffect(() => {
         api.get("/menu/").then((res) => {
@@ -57,71 +61,92 @@ export default function POSPage() {
         }).catch(() => setLoading(false));
     }, []);
 
+    // Offline order queue (tech-debt D15): replays anything queued from a
+    // failed submission — this session's or a prior one still sitting in
+    // localStorage — whenever the browser comes back online, on a 30s
+    // interval, and once on mount.
+    useEffect(() => {
+        setQueueLength(getQueueLength());
+        const stop = watchOfflineQueue(() => {
+            setQueueLength(getQueueLength());
+            setQueuedMessage("A queued order synced to the kitchen.");
+            setTimeout(() => setQueuedMessage(null), 3000);
+        });
+        return stop;
+    }, []);
+
     const categories = ["All", ...Array.from(new Set(menuItems.map((i) => i.category)))];
     const filteredItems = selectedCategory === "All"
         ? menuItems
         : menuItems.filter((i) => i.category === selectedCategory);
 
     const addToCart = useCallback((item: MenuItem) => {
-        setCart((prev) => {
-            const existing = prev.find((c) => c.menuItem.id === item.id);
-            if (existing) {
-                return prev.map((c) =>
-                    c.menuItem.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
-                );
-            }
-            return [...prev, { menuItem: item, quantity: 1 }];
-        });
+        setCart((prev) => addToCartPure(prev, item));
     }, []);
 
     const updateQty = useCallback((itemId: number, delta: number) => {
-        setCart((prev) =>
-            prev
-                .map((c) =>
-                    c.menuItem.id === itemId
-                        ? { ...c, quantity: Math.max(0, c.quantity + delta) }
-                        : c
-                )
-                .filter((c) => c.quantity > 0)
-        );
+        setCart((prev) => updateQtyPure(prev, itemId, delta));
     }, []);
 
     const removeFromCart = useCallback((itemId: number) => {
-        setCart((prev) => prev.filter((c) => c.menuItem.id !== itemId));
+        setCart((prev) => removeFromCartPure(prev, itemId));
     }, []);
 
-    const subtotal = cart.reduce((sum, c) => sum + c.menuItem.price * c.quantity, 0);
-    const itemCount = cart.reduce((sum, c) => sum + c.quantity, 0);
+    const subtotal = cartSubtotal(cart);
+    const itemCount = cartItemCount(cart);
 
     const handleSubmit = async () => {
         if (cart.length === 0) return;
         setSubmitting(true);
-        try {
-            const res = await api.post("/orders/", {
-                items: cart.map((c) => ({
-                    menu_item_id: c.menuItem.id,
-                    quantity: c.quantity,
-                })),
-                order_type: orderType,
-                delivery_channel: deliveryChannel,
-                payment_method: paymentMethod,
-                customer_name: customerName,
-                customer_phone: customerPhone,
-                table_number: tableNumber ? parseInt(tableNumber) : null,
-                notes,
-            });
-            setLastOrderId(res.data.id);
-            setShowSuccess(true);
-            // Reset
+        setErrorMessage(null);
+        const orderPayload = {
+            items: cartToOrderItems(cart),
+            order_type: orderType,
+            delivery_channel: deliveryChannel,
+            payment_method: paymentMethod,
+            customer_name: customerName,
+            customer_phone: customerPhone,
+            table_number: tableNumber ? parseInt(tableNumber) : null,
+            notes,
+            attributed_user_id: activeOperator?.id ?? null,
+        };
+
+        const resetForm = () => {
             setCart([]);
             setCustomerName("");
             setCustomerPhone("");
             setTableNumber("");
             setNotes("");
             setPaymentMethod("pending");
+        };
+
+        try {
+            const res = await api.post("/orders/", orderPayload);
+            setLastOrderId(res.data.id);
+            setShowSuccess(true);
+            resetForm();
             setTimeout(() => setShowSuccess(false), 3000);
         } catch (err) {
-            console.error("Order failed:", err);
+            const hasServerResponse =
+                typeof err === "object" && err !== null && "response" in err && (err as { response?: unknown }).response;
+            if (hasServerResponse) {
+                // A real validation/server error — the waiter needs to see
+                // and fix it, so keep the cart intact and don't queue it
+                // (retrying an invalid request won't help).
+                const detail =
+                    (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+                setErrorMessage(detail || "Couldn't send the order — please try again.");
+            } else {
+                // Network failure (offline, DNS, timeout) — the order is
+                // real, so don't lose it. Queue it for automatic replay
+                // instead of the previous console.error-only silent drop.
+                console.error("Order failed to send, queueing for retry:", err);
+                enqueueOrder(orderPayload);
+                setQueueLength(getQueueLength());
+                setQueuedMessage("You're offline — order queued, will send automatically.");
+                setTimeout(() => setQueuedMessage(null), 4000);
+                resetForm();
+            }
         }
         setSubmitting(false);
     };
@@ -155,11 +180,55 @@ export default function POSPage() {
                 )}
             </AnimatePresence>
 
+            {/* Error toast (tech-debt D19: this used to be a silent console.error) */}
+            <AnimatePresence>
+                {errorMessage && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="fixed top-4 right-4 z-50 bg-[#ef4444]/10 border border-[#ef4444]/30 rounded-xl px-5 py-3 flex items-center gap-2 max-w-sm"
+                    >
+                        <AlertTriangle className="w-4 h-4 text-[#ef4444] shrink-0" />
+                        <span className="text-sm text-[#ef4444]">{errorMessage}</span>
+                        <button onClick={() => setErrorMessage(null)} className="text-[#ef4444]/70 hover:text-[#ef4444]">
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Offline-queue toast (tech-debt D15) */}
+            <AnimatePresence>
+                {queuedMessage && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="fixed top-4 right-4 z-50 bg-[#d4a853]/10 border border-[#d4a853]/30 rounded-xl px-5 py-3 flex items-center gap-2 max-w-sm"
+                    >
+                        <CloudOff className="w-4 h-4 text-[#d4a853] shrink-0" />
+                        <span className="text-sm text-[#d4a853]">{queuedMessage}</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
                 <div>
                     <h1 className="text-xl font-bold text-[#e5e5e5]">New Order</h1>
                     <p className="text-xs text-[#525252]">Tap items to add, then send to kitchen</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    {queueLength > 0 && (
+                        <div className="flex items-center gap-1.5 bg-[#d4a853]/10 border border-[#d4a853]/30 rounded-lg px-2.5 py-1">
+                            <CloudOff className="w-3 h-3 text-[#d4a853]" />
+                            <span className="text-[10px] text-[#d4a853] font-medium">
+                                {queueLength} order{queueLength !== 1 ? "s" : ""} queued
+                            </span>
+                        </div>
+                    )}
+                    <PinSwitcher currentOperator={activeOperator} onSwitch={setActiveOperator} />
                 </div>
             </div>
 

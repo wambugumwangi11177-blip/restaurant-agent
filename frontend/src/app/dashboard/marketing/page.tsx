@@ -126,6 +126,16 @@ function ConfirmSend({
     const [sending, setSending] = useState(false);
     const [error, setError] = useState("");
 
+    // tech-debt D20: the backdrop click-to-dismiss had no keyboard equivalent
+    // — Escape now closes the dialog, matching standard modal behavior.
+    useEffect(() => {
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") onClose();
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [onClose]);
+
     const send = async () => {
         setSending(true);
         setError("");
@@ -146,14 +156,24 @@ function ConfirmSend({
     };
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
-            <div className="w-full max-w-md rounded-xl border border-[#262626] bg-[#0f0f0f] p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60"
+            onClick={onClose}
+            aria-hidden="true"
+        >
+            <div
+                className="w-full max-w-md rounded-xl border border-[#262626] bg-[#0f0f0f] p-5 space-y-4"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="confirm-send-title"
+            >
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2">
                         <Send className="w-4 h-4 text-[#d4a853]" />
-                        <h3 className="text-sm font-semibold text-[#e5e5e5]">Send this campaign?</h3>
+                        <h3 id="confirm-send-title" className="text-sm font-semibold text-[#e5e5e5]">Send this campaign?</h3>
                     </div>
-                    <button onClick={onClose} className="text-[#525252] hover:text-[#e5e5e5]"><X className="w-4 h-4" /></button>
+                    <button onClick={onClose} aria-label="Close dialog" className="text-[#525252] hover:text-[#e5e5e5]"><X className="w-4 h-4" /></button>
                 </div>
 
                 <div className="rounded-lg border border-[#1a1a1a] bg-[#0a0a0a] p-3 space-y-1.5">

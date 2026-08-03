@@ -79,6 +79,14 @@ class OrderCreate(StrictModel):
     table_number: Optional[int] = None
     notes: str = ""
     consent: bool = False   # required True on the public (customer-facing) endpoint only
+    # Client-generated, set only by the POS offline queue (tech-debt D15) so a
+    # retried submission after a network drop returns the original order
+    # instead of creating a duplicate. Omitted by every other caller.
+    idempotency_key: Optional[str] = None
+    # Shared-device PIN quick-switch (tech-debt D16) — which staff member rang
+    # this up, when the device session itself is logged in as a shared
+    # account. Attribution only; never checked for authorization.
+    attributed_user_id: Optional[int] = None
 
 class OrderItemOut(StrictModel):
     id: int
@@ -104,6 +112,7 @@ class OrderOut(StrictModel):
     created_at: datetime
     completed_at: Optional[datetime]
     items: List[OrderItemOut] = []
+    attributed_user_id: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 

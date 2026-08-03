@@ -149,6 +149,13 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
 
+    # Deactivated accounts (departing staff — see /users/{id}/deactivate) lose
+    # access immediately, even on a token minted before deactivation. Distinct
+    # from the token_version check below: this blocks the account outright,
+    # not just a specific batch of sessions.
+    if not user.is_active:
+        raise credentials_exception
+
     # Session revocation: a token is only valid while its embedded version matches
     # the user's current token_version. Bumping token_version (logout-all, or a
     # response to credential compromise) invalidates every token minted before it.

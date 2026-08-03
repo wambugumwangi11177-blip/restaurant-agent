@@ -32,13 +32,14 @@ after finding it was still being read/edited as if live.
 """
 
 import logging
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
 from auth import require_role
 import models
 from routers.deps import get_or_create_restaurant
+from rate_limit import limiter
 
 logger = logging.getLogger("ai.router")
 
@@ -70,7 +71,9 @@ def _safe_run(agent_name: str, restaurant_id: int, fn, *args, **kwargs):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/pricing")
+@limiter.limit("20/minute")
 async def ai_pricing(
+    request: Request,
     narrate: bool = True,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
@@ -142,7 +145,9 @@ async def reject_pricing_rec(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/decisions")
+@limiter.limit("20/minute")
 async def ai_decisions(
+    request: Request,
     narrate: bool = True,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
@@ -174,7 +179,9 @@ async def ai_decisions(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.post("/strategy")
+@limiter.limit("5/minute")
 async def ai_strategy(
+    request: Request,
     body: dict,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
@@ -486,7 +493,9 @@ async def ai_inventory(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/profit")
+@limiter.limit("20/minute")
 async def ai_profit(
+    request: Request,
     narrate: bool = True,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
@@ -518,7 +527,9 @@ async def ai_profit(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/roi")
+@limiter.limit("20/minute")
 async def ai_roi(
+    request: Request,
     narrate: bool = True,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
@@ -547,7 +558,9 @@ async def ai_roi(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/marketing")
+@limiter.limit("20/minute")
 async def ai_marketing(
+    request: Request,
     narrate: bool = True,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
@@ -654,7 +667,9 @@ async def ai_marketing_winback(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.post("/explain")
+@limiter.limit("10/minute")
 async def ai_explain(
+    request: Request,
     body: dict,
     current_user: models.User = Depends(require_role(models.Role.ADMIN)),
     db: Session = Depends(get_db),
@@ -740,4 +755,8 @@ async def ai_usage(
     restaurant = get_or_create_restaurant(db, current_user)
     days = min(max(days, 1), 365)
     from ai.evaluation.tracker import get_ai_ops_summary
-    return _safe_run("ai_ops_summary", restaurant.id, get_ai_ops_summary, db, restaurant.id, days)
+    data = _safe_run("ai_ops_summary", restaurant.id, get_ai_ops_summary, db, restaurant.id, days)
+    if isinstance(data, dict):
+        from ai import spend_guard
+        data["budget"] = spend_guard.get_budget_status(restaurant.id, db=db)
+    return data

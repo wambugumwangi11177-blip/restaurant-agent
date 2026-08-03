@@ -21,6 +21,31 @@ async def create_order(
 ):
     restaurant = get_or_create_restaurant(db, current_user)
 
+    # Idempotent replay (tech-debt D15): the POS offline queue retries the
+    # same key after a network drop. Scoped to this tenant so a key collision
+    # across restaurants can't leak/return someone else's order.
+    if order.idempotency_key:
+        existing = db.query(models.Order).filter(
+            models.Order.idempotency_key == order.idempotency_key,
+            models.Order.restaurant_id == restaurant.id,
+        ).first()
+        if existing:
+            return _order_to_dict(existing)
+
+    # PIN quick-switch attribution (tech-debt D16) — validate the attributed
+    # user belongs to THIS tenant before stamping it (same IDOR discipline as
+    # everywhere else; this is metadata, not a privilege, but a cross-tenant
+    # id must still never be accepted silently). Falls back to no attribution
+    # rather than erroring — a device that hasn't PIN-switched still works.
+    attributed_user_id = None
+    if order.attributed_user_id:
+        attributed_user = db.query(models.User).filter(
+            models.User.id == order.attributed_user_id,
+            models.User.tenant_id == current_user.tenant_id,
+        ).first()
+        if attributed_user:
+            attributed_user_id = attributed_user.id
+
     # Look up menu items and calculate total
     total = 0
     order_items = []
@@ -67,6 +92,8 @@ async def create_order(
         total=total,
         notes=order.notes,
         items=order_items,
+        idempotency_key=order.idempotency_key,
+        attributed_user_id=attributed_user_id,
     )
     db.add(db_order)
     db.commit()
@@ -323,4 +350,5 @@ def _order_to_dict(order: models.Order) -> dict:
         "created_at": order.created_at,
         "completed_at": order.completed_at,
         "items": items_out,
+        "attributed_user_id": order.attributed_user_id,
     }

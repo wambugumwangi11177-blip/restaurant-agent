@@ -259,8 +259,13 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Tightened from ["*"] (tech-debt: audit finding, CORS wildcard methods/
+    # headers). Origin allowlist above is the real boundary here; this just
+    # narrows the wildcard to what the API actually uses — every verb a
+    # router defines (see routers/*.py) plus the two headers the frontend
+    # ever sends (frontend/src/lib/api.ts).
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.add_middleware(TimingMiddleware)

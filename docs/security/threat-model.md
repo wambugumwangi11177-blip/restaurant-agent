@@ -5,8 +5,8 @@
 | **Reference** | LAI-THREAT-001 |
 | **Classification** | Confidential — shared under NDA |
 | **Audience** | Security engineers, auditors |
-| **Version** | 1.0 |
-| **Last Updated** | 2026-07-11 |
+| **Version** | 1.1 |
+| **Last Updated** | 2026-08-02 |
 | **Owner** | Engineering (Leviii AI Technologies) |
 | **Contact** | leviiiaikenya@gmail.com |
 
@@ -45,6 +45,7 @@ the M-Pesa/Twilio/Groq integrations.
 | T12 | **Elevation** — weak passwords | Guessable owner password | Registration policy (min-8, letters+digits) | Low–Med |
 | T13 | **Supply chain** — vulnerable dependency | Known CVE pulled in | pip-audit (blocking) + npm audit; Bandit SAST | Low |
 | T14 | **AI-specific** — prompt injection / data exfil via LLM | Malicious free-text to WhatsApp Brain | Two bounded LLM roles only: (a) unmatched WhatsApp free-text, (b) narration of a server-built deterministic payload (no raw user text). Structured commands deterministic; LLM computes nothing; narration grounded (unbacked numbers redacted); advisory-only, human-in-loop; no training on data | Med (LLM output still owner-reviewed) |
+| T15 | **Elevation** — shared-device PIN quick-switch (2026-08-02) mistaken for a second auth boundary | A 4-6 digit PIN, if it gated privilege, would be trivially brute-forceable behind an already-authenticated device | By design, it doesn't gate anything: `POST /auth/pin/verify` requires an already-valid device JWT, mints no new token, and returns display-only attribution data (see `models.py` User.pin_hash comment; `test_pin_switch.py::test_pin_switch_does_not_elevate_the_devices_own_authorization` proves verifying an ADMIN's PIN doesn't change what a STAFF device session's own JWT can do) | Low |
 
 ## Risk register
 
@@ -81,3 +82,4 @@ the M-Pesa/Twilio/Groq integrations.
 | Version | Date | Author | Change |
 |---|---|---|---|
 | 1.0 | 2026-07-11 | Engineering | Initial STRIDE model + risk register |
+| 1.1 | 2026-08-02 | Engineering | Added T15 (PIN quick-switch attribution-only design confirmation) |

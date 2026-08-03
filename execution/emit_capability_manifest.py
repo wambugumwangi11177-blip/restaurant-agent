@@ -91,7 +91,7 @@ CLAIMS = [
     dict(
         id="webhook-idempotency",
         file="backend/routers/webhooks.py",
-        symbol="idempotency",
+        symbol="_settle_order_once",
         status="Built",
         claim="M-Pesa callbacks reconcile idempotently — duplicates ignored",
     ),
@@ -136,15 +136,16 @@ CLAIMS = [
         symbol=None,
         status="Coming soon",
         claim="Automatic SEV-1 paging / 15-min incident response / SLA credits — NOT wired as of "
-        "docs/sla-remediation.md E1. Do not promise fixed response-time SLAs until this ships.",
+        "docs/operations-and-reliability.md §1 and docs/external-hardening-checklist.md #5 "
+        "(alerting rota / uptime monitor both still open). Do not promise fixed response-time SLAs until this ships.",
     ),
     dict(
         id="cash-up-drawer-reconciliation",
         file=None,
         symbol=None,
         status="Coming soon",
-        claim="No cash-up / drawer / till-count / declared-cash feature exists in backend/ "
-        "(docs/pain-library.md P3). Do not claim this capability.",
+        claim="No cash-up / drawer / till-count / declared-cash reconciliation feature exists "
+        "anywhere in backend/. Not on the current roadmap; do not claim this capability.",
     ),
 ]
 
@@ -207,6 +208,7 @@ def main() -> int:
         print(f"  [{mark}] {c['id']:35s} {c['note']}")
 
     if not args.check:
+        OUT.parent.mkdir(parents=True, exist_ok=True)
         OUT.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
         print(f"\nWrote {OUT}")
         print("Copy this file to ../leviii-gtm/contract/capability-manifest.json")

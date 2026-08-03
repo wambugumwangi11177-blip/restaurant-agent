@@ -33,6 +33,13 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
 
+# Shared-device PIN quick-switch (tech-debt D16). Separate lockout policy from
+# the password login above — deliberately, see models.py's comment on
+# pin_failed_attempts. Same thresholds reused for consistency, not because
+# they're coupled.
+MAX_PIN_ATTEMPTS = 5
+PIN_LOCKOUT_MINUTES = 15
+
 
 # ── Request / Response schemas ────────────────────────────────────────────────
 
@@ -63,6 +70,16 @@ class RestaurantUpdate(StrictModel):
     currency: str | None = None
     timezone: str | None = None
     owner_phone: str | None = None   # E.164, e.g. +2547...; used for WhatsApp owner routing
+
+
+class PinSet(StrictModel):
+    pin: str
+    display_name: str | None = None
+
+
+class PinVerify(StrictModel):
+    user_id: int
+    pin: str
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -135,6 +152,16 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Account temporarily locked due to repeated failed logins. Try again in {remaining} minute(s).",
+        )
+
+    # Deactivated account (departing staff, see POST /users/{id}/deactivate) —
+    # same "reveal before checking the password" tradeoff already made for
+    # lockout above; this is a permanent state, not a hint that helps guess
+    # the password.
+    if user and not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account has been deactivated.",
         )
 
     if not user or not auth.verify_password(login_data.password, user.hashed_password):
@@ -267,6 +294,141 @@ async def mfa_disable(
     user.mfa_secret = None
     db.commit()
     return {"status": "mfa_disabled"}
+
+
+# ── Shared-device PIN quick-switch (tech-debt D16) ─────────────────────────────
+# ATTRIBUTION ONLY, not a second authorization boundary. A POS tablet stays
+# logged in for a shift under one device-level JWT; these endpoints let staff
+# stamp "who rang this up" on an order without a full re-login. Verifying a
+# PIN never mints a token and never changes what the caller's existing JWT/
+# role can do — see models.py's comment on pin_hash and
+# docs/security/threat-model.md.
+
+def _require_pin_format(pin: str) -> None:
+    if not pin.isdigit() or not (4 <= len(pin) <= 6):
+        raise HTTPException(status_code=400, detail="PIN must be 4-6 digits.")
+
+
+@router.post("/pin/set")
+async def pin_set(
+    body: PinSet,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Self-service: the current user sets their own PIN (+ display name, if
+    not already set). Rate-limited like any other credential-setting action."""
+    _require_pin_format(body.pin)
+    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    user.pin_hash = auth.get_password_hash(body.pin)
+    if body.display_name:
+        user.display_name = body.display_name.strip()[:100]
+    user.pin_failed_attempts = 0
+    user.pin_locked_until = None
+    db.commit()
+    return {"status": "pin_set"}
+
+
+@router.get("/pin/roster")
+async def pin_roster(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Tenant-scoped list of staff who've opted into PIN switching, for the
+    POS name-tile picker. Never returns the hash."""
+    users = db.query(models.User).filter(
+        models.User.tenant_id == current_user.tenant_id,
+        models.User.pin_hash.isnot(None),
+        models.User.is_active.is_(True),
+    ).all()
+    return {
+        "staff": [
+            {"id": u.id, "display_name": u.display_name or u.email, "role": u.role.value}
+            for u in users
+        ]
+    }
+
+
+@router.post("/pin/verify")
+async def pin_verify(
+    body: PinVerify,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Verify a PIN for `user_id` — requires an already-valid device JWT (a
+    stolen PIN alone is useless without an authenticated device). Success
+    mints no new token; it just confirms identity for order attribution.
+    Tenant-scoped: a PIN can only switch to someone on the same device's tenant.
+    """
+    target = db.query(models.User).filter(
+        models.User.id == body.user_id,
+        models.User.tenant_id == current_user.tenant_id,
+    ).first()
+    if not target or not target.pin_hash:
+        raise HTTPException(status_code=404, detail="No such staff PIN.")
+
+    if target.pin_locked_until and target.pin_locked_until > utcnow():
+        remaining = int((target.pin_locked_until - utcnow()).total_seconds() / 60) + 1
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"PIN locked from repeated failed attempts. Try again in {remaining} minute(s).",
+        )
+
+    if not auth.verify_password(body.pin, target.pin_hash):
+        target.pin_failed_attempts = (target.pin_failed_attempts or 0) + 1
+        if target.pin_failed_attempts >= MAX_PIN_ATTEMPTS:
+            target.pin_locked_until = utcnow() + timedelta(minutes=PIN_LOCKOUT_MINUTES)
+        db.commit()
+        raise HTTPException(status_code=401, detail="Incorrect PIN.")
+
+    target.pin_failed_attempts = 0
+    target.pin_locked_until = None
+    db.commit()
+    return {"user_id": target.id, "display_name": target.display_name or target.email, "role": target.role.value}
+
+
+@router.post("/users/{user_id}/deactivate")
+async def deactivate_user(
+    user_id: int,
+    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """
+    Revoke a departing staff member's access (tech-debt D18 — previously the
+    only way to do this was changing their password). Sets is_active=False
+    (blocks new logins, see routers/auth.py::login) and bumps token_version
+    (invalidates any outstanding token immediately, not just future ones).
+    """
+    target = db.query(models.User).filter(models.User.id == user_id).first()
+    # Same 404-on-cross-tenant shape as every other IDOR-guarded lookup in this
+    # codebase (see test_tenant_isolation.py) — don't reveal that a user id
+    # exists in a different tenant.
+    if not target or target.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot deactivate your own account.")
+
+    target.is_active = False
+    target.token_version = (target.token_version or 0) + 1
+    db.commit()
+    return {"status": "deactivated", "user_id": target.id}
+
+
+@router.post("/users/{user_id}/activate")
+async def activate_user(
+    user_id: int,
+    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """Reverse a deactivation — the natural inverse of the endpoint above,
+    needed so a mis-click isn't a one-way door."""
+    target = db.query(models.User).filter(models.User.id == user_id).first()
+    if not target or target.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    target.is_active = True
+    db.commit()
+    return {"status": "activated", "user_id": target.id}
 
 
 @router.put("/restaurant")

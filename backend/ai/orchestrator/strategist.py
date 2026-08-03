@@ -168,12 +168,19 @@ def run_strategy(db: Session, restaurant_id: int, goal: str, timeframe: str = ""
         return {"available": False, "error": "Provide a goal, e.g. 'increase monthly profit by KES 100,000'."}
 
     import feature_flags
-    from ai import llm_client
+    from ai import llm_client, spend_guard
 
     llm_ready = (
         feature_flags.is_enabled("strategy_agent")
         and feature_flags.is_enabled("ai_narration")
         and llm_client.is_available()
+        # Tech-debt D14: checked once before the multi-turn tool loop starts,
+        # not per-turn — a blocked tenant falls back to the deterministic
+        # strategy below, same as any other "no LLM available" reason.
+        and not (
+            feature_flags.is_enabled("ai_spend_cap")
+            and spend_guard.get_budget_status(restaurant_id, db=db)["blocked"]
+        )
     )
     if not llm_ready:
         return _deterministic_strategy(db, restaurant_id, goal, timeframe)

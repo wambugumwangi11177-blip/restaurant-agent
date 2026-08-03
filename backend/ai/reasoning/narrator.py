@@ -237,6 +237,16 @@ def narrate(payload: dict, task: str, *, restaurant_id: int | None = None,
     if cached is not None:
         return {**cached, "cached": True}
 
+    # Spend cap (tech-debt D14): checked after the cache hit (free, must never
+    # be blocked) and before the paid LLM call. Same degrade-gracefully
+    # contract as "no provider configured" — caller falls back to the raw
+    # deterministic payload, never an error.
+    if restaurant_id is not None and feature_flags.is_enabled("ai_spend_cap"):
+        from ai import spend_guard
+        if spend_guard.get_budget_status(restaurant_id)["blocked"]:
+            logger.warning("narrate(): blocked by AI spend cap for restaurant_id=%s task=%s", restaurant_id, task)
+            return None
+
     system = _build_system(cfg)
     user = (
         "Here is the deterministic analytics data as JSON. Only cite numbers "

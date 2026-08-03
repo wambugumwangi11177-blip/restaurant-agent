@@ -87,6 +87,18 @@ Tracked here so they aren't forgotten — deferred by design (see the roadmap):
 - [ ] OWASP ZAP baseline scan against staging.
 - [ ] Load test to find the real capacity ceiling.
 
+## 7. AI/LLM provider account hygiene  🟠
+
+- [ ] Set a spend alert in the **Anthropic** console (billing threshold, not just usage
+      dashboard) so a runaway loop or leaked key is caught before it becomes an invoice
+      surprise.
+- [ ] Set the same in the **Groq** console.
+- [ ] Confirm dev/local and prod use **distinct** `ANTHROPIC_API_KEY`/`GROQ_API_KEY` values —
+      `backend/ai/llm_client.py` reads whichever key is in the env with no code-level
+      distinction, so a locally-configured prod key would silently spend prod budget. This is
+      operational discipline only; no code fix closes this on its own — see
+      [tech-debt-register.md](tech-debt-register.md) D14 for the code-side spend cap.
+
 ---
 
 ## Revision history
@@ -94,3 +106,4 @@ Tracked here so they aren't forgotten — deferred by design (see the roadmap):
 | Version | Date | Author | Change |
 |---|---|---|---|
 | 1.0 | 2026-07-11 | Engineering | Initial external-action checklist (Phase 3b); companion to the code hardening pass |
+| 1.1 | 2026-08-02 | Engineering | Added §7 (AI/LLM provider account hygiene) from a platform audit |

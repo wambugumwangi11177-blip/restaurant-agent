@@ -5,7 +5,7 @@
 | **Reference** | LAI-ARCH-001 |
 | **Classification** | Confidential — shared under NDA |
 | **Audience** | Engineers, auditors, technical due diligence |
-| **Version** | 1.1 |
+| **Version** | 1.2 |
 | **Last Updated** | 2026-07-11 |
 | **Owner** | Engineering (Leviii AI Technologies) |
 | **Contact** | leviiiaikenya@gmail.com |
@@ -64,7 +64,8 @@
 | Database | Neon PostgreSQL | Durable state; accessed only via SQLAlchemy ORM |
 | AI | Deterministic Python (analytics) + LLM (WhatsApp free-text & grounded narration; Groq today → Anthropic Claude on upgrade) | Advisory decision-support; LLM never computes |
 | Payments | Safaricom M-Pesa Daraja | Mobile-money capture (per tenant) |
-| Messaging | Twilio | WhatsApp send/receive (per tenant) |
+| Alerting | In-app `notifications` feed (primary) | Owner alerts; no external dependency, so it cannot silently fail |
+| Messaging | Twilio | WhatsApp/SMS send+receive (per tenant) — an **optional forward** of the above, not the primary channel |
 | Monitoring | Sentry | Errors + performance |
 
 ---
@@ -178,6 +179,22 @@ Python; the LLM only interprets or converses.
 
    Data-changing actions (either path) require explicit approval and are written
    to an append-only AgentAuditLog (what changed, why, who approved).
+
+(3) Operational alert (critical/depleted stock, late supplier, failed M-Pesa
+    settlement, slow day, morning briefing, repeated agent failure)
+   │
+   ├─ backend/notifications.py: deliver()
+   │     │
+   │     ├─▶ (always, first, committed) `notifications` row  ─▶ dashboard bell
+   │     │       GET /api/v1/notifications — feed + unread count
+   │     │
+   │     └─▶ (best effort, after) WhatsApp/SMS via ai/whatsapp/brain.send_to_owner
+   │
+   The ordering is the design: in-app delivery has no external dependency and so
+   cannot silently fail, whereas the phone forward requires an owner phone on
+   file AND a configured Twilio sender. Alerts were previously raised behind an
+   `if owner_phone:` gate, so a deployment with neither computed the alert,
+   audited it, and told nobody.
 ```
 
 The Revenue/Profit/Pricing/Inventory/KDS/Reservation "intelligence" engines are
@@ -238,3 +255,4 @@ and [Operations & Reliability](operations-and-reliability.md) for backup/restore
 |---|---|---|---|
 | 1.0 | 2026-07-11 | Engineering | Initial architecture doc from code audit |
 | 1.1 | 2026-07-11 | Engineering | §6 corrected to the two-path LLM model (WhatsApp free-text + grounded reasoning/narration layer); documented Groq→Anthropic Claude upgrade path; "LLM never computes" invariant made explicit |
+| 1.2 | 2026-08-04 | Engineering | Added the in-app owner-alert channel: `notifications` is now the primary delivery path and Twilio an optional forward (previously alerts were WhatsApp-only behind an `if owner_phone:` gate, so a deployment without a configured sender told nobody). Documented as flow (3) in §6 and in the layer table. |

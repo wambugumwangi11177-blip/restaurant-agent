@@ -4,8 +4,8 @@
 |---|---|
 | **Reference** | LAI-ROADMAP-001 |
 | **Classification** | Internal |
-| **Version** | 1.0 |
-| **Last Updated** | 2026-07-11 |
+| **Version** | 1.1 |
+| **Last Updated** | 2026-08-04 |
 | **Owner** | Engineering (Leviii AI Technologies) |
 | **Contact** | leviiiaikenya@gmail.com |
 
@@ -32,7 +32,7 @@ figures, historical postmortems), the document states the target and marks the a
 | 2 | Verification & Evidence | Done | [control-evidence-matrix.md](control-evidence-matrix.md) |
 | 3 | Engineering Governance | Done | [../engineering-standards.md](../engineering-standards.md) |
 | 4 | Architecture Documentation | Done | [../architecture.md](../architecture.md) |
-| 5 | Operational Documentation | Partial | [../operations-and-reliability.md](../operations-and-reliability.md) — monitoring/backup/deploy grounded; alerting rota TBD |
+| 5 | Operational Documentation | Partial | [../operations-and-reliability.md](../operations-and-reliability.md) — backup/deploy grounded; health endpoints documented as monitor targets. **External uptime polling + paging still not wired** (D14, gates the SLA); alerting rota TBD |
 | 6 | AI Documentation | Done | [../ai-governance.md](../ai-governance.md) |
 | 7 | Security Documentation | Partial | [../security/threat-model.md](../security/threat-model.md) (threat model + risk register + SDLC in eng-standards); external pen-test summary Planned |
 | 8 | Reliability Documentation | Partial | [../operations-and-reliability.md](../operations-and-reliability.md) — SLO/RTO/RPO grounded from SLA/BCP; MTTR/MTTD/error-budget actuals TBD |
@@ -64,3 +64,4 @@ These are deliberately left as TBD rather than fabricated:
 | Version | Date | Author | Change |
 |---|---|---|---|
 | 1.0 | 2026-07-11 | Engineering | Initial 12-phase status + plan of record |
+| 1.1 | 2026-08-04 | Engineering | Phase 5 re-stated: health endpoints now exist as monitor targets, but external polling/paging is still unwired (D14) — the previous docs implied monitoring was in place |

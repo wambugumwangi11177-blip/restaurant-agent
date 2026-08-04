@@ -99,8 +99,15 @@ raw untrusted text on the analytics path), and figures it can't back are redacte
 credits if missed.
 
 **How fast do you respond to problems?**
-SEV-1 (POS down during service): 15-minute response target, 2-hour resolution target. Full
-severity table in the SLA.
+SEV-1 (POS down during service): a 15-minute response target and 2-hour resolution target
+during support hours, reached on a direct WhatsApp line. Full severity table in the SLA.
+
+Being straight about detection: automated uptime alerting is being rolled out, so outside
+continuous coverage an incident may be reported by you before it is detected by us. The
+response clock starts when we are notified. *(Adopts option (b) from
+`docs/sales/legal-reconciliation.md` E1 — do not quote fixed 15-min / 24-7 / "automatic
+alerting" numbers as committed until an external monitor is actually polling the health
+endpoints.)*
 
 ## Still have questions?
 leviiiaikenya@gmail.com

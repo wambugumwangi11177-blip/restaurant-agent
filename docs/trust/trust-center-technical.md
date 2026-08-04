@@ -169,7 +169,13 @@ customers, no code change).
   (fail-closed guard).
 - **Monitoring:** Sentry for errors + performance (20% trace sample). An in-app AI
   observability endpoint (`GET /api/v1/ai/usage`) exposes LLM token spend, per-agent latency
-  (p50/p95), success rate, and grounding trust rate.
+  (p50/p95), success rate, and grounding trust rate. Health endpoints `GET /health`,
+  `/health/db` and `/health/notifications` are available as external monitor targets.
+  **External uptime polling and paging are not yet wired** — incident detection is
+  currently manual (see [Operations & Reliability §1](../operations-and-reliability.md)).
+- **Alert delivery:** operational alerts to the restaurant owner are committed to an in-app
+  notification feed first and forwarded to WhatsApp/SMS best-effort, so an outage at the
+  messaging provider cannot suppress an alert.
 - **Backups & recovery:** Neon WAL + daily snapshots with point-in-time restore; procedures
   in `backend/DISASTER_RECOVERY.md`. RTO/RPO targets are in the BCP (LAI-BCP-001).
 - **Incident response:** severity model, containment, and notification timelines in the IRP

@@ -26,9 +26,23 @@ the numbers can be filled in from production data rather than guessed.
   when `SENTRY_DSN` is set. Captures exceptions with limited request context.
 - **AI observability:** `GET /api/v1/ai/usage` (`backend/routers/ai.py`) — LLM token spend
   by model, per-agent latency (p50/p95), success rate, grounding trust rate.
-- **Uptime monitoring:** continuous per SLA §04; SEV-1 triggers engineering alerts.
+- **Health endpoints (monitor targets):** `GET /health` (liveness), `GET /health/db`
+  (database reachability), and `GET /health/notifications` (outbound alert chain —
+  503 when nothing can be delivered, 200 with a detail body when degraded).
+- **Uptime monitoring:** **NOT YET WIRED (operator action).** The health endpoints above
+  exist and are ready to be polled, but no external monitor is currently subscribed to
+  them and nothing pages anyone. Until an external monitor is configured
+  (see [external-hardening-checklist.md](external-hardening-checklist.md) §5), incident
+  detection is manual. Correcting an earlier version of this section, which stated
+  monitoring was "continuous per SLA §04" — that describes the intended state, not the
+  built one, and it is an SLA-backed claim that could not be evidenced.
 - **Alerting rota / on-call:** **TBD (operational decision)** — define channel (WhatsApp
   direct line is used today for SEV-1 per SLA) and escalation. Document who is paged and how.
+
+> ⚠ **Do not quote the SLA's 15-minute SEV-1 / 24-7 / "automatic alerting" numbers to a
+> client until an external monitor is actually polling the endpoints above.** Speak to
+> intent, not to a signed number. Tracked as E1 in
+> [sales/legal-reconciliation.md](sales/legal-reconciliation.md).
 
 ## 2. Logging
 
@@ -38,6 +52,15 @@ the numbers can be filled in from production data rather than guessed.
 | Access logs | Railway platform | Request-level |
 | AI-action audit | `AgentAuditLog` (append-only) | What changed, why, who approved |
 | Auth events | `last_login_at`, lockout counters | Staff-activity + brute-force signals |
+| Owner alerts | `notifications` (in-app feed) + `agent_messages` (WhatsApp/SMS attempts) | Every operational alert raised — see below |
+
+**Owner alert delivery.** Operational alerts (critical/depleted stock, late supplier,
+failed M-Pesa settlement, slow day, morning briefing, repeated agent failure) are written
+to the `notifications` table *first and unconditionally*, then forwarded to WhatsApp/SMS
+on a best-effort basis. In-app delivery has no external dependency, so a deployment with
+no Twilio account still surfaces every alert in the dashboard bell. `agent_messages`
+records the outcome of each wire attempt; `GET /health/notifications` reports the recent
+failure rate over both.
 
 Retention: audit log is currently append-only (no auto-purge) — reconcile the DPA "90-day
 rolling" wording or add a purge job (tracked in [tech-debt-register.md](tech-debt-register.md)).
@@ -130,3 +153,4 @@ rolling" wording or add a purge job (tracked in [tech-debt-register.md](tech-deb
 | Version | Date | Author | Change |
 |---|---|---|---|
 | 1.0 | 2026-07-11 | Engineering | Initial ops+reliability; SLO/RTO from SLA/BCP, actuals TBD |
+| 1.1 | 2026-08-04 | Engineering | §1 corrected: uptime monitoring is **not** wired (the previous "continuous per SLA §04" wording described intent, not the build) and now names the three health endpoints available as monitor targets, including the new `/health/notifications`. Added the in-app owner-alert channel to §2. |

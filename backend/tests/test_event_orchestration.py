@@ -148,12 +148,18 @@ def test_mpesa_payment_failed_is_subscribed(db_session):
 
 
 def test_mpesa_payment_failed_notifies_the_owner_once(db_session, monkeypatch):
+    """
+    Owner alerts now route through notifications.deliver (in-app first, phone
+    forward second), so this patches brain.send_to_owner — the transport choke
+    point that path actually reaches. It used to patch the `ai.whatsapp`
+    package-level re-export, which the handler no longer calls.
+    """
     _seed_restaurant_with_owner(db_session)
 
     sent = []
-    import ai.whatsapp as whatsapp_mod
-    monkeypatch.setattr(whatsapp_mod, "send_whatsapp_message",
-                        lambda to, msg, **kw: sent.append((to, msg)))
+    import ai.whatsapp.brain as brain
+    monkeypatch.setattr(brain, "send_to_owner",
+                        lambda db, restaurant, msg, **kw: sent.append((restaurant.owner_phone, msg)))
 
     clear_handlers()
     from ai.orchestrator.executive import register_all_handlers, on_mpesa_payment_failed
@@ -168,6 +174,12 @@ def test_mpesa_payment_failed_notifies_the_owner_once(db_session, monkeypatch):
     assert to == "+254712345678"           # the owner, not the customer
     assert "#7" in msg
     assert "Request cancelled by user" in msg
+
+    # And — the point of the in-app channel — it is in the dashboard feed too,
+    # so the owner sees it even with no phone forward at all.
+    import notifications
+    feed = notifications.list_for(db_session, 1)
+    assert any("#7" in n.title for n in feed)
 
 
 def test_mpesa_payment_failed_audits_even_with_no_owner_phone(db_session, monkeypatch):

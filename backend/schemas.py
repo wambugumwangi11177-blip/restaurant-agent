@@ -191,3 +191,29 @@ class ReservationOut(StrictModel):
 
 class ReservationStatusUpdate(StrictModel):
     status: str  # confirmed, cancelled, completed, no_show
+
+# ──────────────────────────────────────────────
+# NOTIFICATIONS (in-app alert feed)
+# ──────────────────────────────────────────────
+class NotificationOut(StrictModel):
+    id: int
+    category: str
+    severity: str          # info | warning | critical
+    title: str
+    body: str
+    link: str
+    # Null until someone acknowledges it — this is what drives the unread badge.
+    read_at: Optional[datetime] = None
+    # Nullable for the same reason ReservationOut.created_at is: one legacy row
+    # with a null timestamp must not fail validation and blank the whole feed.
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+class NotificationFeed(StrictModel):
+    items: List[NotificationOut]
+    unread: int
+
+class NotificationAck(StrictModel):
+    ok: bool
+    unread: int

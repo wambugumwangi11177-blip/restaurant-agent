@@ -903,3 +903,51 @@ class Region(Base):
     created_at      = Column(DateTime, default=utcnow)
 
     organization = relationship("Organization")
+
+
+class Notification(Base):
+    """
+    An alert delivered to the owner *inside the dashboard*.
+
+    Every owner alert this system raises (critical stock, stock depleted, late
+    purchase order, slow day, morning briefing, bad feedback) was previously
+    WhatsApp/SMS only, behind an `if owner_phone:` gate and a configured Twilio
+    account. A deployment with neither — which is the normal state before a
+    Safaricom/Twilio sender is approved — raised alerts that reached nobody at
+    all, while the dashboard showed no sign anything had happened.
+
+    So this table is the *primary* delivery channel and WhatsApp is the optional
+    forward, not the other way round: a row is written unconditionally, before
+    and independently of any phone lookup or transport call. In-app delivery
+    cannot silently fail, because it has no external dependency to fail on.
+
+    Scoped by restaurant_id (not user_id) deliberately: these are operational
+    facts about a site, not personal messages, and every manager who opens that
+    restaurant's dashboard needs to see the same stock warning. `read_at` is
+    therefore "someone acknowledged this", which is the useful semantic for a
+    shared operational feed.
+    """
+    __tablename__ = "notifications"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    # Machine-readable class of alert (stock_critical, slow_day, …). Drives the
+    # icon/colour in the UI and makes "mute this kind" possible later.
+    category      = Column(String, nullable=False, default="general")
+    # info | warning | critical — ordering and colour, nothing more.
+    severity      = Column(String, nullable=False, default="info")
+    title         = Column(String, nullable=False)
+    body          = Column(Text, nullable=False, default="")
+    # Where clicking the notification should take the operator, e.g.
+    # "/dashboard/inventory". Empty = not actionable, render as plain text.
+    link          = Column(String, default="")
+    read_at       = Column(DateTime, nullable=True)
+    created_at    = Column(DateTime, default=utcnow, index=True)
+
+    restaurant = relationship("Restaurant")
+
+    __table_args__ = (
+        # The feed query is always "this restaurant, newest first", and the
+        # badge is "this restaurant, unread" — one composite index serves both.
+        Index("ix_notifications_restaurant_created", "restaurant_id", "created_at"),
+    )

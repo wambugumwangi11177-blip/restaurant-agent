@@ -66,6 +66,20 @@ def collect_problems() -> tuple[list[str], list[str]]:
     if prod and not os.getenv("CORS_ORIGINS"):
         soft.append("CORS_ORIGINS is not set — using built-in default origins in production")
 
+    # Outbound notifications fail silently by design (every caller treats a send
+    # as best-effort), so a deploy missing Twilio config looks perfectly healthy
+    # while no owner alert has left the building. Surface it at boot instead.
+    # SOFT on purpose, in production too: a POS that refuses to start because
+    # WhatsApp is misconfigured is strictly worse for a restaurant than a late
+    # morning briefing. The loud path is the log line here plus
+    # GET /health/notifications going unhealthy for the monitor.
+    # Imported lazily to keep this module import-light and free of any cycle.
+    from notifications_health import overall as _notifications_overall
+
+    _notif = _notifications_overall()
+    soft.extend(f"notifications: {p}" for p in _notif["problems"])
+    soft.extend(f"notifications: {w}" for w in _notif["warnings"])
+
     return hard, soft
 
 

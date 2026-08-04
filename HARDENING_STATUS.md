@@ -35,11 +35,57 @@ https://github.com/wambugumwangi11177-blip/restaurant-agent/pull/new/feat/phase1
   `-ll`, frontend `tsc --noEmit` clean, `next build` green (18 routes),
   all internal doc links resolve.
 
+## Notification reliability pass (2026-08-04)
+Prompted by "make sure the notifications work" ahead of going out to sell.
+
+**The gap:** the notification chain failed *silently by design*. `twilio_client.send()`
+returns `{"status": "not_configured"}` and writes a log line when config is missing, and
+every caller treats a send as best-effort — nothing raises. `/health` and `/health/db`
+both stayed green through a total notification outage. Nothing validated Twilio at boot.
+
+**Worst case found:** `TWILIO_WHATSAPP_FROM` *defaults* to Twilio's shared public
+sandbox number. A deploy that forgets to set it gets `sent` back from Twilio for every
+message while reaching only handsets that texted the sandbox join code — and those
+opt-ins expire after 72h. No error anywhere. Now detected and warned about explicitly.
+
+- **`backend/notifications_health.py`** — one shared definition of "notifications are
+  broken": transport config (read from the same module `send()` uses, so it can never
+  certify a broken deploy as healthy), sandbox-sender detection, scheduler-job
+  registration, per-restaurant owner-phone routing, and the recent send-failure rate.
+  Opt-out suppressions are explicitly *not* counted as failures.
+- **`GET /health/notifications`** — 503 when nothing can be delivered, 200 + detail when
+  degraded. Point UptimeRobot here alongside `/health`. Leaks no credentials.
+- **`startup_checks`** now warns loudly on notification config — deliberately SOFT even
+  in production: a POS that refuses to boot because WhatsApp is misconfigured is worse
+  for a restaurant than a late briefing.
+- **`execution/verify_notifications.py`** — preflight before a demo or an onboarding.
+  Read-only by default (safe against prod); `--send +2547…` puts one real message
+  through to prove delivery, not just configuration; `--url` checks a deployed instance.
+- Tests: `test_notifications_health.py` (15). Suite **377 passed** (was 362), Bandit
+  clean at `-ll`, frontend `tsc --noEmit` clean, `next build` green (18 routes).
+
+## Go-to-market (2026-08-04)
+- **`directives/015_cold_outreach.md`** — door-to-door and cold-call SOP: the two good
+  walk-in windows (10:00–11:30, 15:00–17:00 EAT) and the two hours that guarantee a no,
+  qualification signals, gatekeeper and decision-maker scripts, doorstep objections,
+  follow-up cadence, and the funnel targets to steer on. Builds on the existing
+  `docs/sales/talk-track-internal.md` rather than duplicating it.
+- **`execution/outreach_pipeline.py`** — deterministic lead pipeline (add / log / stage /
+  today / show / stats). Funnel conversion is computed on the deepest stage each lead
+  ever reached, so a lost deal stays in the demo denominator instead of quietly
+  inflating the close rate. Data lands in `outreach/`, self-gitignored — it holds real
+  prospects' phone numbers and must never be committed.
+
 ## Not done — needs YOU (ops access) or deliberately deferred
 **These four genuinely require your accounts/credentials — no code can do them:**
 - [ ] Enable Railway Postgres **backups** + run one **restore drill** (steps in `backend/DISASTER_RECOVERY.md`)
 - [ ] Set/verify prod env on Railway: **`MPESA_CALLBACK_TOKEN`** (prod won't boot without it when M-Pesa is configured), **`CORS_ORIGINS`**
-- [ ] Sentry alert rules · UptimeRobot on `/health` · OWASP ZAP baseline
+- [ ] Set **`TWILIO_SMS_FROM`** and a **real `TWILIO_WHATSAPP_FROM`** (not the sandbox
+      default) on Railway, then run `py execution/verify_notifications.py --url <prod>`
+      and once `--send <your own number>` to confirm a message actually arrives on a
+      handset. Until this is done, notifications are the single most likely thing to be
+      quietly broken in front of a paying restaurant.
+- [ ] Sentry alert rules · UptimeRobot on `/health` **and `/health/notifications`** · OWASP ZAP baseline
 - [ ] Confirm/enable GitHub **branch protection** on `master` (require PR + CI green)
 
 **Deferred by design (a product decision or waits for traffic):**

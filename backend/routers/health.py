@@ -32,3 +32,30 @@ async def db_health_check(db: Session = Depends(get_db)):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable"
         )
+
+
+@router.get("/notifications")
+async def notifications_health_check(db: Session = Depends(get_db)):
+    """
+    Is the outbound notification chain alive? Point an uptime monitor here.
+
+    Notifications are the product's daily heartbeat (morning briefing, stock
+    alerts, reservation reminders) but they degrade silently — a send with no
+    Twilio config returns not_configured and is logged, never raised. `/health`
+    and `/health/db` both stay green through a total notification outage.
+
+    Returns 200 for ok/degraded and 503 for down, so a monitor pages on "nothing
+    can be delivered at all" without crying wolf over a missing SMS fallback.
+    The body always carries the full breakdown either way. Unauthenticated to
+    match the other health routes, and it exposes only counts and config
+    booleans — never a credential, phone number, or message body.
+    """
+    from notifications_health import overall
+
+    report = overall(db)
+    if report["status"] == "down":
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=report,
+        )
+    return report

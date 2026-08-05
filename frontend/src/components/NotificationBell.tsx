@@ -119,7 +119,13 @@ export default function NotificationBell() {
 
     const openNotification = (n: Notification) => {
         if (!n.read_at) markRead(n.id);
-        if (n.link) {
+        // Only ever navigate to an in-app path. Links are set server-side from
+        // hardcoded strings today, but this is a value read from the database and
+        // pushed into the router — refusing anything that isn't a single-slash
+        // relative path keeps that from becoming an open redirect if the column
+        // is ever populated from somewhere less controlled. `//evil.com` is
+        // protocol-relative, hence the second character check.
+        if (n.link.startsWith("/") && !n.link.startsWith("//")) {
             setOpen(false);
             router.push(n.link);
         }

@@ -19,6 +19,7 @@ import pytest
 import models
 import notifications
 from ai.whatsapp import twilio_client
+from time_utils import utcnow
 
 
 @pytest.fixture
@@ -125,8 +126,6 @@ def test_unread_only_filter(db_session):
 
 def test_feed_is_newest_first(db_session):
     from datetime import timedelta
-
-    from time_utils import utcnow
 
     restaurant = _restaurant(db_session)
     old = notifications.record(db_session, restaurant.id, "older")
@@ -263,13 +262,173 @@ def test_reading_another_tenants_notification_is_404(client, db_session):
 
 
 def test_limit_is_bounded(client, db_session):
-    """`limit` is client-supplied; an unbounded value would pull the whole
-    history into memory."""
+    """
+    `limit` is client-supplied; an unbounded value would pull the whole history
+    into memory. Seeds *past* the cap so the assertion actually exercises the
+    clamp — with fewer rows than the cap it would pass whether or not one exists.
+    """
     headers = _auth_client(client)
     restaurant = db_session.query(models.Restaurant).first()
-    for i in range(5):
-        notifications.record(db_session, restaurant.id, f"n{i}")
+    for i in range(205):
+        db_session.add(models.Notification(
+            restaurant_id=restaurant.id, title=f"n{i}", body="", category="general",
+            severity="info", created_at=utcnow(),
+        ))
+    db_session.commit()
 
     body = client.get("/api/v1/notifications/?limit=100000", headers=headers).json()
 
-    assert len(body["items"]) == 5  # bounded, not rejected
+    assert len(body["items"]) == 200          # clamped, not rejected
+    assert body["unread"] == 205              # the count is not clamped
+
+
+def test_limit_below_one_is_clamped_up(client, db_session):
+    headers = _auth_client(client)
+    restaurant = db_session.query(models.Restaurant).first()
+    notifications.record(db_session, restaurant.id, "only one")
+
+    body = client.get("/api/v1/notifications/?limit=0", headers=headers).json()
+
+    # limit=0 would otherwise make SQLAlchemy emit LIMIT 0 and return nothing,
+    # rendering an empty feed for a restaurant that has alerts.
+    assert len(body["items"]) == 1
+
+
+# ── role scoping ─────────────────────────────────────────────────────────────
+# Alert *bodies* carry data the rest of the app already gates. The morning
+# briefing contains yesterday's revenue, week-on-week movement, payment split
+# and top sellers; the dashboard hides Sales/AI/ROI from STAFF and the backend
+# RBAC-gates /ai/* and analytics to ADMIN. A feed that served those bodies to
+# STAFF would route financial data straight around that gate.
+
+def _staff_user(db, restaurant):
+    """A STAFF user in the same tenant as `restaurant`."""
+    import auth as auth_mod
+
+    tenant = models.Tenant(name="T")
+    db.add(tenant)
+    db.commit()
+    restaurant.tenant_id = tenant.id
+    user = models.User(
+        email="staff@example.com",
+        hashed_password=auth_mod.get_password_hash("GoodPass1"),
+        role=models.Role.STAFF,
+        tenant_id=tenant.id,
+    )
+    db.add(user)
+    db.commit()
+    return user
+
+
+def test_staff_cannot_see_revenue_bearing_alerts(db_session):
+    restaurant = _restaurant(db_session)
+    notifications.record(db_session, restaurant.id, "Morning briefing",
+                         body="Revenue yesterday: KES 84,000 (+12% WoW)",
+                         category="morning_briefing")
+    notifications.record(db_session, restaurant.id, "Slow day",
+                         body="Revenue 30% below average", category="slow_day_alert")
+    notifications.record(db_session, restaurant.id, "Ugali flour low",
+                         category="stock_critical")
+
+    staff_feed = notifications.list_for(db_session, restaurant.id, role=models.Role.STAFF)
+
+    titles = [n.title for n in staff_feed]
+    assert titles == ["Ugali flour low"]
+    assert notifications.unread_count(db_session, restaurant.id, role=models.Role.STAFF) == 1
+    # The owner still sees everything.
+    assert len(notifications.list_for(db_session, restaurant.id, role=models.Role.ADMIN)) == 3
+
+
+def test_unlisted_category_is_admin_only_by_default(db_session):
+    """Fail-closed: a category nobody has classified must not leak to STAFF."""
+    restaurant = _restaurant(db_session)
+    notifications.record(db_session, restaurant.id, "New alert type",
+                         category="some_future_category_nobody_classified")
+
+    assert notifications.list_for(db_session, restaurant.id, role=models.Role.STAFF) == []
+    assert len(notifications.list_for(db_session, restaurant.id, role=models.Role.ADMIN)) == 1
+
+
+def test_staff_cannot_mark_a_restricted_alert_read(db_session):
+    restaurant = _restaurant(db_session)
+    briefing = notifications.record(db_session, restaurant.id, "Morning briefing",
+                                    category="morning_briefing")
+
+    assert notifications.mark_read(db_session, restaurant.id, briefing.id,
+                                   role=models.Role.STAFF) is False
+    assert notifications.unread_count(db_session, restaurant.id) == 1
+
+
+def test_staff_mark_all_read_leaves_restricted_alerts_unread(db_session):
+    """
+    Otherwise STAFF clearing the bell would silently acknowledge — and hide from
+    the owner — alerts STAFF was never shown.
+    """
+    restaurant = _restaurant(db_session)
+    notifications.record(db_session, restaurant.id, "Morning briefing",
+                         category="morning_briefing")
+    notifications.record(db_session, restaurant.id, "Stock low", category="stock_critical")
+
+    cleared = notifications.mark_all_read(db_session, restaurant.id, role=models.Role.STAFF)
+
+    assert cleared == 1
+    assert notifications.unread_count(db_session, restaurant.id, role=models.Role.ADMIN) == 1
+
+
+def test_role_accepts_enum_value_or_string(db_session):
+    """The role reaches this code from an ORM enum, a JWT claim, or a test."""
+    restaurant = _restaurant(db_session)
+    notifications.record(db_session, restaurant.id, "briefing", category="morning_briefing")
+
+    for role in (models.Role.STAFF, "staff", "STAFF", " Staff "):
+        assert notifications.list_for(db_session, restaurant.id, role=role) == [], role
+    # None means unrestricted — the default for internal callers.
+    assert len(notifications.list_for(db_session, restaurant.id, role=None)) == 1
+
+
+def test_staff_feed_over_http_hides_revenue(client, db_session):
+    """The leak as a client would actually hit it."""
+    restaurant = db_session.query(models.Restaurant).first() or _restaurant(db_session)
+    staff = _staff_user(db_session, restaurant)
+
+    resp = client.post("/api/v1/auth/login",
+                       json={"email": staff.email, "password": "GoodPass1"})
+    assert resp.status_code == 200, resp.text
+    headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+    notifications.record(db_session, restaurant.id, "Morning briefing",
+                         body="Revenue yesterday: KES 84,000", category="morning_briefing")
+    notifications.record(db_session, restaurant.id, "Stock low", category="stock_critical")
+
+    body = client.get("/api/v1/notifications/", headers=headers).json()
+
+    assert [i["title"] for i in body["items"]] == ["Stock low"]
+    assert body["unread"] == 1
+    assert "84,000" not in resp.text + str(body)
+
+
+# ── missing restaurant must not abort the caller ─────────────────────────────
+
+def test_deliver_tolerates_a_missing_restaurant(db_session):
+    """
+    Handlers resolve the restaurant with `.first()` on an id from an event
+    payload, so None is reachable. The old path (`_owner_phone(restaurant)`)
+    returned "" and skipped the send; raising here would abort the handler.
+    """
+    notifications.deliver(db_session, None, title="orphan", body="x")  # must not raise
+
+
+def test_mpesa_failure_still_audits_when_the_restaurant_is_missing(db_session):
+    """
+    The audit write follows the alert in on_mpesa_payment_failed. If delivery
+    raised on a missing restaurant, the record of a failed payment would be lost
+    — the handler's docstring promises it is written "either way".
+    """
+    from ai.orchestrator.executive import on_mpesa_payment_failed
+
+    on_mpesa_payment_failed({"restaurant_id": 4242, "order_id": 7, "reason": "cancelled"})
+
+    audit = db_session.query(models.AgentAuditLog).filter(
+        models.AgentAuditLog.action_type == "mpesa_payment_failed"
+    ).all()
+    assert len(audit) == 1

@@ -289,21 +289,6 @@ def on_order_paid(payload: dict) -> None:
         db.close()
 
 
-def _owner_phone(restaurant) -> str:
-    """
-    The owner's WhatsApp number, or "" if none is configured. Delegates to
-    `brain.owner_phone_for` (DB column first, legacy OWNER_PHONE_{id} /
-    OWNER_PHONE env vars as fallback) rather than re-implementing that
-    precedence — it must stay identical to the inbound resolution in
-    `routers/webhooks._resolve_restaurant_by_phone`, or an owner who can reply
-    to the bot can't be reached by it.
-    """
-    if restaurant is None:
-        return ""
-    from ai.whatsapp.brain import owner_phone_for
-    return owner_phone_for(restaurant)
-
-
 def on_mpesa_payment_failed(payload: dict) -> None:
     """
     An STK push was cancelled, timed out, or hit insufficient funds.

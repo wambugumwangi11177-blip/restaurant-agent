@@ -51,9 +51,10 @@ async def list_notifications(
     limit = max(1, min(limit, 200))
     return {
         "items": notifications_service.list_for(
-            db, restaurant.id, limit=limit, unread_only=unread_only
+            db, restaurant.id, limit=limit, unread_only=unread_only,
+            role=current_user.role,
         ),
-        "unread": notifications_service.unread_count(db, restaurant.id),
+        "unread": notifications_service.unread_count(db, restaurant.id, role=current_user.role),
     }
 
 
@@ -67,9 +68,11 @@ async def mark_notification_read(
     if not restaurant:
         raise HTTPException(status_code=404, detail="Notification not found")
 
-    if not notifications_service.mark_read(db, restaurant.id, notification_id):
+    if not notifications_service.mark_read(db, restaurant.id, notification_id,
+                                           role=current_user.role):
         raise HTTPException(status_code=404, detail="Notification not found")
-    return {"ok": True, "unread": notifications_service.unread_count(db, restaurant.id)}
+    return {"ok": True, "unread": notifications_service.unread_count(db, restaurant.id,
+                                                                    role=current_user.role)}
 
 
 @router.post("/read-all", response_model=schemas.NotificationAck)
@@ -81,5 +84,6 @@ async def mark_all_notifications_read(
     if not restaurant:
         return {"ok": True, "unread": 0}
 
-    notifications_service.mark_all_read(db, restaurant.id)
-    return {"ok": True, "unread": 0}
+    notifications_service.mark_all_read(db, restaurant.id, role=current_user.role)
+    return {"ok": True, "unread": notifications_service.unread_count(db, restaurant.id,
+                                                                    role=current_user.role)}

@@ -229,7 +229,13 @@ def main() -> int:
                   f"machine's Twilio config, not {args.url}'s.")
         else:
             send_code = send_live_test(args.send, args.channel)
-            code = max(code, send_code) if send_code != EXIT_OK else code
+            # NOT max(): the exit codes are identifiers, not a severity ranking
+            # (down=1 sorts *below* degraded=2), so max() would report a failed
+            # live send on a merely-degraded config as "degraded" and hide the
+            # more serious result. A failed live send is definitive — the
+            # transport did not accept a real message — so it wins outright.
+            if send_code != EXIT_OK:
+                code = send_code
 
     return code
 

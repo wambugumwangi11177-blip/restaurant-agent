@@ -58,6 +58,46 @@ AUDIENCE_ALL = "all"        # everyone rostered on this restaurant
 AUDIENCE_ADMIN = "admin"    # owners/managers only
 AUDIENCES = (AUDIENCE_ALL, AUDIENCE_ADMIN)
 
+# ── the category catalogue ───────────────────────────────────────────────────
+# Every category the system emits, with the label the settings UI shows and
+# whether it can be muted. This is the one list the preferences screen renders
+# from, so a category that is emitted but missing here would be invisible to
+# mute — hence `test_every_emitted_category_is_in_the_catalogue` keeps the two
+# in step.
+#
+# `mutable=False` on the two that mean "you are about to stop being able to
+# serve food": being able to silence those permanently is not a preference, it
+# is a way to lose a service. Everything else, including routine order traffic,
+# is the user's call.
+CATEGORY_CATALOGUE: dict[str, dict] = {
+    # Alerts — something needs attention
+    "stock_critical":       {"label": "Stock about to run out",    "mutable": False},
+    "stock_depleted":       {"label": "Out of stock",              "mutable": False},
+    "supplier_late":        {"label": "Supplier delivery late",    "mutable": True},
+    "slow_day_alert":       {"label": "Slow day warning",          "mutable": True},
+    "morning_briefing":     {"label": "Morning briefing",          "mutable": True},
+    "feedback_alert":       {"label": "Low customer rating",       "mutable": True},
+    "mpesa_payment_failed": {"label": "Failed M-Pesa payment",     "mutable": True},
+    "agent_failure":        {"label": "AI system problems",        "mutable": True},
+    "reorder_request":      {"label": "Customer reorder requests", "mutable": True},
+    # Activity — the ordinary running of the restaurant
+    "order_created":        {"label": "New orders",                "mutable": True},
+    "order_status":         {"label": "Order status changes",      "mutable": True},
+    "order_cancelled":      {"label": "Cancelled orders",          "mutable": True},
+    "order_paid":           {"label": "Payments received",         "mutable": True},
+    "reservation_created":  {"label": "New bookings",              "mutable": True},
+    "reservation_status":   {"label": "Booking changes",           "mutable": True},
+    "stock_received":       {"label": "Stock deliveries",          "mutable": True},
+    "stock_adjusted":       {"label": "Stock adjustments (waste)", "mutable": True},
+    "stock_deleted":        {"label": "Stock items removed",       "mutable": True},
+    "menu_changed":         {"label": "Menu and price changes",    "mutable": True},
+    "general":              {"label": "Other",                     "mutable": True},
+}
+
+UNMUTABLE_CATEGORIES = frozenset(
+    name for name, meta in CATEGORY_CATALOGUE.items() if not meta["mutable"]
+)
+
 
 def _is_staff(role) -> bool:
     """
@@ -178,40 +218,120 @@ def deliver(
 
 # ── read side ────────────────────────────────────────────────────────────────
 
-def _visible(query, role):
-    """Restrict a notification query to what `role` is allowed to see."""
+def muted_categories(db, user_id: int | None) -> set[str]:
+    """Categories this user has switched off. Empty set for an anonymous caller."""
+    if not user_id:
+        return set()
+    rows = db.query(models.NotificationMute.category).filter(
+        models.NotificationMute.user_id == user_id
+    ).all()
+    # Never honour a mute on a category that must not be mutable, even if a row
+    # exists — a stale row from before a category was reclassified must not be
+    # able to hide a stockout.
+    return {c for (c,) in rows} - UNMUTABLE_CATEGORIES
+
+
+def set_mutes(db, user_id: int, categories) -> set[str]:
+    """
+    Replace this user's muted set wholesale and return what is now muted.
+
+    Whole-set replacement rather than add/remove: the settings screen renders
+    every category with a toggle, so it always knows the complete desired state,
+    and a full replace cannot drift out of sync with it the way a sequence of
+    deltas can.
+    """
+    wanted = {c for c in categories if c in CATEGORY_CATALOGUE} - UNMUTABLE_CATEGORIES
+
+    existing = db.query(models.NotificationMute).filter(
+        models.NotificationMute.user_id == user_id
+    ).all()
+    for row in existing:
+        if row.category not in wanted:
+            db.delete(row)
+    have = {row.category for row in existing}
+    for category in wanted - have:
+        db.add(models.NotificationMute(user_id=user_id, category=category, created_at=utcnow()))
+    db.commit()
+    return wanted
+
+
+def preferences_for(db, user) -> list[dict]:
+    """The settings screen's payload: every category, its label, and its state."""
+    muted = muted_categories(db, getattr(user, "id", None))
+    staff = _is_staff(getattr(user, "role", None))
+    out = []
+    for name, meta in CATEGORY_CATALOGUE.items():
+        # Don't offer a switch for something this role can never receive — it
+        # would read as "you have this off" rather than "this isn't yours".
+        if staff and name not in _staff_categories():
+            continue
+        out.append({
+            "category": name,
+            "label": meta["label"],
+            "mutable": meta["mutable"],
+            "muted": name in muted,
+        })
+    return out
+
+
+def _staff_categories() -> set[str]:
+    """
+    Categories a STAFF user can ever see. Derived from the audience each emitter
+    uses, kept as one list here purely so the *settings screen* can hide
+    switches that would do nothing; the real access decision is always the
+    stored `audience` on the row, never this.
+    """
+    return {
+        "stock_critical", "stock_depleted", "supplier_late", "reorder_request",
+        "order_created", "order_status", "order_cancelled", "order_paid",
+        "reservation_created", "reservation_status",
+        "stock_received", "stock_adjusted", "general",
+    }
+
+
+def _visible(query, role, muted: set[str] | None = None):
+    """Restrict a notification query to what `role` may see and hasn't muted."""
     if _is_staff(role):
-        return query.filter(models.Notification.audience == AUDIENCE_ALL)
+        query = query.filter(models.Notification.audience == AUDIENCE_ALL)
+    if muted:
+        query = query.filter(~models.Notification.category.in_(muted))
     return query
 
 
 def list_for(db, restaurant_id: int, limit: int = 50, unread_only: bool = False,
-             role=None) -> list:
+             role=None, user_id: int | None = None) -> list:
     """
-    Newest-first feed for one restaurant, filtered to what `role` may see.
+    Newest-first feed for one restaurant, filtered to what `role` may see and
+    what `user_id` has not muted.
 
-    `role=None` means unrestricted and is the right default for internal callers
-    (tests, scheduler jobs). Every HTTP path passes the caller's real role.
+    `role=None` / `user_id=None` mean unrestricted, the right default for
+    internal callers (tests, scheduler jobs). Every HTTP path passes both.
     """
     query = db.query(models.Notification).filter(
         models.Notification.restaurant_id == restaurant_id
     )
-    query = _visible(query, role)
+    query = _visible(query, role, muted_categories(db, user_id))
     if unread_only:
         query = query.filter(models.Notification.read_at.is_(None))
     return query.order_by(models.Notification.created_at.desc()).limit(limit).all()
 
 
-def unread_count(db, restaurant_id: int, role=None) -> int:
-    """Unread badge count — counts only what `role` may actually open."""
+def unread_count(db, restaurant_id: int, role=None, user_id: int | None = None) -> int:
+    """
+    Unread badge count — only what this user may open and hasn't muted.
+
+    Muting has to reach the badge or it does nothing useful: a "3" that opens
+    onto an empty panel is worse than no muting at all.
+    """
     query = db.query(models.Notification).filter(
         models.Notification.restaurant_id == restaurant_id,
         models.Notification.read_at.is_(None),
     )
-    return _visible(query, role).count()
+    return _visible(query, role, muted_categories(db, user_id)).count()
 
 
-def mark_read(db, restaurant_id: int, notification_id: int, role=None) -> bool:
+def mark_read(db, restaurant_id: int, notification_id: int, role=None,
+              user_id: int | None = None) -> bool:
     """
     Mark one notification read. Returns False if it doesn't exist, belongs to
     another restaurant, *or* is outside what `role` may see — all three are
@@ -222,6 +342,10 @@ def mark_read(db, restaurant_id: int, notification_id: int, role=None) -> bool:
         models.Notification.id == notification_id,
         models.Notification.restaurant_id == restaurant_id,
     )
+    # Deliberately NOT filtered by mute: a muted category is hidden from the
+    # feed, not forbidden. A deep link or a stale open tab can still legitimately
+    # acknowledge one, and refusing would be a confusing 404 for a row the user
+    # is looking at.
     note = _visible(query, role).first()
     if not note:
         return False
@@ -231,13 +355,16 @@ def mark_read(db, restaurant_id: int, notification_id: int, role=None) -> bool:
     return True
 
 
-def mark_all_read(db, restaurant_id: int, role=None) -> int:
+def mark_all_read(db, restaurant_id: int, role=None, user_id: int | None = None) -> int:
     """
     Mark read every unread notification this role can see; returns how many.
 
     Scoped by role so a STAFF "mark all read" cannot silently acknowledge — and
     thereby hide from the owner — alerts that STAFF was never shown.
     """
+    # Muted categories are excluded here, unlike in mark_read: "mark all read"
+    # means the list in front of you, and silently acknowledging entries you have
+    # chosen not to see would hide them from your own future un-muting.
     visible_ids = [
         n.id for n in _visible(
             db.query(models.Notification).filter(
@@ -245,6 +372,7 @@ def mark_all_read(db, restaurant_id: int, role=None) -> int:
                 models.Notification.read_at.is_(None),
             ),
             role,
+            muted_categories(db, user_id),
         ).all()
     ]
     if not visible_ids:

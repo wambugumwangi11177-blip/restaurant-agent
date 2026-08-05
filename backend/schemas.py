@@ -217,3 +217,17 @@ class NotificationFeed(StrictModel):
 class NotificationAck(StrictModel):
     ok: bool
     unread: int
+
+class NotificationPreference(StrictModel):
+    category: str
+    label: str
+    mutable: bool          # False = an alert too important to silence
+    muted: bool
+
+class NotificationPreferences(StrictModel):
+    items: List[NotificationPreference]
+
+class NotificationMuteUpdate(StrictModel):
+    # The complete desired set, not a delta — the settings screen renders every
+    # category, so it always knows the full state and a replace cannot drift.
+    muted: List[str] = []

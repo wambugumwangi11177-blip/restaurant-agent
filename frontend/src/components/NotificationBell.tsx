@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, AlertTriangle, AlertCircle, Info, Check } from "lucide-react";
+import { Bell, AlertTriangle, AlertCircle, Info, Check, Settings, ArrowLeft, Lock } from "lucide-react";
 import api from "@/lib/api";
 
 /**
@@ -15,6 +15,13 @@ import api from "@/lib/api";
  * This bell is the delivery channel that has no external dependency and so
  * cannot silently fail.
  */
+
+type Preference = {
+    category: string;
+    label: string;
+    mutable: boolean;   // false = an alert too important to silence
+    muted: boolean;
+};
 
 type Notification = {
     id: number;
@@ -56,6 +63,10 @@ export default function NotificationBell() {
     const [items, setItems] = useState<Notification[]>([]);
     const [unread, setUnread] = useState(0);
     const [open, setOpen] = useState(false);
+    // The panel is either the feed or the settings list, never both — at this
+    // width a split view would leave neither usable.
+    const [showSettings, setShowSettings] = useState(false);
+    const [prefs, setPrefs] = useState<Preference[]>([]);
     const panelRef = useRef<HTMLDivElement>(null);
 
     const load = useCallback(async () => {
@@ -91,6 +102,38 @@ export default function NotificationBell() {
             document.removeEventListener("keydown", onKey);
         };
     }, [open]);
+
+    const loadPrefs = useCallback(async () => {
+        try {
+            const res = await api.get("/api/v1/notifications/preferences");
+            setPrefs(res.data.items ?? []);
+        } catch {
+            setPrefs([]);
+        }
+    }, []);
+
+    const openSettings = () => {
+        setShowSettings(true);
+        loadPrefs();
+    };
+
+    const toggleMute = async (category: string) => {
+        const next = prefs.map((p) =>
+            p.category === category ? { ...p, muted: !p.muted } : p
+        );
+        setPrefs(next);                                   // optimistic
+        try {
+            const res = await api.put("/api/v1/notifications/preferences", {
+                muted: next.filter((p) => p.muted).map((p) => p.category),
+            });
+            // The server is authoritative — it drops anything unmutable, so a
+            // switch that could not really be flipped snaps back here.
+            setPrefs(res.data.items ?? next);
+            load();                                       // badge reflects the change
+        } catch {
+            loadPrefs();
+        }
+    };
 
     const markRead = async (id: number) => {
         // Optimistic: the badge should drop the instant it is clicked. Reconciled
@@ -134,7 +177,13 @@ export default function NotificationBell() {
     return (
         <div className="relative" ref={panelRef}>
             <button
-                onClick={() => setOpen((o) => !o)}
+                onClick={() => {
+                    // Always reopen on the feed. Settings is somewhere you visit
+                    // and leave; landing back on it later, having forgotten you
+                    // were there, reads as the alerts having disappeared.
+                    setShowSettings(false);
+                    setOpen((o) => !o);
+                }}
                 aria-label={unread > 0 ? `Alerts, ${unread} unread` : "Alerts"}
                 className="relative text-[#737373] hover:text-[#e5e5e5] transition-colors p-1"
             >
@@ -149,19 +198,81 @@ export default function NotificationBell() {
             {open && (
                 <div className="absolute right-0 mt-2 w-[min(22rem,calc(100vw-2rem))] max-h-[26rem] overflow-y-auto rounded-lg border border-[#1a1a1a] bg-[#0f0f0f] shadow-xl z-50">
                     <div className="sticky top-0 flex items-center justify-between px-4 py-3 border-b border-[#1a1a1a] bg-[#0f0f0f]">
-                        <span className="text-sm font-semibold text-[#e5e5e5]">Alerts</span>
-                        {unread > 0 && (
-                            <button
-                                onClick={markAllRead}
-                                className="flex items-center gap-1 text-xs text-[#737373] hover:text-[#d4a853] transition-colors"
-                            >
-                                <Check className="w-3 h-3" />
-                                Mark all read
-                            </button>
-                        )}
+                        <span className="flex items-center gap-2 text-sm font-semibold text-[#e5e5e5]">
+                            {showSettings && (
+                                <button
+                                    onClick={() => setShowSettings(false)}
+                                    aria-label="Back to alerts"
+                                    className="text-[#737373] hover:text-[#e5e5e5]"
+                                >
+                                    <ArrowLeft className="w-4 h-4" />
+                                </button>
+                            )}
+                            {showSettings ? "What you get notified about" : "Alerts"}
+                        </span>
+                        <span className="flex items-center gap-3">
+                            {!showSettings && unread > 0 && (
+                                <button
+                                    onClick={markAllRead}
+                                    className="flex items-center gap-1 text-xs text-[#737373] hover:text-[#d4a853] transition-colors"
+                                >
+                                    <Check className="w-3 h-3" />
+                                    Mark all read
+                                </button>
+                            )}
+                            {!showSettings && (
+                                <button
+                                    onClick={openSettings}
+                                    aria-label="Notification settings"
+                                    className="text-[#737373] hover:text-[#d4a853] transition-colors"
+                                >
+                                    <Settings className="w-4 h-4" />
+                                </button>
+                            )}
+                        </span>
                     </div>
 
-                    {items.length === 0 ? (
+                    {showSettings ? (
+                        <ul className="py-1">
+                            {prefs.map((p) => (
+                                <li key={p.category}>
+                                    <button
+                                        onClick={() => p.mutable && toggleMute(p.category)}
+                                        disabled={!p.mutable}
+                                        title={p.mutable ? undefined
+                                            : "Too important to switch off — you would stop being able to serve"}
+                                        className={`w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors ${
+                                            p.mutable ? "hover:bg-[#141414]" : "cursor-not-allowed"
+                                        }`}
+                                    >
+                                        <span className="flex items-center gap-2 min-w-0">
+                                            {!p.mutable && <Lock className="w-3 h-3 shrink-0 text-[#525252]" />}
+                                            <span className={`text-sm truncate ${
+                                                p.mutable ? "text-[#e5e5e5]" : "text-[#737373]"
+                                            }`}>
+                                                {p.label}
+                                            </span>
+                                        </span>
+                                        <span
+                                            aria-hidden
+                                            className={`relative w-8 h-4 rounded-full shrink-0 transition-colors ${
+                                                !p.mutable ? "bg-[#2a2a2a]"
+                                                    : p.muted ? "bg-[#2a2a2a]" : "bg-[#d4a853]"
+                                            }`}
+                                        >
+                                            <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-[#0f0f0f] transition-all ${
+                                                p.muted && p.mutable ? "left-0.5" : "left-4"
+                                            }`} />
+                                        </span>
+                                    </button>
+                                </li>
+                            ))}
+                            <li className="px-4 py-3 text-[11px] leading-relaxed text-[#525252] border-t border-[#141414]">
+                                Switching one off only hides it from you. Everyone else still
+                                gets it, and it is still recorded.
+                            </li>
+                        </ul>
+                    ) : items.length === 0 ? (
                         <p className="px-4 py-8 text-center text-sm text-[#525252]">
                             No alerts yet. Stock warnings and daily briefings show up here.
                         </p>

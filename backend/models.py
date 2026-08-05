@@ -964,3 +964,38 @@ class Notification(Base):
         # badge is "this restaurant, unread" — one composite index serves both.
         Index("ix_notifications_restaurant_created", "restaurant_id", "created_at"),
     )
+
+
+class NotificationMute(Base):
+    """
+    One category of notification that one user does not want to see.
+
+    Presence of a row means muted — there is no `muted` boolean, so there is no
+    way to represent "muted=false" and "no preference" differently and no chance
+    of the two drifting apart.
+
+    Per USER, not per restaurant: the feed now carries routine activity (every
+    order, status change and payment), and how much of that is noise depends
+    entirely on the job. A head chef wants order traffic and not menu-price
+    edits; an owner is usually the reverse. Muting one for everyone would make
+    the feature useless to whoever disagreed.
+
+    Muting is a *view* preference. The notification row is still written and
+    still visible to everyone who has not muted it, so one person hiding a
+    category can never suppress it for the restaurant — the failure mode that
+    would make an operational alert silently disappear.
+    """
+    __tablename__ = "notification_mutes"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    category   = Column(String, nullable=False)
+    created_at = Column(DateTime, default=utcnow)
+
+    user = relationship("User")
+
+    __table_args__ = (
+        # Muting an already-muted category must be a no-op, not a duplicate row
+        # that then needs two deletes to undo.
+        UniqueConstraint("user_id", "category", name="uq_notification_mute_user_category"),
+    )

@@ -52,9 +52,10 @@ async def list_notifications(
     return {
         "items": notifications_service.list_for(
             db, restaurant.id, limit=limit, unread_only=unread_only,
-            role=current_user.role,
+            role=current_user.role, user_id=current_user.id,
         ),
-        "unread": notifications_service.unread_count(db, restaurant.id, role=current_user.role),
+        "unread": notifications_service.unread_count(db, restaurant.id, role=current_user.role,
+                                                    user_id=current_user.id),
     }
 
 
@@ -71,8 +72,8 @@ async def mark_notification_read(
     if not notifications_service.mark_read(db, restaurant.id, notification_id,
                                            role=current_user.role):
         raise HTTPException(status_code=404, detail="Notification not found")
-    return {"ok": True, "unread": notifications_service.unread_count(db, restaurant.id,
-                                                                    role=current_user.role)}
+    return {"ok": True, "unread": notifications_service.unread_count(
+        db, restaurant.id, role=current_user.role, user_id=current_user.id)}
 
 
 @router.post("/read-all", response_model=schemas.NotificationAck)
@@ -84,6 +85,41 @@ async def mark_all_notifications_read(
     if not restaurant:
         return {"ok": True, "unread": 0}
 
-    notifications_service.mark_all_read(db, restaurant.id, role=current_user.role)
-    return {"ok": True, "unread": notifications_service.unread_count(db, restaurant.id,
-                                                                    role=current_user.role)}
+    notifications_service.mark_all_read(db, restaurant.id, role=current_user.role,
+                                        user_id=current_user.id)
+    return {"ok": True, "unread": notifications_service.unread_count(
+        db, restaurant.id, role=current_user.role, user_id=current_user.id)}
+
+
+@router.get("/preferences", response_model=schemas.NotificationPreferences)
+async def get_notification_preferences(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """
+    Every category this user can receive, with its label and mute state.
+
+    Categories the caller's role can never see are omitted rather than shown
+    switched off — a dead switch reads as "you turned this off", which is a
+    different and wrong statement.
+    """
+    return {"items": notifications_service.preferences_for(db, current_user)}
+
+
+@router.put("/preferences", response_model=schemas.NotificationPreferences)
+async def set_notification_preferences(
+    update: schemas.NotificationMuteUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """
+    Replace this user's muted categories.
+
+    Unknown categories and the two that must stay audible (stock critical, out
+    of stock) are dropped rather than rejected: the client sends the whole set
+    it rendered, and a 4xx over one stale name would lose every other choice the
+    user just made. The response is the authoritative state, so a client that
+    sent something unacceptable sees it reflected back unmuted.
+    """
+    notifications_service.set_mutes(db, current_user.id, update.muted)
+    return {"items": notifications_service.preferences_for(db, current_user)}

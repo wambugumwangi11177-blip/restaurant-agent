@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from database import get_db
 import models
+import notifications
 import schemas
 import auth
 from routers.deps import get_or_create_restaurant
@@ -31,6 +32,9 @@ async def create_menu_item(
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
+
+    notifications.menu_changed(db, restaurant.id, db_item.name, "item added")
+
     return db_item
 
 @router.put("/{item_id}", response_model=schemas.MenuItem)
@@ -53,11 +57,24 @@ async def update_menu_item(
     if not db_item:
         raise HTTPException(status_code=404, detail="Menu item not found")
 
-    for key, value in item_update.dict(exclude_unset=True).items():
+    changed = item_update.dict(exclude_unset=True)
+    for key, value in changed.items():
         setattr(db_item, key, value)
-        
+
     db.commit()
     db.refresh(db_item)
+
+    # Name the change rather than saying "updated": a price move and an
+    # availability toggle are different events to whoever reads the feed, and a
+    # price change is the one an owner actually wants to notice.
+    if "price" in changed:
+        what = f"price changed to {(db_item.price or 0) // 100:,}"
+    elif "is_available" in changed:
+        what = "back on the menu" if db_item.is_available else "marked unavailable"
+    else:
+        what = "item updated"
+    notifications.menu_changed(db, restaurant.id, db_item.name, what)
+
     return db_item
 
 @router.delete("/{item_id}")
@@ -74,8 +91,12 @@ async def delete_menu_item(
     if not db_item:
         raise HTTPException(status_code=404, detail="Menu item not found")
 
+    item_name = db_item.name              # read before the row goes away
     db.delete(db_item)
     db.commit()
+
+    notifications.menu_changed(db, restaurant.id, item_name, "item removed")
+
     return {"message": "Item deleted successfully"}
 
 

@@ -324,11 +324,14 @@ def test_staff_cannot_see_revenue_bearing_alerts(db_session):
     restaurant = _restaurant(db_session)
     notifications.record(db_session, restaurant.id, "Morning briefing",
                          body="Revenue yesterday: KES 84,000 (+12% WoW)",
-                         category="morning_briefing")
+                         category="morning_briefing",
+                         audience=notifications.AUDIENCE_ADMIN)
     notifications.record(db_session, restaurant.id, "Slow day",
-                         body="Revenue 30% below average", category="slow_day_alert")
+                         body="Revenue 30% below average", category="slow_day_alert",
+                         audience=notifications.AUDIENCE_ADMIN)
     notifications.record(db_session, restaurant.id, "Ugali flour low",
-                         category="stock_critical")
+                         category="stock_critical",
+                         audience=notifications.AUDIENCE_ALL)
 
     staff_feed = notifications.list_for(db_session, restaurant.id, role=models.Role.STAFF)
 
@@ -339,8 +342,8 @@ def test_staff_cannot_see_revenue_bearing_alerts(db_session):
     assert len(notifications.list_for(db_session, restaurant.id, role=models.Role.ADMIN)) == 3
 
 
-def test_unlisted_category_is_admin_only_by_default(db_session):
-    """Fail-closed: a category nobody has classified must not leak to STAFF."""
+def test_audience_defaults_to_admin_only(db_session):
+    """Fail-closed: an author who did not think about audience gets the safe one."""
     restaurant = _restaurant(db_session)
     notifications.record(db_session, restaurant.id, "New alert type",
                          category="some_future_category_nobody_classified")
@@ -352,7 +355,8 @@ def test_unlisted_category_is_admin_only_by_default(db_session):
 def test_staff_cannot_mark_a_restricted_alert_read(db_session):
     restaurant = _restaurant(db_session)
     briefing = notifications.record(db_session, restaurant.id, "Morning briefing",
-                                    category="morning_briefing")
+                                    category="morning_briefing",
+                                    audience=notifications.AUDIENCE_ADMIN)
 
     assert notifications.mark_read(db_session, restaurant.id, briefing.id,
                                    role=models.Role.STAFF) is False
@@ -366,8 +370,9 @@ def test_staff_mark_all_read_leaves_restricted_alerts_unread(db_session):
     """
     restaurant = _restaurant(db_session)
     notifications.record(db_session, restaurant.id, "Morning briefing",
-                         category="morning_briefing")
-    notifications.record(db_session, restaurant.id, "Stock low", category="stock_critical")
+                         category="morning_briefing", audience=notifications.AUDIENCE_ADMIN)
+    notifications.record(db_session, restaurant.id, "Stock low", category="stock_critical",
+                         audience=notifications.AUDIENCE_ALL)
 
     cleared = notifications.mark_all_read(db_session, restaurant.id, role=models.Role.STAFF)
 
@@ -378,7 +383,8 @@ def test_staff_mark_all_read_leaves_restricted_alerts_unread(db_session):
 def test_role_accepts_enum_value_or_string(db_session):
     """The role reaches this code from an ORM enum, a JWT claim, or a test."""
     restaurant = _restaurant(db_session)
-    notifications.record(db_session, restaurant.id, "briefing", category="morning_briefing")
+    notifications.record(db_session, restaurant.id, "briefing", category="morning_briefing",
+                         audience=notifications.AUDIENCE_ADMIN)
 
     for role in (models.Role.STAFF, "staff", "STAFF", " Staff "):
         assert notifications.list_for(db_session, restaurant.id, role=role) == [], role
@@ -397,8 +403,10 @@ def test_staff_feed_over_http_hides_revenue(client, db_session):
     headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
     notifications.record(db_session, restaurant.id, "Morning briefing",
-                         body="Revenue yesterday: KES 84,000", category="morning_briefing")
-    notifications.record(db_session, restaurant.id, "Stock low", category="stock_critical")
+                         body="Revenue yesterday: KES 84,000", category="morning_briefing",
+                         audience=notifications.AUDIENCE_ADMIN)
+    notifications.record(db_session, restaurant.id, "Stock low", category="stock_critical",
+                         audience=notifications.AUDIENCE_ALL)
 
     body = client.get("/api/v1/notifications/", headers=headers).json()
 

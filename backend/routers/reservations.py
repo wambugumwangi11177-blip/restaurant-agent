@@ -6,6 +6,7 @@ from datetime import date
 
 from database import get_db
 import models
+import notifications
 import schemas
 import auth
 from ai.reservation_optimizer import is_table_available
@@ -111,6 +112,9 @@ async def create_reservation(
             detail="Table is already booked for an overlapping time slot",
         )
     db.refresh(db_res)
+
+    notifications.reservation_created(db, restaurant.id, db_res)
+
     return _res_to_dict(db_res)
 
 
@@ -162,6 +166,7 @@ async def update_reservation_status(
                 detail="Table is already booked for an overlapping time slot",
             )
 
+    previous_status = reservation.status
     reservation.status = new_status
     try:
         db.commit()
@@ -176,6 +181,13 @@ async def update_reservation_status(
             detail="Table is already booked for an overlapping time slot",
         )
     db.refresh(reservation)
+
+    # Only on a real transition, for the same reason the NO_SHOW emit below
+    # guards on one: a PATCH that re-asserts the current status changed nothing
+    # and should not announce that it did.
+    if previous_status != new_status:
+        notifications.reservation_status_changed(db, restaurant.id, reservation,
+                                                 new_status.value)
 
     # RESERVATION_NO_SHOW was subscribed to by executive.py (records into
     # ai/memory/store.py, triggers winback logic) but nothing ever emitted
@@ -207,8 +219,22 @@ async def delete_reservation(
     if not reservation:
         raise HTTPException(status_code=404, detail="Reservation not found")
 
+    # Capture what we need before the row is gone — reading attributes off a
+    # deleted instance after commit raises.
+    customer_name = reservation.customer_name
+    party_size = reservation.party_size
+
     db.delete(reservation)
     db.commit()
+
+    notifications.record(
+        db, restaurant.id,
+        title=f"Booking deleted: {customer_name}",
+        body=f"{party_size} pax",
+        category="reservation_status", severity=notifications.SEVERITY_WARNING,
+        link="/dashboard/reservations", audience=notifications.AUDIENCE_ALL,
+    )
+
     return {"message": "Reservation deleted"}
 
 

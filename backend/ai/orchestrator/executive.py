@@ -131,6 +131,7 @@ def on_stock_critical(payload: dict) -> None:
             title=f"{item_name} critically low (~{hours_left:.0f}h left)",
             body=reasoning,
             category="stock_critical", severity=notifications.SEVERITY_CRITICAL,
+            audience=notifications.AUDIENCE_ALL,
             link="/dashboard/inventory", whatsapp_body=msg,
             message_type="orchestrated_stock_critical",
         )
@@ -186,6 +187,7 @@ def on_stock_depleted(payload: dict) -> None:
             title=f"Out of stock: {item_name}",
             body="Dishes using it cannot be served until it's restocked.",
             category="stock_depleted", severity=notifications.SEVERITY_CRITICAL,
+            audience=notifications.AUDIENCE_ALL,
             link="/dashboard/inventory", whatsapp_body=msg,
         )
     except Exception as exc:
@@ -326,6 +328,7 @@ def on_mpesa_payment_failed(payload: dict) -> None:
             title=f"M-Pesa payment failed — order #{order_id}",
             body=f"Reason: {reason}. The order is still marked unpaid.",
             category="mpesa_payment_failed", severity=notifications.SEVERITY_WARNING,
+            audience=notifications.AUDIENCE_ADMIN,
             link="/dashboard/orders", whatsapp_body=msg,
         )
 
@@ -422,6 +425,7 @@ def on_purchase_order_late(payload: dict) -> None:
                       f"{supplier.reliability_score if supplier else 'N/A'}%. "
                       f"Consider calling the supplier or sourcing an alternative."),
                 category="supplier_late", severity=notifications.SEVERITY_WARNING,
+                audience=notifications.AUDIENCE_ALL,
                 link="/dashboard/inventory", whatsapp_body=msg,
             )
 
@@ -465,6 +469,7 @@ def on_agent_failed(payload: dict) -> None:
                     body=(f"Failed {recent_failures} times in the last hour. "
                           f"Last error: {error[:200]}. Analytics may be temporarily unavailable."),
                     category="agent_failure", severity=notifications.SEVERITY_WARNING,
+                    audience=notifications.AUDIENCE_ADMIN,
                     link="/dashboard/ai-ops", whatsapp_body=msg,
                 )
 

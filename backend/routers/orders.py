@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from database import get_db
 import models
+import notifications
 import schemas
 import auth
 from routers.deps import get_or_create_restaurant
@@ -71,6 +72,9 @@ async def create_order(
     db.add(db_order)
     db.commit()
     db.refresh(db_order)
+
+    notifications.order_created(db, restaurant.id, db_order, len(order_items), source="POS")
+
     return _order_to_dict(db_order)
 
 
@@ -132,12 +136,20 @@ async def update_order_status(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid status: {update.status}")
 
+    previous_status = order.status
     order.status = new_status
     if new_status == models.OrderStatus.SERVED:
         order.completed_at = utcnow()
 
     db.commit()
     db.refresh(order)
+
+    # Only on a real transition — the KDS re-PATCHes the current status on some
+    # interactions, and re-announcing "order #12 ready" every time would fill the
+    # feed with events that describe nothing happening.
+    if previous_status != new_status:
+        notifications.order_status_changed(db, restaurant.id, order, new_status.value)
+
     return _order_to_dict(order)
 
 
@@ -170,6 +182,10 @@ async def update_order_payment(
     db.refresh(order)
 
     if order.is_paid and not was_paid:
+        notifications.order_paid(
+            db, restaurant.id, order,
+            order.payment_method.value if order.payment_method else "unknown",
+        )
         # Mirrors the M-Pesa webhook's ORDER_PAID emit (routers/webhooks.py) so
         # cash/card orders marked paid at the POS get the same itemized customer
         # receipt. No mpesa_reference for these — compose_receipt omits that line.

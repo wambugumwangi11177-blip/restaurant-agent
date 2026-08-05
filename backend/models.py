@@ -934,6 +934,19 @@ class Notification(Base):
     # Machine-readable class of alert (stock_critical, slow_day, …). Drives the
     # icon/colour in the UI and makes "mute this kind" possible later.
     category      = Column(String, nullable=False, default="general")
+    # Who may read this: "all" (everyone working the restaurant) or "admin"
+    # (owners/managers only). Decided at emit time by the code that knows what is
+    # in the body, and stored — rather than inferred later from `category` — so
+    # the judgement is made once, where the context exists, and is auditable
+    # afterwards. Defaults to admin: a new alert type is restricted until someone
+    # deliberately widens it, so nothing leaks on the day it ships.
+    # server_default as well as default: create_all() (fresh installs) and
+    # migration 026 (existing databases) must produce the SAME schema, or a raw
+    # INSERT that omits the column succeeds on one and violates NOT NULL on the
+    # other. Migration 011 exists because exactly this drift bit this project
+    # before.
+    audience      = Column(String, nullable=False, default="admin",
+                           server_default="admin")
     # info | warning | critical — ordering and colour, nothing more.
     severity      = Column(String, nullable=False, default="info")
     title         = Column(String, nullable=False)

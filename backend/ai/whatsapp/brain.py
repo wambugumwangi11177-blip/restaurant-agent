@@ -899,6 +899,7 @@ def handle_customer_message(db: Session, restaurant_id: int, phone: str, message
                     body=(f"From {phone}" + (f" on Order #{last.id}" if last else "")
                           + ". Reach out to make it right."),
                     category="feedback_alert", severity=notifications.SEVERITY_WARNING,
+                    audience=notifications.AUDIENCE_ADMIN,
                     link="/dashboard/orders", whatsapp_body=alert,
                 )
             return "Thank you for the honest feedback — we're sorry we fell short and will do better. 🙏"
@@ -922,6 +923,7 @@ def handle_customer_message(db: Session, restaurant_id: int, phone: str, message
                 title=f"Reorder request from {phone}",
                 body=f"{items_str}. Previous total: KES {(last.total or 0) // 100:,}. Confirm with the customer.",
                 category="reorder_request", severity=notifications.SEVERITY_INFO,
+                audience=notifications.AUDIENCE_ALL,
                 link="/dashboard/orders", whatsapp_body=notice,
             )
         return (f"Got it! We've sent your usual to the team: {items_str}.\n"
@@ -1120,6 +1122,7 @@ def run_morning_briefing(SessionLocal) -> None:
                 title="Morning briefing",
                 body=message,
                 category="morning_briefing", severity=notifications.SEVERITY_INFO,
+                audience=notifications.AUDIENCE_ADMIN,
                 link="/dashboard", whatsapp_body=message,
             )
             logger.info(f"[WhatsApp Brain] Morning briefing sent: {restaurant.name}")
@@ -1172,6 +1175,7 @@ def run_slow_day_check(SessionLocal) -> None:
                     title="Slow day — revenue below average",
                     body=alert,
                     category="slow_day_alert", severity=notifications.SEVERITY_WARNING,
+                    audience=notifications.AUDIENCE_ADMIN,
                     link="/dashboard/sales", whatsapp_body=alert,
                 )
     finally:

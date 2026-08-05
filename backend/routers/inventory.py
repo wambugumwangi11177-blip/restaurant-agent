@@ -5,7 +5,6 @@ from datetime import datetime
 
 from database import get_db
 import models
-import notifications
 import schemas
 import auth
 from routers.deps import get_or_create_restaurant
@@ -98,9 +97,6 @@ async def receive_stock(
     db.add(movement)
     db.commit()
     db.refresh(db_item)
-
-    notifications.stock_received(db, restaurant.id, db_item, receive.quantity)
-
     return {"message": f"Received {receive.quantity} {db_item.unit} of {db_item.item_name}", "new_quantity": db_item.quantity}
 
 
@@ -131,9 +127,6 @@ async def adjust_stock(
     db.add(movement)
     db.commit()
     db.refresh(db_item)
-
-    notifications.stock_adjusted(db, restaurant.id, db_item, adjust.quantity, adjust.reason)
-
     return {"message": f"Adjusted {db_item.item_name}", "new_quantity": db_item.quantity}
 
 
@@ -151,15 +144,6 @@ async def delete_inventory_item(
     if not db_item:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    item_name = db_item.item_name          # read before the row goes away
     db.delete(db_item)
     db.commit()
-
-    notifications.record(
-        db, restaurant.id,
-        title=f"Stock item deleted: {item_name}",
-        category="stock_deleted", severity=notifications.SEVERITY_WARNING,
-        link="/dashboard/inventory", audience=notifications.AUDIENCE_ADMIN,
-    )
-
     return {"message": "Item deleted"}

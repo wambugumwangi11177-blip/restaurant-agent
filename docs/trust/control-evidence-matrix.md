@@ -123,7 +123,6 @@ It answers the question a technical due-diligence reader always asks next:
 | DB integrity constraints | Production | CHECK constraints (non-negative totals/prices, positive quantities/party size), UNIQUE (restaurant_id, table_number), pervasive FKs/NOT NULL; back-filled via migration | Migration + model definitions | `backend/models.py:124,148-149,185,202-203,287`, `backend/alembic/versions/016_add_integrity_constraints.py` | 2026-07-11 |
 | Disaster-recovery runbook | Production | Documented backup config, point-in-time restore, and recovery playbooks | — | `backend/DISASTER_RECOVERY.md` | 2026-07-11 |
 | Point-in-time restore / backups | Production (provider-managed) | Neon WAL + daily snapshots; documented in the runbook | Neon platform | `backend/DISASTER_RECOVERY.md` | 2026-07-11 |
-| Owner-alert delivery independent of third parties | Production | Operational alerts are committed to the `notifications` table first and unconditionally, then forwarded to WhatsApp/SMS best-effort. In-app delivery has no external dependency, so an outage or absence of the messaging provider cannot suppress an alert | `test_notifications_inapp.py` (incl. delivery with no phone and no transport configured) | `backend/notifications.py`, `backend/alembic/versions/025_add_notifications.py` | 2026-08-04 |
 
 ---
 
@@ -148,4 +147,4 @@ It answers the question a technical due-diligence reader always asks next:
 |---|---|---|---|
 | 1.0 | 2026-07-11 | Engineering | Initial matrix from full `backend/` code audit |
 | 1.1 | 2026-07-11 | Engineering | RBAC + password-complexity shipped (Track B1/B2) → Production; Argon2id pinned; open items updated |
-| 1.2 | 2026-08-04 | Engineering | Added §7 health-endpoint control and §9 owner-alert-delivery control. Recorded external uptime monitoring as **Planned, not Production** — the endpoints exist but nothing polls or pages (E1). |
+| 1.2 | 2026-08-05 | Engineering | Added the §7 health-endpoint control (incl. `/health/notifications`). Recorded external uptime monitoring as **Planned, not Production** — the endpoints exist but nothing polls or pages (E1). |

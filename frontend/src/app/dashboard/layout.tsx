@@ -21,7 +21,6 @@ import {
     Megaphone,
     Cpu,
 } from "lucide-react";
-import NotificationBell from "@/components/NotificationBell";
 
 // adminOnly pages call management/AI endpoints that are ADMIN-gated on the
 // backend (routers/ai.py, analytics.py — RBAC pass 2026-07-11). Hiding their nav
@@ -159,10 +158,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     >
                         {sidebarOpen ? <X className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
                     </button>
-                    <div className="flex items-center gap-4">
-                        <NotificationBell />
-                        <div className="text-xs text-[#525252]">{user.role}</div>
-                    </div>
+                    <div className="text-xs text-[#525252]">{user.role}</div>
                 </header>
 
                 <div className="p-5 max-w-6xl">

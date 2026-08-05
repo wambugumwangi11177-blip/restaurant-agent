@@ -52,15 +52,9 @@ the numbers can be filled in from production data rather than guessed.
 | Access logs | Railway platform | Request-level |
 | AI-action audit | `AgentAuditLog` (append-only) | What changed, why, who approved |
 | Auth events | `last_login_at`, lockout counters | Staff-activity + brute-force signals |
-| Owner alerts | `notifications` (in-app feed) + `agent_messages` (WhatsApp/SMS attempts) | Every operational alert raised — see below |
+| Owner alerts | `agent_messages` | Every WhatsApp/SMS send attempt and its outcome |
 
-**Owner alert delivery.** Operational alerts (critical/depleted stock, late supplier,
-failed M-Pesa settlement, slow day, morning briefing, repeated agent failure) are written
-to the `notifications` table *first and unconditionally*, then forwarded to WhatsApp/SMS
-on a best-effort basis. In-app delivery has no external dependency, so a deployment with
-no Twilio account still surfaces every alert in the dashboard bell. `agent_messages`
-records the outcome of each wire attempt; `GET /health/notifications` reports the recent
-failure rate over both.
+**Owner alert delivery.** Operational alerts (critical/depleted stock, late supplier, failed M-Pesa settlement, slow day, morning briefing) are sent over WhatsApp/SMS, which requires both an owner phone on file and a configured Twilio sender. Neither is currently true in production, so **these alerts reach nobody today** — see D15 in the [tech-debt register](tech-debt-register.md). `GET /health/notifications` reports exactly which part of that chain is missing, and `execution/verify_notifications.py` checks it before a demo or an onboarding. An in-app feed that removes the Twilio dependency is built on `feat/staff-rbac-stock-custody-twilio` and lands with that branch.
 
 Retention: audit log is currently append-only (no auto-purge) — reconcile the DPA "90-day
 rolling" wording or add a purge job (tracked in [tech-debt-register.md](tech-debt-register.md)).
@@ -153,4 +147,4 @@ rolling" wording or add a purge job (tracked in [tech-debt-register.md](tech-deb
 | Version | Date | Author | Change |
 |---|---|---|---|
 | 1.0 | 2026-07-11 | Engineering | Initial ops+reliability; SLO/RTO from SLA/BCP, actuals TBD |
-| 1.1 | 2026-08-04 | Engineering | §1 corrected: uptime monitoring is **not** wired (the previous "continuous per SLA §04" wording described intent, not the build) and now names the three health endpoints available as monitor targets, including the new `/health/notifications`. Added the in-app owner-alert channel to §2. |
+| 1.1 | 2026-08-05 | Engineering | §1 corrected: uptime monitoring is **not** wired (the previous "continuous per SLA §04" wording described intent, not the build) and now names the three health endpoints available as monitor targets, including the new `/health/notifications`. §2 states plainly that owner alerts reach nobody until Twilio is provisioned. |

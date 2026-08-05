@@ -173,9 +173,9 @@ customers, no code change).
   `/health/db` and `/health/notifications` are available as external monitor targets.
   **External uptime polling and paging are not yet wired** — incident detection is
   currently manual (see [Operations & Reliability §1](../operations-and-reliability.md)).
-- **Alert delivery:** operational alerts to the restaurant owner are committed to an in-app
-  notification feed first and forwarded to WhatsApp/SMS best-effort, so an outage at the
-  messaging provider cannot suppress an alert.
+- **Alert delivery:** operational alerts to the restaurant owner are sent over WhatsApp/SMS.
+  That path depends on a configured messaging provider, so `GET /health/notifications`
+  reports whether it can currently deliver at all rather than letting it fail silently.
 - **Backups & recovery:** Neon WAL + daily snapshots with point-in-time restore; procedures
   in `backend/DISASTER_RECOVERY.md`. RTO/RPO targets are in the BCP (LAI-BCP-001).
 - **Incident response:** severity model, containment, and notification timelines in the IRP

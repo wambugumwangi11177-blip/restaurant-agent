@@ -26,7 +26,6 @@ from collections import defaultdict
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 import models
-import notifications
 from time_utils import utcnow
 from . import twilio_client
 
@@ -893,15 +892,7 @@ def handle_customer_message(db: Session, restaurant_id: int, phone: str, message
                 alert = (f"⚠️ *Low rating received* — {rating}/5"
                          + (f" on Order #{last.id}" if last else "")
                          + f"\nFrom: {phone}\nReach out to make it right.")
-                notifications.deliver(
-                    db, restaurant,
-                    title=f"Low rating: {rating}/5",
-                    body=(f"From {phone}" + (f" on Order #{last.id}" if last else "")
-                          + ". Reach out to make it right."),
-                    category="feedback_alert", severity=notifications.SEVERITY_WARNING,
-                    audience=notifications.AUDIENCE_ADMIN,
-                    link="/dashboard/orders", whatsapp_body=alert,
-                )
+                send_to_owner(db, restaurant, alert, message_type="feedback_alert")
             return "Thank you for the honest feedback — we're sorry we fell short and will do better. 🙏"
         return "Thank you for the *" + text + "★* rating! We'd love to see you again soon. 🍽️"
 
@@ -918,14 +909,7 @@ def handle_customer_message(db: Session, restaurant_id: int, phone: str, message
         if restaurant:
             notice = (f"🔁 *Reorder request* from {phone}\n{items_str}\n"
                       f"Previous total: KES {(last.total or 0) // 100:,}. Confirm with the customer.")
-            notifications.deliver(
-                db, restaurant,
-                title=f"Reorder request from {phone}",
-                body=f"{items_str}. Previous total: KES {(last.total or 0) // 100:,}. Confirm with the customer.",
-                category="reorder_request", severity=notifications.SEVERITY_INFO,
-                audience=notifications.AUDIENCE_ALL,
-                link="/dashboard/orders", whatsapp_body=notice,
-            )
+            send_to_owner(db, restaurant, notice, message_type="reorder_request")
         return (f"Got it! We've sent your usual to the team: {items_str}.\n"
                 f"They'll confirm shortly. 🍽️")
 
@@ -1117,14 +1101,7 @@ def run_morning_briefing(SessionLocal) -> None:
     try:
         for restaurant in db.query(models.Restaurant).all():
             message = compose_morning_briefing(db, restaurant.id)
-            notifications.deliver(
-                db, restaurant,
-                title="Morning briefing",
-                body=message,
-                category="morning_briefing", severity=notifications.SEVERITY_INFO,
-                audience=notifications.AUDIENCE_ADMIN,
-                link="/dashboard", whatsapp_body=message,
-            )
+            send_to_owner(db, restaurant, message, message_type="morning_briefing")
             logger.info(f"[WhatsApp Brain] Morning briefing sent: {restaurant.name}")
     finally:
         db.close()
@@ -1170,14 +1147,7 @@ def run_slow_day_check(SessionLocal) -> None:
         for restaurant in db.query(models.Restaurant).all():
             alert = compose_slow_day_alert(db, restaurant.id)
             if alert:
-                notifications.deliver(
-                    db, restaurant,
-                    title="Slow day — revenue below average",
-                    body=alert,
-                    category="slow_day_alert", severity=notifications.SEVERITY_WARNING,
-                    audience=notifications.AUDIENCE_ADMIN,
-                    link="/dashboard/sales", whatsapp_body=alert,
-                )
+                send_to_owner(db, restaurant, alert, message_type="slow_day_alert")
     finally:
         db.close()
 

@@ -30,7 +30,6 @@ from datetime import date
 from sqlalchemy.orm import Session, joinedload
 from database import SessionLocal
 import models
-import notifications
 from events.bus import subscribe, EventType, emit_async
 from ai.memory import store as memory
 from ai.evaluation.tracker import write_audit_log
@@ -115,7 +114,9 @@ def on_stock_critical(payload: dict) -> None:
 
         reasoning = " ".join(reasoning_parts)
 
-        # Decision: compose the alert text (in-app + WhatsApp forward)
+        # Decision: compose WhatsApp alert
+        from ai.whatsapp import send_whatsapp_message
+
         msg = _compose_orchestrated_stock_alert(
             item_name     = item_name,
             hours_left    = hours_left,
@@ -126,15 +127,10 @@ def on_stock_critical(payload: dict) -> None:
 
         # Was env-var only, so a restaurant onboarded via the owner_phone column
         # (migration 006) got no critical-stock alerts at all.
-        notifications.deliver(
-            db, restaurant,
-            title=f"{item_name} critically low (~{hours_left:.0f}h left)",
-            body=reasoning,
-            category="stock_critical", severity=notifications.SEVERITY_CRITICAL,
-            audience=notifications.AUDIENCE_ALL,
-            link="/dashboard/inventory", whatsapp_body=msg,
-            message_type="orchestrated_stock_critical",
-        )
+        owner_phone = _owner_phone(restaurant)
+        if owner_phone:
+            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+                                  message_type="orchestrated_stock_critical")
 
         # Memory: auto-record near-stockout
         if hours_left <= 2:
@@ -177,19 +173,16 @@ def on_stock_depleted(payload: dict) -> None:
         restaurant = db.query(models.Restaurant).filter(
             models.Restaurant.id == restaurant_id
         ).first()
-        msg = (
-            f"🚨 *Out of Stock*\n\n"
-            f"{item_name} has hit zero.\n"
-            f"Dishes using it cannot be served until it's restocked."
-        )
-        notifications.deliver(
-            db, restaurant,
-            title=f"Out of stock: {item_name}",
-            body="Dishes using it cannot be served until it's restocked.",
-            category="stock_depleted", severity=notifications.SEVERITY_CRITICAL,
-            audience=notifications.AUDIENCE_ALL,
-            link="/dashboard/inventory", whatsapp_body=msg,
-        )
+        owner_phone = _owner_phone(restaurant)
+        if owner_phone:
+            from ai.whatsapp import send_whatsapp_message
+            msg = (
+                f"🚨 *Out of Stock*\n\n"
+                f"{item_name} has hit zero.\n"
+                f"Dishes using it cannot be served until it's restocked."
+            )
+            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+                                  message_type="stock_depleted")
     except Exception as exc:
         logger.error(f"[Orchestrator] on_stock_depleted failed: {exc}")
     finally:
@@ -276,15 +269,6 @@ def on_order_paid(payload: dict) -> None:
                                       restaurant_id=restaurant_id, message_type="receipt",
                                       channel="whatsapp", fallback_sms=True)
 
-        notifications.record(
-            db, restaurant_id,
-            title=f"Payment received — order #{order_id}",
-            body=f"KES {amount // 100:,} via {method}"
-                 + (f" · ref {mpesa_ref}" if mpesa_ref else ""),
-            category="order_paid", severity=notifications.SEVERITY_INFO,
-            link="/dashboard/orders", audience=notifications.AUDIENCE_ALL,
-        )
-
         write_audit_log(
             db, restaurant_id, "payment_received", "executive_orchestrator",
             entity_type = "order",
@@ -298,6 +282,21 @@ def on_order_paid(payload: dict) -> None:
         logger.error(f"[Orchestrator] on_order_paid failed: {exc}")
     finally:
         db.close()
+
+
+def _owner_phone(restaurant) -> str:
+    """
+    The owner's WhatsApp number, or "" if none is configured. Delegates to
+    `brain.owner_phone_for` (DB column first, legacy OWNER_PHONE_{id} /
+    OWNER_PHONE env vars as fallback) rather than re-implementing that
+    precedence — it must stay identical to the inbound resolution in
+    `routers/webhooks._resolve_restaurant_by_phone`, or an owner who can reply
+    to the bot can't be reached by it.
+    """
+    if restaurant is None:
+        return ""
+    from ai.whatsapp.brain import owner_phone_for
+    return owner_phone_for(restaurant)
 
 
 def on_mpesa_payment_failed(payload: dict) -> None:
@@ -326,20 +325,22 @@ def on_mpesa_payment_failed(payload: dict) -> None:
             models.Restaurant.id == restaurant_id
         ).first()
 
-        msg = (
-            f"⚠️ *Payment Failed*\n\n"
-            f"M-Pesa payment for order #{order_id} did not go through.\n"
-            f"Reason: {reason}\n\n"
-            f"_The order is still marked unpaid._"
-        )
-        notifications.deliver(
-            db, restaurant,
-            title=f"M-Pesa payment failed — order #{order_id}",
-            body=f"Reason: {reason}. The order is still marked unpaid.",
-            category="mpesa_payment_failed", severity=notifications.SEVERITY_WARNING,
-            audience=notifications.AUDIENCE_ADMIN,
-            link="/dashboard/orders", whatsapp_body=msg,
-        )
+        owner_phone = _owner_phone(restaurant)
+        if owner_phone:
+            from ai.whatsapp import send_whatsapp_message
+            msg = (
+                f"⚠️ *Payment Failed*\n\n"
+                f"M-Pesa payment for order #{order_id} did not go through.\n"
+                f"Reason: {reason}\n\n"
+                f"_The order is still marked unpaid._"
+            )
+            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+                                  message_type="mpesa_payment_failed")
+        else:
+            logger.warning(
+                f"[Orchestrator] M-Pesa payment failed for order {order_id} but no "
+                f"owner phone is configured for restaurant {restaurant_id} — nobody notified"
+            )
 
         write_audit_log(
             db, restaurant_id, "mpesa_payment_failed", "executive_orchestrator",
@@ -416,10 +417,10 @@ def on_purchase_order_late(payload: dict) -> None:
             supplier.reliability_score = max(0, (supplier.reliability_score or 100) - 5)
             db.commit()
 
-        restaurant = db.query(models.Restaurant).filter(
-            models.Restaurant.id == restaurant_id
-        ).first()
-        if restaurant:
+        import os
+        from ai.whatsapp import send_whatsapp_message
+        owner_phone = os.getenv(f"OWNER_PHONE_{restaurant_id}", os.getenv("OWNER_PHONE", ""))
+        if owner_phone:
             msg = (
                 f"🚚 *Supplier Alert*\n\n"
                 f"*{supplier_name}* delivery is {days_late} day(s) late.\n"
@@ -427,16 +428,8 @@ def on_purchase_order_late(payload: dict) -> None:
                 f"Reliability score: {supplier.reliability_score if supplier else 'N/A'}%\n"
                 f"Consider calling the supplier or sourcing from an alternative."
             )
-            notifications.deliver(
-                db, restaurant,
-                title=f"{supplier_name} delivery {days_late} day(s) late",
-                body=(f"Item: {item_name}. Reliability score: "
-                      f"{supplier.reliability_score if supplier else 'N/A'}%. "
-                      f"Consider calling the supplier or sourcing an alternative."),
-                category="supplier_late", severity=notifications.SEVERITY_WARNING,
-                audience=notifications.AUDIENCE_ALL,
-                link="/dashboard/inventory", whatsapp_body=msg,
-            )
+            send_whatsapp_message(owner_phone, msg, db=db,
+                                  restaurant_id=restaurant_id, message_type="supplier_late")
 
     except Exception as exc:
         logger.error(f"[Orchestrator] on_purchase_order_late failed: {exc}")
@@ -446,6 +439,7 @@ def on_purchase_order_late(payload: dict) -> None:
 
 def on_agent_failed(payload: dict) -> None:
     """An agent execution failed — alert if it's been failing repeatedly."""
+    import os
     agent_name    = payload.get("agent_name", "unknown")
     error         = payload.get("error", "")
     restaurant_id = payload.get("restaurant_id")
@@ -462,25 +456,17 @@ def on_agent_failed(payload: dict) -> None:
         ).count()
 
         if recent_failures >= 3:
-            restaurant = db.query(models.Restaurant).filter(
-                models.Restaurant.id == restaurant_id
-            ).first()
-            if restaurant:
+            owner_phone = os.getenv("OWNER_PHONE", "")
+            if owner_phone:
+                from ai.whatsapp import send_whatsapp_message
                 msg = (
                     f"⚠️ *AI System Alert*\n\n"
                     f"*{agent_name}* has failed {recent_failures} times in the last hour.\n"
                     f"Last error: {error[:200]}\n\n"
                     f"Analytics may be temporarily unavailable. Team has been notified."
                 )
-                notifications.deliver(
-                    db, restaurant,
-                    title=f"{agent_name} failing repeatedly",
-                    body=(f"Failed {recent_failures} times in the last hour. "
-                          f"Last error: {error[:200]}. Analytics may be temporarily unavailable."),
-                    category="agent_failure", severity=notifications.SEVERITY_WARNING,
-                    audience=notifications.AUDIENCE_ADMIN,
-                    link="/dashboard/ai-ops", whatsapp_body=msg,
-                )
+                send_whatsapp_message(owner_phone, msg, db=db,
+                                      restaurant_id=restaurant_id, message_type="agent_failure")
 
     except Exception as exc:
         logger.error(f"[Orchestrator] on_agent_failed failed: {exc}")

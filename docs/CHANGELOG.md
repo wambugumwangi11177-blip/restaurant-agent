@@ -3,39 +3,45 @@
 Notable changes to the Leviii AI platform and its documentation. Newest first. Derived from
 git history on `feat/phase1-production-hardening`.
 
-## Unreleased — In-app notifications & delivery health (2026-08-04)
+## Unreleased — Notification delivery health & go-to-market (2026-08-05)
 
 ### Added
-- **In-app owner alerts.** `notifications` table (migration 025) + `backend/notifications.py`
-  + `GET/POST /api/v1/notifications` + a dashboard bell with unread badge and deep links.
-  Alerts are committed in-app first and forwarded to WhatsApp/SMS best-effort, so a
-  deployment with no messaging provider still surfaces every alert.
 - **Notification-chain health.** `backend/notifications_health.py`,
-  `GET /health/notifications` (503 when nothing can be delivered), boot-time warnings in
-  `startup_checks`, and `execution/verify_notifications.py` for pre-demo preflight.
+  `GET /health/notifications` (503 when nothing can be delivered, 200 + detail when
+  degraded), boot-time warnings in `startup_checks`, and
+  `execution/verify_notifications.py` for pre-demo preflight (read-only by default;
+  `--send` proves real delivery; `--url` checks a deployed instance).
 - **Cold-outreach SOP** (`directives/015_cold_outreach.md`) and a deterministic lead
-  pipeline (`execution/outreach_pipeline.py`).
+  pipeline (`execution/outreach_pipeline.py`) whose funnel maths counts the deepest stage
+  each lead reached, so a lost deal stays in the demo denominator.
 
 ### Fixed
-- Owner alerts were raised behind an `if owner_phone:` gate and a configured Twilio
-  account. With neither, the system computed the alert, wrote an audit log, and told
-  nobody — with no trace in the product. Nine alert sites now route through
-  `notifications.deliver()`.
-- The supplier-late and repeated-agent-failure handlers resolved the owner phone from
-  env vars only, ignoring the `owner_phone` column entirely (the same bug already fixed
-  for stock alerts in migration 006).
-- `TWILIO_WHATSAPP_FROM` defaults to Twilio's shared public sandbox number; a deploy that
-  forgets to set it gets "sent" back for every message while reaching only handsets that
-  texted the sandbox join code. Now detected and warned about explicitly.
+- Outbound notifications fail silently by design — `twilio_client.send()` returns
+  `not_configured` and only logs — so a deploy missing Twilio config looked healthy while
+  no owner alert had left the building. Now detected at boot and on a monitor endpoint.
+- `TWILIO_WHATSAPP_FROM` defaults to Twilio's shared public sandbox number, so a deploy
+  that forgets to set it gets "sent" back for every message while reaching only handsets
+  that texted the sandbox join code. Now warned about explicitly.
 
 ### Changed
 - **Documentation corrected against the code** (operations-and-reliability §1,
-  control-evidence-matrix §7/§9, architecture §6): uptime monitoring is recorded as
-  **not wired** rather than "continuous per SLA §04" — the endpoints exist, but nothing
-  polls or pages. This was the E1 over-claim in `docs/sales/legal-reconciliation.md`.
+  control-evidence-matrix §7, architecture, faq, trust-center-technical): uptime
+  monitoring is recorded as **not wired** rather than "continuous per SLA §04" — the
+  endpoints exist, but nothing polls or pages. This was the E1 over-claim in
+  `docs/sales/legal-reconciliation.md`.
+
+### Not included — deliberately
+An in-app notification feed was built on this branch and then **removed before merge**:
+`feat/staff-rbac-stock-custody-twilio` independently implements the same feature, keyed
+per-user with web push, escalation and a durable outbox, with fifteen further commits
+depending on it. Keeping both would have produced two `notifications` tables, two
+`/notifications` routers, two `NotificationBell` components, and — the blocking problem —
+two Alembic revisions numbered 025 off 024, giving multiple heads and an
+`alembic upgrade head` failure at container start. That branch's implementation wins; the
+muting/audience work here should be re-applied on top of it (D18).
 
 ### Notes
-- Full backend test suite: **394 passing**. Bandit clean at `-ll`; frontend `tsc --noEmit`
+- Full backend test suite: **377 passing**. Bandit clean at `-ll`; frontend `tsc --noEmit`
   clean; `next build` green (18 routes).
 
 ## Documentation & hardening (2026-07-11)

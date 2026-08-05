@@ -297,3 +297,68 @@ def test_staff_are_not_offered_switches_they_can_never_receive(client, db_sessio
 def test_preferences_require_auth(client):
     assert client.get("/api/v1/notifications/preferences").status_code == 401
     assert client.put("/api/v1/notifications/preferences", json={"muted": []}).status_code == 401
+
+
+def test_concurrent_preference_writes_do_not_500(db_session, client, admin, monkeypatch):
+    """
+    The settings UI fires one PUT per toggle click, so an impatient double-click
+    sends two overlapping desired-states. The unique constraint catches the
+    duplicate insert; that must surface as the stored state, not a 500.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    user = _user(db_session)
+    notifications.set_mutes(db_session, user.id, ["order_created"])
+
+    calls = {"n": 0}
+    real_commit = db_session.commit
+
+    def flaky_commit():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise IntegrityError("duplicate", None, Exception())
+        return real_commit()
+
+    monkeypatch.setattr(db_session, "commit", flaky_commit)
+
+    result = notifications.set_mutes(db_session, user.id, ["order_created", "order_paid"])
+
+    assert result == {"order_created"}          # the state that is actually stored
+
+
+def test_staff_visible_categories_covers_everything_emitted_to_everyone():
+    """
+    `_staff_categories()` only drives which switches the settings screen offers,
+    but if it drifts behind a new AUDIENCE_ALL category, staff silently lose the
+    ability to mute something they do receive. Derived from the emit sites so it
+    cannot rot unnoticed.
+    """
+    import ast
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    emitted_to_all = set()
+
+    for path in root.rglob("*.py"):
+        if ".venv" in path.parts or path.name.startswith("test_"):
+            continue
+        for node in ast.walk(ast.parse(path.read_text())):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+            if name not in {"record", "deliver"}:
+                continue
+            kwargs = {k.arg: k.value for k in node.keywords}
+            audience = kwargs.get("audience")
+            category = kwargs.get("category")
+            if not (isinstance(category, ast.Constant) and audience is not None):
+                continue
+            # audience=notifications.AUDIENCE_ALL / AUDIENCE_ALL
+            attr = getattr(audience, "attr", getattr(audience, "id", ""))
+            if attr == "AUDIENCE_ALL":
+                emitted_to_all.add(category.value)
+
+    assert emitted_to_all, "found no AUDIENCE_ALL writes — the scan is broken"
+    missing = emitted_to_all - notifications._staff_categories()
+    assert not missing, f"emitted to everyone but staff cannot mute it: {sorted(missing)}"

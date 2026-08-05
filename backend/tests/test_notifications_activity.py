@@ -257,3 +257,68 @@ def test_a_broken_notification_never_fails_a_booking(client, db_session, admin, 
 
     assert resp.status_code == 200
     assert db_session.query(models.Reservation).count() == 1
+
+
+# ── the paths nobody is watching ─────────────────────────────────────────────
+
+def test_a_customer_app_order_is_recorded(client, db_session, admin):
+    """
+    The order source with no one standing at the till when it lands, and the one
+    that produced nothing at all until this was noticed in review.
+    """
+    item_id = _menu_item(client, admin)
+    restaurant = _restaurant(db_session)
+
+    resp = client.post(f"/orders/public?restaurant_id={restaurant.id}", json={
+        "items": [{"menu_item_id": item_id, "quantity": 1}],
+        "customer_name": "Njeri", "customer_phone": "+254700000009",
+        "consent": True,
+    })
+    assert resp.status_code == 200, resp.text
+
+    created = _feed(db_session, "order_created")
+    assert len(created) == 1
+    assert "customer app" in created[0].body
+    assert created[0].audience == notifications.AUDIENCE_ALL
+
+
+def test_an_mpesa_settlement_is_recorded(db_session, admin, client):
+    """
+    M-Pesa is the primary payment method in this market and it settles through
+    the webhook, not the POS. Recording only on the POS path — as an earlier
+    version did — left every M-Pesa payment invisible in the feed.
+    """
+    from ai.orchestrator.executive import on_order_paid
+
+    restaurant = _restaurant(db_session)
+
+    on_order_paid({
+        "restaurant_id": restaurant.id, "order_id": 41, "amount_cents": 250000,
+        "customer_phone": "", "mpesa_reference": "QGR7XYZ12",
+    })
+
+    paid = _feed(db_session, "order_paid")
+    assert len(paid) == 1
+    assert "2,500" in paid[0].body
+    assert "QGR7XYZ12" in paid[0].body
+
+
+def test_pos_payment_records_exactly_one_notification(client, db_session, admin):
+    """
+    Both the POS endpoint and the webhook emit ORDER_PAID into the same handler.
+    Recording in the endpoint *and* the handler would double up here.
+    """
+    item_id = _menu_item(client, admin)
+    order_id = _place_order(client, admin, item_id)
+
+    client.patch(f"/api/v1/orders/{order_id}/payment", headers=admin,
+                 json={"payment_method": "cash", "is_paid": True})
+
+    # emit_async runs the handler on a thread; give it a moment to land.
+    import time
+    for _ in range(50):
+        if _feed(db_session, "order_paid"):
+            break
+        time.sleep(0.05)
+
+    assert len(_feed(db_session, "order_paid")) == 1

@@ -30,6 +30,8 @@ that is purely a dashboard affordance).
 import functools
 import logging
 
+from sqlalchemy.exc import IntegrityError
+
 import models
 from time_utils import utcnow
 
@@ -251,7 +253,17 @@ def set_mutes(db, user_id: int, categories) -> set[str]:
     have = {row.category for row in existing}
     for category in wanted - have:
         db.add(models.NotificationMute(user_id=user_id, category=category, created_at=utcnow()))
-    db.commit()
+
+    try:
+        db.commit()
+    except IntegrityError:
+        # Two PUTs raced — easy to provoke, since the settings UI fires one per
+        # toggle click and an impatient double-click sends two overlapping
+        # desired-states. The unique constraint caught the duplicate insert; the
+        # other request already wrote a superset of what we wanted, so returning
+        # the stored state is both correct and what the client re-renders from.
+        db.rollback()
+        return muted_categories(db, user_id)
     return wanted
 
 

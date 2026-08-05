@@ -182,10 +182,10 @@ async def update_order_payment(
     db.refresh(order)
 
     if order.is_paid and not was_paid:
-        notifications.order_paid(
-            db, restaurant.id, order,
-            order.payment_method.value if order.payment_method else "unknown",
-        )
+        # The notification is recorded by the ORDER_PAID handler
+        # (executive.on_order_paid), not here — that handler is the single
+        # subscriber and fires for the M-Pesa webhook too, so recording in both
+        # places would double up on this path and still miss the other.
         # Mirrors the M-Pesa webhook's ORDER_PAID emit (routers/webhooks.py) so
         # cash/card orders marked paid at the POS get the same itemized customer
         # receipt. No mpesa_reference for these — compose_receipt omits that line.
@@ -280,6 +280,9 @@ async def create_public_order(
     db.add(db_order)
     db.commit()
     db.refresh(db_order)
+
+    notifications.order_created(db, restaurant.id, db_order, len(order_items),
+                                source="customer app")
 
     if payment_method == models.PaymentMethod.MPESA:
         _trigger_mpesa_stk_push(db, db_order)

@@ -276,6 +276,15 @@ def on_order_paid(payload: dict) -> None:
                                       restaurant_id=restaurant_id, message_type="receipt",
                                       channel="whatsapp", fallback_sms=True)
 
+        notifications.record(
+            db, restaurant_id,
+            title=f"Payment received — order #{order_id}",
+            body=f"KES {amount // 100:,} via {method}"
+                 + (f" · ref {mpesa_ref}" if mpesa_ref else ""),
+            category="order_paid", severity=notifications.SEVERITY_INFO,
+            link="/dashboard/orders", audience=notifications.AUDIENCE_ALL,
+        )
+
         write_audit_log(
             db, restaurant_id, "payment_received", "executive_orchestrator",
             entity_type = "order",

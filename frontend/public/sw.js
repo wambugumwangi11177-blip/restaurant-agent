@@ -1,5 +1,5 @@
-// Chakula Service Worker — offline caching + PWA install support
-const CACHE_NAME = 'chakula-v1';
+// Leviii AI Service Worker — offline caching + PWA install support
+const CACHE_NAME = 'leviii-v1';
 const PRECACHE_URLS = [
     '/dashboard',
     '/dashboard/pos',

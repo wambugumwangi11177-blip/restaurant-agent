@@ -116,7 +116,7 @@ export default function CustomerOrderPage() {
             <header className="sticky top-0 z-40 bg-[#0a0a0a]/90 backdrop-blur-xl border-b border-[#262626]">
                 <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
                     <div>
-                        <h1 className="text-lg font-bold text-[#d4a853]">Chakula</h1>
+                        <h1 className="text-lg font-bold text-[#d4a853]">Leviii AI</h1>
                         <p className="text-[10px] text-[#525252]">Order fresh food, delivered or pickup</p>
                     </div>
                     {step === "menu" && itemCount > 0 && (

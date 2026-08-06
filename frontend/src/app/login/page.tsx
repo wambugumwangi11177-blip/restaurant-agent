@@ -61,7 +61,7 @@ export default function LoginPage() {
                 {/* Brand */}
                 <div className="text-center mb-10">
                     <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">
-                        Chakula
+                        Leviii AI
                     </h1>
                     <p className="text-sm text-[#737373] mt-1">Restaurant Manager</p>
                 </div>

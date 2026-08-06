@@ -39,10 +39,28 @@ from database import get_db
 from auth import require_role
 import models
 from routers.deps import get_or_create_restaurant
+from routers.billing import require_active_subscription
 
 logger = logging.getLogger("ai.router")
 
-router = APIRouter(prefix="/ai", tags=["ai"])
+# Subscription gate applied at the router, so every current and future /ai route
+# inherits it and none can be added later that quietly bypasses billing.
+#
+# Where the line sits, and why here: this router is *derived intelligence* —
+# pricing recommendations, profit analysis, simulation, strategy. That is the
+# product a restaurant subscribes to. routers/analytics.py (the main dashboard,
+# revenue history, the restaurant's own order data) is deliberately left
+# ungated, as are POS, KDS, orders, menu, payments and auth.
+#
+# The principle: a customer's own operational data stays visible to them
+# whatever their billing state, and a restaurant that hasn't paid can still take
+# orders and feed people tonight. Non-payment costs you our analysis, never your
+# ability to trade or to see your own numbers.
+router = APIRouter(
+    prefix="/ai",
+    tags=["ai"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 def _safe_run(agent_name: str, restaurant_id: int, fn, *args, **kwargs):

@@ -100,7 +100,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
                 {/* Brand */}
                 <div className="px-5 py-5 border-b border-[#1a1a1a]">
-                    <h1 className="text-lg font-bold text-[#e5e5e5] tracking-tight">Chakula</h1>
+                    <h1 className="text-lg font-bold text-[#e5e5e5] tracking-tight">Leviii AI</h1>
                     <p className="text-xs text-[#d4a853] mt-0.5 truncate font-medium">{restaurantName}</p>
                     <p className="text-xs text-[#525252] truncate">{user.email}</p>
                 </div>

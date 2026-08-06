@@ -35,6 +35,36 @@ https://github.com/wambugumwangi11177-blip/restaurant-agent/pull/new/feat/phase1
   `-ll`, frontend `tsc --noEmit` clean, `next build` green (18 routes),
   all internal doc links resolve.
 
+## Capture-layer gap — closed 2026-08-06
+
+An audit of *what the running application actually writes* found that several of
+the most built-out analytics modules were reading tables no production code path
+ever populated. The only writer was `populate_production.py`, the demo seeder —
+so on a real restaurant those modules always took their empty branch. The
+analytics weren't broken; they were starved. Suite went 362 → **412 green**.
+
+| Table | Was written by | Now written by | Unblocks |
+|---|---|---|---|
+| `PrepTime` | seeder only | KDS status transitions (`routers/orders.py`) | `ai/kds_intelligence.py` — station p95s, bottleneck severity, queue depth, delay risk (~12 analytics) |
+| `MenuIngredient` | **nothing — no API existed** | `PUT /menu/{id}/recipe` | theoretical usage, `ai/graph` cascade traversal, derived `cost_price` |
+| `InventoryItem.quantity` on sale | manual `/receive` + `/adjust` only | `stock_ledger.consume_for_order` | food-cost %, depletion prediction, reorder intelligence |
+| `StaffMember` / `LaborShift` | **nothing, not even the seeder** | `routers/staff.py` + clock-in/out | `ai/labor/intelligence.py`; `ai/roi/savings.py` stops falling back to its `DEFAULT_HOURLY_RATE_CENTS` constant |
+
+Second-order win: with recipes in place `MenuItem.cost_price` becomes **derived**
+(Σ quantity × ingredient cost) instead of hand-typed, so a supplier price change
+updates every affected dish's margin without anyone re-entering anything.
+
+Also closed the same day:
+- **Billing is enforceable.** Was `provider="manual"` with a plan string an admin
+  set on themselves and nothing reading it. Now a real state machine (trial →
+  paid period → grace → past_due → canceled), effective status computed on read
+  rather than by a job, and `require_active_subscription` gating `/ai/*` with 402.
+  Payment *processor* stays pluggable — `extend_period()` is the single seam.
+  **POS, KDS, orders, menu, payments and the dashboard are deliberately never
+  gated:** non-payment costs the analysis, never the ability to trade.
+- **Branding unified** to Leviii AI (app previously said "Chakula" in layout,
+  login, order page, `manifest.json`, `sw.js` while every doc said Leviii AI).
+
 ## Not done — needs YOU (ops access) or deliberately deferred
 **These four genuinely require your accounts/credentials — no code can do them:**
 - [ ] Enable Railway Postgres **backups** + run one **restore drill** (steps in `backend/DISASTER_RECOVERY.md`)

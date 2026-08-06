@@ -191,3 +191,109 @@ class ReservationOut(StrictModel):
 
 class ReservationStatusUpdate(StrictModel):
     status: str  # confirmed, cancelled, completed, no_show
+
+# ──────────────────────────────────────────────
+# RECIPES (MenuItem → InventoryItem links)
+# ──────────────────────────────────────────────
+# The write path for MenuIngredient, which had no API at all until 2026-08-06:
+# the table was in the schema and read by the knowledge graph, but nothing could
+# create a row, so no restaurant could ever describe what a dish is made of.
+
+class RecipeLineIn(StrictModel):
+    inventory_item_id: int
+    quantity_per_serving: float
+    # False marks a garnish — present in the recipe and costed, but its absence
+    # doesn't stop the dish being made. The orchestrator's cascade analysis
+    # already relies on this distinction.
+    is_critical: bool = True
+
+
+class RecipeReplace(StrictModel):
+    """
+    Whole-recipe replace rather than per-line CRUD. A recipe is edited as one
+    thing ("here is what goes into this dish"), and replace-in-full removes the
+    partial-update states — a half-saved recipe would silently under-deduct
+    stock on every subsequent sale.
+    """
+    ingredients: List[RecipeLineIn]
+    # Recompute MenuItem.cost_price from the recipe on save. On by default: the
+    # entire point of recipes is that cost stops being a number someone typed
+    # once and drifted from reality.
+    sync_cost_price: bool = True
+
+
+class RecipeLineOut(StrictModel):
+    id: int
+    inventory_item_id: int
+    item_name: str
+    unit: str
+    quantity_per_serving: float
+    is_critical: bool
+    cost_per_unit: float      # whole KES — InventoryItem's native unit
+    line_cost_cents: int      # quantity × cost_per_unit, converted to cents
+
+
+class RecipeOut(StrictModel):
+    menu_item_id: int
+    menu_item_name: str
+    ingredients: List[RecipeLineOut]
+    # None when the dish has no recipe — meaning "unknown", not "free".
+    derived_cost_price: Optional[int] = None   # cents
+    stored_cost_price: int                     # cents, what pricing/profit read
+    cost_price_synced: bool                    # do the two agree?
+
+# ──────────────────────────────────────────────
+# STAFF & SHIFTS
+# ──────────────────────────────────────────────
+# The write path for StaffMember / LaborShift. Both tables shipped with the
+# labor-intelligence work and had NO writer anywhere in the codebase — not even
+# the demo seeder — so ai/labor/intelligence.py returned _empty_response() for
+# every restaurant, and ai/roi/savings.py always fell back to its
+# DEFAULT_HOURLY_RATE_CENTS constant instead of using real wages.
+
+class StaffMemberCreate(StrictModel):
+    name: str
+    role_title: str = ""
+    hourly_rate: int = 0          # cents — matches StaffMember.hourly_rate
+    user_id: Optional[int] = None  # link to a login, for staff who have one
+
+
+class StaffMemberUpdate(StrictModel):
+    name: Optional[str] = None
+    role_title: Optional[str] = None
+    hourly_rate: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+class StaffMemberOut(StrictModel):
+    id: int
+    name: str
+    role_title: str
+    hourly_rate: int
+    is_active: bool
+    user_id: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+
+class ShiftCreate(StrictModel):
+    staff_member_id: int
+    shift_date: date
+    scheduled_start: Optional[datetime] = None
+    scheduled_end: Optional[datetime] = None
+    notes: str = ""
+
+
+class ShiftOut(StrictModel):
+    id: int
+    staff_member_id: int
+    staff_name: str
+    shift_date: date
+    scheduled_start: Optional[datetime] = None
+    scheduled_end: Optional[datetime] = None
+    actual_start: Optional[datetime] = None
+    actual_end: Optional[datetime] = None
+    scheduled_hours: Optional[float] = None
+    actual_hours: Optional[float] = None
+    labor_cost: Optional[int] = None    # cents — hours × the staff hourly_rate
+    notes: str = ""

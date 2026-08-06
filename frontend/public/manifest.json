@@ -1,6 +1,6 @@
 {
-    "name": "Chakula — Restaurant Manager",
-    "short_name": "Chakula",
+    "name": "Leviii AI — Restaurant Manager",
+    "short_name": "Leviii AI",
     "description": "Restaurant management for ordering, POS, kitchen display, inventory & analytics",
     "start_url": "/dashboard",
     "display": "standalone",

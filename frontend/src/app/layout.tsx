@@ -9,13 +9,13 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "Chakula — Restaurant Manager",
+  title: "Leviii AI — Restaurant Manager",
   description: "Simple restaurant management for Kenyan restaurants",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Chakula",
+    title: "Leviii AI",
   },
 };
 

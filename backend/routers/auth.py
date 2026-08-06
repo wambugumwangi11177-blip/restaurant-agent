@@ -310,17 +310,23 @@ def _require_pin_format(pin: str) -> None:
 
 
 @router.post("/pin/set")
+@limiter.limit("10/hour")
 async def pin_set(
+    request: Request,
     body: PinSet,
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
     """Self-service: the current user sets their own PIN (+ display name, if
-    not already set). Rate-limited like any other credential-setting action."""
+    not already set). Rate-limited like any other credential-setting action —
+    this endpoint clears the failed-attempt counter, so without a limit it
+    would be a way to reset the /pin/verify lockout at will."""
     _require_pin_format(body.pin)
     user = db.query(models.User).filter(models.User.id == current_user.id).first()
     user.pin_hash = auth.get_password_hash(body.pin)
-    if body.display_name:
+    # Only fill in a display name that isn't set — re-setting a PIN shouldn't
+    # silently rename someone who already has one.
+    if body.display_name and not user.display_name:
         user.display_name = body.display_name.strip()[:100]
     user.pin_failed_attempts = 0
     user.pin_locked_until = None
@@ -349,7 +355,9 @@ async def pin_roster(
 
 
 @router.post("/pin/verify")
+@limiter.limit("30/minute")
 async def pin_verify(
+    request: Request,
     body: PinVerify,
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
@@ -359,20 +367,35 @@ async def pin_verify(
     stolen PIN alone is useless without an authenticated device). Success
     mints no new token; it just confirms identity for order attribution.
     Tenant-scoped: a PIN can only switch to someone on the same device's tenant.
+
+    Two layers of brute-force defence: per-account lockout (below) stops one
+    staff member's PIN being guessed, and the per-IP limit stops a device
+    sweeping short PINs across the whole roster. The limit is generous because
+    a busy shared tablet legitimately verifies many times per shift.
     """
     target = db.query(models.User).filter(
         models.User.id == body.user_id,
         models.User.tenant_id == current_user.tenant_id,
+        # Match the roster query above: a deactivated user is hidden from the
+        # picker, so their PIN must not verify when posted directly either.
+        models.User.is_active.is_(True),
     ).first()
     if not target or not target.pin_hash:
         raise HTTPException(status_code=404, detail="No such staff PIN.")
 
-    if target.pin_locked_until and target.pin_locked_until > utcnow():
-        remaining = int((target.pin_locked_until - utcnow()).total_seconds() / 60) + 1
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"PIN locked from repeated failed attempts. Try again in {remaining} minute(s).",
-        )
+    if target.pin_locked_until:
+        if target.pin_locked_until > utcnow():
+            remaining = int((target.pin_locked_until - utcnow()).total_seconds() / 60) + 1
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"PIN locked from repeated failed attempts. Try again in {remaining} minute(s).",
+            )
+        # Window expired — clear the counter so the user gets a full fresh set
+        # of attempts. Without this the counter stays at MAX, and one wrong
+        # digit re-trips the lockout immediately, making it effectively
+        # permanent for anyone who can't nail it first try after every wait.
+        target.pin_failed_attempts = 0
+        target.pin_locked_until = None
 
     if not auth.verify_password(body.pin, target.pin_hash):
         target.pin_failed_attempts = (target.pin_failed_attempts or 0) + 1
@@ -410,6 +433,12 @@ async def deactivate_user(
 
     target.is_active = False
     target.token_version = (target.token_version or 0) + 1
+    # Clear PIN state too, so revocation covers every credential this user
+    # holds and re-activation is a deliberate opt-in rather than silently
+    # restoring a PIN that was left lying around on a revoked account.
+    target.pin_hash = None
+    target.pin_failed_attempts = 0
+    target.pin_locked_until = None
     db.commit()
     return {"status": "deactivated", "user_id": target.id}
 
@@ -421,7 +450,9 @@ async def activate_user(
     db: Session = Depends(get_db),
 ):
     """Reverse a deactivation — the natural inverse of the endpoint above,
-    needed so a mis-click isn't a one-way door."""
+    needed so a mis-click isn't a one-way door. Note that deactivation clears
+    the PIN, so a re-activated user must set a new one via /pin/set before
+    they can appear in the quick-switch roster again."""
     target = db.query(models.User).filter(models.User.id == user_id).first()
     if not target or target.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=404, detail="User not found")

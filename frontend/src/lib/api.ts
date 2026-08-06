@@ -36,8 +36,16 @@ api.interceptors.response.use(
     const config = error.config;
     if (error.response?.status === 429 && config && !config.__retriedAfter429) {
       config.__retriedAfter429 = true;
+      // Retry-After is either delta-seconds or an HTTP-date (RFC 7231 §7.1.3).
+      // Number() on the date form yields NaN, which setTimeout coerces to 0 —
+      // so we'd retry instantly against a server that just asked us to wait.
       const retryAfterHeader = error.response.headers?.["retry-after"];
-      const retryAfterMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : 1000;
+      const retryAfterSeconds = Number(retryAfterHeader);
+      const retryAfterMs = !retryAfterHeader
+        ? 1000
+        : Number.isFinite(retryAfterSeconds)
+          ? retryAfterSeconds * 1000
+          : Math.max(0, Date.parse(retryAfterHeader) - Date.now()) || 1000;
       await new Promise((resolve) => setTimeout(resolve, Math.min(retryAfterMs, 10_000)));
       return api(config);
     }

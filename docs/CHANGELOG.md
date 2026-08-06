@@ -3,6 +3,110 @@
 Notable changes to the Leviii AI platform and its documentation. Newest first. Derived from
 git history on `feat/phase1-production-hardening`.
 
+## 2026-08-06 — Second review pass: PIN attribution and retry-policy consistency
+
+A re-review of the branch after the fixes below found five further defects, one
+of which was only reachable *because* the path-prefix fix made the PIN feature
+run at all.
+
+### Fixed
+- **PIN attribution was silently dropping on every order** (D16). `pin_verify`
+  returns `{user_id, ...}` while `/pin/roster` returns `{id, ...}`, and
+  `PinSwitcher` passed the response body straight to `onSwitch` — so
+  `PinOperator.id` was `undefined` and every order posted
+  `attributed_user_id: null`. The header still read "Serving as: Amina" because
+  `display_name` is common to both shapes, so the feature looked like it worked.
+  Now normalized on read. This was invisible until the path prefix was fixed:
+  before that the request 404'd and never returned a body at all.
+- **A transient 5xx on first submit discarded the order** instead of queueing
+  it, contradicting the replay path's policy fixed in the entry below. Worse,
+  the error toast pushed the waiter to resubmit by hand, which minted a *fresh*
+  idempotency key — reintroducing the duplicate-charge bug on exactly the
+  "committed but response lost" case the key exists for. The retry policy now
+  lives in one exported predicate (`isTerminalClientError`) that both the
+  first-attempt and replay paths call, so they cannot drift apart again.
+- **Dropped queue entries were silent.** `flushQueue` discards a 4xx entry
+  permanently, but only exposed an `onFlushed` (success) callback, so the POS
+  never learned and the queue badge went stale. Added `onDropped`; the POS now
+  shows a persistent "please re-enter it" error, since a discarded order exists
+  nowhere but in the waiter's memory.
+- **`Retry-After` HTTP-date parsed as `NaN`** in the axios 429 interceptor.
+  RFC 7231 §7.1.3 permits both delta-seconds and an HTTP-date; `Number(<date>)`
+  is `NaN`, and `setTimeout(fn, NaN)` runs immediately — retrying instantly
+  against a server that just asked us to wait. Not reachable through slowapi
+  today, but a landmine the moment a CDN or gateway sits in front.
+- **PIN modal had no Escape-to-close**, despite declaring `role="dialog"`. The
+  sibling `ConfirmSend` modal added the handler under D20; this one now matches.
+
+- **The PIN-verified operator did not survive a page reload**, so a
+  service-worker update or mobile Safari evicting a backgrounded tab silently
+  reverted attribution to null mid-shift — with no signal, since the backend
+  accepts null attribution by design. Now persisted in `sessionStorage`
+  (`frontend/src/lib/posOperator.ts`): survives a reload, does not outlive the
+  tab, so a tablet left on the counter overnight isn't still ringing up orders
+  as whoever closed. Cleared on logout so the next login can't inherit the
+  previous session's operator. Rehydrated in an effect rather than a lazy
+  `useState` initializer, which would read browser storage during render and
+  produce a hydration mismatch.
+
+## 2026-08-05 — Review follow-up: POS offline queue and PIN switching hardened
+
+Seven defects found by a multi-agent review of `feat/pos-offline-pin-hardening`,
+all in code this branch introduced. Each is covered by a regression test that
+was verified to fail against the pre-fix code.
+
+### Fixed
+- **PIN quick-switch was entirely non-functional** (D16). `PinSwitcher` called
+  `/auth/pin/roster` and `/auth/pin/verify`, but `api.ts`'s baseURL is the bare
+  host and the auth router mounts only at `/api/v1/auth` (included outside the
+  dual-mount loop in `main.py`). Both 404'd; the `.catch` swallowed it into
+  "No staff have set up a PIN yet," so the feature looked merely unconfigured.
+  Backend tests were green throughout — they used the correct path. Now
+  prefixed, and a failed roster fetch reports a load error instead of
+  masquerading as an empty roster. Covered by `PinSwitcher.test.tsx`.
+- **The first order POST carried no idempotency key** (D15), which defeated the
+  guarantee the key exists for. When the server committed an order but the
+  response was lost in transit — cellular handoff, TLS reset, LB timeout, the
+  exact failure the offline queue was built for — the replay was stamped with a
+  *fresh* UUID, so the backend saw a new order and the customer was charged
+  twice. The key is now minted before the first attempt and preserved on
+  enqueue.
+- **The offline queue silently dropped orders two ways** (D15). It treated any
+  HTTP response as non-retryable, so a 502 from a backend restart permanently
+  deleted a queued order; 5xx and 429 are now retained and retried, and only
+  true 4xx are dropped. And it wrote back a pre-`await` snapshot of the queue,
+  so an order enqueued mid-flush (a waiter submitting during a replay, or a
+  second POS tab sharing localStorage) was clobbered; entries are now removed
+  by id against freshly-read storage.
+- **Concurrent idempotent replays returned 500 instead of the existing order**
+  (D15). `create_order`'s key lookup is a check-then-act; two simultaneous
+  replays both missed it and the loser hit
+  `uq_orders_restaurant_idempotency_key` uncaught. Compounding the offline
+  queue's drop-on-5xx above, that 500 then destroyed the order. Now caught,
+  rolled back, and resolved to the winning row.
+- **PIN lockout was effectively permanent.** After the 15-minute window expired
+  the failed-attempt counter was never reset, so a single wrong digit re-tripped
+  the lockout — a staff member who fumbled their PIN once per window was locked
+  out for the rest of the shift unless they entered it correctly first try. The
+  counter now resets when the window lapses.
+
+### Security
+- **Deactivation now revokes every credential, not just login** (D18).
+  `/auth/pin/verify` and `create_order`'s attribution lookup filtered on
+  id + tenant only, while `/pin/roster` one function above correctly filtered
+  `is_active` — so a departed employee's PIN still verified and they could still
+  be stamped as the operator on new orders. Both queries now enforce
+  `is_active`, and `deactivate_user` clears `pin_hash`/`pin_failed_attempts`/
+  `pin_locked_until` so re-activation is a deliberate opt-in. This is the same
+  accountability trail migration 029 was written to protect.
+- **`/pin/set` and `/pin/verify` are now actually rate-limited.** `pin_set`'s
+  docstring claimed "rate-limited like any other credential-setting action" but
+  carried no limiter — and since it resets the failed-attempt counter, it was a
+  way to clear the `/pin/verify` lockout at will. Added `10/hour` on set and
+  `30/minute` on verify (generous: a shared tablet legitimately verifies many
+  times per shift). `pin_set` also overwrote an existing display name on every
+  call despite promising "if not already set"; now guarded.
+
 ## 2026-08-03 — Audit follow-up: CI gate unblocked, stock attribution
 
 ### Security

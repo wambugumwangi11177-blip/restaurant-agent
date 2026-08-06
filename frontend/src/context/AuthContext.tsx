@@ -11,6 +11,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import api from "@/lib/api";
+import { clearOperator } from "@/lib/posOperator";
 
 interface User {
   id: number;
@@ -82,6 +83,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem("access_token");
+    // The next person to log in on this tablet must not inherit the previous
+    // session's PIN-verified operator (tech-debt D16).
+    clearOperator();
     setToken(null);
     setUser(null);
   };

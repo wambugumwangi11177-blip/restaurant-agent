@@ -9,6 +9,7 @@ that the same key across two different tenants creates two distinct orders
 
 import auth
 import models
+from routers import orders as orders_router
 
 
 def _make_tenant_with_admin_and_menu_item(db_session, suffix: str):
@@ -75,6 +76,48 @@ def test_missing_idempotency_key_behaves_as_before(client, db_session):
 
     count = db_session.query(models.Order).filter(models.Order.restaurant_id == restaurant.id).count()
     assert count == 2
+
+
+def test_losing_the_insert_race_returns_the_winner_not_a_500(client, db_session, monkeypatch):
+    """
+    The idempotency check is a check-then-act: two concurrent replays of the
+    same key (two POS tabs sharing one tablet's localStorage) can both miss the
+    lookup and both insert. The unique constraint settles it — but the loser
+    must return the winning order, not surface a 500 that the offline queue
+    would then treat as fatal and discard the order over.
+
+    Reproduced deterministically by stubbing only the FIRST lookup to miss,
+    which is exactly what the losing request observes in the real race.
+    """
+    restaurant, item, token = _make_tenant_with_admin_and_menu_item(db_session, "race")
+    payload = {
+        "items": [{"menu_item_id": item.id, "quantity": 1}],
+        "payment_method": "cash",
+        "idempotency_key": "raced-key",
+    }
+
+    winner = client.post("/orders/", json=payload, headers=_auth_headers(token))
+    assert winner.status_code == 200
+    winner_id = winner.json()["id"]
+
+    real_lookup = orders_router._find_by_idempotency_key
+    calls = {"n": 0}
+
+    def _miss_once(db, key, restaurant_id):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return None  # the race window: winner hasn't committed yet
+        return real_lookup(db, key, restaurant_id)
+
+    monkeypatch.setattr(orders_router, "_find_by_idempotency_key", _miss_once)
+
+    loser = client.post("/orders/", json=payload, headers=_auth_headers(token))
+    assert loser.status_code == 200, f"expected the existing order, got {loser.status_code}"
+    assert loser.json()["id"] == winner_id
+    assert calls["n"] == 2, "the post-IntegrityError re-lookup should have run"
+
+    count = db_session.query(models.Order).filter(models.Order.restaurant_id == restaurant.id).count()
+    assert count == 1
 
 
 def test_same_key_across_tenants_creates_distinct_orders(client, db_session):

@@ -12,8 +12,16 @@ import {
     type MenuItem,
     type CartItem,
 } from "@/lib/cart";
-import { enqueueOrder, watchOfflineQueue, getQueueLength } from "@/lib/offlineQueue";
+import {
+    enqueueOrder,
+    watchOfflineQueue,
+    getQueueLength,
+    newClientId,
+    errorStatus,
+    isTerminalClientError,
+} from "@/lib/offlineQueue";
 import { PinSwitcher, type PinOperator } from "@/components/pos/PinSwitcher";
+import { readOperator, writeOperator } from "@/lib/posOperator";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Plus,
@@ -61,16 +69,38 @@ export default function POSPage() {
         }).catch(() => setLoading(false));
     }, []);
 
+    // Restore the PIN-verified operator after a reload (tech-debt D16).
+    // Rehydrated in an effect rather than a lazy useState initializer so the
+    // server-rendered markup and the first client render agree — reading
+    // sessionStorage during render would be a hydration mismatch.
+    useEffect(() => {
+        const stored = readOperator();
+        if (stored) setActiveOperator(stored);
+    }, []);
+
+    const switchOperator = useCallback((operator: PinOperator) => {
+        setActiveOperator(operator);
+        writeOperator(operator);
+    }, []);
+
     // Offline order queue (tech-debt D15): replays anything queued from a
     // failed submission — this session's or a prior one still sitting in
     // localStorage — whenever the browser comes back online, on a 30s
     // interval, and once on mount.
     useEffect(() => {
         setQueueLength(getQueueLength());
-        const stop = watchOfflineQueue(() => {
-            setQueueLength(getQueueLength());
-            setQueuedMessage("A queued order synced to the kitchen.");
-            setTimeout(() => setQueuedMessage(null), 3000);
+        const stop = watchOfflineQueue({
+            onFlushed: () => {
+                setQueueLength(getQueueLength());
+                setQueuedMessage("A queued order synced to the kitchen.");
+                setTimeout(() => setQueuedMessage(null), 3000);
+            },
+            // A dropped order is gone from storage and only the waiter can
+            // re-enter it, so this must not be silent. No auto-dismiss.
+            onDropped: () => {
+                setQueueLength(getQueueLength());
+                setErrorMessage("A queued order was rejected and could not be sent — please re-enter it.");
+            },
         });
         return stop;
     }, []);
@@ -99,6 +129,12 @@ export default function POSPage() {
         if (cart.length === 0) return;
         setSubmitting(true);
         setErrorMessage(null);
+        // Stamp the idempotency key on the FIRST attempt, not just on the
+        // queued replay. The failure this protects against is the server
+        // committing the order and the response being lost in transit (cellular
+        // handoff, TLS reset, LB timeout) — axios reports that as a network
+        // error, so we queue and retry. If the retry carried a fresh key the
+        // backend would see a brand-new order and charge the customer twice.
         const orderPayload = {
             items: cartToOrderItems(cart),
             order_type: orderType,
@@ -109,6 +145,7 @@ export default function POSPage() {
             table_number: tableNumber ? parseInt(tableNumber) : null,
             notes,
             attributed_user_id: activeOperator?.id ?? null,
+            idempotency_key: newClientId(),
         };
 
         const resetForm = () => {
@@ -127,23 +164,32 @@ export default function POSPage() {
             resetForm();
             setTimeout(() => setShowSuccess(false), 3000);
         } catch (err) {
-            const hasServerResponse =
-                typeof err === "object" && err !== null && "response" in err && (err as { response?: unknown }).response;
-            if (hasServerResponse) {
-                // A real validation/server error — the waiter needs to see
-                // and fix it, so keep the cart intact and don't queue it
-                // (retrying an invalid request won't help).
+            const status = errorStatus(err);
+            // Same policy as flushQueue, shared so the two can't drift: only a
+            // true 4xx is the client's fault and will fail forever. A 5xx or 429
+            // is transient — queueing it preserves the idempotency key stamped
+            // above, so the automatic replay is deduplicated server-side.
+            // Showing a toast instead would push the waiter to resubmit by hand,
+            // which mints a NEW key and duplicates the order if the server had
+            // already committed it.
+            if (isTerminalClientError(err)) {
+                // A real validation error — the waiter needs to see and fix it,
+                // so keep the cart intact and don't queue it.
                 const detail =
                     (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
                 setErrorMessage(detail || "Couldn't send the order — please try again.");
             } else {
-                // Network failure (offline, DNS, timeout) — the order is
-                // real, so don't lose it. Queue it for automatic replay
-                // instead of the previous console.error-only silent drop.
+                // Network failure (offline, DNS, timeout) or a transient server
+                // error — the order is real, so don't lose it. Queue it for
+                // automatic replay instead of the previous silent drop.
                 console.error("Order failed to send, queueing for retry:", err);
                 enqueueOrder(orderPayload);
                 setQueueLength(getQueueLength());
-                setQueuedMessage("You're offline — order queued, will send automatically.");
+                setQueuedMessage(
+                    status === null
+                        ? "You're offline — order queued, will send automatically."
+                        : "Kitchen server is busy — order queued, will send automatically."
+                );
                 setTimeout(() => setQueuedMessage(null), 4000);
                 resetForm();
             }
@@ -228,7 +274,7 @@ export default function POSPage() {
                             </span>
                         </div>
                     )}
-                    <PinSwitcher currentOperator={activeOperator} onSwitch={setActiveOperator} />
+                    <PinSwitcher currentOperator={activeOperator} onSwitch={switchOperator} />
                 </div>
             </div>
 

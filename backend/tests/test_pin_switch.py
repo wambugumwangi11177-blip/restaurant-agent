@@ -8,8 +8,11 @@ and — the core design claim — verifying an ADMIN's PIN never changes what th
 device's own (possibly STAFF) JWT is actually authorized to do.
 """
 
+from datetime import timedelta
+
 import auth
 import models
+from time_utils import utcnow
 
 
 def _user_with_role(db_session, role, suffix, tenant_id=None):
@@ -69,6 +72,101 @@ def test_wrong_pin_locks_out_after_max_attempts(client, db_session):
                      headers=_auth_headers(admin_token))
     assert r.status_code == 429
     assert "locked" in r.json()["detail"].lower()
+
+
+def test_lockout_expiry_restores_a_full_set_of_attempts(client, db_session):
+    """
+    After the lockout window passes, the failed-attempt counter must reset. If
+    it stays at MAX, one wrong digit re-trips the lockout instantly and the
+    staff member is locked out for the rest of the shift — the counter has to
+    go back to zero, not stay primed.
+    """
+    admin, admin_token = _user_with_role(db_session, models.Role.ADMIN, "lockexp")
+    client.post("/api/v1/auth/pin/set", json={"pin": "1111"}, headers=_auth_headers(admin_token))
+
+    for _ in range(5):
+        client.post("/api/v1/auth/pin/verify", json={"user_id": admin.id, "pin": "0000"},
+                    headers=_auth_headers(admin_token))
+
+    locked = client.post("/api/v1/auth/pin/verify", json={"user_id": admin.id, "pin": "1111"},
+                         headers=_auth_headers(admin_token))
+    assert locked.status_code == 429
+
+    # Fast-forward past the window.
+    db_session.query(models.User).filter(models.User.id == admin.id).update(
+        {"pin_locked_until": utcnow() - timedelta(minutes=1)}
+    )
+    db_session.commit()
+
+    # One wrong attempt must NOT immediately re-lock — the counter is fresh.
+    wrong = client.post("/api/v1/auth/pin/verify", json={"user_id": admin.id, "pin": "0000"},
+                        headers=_auth_headers(admin_token))
+    assert wrong.status_code == 401, "a single wrong PIN after expiry should not re-lock"
+
+    # And the correct PIN still works right after it.
+    ok = client.post("/api/v1/auth/pin/verify", json={"user_id": admin.id, "pin": "1111"},
+                     headers=_auth_headers(admin_token))
+    assert ok.status_code == 200
+
+
+def test_deactivated_user_cannot_verify_a_pin_or_be_attributed(client, db_session):
+    """
+    Deactivation must revoke every credential, not just login. A departed
+    employee whose PIN still verifies — or who can still be stamped as the
+    operator on new orders — leaves a false accountability trail.
+    """
+    admin, admin_token = _user_with_role(db_session, models.Role.ADMIN, "deacadmin")
+    staff, staff_token = _user_with_role(db_session, models.Role.STAFF, "deacstaff", tenant_id=admin.tenant_id)
+    client.post("/api/v1/auth/pin/set", json={"pin": "3131"}, headers=_auth_headers(staff_token))
+
+    # Sanity: works while active.
+    assert client.post("/api/v1/auth/pin/verify", json={"user_id": staff.id, "pin": "3131"},
+                       headers=_auth_headers(admin_token)).status_code == 200
+
+    assert client.post(f"/api/v1/auth/users/{staff.id}/deactivate",
+                       headers=_auth_headers(admin_token)).status_code == 200
+
+    # PIN no longer verifies, even posted directly (the roster already hides them).
+    after = client.post("/api/v1/auth/pin/verify", json={"user_id": staff.id, "pin": "3131"},
+                        headers=_auth_headers(admin_token))
+    assert after.status_code == 404
+
+    # And the PIN hash itself is gone, so re-activation is a deliberate opt-in.
+    db_session.expire_all()
+    refreshed = db_session.query(models.User).filter(models.User.id == staff.id).first()
+    assert refreshed.pin_hash is None
+
+    # Attribution to a deactivated user falls back to none.
+    restaurant = models.Restaurant(tenant_id=admin.tenant_id, name="RD", address="x")
+    db_session.add(restaurant)
+    db_session.commit()
+    item = models.MenuItem(restaurant_id=restaurant.id, name="x", price=100, is_available=True)
+    db_session.add(item)
+    db_session.commit()
+
+    resp = client.post("/orders/", json={
+        "items": [{"menu_item_id": item.id, "quantity": 1}],
+        "payment_method": "cash",
+        "attributed_user_id": staff.id,
+    }, headers=_auth_headers(admin_token))
+    assert resp.status_code == 200
+    assert resp.json()["attributed_user_id"] is None
+
+
+def test_pin_set_does_not_overwrite_an_existing_display_name(client, db_session):
+    """Re-setting a PIN shouldn't silently rename someone who already has a
+    display name — the docstring promises 'if not already set'."""
+    _, token = _user_with_role(db_session, models.Role.ADMIN, "dispname")
+
+    client.post("/api/v1/auth/pin/set", json={"pin": "1212", "display_name": "Amina"},
+                headers=_auth_headers(token))
+    client.post("/api/v1/auth/pin/set", json={"pin": "3434", "display_name": "Bob"},
+                headers=_auth_headers(token))
+
+    r = client.get("/api/v1/auth/pin/roster", headers=_auth_headers(token))
+    names = [s["display_name"] for s in r.json()["staff"]]
+    assert "Amina" in names
+    assert "Bob" not in names
 
 
 def test_roster_is_tenant_scoped_and_excludes_users_without_a_pin(client, db_session):

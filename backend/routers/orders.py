@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from rate_limit import limiter
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 
@@ -11,6 +12,16 @@ from routers.deps import get_or_create_restaurant
 from time_utils import utcnow
 
 router = APIRouter(prefix="/orders", tags=["orders"])
+
+
+def _find_by_idempotency_key(db: Session, key: str, restaurant_id: int):
+    """Tenant-scoped idempotency lookup. Factored out because create_order runs
+    it twice — once as the fast path, once after losing the insert race — and
+    because a test needs to stub the first call to reproduce that race."""
+    return db.query(models.Order).filter(
+        models.Order.idempotency_key == key,
+        models.Order.restaurant_id == restaurant_id,
+    ).first()
 
 
 @router.post("/", response_model=schemas.OrderOut)
@@ -25,10 +36,7 @@ async def create_order(
     # same key after a network drop. Scoped to this tenant so a key collision
     # across restaurants can't leak/return someone else's order.
     if order.idempotency_key:
-        existing = db.query(models.Order).filter(
-            models.Order.idempotency_key == order.idempotency_key,
-            models.Order.restaurant_id == restaurant.id,
-        ).first()
+        existing = _find_by_idempotency_key(db, order.idempotency_key, restaurant.id)
         if existing:
             return _order_to_dict(existing)
 
@@ -42,6 +50,10 @@ async def create_order(
         attributed_user = db.query(models.User).filter(
             models.User.id == order.attributed_user_id,
             models.User.tenant_id == current_user.tenant_id,
+            # Deactivated staff must not keep appearing as the operator on
+            # orders rung up after they left — that is the accountability trail
+            # migration 029 exists to protect.
+            models.User.is_active.is_(True),
         ).first()
         if attributed_user:
             attributed_user_id = attributed_user.id
@@ -96,7 +108,21 @@ async def create_order(
         attributed_user_id=attributed_user_id,
     )
     db.add(db_order)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # The lookup above is a check-then-act: two concurrent replays of the
+        # same key (two POS tabs sharing one tablet's localStorage, or a retry
+        # racing a slow original) both miss it and both insert. The
+        # uq_orders_restaurant_idempotency_key constraint is what actually
+        # settles the race — losing that race means the order already exists,
+        # which is a success for the caller, not a 500.
+        db.rollback()
+        if order.idempotency_key:
+            existing = _find_by_idempotency_key(db, order.idempotency_key, restaurant.id)
+            if existing:
+                return _order_to_dict(existing)
+        raise
     db.refresh(db_order)
     return _order_to_dict(db_order)
 

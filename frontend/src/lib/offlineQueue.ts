@@ -34,7 +34,11 @@ function writeQueue(queue: QueuedOrder[]): void {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
 }
 
-function newClientId(): string {
+/** Mint an idempotency key. Exported so the POS can stamp it on the *first*
+ * attempt: if the server commits but the response is lost in transit, the
+ * replay has to carry the same key or the backend sees a new order and
+ * creates a duplicate. */
+export function newClientId(): string {
     if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
         return crypto.randomUUID();
     }
@@ -49,9 +53,14 @@ export function getQueueLength(): number {
 }
 
 /** Persist a failed order submission for later replay. Returns the
- * idempotency key that was stamped onto the payload. */
+ * idempotency key that was stamped onto the payload.
+ *
+ * If the payload already carries an idempotency_key (the caller stamped it
+ * before the first attempt, which it should), that key is preserved — minting
+ * a fresh one here would be exactly the duplicate-order bug the key prevents. */
 export function enqueueOrder(payload: Record<string, unknown>): string {
-    const clientId = newClientId();
+    const existingKey = typeof payload.idempotency_key === "string" ? payload.idempotency_key : null;
+    const clientId = existingKey ?? newClientId();
     const queue = readQueue();
     queue.push({
         clientId,
@@ -64,32 +73,84 @@ export function enqueueOrder(payload: Record<string, unknown>): string {
 
 let flushing = false;
 
-/** Replay queued orders in order. Stops at the first network failure
- * (leaves the rest queued for the next trigger); drops an entry outright on
- * a real 4xx/5xx response, since retrying a validation error won't fix it. */
-export async function flushQueue(onFlushed?: (clientId: string) => void): Promise<void> {
+/** Remove one entry by clientId, re-reading storage first.
+ *
+ * Never write back a pre-await snapshot: enqueueOrder is synchronous and can
+ * land while a flush is suspended on the network (same tab: a waiter submits
+ * during the flush; shared tablet: a second POS tab, which has its own copy of
+ * the `flushing` flag but the same localStorage). A stale slice silently drops
+ * whatever was added in that window. */
+function removeFromQueue(clientId: string): void {
+    writeQueue(readQueue().filter((entry) => entry.clientId !== clientId));
+}
+
+/** HTTP status from an axios error, or null for a bare network failure. */
+export function errorStatus(err: unknown): number | null {
+    if (typeof err !== "object" || err === null || !("response" in err)) return null;
+    const response = (err as { response?: { status?: unknown } }).response;
+    if (!response || typeof response.status !== "number") return null;
+    return response.status;
+}
+
+/** True when retrying is pointless: a 4xx the client caused, which will fail
+ * identically forever. Everything else — network failure, 5xx, 429 — is
+ * transient and must be queued rather than surfaced as a dead end.
+ *
+ * Exported so the POS's first-attempt path and this module's replay path share
+ * one policy. They diverged once, and the result was that a 502 was retried on
+ * replay but discarded on first submit. */
+export function isTerminalClientError(err: unknown): boolean {
+    const status = errorStatus(err);
+    return status !== null && status >= 400 && status < 500 && status !== 429;
+}
+
+export interface FlushHandlers {
+    onFlushed?: (clientId: string) => void;
+    /** A queued order was discarded as unsendable. The caller must surface this:
+     * the order is gone from storage and the waiter is the only one who can
+     * re-enter it. */
+    onDropped?: (entry: QueuedOrder, status: number) => void;
+}
+
+/** Replay queued orders in order. Stops at the first network failure or
+ * retryable server error (leaves the rest queued for the next trigger); drops
+ * an entry only on a true client error, since retrying a validation error
+ * won't fix it. */
+export async function flushQueue(handlers?: FlushHandlers): Promise<void> {
+    const { onFlushed, onDropped } = handlers ?? {};
     if (flushing || typeof window === "undefined") return;
     if (!window.navigator.onLine) return;
     flushing = true;
     try {
+        // Re-read each iteration so entries queued mid-flush are picked up
+        // rather than clobbered. Re-reading means the loop no longer walks a
+        // fixed-length snapshot, so `attempted` guarantees termination: each
+        // entry is tried at most once per flush, and an entry that somehow
+        // survives its own removal can't spin us into an endless POST loop.
+        const attempted = new Set<string>();
         let queue = readQueue();
         while (queue.length > 0) {
             const next = queue[0];
+            if (attempted.has(next.clientId)) break;
+            attempted.add(next.clientId);
             try {
                 await api.post("/orders/", next.payload);
-                queue = queue.slice(1);
-                writeQueue(queue);
+                removeFromQueue(next.clientId);
                 onFlushed?.(next.clientId);
             } catch (err) {
-                const hasServerResponse =
-                    typeof err === "object" && err !== null && "response" in err && (err as { response?: unknown }).response;
-                if (hasServerResponse) {
-                    queue = queue.slice(1);
-                    writeQueue(queue);
+                // 4xx (except 429) is the client's fault and will fail forever —
+                // drop it, but tell the caller so the loss is visible. 5xx and
+                // 429 are transient: a Railway restart or a DB timeout must not
+                // delete an order the idempotency key made safely retryable.
+                if (isTerminalClientError(err)) {
+                    removeFromQueue(next.clientId);
+                    onDropped?.(next, errorStatus(err) as number);
+                    queue = readQueue();
                     continue;
                 }
-                break; // network failure — try the rest later
+                break; // network failure, 5xx, or 429 — try the rest later
             }
+            queue = readQueue();
         }
     } finally {
         flushing = false;
@@ -98,9 +159,9 @@ export async function flushQueue(onFlushed?: (clientId: string) => void): Promis
 
 /** Wire up online-event + polling flush triggers. Call once per mount;
  * returns a cleanup function. */
-export function watchOfflineQueue(onFlushed?: (clientId: string) => void): () => void {
+export function watchOfflineQueue(handlers?: FlushHandlers): () => void {
     if (typeof window === "undefined") return () => {};
-    const trigger = () => void flushQueue(onFlushed);
+    const trigger = () => void flushQueue(handlers);
     window.addEventListener("online", trigger);
     const interval = window.setInterval(trigger, 30_000);
     trigger(); // flush-on-mount, in case orders were queued last session

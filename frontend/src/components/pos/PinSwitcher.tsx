@@ -42,9 +42,29 @@ export function PinSwitcher({
         setSelected(null);
         setPin("");
         setError("");
-        api.get("/auth/pin/roster").then((res) => {
+        // Paths carry the /api/v1 prefix: api.ts's baseURL is the bare host and
+        // the auth router mounts only at /api/v1/auth (main.py includes it
+        // outside the dual-mount loop, so there is no unprefixed fallback).
+        api.get("/api/v1/auth/pin/roster").then((res) => {
             setRoster(res.data?.staff ?? []);
-        }).catch(() => setRoster([]));
+        }).catch(() => {
+            setRoster([]);
+            // Don't let a failed fetch masquerade as "nobody has a PIN yet" —
+            // that reads as a settings problem and sends staff down the wrong path.
+            setError("Couldn't load the staff list.");
+        });
+    }, [open]);
+
+    // tech-debt D20, matching the ConfirmSend dialog: backdrop click-to-dismiss
+    // had no keyboard equivalent, and declaring role="dialog" without honoring
+    // Escape breaks the contract assistive tech expects.
+    useEffect(() => {
+        if (!open) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setOpen(false);
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
     }, [open]);
 
     const digit = (d: string) => {
@@ -59,8 +79,17 @@ export function PinSwitcher({
         setVerifying(true);
         setError("");
         try {
-            const res = await api.post("/auth/pin/verify", { user_id: selected.id, pin });
-            onSwitch(res.data);
+            const res = await api.post("/api/v1/auth/pin/verify", { user_id: selected.id, pin });
+            // Normalize on read: /pin/verify returns `user_id` while /pin/roster
+            // returns `id`. Passing the raw body through leaves PinOperator.id
+            // undefined, so every order posts attributed_user_id: null — the
+            // feature looks like it works (the header reads display_name, which
+            // both shapes share) while attributing nothing.
+            onSwitch({
+                id: res.data.user_id,
+                display_name: res.data.display_name,
+                role: res.data.role,
+            });
             setOpen(false);
         } catch (err) {
             const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -105,7 +134,11 @@ export function PinSwitcher({
 
                         {!selected ? (
                             <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                                {roster.length === 0 ? (
+                                {error ? (
+                                    <p className="col-span-2 text-xs text-[#ef4444] text-center py-4">
+                                        {error}
+                                    </p>
+                                ) : roster.length === 0 ? (
                                     <p className="col-span-2 text-xs text-[#525252] text-center py-4">
                                         No staff have set up a PIN yet.
                                     </p>

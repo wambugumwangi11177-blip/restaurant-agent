@@ -36,7 +36,15 @@ Before writing a script, check `execution/` per your directive. Only create new 
 - Example: you hit an API rate limit → you then look into API → find a batch endpoint that would fix → rewrite script to accommodate → test → update directive.
 
 **3. Update directives as you learn**
-Directives are living documents. When you discover API constraints, better approaches, common errors, or timing expectations—update the directive. But don't create or overwrite directives without asking unless explicitly told to. Directives are your instruction set and must be preserved (and improved upon over time, not extemporaneously used and then discarded).
+Directives are living documents. When you discover API constraints, better approaches, common errors, or timing expectations—update the directive.
+
+**You have standing permission to create and edit directives without asking.** Use it whenever you learn something the instruction set should carry: a flow that changed, a constraint you hit, a decision and its reasoning, or a new subsystem that has no directive yet. Don't wait to be told.
+
+Two things this permission does *not* cover:
+- **Don't delete a directive, or delete reasoning from one.** Directives accumulate; supersede a section by rewriting it and saying what changed and why, so the next reader learns from the correction instead of rediscovering it.
+- **When implementation diverges from what a directive specified, say so explicitly in the directive** — what it called for, what was built, and why. A silent divergence turns the directive into a lie, which is worse than it being out of date.
+
+Directives are your instruction set and must be preserved (and improved upon over time, not extemporaneously used and then discarded).
 
 ## Self-annealing loop
 

@@ -846,3 +846,84 @@ from reading code." Closed here: the backend was booted with `uvicorn` against a
 
 Backend suite 156 passing (85 at the start of this whole pass). Frontend build + typecheck
 green. Working tree clean.
+
+---
+
+## Capture-layer audit (2026-08-06)
+
+Prompted by working back through six startup-diligence questions against the
+code rather than the docs. The finding was structural and it is the most
+important thing in this file: **the intelligence layer was built ahead of the
+capture layer.** Several of the most complete analytics modules were reading
+tables that no production code path ever wrote — the only writer was
+`populate_production.py`, the demo seeder.
+
+This class of bug is invisible from outside. An empty response and a healthy
+response look identical, and the seeded demo tenant made everything look fine in
+development. The modules weren't broken; they were starved.
+
+| Table | Previously written by | Now written by | Unblocks |
+|---|---|---|---|
+| `PrepTime` | seeder only | KDS status transitions (`routers/orders.py`) | `ai/kds_intelligence.py` — station p95s, bottleneck severity, queue depth, delay risk |
+| `MenuIngredient` | **nothing — no API existed** | `PUT /menu/{id}/recipe` | theoretical usage, `ai/graph` cascade traversal, derived `cost_price` |
+| `InventoryItem.quantity` on sale | manual `/receive` + `/adjust` only | `stock_ledger.consume_for_order()` | food cost %, depletion prediction, reorder intelligence |
+| `StaffMember` / `LaborShift` | **nothing, not even the seeder** | `routers/staff.py` + clock-in/out | `ai/labor/intelligence.py`; `ai/roi/savings.py` stops using its default-wage constant |
+
+Standing rule added to directive 001: **analytics may only read tables a
+production code path writes.** Before building an analytic, name the live
+endpoint or scheduled job that populates each table it reads, and state what the
+module returns when they're empty. If there is no writer, build it first.
+
+Details and design decisions: directive 006 (prep timing), 007 (recipes and
+deduction), 015 (staff and labor), 016 (billing).
+
+### Billing became real the same day
+Was a plan string an admin set on themselves with nothing reading it; the product
+could collect M-Pesa *for* restaurants but not *from* them. Now a real state
+machine with enforcement (`require_active_subscription`, 402) on `/ai/*` only —
+POS, KDS, orders and the dashboard are deliberately never gated. See directive 016.
+
+### Verification
+- Backend **362 → 412 tests green** (`LOG_FORMAT=plain python3 -m pytest -q`).
+- Frontend `tsc --noEmit` clean, `next build` green (18 routes).
+- New: `test_prep_timing.py` (9), `test_recipes_and_deduction.py` (15),
+  `test_staff_and_shifts.py` (12); `test_billing.py` 5 → 18.
+
+### Also corrected
+- **Branding** unified to Leviii AI. The app said "Chakula" in `layout.tsx`,
+  `login/page.tsx`, `order/page.tsx`, `manifest.json` and `sw.js` while every
+  document said Leviii AI — a prospect clicking the link saw a different product
+  than the one in the deck.
+- **The offline-POS claim was false** and is now marked as such in directives 001
+  and 006. `sw.js` explicitly skips `/api` and the POS has no local write queue.
+- **`AGENTS.md` did not exist** despite `CLAUDE.md` stating the instructions are
+  mirrored across CLAUDE/AGENTS/GEMINI. Created.
+- **Latent bug**: `record-payment` used `or DEFAULT_PERIOD_DAYS`, so a rejected
+  `{"days": 0}` silently became a granted 30-day period.
+
+### Deploy-readiness tooling added
+- `GET /health/config` (admin-only) — reports which required configuration is
+  present in the *running* process, as `ready` / `degraded` / `blocked`.
+  `startup_checks` runs once at boot and writes to a log line that has scrolled
+  away by the time anyone asks; soft warnings don't block a boot at all, so a
+  degraded deploy looks identical to a healthy one from outside. Reports presence
+  only, never values.
+- `backend/LAUNCH_CHECKLIST.md` — the runnable version of the "needs YOU" items,
+  including the three silent-breakage points after any domain change (Safaricom
+  `CallBackURL`, Twilio webhook, `CORS_ORIGINS`).
+
+## Still open after this pass
+
+- [ ] **Offline POS** — IndexedDB write queue + idempotency key on order creation
+      + sync indicator. Multi-day; deliberately its own piece of work.
+- [ ] **Shrinkage detection** — now *possible* (theoretical usage exists) but
+      needs a physical stock-count endpoint to compare against. Variance between
+      the two is how food walking out the back gets found.
+- [ ] **Frontends for the new APIs** — recipe editor, staff roster + clock-in
+      screen, billing page and 402 handling. All three APIs currently have no UI.
+- [ ] **Station-filtered KDS view** — data is captured now; the kitchen page
+      still shows one undifferentiated queue.
+- [ ] **Demo-data fallback** (`frontend/src/lib/demo-data.ts`) still ships in the
+      production bundle for three dashboard pages. It once masked a real
+      restaurant's data for months.
+- [ ] The four ops items below that need account access.

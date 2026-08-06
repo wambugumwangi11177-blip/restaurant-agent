@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { demoData } from "@/lib/demo-data";
+import { demoData, DEMO_DATA_ENABLED } from "@/lib/demo-data";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Package, AlertTriangle, Plus, TruckIcon,
@@ -116,7 +116,8 @@ export default function InventoryPage() {
     const predictions = aiData?.predictions || [];
     const alerts = aiData?.alerts || [];
 
-    const isDemo = items.length === 0 && alerts.length === 0;
+    // DEMO_DATA_ENABLED gates this in production — see lib/demo-data.ts.
+    const isDemo = DEMO_DATA_ENABLED && items.length === 0 && alerts.length === 0;
     const demoAlerts = demoData.stockAlerts;
 
     const priorityLabel = (c: string) => {

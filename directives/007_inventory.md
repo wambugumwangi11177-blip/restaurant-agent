@@ -102,13 +102,43 @@ persistently low item doesn't send up to 7 identical messages a day. Keep
 deduction free of side effects; alerting is a separate concern with its own
 schedule and dedup rules.
 
+## Shrinkage detection (added 2026-08-06)
+
+`POST /inventory/{id}/count` records a physical count against the system's
+running `quantity` and reconciles the two. `models.StockCount` stores both
+`expected_quantity` (the system's belief immediately before) and
+`counted_quantity`, so `variance = counted - expected` — negative is
+shrinkage, positive is overage (a miscounted delivery, or a correction).
+
+**Why this didn't need a second usage-tracking system.** `InventoryItem.quantity`
+is already a running total across every write path — `/receive`, `/adjust`, and
+`stock_ledger.consume_for_order`'s theoretical sale deduction. A count's
+`expected_quantity` snapshots that running total, so its variance already nets
+out every sale-driven deduction since the previous count. `ai/shrinkage.py`
+aggregates variances counts have already captured; it does not re-derive usage
+from `StockMovement` rows a second time.
+
+**The reconciling movement lands in the existing ledger** (`StockMovement`,
+type `ADJUST`, tagged `stock_count:<id>`), not a separate one — so depletion
+prediction and every other movement-based analytic see one consistent number
+going forward, the same way `/adjust` already works.
+
+**Counting is not admin-gated.** It's floor work, like receiving stock.
+**The report (`GET /ai/shrinkage`) is** — it lives on the `/ai` router and is
+gated by billing (directive 016), consistent with the line that principle
+draws: operations stay free, analysis is what's sold.
+
+**The report aggregates across counts, deliberately.** One count can't tell a
+bad opening estimate from an ongoing pattern of loss; summing variance across
+every count in the window is what turns "counted low once" into "this item is
+actually walking out the back." Items never counted are flagged separately —
+a number nobody has compared against reality yet can't be trusted either way,
+the same principle `ai/data_quality.py` applies to `cost_price`.
+
 ## Still open
 
 -   **Recipe editor UI** — the API has no frontend.
--   **Shrinkage detection** — now *possible* but not built. Theoretical usage
-    (recipes × orders) exists; what's missing is a physical stock-count endpoint
-    to compare it against. Variance between the two is how you find food walking
-    out the back. This is the natural next piece.
+-   **Count-entry UI** — same; counting currently requires the API directly.
 -   **Waste/spoilage** — `expiry_days` exists on the model and nothing uses it.
 
 ## Verification
@@ -117,3 +147,10 @@ schedule and dedup rules.
 cost derivation and its unit boundary, aggregation of a shared ingredient across
 one ticket, the negative-stock path, cancellation, idempotence, tenant scoping
 and the public customer-order path.
+
+`backend/tests/test_shrinkage.py` (13 tests) covers count reconciliation, the
+reconciling movement landing in the existing ledger, exact-match producing no
+movement, overage being recorded (not just shortfall), tenant scoping, the
+report's loss/overage separation and cost-impact calculation, accumulation
+across multiple counts, the never-counted flag, the time window, and that
+counting itself is ungated while the report requires billing.

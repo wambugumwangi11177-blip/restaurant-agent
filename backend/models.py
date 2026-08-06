@@ -263,6 +263,43 @@ class StockMovement(Base):
     
     inventory_item = relationship("InventoryItem", back_populates="movements")
 
+
+class StockCount(Base):
+    """
+    A physical stock count — what the system expected vs what was actually on
+    the shelf, at a point in time.
+
+    This is the second half of shrinkage detection. `stock_ledger.py`'s
+    order-driven deduction gives the THEORETICAL usage (what should have been
+    consumed, from recipes × orders sold); a StockCount gives the ACTUAL
+    physical count. The gap between them — `variance` — is shrinkage: food
+    walking out the back, over-portioning, spillage, or theft. Neither number
+    alone tells you that; the two only mean something compared against
+    each other. Added 2026-08-06 alongside directive 007's "still open" item.
+    """
+    __tablename__ = "stock_counts"
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), index=True, nullable=False)
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id"), index=True, nullable=False)
+    # The system's belief immediately before this count reconciled it, and what
+    # was physically counted. Both are stored (not just the variance) so a
+    # shrinkage report can be rebuilt and re-verified from raw counts later,
+    # rather than trusting a computed number nobody can re-derive.
+    expected_quantity = Column(Float, nullable=False)
+    counted_quantity = Column(Float, nullable=False)
+    variance = Column(Float, nullable=False)   # counted - expected; negative = shrinkage
+    counted_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    notes = Column(String, default="")
+    created_at = Column(DateTime, default=utcnow)
+
+    restaurant = relationship("Restaurant")
+    inventory_item = relationship("InventoryItem")
+    counted_by = relationship("User")
+
+    __table_args__ = (
+        Index("ix_stock_counts_restaurant_item", "restaurant_id", "inventory_item_id"),
+    )
+
 # ──────────────────────────────────────────────
 # RESERVATIONS (New for AI)
 # ──────────────────────────────────────────────

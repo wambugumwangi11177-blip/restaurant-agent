@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
-import { demoData, isDashboardEmpty } from "@/lib/demo-data";
+import { demoData, isDashboardEmpty, DEMO_DATA_ENABLED } from "@/lib/demo-data";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -82,7 +82,8 @@ export default function DashboardPage() {
         );
     }
 
-    const isDemo = isDashboardEmpty(data);
+    // DEMO_DATA_ENABLED gates this in production — see lib/demo-data.ts.
+    const isDemo = DEMO_DATA_ENABLED && isDashboardEmpty(data);
     const activeData = isDemo ? demoData.dashboard : data;
 
     const qs = activeData?.quick_stats || {};

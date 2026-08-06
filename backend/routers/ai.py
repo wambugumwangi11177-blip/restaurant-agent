@@ -13,6 +13,7 @@ Endpoints:
   POST /ai/pricing/{rec_id}/reject    → reject a pricing recommendation
   GET  /ai/labor                      → labor cost analytics + recommendations
   GET  /ai/inventory                  → inventory health + restock predictions
+  GET  /ai/shrinkage                  → physical-count variance vs theoretical usage, by item
   GET  /ai/profit                     → profit intelligence (contribution margins, leaks, drift)
   GET  /ai/supply-chain               → supplier performance + purchase order recommendations
   GET  /ai/roi                        → hours/money saved by automation, money captured, opportunities found
@@ -716,6 +717,28 @@ async def ai_data_quality(
 
     from ai.data_quality import get_cost_price_quality
     return _safe_run("data_quality", restaurant.id, get_cost_price_quality, db, restaurant.id)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SHRINKAGE — physical counts vs theoretical (recipe-driven) usage
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/shrinkage")
+async def ai_shrinkage(
+    days: int = 90,
+    current_user: models.User = Depends(require_role(models.Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """
+    Shrinkage value by item over the window, ranked by cost impact, plus which
+    items have never been physically counted. Deterministic — aggregates
+    variance already captured by POST /inventory/{id}/count; see
+    ai/shrinkage.py for why it doesn't recompute usage itself.
+    """
+    restaurant = get_or_create_restaurant(db, current_user)
+
+    from ai.shrinkage import get_shrinkage_report
+    return _safe_run("shrinkage", restaurant.id, get_shrinkage_report, db, restaurant.id, days)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

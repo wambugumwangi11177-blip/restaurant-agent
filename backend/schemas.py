@@ -297,3 +297,22 @@ class ShiftOut(StrictModel):
     actual_hours: Optional[float] = None
     labor_cost: Optional[int] = None    # cents — hours × the staff hourly_rate
     notes: str = ""
+
+# ──────────────────────────────────────────────
+# STOCK COUNTS (shrinkage detection)
+# ──────────────────────────────────────────────
+class StockCountCreate(StrictModel):
+    counted_quantity: float
+    notes: str = ""
+
+
+class StockCountOut(StrictModel):
+    id: int
+    inventory_item_id: int
+    item_name: str
+    unit: str
+    expected_quantity: float
+    counted_quantity: float
+    variance: float
+    notes: str
+    created_at: Optional[datetime] = None

@@ -1,6 +1,30 @@
 // demo-data.ts
 // Hardcoded realistic demo data for Lavy restaurant.
-// Used when real data is empty or below threshold.
+// Used when real data is empty or below threshold — but ONLY when explicitly
+// enabled. See DEMO_DATA_ENABLED below.
+
+/**
+ * Master switch for whether fabricated "Lavy restaurant" numbers may ever be
+ * shown in place of real (possibly empty) data.
+ *
+ * Off by default, which means off in every ordinary production build: a
+ * `next build` does not set this, so a real restaurant with no data yet sees
+ * an honest empty state (zeros, "no items yet", "we're looking for
+ * opportunities...") instead of someone else's fake revenue and fake
+ * customers.
+ *
+ * Found 2026-08-06: this fallback previously activated purely on empty real
+ * data, unconditionally, in three dashboard pages (dashboard, sales,
+ * inventory) — and it had already caused a real incident once
+ * (isDashboardEmpty's docstring below records a live restaurant whose
+ * dashboard silently showed these fake numbers for months due to a bad
+ * emptiness heuristic). A wrong heuristic is fixable; fabricated data
+ * reachable in production by default is a standing risk regardless of how
+ * good the heuristic is. Sales/demo environments that want the walkthrough
+ * numbers set `NEXT_PUBLIC_ENABLE_DEMO_DATA=true` explicitly for that
+ * deployment only.
+ */
+export const DEMO_DATA_ENABLED = process.env.NEXT_PUBLIC_ENABLE_DEMO_DATA === "true";
 
 export const demoData = {
   dashboard: {

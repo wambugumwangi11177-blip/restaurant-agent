@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { demoData, isOrdersEmpty } from "@/lib/demo-data";
+import { demoData, isOrdersEmpty, DEMO_DATA_ENABLED } from "@/lib/demo-data";
 import { motion } from "framer-motion";
 import {
     TrendingUp, Banknote, Smartphone, CreditCard,
@@ -45,7 +45,8 @@ export default function SalesPage() {
         );
     }
 
-    const isDemo = isOrdersEmpty(orders);
+    // DEMO_DATA_ENABLED gates this in production — see lib/demo-data.ts.
+    const isDemo = DEMO_DATA_ENABLED && isOrdersEmpty(orders);
 
     // Calculate real stats. Group by the STORED date string (YYYY-MM-DD) rather
     // than `new Date(created_at).toDateString()` — the timestamps are naive UTC,

@@ -43,6 +43,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401 && typeof window !== "undefined") {
       localStorage.removeItem("access_token");
+      localStorage.removeItem("cached_user");
       window.location.href = "/login";
     }
     if (error.response?.status === 402 && typeof window !== "undefined") {

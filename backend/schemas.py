@@ -79,6 +79,11 @@ class OrderCreate(StrictModel):
     table_number: Optional[int] = None
     notes: str = ""
     consent: bool = False   # required True on the public (customer-facing) endpoint only
+    # Set only by the offline POS queue (frontend lib/offlineQueue.ts) — a
+    # client-generated UUID so a retried/replayed create is recognized as
+    # "already placed" rather than creating a duplicate order. Omitted by every
+    # normal online order. See models.Order.client_order_id.
+    client_order_id: Optional[str] = None
 
 class OrderItemOut(StrictModel):
     id: int

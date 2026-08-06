@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import api from "@/lib/api";
+import api, { errorMessage } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Plus,
@@ -18,7 +18,11 @@ import {
     User,
     Hash,
     StickyNote,
+    CloudOff,
 } from "lucide-react";
+import { enqueueOrder, cacheMenu, getCachedMenu } from "@/lib/offlineQueue";
+import { isNetworkError, syncPendingOrders } from "@/lib/offlineSync";
+import OfflineSyncIndicator from "@/components/pos/OfflineSyncIndicator";
 
 interface MenuItem {
     id: number;
@@ -49,12 +53,33 @@ export default function POSPage() {
     const [submitting, setSubmitting] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [lastOrderId, setLastOrderId] = useState<number | null>(null);
+    const [savedOffline, setSavedOffline] = useState(false);
+    const [usingCachedMenu, setUsingCachedMenu] = useState(false);
 
     useEffect(() => {
         api.get("/menu/").then((res) => {
-            setMenuItems(res.data.filter((i: MenuItem) => i.is_available !== false));
+            const available = res.data.filter((i: MenuItem) => i.is_available !== false);
+            setMenuItems(available);
+            setUsingCachedMenu(false);
             setLoading(false);
-        }).catch(() => setLoading(false));
+            // Fire-and-forget: keeps the offline fallback fresh for next time.
+            // Cache the FULL list (not just `available`) so an item toggled
+            // unavailable mid-shift doesn't quietly vanish for good the moment
+            // connectivity drops — is_available still gets filtered on render.
+            cacheMenu(res.data);
+        }).catch(async () => {
+            // GET /menu/ itself failed — most likely no connection at all.
+            // Fall back to whatever menu was last cached on this device rather
+            // than leaving the POS with nothing to sell.
+            const cached = await getCachedMenu<MenuItem>();
+            if (cached) {
+                setMenuItems(cached.items.filter((i) => i.is_available !== false));
+                setUsingCachedMenu(true);
+            }
+            setLoading(false);
+        });
+        // Connectivity may already be back from before this page loaded.
+        syncPendingOrders();
     }, []);
 
     const categories = ["All", ...Array.from(new Set(menuItems.map((i) => i.category)))];
@@ -93,35 +118,66 @@ export default function POSPage() {
     const subtotal = cart.reduce((sum, c) => sum + c.menuItem.price * c.quantity, 0);
     const itemCount = cart.reduce((sum, c) => sum + c.quantity, 0);
 
+    const [submitError, setSubmitError] = useState("");
+
     const handleSubmit = async () => {
         if (cart.length === 0) return;
         setSubmitting(true);
-        try {
-            const res = await api.post("/orders/", {
-                items: cart.map((c) => ({
-                    menu_item_id: c.menuItem.id,
-                    quantity: c.quantity,
-                })),
-                order_type: orderType,
-                delivery_channel: deliveryChannel,
-                payment_method: paymentMethod,
-                customer_name: customerName,
-                customer_phone: customerPhone,
-                table_number: tableNumber ? parseInt(tableNumber) : null,
-                notes,
-            });
-            setLastOrderId(res.data.id);
-            setShowSuccess(true);
-            // Reset
+        setSubmitError("");
+
+        const payload = {
+            items: cart.map((c) => ({
+                menu_item_id: c.menuItem.id,
+                quantity: c.quantity,
+            })),
+            order_type: orderType,
+            delivery_channel: deliveryChannel,
+            payment_method: paymentMethod,
+            customer_name: customerName,
+            customer_phone: customerPhone,
+            table_number: tableNumber ? parseInt(tableNumber) : null,
+            notes,
+        };
+
+        const resetForm = () => {
             setCart([]);
             setCustomerName("");
             setCustomerPhone("");
             setTableNumber("");
             setNotes("");
             setPaymentMethod("pending");
+        };
+
+        try {
+            // 8s timeout on THIS call only (not api.ts's default) — a hung
+            // request on a captive portal or a dying connection must fail fast
+            // into the offline queue rather than leave the waiter staring at
+            // "Sending..." for the browser's full default timeout.
+            const res = await api.post("/orders/", payload, { timeout: 8000 });
+            setLastOrderId(res.data.id);
+            setShowSuccess(true);
+            setSavedOffline(false);
+            resetForm();
             setTimeout(() => setShowSuccess(false), 3000);
-        } catch (err) {
-            console.error("Order failed:", err);
+        } catch (err: any) {
+            if (isNetworkError(err)) {
+                // No response reached us — treat as offline, not a failure. A
+                // real rejection (400/402/etc, `err.response` present) falls
+                // through to the catch-all below instead: retrying that
+                // forever would never fix a bad menu item id or an unpaid
+                // subscription, so it must surface to the waiter, not queue.
+                try {
+                    await enqueueOrder(payload);
+                    setShowSuccess(true);
+                    setSavedOffline(true);
+                    resetForm();
+                    setTimeout(() => setShowSuccess(false), 4000);
+                } catch {
+                    setSubmitError("Couldn't save this order, even offline. Try again.");
+                }
+            } else {
+                setSubmitError(errorMessage(err, "Couldn't send this order. Try again."));
+            }
         }
         setSubmitting(false);
     };
@@ -147,21 +203,58 @@ export default function POSPage() {
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
-                        className="fixed top-4 right-4 z-50 bg-[#22c55e]/10 border border-[#22c55e]/30 rounded-xl px-5 py-3 flex items-center gap-2"
+                        className={`fixed top-4 right-4 z-50 border rounded-xl px-5 py-3 flex items-center gap-2 ${savedOffline ? "bg-[#eab308]/10 border-[#eab308]/30" : "bg-[#22c55e]/10 border-[#22c55e]/30"
+                            }`}
                     >
-                        <Check className="w-4 h-4 text-[#22c55e]" />
-                        <span className="text-sm text-[#22c55e]">Order #{lastOrderId} sent to kitchen!</span>
+                        {savedOffline ? (
+                            <>
+                                <CloudOff className="w-4 h-4 text-[#eab308]" />
+                                <span className="text-sm text-[#eab308]">Saved on this device — will send once you're back online</span>
+                            </>
+                        ) : (
+                            <>
+                                <Check className="w-4 h-4 text-[#22c55e]" />
+                                <span className="text-sm text-[#22c55e]">Order #{lastOrderId} sent to kitchen!</span>
+                            </>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Submit error toast — a real rejection, not a connectivity drop */}
+            <AnimatePresence>
+                {submitError && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+                        className="fixed top-4 right-4 z-50 bg-[#ef4444]/10 border border-[#ef4444]/30 rounded-xl px-5 py-3 flex items-center gap-2"
+                    >
+                        <X className="w-4 h-4 text-[#ef4444]" />
+                        <span className="text-sm text-[#ef4444]">{submitError}</span>
+                        <button onClick={() => setSubmitError("")} className="text-[#ef4444]/70 hover:text-[#ef4444]">
+                            <X className="w-3.5 h-3.5" />
+                        </button>
                     </motion.div>
                 )}
             </AnimatePresence>
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-2">
                 <div>
                     <h1 className="text-xl font-bold text-[#e5e5e5]">New Order</h1>
                     <p className="text-xs text-[#525252]">Tap items to add, then send to kitchen</p>
                 </div>
             </div>
+
+            <OfflineSyncIndicator />
+
+            {usingCachedMenu && (
+                <div className="flex items-center gap-2 px-3 py-1.5 mb-3 bg-[#eab308]/10 border border-[#eab308]/30 rounded-lg">
+                    <CloudOff className="w-3.5 h-3.5 text-[#eab308] flex-shrink-0" />
+                    <span className="text-[11px] text-[#eab308]">
+                        Showing your last saved menu — couldn&apos;t reach the server. Prices/availability may be out of date.
+                    </span>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
                 {/* Left: Menu items */}

@@ -53,22 +53,21 @@ path is not a feature; it is a place where a feature could go.
 
 ## Modules
 
-1.  **POS (Point of Sale)**: Fast, touch-friendly. Prices are recalculated
-    server-side from the menu on every order — the client cannot set a total.
+1.  **POS (Point of Sale)**: Fast, touch-friendly, **offline-capable** (built
+    2026-08-06 — see directive 006 for the full design and its limits before
+    describing this to a restaurant). Prices are recalculated server-side from
+    the menu on every order — the client cannot set a total.
 
-    > **Correction (2026-08-06): the POS is NOT offline-capable.** This
-    > directive claimed "offline-capable logic" and it was never true.
-    > `frontend/public/sw.js` caches the app shell but explicitly skips `/api`
-    > requests, and the POS page has no local write queue (no IndexedDB, no
-    > localStorage, no `navigator.onLine` handling). A dropped connection means
-    > no orders can be taken. The honest fallback — and what `docs/faq.md`
-    > already told customers — is paper, entered afterwards.
-    >
-    > Real offline support needs an IndexedDB write queue, an idempotency key on
-    > order creation so replays can't double-charge, and a sync indicator in the
-    > UI. Deliberately deferred as its own piece of work. **Until it is built,
-    > do not describe the POS as offline-capable anywhere** — not in this
-    > directive, not in sales material, not to a restaurant.
+    > **History, for whoever next touches this claim:** this directive said
+    > "offline-capable logic" from the start and for a long time it wasn't true
+    > — `frontend/public/sw.js` cached the app shell but the POS kept no local
+    > state, so a dropped connection meant no orders could be taken. Corrected
+    > the same day it was built: an IndexedDB write queue, a `client_order_id`
+    > idempotency key so a retried sync can't double-create an order or
+    > double-deduct stock, a cached menu snapshot so the POS still has
+    > something to sell from on a cold reload with no connection at all, and a
+    > sync indicator. See directive 006 for the mechanism and its remaining
+    > edges (queue is per-device, not shared across terminals).
 
 2.  **KDS (Kitchen Display System)**: Real-time syncing, per-station prep timing.
 

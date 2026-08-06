@@ -44,15 +44,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Found 2026-08-06 building offline POS support: this unconditionally
+  // treated ANY failure of the boot-time "who am I" check as an invalid
+  // session — including a network failure, which is exactly what happens on
+  // every page reload while offline. The offline POS queue (lib/offlineQueue,
+  // the PENDING orders it holds) survives a reload fine — IndexedDB isn't
+  // wiped by navigation — but this logged the user straight to /login before
+  // they could ever see it, on a device that by definition can't reach
+  // /login's own API calls either. The queue was never the weak link; the
+  // "am I logged in" bootstrap check was.
+  //
+  // Fix: only clear the session on a REAL rejection (`err.response` present —
+  // the server actually said 401/403, meaning the token itself is bad). A
+  // network failure (no response at all) falls back to a locally cached copy
+  // of the user object instead, so the session survives being offline. This
+  // does not weaken auth: a truly invalid token still gets rejected the
+  // moment any request reaches the server — api.ts's own 401 interceptor
+  // already forces that logout globally — this only stops a CONNECTIVITY gap
+  // from being treated as a REVOKED session.
   const fetchUser = async (accessToken: string) => {
     try {
       const res = await api.get("/api/v1/auth/me", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       setUser(res.data);
-    } catch {
-      localStorage.removeItem("access_token");
-      setToken(null);
+      localStorage.setItem("cached_user", JSON.stringify(res.data));
+    } catch (err: any) {
+      if (err?.response) {
+        // The server actually answered and rejected the token — it's genuinely bad.
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("cached_user");
+        setToken(null);
+        setUser(null);
+      } else {
+        // No response reached us — offline/unreachable, not "logged out".
+        // Keep the token, and show whatever we last confirmed about this
+        // user so the app renders instead of bouncing to a login screen that
+        // can't be reached either.
+        const cached = localStorage.getItem("cached_user");
+        if (cached) {
+          try { setUser(JSON.parse(cached)); } catch { /* corrupt cache — ignore, user stays null */ }
+        }
+      }
     } finally {
       setIsLoading(false);
     }
@@ -82,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem("access_token");
+    localStorage.removeItem("cached_user");
     setToken(null);
     setUser(null);
   };

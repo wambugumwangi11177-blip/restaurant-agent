@@ -179,6 +179,15 @@ class Order(Base):
     customer_phone = Column(String, default="")
     total = Column(Integer)  # In cents
     notes = Column(Text, default="")
+    # Client-generated UUID, set only by the offline POS queue (frontend
+    # lib/offlineQueue.ts) — a normal online order never sends one. Lets a
+    # replayed create (the POS retrying a request it can't confirm succeeded,
+    # or the same queued order flushed twice by an interrupted sync) be
+    # recognized as "already placed" instead of creating a duplicate ticket
+    # and double-deducting stock. NULL for every order placed while online, and
+    # multiple NULLs are fine under this UNIQUE constraint on both SQLite and
+    # Postgres. See migration 026 and routers/orders.py's idempotent-create path.
+    client_order_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=utcnow)
     completed_at = Column(DateTime, nullable=True)
 
@@ -194,6 +203,7 @@ class Order(Base):
         # An order total is money in cents — never negative. Allows 0 (comped/
         # zero-total orders are legitimate). See migration 016.
         CheckConstraint("total >= 0", name="ck_orders_total_nonneg"),
+        UniqueConstraint("restaurant_id", "client_order_id", name="uq_orders_restaurant_client_order_id"),
     )
 
 class OrderItem(Base):

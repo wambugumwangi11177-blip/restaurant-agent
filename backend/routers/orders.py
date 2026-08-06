@@ -22,6 +22,16 @@ async def create_order(
 ):
     restaurant = get_or_create_restaurant(db, current_user)
 
+    # Idempotent replay: the offline POS queue (frontend lib/offlineQueue.ts)
+    # can't always tell whether a queued order it's flushing actually reached
+    # the server — the request may have succeeded and only the RESPONSE was
+    # lost to a flaky connection, in which case retrying a plain create would
+    # ring in the same ticket twice and deduct its stock twice. A client that
+    # sent client_order_id gets the SAME order back on a repeat, not a new one.
+    existing = _find_by_client_order_id(db, restaurant.id, order.client_order_id)
+    if existing is not None:
+        return _order_to_dict(existing)
+
     # Look up menu items and calculate total
     total = 0
     order_items = []
@@ -67,6 +77,7 @@ async def create_order(
         table_number=order.table_number,
         total=total,
         notes=order.notes,
+        client_order_id=order.client_order_id,
         items=order_items,
     )
     db.add(db_order)
@@ -311,6 +322,11 @@ async def create_public_order(
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
 
+    # Idempotent replay — see create_order's comment above for why this exists.
+    existing = _find_by_client_order_id(db, restaurant.id, order.client_order_id)
+    if existing is not None:
+        return _order_to_dict(existing)
+
     # Consent gate: only meaningful when actual PII (a phone number) is being
     # collected — an anonymous walk-in-style public order with no contact
     # info has nothing to consent to.
@@ -363,6 +379,7 @@ async def create_public_order(
         customer_phone=order.customer_phone,
         total=total,
         notes=order.notes,
+        client_order_id=order.client_order_id,
         items=order_items,
     )
     db.add(db_order)
@@ -400,6 +417,23 @@ def _trigger_mpesa_stk_push(db: Session, order: models.Order) -> None:
     if result["status"] == "initiated":
         order.mpesa_checkout_request_id = result["checkout_request_id"]
         db.commit()
+
+
+def _find_by_client_order_id(db: Session, restaurant_id: int, client_order_id: str | None) -> models.Order | None:
+    """
+    An empty/None client_order_id is the normal case (every online order) and
+    must never match anything — an empty-string lookup against a nullable
+    column would be a meaningless query, and treating "no id given" as "found"
+    would make every plain online order collide with every other one.
+    """
+    if not client_order_id:
+        return None
+    return db.query(models.Order).options(
+        joinedload(models.Order.items).joinedload(models.OrderItem.menu_item)
+    ).filter(
+        models.Order.restaurant_id == restaurant_id,
+        models.Order.client_order_id == client_order_id,
+    ).first()
 
 
 def _order_to_dict(order: models.Order) -> dict:

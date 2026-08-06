@@ -24,6 +24,7 @@ import {
     Wallet,
 } from "lucide-react";
 import SubscriptionBanner from "@/components/billing/SubscriptionBanner";
+import { attachAutoSync } from "@/lib/offlineSync";
 
 // adminOnly pages call management/AI endpoints that are ADMIN-gated on the
 // backend (routers/ai.py, analytics.py — RBAC pass 2026-07-11). Hiding their nav
@@ -64,6 +65,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     const isStaff = ((user as any)?.role || "").toLowerCase() === "staff";
+
+    // Attached once at the dashboard root, not on the POS page alone — a
+    // waiter placing orders offline may switch to Kitchen or Orders before
+    // connectivity returns, and queued orders must still flush the moment it
+    // does, whichever page happens to be open.
+    useEffect(() => { attachAutoSync(); }, []);
 
     useEffect(() => {
         if (!isLoading && !user) {

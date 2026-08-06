@@ -914,16 +914,93 @@ POS, KDS, orders and the dashboard are deliberately never gated. See directive 0
 
 ## Still open after this pass
 
-- [ ] **Offline POS** — IndexedDB write queue + idempotency key on order creation
-      + sync indicator. Multi-day; deliberately its own piece of work.
-- [ ] **Shrinkage detection** — now *possible* (theoretical usage exists) but
-      needs a physical stock-count endpoint to compare against. Variance between
-      the two is how food walking out the back gets found.
-- [ ] **Frontends for the new APIs** — recipe editor, staff roster + clock-in
-      screen, billing page and 402 handling. All three APIs currently have no UI.
-- [ ] **Station-filtered KDS view** — data is captured now; the kitchen page
-      still shows one undifferentiated queue.
-- [ ] **Demo-data fallback** (`frontend/src/lib/demo-data.ts`) still ships in the
-      production bundle for three dashboard pages. It once masked a real
-      restaurant's data for months.
+- [x] ~~Offline POS~~ **DONE same day** — see the next section.
+- [x] ~~Shrinkage detection~~ **DONE same day** — see the next section.
+- [x] ~~Frontends for the new APIs~~ **DONE same day** — see the next section.
+- [x] ~~Demo-data fallback ships in production~~ **DONE same day** — see the
+      next section.
+- [ ] **Station-filtered KDS view** — data is captured (directive 006) but the
+      kitchen page still shows one undifferentiated queue. UI-only; no schema
+      or capture-layer work left.
 - [ ] The four ops items below that need account access.
+
+---
+
+## Same-day follow-through (2026-08-06, second pass)
+
+The four items above were flagged, then built the same day, in this order:
+demo-data gate → shrinkage detection → three new frontends (recipe editor,
+staff roster, billing) → offline POS. Backend went 412 → 437 tests green
+across the whole pass; every frontend change was verified in a real browser
+against a running backend, not just typechecked — see below for why that
+mattered twice.
+
+**Demo-data gate.** `frontend/src/lib/demo-data.ts`'s fabricated "Lavy
+restaurant" numbers were reachable in every ordinary build, unconditionally,
+whenever a tenant's real data was empty — the exact heuristic that once
+masked a live restaurant's dashboard for months (see that file's own
+docstring). Added `DEMO_DATA_ENABLED`, gated behind
+`NEXT_PUBLIC_ENABLE_DEMO_DATA`, unset (and therefore off) in every default
+build. A genuinely empty restaurant now sees zeros, not someone else's
+revenue.
+
+**Shrinkage detection.** New `StockCount` model + migration 025:
+`POST /inventory/{id}/count` records a physical count against the system's
+running quantity; `variance = counted - expected` is shrinkage (negative) or
+overage (positive). Reconciles through the *existing* `StockMovement` ledger
+rather than a parallel one. `GET /ai/shrinkage` (`ai/shrinkage.py`) aggregates
+variance across counts in a window rather than alarming on one — a single
+count can't tell a bad opening estimate from an actual pattern of loss — and
+flags items never counted at all. Counting is ungated (operational, like
+`/receive`); the report is billing-gated (analysis). Full reasoning in
+directive 007.
+
+**Three new frontends** — recipe editor (`components/menu/RecipeEditor.tsx`),
+staff roster + clock-in/out (`dashboard/staff`), billing status + a global
+402 banner (`dashboard/billing`, `SubscriptionBanner`). Each wired to what the
+backend actually enforces (roster management admin-only, clocking any-authed;
+recipe writes admin-only; billing routes admin-only) rather than assumed.
+
+**A real bug, found only because this was browser-tested, not just
+typechecked:** `routers/billing.py`'s 402 `detail` is a structured object
+(`{message, status, plan, current_period_end}`), but nine existing frontend
+`.catch()` blocks — `useAiModule` and six pages/components — assumed
+`detail` is always a string (FastAPI's default, and the only shape ever
+exercised before this). `catch (e: any)` meant nothing caught the mismatch at
+compile time. Visiting the AI Command Center with a lapsed subscription didn't
+show an error state — it hard-crashed the page. Fixed with one shared
+`errorMessage()` helper in `lib/api.ts` used by all nine sites. Full account,
+including a correction to this file's own earlier claim that gating covers
+"every `/ai/*` route" (it covers every route on `routers/ai.py`'s router
+object — `routers/analytics.py` shares the URL prefix but is deliberately
+ungated), is in directive 016.
+
+**Offline POS.** IndexedDB write queue (`lib/offlineQueue.ts`), a cached menu
+snapshot so a cold reload with no connection still has something to sell,
+`client_order_id` idempotency (migration 026) so a retried sync can't
+double-create an order or double-deduct stock, and a sync indicator. Verified
+end-to-end in a real browser, against a **production build** specifically —
+`next dev` gave a false failure on the offline-reload step first (its own
+asset serving doesn't survive real offline; only `next build && next start`
+represents what ships).
+
+That same verification pass caught a second real bug, this one pre-existing
+and more serious: `AuthContext.fetchUser()` treated *any* failure of the
+boot-time `/auth/me` check — including a bare network failure — as an invalid
+session, clearing the token and redirecting to `/login`. Every page reload
+while offline hit this, on a device that by definition can't reach `/login`'s
+API either — logging the user out was the actual failure mode, not the queue
+or the cached menu. Fixed by only clearing the session on a real `401`/`403`
+response; a network failure now falls back to a `cached_user` snapshot in
+`localStorage`. Full design, the auth-bug writeup, and known remaining edges
+(queue is per-device, not shared across POS terminals) are in directive 006.
+
+**Pattern worth naming:** both real bugs found this pass were the same shape
+— a change that was correct in isolation (structured 402 detail; an
+already-existing boot-time auth check) broke silently when a piece built
+*around* it made a new assumption (that `detail` is always a string; that a
+failed check means the session is gone). Neither was caught by the backend
+test suite, because neither was a backend bug — both needed a real browser
+against a real, degraded network condition to surface. That is the concrete
+argument for the browser-testing step being mandatory on frontend work in
+this codebase, not optional polish.

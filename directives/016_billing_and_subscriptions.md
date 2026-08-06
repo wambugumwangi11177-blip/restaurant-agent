@@ -90,16 +90,33 @@ All routes ADMIN-only.
 ## What is gated — and what must NEVER be
 
 `require_active_subscription` is applied **at the router** in `routers/ai.py`, so
-every current and future `/ai/*` route inherits it and none can be added later
-that quietly bypasses billing.
+every route registered on *that router object* inherits it and none can be added
+there later that quietly bypasses billing.
 
-**Gated:** `/ai/*` — derived intelligence. Pricing recommendations, profit
-analysis, simulation, strategy, ROI, marketing. This is the product a restaurant
-subscribes to.
+**Read that precisely — it is not "every `/ai/*` URL."** `routers/ai.py` and
+`routers/analytics.py` both happen to mount at `prefix="/ai"`, an accident of how
+the codebase split across two files, not a billing-tier decision. A route can sit
+at an `/ai/...` URL and still be outside the gate if it lives in `analytics.py`.
+(The original wording here said "every `/ai/*` route inherits it," which reads as
+every URL — corrected 2026-08-06 after that exact ambiguity was caught
+browser-testing the gate; see "Bug found & fixed" below.)
 
-**Never gated:** POS, KDS, orders, menu, inventory, reservations, payments, auth,
-and `routers/analytics.py` (the main dashboard and the restaurant's own revenue
-history).
+**Gated (`routers/ai.py`):** derived intelligence reached through a dedicated
+analysis surface — pricing recommendations, profit analysis, labor, supply chain,
+shrinkage, simulation, strategy, ROI, decisions, workflows. This is the product a
+restaurant subscribes to; the AI Command Center is its home page.
+
+**Never gated:** POS, KDS, orders, menu, inventory, reservations, payments, auth
+— and `routers/analytics.py`, for a *different reason* than "it's the
+restaurant's own data" (`/ai/menu-engineering`'s Star/Dog classification and
+`/ai/revenue-forecast` are genuinely computed intelligence, not raw history). The
+real reason is **consumption pattern**: every `analytics.py` route is fetched
+inline, with a graceful `.catch()` fallback, as a small enhancement embedded
+directly in a core operational page — Home's health score, Menu's Star/Dog
+badges, Inventory's restock hints, Orders' revenue-forecast line, Reservations'
+no-show insights. Gating those would mean a lapsed subscription breaks the Home
+and Menu pages themselves, which is exactly the outcome this gate exists to
+prevent.
 
 > **This line must not move.** A restaurant whose payment bounced must still be
 > able to take orders and feed people tonight, and must still be able to see its
@@ -110,6 +127,39 @@ history).
 > The principle: **non-payment costs you our analysis, never your ability to
 > trade or to see your own data.** `test_an_unpaid_restaurant_can_still_trade`
 > exists specifically so nobody moves this line without noticing.
+
+## Bug found & fixed browser-testing this (2026-08-06)
+
+The backend tests all passed; the crash only showed up driving a real browser
+against a real lapsed subscription, which is exactly why that step happened
+before this shipped.
+
+`require_active_subscription` raises 402 with a **structured** `detail`
+(`{message, status, plan, current_period_end}`) so `SubscriptionBanner` can read
+the individual fields. Every existing frontend `.catch()` — nine call sites
+across `useAiModule.ts`, the AI Command Center, ROI, Marketing, AI Ops,
+`StrategyAgent`, `WhatIfSimulator` — did `e?.response?.data?.detail || fallback`,
+built against FastAPI's default *string* `detail` and never tested against an
+object one. `catch (e: any)` meant nothing caught the mismatch at compile time.
+
+Result: visiting the AI Command Center with a lapsed subscription didn't show an
+error state — it hard-crashed the whole page with React's "Objects are not valid
+as a React child," because a component tried to render the detail object
+directly as text.
+
+Fixed with one shared helper, `errorMessage()` in `frontend/src/lib/api.ts`,
+that returns `detail` when it's a string, `detail.message` when it's an object,
+or a fallback — and every one of the nine call sites now goes through it instead
+of inlining the same unsafe extraction. Two call sites that can never receive a
+structured detail (`RecipeEditor`, the billing page's own record-payment call —
+neither hits a `routers/ai.py` endpoint) were deliberately left as-is rather than
+changed for consistency's sake alone.
+
+**The lesson for this codebase specifically:** any time a backend error `detail`
+changes shape from a plain string, grep the frontend for
+`response?.data?.detail` before shipping — it's an idiom repeated across the
+codebase, not centralized, and nothing before this session enforced the FastAPI
+convention that `detail` is always a string.
 
 ## Still open
 

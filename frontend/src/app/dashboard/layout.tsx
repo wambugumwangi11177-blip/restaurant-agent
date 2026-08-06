@@ -20,7 +20,10 @@ import {
     Clock,
     Megaphone,
     Cpu,
+    Users,
+    Wallet,
 } from "lucide-react";
+import SubscriptionBanner from "@/components/billing/SubscriptionBanner";
 
 // adminOnly pages call management/AI endpoints that are ADMIN-gated on the
 // backend (routers/ai.py, analytics.py — RBAC pass 2026-07-11). Hiding their nav
@@ -36,6 +39,10 @@ const navItems = [
     { href: "/dashboard/inventory",    label: "Stock",    icon: Package },
     { href: "/dashboard/reservations", label: "Bookings", icon: CalendarDays },
     { href: "/dashboard/sales",        label: "Sales",    icon: DollarSign },
+    // Not adminOnly: clock-in/out (POST /staff/shifts/{id}/clock-in|out) is
+    // any-authed on the backend — the person on the floor uses this. The
+    // page itself hides wage/roster management from non-admins.
+    { href: "/dashboard/staff",        label: "Staff",    icon: Users },
     // The AI Command Center. Superseded /dashboard/insights, which served a
     // hardcoded Lavy demo and was deleted 2026-07-08.
     { href: "/dashboard/ai",           label: "AI",       icon: Brain, adminOnly: true },
@@ -44,6 +51,7 @@ const navItems = [
     // AI Ops shows this restaurant's OWN AI cost/reliability — ADMIN-only, like
     // the rest of /ai/* (it reads /ai/usage).
     { href: "/dashboard/ai-ops",       label: "AI Ops",   icon: Cpu, adminOnly: true },
+    { href: "/dashboard/billing",      label: "Billing",  icon: Wallet, adminOnly: true },
 ];
 
 // STAFF land here instead of /dashboard (Home is an admin analytics page).
@@ -160,6 +168,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </button>
                     <div className="text-xs text-[#525252]">{user.role}</div>
                 </header>
+
+                <SubscriptionBanner />
 
                 <div className="p-5 max-w-6xl">
                     {children}

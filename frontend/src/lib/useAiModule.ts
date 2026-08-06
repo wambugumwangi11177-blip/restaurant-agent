@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
-import api from "@/lib/api";
+import api, { errorMessage } from "@/lib/api";
 
 export function useAiModule<T>(endpoint: string) {
     const [data, setData] = useState<T | null>(null);
@@ -28,7 +28,7 @@ export function useAiModule<T>(endpoint: string) {
                 setData(res.data);
             }
         } catch (e: any) {
-            setError(e?.response?.data?.detail || e?.message || "Could not load this module");
+            setError(errorMessage(e, "Could not load this module"));
         } finally {
             setLoading(false);
         }

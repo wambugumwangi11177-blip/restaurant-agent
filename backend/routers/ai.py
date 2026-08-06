@@ -44,19 +44,41 @@ from routers.billing import require_active_subscription
 
 logger = logging.getLogger("ai.router")
 
-# Subscription gate applied at the router, so every current and future /ai route
-# inherits it and none can be added later that quietly bypasses billing.
+# Subscription gate applied at the router, so every route REGISTERED ON THIS
+# ROUTER OBJECT inherits it and none can be added here later that quietly
+# bypasses billing.
 #
-# Where the line sits, and why here: this router is *derived intelligence* —
-# pricing recommendations, profit analysis, simulation, strategy. That is the
-# product a restaurant subscribes to. routers/analytics.py (the main dashboard,
-# revenue history, the restaurant's own order data) is deliberately left
-# ungated, as are POS, KDS, orders, menu, payments and auth.
+# Read that precisely: it is NOT every URL path starting with "/ai/". This
+# router and routers/analytics.py both happen to mount at prefix="/ai" — an
+# accident of how the codebase split across two files, not a billing-tier
+# decision — so a route can sit at an "/ai/..." URL and still be outside this
+# gate if it lives in analytics.py. Found 2026-08-06 browser-testing the
+# billing gate: the earlier wording here ("every /ai route") read as "every
+# /ai/* URL," which is false and worth being exact about.
 #
-# The principle: a customer's own operational data stays visible to them
-# whatever their billing state, and a restaurant that hasn't paid can still take
-# orders and feed people tonight. Non-payment costs you our analysis, never your
-# ability to trade or to see your own numbers.
+# Where the line actually sits, and why: this router is *derived
+# intelligence* — pricing recommendations, profit analysis, simulation,
+# strategy, shrinkage, ROI. Reached through dedicated pages/sections whose
+# entire purpose is analysis, e.g. the AI Command Center. That is the product
+# a restaurant subscribes to.
+#
+# routers/analytics.py is deliberately left ungated for a different reason
+# than "it's the restaurant's own data" (menu-engineering and revenue-forecast
+# are genuinely computed intelligence, not raw history) — it's CONSUMPTION
+# PATTERN: every one of its routes is fetched inline, with a graceful
+# `.catch()` fallback, as a small enhancement embedded directly in a core
+# operational page (Home's health score, Menu's Star/Dog badges, Inventory's
+# restock hints, Orders' revenue-forecast line, Reservations' no-show
+# insights). Gating those would mean a lapsed subscription breaks the Home
+# page and Menu page themselves — exactly the outcome this whole gate exists
+# to prevent. POS, KDS, orders, menu, payments and auth are ungated for the
+# same reason, more directly (no /ai/ URL at all).
+#
+# The principle: a customer's own operational data — and the small inline
+# insights woven into using it — stays visible whatever their billing state.
+# A restaurant that hasn't paid can still take orders and feed people tonight.
+# Non-payment costs you the DEDICATED analysis surface (this router), never
+# your ability to trade or to see your own numbers.
 router = APIRouter(
     prefix="/ai",
     tags=["ai"],

@@ -18,7 +18,7 @@
  */
 
 import { useEffect, useState } from "react";
-import api from "@/lib/api";
+import api, { errorMessage } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import {
     Brain, TrendingUp, AlertTriangle, CheckCircle,
@@ -145,7 +145,7 @@ export default function AiDashboard() {
             setData(res.data);
             setLastUpdated(new Date());
         } catch (e: any) {
-            setError(e?.response?.data?.detail || e?.message || "Could not load AI data");
+            setError(errorMessage(e, "Could not load AI data"));
         } finally {
             setLoading(false);
         }
@@ -466,7 +466,7 @@ function PricingSection() {
             }
             retry(); // re-materialize: the actioned rec is no longer PENDING
         } catch (e: any) {
-            setNotice({ kind: "err", text: e?.response?.data?.detail || `Could not ${action} this recommendation` });
+            setNotice({ kind: "err", text: errorMessage(e, `Could not ${action} this recommendation`) });
         } finally {
             setActioningId(null);
         }

@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { motion } from "framer-motion";
-import { UtensilsCrossed, Plus, X, Loader2, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { UtensilsCrossed, Plus, X, Loader2, TrendingUp, TrendingDown, Minus, ChefHat } from "lucide-react";
+import RecipeEditor from "@/components/menu/RecipeEditor";
 
 interface MenuItem {
     id: number;
@@ -14,21 +15,32 @@ interface MenuItem {
     is_available: boolean;
 }
 
+interface InventoryItemOption {
+    id: number;
+    item_name: string;
+    unit: string;
+    cost_per_unit: number;
+}
+
 export default function MenuPage() {
     const [items, setItems] = useState<MenuItem[]>([]);
     const [aiData, setAiData] = useState<any>(null);
+    const [inventoryItems, setInventoryItems] = useState<InventoryItemOption[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({ name: "", price: "", category: "", description: "" });
+    const [recipeEditorFor, setRecipeEditorFor] = useState<number | null>(null);
 
     useEffect(() => {
         Promise.all([
             api.get("/menu/").catch(() => ({ data: [] })),
             api.get("/ai/menu-engineering").catch(() => ({ data: null })),
-        ]).then(([menuRes, aiRes]) => {
+            api.get("/inventory/").catch(() => ({ data: [] })),
+        ]).then(([menuRes, aiRes, invRes]) => {
             setItems(menuRes.data || []);
             setAiData(aiRes.data);
+            setInventoryItems(invRes.data || []);
             setLoading(false);
         });
     }, []);
@@ -212,38 +224,57 @@ export default function MenuPage() {
                             <div className="space-y-1">
                                 {items.filter((i) => i.category === cat).map((item, idx) => {
                                     const aiItem = matrix.find((m: any) => m.item_id === item.id);
+                                    const recipeOpen = recipeEditorFor === item.id;
                                     return (
                                         <motion.div key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                                            transition={{ delay: idx * 0.03 }}
-                                            className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3 flex items-center justify-between hover:border-[#333] transition-colors">
-                                            <div className="flex items-center gap-3">
-                                                {aiItem && (
-                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${classColor(aiItem.classification)}`}>
-                                                        {classLabel(aiItem.classification)}
-                                                    </span>
-                                                )}
-                                                <div>
-                                                    <p className={`text-sm font-medium ${item.is_available ? "text-[#e5e5e5]" : "text-[#525252] line-through"}`}>
-                                                        {item.name}
-                                                    </p>
-                                                    {item.description && (
-                                                        <p className="text-xs text-[#525252] mt-0.5">{item.description}</p>
+                                            transition={{ delay: idx * 0.03 }}>
+                                            <div className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3 flex items-center justify-between hover:border-[#333] transition-colors">
+                                                <div className="flex items-center gap-3">
+                                                    {aiItem && (
+                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${classColor(aiItem.classification)}`}>
+                                                            {classLabel(aiItem.classification)}
+                                                        </span>
                                                     )}
+                                                    <div>
+                                                        <p className={`text-sm font-medium ${item.is_available ? "text-[#e5e5e5]" : "text-[#525252] line-through"}`}>
+                                                            {item.name}
+                                                        </p>
+                                                        {item.description && (
+                                                            <p className="text-xs text-[#525252] mt-0.5">{item.description}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    {aiItem?.margin_pct !== undefined && (
+                                                        <span className={`text-[10px] ${aiItem.margin_pct >= 60 ? "text-[#22c55e]" : aiItem.margin_pct >= 30 ? "text-[#737373]" : "text-[#ef4444]"
+                                                            }`}>{aiItem.margin_pct.toFixed(0)}% profit</span>
+                                                    )}
+                                                    <span className="text-sm font-semibold text-[#d4a853]">
+                                                        KES {(item.price / 100).toLocaleString()}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => setRecipeEditorFor(recipeOpen ? null : item.id)}
+                                                        title="What this dish is made of — drives stock deduction and cost"
+                                                        className={`text-[10px] px-2 py-1 rounded flex items-center gap-1 transition-all ${recipeOpen ? "bg-[#d4a853]/10 text-[#d4a853]" : "bg-[#1a1a1a] text-[#737373] hover:text-[#d4a853]"}`}>
+                                                        <ChefHat className="w-3 h-3" /> Recipe
+                                                    </button>
+                                                    <button onClick={() => toggleAvailability(item)}
+                                                        className={`w-8 h-5 rounded-full relative transition-colors ${item.is_available ? "bg-[#22c55e]" : "bg-[#333]"}`}>
+                                                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${item.is_available ? "left-3.5" : "left-0.5"}`} />
+                                                    </button>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-3">
-                                                {aiItem?.margin_pct !== undefined && (
-                                                    <span className={`text-[10px] ${aiItem.margin_pct >= 60 ? "text-[#22c55e]" : aiItem.margin_pct >= 30 ? "text-[#737373]" : "text-[#ef4444]"
-                                                        }`}>{aiItem.margin_pct.toFixed(0)}% profit</span>
+                                            <AnimatePresence>
+                                                {recipeOpen && (
+                                                    <RecipeEditor
+                                                        menuItemId={item.id}
+                                                        menuItemName={item.name}
+                                                        inventoryItems={inventoryItems}
+                                                        onClose={() => setRecipeEditorFor(null)}
+                                                        onSaved={() => fetchMenu()}
+                                                    />
                                                 )}
-                                                <span className="text-sm font-semibold text-[#d4a853]">
-                                                    KES {(item.price / 100).toLocaleString()}
-                                                </span>
-                                                <button onClick={() => toggleAvailability(item)}
-                                                    className={`w-8 h-5 rounded-full relative transition-colors ${item.is_available ? "bg-[#22c55e]" : "bg-[#333]"}`}>
-                                                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${item.is_available ? "left-3.5" : "left-0.5"}`} />
-                                                </button>
-                                            </div>
+                                            </AnimatePresence>
                                         </motion.div>
                                     );
                                 })}

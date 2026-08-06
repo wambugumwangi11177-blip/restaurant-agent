@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useState } from "react";
-import api from "@/lib/api";
+import api, { errorMessage } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Cpu, RefreshCw, AlertTriangle, ShieldCheck, Activity, Gauge } from "lucide-react";
 
@@ -78,7 +78,7 @@ export default function AiOpsPage() {
             setLastUpdated(new Date());
         } catch (e: any) {
             if (e?.response?.status === 403) setForbidden(true);
-            else setError(e?.response?.data?.detail || e?.message || "Could not load AI operations data");
+            else setError(errorMessage(e, "Could not load AI operations data"));
         } finally {
             setLoading(false);
         }

@@ -12,7 +12,7 @@
 
 import { useEffect, useState } from "react";
 import { FlaskConical } from "lucide-react";
-import api from "@/lib/api";
+import api, { errorMessage } from "@/lib/api";
 import { formatKES } from "@/lib/format";
 import { HowItWorks } from "./HowItWorks";
 
@@ -87,7 +87,7 @@ export function WhatIfSimulator() {
             if (res.data?.available === false) setError(res.data.error || "Simulation unavailable.");
             else setResult(res.data);
         } catch (e: any) {
-            setError(e?.response?.data?.detail || e?.message || "Simulation failed.");
+            setError(errorMessage(e, "Simulation failed."));
         } finally {
             setLoading(false);
         }

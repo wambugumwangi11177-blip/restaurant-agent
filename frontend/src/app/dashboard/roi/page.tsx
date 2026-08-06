@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useState } from "react";
-import api from "@/lib/api";
+import api, { errorMessage } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { formatKES } from "@/lib/format";
 import { HowItWorks } from "@/components/ai/HowItWorks";
@@ -179,7 +179,7 @@ export default function RoiDashboard() {
             setData(res.data);
             setLastUpdated(new Date());
         } catch (e: any) {
-            setError(e?.response?.data?.detail || e?.message || "Could not load ROI data");
+            setError(errorMessage(e, "Could not load ROI data"));
         } finally {
             setLoading(false);
         }

@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 import { Target, ChevronDown } from "lucide-react";
-import api from "@/lib/api";
+import api, { errorMessage } from "@/lib/api";
 import { HowItWorks } from "./HowItWorks";
 
 interface Step { action: string; why?: string; expected_impact?: string; priority_score?: number; category?: string; }
@@ -48,7 +48,7 @@ export function StrategyAgent() {
             if (res.data?.available === false) setError(res.data.error || "Strategy unavailable.");
             else setResult(res.data);
         } catch (e: any) {
-            setError(e?.response?.data?.detail || e?.message || "Strategy failed.");
+            setError(errorMessage(e, "Strategy failed."));
         } finally {
             setLoading(false);
         }

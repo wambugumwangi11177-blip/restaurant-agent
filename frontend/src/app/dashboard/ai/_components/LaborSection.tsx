@@ -15,7 +15,8 @@ export default function LaborSection() {
     const { data, loading, error, retry } = useAiModule<LaborData>("/ai/labor");
 
     return (
-        <ModuleShell icon={Activity} title="Labor Optimization" explainKey="labor" loading={loading} error={error} onRetry={retry}>
+        <ModuleShell icon={Activity} title="Labor Optimization" explainKey="labor" loading={loading} error={error} onRetry={retry}
+            fullHref="/dashboard/ai/labor">
             {data && (
                 <>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">

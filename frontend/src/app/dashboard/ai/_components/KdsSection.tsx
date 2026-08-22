@@ -29,6 +29,7 @@ export default function KdsSection() {
             loading={loading}
             error={error}
             onRetry={retry}
+            fullHref="/dashboard/ai/kitchen"
         >
             {data && (
                 <>

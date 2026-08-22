@@ -23,6 +23,7 @@ export default function SupplyChainSection() {
 
     return (
         <ModuleShell icon={Truck} title="Supplier Intelligence" explainKey="supply" loading={loading} error={error} onRetry={retry}
+            fullHref="/dashboard/ai/suppliers"
             subtitle="Which suppliers deliver on time, whose prices are creeping up, and which orders are overdue.">
             {data && (
                 <>

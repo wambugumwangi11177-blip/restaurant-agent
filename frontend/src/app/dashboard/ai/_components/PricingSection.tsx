@@ -67,7 +67,8 @@ export default function PricingSection() {
     };
 
     return (
-        <ModuleShell icon={TrendingUp} title="Pricing Intelligence" explainKey="pricing" loading={loading} error={error} onRetry={retry}>
+        <ModuleShell icon={TrendingUp} title="Pricing Intelligence" explainKey="pricing" loading={loading} error={error} onRetry={retry}
+            fullHref="/dashboard/ai/pricing">
             {data && (
                 <>
                     <NarrativeBlock n={data.narrative} />

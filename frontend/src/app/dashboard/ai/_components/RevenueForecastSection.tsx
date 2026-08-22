@@ -34,6 +34,7 @@ export default function RevenueForecastSection() {
             loading={loading}
             error={error}
             onRetry={retry}
+            fullHref="/dashboard/ai/revenue"
         >
             {data && (
                 <>

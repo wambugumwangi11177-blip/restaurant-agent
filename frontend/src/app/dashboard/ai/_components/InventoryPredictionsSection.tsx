@@ -42,6 +42,7 @@ export default function InventoryPredictionsSection() {
             loading={loading}
             error={error}
             onRetry={retry}
+            fullHref="/dashboard/ai/inventory"
         >
             {data && (
                 <>

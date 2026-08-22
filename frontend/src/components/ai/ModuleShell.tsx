@@ -9,9 +9,11 @@
 
 import { HowItWorks } from "./HowItWorks";
 import type { LucideIcon } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import Link from "next/link";
 
 export function ModuleShell({
-    icon: Icon, title, subtitle, explainKey, loading, error, onRetry, children,
+    icon: Icon, title, subtitle, explainKey, loading, error, onRetry, fullHref, children,
 }: {
     icon: LucideIcon;
     title: string;
@@ -20,14 +22,23 @@ export function ModuleShell({
     loading: boolean;
     error: string;
     onRetry: () => void;
+    /** Link to this module's extensive sub-dashboard (/dashboard/ai/[module]). */
+    fullHref?: string;
     children: React.ReactNode;
 }) {
     return (
         <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
-            <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2">
-                <Icon className="w-4 h-4 text-[var(--accent)]" />
-                {title}
-            </h2>
+            <div className="flex items-start justify-between gap-2">
+                <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2">
+                    <Icon className="w-4 h-4 text-[var(--accent)]" />
+                    {title}
+                </h2>
+                {fullHref && (
+                    <Link href={fullHref} className="flex items-center gap-1 text-xs text-[var(--accent)] hover:underline whitespace-nowrap">
+                        Full dashboard <ArrowRight className="w-3 h-3" />
+                    </Link>
+                )}
+            </div>
             {subtitle && <p className="text-xs text-[#525252] mt-1">{subtitle}</p>}
             {explainKey && <HowItWorks id={explainKey} />}
             <div className="mb-4" />

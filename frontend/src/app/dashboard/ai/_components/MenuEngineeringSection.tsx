@@ -18,6 +18,7 @@ export default function MenuEngineeringSection() {
 
     return (
         <ModuleShell icon={Brain} title="Menu Engineering" explainKey="menu" loading={loading} error={error} onRetry={retry}
+            fullHref="/dashboard/ai/menu"
             subtitle="Classifies every dish by popularity × profit so you know what to promote, reprice, or cut.">
             {data && (
                 <>

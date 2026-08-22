@@ -21,6 +21,7 @@ export default function ProfitSection() {
 
     return (
         <ModuleShell icon={TrendingUp} title="Profit Intelligence" explainKey="profit" loading={loading} error={error} onRetry={retry}
+            fullHref="/dashboard/ai/profit"
             subtitle="Where money leaks out — dishes sold below a healthy margin, and exactly how much each costs you per month.">
             {data && (
                 <>

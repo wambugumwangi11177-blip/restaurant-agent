@@ -24,6 +24,7 @@ export default function FraudSection() {
             loading={loading}
             error={error}
             onRetry={retry}
+            fullHref="/dashboard/ai/fraud"
         >
             {data && (
                 data.flagged ? (

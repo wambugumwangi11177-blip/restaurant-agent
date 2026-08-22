@@ -48,6 +48,10 @@ const ProfitSection = dynamic(() => import("./_components/ProfitSection"));
 const HealthBoostSection = dynamic(() => import("./_components/HealthBoostSection"));
 const RevenueForecastSection = dynamic(() => import("./_components/RevenueForecastSection"));
 const InventoryPredictionsSection = dynamic(() => import("./_components/InventoryPredictionsSection"));
+const KdsSection = dynamic(() => import("./_components/KdsSection"));
+const FraudSection = dynamic(() => import("./_components/FraudSection"));
+const GraphImpactSection = dynamic(() => import("./_components/GraphImpactSection"));
+const CashSection = dynamic(() => import("./_components/CashSection"));
 
 // Mirrors the actual shape returned by ai/ops_manager.get_operations_dashboard
 // (served via GET /ai/dashboard) — this page previously assumed field names
@@ -302,9 +306,13 @@ export default function AiDashboard() {
             <ProfitSection />
             <PricingSection />
             <MenuEngineeringSection />
+            <KdsSection />
             <LaborSection />
             <SupplyChainSection />
             <InventoryPredictionsSection />
+            <GraphImpactSection />
+            <CashSection />
+            <FraudSection />
             <DataQualitySection />
 
             {/* Risks + Opportunities */}

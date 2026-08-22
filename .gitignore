@@ -48,3 +48,4 @@ backend/.storage/
 .storage/
 
 .vercel
+backend/local_dev.db

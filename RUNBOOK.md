@@ -6,16 +6,34 @@
 ./dev.sh
 ```
 
-- Backend:  http://localhost:8000  (takes **~20–40 seconds** to be ready — it
-  syncs the schema to the remote Neon Postgres database on boot. This is
-  normal; it is not a hang.)
+- Backend:  http://localhost:8000  (ready in a few seconds)
 - Frontend: http://localhost:3000  (ready in a few seconds)
 - `Ctrl+C` stops both. Logs land in `./backend.log` and `./frontend.log`.
+- `./dev.sh --dev` runs the frontend in hot-reload mode for coding (slower
+  page opens — each route compiles on first visit). Default is the fast
+  prebuilt production server.
+
+## Local runs on a COPY of your data (sandbox)
+
+Local dev points at `backend/local_dev.db` — a SQLite snapshot of the
+production Neon database (taken 2026-08-22, 661,884 rows). Every query runs
+in milliseconds instead of crossing the ocean to the US, which is what makes
+the dashboards fast locally.
+
+- **It's a sandbox**: orders/edits you make locally do NOT touch production.
+- **Refresh the copy** from live Neon any time:
+  ```bash
+  cd backend && venv/bin/python dev_snapshot.py
+  ```
+- **Work against LIVE remote data instead** (slow locally — every page pays
+  the international round-trips): in `backend/.env`, swap the values of
+  `DATABASE_URL` (→ the postgres URL) and `REMOTE_DATABASE_URL` (→ the
+  sqlite one), restart, and swap back when done.
 
 ## Is it working?
 
 - `http://localhost:8000/health/` → `{"status":"ok"}`
-- Open `http://localhost:3000`, register or log in, and the dashboard loads.
+- Open `http://localhost:3000`, log in, and the dashboard loads in seconds.
 
 ## First-time setup (or after a rebuild)
 
@@ -24,8 +42,9 @@
 cd backend
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
+venv/bin/python dev_snapshot.py   # build local_dev.db from Neon
 
-# Frontend — node modules
+# Frontend — node modules (dev.sh builds .next automatically on first run)
 cd ../frontend
 npm install
 ```

@@ -45,8 +45,21 @@ echo "▶ Backend  → http://localhost:8000  (ready in ~20-40s; check backend.l
 ( cd backend && exec venv/bin/python -m uvicorn main:app --port 8000 > ../backend.log 2>&1 ) &
 BACKEND_PID=$!
 
-echo "▶ Frontend → http://localhost:3000  (ready in a few seconds; check frontend.log)"
-( cd frontend && exec npm run dev > ../frontend.log 2>&1 ) &
+# Production frontend by default: prebuilt pages open instantly. `next dev`
+# recompiles each route on first visit (seconds per page) — great while coding,
+# painful while demoing. ./dev.sh --dev opts back into hot reload.
+if [ "${1:-}" = "--dev" ]; then
+    FE_CMD="npm run dev"
+else
+    if [ ! -d frontend/.next ] || [ ! -f frontend/.next/BUILD_ID ]; then
+        echo "▶ Building frontend (first run only — a few minutes)..."
+        ( cd frontend && npm run build > ../frontend.log 2>&1 )
+    fi
+    FE_CMD="npm start"
+fi
+
+echo "▶ Frontend → http://localhost:3000  ($FE_CMD; ready in a few seconds; check frontend.log)"
+( cd frontend && exec $FE_CMD > ../frontend.log 2>&1 ) &
 FRONTEND_PID=$!
 
 echo ""

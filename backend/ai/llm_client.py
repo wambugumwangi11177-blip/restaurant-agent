@@ -77,7 +77,10 @@ _MODEL_TIERS = {
         # map to the largest configured model; only LOW drops to a smaller,
         # faster one. When ANTHROPIC_API_KEY is added this table stops being
         # used at all — the anthropic row above takes over.
-        TIER_LOW:    os.getenv("GROQ_MODEL_LOW",    "llama-3.1-8b-instant"),
+        # LOW default updated 2026-08-22: llama-3.1-8b-instant was decommissioned
+        # by Groq (404 model_not_found on every call — all narration silently
+        # failed); gpt-oss-20b is the current small/fast tier (verified live).
+        TIER_LOW:    os.getenv("GROQ_MODEL_LOW",    "openai/gpt-oss-20b"),
         TIER_MEDIUM: os.getenv("GROQ_MODEL_MEDIUM", _GROQ_MODEL),
         TIER_HIGH:   os.getenv("GROQ_MODEL_HIGH",   _GROQ_MODEL),
     },

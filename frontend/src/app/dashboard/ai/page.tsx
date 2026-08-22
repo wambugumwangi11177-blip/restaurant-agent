@@ -46,6 +46,8 @@ const DataQualitySection = dynamic(() => import("./_components/DataQualitySectio
 const MenuEngineeringSection = dynamic(() => import("./_components/MenuEngineeringSection"));
 const ProfitSection = dynamic(() => import("./_components/ProfitSection"));
 const HealthBoostSection = dynamic(() => import("./_components/HealthBoostSection"));
+const RevenueForecastSection = dynamic(() => import("./_components/RevenueForecastSection"));
+const InventoryPredictionsSection = dynamic(() => import("./_components/InventoryPredictionsSection"));
 
 // Mirrors the actual shape returned by ai/ops_manager.get_operations_dashboard
 // (served via GET /ai/dashboard) — this page previously assumed field names
@@ -281,6 +283,13 @@ export default function AiDashboard() {
             {/* Digital Twin — forward revenue projection with calendar signals. */}
             <DigitalTwin />
 
+            {/* Revenue Forecast — the 7-day statistical forecast with confidence
+                bands. Distinct from the Digital Twin above: the twin projects a
+                chosen horizon with demand movers; this is the straight
+                sales-pattern forecast. Both surfaces existed only as raw API
+                endpoints consumed by other pages (Orders, Stock) before. */}
+            <RevenueForecastSection />
+
             {/* Concrete, prioritised actions to raise the health score */}
             <HealthBoostSection breakdown={data!.health_breakdown} score={hs} />
 
@@ -295,6 +304,7 @@ export default function AiDashboard() {
             <MenuEngineeringSection />
             <LaborSection />
             <SupplyChainSection />
+            <InventoryPredictionsSection />
             <DataQualitySection />
 
             {/* Risks + Opportunities */}

@@ -90,10 +90,10 @@ def test_dispatch_push_sends_to_every_subscription_and_prunes_dead_ones(db_sessi
     user = _make_user(db_session, tenant, "n3", staff_role=models.StaffRole.OWNER)
 
     alive = models.PushSubscription(
-        user_id=user.id, endpoint="https://push.example/alive", p256dh="p1", auth="a1",
+        user_id=user.id, endpoint="https://updates.push.services.mozilla.com/alive", p256dh="p1", auth="a1",
     )
     dead = models.PushSubscription(
-        user_id=user.id, endpoint="https://push.example/dead", p256dh="p2", auth="a2",
+        user_id=user.id, endpoint="https://updates.push.services.mozilla.com/dead", p256dh="p2", auth="a2",
     )
     db_session.add_all([alive, dead])
     db_session.commit()
@@ -124,11 +124,11 @@ def test_dispatch_push_sends_to_every_subscription_and_prunes_dead_ones(db_sessi
 
     notify_mod._dispatch_push(db_session, user.id, "Title", "Body", "/dashboard")
 
-    assert set(sent) == {"https://push.example/alive", "https://push.example/dead"}
+    assert set(sent) == {"https://updates.push.services.mozilla.com/alive", "https://updates.push.services.mozilla.com/dead"}
     remaining = db_session.query(models.PushSubscription).filter(
         models.PushSubscription.user_id == user.id
     ).all()
-    assert [s.endpoint for s in remaining] == ["https://push.example/alive"]
+    assert [s.endpoint for s in remaining] == ["https://updates.push.services.mozilla.com/alive"]
 
 
 # ── Role-based fan-out: only targeted roles get notified ───────────────────

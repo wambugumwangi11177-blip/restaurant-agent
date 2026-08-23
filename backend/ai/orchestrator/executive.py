@@ -532,6 +532,22 @@ def on_reservation_no_show(payload: dict) -> None:
 
         # For large parties (4+) from known customers, trigger winback
         if party_size >= 4 and customer_phone:
+            # Same marketing-consent gate broadcast_winback/promo enforce
+            # (brain.py): a "come back" promo is marketing traffic and needs a
+            # positive consent signal, not just the absence of a STOP opt-out.
+            from ai.whatsapp.optout import canonical as _canonical_phone, is_opted_out
+            consented = {
+                _canonical_phone(row[0])
+                for row in db.query(models.CustomerConsent.customer_phone)
+                .filter(models.CustomerConsent.restaurant_id == restaurant_id)
+                .all()
+            }
+            if _canonical_phone(customer_phone) not in consented or is_opted_out(db, customer_phone):
+                logger.info(
+                    "[Orchestrator] no-show winback skipped for %s — no marketing consent",
+                    _canonical_phone(customer_phone),
+                )
+                return
             restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
             r_name = restaurant.name if restaurant else "us"
             from ai.whatsapp import compose_winback_message, send_whatsapp_message
@@ -720,10 +736,25 @@ def on_agent_failed(payload: dict) -> None:
             models.AgentExecution.agent_name == agent_name,
             models.AgentExecution.success    == False,
             models.AgentExecution.created_at >= cutoff,
-        ).count()
+        )
+        # Scope to THIS restaurant — without the filter, failures at tenant A
+        # push tenant B over the "3 failures/hour" alert threshold.
+        if restaurant_id:
+            recent_failures = recent_failures.filter(
+                models.AgentExecution.restaurant_id == restaurant_id
+            )
+        recent_failures = recent_failures.count()
 
         if recent_failures >= 3:
-            owner_phone = os.getenv("OWNER_PHONE", "")
+            # Resolve the restaurant's own owner number (DB column, env
+            # fallback) — the global OWNER_PHONE env var ignores per-tenant
+            # routing and can text the wrong owner.
+            owner_phone = ""
+            if restaurant_id:
+                restaurant = db.query(models.Restaurant).filter(
+                    models.Restaurant.id == restaurant_id
+                ).first()
+                owner_phone = _owner_phone(restaurant)
             if owner_phone:
                 from ai.whatsapp import send_whatsapp_message
                 msg = (

@@ -17,9 +17,18 @@ export default function Modal({ label, onClose, children, className = "" }: Moda
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        // WCAG focus management: remember what opened the dialog — BEFORE
+        // moving focus inside it — and return focus there on close, so
+        // keyboard users aren't dropped at the top of the page.
+        const opener = document.activeElement as HTMLElement | null;
+
         const container = containerRef.current;
         const focusable = container?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
         focusable?.[0]?.focus();
+
+        // Lock body scroll while the dialog is open (restored on unmount).
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
 
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === "Escape") {
@@ -43,7 +52,11 @@ export default function Modal({ label, onClose, children, className = "" }: Moda
         };
 
         document.addEventListener("keydown", handleKeyDown);
-        return () => document.removeEventListener("keydown", handleKeyDown);
+        return () => {
+            document.removeEventListener("keydown", handleKeyDown);
+            document.body.style.overflow = previousOverflow;
+            if (opener && document.contains(opener)) opener.focus();
+        };
     }, [onClose]);
 
     return (

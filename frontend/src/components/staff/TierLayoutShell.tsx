@@ -8,8 +8,11 @@ import NotificationBell from "@/components/NotificationBell";
 import AttendanceWidget from "@/components/staff/AttendanceWidget";
 import QuickSwitchModal from "@/components/QuickSwitchModal";
 import PinSetupModal from "@/components/PinSetupModal";
+import PageLoader from "@/components/ui/PageLoader";
+import SkipLink from "@/components/ui/SkipLink";
 import { LogOut, Repeat, Menu as MenuIcon, X, type LucideIcon } from "lucide-react";
 import { tierHome, StaffTier } from "@/lib/permissions";
+import { labelForPath } from "@/lib/pathTitle";
 
 export interface TierNavItem {
     href: string;
@@ -61,24 +64,50 @@ export default function TierLayoutShell({
         return () => document.removeEventListener("keydown", handleKeyDown);
     }, [sidebarOpen]);
 
-    if (!user || staffRole !== tier) return null;
+    // Tab title mirrors the sidebar's own label for the current section —
+    // same single-source-of-truth pattern as the owner dashboard layout,
+    // with the same MutationObserver guard against Next.js re-asserting its
+    // route metadata title after hydration.
+    useEffect(() => {
+        const wanted = `${labelForPath(pathname, navItems.map((i) => ({ href: i.href, label: i.label })))} · Chakula`;
+        const apply = () => { document.title = wanted; };
+        apply();
+        const titleEl = document.querySelector("title");
+        let observer: MutationObserver | null = null;
+        if (titleEl) {
+            observer = new MutationObserver(() => {
+                if (document.title !== wanted) apply();
+            });
+            observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
+        }
+        return () => observer?.disconnect();
+    }, [pathname, navItems]);
+
+    if (!user || staffRole !== tier) {
+        // Still resolving auth, or a role/tier mismatch mid-redirect: the
+        // spinner, never a blank screen — a blank flash reads as "broken".
+        // (A fully logged-out or non-staff visitor is redirected by the
+        // parent /staff/layout.tsx before this branch is reached.)
+        return <PageLoader />;
+    }
 
     const restaurantName = user?.restaurant_name || "Your Restaurant";
 
     return (
         <div className="min-h-screen flex">
+            <SkipLink />
             <aside
-                className={`fixed inset-y-0 left-0 z-50 w-56 bg-[#0f0f0f] border-r border-[#1a1a1a] transform transition-transform duration-200 lg:translate-x-0 ${
+                className={`fixed inset-y-0 left-0 z-50 w-56 bg-[#0f0f0f] border-r border-[#1a1a1a] transform transition-transform duration-200 lg:translate-x-0 flex flex-col ${
                     sidebarOpen ? "translate-x-0" : "-translate-x-full"
                 }`}
             >
-                <div className="px-5 py-5 border-b border-[#1a1a1a]">
+                <div className="px-5 py-5 border-b border-[#1a1a1a] shrink-0">
                     <h1 className="text-lg font-bold text-[#e5e5e5] tracking-tight">Chakula</h1>
                     <p className="text-xs text-[var(--accent)] mt-0.5 truncate font-medium">{restaurantName}</p>
                     <p className="text-xs text-[#525252] truncate">{tierLabel}</p>
                 </div>
 
-                <nav className="p-3 space-y-0.5">
+                <nav className="flex-1 overflow-y-auto p-3 pb-6 space-y-0.5" aria-label="Main navigation">
                     {navItems.map((item) => {
                         const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
                         return (
@@ -86,6 +115,7 @@ export default function TierLayoutShell({
                                 key={item.href}
                                 href={item.href}
                                 onClick={() => setSidebarOpen(false)}
+                                aria-current={isActive ? "page" : undefined}
                                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
                                     isActive
                                         ? "bg-[#1a1a1a] text-[var(--accent)]"
@@ -99,7 +129,7 @@ export default function TierLayoutShell({
                     })}
                 </nav>
 
-                <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-[#1a1a1a] space-y-0.5">
+                <div className="shrink-0 p-3 border-t border-[#1a1a1a] space-y-0.5">
                     <button
                         onClick={() => setShowQuickSwitch(true)}
                         className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[#737373] hover:text-[var(--accent)] hover:bg-[#141414] w-full transition-colors"
@@ -134,7 +164,7 @@ export default function TierLayoutShell({
                 />
             )}
 
-            <main className="flex-1 lg:ml-56 min-h-screen">
+            <main id="main-content" tabIndex={-1} className="flex-1 lg:ml-56 min-h-screen focus:outline-none">
                 <header className="sticky top-0 z-30 bg-[#0a0a0a]/90 backdrop-blur-sm border-b border-[#1a1a1a] px-5 py-3 flex items-center justify-between">
                     <button
                         onClick={() => setSidebarOpen(!sidebarOpen)}

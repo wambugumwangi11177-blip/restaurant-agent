@@ -4,7 +4,23 @@ mpesa_checkout_request_id, idempotency, and failure handling. Mirrors the
 5 scenarios verified by hand during Phase 1 (directives/012_agentic_roadmap.md).
 """
 
+import pytest
+
 import models
+
+_TEST_TOKEN = "test-daraja-token"
+
+
+@pytest.fixture(autouse=True)
+def _callback_token(monkeypatch):
+    """All settlement-path tests now use the tokenized callback URL: the
+    tokenless path fails closed (see _verify_mpesa_token) — an unauthenticated
+    settlement endpoint is free-order fraud, not a dev convenience."""
+    monkeypatch.setenv("MPESA_CALLBACK_TOKEN", _TEST_TOKEN)
+
+
+def _post_callback(client, body):
+    return client.post(f"/webhooks/mpesa/{_TEST_TOKEN}", json=body)
 
 
 def _seed(db_session):
@@ -40,7 +56,7 @@ def _success_callback(checkout_id="ws_CO_test_001"):
 
 def test_successful_payment_marks_order_paid(client, db_session):
     _seed(db_session)
-    resp = client.post("/webhooks/mpesa", json=_success_callback())
+    resp = _post_callback(client, _success_callback())
     assert resp.status_code == 200
     assert resp.json()["ResultCode"] == 0
 
@@ -52,8 +68,8 @@ def test_successful_payment_marks_order_paid(client, db_session):
 
 def test_duplicate_callback_is_idempotent(client, db_session):
     _seed(db_session)
-    client.post("/webhooks/mpesa", json=_success_callback())
-    resp = client.post("/webhooks/mpesa", json=_success_callback())
+    _post_callback(client, _success_callback())
+    resp = _post_callback(client, _success_callback())
     assert resp.status_code == 200
     # Re-processing would otherwise re-send the WhatsApp receipt / re-write
     # the audit log — the webhook's own idempotency check must have skipped it.
@@ -65,7 +81,7 @@ def test_failed_payment_does_not_mark_paid(client, db_session):
         "MerchantRequestID": "mr-2", "CheckoutRequestID": "ws_CO_test_002",
         "ResultCode": 1032, "ResultDesc": "Request cancelled by user",
     }}}
-    resp = client.post("/webhooks/mpesa", json=failure_callback)
+    resp = _post_callback(client, failure_callback)
     assert resp.status_code == 200
 
     order2 = db_session.query(models.Order).filter(models.Order.id == 2).first()
@@ -78,7 +94,7 @@ def test_unknown_checkout_request_id_does_not_crash(client, db_session):
         "MerchantRequestID": "mr-3", "CheckoutRequestID": "ws_CO_does_not_exist",
         "ResultCode": 0,
     }}}
-    resp = client.post("/webhooks/mpesa", json=unknown_callback)
+    resp = _post_callback(client, unknown_callback)
     assert resp.status_code == 200
 
 
@@ -96,7 +112,7 @@ def test_underpaid_callback_does_not_settle_order(client, db_session):
             {"Name": "PhoneNumber", "Value": 254712345678},
         ]},
     }}}
-    resp = client.post("/webhooks/mpesa", json=underpaid)
+    resp = _post_callback(client, underpaid)
     assert resp.status_code == 200  # still acks Safaricom
 
     order = db_session.query(models.Order).filter(models.Order.id == 1).first()
@@ -146,16 +162,19 @@ def test_callback_with_correct_token_settles(client, db_session, monkeypatch):
     assert order.mpesa_receipt == "NLJ7RT61SV"
 
 
-def test_tokenless_path_still_works_when_token_unset(client, db_session, monkeypatch):
-    """Degrade-safe: no env var (local dev) → legacy path keeps working."""
+def test_tokenless_path_fails_closed_when_token_unset(client, db_session, monkeypatch):
+    """Security contract (2026-08-23): with MPESA_CALLBACK_TOKEN unset the
+    settlement endpoint rejects everything. The old behavior — accept any
+    unauthenticated body — meant anyone who learned a CheckoutRequestID could
+    settle an order for free; 'degrade safe' now means fail closed."""
     monkeypatch.delenv("MPESA_CALLBACK_TOKEN", raising=False)
     _seed(db_session)
 
     resp = client.post("/webhooks/mpesa", json=_success_callback())
-    assert resp.status_code == 200
+    assert resp.status_code == 403
 
     order = db_session.query(models.Order).filter(models.Order.id == 1).first()
-    assert order.is_paid is True
+    assert order.is_paid is False
 
 
 # ── Duplicate / concurrent settlement ─────────────────────────────────────────
@@ -208,8 +227,8 @@ def test_duplicate_callback_emits_order_paid_exactly_once(client, db_session, mo
     monkeypatch.setattr(bus, "emit_async", lambda et, payload: emitted.append((et, payload)))
 
     _seed(db_session)
-    assert client.post("/webhooks/mpesa", json=_success_callback()).status_code == 200
-    assert client.post("/webhooks/mpesa", json=_success_callback()).status_code == 200
+    assert _post_callback(client, _success_callback()).status_code == 200
+    assert _post_callback(client, _success_callback()).status_code == 200
 
     paid = [e for e in emitted if e[0] == bus.EventType.ORDER_PAID]
     assert len(paid) == 1, f"expected exactly one ORDER_PAID, got {len(paid)}"

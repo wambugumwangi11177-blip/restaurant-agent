@@ -88,6 +88,8 @@ function ResetPasswordForm() {
                                             onChange={(e) => setPassword(e.target.value)}
                                             className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[var(--accent)] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm pr-10"
                                             placeholder="At least 8 characters, 1 letter, 1 number"
+                                            minLength={8}
+                                            pattern="(?=.*[A-Za-z])(?=.*\d).*"
                                             required
                                         />
                                         <button

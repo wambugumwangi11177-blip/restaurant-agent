@@ -615,13 +615,23 @@ def read_root():
 
 
 @app.get("/metrics")
-def metrics_endpoint():
+def metrics_endpoint(request: Request):
     """Prometheus scrape target — process-local request counters + latency (see
-    metrics.py). Unversioned/unauthenticated by Prometheus convention; restrict at
-    the network layer in production. Multi-worker aggregation needs a shared
-    collector (same Redis caveat as rate limiting)."""
-    from fastapi import Response
+    metrics.py). By Prometheus convention unauthenticated — which also makes it
+    a free traffic-reconnaissance endpoint on a public URL. When METRICS_TOKEN
+    is set (recommended in production) it must be supplied as the
+    `Authorization: Bearer <token>` header or `?token=` query param. Multi-worker
+    aggregation needs a shared collector (same Redis caveat as rate limiting)."""
+    from fastapi import HTTPException, Response
     import metrics
+    expected = os.getenv("METRICS_TOKEN", "").strip()
+    if expected:
+        supplied = (
+            request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+            or request.query_params.get("token", "").strip()
+        )
+        if supplied != expected:
+            raise HTTPException(status_code=403, detail="Forbidden")
     return Response(content=metrics.render(), media_type="text/plain; version=0.0.4")
 
 

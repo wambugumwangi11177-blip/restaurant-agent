@@ -76,6 +76,8 @@ def _safe_run(agent_name: str, restaurant_id: int, fn, *args, **kwargs):
     try:
         return fn(*args, **kwargs)
     except Exception as e:
+        # Full internals (traceback, possible SQL/paths) go to the log and the
+        # internal event only — never to the HTTP client.
         logger.error(f"AI module error: {e}", exc_info=True)
         from events.bus import emit_async, EventType
         emit_async(EventType.AGENT_FAILED, {
@@ -83,7 +85,7 @@ def _safe_run(agent_name: str, restaurant_id: int, fn, *args, **kwargs):
             "restaurant_id": restaurant_id,
             "error": str(e),
         })
-        return {"error": str(e), "available": False}
+        return {"error": "This insight is temporarily unavailable.", "available": False}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

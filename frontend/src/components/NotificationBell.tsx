@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Check } from "lucide-react";
 import { useNotifications, NotificationItem } from "@/lib/useNotifications";
@@ -17,9 +17,49 @@ function timeAgo(iso: string): string {
     return `${days}d ago`;
 }
 
+function isToday(iso: string): boolean {
+    const d = new Date(iso);
+    const now = new Date();
+    return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+    );
+}
+
+// Severity at a glance: a colored edge per event type, mirroring the
+// backend's escalation severity map (ai/escalation/engine.py) — red for
+// "act now" events, amber for watch-list, green for good news, and a
+// neutral accent for routine operational updates.
+const EDGE_BY_EVENT_TYPE: Record<string, string> = {
+    stock_critical: "border-l-[var(--danger)]",
+    stock_depleted: "border-l-[var(--danger)]",
+    mpesa_payment_failed: "border-l-[var(--danger)]",
+    account_locked: "border-l-[var(--danger)]",
+    suspicious_transaction_flagged: "border-l-[var(--danger)]",
+    cash_reconciliation_flagged: "border-l-[var(--danger)]",
+    purchase_order_late: "border-l-[var(--danger)]",
+    stock_transfer_discrepancy: "border-l-[var(--warning)]",
+    stock_variance_flagged: "border-l-[var(--warning)]",
+    stock_count_discrepancy: "border-l-[var(--warning)]",
+    inventory_adjustment_flagged: "border-l-[var(--warning)]",
+    supplier_reliability_dropped: "border-l-[var(--warning)]",
+    reservation_no_show: "border-l-[var(--warning)]",
+    shift_clock_in_flagged: "border-l-[var(--warning)]",
+    agent_failed: "border-l-[var(--warning)]",
+    order_paid: "border-l-[var(--success)]",
+    stock_transfer_fulfilled: "border-l-[var(--success)]",
+    purchase_order_approved: "border-l-[var(--success)]",
+    staff_reactivated: "border-l-[var(--success)]",
+};
+
+function edgeClass(eventType: string): string {
+    return EDGE_BY_EVENT_TYPE[eventType] || "border-l-[#2a2a2a]";
+}
+
 export default function NotificationBell() {
     const {
-        notifications, unreadCount, permission, subscribed, isIOSNotStandalone,
+        notifications, unreadCount, permission, subscribed, isIOSNotStandalone, stale,
         markRead, markAllRead, subscribeToPush,
     } = useNotifications();
     const [open, setOpen] = useState(false);
@@ -38,10 +78,54 @@ export default function NotificationBell() {
 
     const showEnableCta = permission !== "granted" && !subscribed;
 
+    const { today, earlier } = useMemo(() => {
+        const todayList: NotificationItem[] = [];
+        const earlierList: NotificationItem[] = [];
+        for (const n of notifications) {
+            (isToday(n.created_at) ? todayList : earlierList).push(n);
+        }
+        return { today: todayList, earlier: earlierList };
+    }, [notifications]);
+
     function handleClick(n: NotificationItem) {
         if (!n.is_read) markRead(n.id);
         setOpen(false);
         if (n.url) router.push(n.url);
+    }
+
+    function renderGroup(label: string, items: NotificationItem[]) {
+        return (
+            <li>
+                <p className="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#525252]">
+                    {label}
+                </p>
+                <ul>
+                    {items.map((n) => (
+                        <li key={n.id}>
+                            <button
+                                onClick={() => handleClick(n)}
+                                className={`w-full text-left px-3 py-2.5 border-b border-l-2 border-r-0 border-t-0 ${edgeClass(
+                                    n.event_type
+                                )} border-b-[#1a1a1a] hover:bg-[#151515] transition-colors ${
+                                    n.is_read ? "" : "bg-[#111]"
+                                }`}
+                            >
+                                <div className="flex items-start gap-2">
+                                    {!n.is_read && (
+                                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-[#e5e5e5] truncate">{n.title}</p>
+                                        <p className="text-[11px] text-[#737373] line-clamp-2 mt-0.5">{n.body}</p>
+                                        <p className="text-[10px] text-[#525252] mt-1">{timeAgo(n.created_at)}</p>
+                                    </div>
+                                </div>
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            </li>
+        );
     }
 
     return (
@@ -49,6 +133,7 @@ export default function NotificationBell() {
             <button
                 onClick={() => setOpen((v) => !v)}
                 aria-label="Notifications"
+                aria-expanded={open}
                 className="relative text-[#737373] hover:text-[#e5e5e5] transition-colors"
             >
                 <Bell className="w-5 h-5" />
@@ -61,7 +146,7 @@ export default function NotificationBell() {
 
             {open && (
                 <div className="absolute right-0 mt-2 w-80 max-h-[28rem] overflow-y-auto bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg shadow-xl z-50">
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-[#1a1a1a]">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-[#1a1a1a] sticky top-0 bg-[#0f0f0f]">
                         <span className="text-xs font-medium text-[#e5e5e5]">Notifications</span>
                         {unreadCount > 0 && (
                             <button
@@ -102,28 +187,15 @@ export default function NotificationBell() {
                         </div>
                     ) : (
                         <ul>
-                            {notifications.map((n) => (
-                                <li key={n.id}>
-                                    <button
-                                        onClick={() => handleClick(n)}
-                                        className={`w-full text-left px-3 py-2.5 border-b border-[#1a1a1a] hover:bg-[#151515] transition-colors ${
-                                            n.is_read ? "" : "bg-[#111]"
-                                        }`}
-                                    >
-                                        <div className="flex items-start gap-2">
-                                            {!n.is_read && (
-                                                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                                            )}
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-xs font-medium text-[#e5e5e5] truncate">{n.title}</p>
-                                                <p className="text-[11px] text-[#737373] line-clamp-2 mt-0.5">{n.body}</p>
-                                                <p className="text-[10px] text-[#525252] mt-1">{timeAgo(n.created_at)}</p>
-                                            </div>
-                                        </div>
-                                    </button>
-                                </li>
-                            ))}
+                            {today.length > 0 && renderGroup("Today", today)}
+                            {earlier.length > 0 && renderGroup("Earlier", earlier)}
                         </ul>
+                    )}
+
+                    {stale && (
+                        <p className="px-3 py-2 text-[10px] text-[#525252] border-t border-[#1a1a1a] sticky bottom-0 bg-[#0f0f0f]">
+                            Refreshed a while ago — check your connection for the latest.
+                        </p>
                     )}
                 </div>
             )}

@@ -64,7 +64,7 @@ def test_flag_on_loads_history_and_persists(db_session, monkeypatch):
     sent = captured["messages"]
     # History (2 seeded) is prepended, current message last.
     assert [m["content"] for m in sent[:2]] == ["earlier question", "earlier answer"]
-    assert sent[-1]["content"] == "and this week?"
+    assert sent[-1]["content"] == "<owner_message>\nand this week?\n</owner_message>"
 
     # The new exchange was persisted: 2 seeded + user + assistant = 4.
     turns = db_session.query(models.ConversationTurn).order_by(models.ConversationTurn.id).all()

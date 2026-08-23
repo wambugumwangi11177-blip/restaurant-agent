@@ -132,22 +132,38 @@ def _verify_mpesa_token(supplied: str | None) -> None:
     `ResultCode: 0` and flip an order to paid + fire the "payment confirmed"
     WhatsApp — free-order fraud.
 
-    Degrades safe: with MPESA_CALLBACK_TOKEN unset (local dev, tests) the check
-    is skipped with a loud warning, so nothing breaks without the env var. The
-    deploy checklist makes setting it mandatory in production; once it IS set,
-    the legacy tokenless `/webhooks/mpesa` path 403s.
+    Degrades safe: with MPESA_CALLBACK_TOKEN unset the behavior depends on
+    whether M-Pesa itself is configured. If no Daraja credentials exist there
+    can be no legitimate callback, and none is accepted. If credentials DO
+    exist (real STK pushes are possible — orders carry CheckoutRequestIDs an
+    attacker could forge a ResultCode against), the callback fails CLOSED: an
+    unauthenticated settlement endpoint is a free-order-fraud vector, not a
+    convenience. Local/dev flows set the token like prod does (one env var).
+    Once the token IS set, the legacy tokenless `/webhooks/mpesa` path 403s.
     """
     expected = os.getenv("MPESA_CALLBACK_TOKEN", "").strip()
     if not expected:
+        mpesa_live = bool(
+            os.getenv("MPESA_CONSUMER_KEY", "").strip()
+            and os.getenv("MPESA_CONSUMER_SECRET", "").strip()
+        )
+        if mpesa_live:
+            # Real payment credentials active but the callback can't be
+            # authenticated — reject rather than trust the body.
+            logger.error(
+                "[MPesa Webhook] MPESA_CALLBACK_TOKEN is unset while M-Pesa "
+                "credentials are configured — rejecting callback (fail closed). "
+                "Set MPESA_CALLBACK_TOKEN to accept Daraja callbacks."
+            )
+            raise HTTPException(status_code=403, detail="Forbidden")
         global _MPESA_TOKEN_WARNED
         if not _MPESA_TOKEN_WARNED:
             logger.warning(
-                "[MPesa Webhook] MPESA_CALLBACK_TOKEN is unset — the payment "
-                "callback is UNAUTHENTICATED. Anyone who learns a "
-                "CheckoutRequestID can forge a settlement. Set it in prod."
+                "[MPesa Webhook] M-Pesa unconfigured and MPESA_CALLBACK_TOKEN "
+                "unset — no callbacks accepted."
             )
             _MPESA_TOKEN_WARNED = True
-        return
+        raise HTTPException(status_code=403, detail="Forbidden")
 
     if supplied is None or not hmac.compare_digest(supplied, expected):
         logger.warning("[MPesa Webhook] Rejected callback with missing/incorrect URL token")

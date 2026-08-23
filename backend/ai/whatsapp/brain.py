@@ -110,7 +110,14 @@ def compose_morning_briefing(db: Session, restaurant_id: int) -> str:
         func.date(models.Order.created_at) == lw_date,
     ).scalar() or 0
 
-    wow_pct   = round(((yesterday_revenue - lw_revenue) / max(lw_revenue, 1)) * 100, 1)
+    # WoW % only against a non-trivial baseline — `max(lw, 1)` turned a quiet
+    # day last week into absurd figures (+50,000% on KES 500 vs 0). Same fix
+    # revenue_forecaster.py already carries (MIN_BASELINE).
+    _WOW_MIN_BASELINE_CENTS = 100_000  # KES 1,000
+    if lw_revenue >= _WOW_MIN_BASELINE_CENTS:
+        wow_pct = round(((yesterday_revenue - lw_revenue) / lw_revenue) * 100, 1)
+    else:
+        wow_pct = 0.0
     wow_emoji = "📈" if wow_pct >= 0 else "📉"
     wow_str   = f"+{wow_pct}%" if wow_pct >= 0 else f"{wow_pct}%"
 

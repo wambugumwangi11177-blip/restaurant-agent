@@ -5,13 +5,15 @@ Rule-based statistics and thresholds, not LLM-backed — see
 directives/012_agentic_roadmap.md's standing rule on labeling honestly.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from database import get_db
 from auth import require_role, require_staff_role
 import models
 from ai import menu_engineer, revenue_forecaster, kds_intelligence, inventory_predictor, reservation_optimizer, ops_manager
 from ai.analysis_clock import data_freshness
+from ai.spend_cap import check_spend_cap
+from rate_limit import limiter
 from routers.deps import get_restaurant_or_none
 
 router = APIRouter(prefix="/ai", tags=["analytics"])
@@ -72,7 +74,8 @@ def ai_dashboard(db: Session = Depends(get_db), user: models.User = Depends(requ
 
 
 @router.get("/menu-engineering")
-def menu_engineering(narrate: bool = True, db: Session = Depends(get_db), user: models.User = Depends(require_staff_role(*_AI_READ))):
+@limiter.limit("20/minute")
+def menu_engineering(request: Request, narrate: bool = True, db: Session = Depends(get_db), user: models.User = Depends(require_staff_role(*_AI_READ))):
     """
     Menu Engineering Matrix — Star/Plowhorse/Puzzle/Dog classification.
     Numbers are deterministic; when an LLM provider is set (and narrate=true) a
@@ -81,6 +84,10 @@ def menu_engineering(narrate: bool = True, db: Session = Depends(get_db), user: 
     rid = _get_restaurant_id(db, user)
     if not rid:
         return {"error": "No restaurant found"}
+    if narrate:
+        # This narration is a real LLM call — the cap + throttle the other
+        # LLM-touching routes carry (routers/ai.py) were missing here.
+        check_spend_cap(user, db)
     data = menu_engineer.get_menu_engineering(db, rid)
     data["upsell_pairs"] = menu_engineer.get_upsell_pairs(db, rid)
     # Shared narrate-attach helper — this route is a plain `def`, so FastAPI

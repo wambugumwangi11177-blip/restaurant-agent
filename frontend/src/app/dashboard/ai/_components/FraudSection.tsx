@@ -16,11 +16,20 @@ interface FraudData {
 export default function FraudSection() {
     const { data, loading, error, retry } = useAiModule<FraudData>("/fraud/report");
 
+    // "jane@mamas.co.ke" → "Jane" — a person, not an email address, is what
+    // the owner needs to read at a glance during a shift.
+    const friendlyActor = (email?: string) => {
+        if (!email) return "Unknown staff member";
+        const local = email.split("@")[0].split(/[._\-+\d]/)[0];
+        if (!local) return email;
+        return local.charAt(0).toUpperCase() + local.slice(1).toLowerCase();
+    };
+
     return (
         <ModuleShell
             icon={ShieldCheck}
             title="Fraud Watch"
-            subtitle={`Suspicious-transaction scan — void/cancel bursts, refund velocity, payment mismatches, off-hours activity (last ${data?.window_hours ?? 24}h).`}
+            subtitle={`We watch for unusual voids, rapid refunds, payment mismatches and after-hours changes over the last ${data?.window_hours ?? 24}h — so you don't have to.`}
             loading={loading}
             error={error}
             onRetry={retry}
@@ -31,23 +40,23 @@ export default function FraudSection() {
                     <div className="space-y-2">
                         {data.void_spikes.length > 0 && (
                             <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/20 text-sm">
-                                <p className="text-red-300 font-medium">Void/cancel spike</p>
+                                <p className="text-red-300 font-medium">Unusual cancel/void activity</p>
                                 <p className="text-text-dim text-xs mt-0.5">
-                                    {data.void_spikes.map(v => v.actor_email).filter(Boolean).join(", ")}
+                                    Involving {data.void_spikes.map(v => friendlyActor(v.actor_email)).join(", ")}
                                 </p>
                             </div>
                         )}
                         {data.refund_velocity.length > 0 && (
                             <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/20 text-sm">
-                                <p className="text-red-300 font-medium">Refund velocity</p>
+                                <p className="text-red-300 font-medium">Rapid refunds</p>
                                 <p className="text-text-dim text-xs mt-0.5">
-                                    {data.refund_velocity.map(v => `${v.actor_email} (${v.count})`).join(", ")}
+                                    {data.refund_velocity.map(v => `${friendlyActor(v.actor_email)} (${v.count} refunds)`).join(", ")}
                                 </p>
                             </div>
                         )}
                         {data.payment_mismatches.length > 0 && (
                             <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 text-sm">
-                                <p className="text-amber-300 font-medium">Payment mismatches</p>
+                                <p className="text-amber-300 font-medium">Payments that don&apos;t match orders</p>
                                 <p className="text-text-dim text-xs mt-0.5">
                                     {data.payment_mismatches.map(v => v.reason).filter(Boolean).join("; ")}
                                 </p>

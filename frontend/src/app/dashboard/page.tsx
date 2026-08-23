@@ -17,12 +17,11 @@ import {
     Wifi,
     Monitor,
     Smartphone,
-    Clock,
-    Megaphone,
     Brain,
     ArrowRight,
 } from "lucide-react";
 import StatCard from "@/components/ui/StatCard";
+import { useAuth } from "@/context/AuthContext";
 
 const SystemStatus = dynamic(() => import("./_components/SystemStatus"));
 
@@ -44,6 +43,7 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
+    const { user } = useAuth();
     const [data, setData] = useState<DashboardData | null>(null);
     const [loading, setLoading] = useState(true);
     const [trustStats, setTrustStats] = useState<{ grounded_pct: number | null; narratives_generated: number } | null>(null);
@@ -90,6 +90,19 @@ export default function DashboardPage() {
         return "Good evening";
     };
 
+    // The account has no separate name field — derive a friendly first name
+    // from the email's local part ("james.mwangi@x.co" → "James"), falling
+    // back to the restaurant name so the greeting is always personal.
+    const getDisplayName = () => {
+        const local = (user?.email || "").split("@")[0].split(/[._\-+\d]/)[0];
+        if (local && local.length >= 3) {
+            return local.charAt(0).toUpperCase() + local.slice(1).toLowerCase();
+        }
+        return user?.restaurant_name || "";
+    };
+
+    const greetingName = getDisplayName();
+
     if (loading) {
         return (
             <div className="space-y-4">
@@ -113,7 +126,7 @@ export default function DashboardPage() {
                     <TrendingUp className="w-7 h-7 text-[var(--accent)]" />
                 </div>
                 <div className="space-y-1.5 max-w-md">
-                    <h1 className="text-xl font-bold text-text">{getGreeting()} 👋</h1>
+                    <h1 className="text-xl font-bold text-text">{getGreeting()}{greetingName ? `, ${greetingName}` : ""} 👋</h1>
                     <p className="text-sm text-text-muted">
                         Your dashboard is ready. Once you add menu items and start taking orders,
                         your restaurant health score, revenue trends, alerts, and AI opportunities
@@ -146,7 +159,7 @@ export default function DashboardPage() {
     const healthLabel = healthScore >= 80 ? "Looking great" : healthScore >= 60 ? "Doing okay" : healthScore >= 40 ? "Needs attention" : "Let's fix a few things";
 
     return (
-        <div className="space-y-5">
+        <div className="space-y-6">
             {/* Demo Mode Banner */}
             {isDemo && (
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent)]/8 border border-[var(--accent)]/20 rounded-lg">
@@ -158,7 +171,7 @@ export default function DashboardPage() {
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div>
                     <h1 className="text-xl font-bold text-text">
-                        {getGreeting()} 👋
+                        {getGreeting()}{greetingName ? `, ${greetingName}` : ""} 👋
                     </h1>
                     <p className="text-sm text-text-dim mt-1">
                         Here&apos;s how your restaurant is doing right now
@@ -246,11 +259,9 @@ export default function DashboardPage() {
                         </Link>
                     </div>
                     <div className="flex flex-wrap gap-2 mt-3">
-                        <Link href="/dashboard/ai" className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-[var(--accent)] transition-colors"><Brain className="w-3 h-3" /> AI Command Center</Link>
-                        <span className="text-border">·</span>
-                        <Link href="/dashboard/roi" className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-[var(--accent)] transition-colors"><Clock className="w-3 h-3" /> Time & Money Saved</Link>
-                        <span className="text-border">·</span>
-                        <Link href="/dashboard/marketing" className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-[var(--accent)] transition-colors"><Megaphone className="w-3 h-3" /> Campaigns & Win-back <ArrowRight className="w-3 h-3" /></Link>
+                        <Link href="/dashboard/ai" className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-[var(--accent)] transition-colors">
+                            <Brain className="w-3 h-3" /> See the full picture <ArrowRight className="w-3 h-3" />
+                        </Link>
                     </div>
                 </div>
             )}

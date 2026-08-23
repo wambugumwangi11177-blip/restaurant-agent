@@ -52,6 +52,11 @@ export function useNotifications() {
     const [permission, setPermission] = useState<PermissionState>("unsupported");
     const [subscribed, setSubscribed] = useState(false);
     const [isIOSNotStandalone] = useState<boolean>(detectIOSNotStandalone);
+    // 3+ consecutive failed polls → the feed may be stale. Surfaced (rather
+    // than silently swallowed) so the panel can say "updated a while ago"
+    // instead of quietly pretending to be fresh.
+    const [stale, setStale] = useState(false);
+    const consecutiveFailures = useRef(0);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const fetchNotifications = useCallback(async () => {
@@ -59,9 +64,13 @@ export function useNotifications() {
             const res = await api.get("/notifications/", { params: { limit: 50 } });
             setNotifications(res.data.items || []);
             setUnreadCount(res.data.unread_count || 0);
+            consecutiveFailures.current = 0;
+            setStale(false);
         } catch {
             // Best-effort feed — a failed poll shouldn't surface an error UI;
             // it just tries again on the next interval.
+            consecutiveFailures.current += 1;
+            if (consecutiveFailures.current >= 3) setStale(true);
         }
     }, []);
 
@@ -146,6 +155,7 @@ export function useNotifications() {
         permission,
         subscribed,
         isIOSNotStandalone,
+        stale,
         markRead,
         markAllRead,
         subscribeToPush,

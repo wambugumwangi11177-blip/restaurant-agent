@@ -88,7 +88,10 @@ def initiate_stk_push(phone_number: str, amount_cents: int, account_reference: s
         return {"status": "not_configured", "checkout_request_id": None}
 
     amount_shillings = max(amount_cents // 100, 1)
-    timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    # Daraja validates the timestamp in the Password against Safaricom server
+    # time, which runs on East Africa Time (UTC+3). A UTC container clock
+    # (Railway default) makes STK pushes fail intermittently — pin EAT.
+    timestamp = (datetime.datetime.utcnow() + datetime.timedelta(hours=3)).strftime("%Y%m%d%H%M%S")
     password = base64.b64encode(
         f"{MPESA_SHORTCODE}{MPESA_PASSKEY}{timestamp}".encode("utf-8")
     ).decode("utf-8")
@@ -118,4 +121,6 @@ def initiate_stk_push(phone_number: str, amount_cents: int, account_reference: s
         return {"status": "initiated", "checkout_request_id": body.get("CheckoutRequestID")}
     except requests.RequestException as exc:
         logger.error(f"[MPesa] STK push error: {exc}")
-        return {"status": "error", "detail": str(exc), "checkout_request_id": None}
+        # Generic message to the caller — raw exception text can leak the
+        # outbound URL/credentials shape and internal details to the client.
+        return {"status": "error", "detail": "Could not reach the payment service. Try again shortly.", "checkout_request_id": None}

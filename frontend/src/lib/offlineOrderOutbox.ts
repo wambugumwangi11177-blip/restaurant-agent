@@ -99,6 +99,19 @@ export async function removePendingOrder(localId: string): Promise<void> {
     db.close();
 }
 
+/** Drop every queued order (logout on a shared device — queued payloads carry
+ * customer names/phones and must not survive into the next user's session). */
+export async function clearPendingOrders(): Promise<void> {
+    const db = await openDB();
+    await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        tx.objectStore(STORE_NAME).clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+}
+
 async function markAttempt(localId: string, error: string): Promise<void> {
     const db = await openDB();
     await new Promise<void>((resolve, reject) => {
@@ -124,8 +137,28 @@ async function markAttempt(localId: string, error: string): Promise<void> {
  * still a network failure (no point burning through the rest of the queue
  * offline) but keeps going past a non-network failure on one order (e.g. a
  * stale menu item id) so the rest of the queue still gets a chance.
+ *
+ * Module-level mutex: page-load and the `online` event can fire nearly
+ * simultaneously (and two POS tabs replay independently of each other via
+ * separate page contexts, which is out of scope) — without the guard both
+ * replays read the same queue before either deletes, double-submitting
+ * every order in it.
  */
+let replayInFlight = false;
+
 export async function replayPendingOrders(
+    submit: (payload: Record<string, unknown>) => Promise<unknown>
+): Promise<{ delivered: number; remaining: number }> {
+    if (replayInFlight) return { delivered: 0, remaining: (await getPendingOrders()).length };
+    replayInFlight = true;
+    try {
+        return await _replayLocked(submit);
+    } finally {
+        replayInFlight = false;
+    }
+}
+
+async function _replayLocked(
     submit: (payload: Record<string, unknown>) => Promise<unknown>
 ): Promise<{ delivered: number; remaining: number }> {
     const pending = await getPendingOrders();

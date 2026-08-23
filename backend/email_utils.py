@@ -13,6 +13,7 @@ dev without any provider set up.
 
 import logging
 import os
+import re
 import smtplib
 from email.message import EmailMessage
 
@@ -40,7 +41,10 @@ def send_email(to: str, subject: str, body: str) -> bool:
     Returns True only if the message was actually handed to an SMTP server.
     """
     if not _SMTP_CONFIGURED:
-        logger.info("[email] (SMTP not configured) to=%s subject=%r body=%r", to, subject, body)
+        # The body carries raw single-use auth tokens (reset/verify links) —
+        # anyone with log access could use them to take over the account.
+        redacted = re.sub(r"(token=)[^\s&'\"]+", r"\1[REDACTED]", body)
+        logger.info("[email] (SMTP not configured) to=%s subject=%r body=%r", to, subject, redacted)
         return False
 
     msg = EmailMessage()

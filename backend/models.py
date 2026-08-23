@@ -128,6 +128,12 @@ class User(Base):
     # account already has exactly one User row — this is the simpler,
     # unambiguous home for it.
     hashed_pin = Column(String, nullable=True)
+    # PIN-attempt lockout, tracked SEPARATELY from failed_login_attempts so a
+    # teammate hammering quick-switch can't lock the target out of password
+    # login (and vice versa). Same 5/15min policy, independent counters.
+    # Added by migration 045.
+    pin_failed_attempts = Column(Integer, default=0, nullable=False)
+    pin_locked_until = Column(DateTime, nullable=True)
     # Fine-grained tier layered on top of `role` (directive 015). NULL means
     # "not yet assigned" — deliberately not defaulted, see directive's Edge
     # Cases: guessing a tier for a pre-existing STAFF user could grant access

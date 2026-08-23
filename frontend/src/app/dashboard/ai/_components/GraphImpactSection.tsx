@@ -50,7 +50,7 @@ export default function GraphImpactSection() {
     return (
         <ModuleShell
             icon={Network}
-            title="Impact Cascade (Knowledge Graph)"
+            title="Impact Cascade"
             subtitle="Pick an ingredient — see every dish it feeds, its categories, and how much revenue is at risk if it runs out."
             loading={loading}
             error={error}

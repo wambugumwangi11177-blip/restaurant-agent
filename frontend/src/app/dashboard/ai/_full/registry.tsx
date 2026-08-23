@@ -52,7 +52,7 @@ export const FULL_MODULES: Record<string, FullModule> = {
         Component: withLoader(() => import("./SuppliersFull")),
     },
     kitchen: {
-        title: "Kitchen Intelligence (KDS)",
+        title: "Kitchen Intelligence",
         subtitle: "Station performance, per-item prep times, rush load and recommendations.",
         Component: withLoader(() => import("./KitchenFull")),
     },

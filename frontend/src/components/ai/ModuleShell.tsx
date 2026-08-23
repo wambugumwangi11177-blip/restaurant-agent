@@ -47,9 +47,18 @@ export function ModuleShell({
                     <div className="bg-[#141414] rounded-lg h-16 animate-pulse" />
                 </div>
             ) : error ? (
-                <div className="flex items-center justify-between gap-3 py-2">
-                    <p className="text-[#525252] text-sm">{error}</p>
-                    <button onClick={onRetry} className="text-xs text-[var(--accent)] hover:underline flex-shrink-0">Retry</button>
+                <div className="py-2">
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="text-[#a3a3a3] text-sm">This module couldn&apos;t analyse your data just now.</p>
+                        <button onClick={onRetry} className="text-xs text-[var(--accent)] hover:underline flex-shrink-0">Retry</button>
+                    </div>
+                    {/* Raw backend/network detail stays available for
+                        debugging, tucked behind a toggle instead of being
+                        the headline the user reads. */}
+                    <details className="mt-1.5">
+                        <summary className="text-[11px] text-[#525252] cursor-pointer hover:text-[#737373] select-none">Details</summary>
+                        <p className="text-[11px] text-[#525252] mt-1 break-words">{error}</p>
+                    </details>
                 </div>
             ) : (
                 children

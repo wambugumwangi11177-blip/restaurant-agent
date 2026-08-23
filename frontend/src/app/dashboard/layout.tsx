@@ -10,7 +10,10 @@ import AttendanceWidget from "@/components/staff/AttendanceWidget";
 import VerifyEmailBanner from "@/components/VerifyEmailBanner";
 import QuickSwitchModal from "@/components/QuickSwitchModal";
 import PinSetupModal from "@/components/PinSetupModal";
+import PageLoader from "@/components/ui/PageLoader";
+import SkipLink from "@/components/ui/SkipLink";
 import { tierHome, StaffTier } from "@/lib/permissions";
+import { labelForPath } from "@/lib/pathTitle";
 import {
     Home,
     UtensilsCrossed,
@@ -31,7 +34,14 @@ import {
     Users,
     Truck,
     LifeBuoy,
+    type LucideIcon,
 } from "lucide-react";
+
+interface NavItem {
+    href: string;
+    label: string;
+    icon: LucideIcon;
+}
 
 // Owner-only now: every staff_role tier has its own dedicated frontend under
 // /staff/<tier> (see frontend/src/lib/permissions.ts and
@@ -39,27 +49,51 @@ import {
 // dashboard entirely below, so there's no per-route access filtering left to
 // maintain here (that hand-maintained `access` array is what caused the
 // Manager nav-visibility bug this replaced).
-const navItems = [
-    { href: "/dashboard", label: "Home", icon: Home },
-    { href: "/dashboard/pos", label: "POS", icon: CreditCard },
-    { href: "/dashboard/kitchen", label: "Kitchen", icon: ChefHat },
-    { href: "/dashboard/orders", label: "Orders", icon: ShoppingBag },
-    { href: "/dashboard/menu", label: "Menu", icon: UtensilsCrossed },
-    { href: "/dashboard/inventory", label: "Stock", icon: Package },
-    { href: "/dashboard/reservations", label: "Bookings", icon: CalendarDays },
-    { href: "/dashboard/sales", label: "Sales", icon: DollarSign },
-    // The AI Command Center. Superseded /dashboard/insights, which served a
-    // hardcoded Lavy demo and was deleted 2026-07-08.
-    { href: "/dashboard/ai", label: "AI", icon: Brain },
-    { href: "/dashboard/marketing", label: "Growth", icon: Megaphone },
-    { href: "/dashboard/staff", label: "Staff", icon: Users },
-    { href: "/dashboard/purchasing", label: "Purchasing", icon: Truck },
-    { href: "/dashboard/roi", label: "ROI", icon: Clock },
-    { href: "/dashboard/ai-ops", label: "AI Ops", icon: Cpu },
-    // Every staff tier can raise/view a support ticket from their own tier's
-    // frontend too — the in-app channel that exists because Twilio (the
-    // "call/WhatsApp the owner" fallback) is unfunded.
-    { href: "/dashboard/support", label: "Support", icon: LifeBuoy },
+//
+// Grouped into labelled sections (the Stripe/Shopify-admin pattern) rather
+// than one flat 15-item list — a flat list of 15 reads as a wall of equal
+// links and forces visual scanning on every navigation.
+const navSections: { label: string; items: NavItem[] }[] = [
+    {
+        label: "Main",
+        items: [
+            { href: "/dashboard", label: "Home", icon: Home },
+            { href: "/dashboard/pos", label: "POS", icon: CreditCard },
+            { href: "/dashboard/kitchen", label: "Kitchen", icon: ChefHat },
+            { href: "/dashboard/orders", label: "Orders", icon: ShoppingBag },
+        ],
+    },
+    {
+        label: "Operations",
+        items: [
+            { href: "/dashboard/menu", label: "Menu", icon: UtensilsCrossed },
+            { href: "/dashboard/inventory", label: "Stock", icon: Package },
+            { href: "/dashboard/reservations", label: "Bookings", icon: CalendarDays },
+            { href: "/dashboard/purchasing", label: "Purchasing", icon: Truck },
+        ],
+    },
+    {
+        label: "Insights",
+        items: [
+            { href: "/dashboard/sales", label: "Sales", icon: DollarSign },
+            // The AI Command Center. Superseded /dashboard/insights, which served a
+            // hardcoded Lavy demo and was deleted 2026-07-08.
+            { href: "/dashboard/ai", label: "AI", icon: Brain },
+            { href: "/dashboard/marketing", label: "Growth", icon: Megaphone },
+            { href: "/dashboard/roi", label: "ROI", icon: Clock },
+        ],
+    },
+    {
+        label: "Manage",
+        items: [
+            { href: "/dashboard/staff", label: "Staff", icon: Users },
+            { href: "/dashboard/ai-ops", label: "AI Ops", icon: Cpu },
+            // Every staff tier can raise/view a support ticket from their own tier's
+            // frontend too — the in-app channel that exists because Twilio (the
+            // "call/WhatsApp the owner" fallback) is unfunded.
+            { href: "/dashboard/support", label: "Support", icon: LifeBuoy },
+        ],
+    },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -88,12 +122,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }
     }, [user, isLoading, isStaffAccount, staffRole, router]);
 
+    // Tab title mirrors the sidebar's own label for the current section —
+    // phone app-switchers and stacked tabs then say "POS · Chakula" etc.
+    // Next.js re-asserts its route metadata title after hydration and on
+    // client navigations, which can overwrite a plain assignment — so watch
+    // the <title> element and re-apply ours whenever it gets reset while
+    // this layout is mounted.
+    useEffect(() => {
+        const pairs = navSections.flatMap((s) => s.items.map((i) => ({ href: i.href, label: i.label })));
+        const wanted = `${labelForPath(pathname, pairs)} · Chakula`;
+        const apply = () => { document.title = wanted; };
+        apply();
+        const titleEl = document.querySelector("title");
+        let observer: MutationObserver | null = null;
+        if (titleEl) {
+            observer = new MutationObserver(() => {
+                if (document.title !== wanted) apply();
+            });
+            observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
+        }
+        return () => observer?.disconnect();
+    }, [pathname]);
+
     if (isLoading || (user && isStaffAccount && staffRole)) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
+        return <PageLoader />;
     }
 
     if (!user) return null;
@@ -126,43 +178,55 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     return (
         <div className="min-h-screen flex">
+            <SkipLink />
             {/* Sidebar */}
             <aside
-                className={`fixed inset-y-0 left-0 z-50 w-56 bg-[#0f0f0f] border-r border-[#1a1a1a] transform transition-transform duration-200 lg:translate-x-0 ${
+                className={`fixed inset-y-0 left-0 z-50 w-56 bg-[#0f0f0f] border-r border-[#1a1a1a] transform transition-transform duration-200 lg:translate-x-0 flex flex-col ${
                     sidebarOpen ? "translate-x-0" : "-translate-x-full"
                 }`}
             >
                 {/* Brand */}
-                <div className="px-5 py-5 border-b border-[#1a1a1a]">
+                <div className="px-5 py-5 border-b border-[#1a1a1a] shrink-0">
                     <h1 className="text-lg font-bold text-[#e5e5e5] tracking-tight">Chakula</h1>
                     <p className="text-xs text-[var(--accent)] mt-0.5 truncate font-medium">{restaurantName}</p>
                     <p className="text-xs text-[#525252] truncate">{user.email}</p>
                 </div>
 
-                {/* Nav */}
-                <nav className="p-3 space-y-0.5">
-                    {navItems.map((item) => {
-                        const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                onClick={() => setSidebarOpen(false)}
-                                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                                    isActive
-                                        ? "bg-[#1a1a1a] text-[var(--accent)]"
-                                        : "text-[#737373] hover:text-[#e5e5e5] hover:bg-[#141414]"
-                                }`}
-                            >
-                                <item.icon className="w-4 h-4" />
-                                <span className="font-medium">{item.label}</span>
-                            </Link>
-                        );
-                    })}
+                {/* Nav — scrollable so the grouped sections fit on short screens,
+                    with the account block always visible below. */}
+                <nav className="flex-1 overflow-y-auto p-3 pb-6 space-y-4" aria-label="Main navigation">
+                    {navSections.map((section) => (
+                        <div key={section.label}>
+                            <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#525252]">
+                                {section.label}
+                            </p>
+                            <div className="space-y-0.5">
+                                {section.items.map((item) => {
+                                    const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                                    return (
+                                        <Link
+                                            key={item.href}
+                                            href={item.href}
+                                            onClick={() => setSidebarOpen(false)}
+                                            aria-current={isActive ? "page" : undefined}
+                                            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                                                isActive
+                                                    ? "bg-[#1a1a1a] text-[var(--accent)]"
+                                                    : "text-[#737373] hover:text-[#e5e5e5] hover:bg-[#141414]"
+                                            }`}
+                                        >
+                                            <item.icon className="w-4 h-4" />
+                                            <span className="font-medium">{item.label}</span>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
                 </nav>
 
                 {/* Switch user / Logout */}
-                <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-[#1a1a1a] space-y-0.5">
+                <div className="shrink-0 p-3 border-t border-[#1a1a1a] space-y-0.5">
                     <button
                         onClick={() => setShowQuickSwitch(true)}
                         className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[#737373] hover:text-[var(--accent)] hover:bg-[#141414] w-full transition-colors"
@@ -197,7 +261,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
 
             {/* Main */}
-            <main className="flex-1 lg:ml-56 min-h-screen">
+            <main id="main-content" tabIndex={-1} className="flex-1 lg:ml-56 min-h-screen focus:outline-none">
                 <header className="sticky top-0 z-30 bg-[#0a0a0a]/90 backdrop-blur-sm border-b border-[#1a1a1a] px-5 py-3 flex items-center justify-between">
                     <button
                         onClick={() => setSidebarOpen(!sidebarOpen)}

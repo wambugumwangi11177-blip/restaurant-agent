@@ -100,6 +100,16 @@ def db_env(tmp_path, monkeypatch):
         narrator._cache.clear()
     except Exception:
         pass
+    # ops_manager has the same process-wide TTL cache — without this reset a
+    # dashboard cached by an earlier test (same restaurant_id, different fresh
+    # DB) leaks into the next test and produces order-dependent failures
+    # (found 2026-08-23: test_zero_yesterday saw the previous test's revenue).
+    try:
+        from ai import ops_manager
+        with ops_manager._cache_lock:
+            ops_manager._cache.clear()
+    except Exception:
+        pass
     try:
         import ai.llm_client as llm_client
         llm_client._client = None

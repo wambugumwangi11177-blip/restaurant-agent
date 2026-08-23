@@ -16,7 +16,12 @@ test_migration_009_is_a_noop_on_sqlite for what is asserted instead, and the
 migration's docstring for why the split exists.
 """
 
-from datetime import date, time
+from datetime import date, time, timedelta
+
+# Fixed future dates rot; anchor bookings to tomorrow so the suite stays
+# green regardless of when it runs.
+_BOOKING_DAY = date.today() + timedelta(days=1)
+_BOOKING_DAY_NEXT = _BOOKING_DAY + timedelta(days=1)
 
 import auth
 import models
@@ -59,7 +64,7 @@ def _booking(table_id, hour=18, minute=0, duration=90, party_size=2):
     return {
         "customer_name": "Test Customer",
         "party_size": party_size,
-        "reservation_date": str(date(2026, 8, 1)),
+        "reservation_date": str(_BOOKING_DAY),
         "reservation_time": str(time(hour, minute)),
         "duration_minutes": duration,
         "table_id": table_id,
@@ -171,7 +176,8 @@ def test_cross_midnight_reservation_blocks_next_day_overlap(client, db_session):
     calendar day. is_table_available scoped to the exact reservation_date used to
     miss it, letting a 00:00 next-day booking double-book the table.
     """
-    from datetime import date, time
+    from datetime import time
+
     from ai.reservation_optimizer import is_table_available
 
     restaurant, token = _make_tenant_with_user_and_restaurant(db_session, "midnight")
@@ -180,7 +186,7 @@ def test_cross_midnight_reservation_blocks_next_day_overlap(client, db_session):
     late = {
         "customer_name": "Late Diner",
         "party_size": 2,
-        "reservation_date": str(date(2026, 8, 1)),
+        "reservation_date": str(_BOOKING_DAY),
         "reservation_time": str(time(23, 0)),
         "duration_minutes": 120,
         "table_id": table.id,
@@ -188,12 +194,12 @@ def test_cross_midnight_reservation_blocks_next_day_overlap(client, db_session):
     resp = client.post("/reservations/", json=late, headers=_auth_headers(token))
     assert resp.status_code == 201, resp.text
 
-    # A 00:00 booking on 2026-08-02 overlaps the 23:00–01:00 window from 08-01.
+    # A 00:00 booking on the next day overlaps the 23:00–01:00 window from 08-01.
     assert is_table_available(
         db_session,
         restaurant_id=restaurant.id,
         table_id=table.id,
-        reservation_date=date(2026, 8, 2),
+        reservation_date=_BOOKING_DAY_NEXT,
         reservation_time=time(0, 0),
         duration_minutes=60,
     ) is False

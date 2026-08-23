@@ -62,7 +62,10 @@ function statusLabel(s: string) {
  */
 export default function SupportView() {
     const { user } = useAuth();
-    const isTriage = user?.role === "admin" || user?.role === "superadmin" || user?.staff_role === "manager";
+    // Lowercase the comparison like every other role check in the app —
+    // a backend returning "Admin" would otherwise silently break triage.
+    const role = (user?.role || "").toLowerCase();
+    const isTriage = role === "admin" || role === "superadmin" || user?.staff_role === "manager";
 
     const [tickets, setTickets] = useState<TicketSummary[]>([]);
     const [loading, setLoading] = useState(true);

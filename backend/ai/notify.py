@@ -23,13 +23,35 @@ ai/whatsapp/twilio_client.send().
 """
 
 import os
+import ipaddress
 import json
 import logging
+import socket
+from urllib.parse import urlparse
+
 from sqlalchemy.orm import Session
 
 import models
 
 logger = logging.getLogger("ai.notify")
+
+
+def _endpoint_allowed(endpoint: str) -> bool:
+    """True only for https push endpoints whose host resolves to a public IP.
+    heuristic (a determined attacker could DNS-rebind between check and send)
+    but closes the trivially-exploitable blind-POST-to-internal-services path."""
+    try:
+        parsed = urlparse(endpoint or "")
+        if parsed.scheme != "https" or not parsed.hostname:
+            return False
+        try:
+            ip = ipaddress.ip_address(parsed.hostname)
+        except ValueError:
+            infos = socket.getaddrinfo(parsed.hostname, None)
+            ip = ipaddress.ip_address(infos[0][4][0])
+        return ip.is_global
+    except Exception:  # noqa: BLE001 — unresolvable/unparsable = not allowed
+        return False
 
 VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
 VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
@@ -112,6 +134,16 @@ def _dispatch_push(db: Session, user_id: int, title: str, body: str, url: str | 
     payload = json.dumps({"title": title, "body": body, "url": url or "/dashboard"})
 
     for sub in subs:
+        # SSRF guard: subscription endpoints are client-registered URLs and
+        # webpush() POSTs to them server-side. Without validation a malicious
+        # authenticated user could point the backend at internal services
+        # (cloud metadata, internal admin panels). Push endpoints from any
+        # legitimate browser push service are https:// and public.
+        if not _endpoint_allowed(sub.endpoint):
+            logger.warning(
+                "[notify] blocked push to disallowed endpoint for user %s", user_id,
+            )
+            continue
         try:
             webpush(
                 subscription_info={

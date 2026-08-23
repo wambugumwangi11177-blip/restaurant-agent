@@ -28,8 +28,11 @@ requirements.txt — "uncomment when client has paid").
 """
 
 import json
+import logging
 import os
 from types import SimpleNamespace
+
+logger = logging.getLogger("ai.llm_client")
 
 
 def _block_get(block, key):
@@ -359,11 +362,22 @@ def chat_with_tools(
     if choice.message.content:
         content.append(SimpleNamespace(type="text", text=choice.message.content))
     for tc in (choice.message.tool_calls or []):
+        # Small models occasionally emit malformed tool-argument JSON — one
+        # bad call must not crash the whole multi-turn run after its tokens
+        # were already spent. Empty args degrade to "no arguments".
+        try:
+            tool_input = json.loads(tc.function.arguments or "{}")
+        except json.JSONDecodeError:
+            logger.warning(
+                "malformed tool arguments from model for tool %r — treated as empty",
+                getattr(tc.function, "name", "?"),
+            )
+            tool_input = {}
         content.append(SimpleNamespace(
             type="tool_use",
             id=tc.id,
             name=tc.function.name,
-            input=json.loads(tc.function.arguments or "{}"),
+            input=tool_input,
         ))
 
     stop_reason = "tool_use" if choice.message.tool_calls else "end_turn"

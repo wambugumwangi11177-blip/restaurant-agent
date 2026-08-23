@@ -40,17 +40,26 @@ export default function CustomerOrderPage() {
     const [notes, setNotes] = useState("");
     const [consentGiven, setConsentGiven] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
     const [orderId, setOrderId] = useState<number | null>(null);
 
     useEffect(() => {
         fetch(`${API_URL}/menu/public/${RESTAURANT_ID}`)
-            .then((r) => r.json())
+            .then((r) => {
+                if (!r.ok) throw new Error(`Menu unavailable (${r.status})`);
+                return r.json();
+            })
             .then((data) => {
+                if (!Array.isArray(data)) throw new Error("Unexpected menu response");
                 setMenuItems(data);
                 setLoading(false);
             })
-            .catch(() => setLoading(false));
+            .catch(() => {
+                setLoadError("Sorry — we couldn't load the menu right now. Please try again in a moment.");
+                setLoading(false);
+            });
     }, []);
 
     const categories = ["All", ...Array.from(new Set(menuItems.map((i) => i.category)))];
@@ -76,6 +85,7 @@ export default function CustomerOrderPage() {
     const handleSubmit = async () => {
         if (cart.length === 0 || !customerName || !customerPhone || !consentGiven) return;
         setSubmitting(true);
+        setSubmitError(null);
         try {
             const res = await fetch(`${API_URL}/orders/public?restaurant_id=${RESTAURANT_ID}`, {
                 method: "POST",
@@ -91,11 +101,21 @@ export default function CustomerOrderPage() {
                     consent: consentGiven,
                 }),
             });
-            const data = await res.json();
-            setOrderId(data.id);
-            setStep("confirmed");
+            const data = await res.json().catch(() => null);
+            // Only confirm on a real success — previously ANY response (4xx/5xx)
+            // showed the "Order Placed!" screen and the customer walked away
+            // believing an order existed.
+            if (res.ok && data && typeof data.id === "number") {
+                setOrderId(data.id);
+                setStep("confirmed");
+            } else {
+                setSubmitError(
+                    data?.detail || "Your order didn't go through. Please try again — you haven't been charged."
+                );
+            }
         } catch (err) {
             console.error("Order failed:", err);
+            setSubmitError("Network problem — your order didn't go through. Please try again.");
         }
         setSubmitting(false);
     };
@@ -104,6 +124,22 @@ export default function CustomerOrderPage() {
         return (
             <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
                 <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <div className="min-h-screen bg-[#0a0a0a] text-[#e5e5e5] flex items-center justify-center px-4">
+                <div className="text-center">
+                    <p className="text-sm text-[#a3a3a3]">{loadError}</p>
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="mt-4 px-4 py-2 bg-[var(--accent)] text-black rounded-xl text-sm font-semibold"
+                    >
+                        Retry
+                    </button>
+                </div>
             </div>
         );
     }
@@ -287,6 +323,11 @@ export default function CustomerOrderPage() {
                             </label>
 
                             {/* Submit */}
+                            {submitError && (
+                                <div className="mb-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
+                                    <p className="text-xs text-red-400">{submitError}</p>
+                                </div>
+                            )}
                             <button
                                 onClick={handleSubmit}
                                 disabled={!customerName || !customerPhone || !consentGiven || submitting}

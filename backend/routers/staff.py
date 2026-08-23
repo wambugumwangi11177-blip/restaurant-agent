@@ -198,8 +198,38 @@ async def update_staff(
     if not member:
         raise HTTPException(status_code=404, detail="Staff member not found")
 
-    was_active = member.is_active
+    # Privilege guard (security audit 2026-08-23): create/assign-role carefully
+    # bound what a Manager may grant via _require_grant_allowed, but this
+    # generic update path let a Manager-tier caller deactivate a peer Manager
+    # (force-logging them out) or edit their pay rate — the same powers the
+    # grant rules exist to withhold.
     updates = body.dict(exclude_unset=True)
+    caller_is_admin = current_user.role in (models.Role.ADMIN, models.Role.SUPERADMIN)
+    if not caller_is_admin:
+        target_tier = None
+        if member.user_id:
+            linked = db.query(models.User).filter(models.User.id == member.user_id).first()
+            target_tier = linked.staff_role if linked else None
+        if target_tier in (models.StaffRole.MANAGER, models.StaffRole.OWNER):
+            raise HTTPException(
+                status_code=403,
+                detail="Only an Owner can modify Manager-tier staff.",
+            )
+        # Segregation of duties on payroll data: nobody edits their own pay
+        # rate, and deactivating yourself is what logout is for (a self-off
+        # here would also skip the revocation audit/event path below).
+        if member.user_id == current_user.id:
+            if "hourly_rate" in updates:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You cannot edit your own pay rate.",
+                )
+            if updates.get("is_active") is False:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You cannot deactivate your own account.",
+                )
+    was_active = member.is_active
     if "phone" in updates and updates["phone"]:
         updates["phone"] = normalize_phone(updates["phone"])
     for key, value in updates.items():

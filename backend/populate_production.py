@@ -41,10 +41,19 @@ def populate():
         db.add(tenant)
         db.flush()
 
+        # Never ship a guessable password for an ADMIN account: take it from the
+        # environment, or generate a strong one-time value and print it once.
+        admin_password = os.getenv("SEED_ADMIN_PASSWORD", "")
+        if not admin_password:
+            import secrets as _secrets
+            admin_password = _secrets.token_urlsafe(16)
+            print("[WARN] SEED_ADMIN_PASSWORD not set — generated a one-time admin password.")
+        print(f"[INFO] Admin email: client@leviii.ai")
+        print(f"[INFO] Admin password (store securely, shown once): {admin_password}")
         admin = User(
             tenant_id=tenant.id,
             email="client@leviii.ai",
-            hashed_password=get_password_hash("client123"),
+            hashed_password=get_password_hash(admin_password),
             role=Role.ADMIN,
         )
         db.add(admin)

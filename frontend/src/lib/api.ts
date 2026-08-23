@@ -25,8 +25,18 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem("access_token");
-      window.location.href = "/login";
+      // Don't redirect when we're already on /login or registering/logging in —
+      // the login page fires unauthenticated API calls (trust-stats) and a
+      // redirect here used to loop the page into itself forever.
+      const isAuthPath =
+        window.location.pathname === "/login" ||
+        window.location.pathname === "/register" ||
+        window.location.pathname === "/order" ||
+        (error.config?.url ?? "").includes("/auth/");
+      if (!isAuthPath) {
+        localStorage.removeItem("access_token");
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }

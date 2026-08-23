@@ -23,11 +23,13 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import {
     Brain, TrendingUp, AlertTriangle, CheckCircle,
-    RefreshCw, Zap, Shield, Activity, ArrowRight,
+    RefreshCw, Shield, Activity, ArrowRight,
 } from "lucide-react";
 import Link from "next/link";
 import { formatKES } from "@/lib/format";
 import EmptyState from "@/components/ui/EmptyState";
+import SectionCard from "@/components/ui/SectionCard";
+import AiTabs, { tabFromHash, type AiTabId } from "./_components/AiTabs";
 
 const HowItWorks = dynamic(() => import("@/components/ai/HowItWorks").then((mod) => mod.HowItWorks));
 import { StrategyAgent } from "@/components/ai/StrategyAgent";
@@ -104,6 +106,12 @@ export default function AiDashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    // Active module tab, synced to the URL hash so refresh/back keeps it.
+    // "overview" (the calm summary) is the default landing tab. The hash is
+    // read in an effect, not in the useState initializer — the initializer
+    // runs during SSR too, and a #money URL would render a different tab on
+    // the server than the client's first paint (hydration mismatch).
+    const [activeTab, setActiveTab] = useState<AiTabId>("overview");
 
     const restaurantName = user?.restaurant_name || "Your Restaurant";
 
@@ -122,6 +130,24 @@ export default function AiDashboard() {
     };
 
     useEffect(() => { fetchData(); }, []);
+
+    // Restore the tab from a #hash URL after hydration (see the useState
+    // note above), then keep back/forward working via hashchange.
+    useEffect(() => {
+        setActiveTab(tabFromHash(window.location.hash));
+        const onHashChange = () => setActiveTab(tabFromHash(window.location.hash));
+        window.addEventListener("hashchange", onHashChange);
+        return () => window.removeEventListener("hashchange", onHashChange);
+    }, []);
+
+    const selectTab = (id: AiTabId) => {
+        setActiveTab(id);
+        if (id === "overview") {
+            history.replaceState(null, "", window.location.pathname);
+        } else {
+            history.replaceState(null, "", `#${id}`);
+        }
+    };
 
     if (loading) {
         return (
@@ -206,6 +232,21 @@ export default function AiDashboard() {
     const qs = data!.quick_stats;
     const wowGrowth = data!.ai_modules?.revenue?.week_over_week_growth ?? qs.day_over_day_change;
 
+    // "Needs your attention" — the calm replacement for stacking every module:
+    // the single worst risk, the top opportunity, and a nudge if alerts are
+    // piling up. Everything else is one tab click away.
+    const severityRank: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+    const topRisk = [...data!.risks].sort(
+        (a, b) => (severityRank[a.severity] ?? 9) - (severityRank[b.severity] ?? 9)
+    )[0];
+    const topOpportunity = data!.opportunities[0];
+
+    const panelProps = (id: AiTabId) => ({
+        id: `ai-panel-${id}`,
+        role: "tabpanel" as const,
+        "aria-labelledby": `ai-tab-${id}`,
+    });
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -274,116 +315,138 @@ export default function AiDashboard() {
                 ))}
             </div>
 
-            {/* CEO Strategy Agent — goal in, one prioritized plan out. */}
-            <StrategyAgent />
+            {/* Summary tab — the calm default: the one glance panel.
+                Every AI module is grouped into themed tabs instead of ~20
+                stacked cards. Sections render themselves unchanged inside
+                their tab; each still fetches independently, so one module
+                erroring never takes the others down. */}
+            <AiTabs active={activeTab} onChange={selectTab} />
 
-            {/* Decision Intelligence — every agent's recommendations, ranked into
-                one prioritised stream. The owner's "what should I do first" view. */}
-            <DecisionsSection />
-
-            {/* What-If Simulator — test a price change before committing. */}
-            <WhatIfSimulator />
-
-            {/* Digital Twin — forward revenue projection with calendar signals. */}
-            <DigitalTwin />
-
-            {/* Revenue Forecast — the 7-day statistical forecast with confidence
-                bands. Distinct from the Digital Twin above: the twin projects a
-                chosen horizon with demand movers; this is the straight
-                sales-pattern forecast. Both surfaces existed only as raw API
-                endpoints consumed by other pages (Orders, Stock) before. */}
-            <RevenueForecastSection />
-
-            {/* Concrete, prioritised actions to raise the health score */}
-            <HealthBoostSection breakdown={data!.health_breakdown} score={hs} />
-
-            {/* AI modules — inline, not separate pages. These used to link to
-                /dashboard/ai/pricing, /dashboard/ai/labor, /dashboard/ai/menu,
-                none of which exist (a 404 on every click) — found 2026-07-07
-                from a user report. Each section fetches and renders itself
-                independently, so one module erroring doesn't take down the
-                others or force a page navigation to see what's wrong. */}
-            <ProfitSection />
-            <PricingSection />
-            <MenuEngineeringSection />
-            <KdsSection />
-            <LaborSection />
-            <SupplyChainSection />
-            <InventoryPredictionsSection />
-            <GraphImpactSection />
-            <CashSection />
-            <FraudSection />
-            <DataQualitySection />
-
-            {/* Risks + Opportunities */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Risks */}
-                <div className="rounded-xl border border-surface-hover bg-[#0f0f0f] p-5">
-                    <h2 className="text-sm font-semibold text-text mb-4 flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-red-400" />
-                        Active Risks ({data!.risks.length})
-                    </h2>
-                    {data!.risks.length === 0 ? (
-                        <div className="flex items-center gap-2 text-emerald-400 text-sm py-2">
-                            <CheckCircle className="w-4 h-4" />
-                            No active risks
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            {data!.risks.slice(0, 5).map((r, i) => (
-                                <div key={i} className={`p-3 rounded-lg border text-sm ${severityStyle[r.severity] || "border-border text-text-muted"}`}>
-                                    <p className="font-medium">{r.risk}</p>
-                                    <p className="text-xs opacity-70 mt-0.5">{r.detail}</p>
+            {activeTab === "overview" && (
+                <div {...panelProps("overview")} className="space-y-4">
+                    <SectionCard title="Needs your attention">
+                        <div className="space-y-3">
+                            {topRisk ? (
+                                <div className={`p-3 rounded-lg border text-sm ${severityStyle[topRisk.severity] || "border-border text-text-muted"}`}>
+                                    <p className="font-medium">{topRisk.risk}</p>
+                                    <p className="text-xs opacity-70 mt-0.5">{topRisk.detail}</p>
                                 </div>
-                            ))}
+                            ) : (
+                                <div className="flex items-center gap-2 text-emerald-400 text-sm py-1">
+                                    <CheckCircle className="w-4 h-4" /> No active risks
+                                </div>
+                            )}
+                            {topOpportunity ? (
+                                <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                                    <p className="text-sm font-medium text-text">{topOpportunity.opportunity}</p>
+                                    <p className="text-emerald-400 text-xs font-medium mt-0.5">{topOpportunity.potential}</p>
+                                    <p className="text-text-dim text-xs">{topOpportunity.detail}</p>
+                                </div>
+                            ) : (
+                                <p className="text-text-dim text-sm">No opportunities flagged yet — keep adding data</p>
+                            )}
+                            {qs.active_alerts > 0 && (
+                                <p className="text-xs text-text-dim">
+                                    {qs.active_alerts} active alert{qs.active_alerts === 1 ? "" : "s"} from your systems — see the Home dashboard for the full list.
+                                </p>
+                            )}
+                            <p className="text-xs text-text-dim pt-1">
+                                Explore your AI modules in the tabs above — Money, Operations, Growth &amp; Strategy, or Trust &amp; Safety.
+                            </p>
                         </div>
-                    )}
+                    </SectionCard>
                 </div>
+            )}
 
-                {/* Opportunities */}
-                <div className="rounded-xl border border-surface-hover bg-[#0f0f0f] p-5">
-                    <h2 className="text-sm font-semibold text-text mb-4 flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-emerald-400" />
-                        Opportunities
-                    </h2>
-                    {data!.opportunities.length === 0 ? (
-                        <p className="text-text-dim text-sm py-2">No opportunities flagged yet — keep adding data</p>
-                    ) : (
-                        <div className="space-y-2">
-                            {data!.opportunities.map((o, i) => (
-                                <div key={i} className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
-                                    <p className="text-sm font-medium text-text">{o.opportunity}</p>
-                                    <p className="text-emerald-400 text-xs font-medium mt-0.5">{o.potential}</p>
-                                    <p className="text-text-dim text-xs">{o.detail}</p>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+            {activeTab === "money" && (
+                <div {...panelProps("money")} className="space-y-6">
+                    <RevenueForecastSection />
+                    <ProfitSection />
+                    <PricingSection />
+                    <CashSection />
                 </div>
-            </div>
+            )}
+            {activeTab === "ops" && (
+                <div {...panelProps("ops")} className="space-y-6">
+                    <KdsSection />
+                    <MenuEngineeringSection />
+                    <InventoryPredictionsSection />
+                    <SupplyChainSection />
+                    <LaborSection />
+                </div>
+            )}
+            {activeTab === "growth" && (
+                <div {...panelProps("growth")} className="space-y-6">
+                    <StrategyAgent />
+                    <DecisionsSection />
+                    <WhatIfSimulator />
+                    <DigitalTwin />
+                    <HealthBoostSection breakdown={data!.health_breakdown} score={hs} />
 
-            {/* Recent AI Actions */}
-            <div className="rounded-xl border border-surface-hover bg-[#0f0f0f] p-5">
-                <h2 className="text-sm font-semibold text-text mb-4 flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-[var(--accent)]" />
-                    Recent AI Actions
-                </h2>
-                {data!.recent_ai_actions.length === 0 ? (
-                    <p className="text-text-dim text-sm">No AI actions logged yet</p>
-                ) : (
-                    <div className="space-y-2">
-                        {data!.recent_ai_actions.map((log, i) => (
-                            <div key={i} className="flex justify-between items-center py-2 border-b border-surface-hover last:border-0">
-                                <div>
-                                    <p className="text-sm text-text">{log.action}</p>
-                                    <p className="text-xs text-text-dim">{log.agent}</p>
+                    {/* Risks + Opportunities — full lists */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <SectionCard title={`Active Risks (${data!.risks.length})`}>
+                            {data!.risks.length === 0 ? (
+                                <div className="flex items-center gap-2 text-emerald-400 text-sm py-2">
+                                    <CheckCircle className="w-4 h-4" />
+                                    No active risks
                                 </div>
-                                <span className="text-xs text-text-dim bg-surface px-2 py-1 rounded-md whitespace-nowrap">{log.time}</span>
-                            </div>
-                        ))}
+                            ) : (
+                                <div className="space-y-2">
+                                    {data!.risks.slice(0, 5).map((r, i) => (
+                                        <div key={i} className={`p-3 rounded-lg border text-sm ${severityStyle[r.severity] || "border-border text-text-muted"}`}>
+                                            <p className="font-medium">{r.risk}</p>
+                                            <p className="text-xs opacity-70 mt-0.5">{r.detail}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </SectionCard>
+
+                        <SectionCard title="Opportunities">
+                            {data!.opportunities.length === 0 ? (
+                                <p className="text-text-dim text-sm py-2">No opportunities flagged yet — keep adding data</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {data!.opportunities.map((o, i) => (
+                                        <div key={i} className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                                            <p className="text-sm font-medium text-text">{o.opportunity}</p>
+                                            <p className="text-emerald-400 text-xs font-medium mt-0.5">{o.potential}</p>
+                                            <p className="text-text-dim text-xs">{o.detail}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </SectionCard>
                     </div>
-                )}
-            </div>
+                </div>
+            )}
+            {activeTab === "trust" && (
+                <div {...panelProps("trust")} className="space-y-6">
+                    <FraudSection />
+                    <GraphImpactSection />
+                    <DataQualitySection />
+
+                    {/* Recent AI Actions */}
+                    <SectionCard title="Recent AI Actions">
+                        {data!.recent_ai_actions.length === 0 ? (
+                            <p className="text-text-dim text-sm">No AI actions logged yet</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {data!.recent_ai_actions.map((log, i) => (
+                                    <div key={i} className="flex justify-between items-center py-2 border-b border-surface-hover last:border-0">
+                                        <div>
+                                            <p className="text-sm text-text">{log.action}</p>
+                                            <p className="text-xs text-text-dim">{log.agent}</p>
+                                        </div>
+                                        <span className="text-xs text-text-dim bg-surface px-2 py-1 rounded-md whitespace-nowrap">{log.time}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </SectionCard>
+                </div>
+            )}
         </div>
     );
 }

@@ -206,9 +206,14 @@ def _analyze_single_item(item, movements, now, thirty_days_ago, seven_days_ago):
         status = "ok"
 
     # ── Velocity Classification ──
-    if daily_usage >= (total_out_30d / days_tracked) * 1.3:
+    # Fast/slow relative to the item's OWN 30-day baseline: is the last week
+    # running hot or cold versus the month? (The previous form compared
+    # daily_usage against total_out_30d/days_tracked — literally itself —
+    # so both branches were unreachable and every item was "medium",
+    # permanently zeroing summary.fast_movers/slow_movers.)
+    if daily_usage > 0 and daily_usage_recent >= daily_usage * 1.3:
         velocity = "fast"
-    elif daily_usage <= (total_out_30d / days_tracked) * 0.5:
+    elif daily_usage > 0 and daily_usage_recent <= daily_usage * 0.5:
         velocity = "slow"
     else:
         velocity = "medium"

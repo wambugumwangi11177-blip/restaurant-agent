@@ -580,8 +580,8 @@ def _on_agent_failed(payload: dict) -> None:
         restaurant = _get_restaurant(db, restaurant_id)
         if not restaurant:
             return
-        title = "AI agent failed"
-        body = f"{agent_name} failed to run — check AI Ops for details."
+        title = "An AI check didn't finish"
+        body = f"The {agent_name} check couldn't finish just now. Everything else kept running — details are in AI Ops."
         _fan_out(db, restaurant, EventType.AGENT_FAILED, title, body, "ai-ops")
     except Exception as exc:
         logger.error(f"[PushNotifier] agent_failed failed: {exc}")

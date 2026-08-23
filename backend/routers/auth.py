@@ -276,6 +276,10 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
             detail=f"Account temporarily locked due to repeated failed logins. Try again in {remaining} minute(s).",
         )
 
+    if not user:
+        # Burn the same Argon2 work a real verification costs so response time
+        # doesn't reveal whether the account exists (user-enumeration oracle).
+        auth.verify_password(login_data.password, auth.get_password_hash("timing-equalizer"))
     if not user or not auth.verify_password(login_data.password, user.hashed_password):
         if user:
             user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
@@ -309,6 +313,14 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
     # the login. The client resubmits email+password+mfa_code together.
     if user.mfa_enabled:
         if not login_data.mfa_code or not auth.verify_totp(user.mfa_secret, login_data.mfa_code):
+            # A wrong TOTP code must count toward brute-force lockout — with a
+            # known/stolen password, unbounded code guessing would otherwise
+            # defeat the second factor (only the 10/min IP limiter would brake
+            # it, and IP rotation defeats that).
+            user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+            if user.failed_login_attempts >= MAX_FAILED_ATTEMPTS:
+                user.locked_until = utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+            db.commit()
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="A valid authenticator code is required.",
@@ -419,6 +431,12 @@ async def confirm_password_reset(
     user.hashed_password = auth.get_password_hash(body.new_password)
     user.failed_login_attempts = 0
     user.locked_until = None
+    # A reset means the old credentials may be compromised — a PIN planted
+    # during a brief session theft must not survive as a quick-switch
+    # backdoor into the new password.
+    user.hashed_pin = None
+    user.pin_failed_attempts = 0
+    user.pin_locked_until = None
     # A password reset must invalidate every outstanding session — otherwise
     # a session opened with the OLD (possibly compromised) password survives
     # the very reset meant to kill it off.
@@ -606,6 +624,13 @@ async def quick_switch(
     establishes trust that this is a legitimate shared device, not an
     open door: the target must belong to the same tenant as the caller, have
     already opted in with a PIN, and pass the same lockout gate /login uses.
+
+    Escalation guards (security audit 2026-08-23):
+      - MFA-enabled targets are excluded entirely — a 4-6 digit PIN must never
+        satisfy an account whose owner deliberately added a second factor.
+      - ADMIN-role / OWNER-tier targets are only reachable from an ADMIN
+        caller. Without this, the lowest-privilege account at a tenant could
+        brute-force a PIN (10^4 options) to become the Owner.
     """
     target = db.query(models.User).filter(
         models.User.id == body.user_id,
@@ -614,25 +639,63 @@ async def quick_switch(
     if not target or not target.hashed_pin or not target.is_active:
         raise HTTPException(status_code=404, detail="Not available for quick switch.")
 
-    if target.locked_until and target.locked_until > utcnow():
-        remaining = int((target.locked_until - utcnow()).total_seconds() / 60) + 1
+    if target.mfa_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account requires full login (MFA enabled).",
+        )
+
+    caller_is_admin = (
+        current_user.role == models.Role.ADMIN
+        or current_user.role == models.Role.SUPERADMIN
+    )
+    target_is_privileged = (
+        target.role == models.Role.ADMIN
+        or target.role == models.Role.SUPERADMIN
+        or target.staff_role == models.StaffRole.OWNER
+    )
+    if target_is_privileged and not caller_is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Quick switch to this account is not permitted.",
+        )
+
+    # PIN failures use their OWN counters — a teammate's bad PIN must never
+    # lock the target out of password login (the old behavior was a 5-attempt
+    # griefing vector against any user at the tenant).
+    if target.pin_locked_until and target.pin_locked_until > utcnow():
+        remaining = int((target.pin_locked_until - utcnow()).total_seconds() / 60) + 1
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Account temporarily locked due to repeated failed PIN attempts. Try again in {remaining} minute(s).",
         )
 
     if not auth.verify_pin(body.pin, target.hashed_pin):
-        target.failed_login_attempts = (target.failed_login_attempts or 0) + 1
-        just_locked = target.failed_login_attempts >= MAX_FAILED_ATTEMPTS
-        if just_locked:
-            target.locked_until = utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+        target.pin_failed_attempts = (target.pin_failed_attempts or 0) + 1
+        if target.pin_failed_attempts >= MAX_FAILED_ATTEMPTS:
+            target.pin_locked_until = utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
         db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect PIN")
 
-    target.failed_login_attempts = 0
-    target.locked_until = None
+    target.pin_failed_attempts = 0
+    target.pin_locked_until = None
     target.last_login_at = utcnow()
     db.commit()
+
+    # Durable audit trail — unlike Owner impersonation (routers/staff.py),
+    # quick-switch previously left no record of who became whom.
+    restaurant = get_restaurant_or_none(db, current_user)
+    if restaurant:
+        db.add(models.AgentAuditLog(
+            restaurant_id=restaurant.id,
+            action_type="quick_switch",
+            agent_name="auth",
+            entity_type="user",
+            entity_id=target.id,
+            reasoning=f"{current_user.email} quick-switched to {target.email}",
+            approved_by=current_user.email,
+        ))
+        db.commit()
 
     access_token = auth.create_access_token(data={"sub": target.email, "ver": target.token_version or 0})
     return {"access_token": access_token, "token_type": "bearer"}

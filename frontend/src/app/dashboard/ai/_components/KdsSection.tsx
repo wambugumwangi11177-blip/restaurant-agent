@@ -24,7 +24,7 @@ export default function KdsSection() {
     return (
         <ModuleShell
             icon={ChefHat}
-            title="Kitchen Intelligence (KDS)"
+            title="Kitchen Intelligence"
             subtitle="Actual prep times per station, bottlenecks, and rush-hour load from your kitchen display data."
             loading={loading}
             error={error}

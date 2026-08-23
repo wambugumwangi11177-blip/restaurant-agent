@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List
@@ -6,6 +6,7 @@ from database import get_db
 import models
 import schemas
 import auth
+from rate_limit import limiter
 from routers.deps import get_or_create_restaurant
 
 router = APIRouter(prefix="/menu", tags=["menu"])
@@ -259,11 +260,15 @@ async def delete_ingredient(
 # ── Public endpoint (no auth) for customer ordering ──
 
 @router.get("/public/{restaurant_id}", response_model=List[schemas.MenuItem])
+@limiter.limit("60/minute")
 async def get_public_menu(
+    request: Request,
     restaurant_id: int,
     db: Session = Depends(get_db),
 ):
-    """Public menu for customer ordering — no login required."""
+    """Public menu for customer ordering — no login required. Rate-limited so
+    enumerable restaurant IDs can't be scraped wholesale (POST /orders/public
+    already carries the same protection)."""
     items = db.query(models.MenuItem).filter(
         models.MenuItem.restaurant_id == restaurant_id,
         models.MenuItem.is_available == True,

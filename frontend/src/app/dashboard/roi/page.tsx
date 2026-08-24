@@ -358,27 +358,24 @@ export default function RoiDashboard() {
                 </div>
             </div>
 
-            {/* Net ROI — the "is it worth what it costs?" answer. Only shown once
-                there's metered AI spend to divide by; otherwise it would be a
-                divide-by-zero dressed up as a number. */}
-            {econ && econ.roi_multiple !== null && econ.roi_multiple !== undefined && (
+            {/* Net ROI — show the two KES figures, never a vanity multiple.
+                Hidden until there is metered AI spend (avoids divide-by-zero).
+                Multiples above 20× (or with tiny AI cost) read as marketing, not accounting. */}
+            {econ && econ.ai_cost_cents > 0 && (
                 <div className="rounded-xl border border-[#d4a853]/30 bg-gradient-to-br from-[#d4a853]/[0.07] to-transparent p-5">
                     <div className="flex items-center gap-2 text-[#d4a853] mb-2">
                         <Scale className="w-4 h-4" />
-                        <p className="text-xs uppercase tracking-widest">Net return on your AI</p>
+                        <p className="text-xs uppercase tracking-widest">What it cost vs what it returned</p>
                     </div>
-                    <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
-                        <p className="text-3xl font-black text-[#e5e5e5]">
-                            {econ.roi_multiple}× <span className="text-base font-bold text-[#737373]">return</span>
-                        </p>
-                        <p className="text-[#a3a3a3] text-sm mb-1">
-                            Every <span className="text-[#e5e5e5] font-medium">{formatKES(100)}</span> spent on AI returned{" "}
-                            <span className="text-emerald-400 font-medium">{formatKES(Math.round(econ.roi_multiple * 100))}</span> in value.
-                        </p>
-                    </div>
+                    <p className="text-[#a3a3a3] text-sm">
+                        <span className="text-[#e5e5e5] font-medium">{formatKES(econ.ai_cost_cents)}</span> spent on AI
+                        {" "}returned{" "}
+                        <span className="text-emerald-400 font-medium">{formatKES(econ.value_delivered_cents)}</span> in
+                        time saved + profit captured, last {days} days.
+                    </p>
                     <p className="text-[11px] text-[#525252] mt-2">
-                        {formatKES(econ.value_delivered_cents)} value delivered (time saved + profit captured) vs{" "}
-                        {formatKES(econ.ai_cost_cents)} in AI cost, last {days} days. Opportunities not yet captured are excluded — this counts only real money.
+                        Opportunities not yet captured are excluded — this counts only money already realised.
+                        Formula: (time-saved wages + approved pricing uplift) ÷ metered AI cost.
                     </p>
                     <HowItWorks id="roi_net" />
                 </div>

@@ -20,7 +20,7 @@ from sqlalchemy import func
 from datetime import timedelta
 import models
 from ai import menu_engineer, revenue_forecaster, kds_intelligence, inventory_predictor, reservation_optimizer
-from time_utils import utcnow
+from time_utils import business_today, utc_naive_range_for_day, BUSINESS_TZ_NAME
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -28,20 +28,18 @@ from time_utils import utcnow
 # ─────────────────────────────────────────────────────────────────────────────
 def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
     """Complete AI Operations Manager dashboard — exhaustive."""
-    # "Today" for the snapshot = the most recent day the restaurant actually
-    # had orders, not wall-clock UTC. For a live restaurant that IS today; for
-    # data that doesn't reach the current wall-clock day (historical/imported,
-    # or just a timezone offset between UTC storage and the venue's day) it
-    # avoids a permanently-empty "Today's Sales" tile. Same principle as
-    # ai/analysis_clock.py.
+    # Operational "today" is the Nairobi calendar day, mapped onto naive-UTC
+    # created_at. Analytics modules still use analysis_anchor() for rolling
+    # windows — that is a different question (where the data is dense).
     latest_order = (
         db.query(func.max(models.Order.created_at))
         .filter(models.Order.restaurant_id == restaurant_id)
         .scalar()
     )
-    now = latest_order or utcnow()
-    today = now.date()
+    today = business_today()
     yesterday = today - timedelta(days=1)
+    today_start, today_end = utc_naive_range_for_day(today)
+    yday_start, yday_end = utc_naive_range_for_day(yesterday)
 
     # Gather data from all AI services
     menu_data = menu_engineer.get_menu_engineering(db, restaurant_id)
@@ -123,18 +121,21 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
     # ─────────────────────────────────────────────
     today_orders = db.query(models.Order).filter(
         models.Order.restaurant_id == restaurant_id,
-        func.date(models.Order.created_at) == today,
+        models.Order.created_at >= today_start,
+        models.Order.created_at < today_end,
     ).count()
 
     today_revenue = db.query(func.sum(models.Order.total)).filter(
         models.Order.restaurant_id == restaurant_id,
-        func.date(models.Order.created_at) == today,
+        models.Order.created_at >= today_start,
+        models.Order.created_at < today_end,
         models.Order.status != models.OrderStatus.CANCELLED,
     ).scalar() or 0
 
     yesterday_revenue = db.query(func.sum(models.Order.total)).filter(
         models.Order.restaurant_id == restaurant_id,
-        func.date(models.Order.created_at) == yesterday,
+        models.Order.created_at >= yday_start,
+        models.Order.created_at < yday_end,
         models.Order.status != models.OrderStatus.CANCELLED,
     ).scalar() or 0
 
@@ -158,6 +159,8 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
         "total_revenue_30d": revenue_data.get("trends", {}).get("total_revenue", 0),
         "avg_order_value": revenue_data.get("trends", {}).get("avg_order_value", 0),
         "active_alerts": len(_aggregate_alerts(menu_data, kds_data, inventory_data, reservation_data)),
+        "snapshot_date": today.isoformat(),
+        "timezone": BUSINESS_TZ_NAME,
     }
 
     # ─────────────────────────────────────────────
@@ -248,7 +251,7 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
         )
         for m in msgs:
             recent_ai_actions.append({
-                "action": m.message_type or "Agent action",
+                "action": _human_action(m.message_type or "Agent action"),
                 "agent": "AI System",
                 "time": m.created_at.strftime("%d %b, %H:%M") if m.created_at else "",
             })
@@ -277,6 +280,63 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 # ALERT AGGREGATION
 # ─────────────────────────────────────────────────────────────────────────────
+
+# Internal action keys must never reach the UI. Keep this map in sync with
+# frontend/src/lib/actions.ts.
+ACTION_LABELS = {
+    "reorder_now": "Reorder now",
+    "reorder_soon": "Reorder soon",
+    "plan_reorder": "Plan a reorder",
+    "use_or_promote": "Use or promote before it spoils",
+    "reduce_waste": "Review waste and portions",
+    "increase_frequency": "Order more often",
+    "morning_briefing": "Morning briefing sent",
+    "reservation_reminder": "Reservation reminder sent",
+    "reservation_reminderwhatsapp": "Reservation reminder sent",
+    "no_show_winback": "No-show win-back sent",
+    "receipt": "Receipt sent",
+    "promo": "Promo sent",
+    "campaign_winback": "Win-back campaign sent",
+    "reorder_request": "Reorder request sent",
+    "supplier_late": "Supplier delay alert",
+    "stock_depleted": "Stock-out alert",
+    "orchestrated_stock_critical": "Critical stock alert",
+}
+
+
+def _human_action(action: str) -> str:
+    if not action:
+        return ""
+    if action in ACTION_LABELS:
+        return ACTION_LABELS[action]
+    key = action.strip()
+    if key in ACTION_LABELS:
+        return ACTION_LABELS[key]
+    if "_" in key and key == key.lower():
+        return key.replace("_", " ").capitalize()
+    return action
+
+
+def _with_item(item: str, message: str) -> str:
+    item = (item or "").strip()
+    message = message or ""
+    if item and item.lower() not in message.lower():
+        return f"{item} — {message}"
+    return message
+
+
+def _dedupe_alerts(alerts: list) -> list:
+    seen = set()
+    out = []
+    for a in alerts:
+        key = (a.get("source"), a.get("item"), a.get("action"), a.get("message"))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(a)
+    return out
+
+
 def _aggregate_alerts(menu_data, kds_data, inventory_data, reservation_data):
     """Pull and rank alerts from all AI services."""
     alerts = []
@@ -284,32 +344,35 @@ def _aggregate_alerts(menu_data, kds_data, inventory_data, reservation_data):
 
     # Inventory alerts
     for alert in (inventory_data.get("alerts") or [])[:5]:
+        item = alert.get("item", "")
         alerts.append({
             "source": "inventory",
-            "item": alert.get("item", ""),
-            "message": alert["message"],
+            "item": item,
+            "message": _with_item(item, alert["message"]),
             "severity": alert.get("severity", "warning"),
-            "action": alert.get("action", ""),
+            "action": _human_action(alert.get("action", "")),
         })
 
     # KDS recommendations
     for rec in (kds_data.get("recommendations") or [])[:3]:
+        item = rec.get("station", "")
         alerts.append({
             "source": "kitchen",
-            "item": rec.get("station", ""),
-            "message": rec["message"],
+            "item": item,
+            "message": _with_item(item, rec["message"]),
             "severity": rec.get("priority", "medium"),
-            "action": rec.get("action", ""),
+            "action": _human_action(rec.get("action", "")),
         })
 
     # Menu recommendations
     for rec in (menu_data.get("recommendations") or [])[:3]:
+        item = rec.get("item", "")
         alerts.append({
             "source": "menu",
-            "item": rec.get("item", ""),
-            "message": rec.get("reason", rec.get("message", "")),
+            "item": item,
+            "message": _with_item(item, rec.get("reason", rec.get("message", ""))),
             "severity": rec.get("priority", "medium"),
-            "action": rec.get("action", ""),
+            "action": _human_action(rec.get("action", "")),
         })
 
     # Reservation recommendations
@@ -319,9 +382,9 @@ def _aggregate_alerts(menu_data, kds_data, inventory_data, reservation_data):
             "item": "",
             "message": rec.get("message", ""),
             "severity": rec.get("priority", "medium"),
-            "action": rec.get("action", ""),
+            "action": _human_action(rec.get("action", "")),
         })
 
-    # Sort by severity
-    alerts.sort(key=lambda x: priority_map.get(x["severity"], 5))
-    return alerts
+    # Sort by severity, drop exact duplicates, cap so Home stays a brief.
+    alerts.sort(key=lambda x: priority_map.get(str(x["severity"]).lower(), 5))
+    return _dedupe_alerts(alerts)[:8]

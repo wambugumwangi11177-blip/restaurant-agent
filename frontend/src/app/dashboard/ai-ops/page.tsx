@@ -103,8 +103,8 @@ export default function AiOpsPage() {
                 <ShieldCheck className="w-10 h-10 text-[#d4a853]" />
                 <p className="text-[#e5e5e5] font-medium">Admins only</p>
                 <p className="text-[#525252] text-sm max-w-sm">
-                    AI Operations shows sensitive cost and reliability metrics, so it&apos;s limited to admin accounts.
-                    You&apos;re signed in as <span className="text-[#a3a3a3]">{user?.role || "a non-admin"}</span>.
+                    AI Operations shows sensitive cost and reliability metrics, so it's limited to admin accounts.
+                    You're signed in as <span className="text-[#a3a3a3]">{user?.role || "a non-admin"}</span>.
                 </p>
             </div>
         );
@@ -132,7 +132,7 @@ export default function AiOpsPage() {
             <div className="flex items-start justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-[#e5e5e5]">AI Operations</h1>
-                    <p className="text-[#525252] mt-1 text-sm">What the AI costs and how well it&apos;s working — last {d.window_days} days</p>
+                    <p className="text-[#525252] mt-1 text-sm">What the AI costs and how well it's working — last {d.window_days} days</p>
                 </div>
                 <button onClick={fetchData} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#141414] border border-[#262626] text-[#737373] hover:text-[#e5e5e5] text-sm transition-colors">
                     <RefreshCw className="w-3.5 h-3.5" />
@@ -215,11 +215,11 @@ export default function AiOpsPage() {
 
             {/* Agent scorecards — accuracy + owner acceptance (measured like an employee) */}
             {d.scorecards && d.scorecards.length > 0 && (
-                <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0] p-5">
+                <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
                     <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2 mb-1">
                         <ShieldCheck className="w-4 h-4 text-[#d4a853]" /> Agent scorecards
                     </h2>
-                    <p className="text-xs text-[#525252] mb-4">Forecast accuracy and how often you accept each agent&apos;s advice — measured against reality.</p>
+                    <p className="text-xs text-[#525252] mb-4">Forecast accuracy and how often you accept each agent's advice — measured against reality.</p>
                     <div className="space-y-2">
                         {d.scorecards.map((c) => {
                             const n = c.prediction_count || 0;

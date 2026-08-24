@@ -215,13 +215,16 @@ export default function AiOpsPage() {
 
             {/* Agent scorecards — accuracy + owner acceptance (measured like an employee) */}
             {d.scorecards && d.scorecards.length > 0 && (
-                <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
+                <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0] p-5">
                     <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2 mb-1">
                         <ShieldCheck className="w-4 h-4 text-[#d4a853]" /> Agent scorecards
                     </h2>
                     <p className="text-xs text-[#525252] mb-4">Forecast accuracy and how often you accept each agent&apos;s advice — measured against reality.</p>
                     <div className="space-y-2">
-                        {d.scorecards.map((c) => (
+                        {d.scorecards.map((c) => {
+                            const n = c.prediction_count || 0;
+                            const unscored = n < 5;
+                            return (
                             <div key={c.agent} className="flex items-center justify-between text-sm py-1.5 border-b border-[#1a1a1a] last:border-0">
                                 <span className="text-[#e5e5e5]">{c.agent}</span>
                                 <span className="text-xs text-[#525252] flex items-center gap-3 whitespace-nowrap">
@@ -230,17 +233,20 @@ export default function AiOpsPage() {
                                             {c.acceptance_rate_pct}% accepted ({c.approved}/{(c.approved || 0) + (c.rejected || 0)})
                                         </span>
                                     )}
-                                    {typeof c.mae_pct === "number" && (
+                                    {unscored ? (
+                                        <span className="text-[#737373]">Not yet scored — need a few labelled outcomes</span>
+                                    ) : typeof c.mae_pct === "number" && (
                                         <span className={c.mae_pct <= 10 ? "text-emerald-400" : c.mae_pct <= 20 ? "text-amber-400" : "text-red-400"}>
-                                            {c.mae_pct}% avg error · {c.prediction_count} scored
+                                            {c.mae_pct}% avg error · {n} scored
                                         </span>
                                     )}
-                                    {typeof c.ci_coverage_pct === "number" && (
+                                    {!unscored && typeof c.ci_coverage_pct === "number" && (
                                         <span>{c.ci_coverage_pct}% in range</span>
                                     )}
                                 </span>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}

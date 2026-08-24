@@ -4,19 +4,16 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { demoData, isDashboardEmpty } from "@/lib/demo-data";
+import { formatKES } from "@/lib/format";
+import { humanAction } from "@/lib/actions";
+import { nairobiDate } from "@/lib/businessDay";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
-    TrendingUp,
-    ShoppingBag,
     AlertTriangle,
-    Activity,
     Zap,
     Shield,
     ShieldCheck,
-    Wifi,
-    Monitor,
-    Smartphone,
     Clock,
     Megaphone,
     Brain,
@@ -141,32 +138,19 @@ export default function DashboardPage() {
                 </motion.div>
             </div>
 
-            {/* Connected Systems */}
-            <div className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
-                        <span className="flex h-2 w-2">
-                            <span className="animate-ping absolute h-2 w-2 rounded-full bg-[#22c55e] opacity-75" />
-                            <span className="relative rounded-full h-2 w-2 bg-[#22c55e]" />
-                        </span>
-                        <span className="text-xs font-medium text-[#22c55e]">Systems Connected</span>
-                    </div>
-                    {trustStats?.grounded_pct != null && (
-                        <span
-                            className="flex items-center gap-1 text-[10px] text-[#d4a853] bg-[#d4a853]/10 border border-[#d4a853]/20 rounded px-1.5 py-0.5 whitespace-nowrap"
-                            title={`${trustStats.narratives_generated.toLocaleString()} AI insights generated; every cited figure is checked against your real data before it's shown`}
-                        >
-                            <ShieldCheck className="w-3 h-3" /> {trustStats.grounded_pct}% of AI figures verified
-                        </span>
-                    )}
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                    <SystemStatus icon={Monitor} label="POS" status="connected" />
-                    <SystemStatus icon={Smartphone} label="KDS" status="connected" />
-                    <SystemStatus icon={ShoppingBag} label="Orders" status="connected" />
-                    <SystemStatus icon={Activity} label="Inventory" status="connected" />
-                    <SystemStatus icon={Wifi} label="Payments" status="connected" />
-                </div>
+            {/* Snapshot — real clock, not fake green dots */}
+            <div className="bg-[#141414] border border-[#262626] rounded-xl px-4 py-3 flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-xs text-[#a3a3a3]">
+                    Live snapshot · {qs.snapshot_date || nairobiDate()} · Africa/Nairobi
+                </p>
+                {trustStats?.grounded_pct != null && (
+                    <span
+                        className="flex items-center gap-1 text-[10px] text-[#d4a853] bg-[#d4a853]/10 border border-[#d4a853]/20 rounded px-1.5 py-0.5 whitespace-nowrap"
+                        title={`${trustStats.narratives_generated.toLocaleString()} AI insights generated; every cited figure is checked against your real data before it's shown`}
+                    >
+                        <ShieldCheck className="w-3 h-3" /> {trustStats.grounded_pct}% of AI figures verified
+                    </span>
+                )}
             </div>
 
             {/* What your AI is doing — launchpad into ROI / AI / Growth */}
@@ -346,7 +330,7 @@ export default function DashboardPage() {
                                     <div>
                                         <p className="text-sm text-[#e5e5e5]">{a.message}</p>
                                         {a.action && (
-                                            <p className="text-xs text-[#d4a853] mt-1">💡 {a.action}</p>
+                                            <p className="text-xs text-[#d4a853] mt-1">{humanAction(a.action)}</p>
                                         )}
                                     </div>
                                 </div>
@@ -360,17 +344,6 @@ export default function DashboardPage() {
 }
 
 /* Helper Components */
-function SystemStatus({ icon: Icon, label, status }: { icon: any; label: string; status: string }) {
-    return (
-        <div className="flex items-center gap-2">
-            <Icon className="w-3 h-3 text-[#525252]" />
-            <span className="text-xs text-[#737373]">{label}</span>
-            <span className={`w-1.5 h-1.5 rounded-full ml-auto ${status === "connected" ? "bg-[#22c55e]" : "bg-[#ef4444]"
-                }`} />
-        </div>
-    );
-}
-
 function StatCard({ label, value, sub, color }: { label: string; value: any; sub?: string; color: string; }) {
     return (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
@@ -380,11 +353,6 @@ function StatCard({ label, value, sub, color }: { label: string; value: any; sub
             {sub && <p className="text-[10px] mt-1" style={{ color }}>{sub}</p>}
         </motion.div>
     );
-}
-
-function formatKES(cents: number) {
-    if (!cents) return "KES 0";
-    return `KES ${(cents / 100).toLocaleString("en-KE", { maximumFractionDigits: 0 })}`;
 }
 
 /* Friendly language helpers */

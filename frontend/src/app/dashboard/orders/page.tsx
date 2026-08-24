@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { motion } from "framer-motion";
-import { ShoppingBag, Clock, TrendingUp } from "lucide-react";
+import { ShoppingBag } from "lucide-react";
+import { formatKES } from "@/lib/format";
+import { isOnBusinessDay, nairobiDate } from "@/lib/businessDay";
 
 export default function OrdersPage() {
     const [orders, setOrders] = useState<any[]>([]);
@@ -31,8 +33,8 @@ export default function OrdersPage() {
         );
     }
 
-    const today = new Date().toISOString().split("T")[0];
-    const todayOrders = orders.filter((o) => o.created_at?.startsWith(today));
+    const today = nairobiDate();
+    const todayOrders = orders.filter((o) => isOnBusinessDay(o.created_at, today));
     const pendingCount = orders.filter((o) => o.status === "pending" || o.status === "prep").length;
     const todayRevenue = todayOrders.reduce((s: number, o: any) => s + (o.total || 0), 0);
 
@@ -48,7 +50,7 @@ export default function OrdersPage() {
             <div>
                 <h1 className="text-xl font-bold text-[#e5e5e5]">Orders</h1>
                 <p className="text-sm text-[#525252] mt-0.5">
-                    Live from your POS &amp; KDS
+                    Live from your POS and kitchen · {today} Nairobi
                 </p>
             </div>
 
@@ -200,11 +202,6 @@ export default function OrdersPage() {
             </div>
         </div>
     );
-}
-
-function formatKES(cents: number) {
-    if (!cents) return "KES 0";
-    return `KES ${(cents / 100).toLocaleString("en-KE", { maximumFractionDigits: 0 })}`;
 }
 
 function formatHour(hour: number) {

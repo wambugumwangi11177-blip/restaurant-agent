@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { motion } from "framer-motion";
 import { CalendarDays, DollarSign } from "lucide-react";
+import { nairobiDate } from "@/lib/businessDay";
 
 export default function ReservationsPage() {
     const [reservations, setReservations] = useState<any[]>([]);
@@ -31,7 +32,7 @@ export default function ReservationsPage() {
         );
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = nairobiDate();
     const todayBookings = reservations.filter((r) => r.reservation_date === today);
     const upcoming = reservations.filter((r) => r.reservation_date >= today && r.status === "confirmed");
 

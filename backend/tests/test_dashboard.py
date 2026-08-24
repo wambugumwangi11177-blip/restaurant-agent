@@ -44,5 +44,6 @@ def test_dashboard_recent_actions_includes_outbound_message(client, db_session):
 
     actions = resp.json()["recent_ai_actions"]
     types = [a["action"] for a in actions]
-    assert "morning_briefing" in types
+    assert "Morning briefing sent" in types
     assert "orchestrator_turn" not in types
+    assert "morning_briefing" not in types  # raw keys must not leak

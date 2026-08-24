@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { demoData, isOrdersEmpty } from "@/lib/demo-data";
+import { formatKES } from "@/lib/format";
+import { businessDayOf, isOnBusinessDay, nairobiDate, nairobiHour } from "@/lib/businessDay";
 import { motion } from "framer-motion";
 import {
     TrendingUp, Banknote, Smartphone, CreditCard,
@@ -47,17 +49,17 @@ export default function SalesPage() {
 
     const isDemo = isOrdersEmpty(orders);
 
-    // Calculate real stats. Group by the STORED date string (YYYY-MM-DD) rather
-    // than `new Date(created_at).toDateString()` — the timestamps are naive UTC,
-    // and letting the browser parse them as local time shifts orders across the
-    // day boundary (an EAT viewer saw every UTC-dated order land on the "wrong"
-    // day, so "today" matched nothing → sales showed 0). Show the most recent
-    // business day that actually has orders: that's real today for a live
-    // restaurant, and the latest data day for the showcase — always non-empty.
-    const dayKey = (s: string) => (s || "").slice(0, 10);
-    const latestDay = orders.reduce((m, o) => (dayKey(o.created_at) > m ? dayKey(o.created_at) : m), "");
-    const todayOrders = orders.filter((o) => dayKey(o.created_at) === latestDay);
+    // Operational "today" is Africa/Nairobi. Never use the latest day in the
+    // list (that mixed historical takings into "today") and never format cents
+    // as shillings (that made KES 640 read as KES 64,000).
+    const today = nairobiDate();
+    const todayOrders = orders.filter((o) => isOnBusinessDay(o.created_at, today));
     const completedToday = todayOrders.filter((o) => o.status !== "cancelled");
+
+    const lastSaleDay = orders.reduce((m, o) => {
+        const d = businessDayOf(o.created_at);
+        return d && d > m ? d : m;
+    }, "");
 
     const totalRevenue = completedToday.reduce((sum, o) => sum + (o.total || 0), 0);
     const totalOrders = completedToday.length;
@@ -90,20 +92,17 @@ export default function SalesPage() {
 
     const hourlyData: Record<number, number> = {};
     completedToday.forEach((o) => {
-        const h = new Date(o.created_at).getHours();
+        const h = nairobiHour(o.created_at);
+        if (h === null) return;
         hourlyData[h] = (hourlyData[h] || 0) + o.total;
     });
     const maxHourlyRevenue = Math.max(...Object.values(hourlyData), 1);
+    const hasHourlySales = Object.values(hourlyData).some((v) => v > 0);
 
     // Demo values
     const demoRevenue = demoData.revenue;
     const maxDemoRevenue = Math.max(...demoRevenue.map((d) => d.revenue));
     const demoTopSellers = demoData.topSellers;
-
-    const formatKES = (v: number) => {
-        if (!v) return "KES 0";
-        return `KES ${v.toLocaleString("en-KE", { maximumFractionDigits: 0 })}`;
-    };
 
     return (
         <div className="space-y-5">
@@ -111,7 +110,7 @@ export default function SalesPage() {
             <div>
                 <h1 className="text-xl font-bold text-[#e5e5e5]">Sales</h1>
                 <p className="text-sm text-[#525252] mt-0.5">
-                    {isDemo ? "Last 7 days performance" : "Today's performance"}
+                    {isDemo ? "Last 7 days performance" : `Today · ${today} Nairobi`}
                 </p>
             </div>
 
@@ -131,12 +130,21 @@ export default function SalesPage() {
                     <StatCard label="Top Day" value="Saturday" color="#8b5cf6" />
                 </div>
             ) : (
+                <>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <StatCard label="Revenue Today" value={formatKES(totalRevenue)} color="#d4a853" />
+                    <StatCard
+                        label="Revenue Today"
+                        value={formatKES(totalRevenue)}
+                        color="#d4a853"
+                    />
                     <StatCard label="Orders" value={`${totalOrders}`} color="#3b82f6" />
                     <StatCard label="Avg Order" value={formatKES(avgOrder)} color="#22c55e" />
                     <StatCard label="Unpaid" value={`${unpaidOrders.length}`} color={unpaidOrders.length > 0 ? "#ef4444" : "#22c55e"} />
                 </div>
+                {totalOrders === 0 && lastSaleDay && lastSaleDay !== today && (
+                    <p className="text-xs text-[#737373]">No sales yet today. Last sale was {lastSaleDay}.</p>
+                )}
+                </>
             )}
 
             {/* Demo: Weekly Revenue Chart */}
@@ -210,18 +218,21 @@ export default function SalesPage() {
                 </div>
             )}
 
-            {/* Real: Hourly chart */}
-            {!isDemo && Object.keys(hourlyData).length > 0 && (
+            {/* Real: Hourly chart — always render so an empty day is not a black void */}
+            {!isDemo && (
                 <div className="bg-[#141414] border border-[#262626] rounded-xl">
                     <div className="px-4 py-3 border-b border-[#1a1a1a]">
                         <h2 className="text-sm font-semibold text-[#e5e5e5]">Sales by Hour</h2>
                     </div>
                     <div className="px-4 py-4">
+                        {!hasHourlySales && (
+                            <p className="text-xs text-[#737373] mb-3">No sales in these hours yet today.</p>
+                        )}
                         <div className="flex items-end gap-1 h-32">
                             {Array.from({ length: 18 }, (_, i) => i + 6).map((hour) => {
                                 const val = hourlyData[hour] || 0;
-                                const pct = (val / maxHourlyRevenue) * 100;
-                                const isNow = new Date().getHours() === hour;
+                                const pct = hasHourlySales ? (val / maxHourlyRevenue) * 100 : 0;
+                                const isNow = nairobiHour(new Date().toISOString()) === hour;
                                 return (
                                     <div key={hour} className="flex-1 flex flex-col items-center gap-1">
                                         <div className="w-full relative" style={{ height: `${Math.max(pct, 2)}%` }}>

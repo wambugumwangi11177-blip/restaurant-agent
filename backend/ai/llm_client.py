@@ -366,11 +366,12 @@ def chat_with_tools(
         # bad call must not crash the whole multi-turn run after its tokens
         # were already spent. Empty args degrade to "no arguments".
         try:
-            tool_input = json.loads(tc.function.arguments or "{}")
-        except json.JSONDecodeError:
+            tool_input = json.loads(tc.function.arguments) if tc.function.arguments else {}
+        except (json.JSONDecodeError, ValueError):
             logger.warning(
-                "malformed tool arguments from model for tool %r — treated as empty",
-                getattr(tc.function, "name", "?"),
+                "Malformed tool-call arguments from %s for tool %s — defaulting to {}",
+                response.model,
+                tc.function.name,
             )
             tool_input = {}
         content.append(SimpleNamespace(
@@ -380,7 +381,9 @@ def chat_with_tools(
             input=tool_input,
         ))
 
-    stop_reason = "tool_use" if choice.message.tool_calls else "end_turn"
+    finish_reason = choice.finish_reason
+    stop_reason = "tool_use" if finish_reason == "tool_calls" else "end_turn"
+
     return SimpleNamespace(
         stop_reason=stop_reason,
         content=content,

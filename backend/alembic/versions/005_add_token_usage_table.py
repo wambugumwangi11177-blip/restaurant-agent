@@ -50,4 +50,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("token_usage")
+    if _table_exists("token_usage"):
+        if _index_exists("token_usage", "ix_token_usage_restaurant_created"):
+            op.drop_index("ix_token_usage_restaurant_created", table_name="token_usage")
+        if _index_exists("token_usage", "ix_token_usage_id"):
+            op.drop_index("ix_token_usage_id", table_name="token_usage")
+        op.drop_table("token_usage")

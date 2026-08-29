@@ -21,7 +21,17 @@ depends_on = None
 
 
 def _table_exists(table_name: str) -> bool:
-    return table_name in sa.inspect(op.get_bind()).get_table_names()
+    bind = op.get_context().bind
+    return table_name in sa.inspect(bind).get_table_names()
+
+
+def _index_exists(index_name: str, table_name: str) -> bool:
+    bind = op.get_context().bind
+    inspector = sa.inspect(bind)
+    return any(
+        idx["name"] == index_name
+        for idx in inspector.get_indexes(table_name)
+    )
 
 
 def upgrade() -> None:
@@ -45,5 +55,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_customer_feedback_restaurant_created", table_name="customer_feedback")
+    if not _table_exists("customer_feedback"):
+        return
+    if _index_exists("ix_customer_feedback_restaurant_created", "customer_feedback"):
+        op.drop_index("ix_customer_feedback_restaurant_created", table_name="customer_feedback")
     op.drop_table("customer_feedback")

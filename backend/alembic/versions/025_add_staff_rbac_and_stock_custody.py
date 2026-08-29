@@ -109,9 +109,20 @@ def upgrade():
 
     # Backfill: existing ADMIN users are the Owner tier by definition (015).
     # Existing STAFF users are deliberately left NULL — see docstring above.
-    op.execute(
-        "UPDATE users SET staff_role = 'OWNER' WHERE role = 'ADMIN' AND staff_role IS NULL"
-    )
+    #
+    # On PostgreSQL the staff_role column is a native enum type; assigning a
+    # bare string literal in SQL requires an explicit cast to that type or
+    # PostgreSQL raises "column is of type staffrole but expression is of type
+    # text".  SQLite has no native enums so the plain string works there.
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        op.execute(
+            "UPDATE users SET staff_role = 'OWNER'::staffrole WHERE role = 'ADMIN' AND staff_role IS NULL"
+        )
+    else:
+        op.execute(
+            "UPDATE users SET staff_role = 'OWNER' WHERE role = 'ADMIN' AND staff_role IS NULL"
+        )
 
 
 def downgrade():

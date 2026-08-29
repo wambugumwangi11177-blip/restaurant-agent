@@ -45,6 +45,9 @@ def _norm_impact(impact_cents_month: int | None) -> float:
 
 def _inverse_ordinal(value: int, max_value: int) -> float:
     """Map a 1..max ordinal to [1..0] — 1 (best) → 1.0, max (worst) → 0.0."""
+    if max_value <= 1:
+        # Only one possible value; treat it as the best (no penalty).
+        return 1.0
     return 1.0 - (value - 1) / (max_value - 1)
 
 

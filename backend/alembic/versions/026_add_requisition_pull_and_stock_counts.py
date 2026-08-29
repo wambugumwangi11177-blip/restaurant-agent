@@ -77,7 +77,7 @@ def upgrade():
             sa.Column("counted_quantity", sa.Float(), nullable=False),
             sa.Column("counted_by_user_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
             sa.Column("counted_at", sa.DateTime(), nullable=True),
-            sa.Column("notes", sa.Text(), server_default=""),
+            sa.Column("notes", sa.Text(), server_default=sa.text("''"), nullable=True),
         )
         op.create_index("ix_stock_counts_restaurant_item", "stock_counts",
                          ["restaurant_id", "inventory_item_id"])

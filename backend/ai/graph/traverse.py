@@ -20,7 +20,7 @@ from collections import deque
 from .build import Graph, node_key
 
 
-def _walk(graph: Graph, start: str, edges_attr: str, forward: bool) -> tuple[set[str], list[dict]]:
+def _walk(graph: Graph, start: str, forward: bool) -> tuple[set[str], list[dict]]:
     """BFS from `start` over graph.out (forward) or graph.inn (reverse). Returns
     (visited node keys excluding start, edges traversed)."""
     adjacency = graph.out if forward else graph.inn
@@ -32,22 +32,22 @@ def _walk(graph: Graph, start: str, edges_attr: str, forward: bool) -> tuple[set
         cur = q.popleft()
         for edge in adjacency.get(cur, []):
             nxt = edge["target"] if forward else edge["source"]
-            traversed.append(edge)
             if nxt not in seen:
                 seen.add(nxt)
                 order.append(nxt)
+                traversed.append(edge)
                 q.append(nxt)
     return set(order), traversed
 
 
 def downstream(graph: Graph, start_key: str) -> tuple[set[str], list[dict]]:
     """Everything `start_key` affects (following impact edges forward)."""
-    return _walk(graph, start_key, "out", forward=True)
+    return _walk(graph, start_key, forward=True)
 
 
 def upstream(graph: Graph, start_key: str) -> tuple[set[str], list[dict]]:
     """Everything `start_key` depends on (following impact edges backward)."""
-    return _walk(graph, start_key, "inn", forward=False)
+    return _walk(graph, start_key, forward=False)
 
 
 def impact_report(graph: Graph, entity_type: str, ref_id) -> dict:

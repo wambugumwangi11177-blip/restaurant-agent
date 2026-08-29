@@ -363,134 +363,24 @@ def _run_fraud_check_job():
         db = SessionLocal()
         try:
             for restaurant in db.query(models.Restaurant).all():
-                report = compute_fraud_report(db, restaurant.id, window_hours=24)
-                if not report.flagged:
+                report = compute_fraud_report(db, restaurant.id)
+                if not report or not report.flagged_transactions:
                     continue
                 emit_async(EventType.SUSPICIOUS_TRANSACTION_FLAGGED, {
                     "restaurant_id": restaurant.id,
-                    "void_spike_count": len(report.void_spikes),
-                    "refund_velocity_count": len(report.refund_velocity),
-                    "payment_mismatch_count": len(report.payment_mismatches),
-                    "off_hours_count": len(report.off_hours),
-                    "void_spikes": [
-                        {"actor_email": f.actor_email, "window_count": f.window_count}
-                        for f in report.void_spikes
-                    ],
-                    "refund_velocity": [
-                        {"actor_email": f.actor_email, "count": f.count}
-                        for f in report.refund_velocity
+                    "flagged_transactions": [
+                        {
+                            "transaction_id": t.transaction_id,
+                            "reason": t.reason,
+                            "amount": t.amount,
+                        }
+                        for t in report.flagged_transactions
                     ],
                 })
         finally:
             db.close()
     except Exception as exc:
         logger.error(f"[Fraud Check] Scheduler job failed: {exc}")
-
-
-def _run_escalation_sweep_job():
-    """Sprint 2: advance the manager-escalation ladder for every unacknowledged
-    severity-tagged Notification, across all restaurants — a single global
-    scan (not per-restaurant like the jobs above) since it's keyed off the
-    Notification table directly, not restaurant-scoped source data."""
-    try:
-        from database import SessionLocal
-        from ai.escalation.engine import run_escalation_sweep
-
-        db = SessionLocal()
-        try:
-            result = run_escalation_sweep(db)
-            if result["escalated_to_managers"] or result["escalated_to_call"]:
-                logger.info(f"[Escalation Sweep] {result}")
-        finally:
-            db.close()
-    except Exception as exc:
-        logger.error(f"[Escalation Sweep] Scheduler job failed: {exc}")
-
-
-def _run_outbox_sweep_job():
-    """Audit remediation, Tier 2 item 5: retry NotificationOutbox rows left
-    behind by a failed events/bus.py handler call. events.bus.sweep_outbox()
-    owns its own DB session (it's called from a bare scheduler tick, not a
-    request), so this wrapper only needs the standard log-don't-crash guard
-    every job in this file uses."""
-    try:
-        from events.bus import sweep_outbox
-        result = sweep_outbox()
-        if result["delivered"] or result["still_failed"] or result["dead"]:
-            logger.info(f"[Outbox Sweep] {result}")
-    except Exception as exc:
-        logger.error(f"[Outbox Sweep] Scheduler job failed: {exc}")
-
-
-def _run_audit_log_purge_job():
-    """Audit remediation, Tier 2 item 6: delete AgentAuditLog rows older than
-    90 days, closing the gap docs/compliance-matrix.md flags as open ("DPA
-    '90-day rolling'" vs "no auto-purge today"). Hard delete, not
-    anonymization — AgentAuditLog's own docstring frames it as an immutable
-    audit trail of AI-driven actions (what changed, why, who approved), not a
-    customer PII store; the 90-day retention line is about not keeping that
-    operational trail forever, unlike Order/Reservation rows (see
-    routers/export.py's erasure path), which stay for tax integrity and are
-    pseudonymized instead of deleted."""
-    try:
-        from database import SessionLocal
-        from time_utils import utcnow
-        from datetime import timedelta
-        import models
-
-        db = SessionLocal()
-        try:
-            cutoff = utcnow() - timedelta(days=90)
-            deleted = (
-                db.query(models.AgentAuditLog)
-                .filter(models.AgentAuditLog.created_at < cutoff)
-                .delete(synchronize_session=False)
-            )
-            db.commit()
-            if deleted:
-                logger.info(f"[Audit Log Purge] Deleted {deleted} row(s) older than 90 days")
-        finally:
-            db.close()
-    except Exception as exc:
-        logger.error(f"[Audit Log Purge] Scheduler job failed: {exc}")
-
-
-def _run_reorder_check_job():
-    """Directive 018: for every restaurant, find items at their reorder
-    point with a par_level and default_supplier_id set, draft a purchase
-    order (demand-adjusted), and notify the owner it's awaiting approval.
-    Items with neither set are simply never drafted — no guessing at a par
-    level or a supplier nobody configured."""
-    try:
-        from database import SessionLocal
-        from ai.reorder import find_reorder_candidates, draft_purchase_order
-        import models
-
-        db = SessionLocal()
-        try:
-            for restaurant in db.query(models.Restaurant).all():
-                candidates = find_reorder_candidates(db, restaurant.id)
-                for candidate in candidates:
-                    draft_purchase_order(db, restaurant.id, candidate)
-        finally:
-            db.close()
-    except Exception as exc:
-        logger.error(f"[Reorder Check] Scheduler job failed: {exc}")
-
-
-def _run_learning_cycle_job():
-    """Phase 5 continuous-learning loop: record tomorrow's revenue forecast and
-    score any matured predictions against actuals, across every restaurant."""
-    try:
-        from database import SessionLocal
-        from ai.evaluation.learning import run_learning_cycle
-        db = SessionLocal()
-        try:
-            run_learning_cycle(db)
-        finally:
-            db.close()
-    except Exception as exc:
-        logger.error(f"[Learning Cycle] Scheduler job failed: {exc}")
 
 
 def _run_slow_day_check_job():
@@ -502,6 +392,15 @@ def _run_slow_day_check_job():
         logger.error(f"[Slow Day Check] Scheduler job failed: {exc}")
 
 
+def _run_reorder_check_job():
+    try:
+        from database import SessionLocal
+        from ai.whatsapp.brain import run_reorder_check
+        run_reorder_check(SessionLocal)
+    except Exception as exc:
+        logger.error(f"[Reorder Check] Scheduler job failed: {exc}")
+
+
 def _run_reservation_reminders_job():
     try:
         from database import SessionLocal
@@ -511,133 +410,46 @@ def _run_reservation_reminders_job():
         logger.error(f"[Reservation Reminders] Scheduler job failed: {exc}")
 
 
-def _run_strategist_review_job():
-    """Weekly unattended strategy review — the strategist looks at each
-    restaurant on its own standing goal, no owner-initiated request. Gated
-    behind autonomous_strategist so opting in is explicit (spends LLM tokens
-    same as the on-demand endpoint). Narrate-only: pushes the headline via
-    WhatsApp + in-app notification, never writes/approves anything itself —
-    applying a step still goes through the existing approval endpoints."""
+def _run_learning_cycle_job():
     try:
-        import feature_flags
-        if not feature_flags.is_enabled("autonomous_strategist"):
-            return
-
         from database import SessionLocal
-        from ai.orchestrator.strategist import run_strategy, format_for_whatsapp, STANDING_GOAL
-        from ai.whatsapp.brain import send_to_owner
-        from events.bus import emit_async, EventType
-        import models
+        from ai.learning.cycle import run_learning_cycle
+        run_learning_cycle(SessionLocal)
+    except Exception as exc:
+        logger.error(f"[Learning Cycle] Scheduler job failed: {exc}")
 
-        db = SessionLocal()
-        try:
-            for restaurant in db.query(models.Restaurant).all():
-                result = run_strategy(db, restaurant.id, STANDING_GOAL, triggered_by="scheduler")
-                if not result.get("available") or result.get("mode") != "llm":
-                    continue  # nothing to say if it fell back to deterministic
-                strategy = result["strategy"]
-                send_to_owner(db, restaurant, format_for_whatsapp(strategy), message_type="strategy_review")
-                emit_async(EventType.STRATEGY_REVIEW_GENERATED, {
-                    "restaurant_id": restaurant.id,
-                    "headline": strategy.get("headline", ""),
-                })
-        finally:
-            db.close()
+
+def _run_strategist_review_job():
+    try:
+        from database import SessionLocal
+        from ai.strategist import run_strategist_review
+        run_strategist_review(SessionLocal)
     except Exception as exc:
         logger.error(f"[Strategist Review] Scheduler job failed: {exc}")
 
 
-# ── CORS ──────────────────────────────────────────────────────────────────────
-# Real Vercel production domain is included as a fallback default (not just
-# localhost) — found 2026-07-07 that a misconfigured/placeholder CORS_ORIGINS
-# on Railway silently breaks frontend login with a browser-side "network
-# error" (CORS preflight is rejected before the request body is ever sent,
-# so the backend logs show nothing — this is invisible without checking the
-# preflight response directly). CORS_ORIGINS env var still takes priority
-# when set correctly; this is a safety net, not a replacement for setting it.
-default_origins = (
-    "http://localhost:3000,http://127.0.0.1:3000,http://192.168.100.4:3000,"
-    "https://restaurant-agent-o38i.vercel.app"
-)
-cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", default_origins).split(",")]
-logger.info(f"[CORS] Allowed origins: {cors_origins}")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.add_middleware(TimingMiddleware)
-app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(BodySizeLimitMiddleware)
-# Added last so it wraps OUTERMOST: the request_id is set before any other
-# middleware or route runs (so their logs carry it) and the oversized-body
-# rejection above still emits under the correlation id.
-app.add_middleware(CorrelationIdMiddleware)
-
-# ── Routers ───────────────────────────────────────────────────────────────────
-#
-# API versioning (2026-07-10): the data API is now canonically served under
-# /api/v1/* (documented in OpenAPI). The original unversioned paths (/orders,
-# /menu, …) are ALSO mounted so the current frontend keeps working unchanged, but
-# hidden from the schema (include_in_schema=False) to mark them deprecated — new
-# consumers should target /api/v1. Migrate the frontend to /api/v1, then drop the
-# legacy mount in a later release.
-#
-# NOT versioned, deliberately:
-#   • auth.router already carries its own /api/v1/auth prefix.
-#   • webhooks — Safaricom/Twilio POST to fixed, externally-registered callback
-#     URLs; versioning them would break every registered CallBackURL.
-#   • health — conventionally unversioned (probes/uptime checks hit /health).
-_VERSIONED_ROUTERS = [
-    menu.router, orders.router, inventory.router, analytics.router,
-    reservations.router, ai.router, export.router, flags.router, events.router,
-    billing.router, enterprise.router, staff.router, stock_custody.router,
-    suppliers.router, purchase_orders.router, notifications.router, support.router,
-    tables.router, attendance.router, fraud.router, cash_reconciliation.router,
-    restaurants.router,
-]
-
-app.include_router(auth.router)
-app.include_router(webhooks.router)
-app.include_router(health.router)
-for _r in _VERSIONED_ROUTERS:
-    app.include_router(_r, prefix="/api/v1")          # canonical, documented
-    app.include_router(_r, include_in_schema=False)   # legacy path, still works
+def _run_escalation_sweep_job():
+    try:
+        from database import SessionLocal
+        from ai.escalation import run_escalation_sweep
+        run_escalation_sweep(SessionLocal)
+    except Exception as exc:
+        logger.error(f"[Escalation Sweep] Scheduler job failed: {exc}")
 
 
-@app.get("/")
-def read_root():
-    return {"service": "Restaurant Agent API", "version": "2.0.0", "status": "ok"}
+def _run_outbox_sweep_job():
+    try:
+        from database import SessionLocal
+        from events.bus import run_outbox_sweep
+        run_outbox_sweep(SessionLocal)
+    except Exception as exc:
+        logger.error(f"[Outbox Sweep] Scheduler job failed: {exc}")
 
 
-@app.get("/metrics")
-def metrics_endpoint(request: Request):
-    """Prometheus scrape target — process-local request counters + latency (see
-    metrics.py). By Prometheus convention unauthenticated — which also makes it
-    a free traffic-reconnaissance endpoint on a public URL. When METRICS_TOKEN
-    is set (recommended in production) it must be supplied as the
-    `Authorization: Bearer <token>` header or `?token=` query param. Multi-worker
-    aggregation needs a shared collector (same Redis caveat as rate limiting)."""
-    from fastapi import HTTPException, Response
-    import metrics
-    expected = os.getenv("METRICS_TOKEN", "").strip()
-    if expected:
-        supplied = (
-            request.headers.get("authorization", "").removeprefix("Bearer ").strip()
-            or request.query_params.get("token", "").strip()
-        )
-        if supplied != expected:
-            raise HTTPException(status_code=403, detail="Forbidden")
-    return Response(content=metrics.render(), media_type="text/plain; version=0.0.4")
-
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.getenv("PORT", 8000))
-    # Bind all interfaces: required inside the container so Railway's edge proxy
-    # can reach the app; not exposed directly to the internet.
-    uvicorn.run(app, host="0.0.0.0", port=port)  # nosec B104
+def _run_audit_log_purge_job():
+    try:
+        from database import SessionLocal
+        from ai.audit import purge_old_audit_logs
+        purge_old_audit_logs(SessionLocal)
+    except Exception as exc:
+        logger.error(f"[Audit Log Purge] Scheduler job failed: {exc}")

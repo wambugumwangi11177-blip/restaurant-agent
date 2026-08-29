@@ -16,6 +16,7 @@ routers/ai.py's `_LLM_TOUCHING` set — not the purely deterministic ones.
 
 from __future__ import annotations
 
+import logging
 import os
 
 from fastapi import HTTPException, status
@@ -26,9 +27,31 @@ from ai.cost_model import cost_usd
 from routers.deps import get_or_create_restaurant
 from time_utils import utcnow
 
+logger = logging.getLogger(__name__)
+
 # Generous default — this is a circuit breaker against a runaway loop or abuse,
 # not a tight budget knob; tune per-deployment via env.
-DAILY_LLM_SPEND_CAP_USD = float(os.getenv("DAILY_LLM_SPEND_CAP_USD", "20.0"))
+_DEFAULT_DAILY_CAP = "20.0"
+
+
+def _parse_spend_cap() -> float:
+    """Parse DAILY_LLM_SPEND_CAP_USD from the environment, falling back to the
+    default and logging a warning if the value is invalid."""
+    raw = os.getenv("DAILY_LLM_SPEND_CAP_USD", _DEFAULT_DAILY_CAP)
+    try:
+        value = float(raw)
+    except (ValueError, TypeError):
+        logger.warning(
+            "DAILY_LLM_SPEND_CAP_USD=%r is not a valid float; "
+            "falling back to default %s",
+            raw,
+            _DEFAULT_DAILY_CAP,
+        )
+        value = float(_DEFAULT_DAILY_CAP)
+    return value
+
+
+DAILY_LLM_SPEND_CAP_USD: float = _parse_spend_cap()
 
 
 def today_spend_usd(db: Session, restaurant_id: int) -> float:
@@ -44,7 +67,19 @@ def today_spend_usd(db: Session, restaurant_id: int) -> float:
         )
         .all()
     )
-    return sum(cost_usd(model, in_tok or 0, out_tok or 0) for model, in_tok, out_tok in rows)
+    total = 0.0
+    for model, in_tok, out_tok in rows:
+        try:
+            total += cost_usd(model, in_tok or 0, out_tok or 0)
+        except Exception:
+            logger.warning(
+                "cost_usd() failed for model=%r in_tok=%r out_tok=%r; skipping row",
+                model,
+                in_tok,
+                out_tok,
+                exc_info=True,
+            )
+    return total
 
 
 def check_spend_cap(current_user: models.User, db: Session) -> None:

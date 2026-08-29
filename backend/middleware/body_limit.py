@@ -26,7 +26,10 @@ logger = logging.getLogger("uvicorn")
 
 MAX_REQUEST_BODY_BYTES = int(os.getenv("MAX_REQUEST_BODY_BYTES", str(1 * 1024 * 1024)))
 
-_TOO_LARGE = JSONResponse({"detail": "Request body too large"}, status_code=413)
+
+def _too_large_response() -> JSONResponse:
+    """Return a fresh 413 JSONResponse each time (Response objects are stateful)."""
+    return JSONResponse({"detail": "Request body too large"}, status_code=413)
 
 
 class BodySizeLimitMiddleware(BaseHTTPMiddleware):
@@ -40,7 +43,7 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
                         "[BodyLimit] Rejected %s %s — Content-Length %s exceeds %d",
                         request.method, request.url.path, content_length, MAX_REQUEST_BODY_BYTES,
                     )
-                    return _TOO_LARGE
+                    return _too_large_response()
             except ValueError:
                 return JSONResponse({"detail": "Invalid Content-Length"}, status_code=400)
 
@@ -66,7 +69,7 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
                 "[BodyLimit] Rejected %s %s — streamed body exceeded %d bytes",
                 request.method, request.url.path, MAX_REQUEST_BODY_BYTES,
             )
-            return _TOO_LARGE
+            return _too_large_response()
 
 
 class _BodyTooLarge(Exception):

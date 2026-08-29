@@ -70,8 +70,10 @@ def upgrade():
         return
 
     op.execute(
-        f'CREATE UNIQUE INDEX {_INDEX_NAME} ON orders (mpesa_receipt) '
-        f'WHERE mpesa_receipt IS NOT NULL'
+        sa.text(
+            f'CREATE UNIQUE INDEX {_INDEX_NAME} ON orders (mpesa_receipt) '
+            f'WHERE mpesa_receipt IS NOT NULL'
+        )
     )
 
 

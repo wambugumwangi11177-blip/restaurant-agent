@@ -52,7 +52,8 @@ def _with_freshness(db: Session, restaurant_id: int, data: dict) -> dict:
 
 
 @router.get("/trust-stats")
-def ai_trust_stats():
+@limiter.limit("30/minute")
+def ai_trust_stats(request: Request):
     """
     Public, tenant-agnostic AI accuracy stat: what share of AI narratives this
     worker has generated had every cited figure verified against real data

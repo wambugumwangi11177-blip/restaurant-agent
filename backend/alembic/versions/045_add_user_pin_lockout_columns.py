@@ -39,7 +39,7 @@ def upgrade():
     if not _column_exists("users", "pin_failed_attempts"):
         op.add_column("users", sa.Column("pin_failed_attempts", sa.Integer(), nullable=False, server_default="0"))
     if not _column_exists("users", "pin_locked_until"):
-        op.add_column("users", sa.Column("pin_locked_until", sa.DateTime(), nullable=True))
+        op.add_column("users", sa.Column("pin_locked_until", sa.DateTime(timezone=True), nullable=True))
 
 
 def downgrade():

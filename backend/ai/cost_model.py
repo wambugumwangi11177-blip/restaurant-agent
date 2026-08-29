@@ -58,8 +58,10 @@ def _price_for(model: str | None) -> tuple[float, float]:
 
 def cost_usd(model: str | None, input_tokens: int, output_tokens: int) -> float:
     """USD cost of one call (or aggregate) at list prices for `model`."""
+    in_tok = max(0, input_tokens)
+    out_tok = max(0, output_tokens)
     in_price, out_price = _price_for(model)
-    return (input_tokens / 1_000_000) * in_price + (output_tokens / 1_000_000) * out_price
+    return (in_tok / 1_000_000) * in_price + (out_tok / 1_000_000) * out_price
 
 
 def cost_kes_cents(model: str | None, input_tokens: int, output_tokens: int) -> int:

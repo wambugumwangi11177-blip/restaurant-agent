@@ -26,6 +26,8 @@ down_revision = "040_add_notification_outbox"
 branch_labels = None
 depends_on = None
 
+_FK_NAME = "fk_users_active_restaurant_id_restaurants"
+
 
 def _insp():
     return sa.inspect(op.get_bind())
@@ -38,15 +40,34 @@ def _column_exists(table_name: str, column_name: str) -> bool:
         return False
 
 
+def _fk_exists(table_name: str, fk_name: str) -> bool:
+    try:
+        return any(
+            fk["name"] == fk_name
+            for fk in _insp().get_foreign_keys(table_name)
+        )
+    except sa.exc.NoSuchTableError:
+        return False
+
+
 def upgrade():
     if not _column_exists("users", "active_restaurant_id"):
         op.add_column(
             "users",
-            sa.Column("active_restaurant_id", sa.Integer(),
-                      sa.ForeignKey("restaurants.id"), nullable=True),
+            sa.Column("active_restaurant_id", sa.Integer(), nullable=True),
+        )
+    if not _fk_exists("users", _FK_NAME):
+        op.create_foreign_key(
+            _FK_NAME,
+            "users",
+            "restaurants",
+            ["active_restaurant_id"],
+            ["id"],
         )
 
 
 def downgrade():
+    if _fk_exists("users", _FK_NAME):
+        op.drop_constraint(_FK_NAME, "users", type_="foreignkey")
     if _column_exists("users", "active_restaurant_id"):
         op.drop_column("users", "active_restaurant_id")

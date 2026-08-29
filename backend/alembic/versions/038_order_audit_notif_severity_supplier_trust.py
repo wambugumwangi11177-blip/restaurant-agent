@@ -56,16 +56,20 @@ def _index_exists(table: str, index_name: str) -> bool:
 
 def upgrade():
     if not _table_exists("order_audits"):
+        # Create the enum type separately with checkfirst=True so that a
+        # previously-failed migration that created the type but not the table
+        # does not cause an error here.
         action_enum = sa.Enum(*ORDER_AUDIT_ACTION_VALUES, name="orderauditaction")
+        action_enum.create(op.get_bind(), checkfirst=True)
         op.create_table(
             "order_audits",
             sa.Column("id", sa.Integer(), primary_key=True),
             sa.Column("order_id", sa.Integer(), sa.ForeignKey("orders.id", ondelete="CASCADE"), nullable=False),
             sa.Column("restaurant_id", sa.Integer(), sa.ForeignKey("restaurants.id"), nullable=False),
-            sa.Column("action", action_enum, nullable=False),
+            sa.Column("action", sa.Enum(*ORDER_AUDIT_ACTION_VALUES, name="orderauditaction", create_type=False), nullable=False),
             sa.Column("actor_user_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=True),
             sa.Column("reason", sa.Text(), nullable=True),
-            sa.Column("created_at", sa.DateTime(), nullable=True),
+            sa.Column("created_at", sa.DateTime(), nullable=True, server_default=sa.func.now()),
         )
         op.create_index(
             "ix_order_audits_restaurant_actor_created", "order_audits",

@@ -54,4 +54,5 @@ def upgrade():
 
 def downgrade():
     if _table_exists("notification_outbox"):
+        op.drop_index("ix_notification_outbox_status_created", table_name="notification_outbox")
         op.drop_table("notification_outbox")

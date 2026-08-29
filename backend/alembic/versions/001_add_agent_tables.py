@@ -99,5 +99,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute("DROP INDEX IF EXISTS ix_pricing_rec_one_pending_per_item")
-    op.drop_table("agent_messages")
-    op.drop_table("pricing_recommendations")
+    if _table_exists("agent_messages"):
+        op.drop_table("agent_messages")
+    if _table_exists("pricing_recommendations"):
+        op.drop_table("pricing_recommendations")

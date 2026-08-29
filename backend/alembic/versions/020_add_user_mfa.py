@@ -25,7 +25,8 @@ depends_on = None
 
 
 def _column_exists(table_name: str, column_name: str) -> bool:
-    return any(c["name"] == column_name for c in sa.inspect(op.get_bind()).get_columns(table_name))
+    conn = op.get_context().connection
+    return any(c["name"] == column_name for c in sa.inspect(conn).get_columns(table_name))
 
 
 def upgrade():

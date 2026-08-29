@@ -394,53 +394,64 @@ def submit_count(
     if counted_quantity < 0:
         raise StockCountError("counted_quantity cannot be negative")
 
-    expected = item.quantity
-    delta = counted_quantity - expected
+    system_quantity = item.quantity
+    delta = counted_quantity - system_quantity
 
     count = models.StockCount(
         restaurant_id=restaurant_id,
         inventory_item_id=item.id,
-        expected_quantity=expected,
-        counted_quantity=counted_quantity,
         counted_by_user_id=counted_by_user_id,
+        counted_at=utcnow(),
+        system_quantity=system_quantity,
+        counted_quantity=counted_quantity,
+        delta=delta,
         notes=notes,
     )
     db.add(count)
 
+    # Reconcile the live quantity to match the physical count via an ADJUST
+    # movement so the audit trail is complete.
     if abs(delta) > 1e-9:
         db.add(models.StockMovement(
             inventory_item_id=item.id,
-            movement_type=models.StockMovementType.ADJUST if delta >= 0 else models.StockMovementType.OUT,
-            quantity=abs(delta),
-            reason="Physical count reconciliation",
+            movement_type=models.StockMovementType.ADJUST,
+            quantity=delta,
+            reason=f"Physical count reconciliation (count #{count.id if count.id else 'pending'})",
             performed_by_user_id=counted_by_user_id,
         ))
-    item.quantity = counted_quantity
+        item.quantity = counted_quantity
 
     db.commit()
     db.refresh(count)
 
+    mismatch = abs(delta) > 1e-9
+
     from ai.evaluation.tracker import write_audit_log
+    counted_by_user = db.query(models.User).filter(models.User.id == counted_by_user_id).first()
     write_audit_log(
-        db, restaurant_id, "stock_count_recorded", "stock_custody",
+        db, restaurant_id,
+        "stock_count_discrepancy" if mismatch else "stock_count_confirmed",
+        "stock_custody",
         entity_type="stock_count", entity_id=count.id,
-        before={"expected_quantity": expected},
+        before={"system_quantity": system_quantity},
         after={"counted_quantity": counted_quantity},
-        reasoning=f"{item.item_name}: system expected {expected}{item.unit}, count found {counted_quantity}{item.unit}.",
+        reasoning=(
+            f"Physical count of {item.item_name}: "
+            f"system had {system_quantity}{item.unit}, counted {counted_quantity}{item.unit} "
+            f"(delta {delta:+g}{item.unit})."
+        ),
+        approved_by=counted_by_user.email if counted_by_user else "system",
     )
 
-    # Only a real gap is worth a message — not every count (most will match
-    # closely), matching the "alert on the exception" philosophy used
-    # throughout this workstream. Threshold reuses VARIANCE_THRESHOLD rather
-    # than inventing a second number to keep in sync.
-    if expected > 0 and abs(delta) / expected > VARIANCE_THRESHOLD:
+    if mismatch:
         from events.bus import emit_async, EventType
         emit_async(EventType.STOCK_COUNT_DISCREPANCY, {
             "restaurant_id": restaurant_id,
             "count_id": count.id,
             "item_name": item.item_name,
-            "expected_quantity": expected,
+            "system_quantity": system_quantity,
             "counted_quantity": counted_quantity,
+            "delta": delta,
             "unit": item.unit,
         })
 

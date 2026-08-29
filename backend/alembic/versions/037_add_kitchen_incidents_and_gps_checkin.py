@@ -30,22 +30,24 @@ depends_on = None
 INCIDENT_TYPE_VALUES = ("REMAKE", "QUALITY_ISSUE", "OTHER")
 
 
-def _insp():
-    return sa.inspect(op.get_bind())
+def _insp(conn):
+    return sa.inspect(conn)
 
 
-def _table_exists(name: str) -> bool:
-    return name in _insp().get_table_names()
+def _table_exists(conn, name: str) -> bool:
+    return name in _insp(conn).get_table_names()
 
 
-def _column_exists(table: str, column: str) -> bool:
-    if not _table_exists(table):
+def _column_exists(conn, table: str, column: str) -> bool:
+    if not _table_exists(conn, table):
         return False
-    return column in [c["name"] for c in _insp().get_columns(table)]
+    return column in [c["name"] for c in _insp(conn).get_columns(table)]
 
 
 def upgrade():
-    if not _table_exists("kitchen_incidents"):
+    conn = op.get_bind()
+
+    if not _table_exists(conn, "kitchen_incidents"):
         # No separate .create(checkfirst=True) call — op.create_table's own
         # enum-creation-on-table-create does not respect checkfirst against
         # real Postgres (see 025/032's writeup of this SQLAlchemy behavior).
@@ -64,42 +66,44 @@ def upgrade():
         op.create_index("ix_kitchen_incidents_restaurant_created", "kitchen_incidents",
                          ["restaurant_id", "created_at"])
 
-    if not _column_exists("restaurants", "latitude"):
+    if not _column_exists(conn, "restaurants", "latitude"):
         op.add_column("restaurants", sa.Column("latitude", sa.Float(), nullable=True))
-    if not _column_exists("restaurants", "longitude"):
+    if not _column_exists(conn, "restaurants", "longitude"):
         op.add_column("restaurants", sa.Column("longitude", sa.Float(), nullable=True))
 
-    if _column_exists("labor_shifts", "actual_start"):
-        if not _column_exists("labor_shifts", "clock_in_lat"):
+    if _column_exists(conn, "labor_shifts", "actual_start"):
+        if not _column_exists(conn, "labor_shifts", "clock_in_lat"):
             op.add_column("labor_shifts", sa.Column("clock_in_lat", sa.Float(), nullable=True))
-        if not _column_exists("labor_shifts", "clock_in_lng"):
+        if not _column_exists(conn, "labor_shifts", "clock_in_lng"):
             op.add_column("labor_shifts", sa.Column("clock_in_lng", sa.Float(), nullable=True))
-        if not _column_exists("labor_shifts", "clock_out_lat"):
+        if not _column_exists(conn, "labor_shifts", "clock_out_lat"):
             op.add_column("labor_shifts", sa.Column("clock_out_lat", sa.Float(), nullable=True))
-        if not _column_exists("labor_shifts", "clock_out_lng"):
+        if not _column_exists(conn, "labor_shifts", "clock_out_lng"):
             op.add_column("labor_shifts", sa.Column("clock_out_lng", sa.Float(), nullable=True))
-        if not _column_exists("labor_shifts", "clock_in_flagged"):
+        if not _column_exists(conn, "labor_shifts", "clock_in_flagged"):
             op.add_column("labor_shifts", sa.Column(
-                "clock_in_flagged", sa.Boolean(), nullable=False, server_default=sa.false()))
+                "clock_in_flagged", sa.Boolean(), nullable=False, server_default=sa.text("false")))
 
 
 def downgrade():
-    if _column_exists("labor_shifts", "clock_in_flagged"):
+    conn = op.get_bind()
+
+    if _column_exists(conn, "labor_shifts", "clock_in_flagged"):
         op.drop_column("labor_shifts", "clock_in_flagged")
-    if _column_exists("labor_shifts", "clock_out_lng"):
+    if _column_exists(conn, "labor_shifts", "clock_out_lng"):
         op.drop_column("labor_shifts", "clock_out_lng")
-    if _column_exists("labor_shifts", "clock_out_lat"):
+    if _column_exists(conn, "labor_shifts", "clock_out_lat"):
         op.drop_column("labor_shifts", "clock_out_lat")
-    if _column_exists("labor_shifts", "clock_in_lng"):
+    if _column_exists(conn, "labor_shifts", "clock_in_lng"):
         op.drop_column("labor_shifts", "clock_in_lng")
-    if _column_exists("labor_shifts", "clock_in_lat"):
+    if _column_exists(conn, "labor_shifts", "clock_in_lat"):
         op.drop_column("labor_shifts", "clock_in_lat")
 
-    if _column_exists("restaurants", "longitude"):
+    if _column_exists(conn, "restaurants", "longitude"):
         op.drop_column("restaurants", "longitude")
-    if _column_exists("restaurants", "latitude"):
+    if _column_exists(conn, "restaurants", "latitude"):
         op.drop_column("restaurants", "latitude")
 
-    if _table_exists("kitchen_incidents"):
+    if _table_exists(conn, "kitchen_incidents"):
         op.drop_table("kitchen_incidents")
         sa.Enum(name="incidenttype").drop(op.get_bind(), checkfirst=True)

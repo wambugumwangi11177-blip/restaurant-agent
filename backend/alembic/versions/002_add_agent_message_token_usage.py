@@ -25,7 +25,9 @@ depends_on = None
 
 
 def _column_exists(table_name: str, column_name: str) -> bool:
-    return any(c["name"] == column_name for c in sa.inspect(op.get_bind()).get_columns(table_name))
+    conn = op.get_context().bind
+    inspector = sa.inspect(conn)
+    return any(c["name"] == column_name for c in inspector.get_columns(table_name))
 
 
 def upgrade() -> None:
@@ -40,6 +42,9 @@ def upgrade() -> None:
 def downgrade() -> None:
     # batch_alter_table for SQLite compatibility — see 003's downgrade() for why.
     with op.batch_alter_table("agent_messages") as batch_op:
-        batch_op.drop_column("output_tokens")
-        batch_op.drop_column("input_tokens")
-        batch_op.drop_column("llm_model")
+        if _column_exists("agent_messages", "output_tokens"):
+            batch_op.drop_column("output_tokens")
+        if _column_exists("agent_messages", "input_tokens"):
+            batch_op.drop_column("input_tokens")
+        if _column_exists("agent_messages", "llm_model"):
+            batch_op.drop_column("llm_model")

@@ -78,20 +78,22 @@ def get_free_port() -> int:
 async def check_db_state(booking_id: str, checkout_id: str) -> tuple[str, str]:
     """Queries current status of payment and booking."""
     session_maker, _engine = get_async_session_maker()
-    async with session_maker() as db:
-        res_pay = await db.execute(
-            text("SELECT status FROM payments WHERE checkout_request_id = :id"),
-            {"id": checkout_id}
-        )
-        pay_status = res_pay.scalar()
+    try:
+        async with session_maker() as db:
+            res_pay = await db.execute(
+                text("SELECT status FROM payments WHERE checkout_request_id = :id"),
+                {"id": checkout_id}
+            )
+            pay_status = res_pay.scalar()
 
-        res_book = await db.execute(
-            text("SELECT payment_status FROM bookings WHERE booking_id = :id"),
-            {"id": booking_id}
-        )
-        book_status = res_book.scalar()
+            res_book = await db.execute(
+                text("SELECT payment_status FROM bookings WHERE booking_id = :id"),
+                {"id": booking_id}
+            )
+            book_status = res_book.scalar()
+    finally:
+        await _engine.dispose()
 
-    await _engine.dispose()
     return pay_status, book_status
 
 async def main():
@@ -104,53 +106,54 @@ async def main():
     checkout_id = "VERIFY_MOCK_CHECKOUT_999"
     
     session_maker, _engine = get_async_session_maker()
-    async with session_maker() as db:
-        # Insert test booking
-        res = await db.execute(text("""
-            INSERT INTO bookings (
-                user_id_hash,
-                table_id,
-                booking_time,
-                party_size,
-                idempotency_key,
-                payment_status
-            )
-            VALUES (
-                'verify_callback_hash_999',
-                1,
-                '2026-12-25 19:00:00+03',
-                2,
-                'verify_callback_idempotency_999',
-                'Unpaid'
-            )
-            ON CONFLICT (idempotency_key) DO UPDATE
-            SET payment_status = 'Unpaid'
-            RETURNING booking_id;
-        """))
-        booking_id = str(res.scalar())
-        
-        # Clean previous payment tests if any
-        await db.execute(text("DELETE FROM payments WHERE checkout_request_id = :id"), {"id": checkout_id})
-        
-        # Insert pending payment
-        await db.execute(text("""
-            INSERT INTO payments (
-                booking_id,
-                checkout_request_id,
-                amount_cents,
-                status
-            )
-            VALUES (
-                :booking_id,
-                :checkout_id,
-                50000,
-                'Pending'
-            )
-        """), {"booking_id": booking_id, "checkout_id": checkout_id})
-        await db.commit()
-
-    # Dispose the engine completely so uvicorn subprocess doesn't inherit active sockets
-    await _engine.dispose()
+    try:
+        async with session_maker() as db:
+            # Insert test booking
+            res = await db.execute(text("""
+                INSERT INTO bookings (
+                    user_id_hash,
+                    table_id,
+                    booking_time,
+                    party_size,
+                    idempotency_key,
+                    payment_status
+                )
+                VALUES (
+                    'verify_callback_hash_999',
+                    1,
+                    '2026-12-25 19:00:00+03',
+                    2,
+                    'verify_callback_idempotency_999',
+                    'Unpaid'
+                )
+                ON CONFLICT (idempotency_key) DO UPDATE
+                SET payment_status = 'Unpaid'
+                RETURNING booking_id;
+            """))
+            booking_id = str(res.scalar())
+            
+            # Clean previous payment tests if any
+            await db.execute(text("DELETE FROM payments WHERE checkout_request_id = :id"), {"id": checkout_id})
+            
+            # Insert pending payment
+            await db.execute(text("""
+                INSERT INTO payments (
+                    booking_id,
+                    checkout_request_id,
+                    amount_cents,
+                    status
+                )
+                VALUES (
+                    :booking_id,
+                    :checkout_id,
+                    50000,
+                    'Pending'
+                )
+            """), {"booking_id": booking_id, "checkout_id": checkout_id})
+            await db.commit()
+    finally:
+        # Dispose the engine completely so uvicorn subprocess doesn't inherit active sockets
+        await _engine.dispose()
 
     # 2. Choose local port and start server in background
     port = get_free_port()
@@ -160,119 +163,118 @@ async def main():
     # Start the server process using Python interpreter from PATH (will inherit current env with loaded vars)
     uvicorn_log_path = os.path.join(_script_dir, "uvicorn_verify.log")
     uvicorn_log = open(uvicorn_log_path, "w")
-    
-    server_process = subprocess.Popen(
-        [
-            sys.executable,
-            "-m", "uvicorn",
-            "main:app",
-            "--host", "127.0.0.1",
-            "--port", str(port),
-            "--log-level", "debug"
-        ],
-        cwd=_backend_dir,
-        stdout=uvicorn_log,
-        stderr=uvicorn_log
-    )
+    server_process = None
 
-    # Wait for server to start responding
-    time.sleep(3.0)
+    try:
+        server_process = subprocess.Popen(
+            [
+                sys.executable,
+                "-m", "uvicorn",
+                "main:app",
+                "--host", "127.0.0.1",
+                "--port", str(port),
+                "--log-level", "debug"
+            ],
+            cwd=_backend_dir,
+            stdout=uvicorn_log,
+            stderr=uvicorn_log
+        )
 
-    print(f"[SETUP] Created test booking: {booking_id}")
-    print(f"[SETUP] Created pending payment: {checkout_id}")
+        # Wait for server to start responding
+        time.sleep(3.0)
+
+        print(f"[SETUP] Created test booking: {booking_id}")
+        print(f"[SETUP] Created pending payment: {checkout_id}")
 
 
-    # Check initial states
-    pay_init, book_init = await check_db_state(booking_id, checkout_id)
-    print(f"  Initial DB State: payments.status={pay_init}, bookings.payment_status={book_init}")
-    if pay_init != "Pending" or book_init != "Unpaid":
-        print("[FAIL] Initial state setup incorrect.")
-        server_process.terminate()
-        sys.exit(1)
-
-    # Diagnostic DB check on the running server
-    async with httpx.AsyncClient() as client:
-        try:
-            diag_res = await client.get(f"{base_url}/diagnostic_db_session", timeout=5.0)
-            print(f"[DIAGNOSTIC] Server DB check: {diag_res.json()}")
-        except Exception as e:
-            print(f"[DIAGNOSTIC] Server DB check failed: {e}")
-
-    # 3. Trigger Mock Callback POST request (ResultCode 0 - Success)
-    print("\n--- Sending Mock Callback POST request (Success) ---")
-    mock_payload = {
-        "Body": {
-            "stkCallback": {
-                "MerchantRequestID": checkout_id,
-                "CheckoutRequestID": checkout_id,
-                "ResultCode": 0,
-                "ResultDesc": "The service request is processed successfully."
-            }
-        }
-    }
-
-    async with httpx.AsyncClient() as client:
-        response = await client.post(f"{base_url}/v1/payments/callback", json=mock_payload)
-        print(f"Server Response Status: {response.status_code}")
-        print(f"Server Response Body: {response.json()}")
-        
-        if response.status_code != 200:
-            print("[FAIL] Webhook returned non-200 response status.")
-            server_process.terminate()
+        # Check initial states
+        pay_init, book_init = await check_db_state(booking_id, checkout_id)
+        print(f"  Initial DB State: payments.status={pay_init}, bookings.payment_status={book_init}")
+        if pay_init != "Pending" or book_init != "Unpaid":
+            print("[FAIL] Initial state setup incorrect.")
             sys.exit(1)
 
-    # 4. Wait for background task settlement
-    print("[INFO] Waiting 2 seconds for background settlement service to process...")
-    await asyncio.sleep(2.0)
+        # Diagnostic DB check on the running server
+        async with httpx.AsyncClient() as client:
+            try:
+                diag_res = await client.get(f"{base_url}/diagnostic_db_session", timeout=5.0)
+                print(f"[DIAGNOSTIC] Server DB check: {diag_res.json()}")
+            except Exception as e:
+                print(f"[DIAGNOSTIC] Server DB check failed: {e}")
 
-    # Verify atomic update
-    pay_after, book_after = await check_db_state(booking_id, checkout_id)
-    print(f"  DB State after callback: payments.status={pay_after}, bookings.payment_status={book_after}")
-    
-    if pay_after != "Completed" or book_after != "Paid":
-        print("[FAIL] Webhook did not update tables atomically to Completed / Paid.")
-        server_process.terminate()
-        sys.exit(1)
-    print("[PASS] Atomic updates verified successfully.")
+        # 3. Trigger Mock Callback POST request (ResultCode 0 - Success)
+        print("\n--- Sending Mock Callback POST request (Success) ---")
+        mock_payload = {
+            "Body": {
+                "stkCallback": {
+                    "MerchantRequestID": checkout_id,
+                    "CheckoutRequestID": checkout_id,
+                    "ResultCode": 0,
+                    "ResultDesc": "The service request is processed successfully."
+                }
+            }
+        }
 
-    # 5. Test Idempotency (Double post protection)
-    print("\n--- Sending Duplicate Callback request (Idempotency Audit) ---")
-    async with httpx.AsyncClient() as client:
-        response_dup = await client.post(f"{base_url}/v1/payments/callback", json=mock_payload)
-        print(f"Duplicate Response Status: {response_dup.status_code}")
+        async with httpx.AsyncClient() as client:
+            response = await client.post(f"{base_url}/v1/payments/callback", json=mock_payload)
+            print(f"Server Response Status: {response.status_code}")
+            print(f"Server Response Body: {response.json()}")
+            
+            if response.status_code != 200:
+                print("[FAIL] Webhook returned non-200 response status.")
+                sys.exit(1)
+
+        # 4. Wait for background task settlement
+        print("[INFO] Waiting 2 seconds for background settlement service to process...")
+        await asyncio.sleep(2.0)
+
+        # Verify atomic update
+        pay_after, book_after = await check_db_state(booking_id, checkout_id)
+        print(f"  DB State after callback: payments.status={pay_after}, bookings.payment_status={book_after}")
         
-    await asyncio.sleep(1.0)
-    pay_dup, book_dup = await check_db_state(booking_id, checkout_id)
-    print(f"  DB State after duplicate callback: payments.status={pay_dup}, bookings.payment_status={book_dup}")
-    if pay_dup != "Completed" or book_dup != "Paid":
-        print("[FAIL] Duplicate callback corrupted database states.")
-        server_process.terminate()
-        sys.exit(1)
-    print("[PASS] Idempotency checks passed.")
+        if pay_after != "Completed" or book_after != "Paid":
+            print("[FAIL] Webhook did not update tables atomically to Completed / Paid.")
+            print("\n=== Uvicorn Server Logs ===")
+            uvicorn_log.flush()
+            with open(uvicorn_log_path, "r") as f:
+                print(f.read())
+            print("==========================")
+            sys.exit(1)
+        print("[PASS] Atomic updates verified successfully.")
+
+        # 5. Test Idempotency (Double post protection)
+        print("\n--- Sending Duplicate Callback request (Idempotency Audit) ---")
+        async with httpx.AsyncClient() as client:
+            response_dup = await client.post(f"{base_url}/v1/payments/callback", json=mock_payload)
+            print(f"Duplicate Response Status: {response_dup.status_code}")
+            
+        await asyncio.sleep(1.0)
+        pay_dup, book_dup = await check_db_state(booking_id, checkout_id)
+        print(f"  DB State after duplicate callback: payments.status={pay_dup}, bookings.payment_status={book_dup}")
+        if pay_dup != "Completed" or book_dup != "Paid":
+            print("[FAIL] Duplicate callback corrupted database states.")
+            sys.exit(1)
+        print("[PASS] Idempotency checks passed.")
+
+    finally:
+        # Always clean up the subprocess and log file handle
+        if server_process is not None:
+            server_process.terminate()
+            server_process.wait()
+        uvicorn_log.close()
+        print("[INFO] Local server terminated.")
 
     # 6. Cleanup
     session_maker, _engine = get_async_session_maker()
-    async with session_maker() as db:
-        await db.execute(text("DELETE FROM payments WHERE booking_id = :b"), {"b": booking_id})
-        await db.execute(text("DELETE FROM bookings WHERE booking_id = :b"), {"b": booking_id})
-        await db.commit()
-    await _engine.dispose()
+    try:
+        async with session_maker() as db:
+            await db.execute(text("DELETE FROM payments WHERE booking_id = :b"), {"b": booking_id})
+            await db.execute(text("DELETE FROM bookings WHERE booking_id = :b"), {"b": booking_id})
+            await db.commit()
+    finally:
+        await _engine.dispose()
     print("\n[CLEANUP] Test data cleaned from Neon.")
 
-    # Stop server
-    server_process.terminate()
-    server_process.wait()
-    uvicorn_log.close()
-    print("[INFO] Local server terminated.")
-    
-    # Read and show logs if failed
-    if pay_after != "Completed" or book_after != "Paid":
-        print("\n=== Uvicorn Server Logs ===")
-        with open(uvicorn_log_path, "r") as f:
-            print(f.read())
-        print("==========================")
-        sys.exit(1)
-        
     # Clean up log file
     try:
         os.remove(uvicorn_log_path)

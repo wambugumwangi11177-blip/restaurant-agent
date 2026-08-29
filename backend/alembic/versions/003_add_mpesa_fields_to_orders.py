@@ -24,12 +24,18 @@ branch_labels = None
 depends_on = None
 
 
+def _get_inspector():
+    # op.get_bind() is deprecated in Alembic + SQLAlchemy 2.x;
+    # op.get_context().connection is the supported replacement.
+    return sa.inspect(op.get_context().connection)
+
+
 def _column_exists(table_name: str, column_name: str) -> bool:
-    return any(c["name"] == column_name for c in sa.inspect(op.get_bind()).get_columns(table_name))
+    return any(c["name"] == column_name for c in _get_inspector().get_columns(table_name))
 
 
 def _index_exists(table_name: str, index_name: str) -> bool:
-    return any(idx["name"] == index_name for idx in sa.inspect(op.get_bind()).get_indexes(table_name))
+    return any(idx["name"] == index_name for idx in _get_inspector().get_indexes(table_name))
 
 
 def upgrade() -> None:

@@ -43,7 +43,13 @@ target_metadata = Base.metadata
 
 load_dotenv()
 # Override sqlalchemy.url with env var
-config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL"))
+database_url = os.getenv("DATABASE_URL")
+if database_url is None:
+    raise RuntimeError(
+        "DATABASE_URL environment variable is not set. "
+        "Please set it before running Alembic migrations."
+    )
+config.set_main_option("sqlalchemy.url", database_url)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

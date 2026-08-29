@@ -44,7 +44,7 @@ def upgrade():
             sa.Column("restaurant_id", sa.Integer(), sa.ForeignKey("restaurants.id"), nullable=False),
             sa.Column("impersonator_user_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
             sa.Column("target_user_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
-            sa.Column("started_at", sa.DateTime(), nullable=True),
+            sa.Column("started_at", sa.DateTime(), nullable=False),
             sa.Column("expires_at", sa.DateTime(), nullable=False),
             sa.Column("ended_at", sa.DateTime(), nullable=True),
             sa.Column("end_reason", sa.String(), nullable=True),
@@ -55,4 +55,6 @@ def upgrade():
 
 def downgrade():
     if _table_exists("impersonation_sessions"):
+        op.drop_index("ix_impersonation_sessions_impersonator", table_name="impersonation_sessions")
+        op.drop_index("ix_impersonation_sessions_target", table_name="impersonation_sessions")
         op.drop_table("impersonation_sessions")

@@ -327,17 +327,18 @@ def _generate_recommendations(stations, bottlenecks, items, rush_periods, throug
         recs.append({
             "type": "consistency",
             "station": s["station"],
-            "message": f"{s['station']} has low consistency (score: {s['consistency_score']}). Prep times vary wildly — indicates skill gap or process issue.",
-            "action": "Standardize procedures and train staff",
+            "message": f"{s['station']} has low consistency (score: {s['consistency_score']}). Prep times vary widely — standardize recipes and procedures.",
+            "action": "Implement station checklists and standardized plating guides",
             "priority": "medium",
         })
 
-    if throughput["completion_rate"] < 90:
+    # Throughput warning
+    if throughput["completion_rate"] < 80:
         recs.append({
-            "type": "completion",
+            "type": "throughput",
             "station": "all",
-            "message": f"Order completion rate is {throughput['completion_rate']}% — below 90% target.",
-            "action": "Investigate cancellation/abandonment causes",
+            "message": f"Order completion rate is {throughput['completion_rate']}% — below the 80% target. Review order flow and kitchen capacity.",
+            "action": "Audit order routing and station assignments",
             "priority": "high",
         })
 
@@ -345,11 +346,26 @@ def _generate_recommendations(stations, bottlenecks, items, rush_periods, throug
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# EMPTY RESPONSE
+# HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
-def _empty_response():
+def _empty_response() -> dict:
+    """Return a safe empty structure when no prep-time data exists."""
     return {
-        "station_performance": [], "item_prep_times": [], "bottlenecks": [],
-        "rush_periods": [], "throughput": {}, "efficiency_ratings": [],
+        "station_performance": [],
+        "item_prep_times": [],
+        "bottlenecks": [],
+        "rush_periods": [],
+        "throughput": {
+            "total_completed": 0,
+            "orders_per_day": 0,
+            "items_per_day": 0,
+            "avg_order_completion_minutes": 0,
+            "median_completion_minutes": 0,
+            "p95_completion_minutes": 0,
+            "avg_prep_minutes": 0,
+            "stations_active": 0,
+            "completion_rate": 0,
+        },
+        "efficiency_ratings": [],
         "recommendations": [],
     }

@@ -42,8 +42,14 @@ if not REMOTE_URL:
              "nothing to copy from.")
 
 
+def _is_integer_pk(col) -> bool:
+    """Return True if the column type is an integer-like type safe for keyset pagination."""
+    from sqlalchemy import Integer
+    return isinstance(col.type, Integer)
+
+
 def main(force: bool = False) -> None:
-    from sqlalchemy import create_engine, select, delete, func
+    from sqlalchemy import create_engine, select, delete, Integer
     from models import Base
 
     if force and LOCAL_URL.startswith("sqlite:///") and os.path.exists(LOCAL_URL.replace("sqlite:///", "", 1)):
@@ -67,16 +73,36 @@ def main(force: bool = False) -> None:
             d_conn.execute(delete(table))
         for table in tables:
             pk = table.primary_key.columns[0]
-            last_id, copied = -1, 0
-            while True:
-                rows = s_conn.execute(
-                    select(table).where(pk > last_id).order_by(pk).limit(BATCH)
-                ).mappings().all()
-                if not rows:
-                    break
-                d_conn.execute(table.insert(), [dict(r) for r in rows])
-                last_id = rows[-1][pk.name]
-                copied += len(rows)
+            copied = 0
+
+            if _is_integer_pk(pk):
+                # Keyset pagination: efficient and stable for integer PKs.
+                last_id = -1
+                while True:
+                    rows = s_conn.execute(
+                        select(table).where(pk > last_id).order_by(pk).limit(BATCH)
+                    ).mappings().all()
+                    if not rows:
+                        break
+                    d_conn.execute(table.insert(), [dict(r) for r in rows])
+                    last_id = rows[-1][pk.name]
+                    copied += len(rows)
+            else:
+                # Offset pagination: correct for UUID / non-integer PKs.
+                # For a one-time snapshot this is acceptable.
+                offset = 0
+                while True:
+                    rows = s_conn.execute(
+                        select(table).order_by(pk).limit(BATCH).offset(offset)
+                    ).mappings().all()
+                    if not rows:
+                        break
+                    d_conn.execute(table.insert(), [dict(r) for r in rows])
+                    offset += len(rows)
+                    copied += len(rows)
+                    if len(rows) < BATCH:
+                        break
+
             total_rows += copied
             if copied:
                 print(f"[snapshot] {table.name}: {copied} rows")

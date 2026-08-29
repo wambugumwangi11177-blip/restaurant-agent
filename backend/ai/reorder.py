@@ -299,17 +299,16 @@ def receive_purchase_order(
     db.refresh(po)
 
     shortfall = po.quantity_ordered - quantity_received
-    if shortfall > 0:
-        from events.bus import emit_async, EventType
-        emit_async(EventType.PURCHASE_ORDER_DELIVERED, {
-            "restaurant_id": restaurant_id,
-            "po_id": po.id,
-            "item_name": item.item_name if item else "Unknown item",
-            "quantity_ordered": po.quantity_ordered,
-            "quantity_received": quantity_received,
-            "shortfall": shortfall,
-            "unit": po.unit,
-        })
+    from events.bus import emit_async, EventType
+    emit_async(EventType.PURCHASE_ORDER_DELIVERED, {
+        "restaurant_id": restaurant_id,
+        "po_id": po.id,
+        "item_name": item.item_name if item else "Unknown item",
+        "quantity_ordered": po.quantity_ordered,
+        "quantity_received": quantity_received,
+        "shortfall": shortfall,
+        "unit": po.unit,
+    })
 
     return po
 

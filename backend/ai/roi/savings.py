@@ -169,8 +169,7 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
         for name, count in execution_counts.items()
     ]
 
-    total_minutes = sum(b["total_minutes"] for b in message_breakdown) + \
-                     sum(b["total_minutes"] for b in execution_breakdown)
+    total_minutes = sum(b["total_minutes"] for b in message_breakdown) + \n                     sum(b["total_minutes"] for b in execution_breakdown)
     hours_saved = round(total_minutes / 60, 1)
 
     staff = db.query(models.StaffMember).filter(
@@ -326,50 +325,9 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
     except Exception:  # noqa: BLE001
         pass
 
-    # ── 5. NET ROI (is the AI worth what it costs?) ──────────────────────────
-    # AI cost = this restaurant's LLM token spend over the window, priced by the
-    # same static cost model AI-Ops uses. Value delivered = the two "real money"
-    # figures already on this page (time saved + profit captured) — opportunities
-    # are deliberately excluded because they aren't realized yet. Kept as a ratio,
-    # never a blended total, so it stays honest.
-    ai_cost_cents = 0
-    try:
-        from ai.cost_model import cost_kes_cents
-        token_rows = db.query(models.TokenUsage).filter(
-            models.TokenUsage.restaurant_id == restaurant_id,
-            models.TokenUsage.created_at >= thirty_days_ago,
-        ).all()
-        ai_cost_cents = sum(
-            cost_kes_cents(t.llm_model, t.input_tokens or 0, t.output_tokens or 0)
-            for t in token_rows
-        )
-    except Exception:  # noqa: BLE001 — ROI must degrade, not crash
-        pass
-
-    value_delivered_cents = money_saved_from_time_cents + monthly_impact_cents
-    economics = {
-        "ai_cost_cents": ai_cost_cents,
-        "value_delivered_cents": value_delivered_cents,
-        # "Every KES 1 spent on AI returned KES X." None when there's no metered
-        # AI spend yet (can't divide by zero — the frontend shows this honestly).
-        "roi_multiple": round(value_delivered_cents / ai_cost_cents, 1) if ai_cost_cents > 0 else None,
-    }
-
-    # ── 6. ANNUAL RUN-RATE (at the current pace) ─────────────────────────────
-    # Simple ×12 annualization of the two monthly figures. Labelled "at current
-    # pace" in the UI — a projection, not a promise.
-    projection = {
-        "annual_hours_saved": round(hours_saved * 12),
-        "annual_money_saved_cents": round(money_saved_from_time_cents * 12),
-        "annual_captured_cents": round(monthly_impact_cents * 12),
-    }
-
     return {
-        "window_days": 30,
         "time_saved": time_saved,
         "money_captured": money_captured,
         "opportunities": opportunities,
         "capacity": capacity,
-        "economics": economics,
-        "projection": projection,
     }

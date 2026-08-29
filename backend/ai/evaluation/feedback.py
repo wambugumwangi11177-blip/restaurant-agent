@@ -88,10 +88,12 @@ def classify_prediction(db: Session, restaurant_id: int, pred: models.AgentPredi
     if pred.actual_value is None or pred.error_pct is None:
         return {"prediction_id": pred.id, "verdict": "unscored"}
 
+    abs_error_pct = abs(pred.error_pct)
+
     if pred.within_ci:
         verdict, reason = "worked", "actual landed within the confidence interval"
-    elif pred.error_pct <= 20:
-        verdict, reason = "acceptable", f"within {pred.error_pct:.0f}% of forecast"
+    elif abs_error_pct <= 20:
+        verdict, reason = "acceptable", f"within {abs_error_pct:.0f}% of forecast"
     else:
         # Was there an exogenous calendar effect on the predicted day?
         from ai.simulation.signals import demand_signals
@@ -101,7 +103,7 @@ def classify_prediction(db: Session, restaurant_id: int, pred: models.AgentPredi
             reason = f"calendar effect not in baseline: {', '.join(sig['reasons'])}"
         else:
             verdict = "missed"
-            reason = f"model error ({pred.error_pct:.0f}% off), no known calendar cause"
+            reason = f"model error ({abs_error_pct:.0f}% off), no known calendar cause"
 
     return {
         "prediction_id": pred.id,

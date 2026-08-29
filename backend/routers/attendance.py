@@ -171,7 +171,7 @@ async def clock_out(
     shift.clock_out_lng = body.lng
     hours = max((now - shift.actual_start).total_seconds() / 3600.0, 0.0)
     shift.actual_hours = round(hours, 2)
-    shift.labor_cost = round(hours * (member.hourly_rate or 0))
+    shift.labor_cost = round(hours * (member.hourly_rate or 0), 2)
 
     db.commit()
     db.refresh(shift)

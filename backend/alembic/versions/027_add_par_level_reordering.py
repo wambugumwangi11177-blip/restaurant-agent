@@ -29,15 +29,29 @@ down_revision = "026_add_requisition_pull_and_stock_counts"
 branch_labels = None
 depends_on = None
 
+# Explicit constraint name so downgrade() can drop it by name on all backends
+_FK_CONSTRAINT = "fk_inventory_items_default_supplier_id_suppliers"
+
 
 def _insp():
     return sa.inspect(op.get_bind())
 
 
 def _column_exists(table: str, column: str) -> bool:
-    if table not in _insp().get_table_names():
+    insp = _insp()
+    if table not in insp.get_table_names():
         return False
-    return column in [c["name"] for c in _insp().get_columns(table)]
+    return column in [c["name"] for c in insp.get_columns(table)]
+
+
+def _fk_exists(table: str, constraint_name: str) -> bool:
+    insp = _insp()
+    if table not in insp.get_table_names():
+        return False
+    return any(
+        fk["name"] == constraint_name
+        for fk in insp.get_foreign_keys(table)
+    )
 
 
 def upgrade():
@@ -45,11 +59,20 @@ def upgrade():
         op.add_column("inventory_items", sa.Column("par_level", sa.Float(), nullable=True))
     if not _column_exists("inventory_items", "default_supplier_id"):
         op.add_column("inventory_items", sa.Column(
-            "default_supplier_id", sa.Integer(), sa.ForeignKey("suppliers.id"), nullable=True))
+            "default_supplier_id", sa.Integer(), nullable=True))
+        op.create_foreign_key(
+            _FK_CONSTRAINT,
+            "inventory_items", "suppliers",
+            ["default_supplier_id"], ["id"],
+        )
 
 
 def downgrade():
     if _column_exists("inventory_items", "default_supplier_id"):
+        # Drop the FK constraint explicitly before dropping the column;
+        # required on PostgreSQL and other strict backends.
+        if _fk_exists("inventory_items", _FK_CONSTRAINT):
+            op.drop_constraint(_FK_CONSTRAINT, "inventory_items", type_="foreignkey")
         op.drop_column("inventory_items", "default_supplier_id")
     if _column_exists("inventory_items", "par_level"):
         op.drop_column("inventory_items", "par_level")

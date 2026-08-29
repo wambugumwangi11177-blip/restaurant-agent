@@ -50,4 +50,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("customer_consents")
+    if _table_exists("customer_consents"):
+        if _index_exists("customer_consents", "ix_customer_consents_restaurant_phone"):
+            op.drop_index("ix_customer_consents_restaurant_phone", table_name="customer_consents")
+        if _index_exists("customer_consents", "ix_customer_consents_id"):
+            op.drop_index("ix_customer_consents_id", table_name="customer_consents")
+        op.drop_table("customer_consents")

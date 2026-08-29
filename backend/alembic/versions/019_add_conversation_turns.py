@@ -25,7 +25,9 @@ depends_on = None
 
 
 def _table_exists(table_name: str) -> bool:
-    return table_name in sa.inspect(op.get_bind()).get_table_names()
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    return table_name in inspector.get_table_names()
 
 
 def upgrade():
@@ -37,7 +39,12 @@ def upgrade():
         sa.Column("restaurant_id", sa.Integer(), sa.ForeignKey("restaurants.id"), nullable=False),
         sa.Column("role", sa.String(), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
-        sa.Column("created_at", sa.DateTime(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
     )
     op.create_index(
         "ix_conversation_turns_restaurant_created",

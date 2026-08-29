@@ -36,7 +36,16 @@ NAME_LABELS = ("PASSWORD_RESET", "EMAIL_VERIFY")
 VALUE_LABELS = ("password_reset", "email_verify")
 
 
+def _type_exists() -> bool:
+    result = op.get_bind().execute(
+        sa.text("SELECT 1 FROM pg_type WHERE typname = 'authtokenpurpose'")
+    )
+    return result.fetchone() is not None
+
+
 def _current_labels() -> tuple:
+    if not _type_exists():
+        return ()
     result = op.get_bind().execute(
         sa.text("SELECT unnest(enum_range(NULL::authtokenpurpose))")
     )
@@ -55,12 +64,14 @@ def _rebuild_type(labels: tuple) -> None:
 
 
 def upgrade():
-    if _current_labels() == NAME_LABELS:
+    current = _current_labels()
+    if current == NAME_LABELS or current == ():
         return
     _rebuild_type(NAME_LABELS)
 
 
 def downgrade():
-    if _current_labels() == VALUE_LABELS:
+    current = _current_labels()
+    if current == VALUE_LABELS or current == ():
         return
     _rebuild_type(VALUE_LABELS)

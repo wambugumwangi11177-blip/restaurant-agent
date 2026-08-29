@@ -30,5 +30,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("reservations") as batch_op:
-        batch_op.drop_column("reminder_sent_at")
+    if _column_exists("reservations", "reminder_sent_at"):
+        with op.batch_alter_table("reservations") as batch_op:
+            batch_op.drop_column("reminder_sent_at")

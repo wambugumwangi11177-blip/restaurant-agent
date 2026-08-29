@@ -35,5 +35,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     with op.batch_alter_table("users") as batch_op:
-        batch_op.drop_column("locked_until")
-        batch_op.drop_column("failed_login_attempts")
+        if _column_exists("users", "locked_until"):
+            batch_op.drop_column("locked_until")
+        if _column_exists("users", "failed_login_attempts"):
+            batch_op.drop_column("failed_login_attempts")

@@ -129,16 +129,15 @@ def _page_managers(db: Session, notif: "models.Notification") -> None:
         f"(no response in {timeout} min):\n\n{notif.body}"
     )
 
-    if manager_ids:
-        notify_users(db, manager_ids, f"[ESCALATED] {notif.title}", escalated_body,
-                     notif.event_type, notif.url, severity=notif.severity)
-
     if not manager_ids:
         logger.warning(
             f"[Escalation] Notification {notif.id} escalated to level 1 but "
             f"restaurant {restaurant.id} has no active MANAGER to page."
         )
         return
+
+    notify_users(db, manager_ids, f"[ESCALATED] {notif.title}", escalated_body,
+                 notif.event_type, notif.url, severity=notif.severity)
 
     # WhatsApp/SMS to every manager with a phone on file. StaffMember.phone is
     # the reachable-number field (models.py's own docstring); join via

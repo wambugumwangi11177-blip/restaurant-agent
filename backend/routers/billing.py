@@ -9,6 +9,7 @@ decision that doesn't change this surface. Admin-only.
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from database import get_db
 from auth import require_role
@@ -26,7 +27,16 @@ def _get_or_create(db: Session, tenant_id: int) -> models.Subscription:
     ).first()
     if not sub:
         sub = models.Subscription(tenant_id=tenant_id, plan="free", status="active", provider="manual")
-        db.add(sub); db.commit(); db.refresh(sub)
+        db.add(sub)
+        try:
+            db.commit()
+            db.refresh(sub)
+        except IntegrityError:
+            # Another concurrent request already inserted the row; roll back and fetch it.
+            db.rollback()
+            sub = db.query(models.Subscription).filter(
+                models.Subscription.tenant_id == tenant_id
+            ).first()
     return sub
 
 
@@ -65,5 +75,10 @@ async def set_plan(
     sub = _get_or_create(db, current_user.tenant_id)
     sub.plan = plan
     sub.status = "active"
-    db.commit(); db.refresh(sub)
+    try:
+        db.commit()
+        db.refresh(sub)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to update subscription; please retry.")
     return _serialize(sub)

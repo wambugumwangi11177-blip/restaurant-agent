@@ -45,10 +45,14 @@ def _column_exists(table_name: str, column_name: str) -> bool:
 
 def upgrade():
     if not _column_exists("users", "is_email_verified"):
+        # New signups must default to False so they go through email verification.
+        # Existing users are backfilled to True immediately after column creation
+        # because they were trusted before this column existed.
         op.add_column(
             "users",
-            sa.Column("is_email_verified", sa.Boolean(), nullable=False, server_default=sa.true()),
+            sa.Column("is_email_verified", sa.Boolean(), nullable=False, server_default=sa.false()),
         )
+        op.execute("UPDATE users SET is_email_verified = TRUE")
 
     if not _table_exists("auth_tokens"):
         # op.create_table's automatic enum-creation-on-table-create does not

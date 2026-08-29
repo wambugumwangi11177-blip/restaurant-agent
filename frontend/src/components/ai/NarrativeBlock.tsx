@@ -29,11 +29,11 @@ export function NarrativeBlock({ n }: { n?: Narrative }) {
     if (!n || (!n.headline && (!n.priorities || n.priorities.length === 0))) return null;
     const redacted = n.ungrounded_numbers?.length || 0;
     return (
-        <div className="mb-4 rounded-lg border border-[#d4a853]/25 bg-[#d4a853]/[0.04] p-4">
+        <div className="mb-4 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent)]/[0.04] p-4">
             <div className="flex items-start justify-between gap-3 mb-2">
                 <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-[#d4a853]" />
-                    <span className="text-xs font-semibold uppercase tracking-wide text-[#d4a853]">AI reading</span>
+                    <Sparkles className="w-4 h-4 text-[var(--accent)]" />
+                    <span className="text-xs font-semibold uppercase tracking-wide text-[var(--accent)]">AI reading</span>
                 </div>
                 {n.verified ? (
                     <span
@@ -56,7 +56,7 @@ export function NarrativeBlock({ n }: { n?: Narrative }) {
                 <ul className="mt-2 space-y-1">
                     {n.priorities.map((p, i) => (
                         <li key={i} className="text-xs text-[#a3a3a3] flex gap-2">
-                            <span className="text-[#d4a853] flex-shrink-0">•</span>
+                            <span className="text-[var(--accent)] flex-shrink-0">•</span>
                             <span>{p}</span>
                         </li>
                     ))}

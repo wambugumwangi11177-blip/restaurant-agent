@@ -185,6 +185,58 @@ def _build_context_summary(seasonal: list, stockouts: list) -> str:
     return " ".join(parts) if parts else "No significant historical patterns for this period."
 
 
+def recall_recent_reflections(db: Session, restaurant_id: int, limit: int = 3) -> list[dict]:
+    """
+    The strategist's own prior conclusions, most recent first — not seasonal
+    or date-keyed like recall_context(), just "what did I last tell this
+    owner." Lets a new run see its own history instead of starting cold.
+    """
+    rows = (
+        db.query(models.MemoryEvent)
+        .filter(
+            models.MemoryEvent.restaurant_id == restaurant_id,
+            models.MemoryEvent.event_type == "strategy_reflection",
+        )
+        .order_by(models.MemoryEvent.event_date.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "event_date": m.event_date.isoformat(),
+            "event_name": m.event_name,
+            "agent_notes": m.agent_notes,
+        }
+        for m in rows
+    ]
+
+
+def record_strategy_reflection(db: Session, restaurant_id: int, goal: str, strategy: dict) -> int:
+    """
+    Persist what the strategist just concluded so the next run — on-demand or
+    scheduled — can recall it via recall_recent_reflections() instead of
+    reasoning from scratch every time.
+    """
+    headline = (strategy.get("headline") or "").strip()
+    steps = [s.get("action", "") for s in strategy.get("steps", [])[:3] if isinstance(s, dict)]
+    risks = strategy.get("risks", [])[:2]
+    notes = headline
+    if steps:
+        notes += " | Steps: " + "; ".join(steps)
+    if risks:
+        notes += " | Risks: " + "; ".join(risks)
+
+    return remember(
+        db, restaurant_id,
+        event_type  = "strategy_reflection",
+        event_name  = f"Strategy: {headline[:80] or goal[:80]}",
+        event_date  = utcnow().date(),
+        impact_type = "strategy_outcome",
+        agent_notes = notes[:2000],
+        created_by  = "strategist",
+    )
+
+
 def auto_record_revenue_spike(
     db: Session,
     restaurant_id: int,

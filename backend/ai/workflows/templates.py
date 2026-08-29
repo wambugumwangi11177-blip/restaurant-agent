@@ -58,6 +58,16 @@ def h_draft_purchase_order(db: Session, restaurant_id: int, ctx: dict) -> dict:
 
 
 def h_create_purchase_order(db: Session, restaurant_id: int, ctx: dict) -> dict:
+    """
+    Runs after the human_approval step has already resolved (approved by a
+    human via resume(), or auto-approved by supplier trust — see
+    ai/workflows/engine.py::_is_auto_approvable). Creates PENDING then routes
+    through reorder_engine.approve_and_send — the SAME single approval/send
+    path routers/purchase_orders.py's manual endpoint uses — instead of
+    writing status="SENT" directly. That used to skip the supplier WhatsApp
+    notification and the audit log entirely (Sprint 5 fix: two approval
+    paths existed, only one of them actually notified anyone).
+    """
     draft = ctx.get("draft_po")
     if not draft:
         return {"created": False, "reason": "no draft to create"}
@@ -67,13 +77,18 @@ def h_create_purchase_order(db: Session, restaurant_id: int, ctx: dict) -> dict:
         inventory_item_id=draft.get("item_id"),
         quantity_ordered=draft.get("quantity", 10),
         unit="unit",
-        status="SENT",
+        status="PENDING",
     )
     db.add(po)
     db.commit()
     db.refresh(po)
     ctx["po_id"] = po.id
-    return {"created": True, "po_id": po.id}
+
+    from ai.reorder import approve_and_send
+    approved_by = ctx.get("approved_by") or "workflow"
+    approve_and_send(db, po.id, restaurant_id, approved_by)
+
+    return {"created": True, "po_id": po.id, "approved_by": approved_by}
 
 
 def h_receive_delivery(db: Session, restaurant_id: int, ctx: dict) -> dict:

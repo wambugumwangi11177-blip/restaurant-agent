@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from rate_limit import limiter
 from sqlalchemy.orm import Session, joinedload
@@ -9,26 +10,52 @@ import schemas
 import auth
 from routers.deps import get_or_create_restaurant
 from time_utils import utcnow
+from ai.order_stock import deduct_ingredients_for_order, reverse_ingredients_for_order
+
+logger = logging.getLogger("orders.router")
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
+# Directive 015's permission matrix for `orders`: RW = Owner, Manager,
+# Supervisor, Waiter; R = Controller, Kitchen; nothing for Stockkeeper. Owner
+# passes through every require_staff_role() call automatically (Role.ADMIN
+# bypass), so it isn't listed explicitly below.
+#
+# Status updates get their own, broader tuple: the `kitchen` page/route is RW
+# for Kitchen-tier staff (they advance orders through the KDS via exactly this
+# endpoint), even though `orders` itself is read-only for that tier — the
+# matrix distinguishes the two *pages*, but they share this one backend
+# endpoint, so the endpoint must permit whichever tier needs to write to it.
+_CAN_WRITE = (models.StaffRole.MANAGER, models.StaffRole.SUPERVISOR, models.StaffRole.WAITER)
+_CAN_UPDATE_STATUS = _CAN_WRITE + (models.StaffRole.KITCHEN,)
+_CAN_READ = (models.StaffRole.MANAGER, models.StaffRole.SUPERVISOR, models.StaffRole.WAITER,
+             models.StaffRole.CONTROLLER, models.StaffRole.KITCHEN)
 
-@router.post("/", response_model=schemas.OrderOut)
+
+@router.post("/", response_model=schemas.OrderOut, status_code=201)
 async def create_order(
     order: schemas.OrderCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
 
-    # Look up menu items and calculate total
+    # Look up menu items and calculate total — one batched query instead of
+    # one query per cart line (this is the highest-frequency write endpoint
+    # in the app; a 5-item cart was issuing 5 separate MenuItem queries).
+    requested_ids = {oi.menu_item_id for oi in order.items}
+    menu_items_by_id = {
+        m.id: m
+        for m in db.query(models.MenuItem).filter(
+            models.MenuItem.id.in_(requested_ids),
+            models.MenuItem.restaurant_id == restaurant.id,
+        ).all()
+    }
+
     total = 0
     order_items = []
     for oi in order.items:
-        menu_item = db.query(models.MenuItem).filter(
-            models.MenuItem.id == oi.menu_item_id,
-            models.MenuItem.restaurant_id == restaurant.id,
-        ).first()
+        menu_item = menu_items_by_id.get(oi.menu_item_id)
         if not menu_item:
             raise HTTPException(status_code=404, detail=f"Menu item {oi.menu_item_id} not found")
         line_total = menu_item.price * oi.quantity
@@ -71,6 +98,19 @@ async def create_order(
     db.add(db_order)
     db.commit()
     db.refresh(db_order)
+
+    # Directive 017: deduct recipe ingredients the moment the order is rung
+    # up — not at SERVED. Best-effort, same posture as the M-Pesa STK push
+    # below: a deduction problem must never block the order itself from
+    # existing (the sale still happened; stock accuracy is a downstream
+    # concern, not a reason to fail the till).
+    try:
+        deduct_ingredients_for_order(db, db_order, performed_by_user_id=current_user.id)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.error(f"Ingredient deduction failed for order {db_order.id}: {exc}")
+
     return _order_to_dict(db_order)
 
 
@@ -78,7 +118,7 @@ async def create_order(
 async def list_orders(
     status_filter: Optional[str] = Query(None, alias="status"),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_READ)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     q = db.query(models.Order).options(
@@ -98,7 +138,7 @@ async def list_orders(
 @router.get("/active", response_model=List[schemas.OrderOut])
 async def active_orders(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_READ)),
 ):
     """Orders for the KDS — pending, cooking, or ready."""
     restaurant = get_or_create_restaurant(db, current_user)
@@ -108,16 +148,16 @@ async def active_orders(
     ).filter(
         models.Order.restaurant_id == restaurant.id,
         models.Order.status.in_(active_statuses),
-    ).order_by(models.Order.created_at.asc()).all()
+    ).order_by(models.Order.created_at.asc()).limit(200).all()
     return [_order_to_dict(o) for o in orders]
 
 
-@router.patch("/{order_id}/status", response_model=schemas.OrderOut)
+@router.post("/{order_id}/status", response_model=schemas.OrderOut)
 async def update_order_status(
     order_id: int,
     update: schemas.OrderStatusUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_UPDATE_STATUS)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     order = db.query(models.Order).filter(
@@ -132,21 +172,78 @@ async def update_order_status(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid status: {update.status}")
 
+    old_status = order.status
     order.status = new_status
     if new_status == models.OrderStatus.SERVED:
         order.completed_at = utcnow()
 
     db.commit()
+
+    # 2026-07-18 event-map pass. Both fire once, only on the real transition
+    # into the target status (guarded on old_status), and exclude the actor
+    # (whoever advanced the ticket already knows). Push-only, role-scoped —
+    # see the ORDER_READY / ORDER_CANCELLED docstrings in events/bus.py.
+    if new_status == models.OrderStatus.READY and old_status != models.OrderStatus.READY:
+        from events.bus import emit_async, EventType
+        emit_async(EventType.ORDER_READY, {
+            "restaurant_id": restaurant.id,
+            "order_id": order.id,
+            "table_number": order.table_number,
+            "customer_name": order.customer_name or "",
+            "actor_user_id": current_user.id,
+        })
+    elif new_status == models.OrderStatus.CANCELLED and old_status != models.OrderStatus.CANCELLED:
+        from events.bus import emit_async, EventType
+        emit_async(EventType.ORDER_CANCELLED, {
+            "restaurant_id": restaurant.id,
+            "order_id": order.id,
+            "table_number": order.table_number,
+            "customer_name": order.customer_name or "",
+            "actor_user_id": current_user.id,
+        })
+        # Persist the actor — previously only broadcast on the event bus above,
+        # never written to a row. Fraud pattern detection (void spikes by staff,
+        # refund velocity) reads this table directly. A served order being
+        # cancelled (refund-after-service) is recorded as REFUND, not VOID/CANCEL,
+        # since real money already moved and that's the pattern fraud detection
+        # cares about most.
+        db.add(models.OrderAudit(
+            order_id=order.id,
+            restaurant_id=restaurant.id,
+            action=models.OrderAuditAction.REFUND if old_status == models.OrderStatus.SERVED
+                   else models.OrderAuditAction.CANCEL,
+            actor_user_id=current_user.id,
+            reason=update.reason,
+        ))
+        db.commit()
+
+    # Directive 017's reversal rule: cancelling before the food was ever
+    # served credits the deducted ingredients back — cancelling AFTER served
+    # does not, because they were physically used regardless of what happens
+    # to the bill. `old_status != CANCELLED` guards against re-reversing an
+    # already-cancelled order if this endpoint is called twice.
+    if (
+        new_status == models.OrderStatus.CANCELLED
+        and old_status in (models.OrderStatus.PENDING, models.OrderStatus.PREP)
+        and old_status != models.OrderStatus.CANCELLED
+    ):
+        try:
+            reverse_ingredients_for_order(db, order, performed_by_user_id=current_user.id)
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.error(f"Ingredient reversal failed for cancelled order {order.id}: {exc}")
+
     db.refresh(order)
     return _order_to_dict(order)
 
 
-@router.patch("/{order_id}/payment", response_model=schemas.OrderOut)
+@router.post("/{order_id}/payment", response_model=schemas.OrderOut)
 async def update_order_payment(
     order_id: int,
     update: schemas.OrderPaymentUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     order = db.query(models.Order).filter(
@@ -165,7 +262,20 @@ async def update_order_payment(
     # actually moves unpaid -> paid. Re-marking an already-paid order (or a paid
     # M-Pesa order the webhook already settled + receipted) must not re-send.
     was_paid = bool(order.is_paid)
+    was_method = order.payment_method
     order.is_paid = update.is_paid
+    # Manual payment overrides are a real fraud signal (a staff member changing
+    # how an already-settled order is recorded) — every one is persisted, not
+    # just the paid/unpaid flips that trigger a receipt below.
+    if was_method != order.payment_method or was_paid != update.is_paid:
+        db.add(models.OrderAudit(
+            order_id=order.id,
+            restaurant_id=restaurant.id,
+            action=models.OrderAuditAction.PAYMENT_CHANGE,
+            actor_user_id=current_user.id,
+            reason=f"payment_method {was_method.value if was_method else 'none'} -> "
+                   f"{order.payment_method.value}, is_paid {was_paid} -> {update.is_paid}",
+        ))
     db.commit()
     db.refresh(order)
 
@@ -185,9 +295,98 @@ async def update_order_payment(
     return _order_to_dict(order)
 
 
+@router.post("/{order_id}/details", response_model=schemas.OrderOut)
+async def update_order_details(
+    order_id: int,
+    update: schemas.OrderDetailsUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_UPDATE_STATUS)),
+):
+    """Manual corrections that aren't a status/payment transition: fixing a
+    customer's name/phone taken down wrong, or appending a note (a cancel/void
+    reason, a kitchen call-out) to an order already in flight. Same role gate
+    as status updates — Kitchen needs this too, to leave notes on a ticket."""
+    restaurant = get_or_create_restaurant(db, current_user)
+    order = db.query(models.Order).filter(
+        models.Order.id == order_id,
+        models.Order.restaurant_id == restaurant.id,
+    ).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    for key, value in update.dict(exclude_unset=True).items():
+        setattr(order, key, value)
+
+    db.commit()
+    db.refresh(order)
+    return _order_to_dict(order)
+
+
+# ── Kitchen incidents: remakes / quality issues (migration 037) ──
+# Owner's operational walkthrough (2026-07-19): "if there's any food that
+# needs to be remade, it's also put in the system manually" / "if any issue
+# happens in the kitchen, it's put in." Previously nowhere to log either.
+
+@router.post("/incidents", response_model=schemas.KitchenIncidentOut, status_code=201)
+async def log_kitchen_incident(
+    body: schemas.KitchenIncidentCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_UPDATE_STATUS)),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+
+    if body.order_id is not None:
+        order = db.query(models.Order).filter(
+            models.Order.id == body.order_id,
+            models.Order.restaurant_id == restaurant.id,
+        ).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+    try:
+        incident_type = models.IncidentType(body.incident_type)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid incident_type: {body.incident_type}")
+
+    incident = models.KitchenIncident(
+        restaurant_id=restaurant.id,
+        order_id=body.order_id,
+        order_item_id=body.order_item_id,
+        incident_type=incident_type,
+        reason=body.reason,
+        reported_by_user_id=current_user.id,
+    )
+    db.add(incident)
+    db.commit()
+    db.refresh(incident)
+
+    from events.bus import emit_async, EventType
+    emit_async(EventType.KITCHEN_INCIDENT_LOGGED, {
+        "restaurant_id": restaurant.id,
+        "incident_type": incident_type.value,
+        "order_id": body.order_id,
+        "reason": body.reason,
+        "reported_by": current_user.email,
+        "actor_user_id": current_user.id,
+    })
+
+    return incident
+
+
+@router.get("/incidents", response_model=List[schemas.KitchenIncidentOut])
+async def list_kitchen_incidents(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_READ)),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+    return db.query(models.KitchenIncident).filter(
+        models.KitchenIncident.restaurant_id == restaurant.id
+    ).order_by(models.KitchenIncident.created_at.desc()).limit(200).all()
+
+
 # ── Public endpoint (no auth) for customer ordering ──
 
-@router.post("/public", response_model=schemas.OrderOut)
+@router.post("/public", response_model=schemas.OrderOut, status_code=201)
 @limiter.limit("20/minute")
 async def create_public_order(
     request: Request,
@@ -222,14 +421,20 @@ async def create_public_order(
             purpose="order_checkout",
         ))
 
+    requested_ids = {oi.menu_item_id for oi in order.items}
+    menu_items_by_id = {
+        m.id: m
+        for m in db.query(models.MenuItem).filter(
+            models.MenuItem.id.in_(requested_ids),
+            models.MenuItem.restaurant_id == restaurant.id,
+            models.MenuItem.is_available == True,
+        ).all()
+    }
+
     total = 0
     order_items = []
     for oi in order.items:
-        menu_item = db.query(models.MenuItem).filter(
-            models.MenuItem.id == oi.menu_item_id,
-            models.MenuItem.restaurant_id == restaurant.id,
-            models.MenuItem.is_available == True,
-        ).first()
+        menu_item = menu_items_by_id.get(oi.menu_item_id)
         if not menu_item:
             raise HTTPException(status_code=404, detail=f"Menu item {oi.menu_item_id} not found or unavailable")
         line_total = menu_item.price * oi.quantity
@@ -265,8 +470,31 @@ async def create_public_order(
     db.commit()
     db.refresh(db_order)
 
+    # Directive 017: same auto-deduction as the staff-facing create_order —
+    # no current_user here (unauthenticated customer order), so the movement
+    # is attributed to no one rather than guessing at a staff member.
+    try:
+        deduct_ingredients_for_order(db, db_order, performed_by_user_id=None)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.error(f"Ingredient deduction failed for public order {db_order.id}: {exc}")
+
     if payment_method == models.PaymentMethod.MPESA:
         _trigger_mpesa_stk_push(db, db_order)
+
+    # 2026-07-18 event-map pass: unlike a staff-rung dine-in order (the waiter
+    # is right there, the KDS shows it), an online order arrives with *no staff
+    # involved* — during a lull nobody may be watching the KDS. Scoped to this
+    # public path only, so it's a real gap-closer, not per-order noise.
+    from events.bus import emit_async, EventType
+    emit_async(EventType.ORDER_CREATED, {
+        "restaurant_id": restaurant.id,
+        "order_id": db_order.id,
+        "customer_name": db_order.customer_name or "",
+        "total_cents": db_order.total or 0,
+        "channel": "online",
+    })
 
     return _order_to_dict(db_order)
 
@@ -299,14 +527,17 @@ def _order_to_dict(order: models.Order) -> dict:
     items_out = []
     for oi in (order.items or []):
         item_name = ""
+        prep_station = "main"
         if oi.menu_item:
             item_name = oi.menu_item.name
+            prep_station = oi.menu_item.prep_station or "main"
         items_out.append({
             "id": oi.id,
             "menu_item_id": oi.menu_item_id,
             "quantity": oi.quantity,
             "unit_price": oi.unit_price,
             "item_name": item_name,
+            "prep_station": prep_station,
         })
     return {
         "id": order.id,

@@ -28,8 +28,11 @@ requirements.txt — "uncomment when client has paid").
 """
 
 import json
+import logging
 import os
 from types import SimpleNamespace
+
+logger = logging.getLogger("ai.llm_client")
 
 
 def _block_get(block, key):
@@ -77,7 +80,10 @@ _MODEL_TIERS = {
         # map to the largest configured model; only LOW drops to a smaller,
         # faster one. When ANTHROPIC_API_KEY is added this table stops being
         # used at all — the anthropic row above takes over.
-        TIER_LOW:    os.getenv("GROQ_MODEL_LOW",    "llama-3.1-8b-instant"),
+        # LOW default updated 2026-08-22: llama-3.1-8b-instant was decommissioned
+        # by Groq (404 model_not_found on every call — all narration silently
+        # failed); gpt-oss-20b is the current small/fast tier (verified live).
+        TIER_LOW:    os.getenv("GROQ_MODEL_LOW",    "openai/gpt-oss-20b"),
         TIER_MEDIUM: os.getenv("GROQ_MODEL_MEDIUM", _GROQ_MODEL),
         TIER_HIGH:   os.getenv("GROQ_MODEL_HIGH",   _GROQ_MODEL),
     },
@@ -322,34 +328,56 @@ def chat_with_tools(
             cached_tools[-1]["cache_control"] = {"type": "ephemeral"}
         system_blocks = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}] if system else []
 
-        return client.messages.create(
-            model=resolved or _ANTHROPIC_MODEL,
-            max_tokens=max_tokens,
-            system=system_blocks,
-            tools=cached_tools,
-            messages=messages,
-        )
+        kwargs = {
+            "model": resolved or _ANTHROPIC_MODEL,
+            "max_tokens": max_tokens,
+            "system": system_blocks,
+            "messages": messages,
+        }
+        # Mirror the Groq branch: omit `tools` entirely for a no-tools turn
+        # rather than sending an empty array, for the same reason.
+        if cached_tools:
+            kwargs["tools"] = cached_tools
+        return client.messages.create(**kwargs)
 
     # Groq / OpenAI-compatible — translate request and response at the boundary
     # so ai/whatsapp/orchestrator.py's loop logic stays provider-agnostic.
     openai_messages = ([{"role": "system", "content": system}] if system else []) + _canonical_messages_to_openai(messages)
-    response = client.chat.completions.create(
-        model=resolved or _GROQ_MODEL,
-        max_tokens=max_tokens,
-        messages=openai_messages,
-        tools=_tools_to_openai_format(tools),
-    )
+    kwargs = {
+        "model": resolved or _GROQ_MODEL,
+        "max_tokens": max_tokens,
+        "messages": openai_messages,
+    }
+    # Some OpenAI-compatible APIs reject an explicit empty `tools` array (400
+    # "must not be empty") rather than treating it the same as omitting the
+    # param. Omit it entirely for a no-tools turn (e.g. forcing a strategist
+    # loop to conclude) so callers can safely pass tools=[] regardless of
+    # provider quirks.
+    if tools:
+        kwargs["tools"] = _tools_to_openai_format(tools)
+    response = client.chat.completions.create(**kwargs)
     choice = response.choices[0]
 
     content = []
     if choice.message.content:
         content.append(SimpleNamespace(type="text", text=choice.message.content))
     for tc in (choice.message.tool_calls or []):
+        # Small models occasionally emit malformed tool-argument JSON — one
+        # bad call must not crash the whole multi-turn run after its tokens
+        # were already spent. Empty args degrade to "no arguments".
+        try:
+            tool_input = json.loads(tc.function.arguments or "{}")
+        except json.JSONDecodeError:
+            logger.warning(
+                "malformed tool arguments from model for tool %r — treated as empty",
+                getattr(tc.function, "name", "?"),
+            )
+            tool_input = {}
         content.append(SimpleNamespace(
             type="tool_use",
             id=tc.id,
             name=tc.function.name,
-            input=json.loads(tc.function.arguments or "{}"),
+            input=tool_input,
         ))
 
     stop_reason = "tool_use" if choice.message.tool_calls else "end_turn"

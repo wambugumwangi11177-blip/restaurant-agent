@@ -85,3 +85,71 @@ def test_mpesa_not_configured_means_no_token_requirement(monkeypatch):
 
     hard, _soft = startup_checks.collect_problems()
     assert hard == []
+
+
+def test_local_storage_backend_in_production_is_a_soft_warning(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("SECRET_KEY", "x")
+    monkeypatch.delenv("STORAGE_BACKEND", raising=False)  # unset == "local"
+
+    hard, soft = startup_checks.collect_problems()
+    assert not any("STORAGE_BACKEND" in h for h in hard)
+    assert any("STORAGE_BACKEND" in s for s in soft)
+
+    # Soft, not hard: must NOT block boot.
+    startup_checks.enforce_startup_checks()
+
+
+def test_s3_storage_backend_in_production_has_no_warning(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("SECRET_KEY", "x")
+    monkeypatch.setenv("STORAGE_BACKEND", "s3")
+
+    _hard, soft = startup_checks.collect_problems()
+    assert not any("STORAGE_BACKEND" in s for s in soft)
+
+
+def test_local_storage_backend_outside_production_has_no_warning(monkeypatch):
+    monkeypatch.delenv("APP_ENV", raising=False)
+    monkeypatch.delenv("MPESA_ENV", raising=False)
+    monkeypatch.setenv("SECRET_KEY", "x")
+    monkeypatch.delenv("STORAGE_BACKEND", raising=False)
+
+    _hard, soft = startup_checks.collect_problems()
+    assert not any("STORAGE_BACKEND" in s for s in soft)
+
+
+def test_unconfigured_smtp_in_production_is_a_soft_warning(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("SECRET_KEY", "x")
+    for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"):
+        monkeypatch.delenv(k, raising=False)
+
+    hard, soft = startup_checks.collect_problems()
+    assert not any("SMTP" in h for h in hard)
+    assert any("SMTP" in s for s in soft)
+
+    # Soft, not hard: must NOT block boot.
+    startup_checks.enforce_startup_checks()
+
+
+def test_configured_smtp_in_production_has_no_warning(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("SECRET_KEY", "x")
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SMTP_USER", "bot@example.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "s3cret")
+
+    _hard, soft = startup_checks.collect_problems()
+    assert not any("SMTP" in s for s in soft)
+
+
+def test_unconfigured_smtp_outside_production_has_no_warning(monkeypatch):
+    monkeypatch.delenv("APP_ENV", raising=False)
+    monkeypatch.delenv("MPESA_ENV", raising=False)
+    monkeypatch.setenv("SECRET_KEY", "x")
+    for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"):
+        monkeypatch.delenv(k, raising=False)
+
+    _hard, soft = startup_checks.collect_problems()
+    assert not any("SMTP" in s for s in soft)

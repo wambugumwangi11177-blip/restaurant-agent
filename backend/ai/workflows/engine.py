@@ -31,6 +31,52 @@ logger = logging.getLogger("ai.workflows")
 _AUTO_TYPES = {"agent_call", "notify"}
 _PAUSE_TYPES = {"human_approval", "wait_external"}
 
+# Sprint 5 — tiered PO auto-approval. Matches ai/supply_chain/intelligence.py's
+# own "GOOD" cutoff (>=85%) rather than inventing a second number to keep in
+# sync — a supplier already labelled GOOD/EXCELLENT there is exactly the
+# "no owner approval needed every time" tier here.
+AUTO_APPROVE_RELIABILITY_MIN = 85.0
+
+# A brand-new Supplier row defaults reliability_score to 100.0 (models.py) —
+# an optimistic placeholder for "no history yet", not proof of anything. Without
+# this guard every never-ordered-from supplier would auto-qualify on day one,
+# which is the opposite of "earn the no-approval tier". Same cold-start-guard
+# posture as ai/fraud/detection.py's MIN_BASELINE_DAYS.
+MIN_CLOSED_ORDERS_FOR_TRUST = 3
+_CLOSED_PO_STATUSES = ("DELIVERED", "LATE", "PARTIAL")
+
+
+def _is_auto_approvable(db: Session, restaurant_id: int, ctx: dict) -> bool:
+    """
+    True when the low_stock_reorder template's human_approval step should be
+    skipped for this run's draft PO. Trust source, in priority order:
+      1. Supplier.requires_approval explicit owner override (True/False always
+         wins — an owner vouching for a supplier overrides the cold-start
+         guard below too; that's the whole point of an explicit override).
+      2. Supplier.reliability_score >= AUTO_APPROVE_RELIABILITY_MIN, but only
+         once the supplier has a real track record (MIN_CLOSED_ORDERS_FOR_TRUST) —
+         see the cold-start note above.
+    Anything without a resolvable supplier (no draft, no supplier row) falls
+    back to requiring approval — the safe default.
+    """
+    draft = ctx.get("draft_po") or {}
+    supplier_id = draft.get("supplier_id")
+    if not supplier_id:
+        return False
+    supplier = db.query(models.Supplier).filter(models.Supplier.id == supplier_id).first()
+    if supplier is None:
+        return False
+    if supplier.requires_approval is not None:
+        return not supplier.requires_approval
+
+    closed_orders = db.query(models.PurchaseOrder).filter(
+        models.PurchaseOrder.supplier_id == supplier.id,
+        models.PurchaseOrder.status.in_(_CLOSED_PO_STATUSES),
+    ).count()
+    if closed_orders < MIN_CLOSED_ORDERS_FOR_TRUST:
+        return False
+    return supplier.reliability_score >= AUTO_APPROVE_RELIABILITY_MIN
+
 
 def start_workflow(db: Session, restaurant_id: int, template: str) -> dict:
     """Create a run + its steps from a template and advance to the first pause."""
@@ -71,6 +117,32 @@ def advance(db: Session, run_id: int) -> dict:
         step_type = spec[idx]["type"]
 
         if step_type in _PAUSE_TYPES:
+            if step_type == "human_approval" and _is_auto_approvable(db, run.restaurant_id, ctx):
+                draft = ctx.get("draft_po") or {}
+                ctx["approved_by"] = "auto:supplier_trust"
+                step.status = "done"
+                step.output_json = json.dumps({"decision": "approve", "auto": True}, default=str)
+                step.completed_at = utcnow()
+                run.current_step = idx + 1
+                _save_ctx(run, ctx)
+                db.commit()
+
+                supplier = db.query(models.Supplier).filter(
+                    models.Supplier.id == draft.get("supplier_id")
+                ).first()
+                from ai.evaluation.tracker import write_audit_log
+                write_audit_log(
+                    db, run.restaurant_id, "purchase_order_auto_approved", "workflow_engine",
+                    entity_type="supplier", entity_id=supplier.id if supplier else None,
+                    reasoning=(
+                        f"Supplier trust threshold met "
+                        f"(reliability {supplier.reliability_score:.0f}%)" if supplier and supplier.requires_approval is None
+                        else "Owner override: supplier marked auto-approve trusted"
+                    ) + " — approval step skipped.",
+                    approved_by="auto:supplier_trust",
+                )
+                continue   # keep advancing without pausing
+
             step.status = "awaiting"
             run.status = "awaiting"
             db.commit()
@@ -102,12 +174,20 @@ def advance(db: Session, run_id: int) -> dict:
     return serialize(db, run)
 
 
-def resume(db: Session, run_id: int, decision: str = "approve", payload: dict | None = None) -> dict:
+def resume(
+    db: Session, run_id: int, decision: str = "approve", payload: dict | None = None,
+    approved_by: str | None = None,
+) -> dict:
     """
     Resume a run paused on a human_approval or wait_external step.
       decision="approve" (default) or "reject" for approval steps. A rejection
       cancels the run (nothing downstream runs). wait_external steps ignore
       decision and just continue when the external event arrives.
+      approved_by: the human's email (routers/ai.py passes current_user.email)
+      — stashed in ctx so a later agent_call step (e.g. h_create_purchase_order)
+      can attribute the real send to the actual approver, not a generic
+      "workflow" placeholder. Mirrors the "auto:supplier_trust" value
+      _is_auto_approvable's auto-approval path sets for the same ctx key.
     """
     run = db.query(models.WorkflowRun).filter(models.WorkflowRun.id == run_id).first()
     if run is None:
@@ -134,6 +214,8 @@ def resume(db: Session, run_id: int, decision: str = "approve", payload: dict | 
         if decision != "approve":
             return {"available": False,
                     "error": "Approval step needs an explicit decision: 'approve' or 'reject'."}
+        if approved_by:
+            ctx["approved_by"] = approved_by
 
     step.status = "done"
     step.output_json = json.dumps({"decision": decision, **(payload or {})}, default=str)

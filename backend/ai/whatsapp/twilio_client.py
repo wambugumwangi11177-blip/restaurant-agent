@@ -114,6 +114,49 @@ def send(to_number: str, message: str, channel: str = CHANNEL_WHATSAPP,
         return {"status": "error", "sid": None}
 
 
+def call(to_number: str, message: str) -> dict:
+    """
+    Place an automated voice call reading `message` via TwiML <Say>. Used only
+    by the manager-escalation engine's final tier (ai/escalation/engine.py) —
+    a critical alert unacknowledged for 45+ minutes gets a phone call, not just
+    another WhatsApp/SMS the owner may have already missed. Same best-effort
+    contract as send(): never raises, returns a status dict the caller logs.
+    """
+    if not CONFIGURED:
+        logger.warning(f"[Twilio] NOT CONFIGURED (voice) — would call {to_number}: {message[:200]}")
+        return {"status": "not_configured", "sid": None}
+    if not TWILIO_SMS_FROM:
+        # Voice calls originate from a real phone number, same as SMS — a
+        # WhatsApp sandbox number can't place PSTN calls.
+        logger.warning("[Twilio] TWILIO_SMS_FROM not set — cannot place voice calls")
+        return {"status": "not_configured", "sid": None}
+
+    try:
+        from twilio.rest import Client
+        from twilio.http.http_client import TwilioHttpClient
+        http_client = TwilioHttpClient(timeout=float(os.getenv("TWILIO_TIMEOUT_SECONDS", "10")))
+        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, http_client=http_client)
+
+        # <Say> repeated twice so a call answered mid-ring / picked up by
+        # voicemail still has a chance to convey the alert. XML-escaped since
+        # this is a full TwiML document, not just a text body — an alert whose
+        # message happens to contain '&', '<', or '>' (e.g. a raw amount
+        # comparison) must not break the document Twilio parses.
+        from xml.sax.saxutils import escape as _xml_escape
+        say_text = _xml_escape(to_sms(message))  # strip emoji/markdown — this is read aloud
+        twiml = (
+            f'<Response><Say>{say_text}</Say><Pause length="1"/><Say>{say_text}</Say></Response>'
+        )
+        call_obj = client.calls.create(from_=TWILIO_SMS_FROM, to=to_number, twiml=twiml)
+        return {"status": "sent", "sid": call_obj.sid}
+    except ImportError:
+        logger.error("[Twilio] Package not installed. Run: pip install twilio")
+        return {"status": "twilio_not_installed", "sid": None}
+    except Exception as exc:
+        logger.error(f"[Twilio] Call error: {exc}")
+        return {"status": "error", "sid": None}
+
+
 def validate_twilio_request(
     request_url: str,
     post_params: dict,

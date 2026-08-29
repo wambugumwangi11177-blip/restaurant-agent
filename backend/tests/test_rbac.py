@@ -118,5 +118,5 @@ def test_register_accepts_strong_password(client, db_session):
         "/api/v1/auth/register",
         json={"email": "strong@e.com", "password": "GoodPass1", "tenant_name": "X"},
     )
-    assert r.status_code == 200
+    assert r.status_code == 201
     assert "access_token" in r.json()

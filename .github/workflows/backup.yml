@@ -1,0 +1,40 @@
+name: db-backup
+
+# Scheduled logical (pg_dump) backup of production Postgres to S3 — the
+# "secondary — recommended" backup from backend/DISASTER_RECOVERY.md §1.
+# Separate from ci.yml on purpose: this must run on a schedule regardless of
+# pushes/PRs, and never blocks or is blocked by the normal CI pipeline.
+#
+# Requires these secrets to be set on the repo before this can do anything
+# (Settings -> Secrets and variables -> Actions):
+#   DATABASE_URL          — ideally a read-only DB role
+#   BACKUP_S3_BUCKET
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (or use an OIDC role instead)
+# Until those are added, this workflow will simply fail at the "Run backup"
+# step when the schedule fires — safe to merge before secrets exist.
+on:
+  schedule:
+    - cron: "17 3 * * *"  # 03:17 UTC daily — off-the-hour, avoids the crowd
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install postgresql-client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Run backup
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+        run: bash backend/scripts/backup_db.sh

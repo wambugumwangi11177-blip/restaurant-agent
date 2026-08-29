@@ -39,7 +39,8 @@ https://github.com/wambugumwangi11177-blip/restaurant-agent/pull/new/feat/phase1
 **These four genuinely require your accounts/credentials — no code can do them:**
 - [ ] Enable Railway Postgres **backups** + run one **restore drill** (steps in `backend/DISASTER_RECOVERY.md`)
 - [ ] Set/verify prod env on Railway: **`MPESA_CALLBACK_TOKEN`** (prod won't boot without it when M-Pesa is configured), **`CORS_ORIGINS`**
-- [ ] Sentry alert rules · UptimeRobot on `/health` · OWASP ZAP baseline
+- [x] ~~Sentry alert rules~~ **DONE 2026-07-25** — project `restaurant-agent-backend` created in the `leviii` org, `SENTRY_DSN` set in `backend/.env`, verified end-to-end with a real captured+flushed exception visible via the Sentry API. Two active rules: "New issue seen" and "Error spike (10+ events in 1 hour)", both notifying via email.
+- [ ] UptimeRobot on `/health` · OWASP ZAP baseline
 - [ ] Confirm/enable GitHub **branch protection** on `master` (require PR + CI green)
 
 **Deferred by design (a product decision or waits for traffic):**

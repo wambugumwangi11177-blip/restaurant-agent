@@ -55,7 +55,7 @@ def test_mpesa_order_triggers_stk_push_and_stores_checkout_id(client, db_session
         "customer_phone": "0712345678",
         "consent": True,
     })
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     assert resp.json()["payment_method"] == "mpesa"
 
     order = db_session.query(models.Order).filter(models.Order.id == resp.json()["id"]).first()
@@ -73,7 +73,7 @@ def test_malformed_phone_skips_stk_push_without_crashing(client, db_session, mon
         "customer_phone": "not-a-real-phone",
         "consent": True,
     })
-    assert resp.status_code == 200
+    assert resp.status_code == 201
 
     order = db_session.query(models.Order).filter(models.Order.id == resp.json()["id"]).first()
     assert order.mpesa_checkout_request_id is None

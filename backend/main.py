@@ -16,7 +16,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from logging_config import configure_logging
-from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise
+from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support, tables, attendance, fraud, cash_reconciliation, restaurants
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
@@ -51,6 +51,24 @@ if SLOWAPI_AVAILABLE:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
+# ── Global exception handler ─────────────────────────────────────────────────
+# Catches anything a route/dependency didn't handle itself (FastAPI's own
+# HTTPException/RequestValidationError handling still takes precedence —
+# this only fires for genuinely unexpected exceptions) so a client always
+# gets a clean JSON error instead of whatever the default framework/server
+# error page would otherwise return.
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    from alerting import record_error_and_maybe_alert
+    record_error_and_maybe_alert(request.method, request.url.path, exc)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
 # ── Startup ───────────────────────────────────────────────────────────────────
 
 @app.on_event("startup")
@@ -77,6 +95,17 @@ def on_startup():
         logger.info("[OK] Orchestrator event handlers registered")
     except Exception as e:
         logger.warning(f"[WARN] Orchestrator registration failed: {e}")
+
+    # 2b. Second, independent event-bus subscriber: in-app + push
+    #     notifications (ai/notify.py), alongside (not instead of) the
+    #     WhatsApp handlers above. A failure here must never block boot or
+    #     affect the WhatsApp pipeline — same posture as 2.
+    try:
+        from ai.orchestrator.push_notifier import register_push_handlers
+        register_push_handlers()
+        logger.info("[OK] Push/in-app notification handlers registered")
+    except Exception as e:
+        logger.warning(f"[WARN] Push notification handler registration failed: {e}")
 
     # 3. Schedule morning WhatsApp briefing (07:00 EAT = 04:00 UTC)
     _start_scheduler()
@@ -118,10 +147,29 @@ def _start_scheduler():
             id="stock_check",
             replace_existing=True,
         )
+        # Directive 016: theoretical-vs-actual usage variance, once daily
+        # after most of the day's covers — deliberately NOT on the 2-hourly
+        # cadence above. A shift-level summary, not a per-movement ping (see
+        # ai/stock_custody.py and the stock-loss-prevention skill).
+        scheduler.add_job(
+            _run_variance_check_job,
+            CronTrigger(hour=18, minute=0),  # 21:00 EAT
+            id="variance_check",
+            replace_existing=True,
+        )
         scheduler.add_job(
             _run_slow_day_check_job,
             CronTrigger(hour=11, minute=0),  # 14:00 EAT — matches the function's own gate (only fires after 14:00 EAT)
             id="slow_day_check",
+            replace_existing=True,
+        )
+        # Directive 018: par-level reorder check, once daily early — a draft
+        # PO should be ready for the owner to approve before/during opening,
+        # not discovered mid-shift.
+        scheduler.add_job(
+            _run_reorder_check_job,
+            CronTrigger(hour=3, minute=0),   # 06:00 EAT
+            id="reorder_check",
             replace_existing=True,
         )
         # Same-day reservation reminders to cut no-shows. Once per day so it never
@@ -142,6 +190,64 @@ def _start_scheduler():
             id="learning_cycle",
             replace_existing=True,
             misfire_grace_time=3600,
+        )
+
+        # Weekly unattended strategist review — off by default (see
+        # autonomous_strategist in feature_flags.py); registered unconditionally
+        # so a redeploy-free env flip turns it on. Monday, after learning_cycle
+        # has refreshed the accuracy numbers the strategist reads about itself.
+        scheduler.add_job(
+            _run_strategist_review_job,
+            CronTrigger(day_of_week="mon", hour=5, minute=0),   # 08:00 EAT Monday
+            id="strategist_review",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+
+        # Sprint 3 — suspicious-transaction (fraud) scan. Every 2h, same
+        # cadence as po_late_check/stock_check above — frequent enough to
+        # catch a same-shift burst, not so frequent it re-scans the same
+        # 24h window pointlessly.
+        scheduler.add_job(
+            _run_fraud_check_job,
+            CronTrigger(hour="*/2"),
+            id="fraud_check",
+            replace_existing=True,
+        )
+
+        # Sprint 2 — manager escalation sweep. Every 5 min, not daily/hourly
+        # like everything else above: the whole point is catching an
+        # unacknowledged critical alert within its 15-minute timeout, so the
+        # poll interval has to be short relative to that.
+        from apscheduler.triggers.interval import IntervalTrigger
+        scheduler.add_job(
+            _run_escalation_sweep_job,
+            IntervalTrigger(minutes=5),
+            id="escalation_sweep",
+            replace_existing=True,
+        )
+
+        # Audit remediation, Tier 2 item 5 — retry failed event-bus deliveries
+        # (see events/bus.py's NotificationOutbox). Same 5-min cadence as
+        # escalation_sweep above, for the same reason: this is the one job in
+        # this scheduler where "someone didn't get notified" degrades with
+        # every extra minute of delay, unlike the once-daily analytics jobs.
+        scheduler.add_job(
+            _run_outbox_sweep_job,
+            IntervalTrigger(minutes=5),
+            id="outbox_sweep",
+            replace_existing=True,
+        )
+
+        # Audit remediation, Tier 2 item 6 — purge AgentAuditLog rows older
+        # than 90 days, closing the gap docs/compliance-matrix.md flagged as
+        # open ("Append-only (no auto-purge today) — reconcile vs DPA
+        # '90-day rolling'"). Once daily, off-peak.
+        scheduler.add_job(
+            _run_audit_log_purge_job,
+            CronTrigger(hour=1, minute=30),  # 04:30 EAT
+            id="audit_log_purge",
+            replace_existing=True,
         )
 
         scheduler.start()
@@ -207,6 +313,171 @@ def _run_stock_check_job():
         logger.error(f"[Stock Check] Scheduler job failed: {exc}")
 
 
+def _run_variance_check_job():
+    """Directive 016: compute the theoretical-vs-actual variance report for
+    every restaurant and emit STOCK_VARIANCE_FLAGGED for any with at least
+    one item over threshold. Emitting only when there's something to flag
+    (rather than one event per restaurant regardless) is what keeps this a
+    real signal instead of a daily no-op ping."""
+    try:
+        from database import SessionLocal
+        from events.bus import emit_async, EventType
+        from ai.stock_custody import flagged_items
+        import models
+
+        db = SessionLocal()
+        try:
+            for restaurant in db.query(models.Restaurant).all():
+                items = flagged_items(db, restaurant.id, hours=24)
+                if not items:
+                    continue
+                emit_async(EventType.STOCK_VARIANCE_FLAGGED, {
+                    "restaurant_id": restaurant.id,
+                    "items": [
+                        {
+                            "item_name": i.item_name,
+                            "variance_pct": i.variance_pct,
+                            "theoretical": i.theoretical_usage,
+                            "actual": i.actual_usage,
+                        }
+                        for i in items
+                    ],
+                })
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Variance Check] Scheduler job failed: {exc}")
+
+
+def _run_fraud_check_job():
+    """Sprint 3: run the suspicious-transaction report for every restaurant,
+    emit SUSPICIOUS_TRANSACTION_FLAGGED only for ones with at least one
+    flagged pattern — mirrors _run_variance_check_job's "alert on the report,
+    not a daily no-op ping" shape exactly."""
+    try:
+        from database import SessionLocal
+        from events.bus import emit_async, EventType
+        from ai.fraud.detection import compute_fraud_report
+        import models
+
+        db = SessionLocal()
+        try:
+            for restaurant in db.query(models.Restaurant).all():
+                report = compute_fraud_report(db, restaurant.id, window_hours=24)
+                if not report.flagged:
+                    continue
+                emit_async(EventType.SUSPICIOUS_TRANSACTION_FLAGGED, {
+                    "restaurant_id": restaurant.id,
+                    "void_spike_count": len(report.void_spikes),
+                    "refund_velocity_count": len(report.refund_velocity),
+                    "payment_mismatch_count": len(report.payment_mismatches),
+                    "off_hours_count": len(report.off_hours),
+                    "void_spikes": [
+                        {"actor_email": f.actor_email, "window_count": f.window_count}
+                        for f in report.void_spikes
+                    ],
+                    "refund_velocity": [
+                        {"actor_email": f.actor_email, "count": f.count}
+                        for f in report.refund_velocity
+                    ],
+                })
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Fraud Check] Scheduler job failed: {exc}")
+
+
+def _run_escalation_sweep_job():
+    """Sprint 2: advance the manager-escalation ladder for every unacknowledged
+    severity-tagged Notification, across all restaurants — a single global
+    scan (not per-restaurant like the jobs above) since it's keyed off the
+    Notification table directly, not restaurant-scoped source data."""
+    try:
+        from database import SessionLocal
+        from ai.escalation.engine import run_escalation_sweep
+
+        db = SessionLocal()
+        try:
+            result = run_escalation_sweep(db)
+            if result["escalated_to_managers"] or result["escalated_to_call"]:
+                logger.info(f"[Escalation Sweep] {result}")
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Escalation Sweep] Scheduler job failed: {exc}")
+
+
+def _run_outbox_sweep_job():
+    """Audit remediation, Tier 2 item 5: retry NotificationOutbox rows left
+    behind by a failed events/bus.py handler call. events.bus.sweep_outbox()
+    owns its own DB session (it's called from a bare scheduler tick, not a
+    request), so this wrapper only needs the standard log-don't-crash guard
+    every job in this file uses."""
+    try:
+        from events.bus import sweep_outbox
+        result = sweep_outbox()
+        if result["delivered"] or result["still_failed"] or result["dead"]:
+            logger.info(f"[Outbox Sweep] {result}")
+    except Exception as exc:
+        logger.error(f"[Outbox Sweep] Scheduler job failed: {exc}")
+
+
+def _run_audit_log_purge_job():
+    """Audit remediation, Tier 2 item 6: delete AgentAuditLog rows older than
+    90 days, closing the gap docs/compliance-matrix.md flags as open ("DPA
+    '90-day rolling'" vs "no auto-purge today"). Hard delete, not
+    anonymization — AgentAuditLog's own docstring frames it as an immutable
+    audit trail of AI-driven actions (what changed, why, who approved), not a
+    customer PII store; the 90-day retention line is about not keeping that
+    operational trail forever, unlike Order/Reservation rows (see
+    routers/export.py's erasure path), which stay for tax integrity and are
+    pseudonymized instead of deleted."""
+    try:
+        from database import SessionLocal
+        from time_utils import utcnow
+        from datetime import timedelta
+        import models
+
+        db = SessionLocal()
+        try:
+            cutoff = utcnow() - timedelta(days=90)
+            deleted = (
+                db.query(models.AgentAuditLog)
+                .filter(models.AgentAuditLog.created_at < cutoff)
+                .delete(synchronize_session=False)
+            )
+            db.commit()
+            if deleted:
+                logger.info(f"[Audit Log Purge] Deleted {deleted} row(s) older than 90 days")
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Audit Log Purge] Scheduler job failed: {exc}")
+
+
+def _run_reorder_check_job():
+    """Directive 018: for every restaurant, find items at their reorder
+    point with a par_level and default_supplier_id set, draft a purchase
+    order (demand-adjusted), and notify the owner it's awaiting approval.
+    Items with neither set are simply never drafted — no guessing at a par
+    level or a supplier nobody configured."""
+    try:
+        from database import SessionLocal
+        from ai.reorder import find_reorder_candidates, draft_purchase_order
+        import models
+
+        db = SessionLocal()
+        try:
+            for restaurant in db.query(models.Restaurant).all():
+                candidates = find_reorder_candidates(db, restaurant.id)
+                for candidate in candidates:
+                    draft_purchase_order(db, restaurant.id, candidate)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Reorder Check] Scheduler job failed: {exc}")
+
+
 def _run_learning_cycle_job():
     """Phase 5 continuous-learning loop: record tomorrow's revenue forecast and
     score any matured predictions against actuals, across every restaurant."""
@@ -238,6 +509,42 @@ def _run_reservation_reminders_job():
         run_reservation_reminders(SessionLocal)
     except Exception as exc:
         logger.error(f"[Reservation Reminders] Scheduler job failed: {exc}")
+
+
+def _run_strategist_review_job():
+    """Weekly unattended strategy review — the strategist looks at each
+    restaurant on its own standing goal, no owner-initiated request. Gated
+    behind autonomous_strategist so opting in is explicit (spends LLM tokens
+    same as the on-demand endpoint). Narrate-only: pushes the headline via
+    WhatsApp + in-app notification, never writes/approves anything itself —
+    applying a step still goes through the existing approval endpoints."""
+    try:
+        import feature_flags
+        if not feature_flags.is_enabled("autonomous_strategist"):
+            return
+
+        from database import SessionLocal
+        from ai.orchestrator.strategist import run_strategy, format_for_whatsapp, STANDING_GOAL
+        from ai.whatsapp.brain import send_to_owner
+        from events.bus import emit_async, EventType
+        import models
+
+        db = SessionLocal()
+        try:
+            for restaurant in db.query(models.Restaurant).all():
+                result = run_strategy(db, restaurant.id, STANDING_GOAL, triggered_by="scheduler")
+                if not result.get("available") or result.get("mode") != "llm":
+                    continue  # nothing to say if it fell back to deterministic
+                strategy = result["strategy"]
+                send_to_owner(db, restaurant, format_for_whatsapp(strategy), message_type="strategy_review")
+                emit_async(EventType.STRATEGY_REVIEW_GENERATED, {
+                    "restaurant_id": restaurant.id,
+                    "headline": strategy.get("headline", ""),
+                })
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Strategist Review] Scheduler job failed: {exc}")
 
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
@@ -288,7 +595,10 @@ app.add_middleware(CorrelationIdMiddleware)
 _VERSIONED_ROUTERS = [
     menu.router, orders.router, inventory.router, analytics.router,
     reservations.router, ai.router, export.router, flags.router, events.router,
-    billing.router, enterprise.router,
+    billing.router, enterprise.router, staff.router, stock_custody.router,
+    suppliers.router, purchase_orders.router, notifications.router, support.router,
+    tables.router, attendance.router, fraud.router, cash_reconciliation.router,
+    restaurants.router,
 ]
 
 app.include_router(auth.router)
@@ -305,13 +615,23 @@ def read_root():
 
 
 @app.get("/metrics")
-def metrics_endpoint():
+def metrics_endpoint(request: Request):
     """Prometheus scrape target — process-local request counters + latency (see
-    metrics.py). Unversioned/unauthenticated by Prometheus convention; restrict at
-    the network layer in production. Multi-worker aggregation needs a shared
-    collector (same Redis caveat as rate limiting)."""
-    from fastapi import Response
+    metrics.py). By Prometheus convention unauthenticated — which also makes it
+    a free traffic-reconnaissance endpoint on a public URL. When METRICS_TOKEN
+    is set (recommended in production) it must be supplied as the
+    `Authorization: Bearer <token>` header or `?token=` query param. Multi-worker
+    aggregation needs a shared collector (same Redis caveat as rate limiting)."""
+    from fastapi import HTTPException, Response
     import metrics
+    expected = os.getenv("METRICS_TOKEN", "").strip()
+    if expected:
+        supplied = (
+            request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+            or request.query_params.get("token", "").strip()
+        )
+        if supplied != expected:
+            raise HTTPException(status_code=403, detail="Forbidden")
     return Response(content=metrics.render(), media_type="text/plain; version=0.0.4")
 
 

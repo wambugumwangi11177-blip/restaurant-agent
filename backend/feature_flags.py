@@ -38,6 +38,11 @@ _FLAGS: dict[str, tuple[bool, str]] = {
     # and is additionally gated by ai_narration + a configured provider.
     "simulation": (True, "What-if simulation engine (POST /ai/simulate) and digital twin."),
     "strategy_agent": (False, "Goal-driven CEO/Strategy agent (POST /ai/strategy); spends LLM tokens."),
+    # Unattended weekly run of the strategist (main.py's strategist_review job)
+    # with no owner-initiated request. Separate from strategy_agent so opting
+    # into unattended LLM spend is an explicit, distinct choice from just
+    # enabling the on-demand endpoint. Narrate-only — never writes/approves.
+    "autonomous_strategist": (False, "Weekly unattended strategist review, pushed via WhatsApp/in-app; spends LLM tokens."),
 }
 
 _TRUTHY = {"1", "true", "yes", "on"}

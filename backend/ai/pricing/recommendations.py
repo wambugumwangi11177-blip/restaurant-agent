@@ -207,6 +207,18 @@ def generate_and_store_recommendations(db: Session, restaurant_id: int) -> list[
             db.expunge(db_rec)     # Remove the failed object from the session
 
     db.commit()
+
+    # 2026-07-18 event-map pass: tell the approvers a batch is waiting (map §10
+    # "AI recommendation available"). One summary emit per run, not one per rec
+    # — this can produce several at once, and a per-rec fan-out would be exactly
+    # the alert-fatigue the workstream guards against.
+    if new_ids:
+        from events.bus import emit_async, EventType
+        emit_async(EventType.RECOMMENDATION_GENERATED, {
+            "restaurant_id": restaurant_id,
+            "count": len(new_ids),
+        })
+
     return new_ids
 
 

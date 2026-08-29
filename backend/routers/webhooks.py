@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import PlainTextResponse
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from urllib.parse import parse_qsl
 from xml.sax.saxutils import escape
@@ -44,6 +45,24 @@ def _resolve_restaurant_by_phone(db: Session, from_number: str) -> models.Restau
         if owner_phone and normalize_phone(owner_phone) == normalized:
             return restaurant
     return None
+
+
+def _resolve_staff_by_phone(db: Session, from_number: str) -> models.StaffMember | None:
+    """
+    Third case in inbound resolution, alongside owner and customer (directive
+    016): is this message from a roster StaffMember? Matches on normalized
+    phone, same precedence style as _resolve_restaurant_by_phone. Only
+    StaffMember rows with a phone set are candidates — most of the roster
+    (see StaffMember.phone's nullable docstring in models.py) has no way to
+    be reached this way at all, which is expected, not a bug.
+    """
+    normalized = normalize_phone(from_number)
+    if not normalized:
+        return None
+    return db.query(models.StaffMember).filter(
+        models.StaffMember.phone == normalized,
+        models.StaffMember.is_active.is_(True),
+    ).first()
 
 
 def _resolve_restaurant_for_customer(db: Session, from_number: str) -> models.Restaurant | None:
@@ -113,22 +132,38 @@ def _verify_mpesa_token(supplied: str | None) -> None:
     `ResultCode: 0` and flip an order to paid + fire the "payment confirmed"
     WhatsApp — free-order fraud.
 
-    Degrades safe: with MPESA_CALLBACK_TOKEN unset (local dev, tests) the check
-    is skipped with a loud warning, so nothing breaks without the env var. The
-    deploy checklist makes setting it mandatory in production; once it IS set,
-    the legacy tokenless `/webhooks/mpesa` path 403s.
+    Degrades safe: with MPESA_CALLBACK_TOKEN unset the behavior depends on
+    whether M-Pesa itself is configured. If no Daraja credentials exist there
+    can be no legitimate callback, and none is accepted. If credentials DO
+    exist (real STK pushes are possible — orders carry CheckoutRequestIDs an
+    attacker could forge a ResultCode against), the callback fails CLOSED: an
+    unauthenticated settlement endpoint is a free-order-fraud vector, not a
+    convenience. Local/dev flows set the token like prod does (one env var).
+    Once the token IS set, the legacy tokenless `/webhooks/mpesa` path 403s.
     """
     expected = os.getenv("MPESA_CALLBACK_TOKEN", "").strip()
     if not expected:
+        mpesa_live = bool(
+            os.getenv("MPESA_CONSUMER_KEY", "").strip()
+            and os.getenv("MPESA_CONSUMER_SECRET", "").strip()
+        )
+        if mpesa_live:
+            # Real payment credentials active but the callback can't be
+            # authenticated — reject rather than trust the body.
+            logger.error(
+                "[MPesa Webhook] MPESA_CALLBACK_TOKEN is unset while M-Pesa "
+                "credentials are configured — rejecting callback (fail closed). "
+                "Set MPESA_CALLBACK_TOKEN to accept Daraja callbacks."
+            )
+            raise HTTPException(status_code=403, detail="Forbidden")
         global _MPESA_TOKEN_WARNED
         if not _MPESA_TOKEN_WARNED:
             logger.warning(
-                "[MPesa Webhook] MPESA_CALLBACK_TOKEN is unset — the payment "
-                "callback is UNAUTHENTICATED. Anyone who learns a "
-                "CheckoutRequestID can forge a settlement. Set it in prod."
+                "[MPesa Webhook] M-Pesa unconfigured and MPESA_CALLBACK_TOKEN "
+                "unset — no callbacks accepted."
             )
             _MPESA_TOKEN_WARNED = True
-        return
+        raise HTTPException(status_code=403, detail="Forbidden")
 
     if supplied is None or not hmac.compare_digest(supplied, expected):
         logger.warning("[MPesa Webhook] Rejected callback with missing/incorrect URL token")
@@ -163,7 +198,20 @@ def _settle_order_once(db: Session, order_id: int, receipt: str) -> bool:
             synchronize_session=False,
         )
     )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # uq_orders_mpesa_receipt (migration 029): this receipt is already
+        # recorded against a DIFFERENT order — a duplicated/forged callback,
+        # not a normal retry (a normal retry hits the `is_paid = false`
+        # predicate above and rowcount == 0 before this is ever reached).
+        # Never surface this as an error: Safaricom always gets its 200 ack.
+        db.rollback()
+        logger.warning(
+            "[MPesa Webhook] Duplicate mpesa_receipt %s rejected for order %s "
+            "— already settled against a different order.", receipt, order_id,
+        )
+        return False
     return rowcount == 1
 
 
@@ -318,17 +366,43 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
             media_type="application/xml",
         )
 
+    # brain.handle_* calls below are wrapped: an exception here must still
+    # produce a valid TwiML reply — Twilio expects XML back regardless, and an
+    # unhandled 500 would surface as a broken delivery rather than a graceful
+    # "something went wrong" reply (unlike the M-Pesa webhook path above,
+    # which was already defensively coded end-to-end).
     restaurant = _resolve_restaurant_by_phone(db, from_number)
     if restaurant:
-        reply_text = brain.handle_owner_command(db, restaurant.id, body)
+        try:
+            reply_text = brain.handle_owner_command(db, restaurant.id, body)
+        except Exception:
+            logger.exception("[WhatsApp Webhook] handle_owner_command failed")
+            reply_text = "Sorry, something went wrong processing that. Please try again."
         twiml = f"<Response><Message>{escape(reply_text)}</Message></Response>"
         return PlainTextResponse(twiml, media_type="application/xml")
 
-    # Not an owner — try to resolve a diner by their order history so two-way
+    # Not the owner — is this a roster staff member (directive 016)? Checked
+    # before customer resolution: a staff phone should never be misread as a
+    # diner's just because it also appears somewhere in order history.
+    staff_member = _resolve_staff_by_phone(db, from_number)
+    if staff_member:
+        try:
+            reply_text = brain.handle_staff_command(db, staff_member, body)
+        except Exception:
+            logger.exception("[WhatsApp Webhook] handle_staff_command failed")
+            reply_text = "Sorry, something went wrong processing that. Please try again."
+        twiml = f"<Response><Message>{escape(reply_text)}</Message></Response>"
+        return PlainTextResponse(twiml, media_type="application/xml")
+
+    # Not staff either — try to resolve a diner by their order history so two-way
     # customer replies (REORDER, 1–5 rating from the receipt) work too.
     customer_restaurant = _resolve_restaurant_for_customer(db, from_number)
     if customer_restaurant:
-        reply_text = brain.handle_customer_message(db, customer_restaurant.id, from_number, body)
+        try:
+            reply_text = brain.handle_customer_message(db, customer_restaurant.id, from_number, body)
+        except Exception:
+            logger.exception("[WhatsApp Webhook] handle_customer_message failed")
+            reply_text = "Sorry, something went wrong processing that. Please try again."
         twiml = f"<Response><Message>{escape(reply_text)}</Message></Response>"
         return PlainTextResponse(twiml, media_type="application/xml")
 

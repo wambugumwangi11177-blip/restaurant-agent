@@ -50,6 +50,34 @@ def agent_reliability(db: Session, restaurant_id: int, agent_name: str, days: in
     return round(max(RELIABILITY_MIN, min(RELIABILITY_FULL, scaled)), 3)
 
 
+def reliability_summary_text(db: Session, restaurant_id: int, days: int = 30) -> str:
+    """
+    Render agent_reliability() as text the strategist can actually read,
+    instead of it staying a silent multiplier inside decision ranking. Empty
+    string when there's no evaluated history yet — nothing to say.
+    """
+    cutoff = utcnow() - timedelta(days=days)
+    agent_names = (
+        db.query(models.AgentPrediction.agent_name)
+        .filter(
+            models.AgentPrediction.restaurant_id == restaurant_id,
+            models.AgentPrediction.evaluated_at >= cutoff,
+            models.AgentPrediction.actual_value.isnot(None),
+        )
+        .distinct()
+        .all()
+    )
+    lines = []
+    for (agent_name,) in agent_names:
+        acc = get_agent_accuracy(db, restaurant_id, agent_name, days=days)
+        mae = acc.get("mae_pct")
+        if mae is None:
+            continue
+        reliability = agent_reliability(db, restaurant_id, agent_name, days=days)
+        lines.append(f"{agent_name}: {mae:.0f}% avg error last {days}d (reliability {reliability:.2f}).")
+    return "\n".join(lines)
+
+
 def classify_prediction(db: Session, restaurant_id: int, pred: models.AgentPrediction) -> dict:
     """
     Classify one evaluated prediction: worked / acceptable / missed, and — when

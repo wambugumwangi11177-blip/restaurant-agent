@@ -12,7 +12,6 @@ import { Sparkles } from "lucide-react";
 import { useAiModule } from "@/lib/useAiModule";
 import { formatKES } from "@/lib/format";
 import { MiniStat } from "./MiniStat";
-import { HowItWorks } from "./HowItWorks";
 import { ModuleShell } from "./ModuleShell";
 
 interface TwinData {
@@ -54,7 +53,7 @@ export function DigitalTwin() {
                                 onClick={() => setHorizon(h)}
                                 className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                                     horizon === h
-                                        ? "border-[#d4a853]/40 text-[#d4a853] bg-[#d4a853]/10"
+                                        ? "border-[var(--accent)]/40 text-[var(--accent)] bg-[var(--accent)]/10"
                                         : "border-[#1a1a1a] text-[#737373] hover:text-[#e5e5e5]"
                                 }`}
                             >

@@ -34,7 +34,7 @@ def test_openapi_documents_versioned_and_hides_legacy(client):
 def _register(client, email="rev@example.com", pw="password123"):
     r = client.post("/api/v1/auth/register",
                     json={"email": email, "password": pw, "tenant_name": "T"})
-    assert r.status_code == 200, r.text
+    assert r.status_code == 201, r.text
     return r.json()["access_token"]
 
 

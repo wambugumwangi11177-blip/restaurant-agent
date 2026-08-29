@@ -50,7 +50,7 @@ def test_cannot_update_another_tenants_order_status(client, db_session):
     db_session.commit()
 
     # Tenant A's user tries to change tenant B's order status.
-    resp = client.patch(
+    resp = client.post(
         f"/orders/{order_b.id}/status",
         json={"status": "served"},
         headers=_auth_headers(token_a),
@@ -72,7 +72,7 @@ def test_cannot_mark_another_tenants_order_paid(client, db_session):
     db_session.add(order_b)
     db_session.commit()
 
-    resp = client.patch(
+    resp = client.post(
         f"/orders/{order_b.id}/payment",
         json={"payment_method": "cash", "is_paid": True},
         headers=_auth_headers(token_a),

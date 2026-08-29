@@ -31,6 +31,11 @@ if not SECRET_KEY:
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = int(os.getenv("ACCESS_TOKEN_EXPIRE_HOURS", "8"))   # was 30 MINUTES
+# Owner "view as" real impersonation (directive 015 follow-up): deliberately
+# much shorter than a normal session — bounds how long a mis-clicked or
+# forgotten impersonation stays live. Not renewable; the Owner re-issues from
+# the Staff page if they need longer.
+IMPERSONATION_TOKEN_EXPIRE_MINUTES = int(os.getenv("IMPERSONATION_TOKEN_EXPIRE_MINUTES", "20"))
 
 # Pin the Argon2 variant explicitly to Argon2id (OWASP-recommended). passlib's
 # argon2 handler already defaults to type "ID", but pinning makes the guarantee
@@ -111,12 +116,55 @@ def mfa_provisioning_uri(email: str, secret_b32: str, issuer: str = "RestaurantA
     return f"otpauth://totp/{label}?secret={secret_b32}&issuer={quote(issuer)}"
 
 
+import secrets
+
+
+def generate_auth_token() -> str:
+    """A fresh single-use token for password reset / email verify links
+    (256 bits of entropy, URL-safe)."""
+    return secrets.token_urlsafe(32)
+
+
+def hash_auth_token(token: str) -> str:
+    """SHA-256 of a reset/verify token — what gets stored, never the raw
+    value (same reasoning as password hashing: a DB read must not be
+    replayable as a valid link). Not a password, so a fast hash is fine here:
+    entropy comes from 256 random bits, not human-guessable input."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
+
+
+# ── Shared-device quick-switch PIN (audit remediation, Tier 5 item 12) ───────
+# Same pwd_context (Argon2id) as passwords — a short PIN doesn't mean a weaker
+# hash; brute-force resistance comes from lockout (see routers/auth.py's
+# MAX_FAILED_ATTEMPTS reuse for PIN attempts), not the hash algorithm.
+PIN_MIN_LENGTH = 4
+PIN_MAX_LENGTH = 6
+
+
+def require_valid_pin_format(pin: str) -> None:
+    """Raise HTTP 400 unless `pin` is 4-6 digits. Digits only, deliberately —
+    this is a quick-entry code for a shared touchscreen, not a password."""
+    if not pin.isdigit() or not (PIN_MIN_LENGTH <= len(pin) <= PIN_MAX_LENGTH):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"PIN must be {PIN_MIN_LENGTH}-{PIN_MAX_LENGTH} digits.",
+        )
+
+
+def verify_pin(plain_pin: str, hashed_pin: str) -> bool:
+    return pwd_context.verify(plain_pin, hashed_pin)
+
+
+def get_pin_hash(pin: str) -> str:
+    return pwd_context.hash(pin)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -157,6 +205,46 @@ async def get_current_user(
     if payload.get("ver", 0) != (user.token_version or 0):
         raise credentials_exception
 
+    # Account lifecycle (directive 016): deactivating a StaffMember with a
+    # linked login also bumps token_version (see routers/staff.py), so this
+    # check is largely redundant with the one above — but is_active is kept
+    # as an explicit, independently-readable gate rather than relying solely
+    # on the version-bump side effect, in case a future caller sets one
+    # without the other.
+    if user.is_active is False:
+        raise credentials_exception
+
+    # Real Owner impersonation: an impersonation token's `sub` is the
+    # TARGET's email (see routers/staff.py's /impersonate), so `user` above
+    # already resolves to the target — every existing router works
+    # unmodified, scoped exactly as if the target had logged in themselves.
+    # This block only validates the session is still live and surfaces the
+    # impersonator's identity as transient (never persisted) metadata for
+    # any caller that wants to log/display it.
+    imp_session_id = payload.get("imp_session_id")
+    if imp_session_id is not None:
+        session = db.query(models.ImpersonationSession).filter(
+            models.ImpersonationSession.id == imp_session_id
+        ).first()
+        if not session or session.ended_at is not None or session.expires_at < utcnow():
+            raise credentials_exception
+        impersonator = db.query(models.User).filter(
+            models.User.id == session.impersonator_user_id
+        ).first()
+        if (
+            not impersonator
+            or impersonator.is_active is False
+            or impersonator.role not in (models.Role.ADMIN, models.Role.SUPERADMIN)
+        ):
+            raise credentials_exception
+        user.impersonated_by = {
+            "session_id": session.id,
+            "impersonator_id": impersonator.id,
+            "impersonator_email": impersonator.email,
+        }
+    else:
+        user.impersonated_by = None
+
     return user
 
 
@@ -183,3 +271,46 @@ def require_role(*allowed_roles: "models.Role"):
         )
 
     return _require_role_dep
+
+
+def require_staff_role(*allowed_staff_roles: "models.StaffRole"):
+    """
+    Dependency factory for the fine-grained 7-tier model (directive 015).
+    Composable with require_role, not a replacement for it:
+
+      - SUPERADMIN/ADMIN always pass, exactly like require_role — an Owner
+        IS an ADMIN user (directive 015), so this never locks out the
+        account tier that already has full access today.
+      - Otherwise the user's staff_role must be one of allowed_staff_roles.
+      - A STAFF-role user with staff_role IS NULL gets a distinguishable
+        403 detail ("staff_role_unassigned") rather than the generic
+        "insufficient permissions" — see directive 015's Edge Cases on why
+        NULL isn't defaulted to a tier, and why the frontend needs to tell
+        these users apart from a plain permission denial so it can render
+        "ask your manager to assign your role" instead of a dead end.
+
+    Usage:
+        current_user: models.User = Depends(
+            require_staff_role(models.StaffRole.MANAGER, models.StaffRole.SUPERVISOR)
+        )
+    """
+    allowed = set(allowed_staff_roles)
+
+    async def _require_staff_role_dep(
+        current_user: models.User = Depends(get_current_user),
+    ) -> models.User:
+        if current_user.role in (models.Role.SUPERADMIN, models.Role.ADMIN):
+            return current_user
+        if current_user.staff_role is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="staff_role_unassigned",
+            )
+        if current_user.staff_role in allowed:
+            return current_user
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions for this action",
+        )
+
+    return _require_staff_role_dep

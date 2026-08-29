@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-# from database import get_db # Assuming db setup is done or will be done
-import os
+from sqlalchemy import text
 import logging
+
+import schemas
+from database import get_db
 
 logger = logging.getLogger("health")
 
@@ -12,23 +14,28 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-@router.get("/")
-async def health_check():
-    return {"status": "ok", "message": "Service is healthy"}
 
-from sqlalchemy import text
-from database import get_db
-
-@router.get("/db")
-async def db_health_check(db: Session = Depends(get_db)):
+def _check_db(db: Session) -> None:
+    """Raise 503 unless a trivial query round-trips. Shared by both routes
+    below so an uptime prober hitting either one exercises the same check —
+    the bare "/" route used to return a hardcoded 200 regardless of DB state."""
     try:
-        # Execute a simple query to check connection
         db.execute(text("SELECT 1"))
-        return {"status": "ok", "database": "connected"}
     except Exception as e:
-        # Log the error (Sentry will catch it if configured)
         logger.error(f"Database connection error: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable"
         )
+
+
+@router.get("/", response_model=schemas.HealthOut)
+async def health_check(db: Session = Depends(get_db)):
+    _check_db(db)
+    return {"status": "ok", "message": "Service is healthy"}
+
+
+@router.get("/db", response_model=schemas.DbHealthOut)
+async def db_health_check(db: Session = Depends(get_db)):
+    _check_db(db)
+    return {"status": "ok", "database": "connected"}

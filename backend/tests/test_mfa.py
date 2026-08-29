@@ -35,7 +35,7 @@ def test_totp_roundtrip_and_rejects_wrong_code():
 def _register(client, email="mfa@e.com"):
     r = client.post("/api/v1/auth/register",
                     json={"email": email, "password": "GoodPass1", "tenant_name": "T"})
-    assert r.status_code == 200
+    assert r.status_code == 201
     return r.json()["access_token"]
 
 

@@ -17,6 +17,7 @@ python-multipart==0.0.31   # CVE bumps 2026-07-08 (form parsing; Twilio webhook)
 # Config
 python-dotenv==1.2.2       # CVE-2026-28684
 pydantic==2.12.5
+email-validator==2.2.0     # pydantic EmailStr support
 
 # HTTP
 requests==2.33.0           # CVE-2026-25645
@@ -32,6 +33,11 @@ openai==1.58.1
 # anthropic==0.116.0
 # headroom-ai==0.28.0   # context compression proxy/lib in front of Claude — see ai/llm_client.py
 
+# Object storage — backend/storage.py's S3 backend (STORAGE_BACKEND=s3).
+# Imported lazily there, but listed here so the branch actually works once
+# toggled on instead of ImportError-ing at first use.
+boto3==1.35.94
+
 # Monitoring
 sentry-sdk==2.52.0
 
@@ -43,6 +49,10 @@ apscheduler==3.10.4
 
 # WhatsApp / Twilio
 twilio==9.3.5
+
+# Web Push (VAPID) — staff notification channel, independent of WhatsApp/Twilio
+pywebpush==2.0.3
+py-vapid==1.9.0
 
 # Testing
 pytest==9.0.3              # PYSEC-2026-1845

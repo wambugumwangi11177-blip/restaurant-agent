@@ -37,6 +37,11 @@ from time_utils import utcnow
 
 logger = logging.getLogger("ai.orchestrator")
 
+# Reliability score (0–100) at/below which a supplier is worth watching. A
+# late delivery costs 5 points; crossing this line fires SUPPLIER_RELIABILITY_
+# DROPPED once (see on_purchase_order_late), rather than re-alerting per lateness.
+SUPPLIER_WATCH_THRESHOLD = 70
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STARTUP REGISTRATION
@@ -54,7 +59,12 @@ def register_all_handlers() -> None:
     subscribe(EventType.MPESA_PAYMENT_FAILED,    on_mpesa_payment_failed)
     subscribe(EventType.RESERVATION_NO_SHOW,     on_reservation_no_show)
     subscribe(EventType.PURCHASE_ORDER_LATE,     on_purchase_order_late)
+    subscribe(EventType.PURCHASE_ORDER_CREATED,  on_purchase_order_created)
+    subscribe(EventType.PURCHASE_ORDER_DELIVERED, on_purchase_order_delivered)
     subscribe(EventType.AGENT_FAILED,            on_agent_failed)
+    subscribe(EventType.STOCK_TRANSFER_DISCREPANCY, on_stock_transfer_discrepancy)
+    subscribe(EventType.STOCK_VARIANCE_FLAGGED,      on_stock_variance_flagged)
+    subscribe(EventType.STOCK_COUNT_DISCREPANCY,     on_stock_count_discrepancy)
 
     logger.info("[Orchestrator] All handlers registered")
 
@@ -185,6 +195,149 @@ def on_stock_depleted(payload: dict) -> None:
                                   message_type="stock_depleted")
     except Exception as exc:
         logger.error(f"[Orchestrator] on_stock_depleted failed: {exc}")
+    finally:
+        db.close()
+
+
+def on_stock_transfer_discrepancy(payload: dict) -> None:
+    """
+    A store->kitchen StockTransfer was confirmed with a quantity that
+    doesn't match what the sender declared (directive 016). Fires once per
+    confirm action — inherently non-repeating, so unlike the 2-hourly stock
+    check this needs no cooldown column to avoid re-alerting.
+    """
+    restaurant_id       = payload.get("restaurant_id")
+    transfer_id         = payload.get("transfer_id")
+    item_name           = payload.get("item_name", "Unknown item")
+    declared_quantity   = payload.get("declared_quantity", 0)
+    confirmed_quantity  = payload.get("confirmed_quantity", 0)
+    unit                = payload.get("unit", "")
+
+    db = SessionLocal()
+    try:
+        restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
+        if not restaurant:
+            return
+
+        owner_phone = _owner_phone(restaurant)
+        if owner_phone:
+            direction = "less" if confirmed_quantity < declared_quantity else "more"
+            gap = abs(confirmed_quantity - declared_quantity)
+            from ai.whatsapp import send_whatsapp_message
+            msg = (
+                f"⚠️ *Stock Transfer Mismatch*\n\n"
+                f"Transfer #{transfer_id} of {item_name}: sender declared "
+                f"{declared_quantity}{unit}, receiver confirmed {confirmed_quantity}{unit} "
+                f"({gap}{unit} {direction} than declared).\n"
+                f"Flagged for review — not auto-corrected."
+            )
+            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+                                  message_type="stock_transfer_discrepancy")
+
+        write_audit_log(
+            db, restaurant_id, "stock_transfer_discrepancy_alerted", "executive_orchestrator",
+            entity_type="stock_transfer", entity_id=transfer_id,
+            reasoning=f"{item_name}: declared {declared_quantity}{unit} vs confirmed {confirmed_quantity}{unit}.",
+            data_sources=["stock_custody_router"],
+        )
+    except Exception as exc:
+        logger.error(f"[Orchestrator] on_stock_transfer_discrepancy failed: {exc}")
+    finally:
+        db.close()
+
+
+def on_stock_variance_flagged(payload: dict) -> None:
+    """
+    Daily variance job (main.py: run_variance_check) found at least one item
+    whose theoretical-vs-actual usage gap exceeds the threshold (directive
+    016). One summary message per restaurant per day — matches the "alert on
+    the report, not on every movement" philosophy from the
+    stock-loss-prevention skill, and avoids needing a per-item cooldown.
+    """
+    restaurant_id = payload.get("restaurant_id")
+    items         = payload.get("items", [])   # [{item_name, variance_pct, theoretical, actual}, ...]
+    if not items:
+        return
+
+    db = SessionLocal()
+    try:
+        restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
+        if not restaurant:
+            return
+
+        owner_phone = _owner_phone(restaurant)
+        if owner_phone:
+            from ai.stock_custody import VARIANCE_THRESHOLD
+            lines = [
+                f"• {i['item_name']}: {i['variance_pct']*100:.1f}% variance "
+                f"(expected ~{i['theoretical']:.1f}, actual {i['actual']:.1f})"
+                for i in items[:5]
+            ]
+            more = f"\n…and {len(items) - 5} more" if len(items) > 5 else ""
+            from ai.whatsapp import send_whatsapp_message
+            msg = (
+                f"📊 *Stock Variance Report*\n\n"
+                f"{len(items)} item(s) over the {VARIANCE_THRESHOLD*100:.0f}% variance threshold "
+                f"in the last 24h:\n\n" + "\n".join(lines) + more +
+                f"\n\nWorth a physical count if this keeps recurring on the same item."
+            )
+            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+                                  message_type="stock_variance_flagged")
+
+        write_audit_log(
+            db, restaurant_id, "stock_variance_alerted", "executive_orchestrator",
+            entity_type="inventory_variance_report", entity_id=None,
+            reasoning=f"{len(items)} item(s) flagged over variance threshold.",
+            data_sources=["ai.stock_custody"],
+        )
+    except Exception as exc:
+        logger.error(f"[Orchestrator] on_stock_variance_flagged failed: {exc}")
+    finally:
+        db.close()
+
+
+def on_stock_count_discrepancy(payload: dict) -> None:
+    """
+    A physical count (directive 017) found a real gap against what the
+    system expected. This is the independent check — the one number that
+    isn't derived from the recipe math auto-deduction relies on — so a
+    mismatch here is the closest thing this system has to catching real
+    shrinkage rather than a bookkeeping artifact.
+    """
+    restaurant_id      = payload.get("restaurant_id")
+    item_name          = payload.get("item_name", "Unknown item")
+    expected_quantity  = payload.get("expected_quantity", 0)
+    counted_quantity   = payload.get("counted_quantity", 0)
+    unit               = payload.get("unit", "")
+
+    db = SessionLocal()
+    try:
+        restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
+        if not restaurant:
+            return
+
+        owner_phone = _owner_phone(restaurant)
+        if owner_phone:
+            direction = "less" if counted_quantity < expected_quantity else "more"
+            gap = abs(counted_quantity - expected_quantity)
+            from ai.whatsapp import send_whatsapp_message
+            msg = (
+                f"🔍 *Stock Count Discrepancy*\n\n"
+                f"{item_name}: system expected {expected_quantity}{unit}, physical count found "
+                f"{counted_quantity}{unit} ({gap}{unit} {direction} than expected).\n"
+                f"Worth investigating if this isn't a one-off."
+            )
+            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+                                  message_type="stock_count_discrepancy")
+
+        write_audit_log(
+            db, restaurant_id, "stock_count_discrepancy_alerted", "executive_orchestrator",
+            entity_type="stock_count", entity_id=None,
+            reasoning=f"{item_name}: expected {expected_quantity}{unit} vs counted {counted_quantity}{unit}.",
+            data_sources=["stock_custody_router"],
+        )
+    except Exception as exc:
+        logger.error(f"[Orchestrator] on_stock_count_discrepancy failed: {exc}")
     finally:
         db.close()
 
@@ -379,6 +532,22 @@ def on_reservation_no_show(payload: dict) -> None:
 
         # For large parties (4+) from known customers, trigger winback
         if party_size >= 4 and customer_phone:
+            # Same marketing-consent gate broadcast_winback/promo enforce
+            # (brain.py): a "come back" promo is marketing traffic and needs a
+            # positive consent signal, not just the absence of a STOP opt-out.
+            from ai.whatsapp.optout import canonical as _canonical_phone, is_opted_out
+            consented = {
+                _canonical_phone(row[0])
+                for row in db.query(models.CustomerConsent.customer_phone)
+                .filter(models.CustomerConsent.restaurant_id == restaurant_id)
+                .all()
+            }
+            if _canonical_phone(customer_phone) not in consented or is_opted_out(db, customer_phone):
+                logger.info(
+                    "[Orchestrator] no-show winback skipped for %s — no marketing consent",
+                    _canonical_phone(customer_phone),
+                )
+                return
             restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
             r_name = restaurant.name if restaurant else "us"
             from ai.whatsapp import compose_winback_message, send_whatsapp_message
@@ -412,14 +581,31 @@ def on_purchase_order_late(payload: dict) -> None:
             models.Supplier.id == supplier_id,
             models.Supplier.restaurant_id == restaurant_id,
         ).first()
+        crossed_watch_threshold = False
         if supplier:
             # Penalise reliability: each late delivery -5 points, min 0
-            supplier.reliability_score = max(0, (supplier.reliability_score or 100) - 5)
+            before_score = supplier.reliability_score or 100
+            supplier.reliability_score = max(0, before_score - 5)
             db.commit()
+            # 2026-07-18 event-map pass: surface the *crossing* into "watch"
+            # territory once (map §1 "Supplier rating dropped / consistently
+            # late"), not on every late delivery — before was above, now at/
+            # below SUPPLIER_WATCH_THRESHOLD.
+            crossed_watch_threshold = (
+                before_score > SUPPLIER_WATCH_THRESHOLD
+                and supplier.reliability_score <= SUPPLIER_WATCH_THRESHOLD
+            )
 
-        import os
+        # Bug found 2026-07-16 while extending this same alerting pattern
+        # for directive 018: this read OWNER_PHONE_{id}/OWNER_PHONE env vars
+        # only, never Restaurant.owner_phone — the exact class of bug
+        # on_stock_critical's own comment describes fixing elsewhere in this
+        # file ("Was env-var only... got no critical-stock alerts at all").
+        # A restaurant onboarded via the DB column (the normal path today)
+        # got zero supplier-late alerts. Switched to the shared helper.
+        restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
         from ai.whatsapp import send_whatsapp_message
-        owner_phone = os.getenv(f"OWNER_PHONE_{restaurant_id}", os.getenv("OWNER_PHONE", ""))
+        owner_phone = _owner_phone(restaurant)
         if owner_phone:
             msg = (
                 f"🚚 *Supplier Alert*\n\n"
@@ -431,8 +617,105 @@ def on_purchase_order_late(payload: dict) -> None:
             send_whatsapp_message(owner_phone, msg, db=db,
                                   restaurant_id=restaurant_id, message_type="supplier_late")
 
+        if crossed_watch_threshold and supplier:
+            emit_async(EventType.SUPPLIER_RELIABILITY_DROPPED, {
+                "restaurant_id": restaurant_id,
+                "supplier_id": supplier.id,
+                "supplier_name": supplier_name or supplier.name,
+                "reliability_score": supplier.reliability_score,
+            })
+
     except Exception as exc:
         logger.error(f"[Orchestrator] on_purchase_order_late failed: {exc}")
+    finally:
+        db.close()
+
+
+def on_purchase_order_created(payload: dict) -> None:
+    """
+    Directive 018: a purchase order was auto-drafted (par level crossed the
+    reorder point). Tells the owner a draft is waiting — approval still
+    happens explicitly via POST /purchase-orders/{id}/approve, this is only
+    the notification that one exists, same "surface it, don't act silently"
+    posture as everything else in this alerting pipeline.
+    """
+    restaurant_id = payload.get("restaurant_id")
+    po_id         = payload.get("po_id")
+    item_name     = payload.get("item_name", "Unknown item")
+    quantity      = payload.get("quantity", 0)
+    unit          = payload.get("unit", "")
+    supplier_name = payload.get("supplier_name", "")
+
+    db = SessionLocal()
+    try:
+        restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
+        if not restaurant:
+            return
+
+        owner_phone = _owner_phone(restaurant)
+        if owner_phone:
+            from ai.whatsapp import send_whatsapp_message
+            msg = (
+                f"📝 *Purchase Order Drafted*\n\n"
+                f"{quantity}{unit} {item_name} from {supplier_name} — stock hit its reorder point.\n"
+                f"Reply or open the dashboard to approve before it's sent."
+            )
+            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+                                  message_type="purchase_order_drafted")
+
+        write_audit_log(
+            db, restaurant_id, "purchase_order_drafted", "executive_orchestrator",
+            entity_type="purchase_order", entity_id=po_id,
+            reasoning=f"{item_name}: reorder point crossed, drafted {quantity}{unit} from {supplier_name}.",
+            data_sources=["ai.reorder"],
+        )
+    except Exception as exc:
+        logger.error(f"[Orchestrator] on_purchase_order_created failed: {exc}")
+    finally:
+        db.close()
+
+
+def on_purchase_order_delivered(payload: dict) -> None:
+    """
+    Directive 018: a delivery came in short of what was ordered — the
+    supplier-leg equivalent of on_stock_transfer_discrepancy. Only fires on
+    a real shortfall (see ai/reorder.receive_purchase_order), matching the
+    "alert on the exception" philosophy throughout this workstream.
+    """
+    restaurant_id      = payload.get("restaurant_id")
+    po_id              = payload.get("po_id")
+    item_name          = payload.get("item_name", "Unknown item")
+    quantity_ordered   = payload.get("quantity_ordered", 0)
+    quantity_received  = payload.get("quantity_received", 0)
+    shortfall          = payload.get("shortfall", 0)
+    unit               = payload.get("unit", "")
+
+    db = SessionLocal()
+    try:
+        restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
+        if not restaurant:
+            return
+
+        owner_phone = _owner_phone(restaurant)
+        if owner_phone:
+            from ai.whatsapp import send_whatsapp_message
+            msg = (
+                f"📦 *Short Delivery*\n\n"
+                f"PO #{po_id} for {item_name}: ordered {quantity_ordered}{unit}, "
+                f"received {quantity_received}{unit} — {shortfall}{unit} short.\n"
+                f"Recorded as-is; follow up with the supplier if this keeps happening."
+            )
+            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+                                  message_type="purchase_order_short_delivery")
+
+        write_audit_log(
+            db, restaurant_id, "purchase_order_short_delivery", "executive_orchestrator",
+            entity_type="purchase_order", entity_id=po_id,
+            reasoning=f"{item_name}: ordered {quantity_ordered}{unit}, received {quantity_received}{unit}.",
+            data_sources=["stock_custody_router"],
+        )
+    except Exception as exc:
+        logger.error(f"[Orchestrator] on_purchase_order_delivered failed: {exc}")
     finally:
         db.close()
 
@@ -453,10 +736,25 @@ def on_agent_failed(payload: dict) -> None:
             models.AgentExecution.agent_name == agent_name,
             models.AgentExecution.success    == False,
             models.AgentExecution.created_at >= cutoff,
-        ).count()
+        )
+        # Scope to THIS restaurant — without the filter, failures at tenant A
+        # push tenant B over the "3 failures/hour" alert threshold.
+        if restaurant_id:
+            recent_failures = recent_failures.filter(
+                models.AgentExecution.restaurant_id == restaurant_id
+            )
+        recent_failures = recent_failures.count()
 
         if recent_failures >= 3:
-            owner_phone = os.getenv("OWNER_PHONE", "")
+            # Resolve the restaurant's own owner number (DB column, env
+            # fallback) — the global OWNER_PHONE env var ignores per-tenant
+            # routing and can text the wrong owner.
+            owner_phone = ""
+            if restaurant_id:
+                restaurant = db.query(models.Restaurant).filter(
+                    models.Restaurant.id == restaurant_id
+                ).first()
+                owner_phone = _owner_phone(restaurant)
             if owner_phone:
                 from ai.whatsapp import send_whatsapp_message
                 msg = (

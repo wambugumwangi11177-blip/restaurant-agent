@@ -75,6 +75,18 @@ def db_env(tmp_path, monkeypatch):
     except ImportError:
         pass
 
+    # Same hazard as executive.py above, for the second event-bus subscriber
+    # (ai/orchestrator/push_notifier.py) added alongside it: it also does
+    # `from database import SessionLocal` at module level, so it must be
+    # reloaded here too or it keeps querying whatever DATABASE_URL was live
+    # at its first import (real risk: that can be the real .env DB if a test
+    # module imports it at collection time, before this fixture has run).
+    try:
+        import ai.orchestrator.push_notifier as push_notifier
+        importlib.reload(push_notifier)
+    except ImportError:
+        pass
+
     from events.bus import clear_handlers
     clear_handlers()
 
@@ -86,6 +98,16 @@ def db_env(tmp_path, monkeypatch):
     try:
         from ai.reasoning import narrator
         narrator._cache.clear()
+    except Exception:
+        pass
+    # ops_manager has the same process-wide TTL cache — without this reset a
+    # dashboard cached by an earlier test (same restaurant_id, different fresh
+    # DB) leaks into the next test and produces order-dependent failures
+    # (found 2026-08-23: test_zero_yesterday saw the previous test's revenue).
+    try:
+        from ai import ops_manager
+        with ops_manager._cache_lock:
+            ops_manager._cache.clear()
     except Exception:
         pass
     try:

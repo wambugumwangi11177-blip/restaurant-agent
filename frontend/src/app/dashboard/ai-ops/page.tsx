@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Cpu, RefreshCw, AlertTriangle, ShieldCheck, Activity, Gauge } from "lucide-react";
+import { getErrorMessage, isHttpStatus } from "@/lib/errors";
 
 interface UsageData {
     window_days: number;
@@ -44,13 +45,9 @@ interface UsageData {
         approved?: number;
         rejected?: number;
     }[];
-    grounding: Record<string, any>;
+    grounding: Record<string, unknown>;
 }
 
-function usd(n: number | null | undefined): string {
-    if (!n) return "$0.00";
-    return `$${n.toFixed(n < 1 ? 4 : 2)}`;
-}
 function kes(cents: number | null | undefined): string {
     return `KES ${Math.round((cents || 0) / 100).toLocaleString("en-KE")}`;
 }
@@ -76,9 +73,9 @@ export default function AiOpsPage() {
             const res = await api.get("/ai/usage?days=30");
             setData(res.data);
             setLastUpdated(new Date());
-        } catch (e: any) {
-            if (e?.response?.status === 403) setForbidden(true);
-            else setError(e?.response?.data?.detail || e?.message || "Could not load AI operations data");
+        } catch (e) {
+            if (isHttpStatus(e, 403)) setForbidden(true);
+            else setError(getErrorMessage(e, "Could not load AI operations data"));
         } finally {
             setLoading(false);
         }
@@ -100,7 +97,7 @@ export default function AiOpsPage() {
     if (forbidden) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-3 text-center">
-                <ShieldCheck className="w-10 h-10 text-[#d4a853]" />
+                <ShieldCheck className="w-10 h-10 text-[var(--accent)]" />
                 <p className="text-[#e5e5e5] font-medium">Admins only</p>
                 <p className="text-[#525252] text-sm max-w-sm">
                     AI Operations shows sensitive cost and reliability metrics, so it&apos;s limited to admin accounts.
@@ -116,7 +113,7 @@ export default function AiOpsPage() {
                 <AlertTriangle className="w-10 h-10 text-amber-400" />
                 <p className="text-[#e5e5e5] font-medium">Could not load AI operations</p>
                 <p className="text-[#525252] text-sm text-center max-w-sm">{error}</p>
-                <button onClick={fetchData} className="px-4 py-2 bg-[#d4a853] text-[#0a0a0a] font-semibold rounded-lg text-sm hover:bg-[#e0b96a]">Retry</button>
+                <button onClick={fetchData} className="px-4 py-2 bg-[var(--accent)] text-[#0a0a0a] font-semibold rounded-lg text-sm hover:bg-[var(--accent-hover)]">Retry</button>
             </div>
         );
     }
@@ -132,7 +129,7 @@ export default function AiOpsPage() {
             <div className="flex items-start justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-[#e5e5e5]">AI Operations</h1>
-                    <p className="text-[#525252] mt-1 text-sm">What the AI costs and how well it&apos;s working — last {d.window_days} days</p>
+                    <p className="text-[#525252] mt-1 text-sm">How much the AI is using and how well it&apos;s working — last {d.window_days} days</p>
                 </div>
                 <button onClick={fetchData} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#141414] border border-[#262626] text-[#737373] hover:text-[#e5e5e5] text-sm transition-colors">
                     <RefreshCw className="w-3.5 h-3.5" />
@@ -151,23 +148,22 @@ export default function AiOpsPage() {
 
             {/* LLM usage */}
             <div>
-                <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2 mb-3"><Cpu className="w-4 h-4 text-[#d4a853]" /> How much the AI is thinking</h2>
+                <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2 mb-3"><Cpu className="w-4 h-4 text-[var(--accent)]" /> How much the AI is thinking</h2>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <Stat label="AI calls" value={fmt(d.llm?.calls)} />
-                    <Stat label="Est. cost" value={usd(d.llm?.cost_usd)} />
-                    <Stat label="Cost / response" value={usd(d.llm?.cost_per_response_usd)} />
+                    <Stat label="Input tokens" value={fmt(d.llm?.input_tokens)} />
+                    <Stat label="Output tokens" value={fmt(d.llm?.output_tokens)} />
                     <Stat label="Figures verified" value={typeof groundedPct === "number" ? `${groundedPct}%` : groundedPct ? "On" : "—"} tone="ok" />
                 </div>
                 {d.economics && (
                     <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-4 mt-3 flex items-center justify-between flex-wrap gap-2">
                         <div className="text-sm">
-                            <span className="text-[#525252]">AI cost </span>
-                            <span className="text-[#e5e5e5] font-medium">{usd(d.economics.llm_cost_usd)}</span>
-                            <span className="text-[#525252]"> ({kes(d.economics.llm_cost_kes_cents)})</span>
+                            <span className="text-[#525252]">Tokens used </span>
+                            <span className="text-[#e5e5e5] font-medium">{fmt(totalTokens)}</span>
                             <span className="text-[#525252]"> vs. profit captured </span>
                             <span className="text-emerald-400 font-medium">{kes(d.economics.profit_generated_cents)}</span>
                         </div>
-                        <p className="text-[10px] text-[#525252]">Profit = approved pricing recommendations. Never summed with cost.</p>
+                        <p className="text-[10px] text-[#525252]">Profit = approved pricing recommendations.</p>
                     </div>
                 )}
                 {models.length > 0 && (
@@ -177,7 +173,7 @@ export default function AiOpsPage() {
                             {models.map(([model, m]) => (
                                 <div key={model} className="flex items-center justify-between text-sm py-1.5 border-b border-[#1a1a1a] last:border-0">
                                     <span className="text-[#e5e5e5] truncate">{model}</span>
-                                    <span className="text-[#525252] text-xs whitespace-nowrap">{fmt(m.calls)} calls · {fmt(m.input_tokens + m.output_tokens)} tokens · {usd(m.cost_usd)}</span>
+                                    <span className="text-[#525252] text-xs whitespace-nowrap">{fmt(m.calls)} calls · {fmt(m.input_tokens + m.output_tokens)} tokens</span>
                                 </div>
                             ))}
                         </div>
@@ -188,7 +184,7 @@ export default function AiOpsPage() {
 
             {/* Agent reliability */}
             <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
-                <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2 mb-1"><Activity className="w-4 h-4 text-[#d4a853]" /> Agent reliability</h2>
+                <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2 mb-1"><Activity className="w-4 h-4 text-[var(--accent)]" /> Agent reliability</h2>
                 <p className="text-xs text-[#525252] mb-4">How often each analysis agent ran, how often it succeeded, and how fast it responded.</p>
                 {(!d.agents || d.agents.length === 0) ? (
                     <p className="text-[#525252] text-sm">No agent runs recorded in this window yet.</p>
@@ -204,7 +200,7 @@ export default function AiOpsPage() {
                                     </span>
                                 </div>
                                 <div className="mt-1 h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
-                                    <div className="h-full bg-[#d4a853] rounded-full" style={{ width: `${Math.round((a.runs / maxRuns) * 100)}%` }} />
+                                    <div className="h-full bg-[var(--accent)] rounded-full" style={{ width: `${Math.round((a.runs / maxRuns) * 100)}%` }} />
                                 </div>
                                 <p className="text-[10px] text-[#525252] mt-0.5">{fmt(a.runs)} runs</p>
                             </div>
@@ -217,7 +213,7 @@ export default function AiOpsPage() {
             {d.scorecards && d.scorecards.length > 0 && (
                 <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
                     <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2 mb-1">
-                        <ShieldCheck className="w-4 h-4 text-[#d4a853]" /> Agent scorecards
+                        <ShieldCheck className="w-4 h-4 text-[var(--accent)]" /> Agent scorecards
                     </h2>
                     <p className="text-xs text-[#525252] mb-4">Forecast accuracy and how often you accept each agent&apos;s advice — measured against reality.</p>
                     <div className="space-y-2">

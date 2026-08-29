@@ -38,7 +38,7 @@ def test_order_with_phone_and_consent_is_recorded(client, db_session):
         "customer_phone": "0712345678",
         "consent": True,
     })
-    assert resp.status_code == 200
+    assert resp.status_code == 201
 
     consent = db_session.query(models.CustomerConsent).filter(
         models.CustomerConsent.customer_phone == "0712345678"
@@ -55,7 +55,7 @@ def test_anonymous_order_without_phone_does_not_require_consent(client, db_sessi
         "payment_method": "cash",
         "consent": False,
     })
-    assert resp.status_code == 200
+    assert resp.status_code == 201
 
     consents = db_session.query(models.CustomerConsent).all()
     assert consents == []

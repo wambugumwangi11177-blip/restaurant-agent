@@ -30,6 +30,11 @@ Desktop.ini
 # Project specific
 *.db
 .tmp/
+leads/
+
+# Google OAuth (execution/upload_to_google_doc.py)
+credentials.json
+token.json
 
 # Local tool state / quarantined content (not for version control)
 .obsidian/
@@ -43,3 +48,4 @@ backend/.storage/
 .storage/
 
 .vercel
+backend/local_dev.db

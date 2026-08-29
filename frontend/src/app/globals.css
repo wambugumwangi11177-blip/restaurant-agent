@@ -13,6 +13,23 @@
   --success: #22c55e;
   --warning: #eab308;
   --danger: #ef4444;
+  --info: #3b82f6;
+}
+
+@theme {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-dim: var(--text-dim);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
 }
 
 body {
@@ -58,4 +75,29 @@ body {
   transition-property: background-color, border-color, color, opacity;
   transition-duration: 150ms;
   transition-timing-function: ease;
+}
+
+/* Keyboard focus must be visible — accent ring on interactive elements,
+   suppressed for mouse clicks via :focus-visible. */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Respect prefers-reduced-motion: no animations, instant transitions.
+   Covers the global * transition above plus Tailwind's animate-* utilities
+   used for skeletons/spinners (overridden via !important since those set
+   the animation shorthand). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

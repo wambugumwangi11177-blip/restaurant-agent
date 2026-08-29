@@ -146,13 +146,30 @@ export const demoData = {
  * the same hardcoded demo numbers. That's what "dashboard shows the same
  * data for months" was: not a caching bug, a wrong emptiness heuristic.
  */
-export function isDashboardEmpty(data: any): boolean {
+export function isDashboardEmpty(
+  data: { quick_stats?: { menu_items?: number; total_revenue_30d?: number } } | null
+): boolean {
   if (!data) return true;
   const qs = data.quick_stats || {};
   return !qs.menu_items && !qs.total_revenue_30d;
 }
 
 /** Returns true when real orders list is empty */
-export function isOrdersEmpty(orders: any[]): boolean {
+export function isOrdersEmpty(orders: unknown[] | null | undefined): boolean {
   return !orders || orders.length === 0;
+}
+
+/**
+ * Demo mode is OFF unless explicitly turned on via NEXT_PUBLIC_DEMO_MODE=true.
+ *
+ * The "Lavy restaurant" numbers above are a sales/pitch showcase, NOT a
+ * per-account thing — there is no real "Lavy account". Before this gate the
+ * fallback fired on *any* empty account, so a brand-new real restaurant saw
+ * another restaurant's fabricated data behind a small banner. That's
+ * misleading; a real empty account should get an honest empty state instead
+ * (each surface renders one when this returns false). Keep the showcase
+ * available for demos by setting the env flag on a dedicated demo deployment.
+ */
+export function isDemoMode(): boolean {
+  return process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 }

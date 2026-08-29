@@ -15,6 +15,7 @@ import { FlaskConical } from "lucide-react";
 import api from "@/lib/api";
 import { formatKES } from "@/lib/format";
 import { HowItWorks } from "./HowItWorks";
+import { getErrorMessage } from "@/lib/errors";
 
 interface MenuItem { id: number; name: string; price: number; cost_price?: number; category?: string; }
 
@@ -86,8 +87,8 @@ export function WhatIfSimulator() {
             });
             if (res.data?.available === false) setError(res.data.error || "Simulation unavailable.");
             else setResult(res.data);
-        } catch (e: any) {
-            setError(e?.response?.data?.detail || e?.message || "Simulation failed.");
+        } catch (e) {
+            setError(getErrorMessage(e, "Simulation failed."));
         } finally {
             setLoading(false);
         }
@@ -96,7 +97,7 @@ export function WhatIfSimulator() {
     return (
         <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5">
             <h2 className="text-sm font-semibold text-[#e5e5e5] flex items-center gap-2">
-                <FlaskConical className="w-4 h-4 text-[#d4a853]" />
+                <FlaskConical className="w-4 h-4 text-[var(--accent)]" />
                 What-If Simulator
             </h2>
             <p className="text-xs text-[#525252] mt-1">
@@ -132,7 +133,7 @@ export function WhatIfSimulator() {
                 <button
                     onClick={runSim}
                     disabled={loading || itemId == null}
-                    className="bg-[#d4a853] text-[#0a0a0a] font-medium text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity"
+                    className="bg-[var(--accent)] text-[#0a0a0a] font-medium text-sm px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity"
                 >
                     {loading ? "Simulating…" : "Simulate"}
                 </button>

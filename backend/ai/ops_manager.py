@@ -18,16 +18,75 @@ Pulls deep insights from all AI services and produces:
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import timedelta
+import threading
+import time
 import models
 from ai import menu_engineer, revenue_forecaster, kds_intelligence, inventory_predictor, reservation_optimizer
 from time_utils import utcnow
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# RESULT CACHE
+# ─────────────────────────────────────────────────────────────────────────────
+# get_operations_dashboard fans out into five intelligence modules, each of
+# which ships a month+ of order history over the wire. On a deploy whose DB is
+# a continent away (local dev against Neon) that's tens of seconds per page
+# view — and the dashboard is the landing page, so EVERY login paid it. This
+# is a read-only aggregate over historical orders; recomputing it more often
+# than CACHE_TTL_SECONDS changes nothing anyone can see in practice.
+#
+# Scope: per-restaurant, in-process, size-bounded. Single-worker deployments
+# (the Dockerfile pins --workers 1) share one cache; a multi-worker deploy
+# would simply hold one per worker — correctness is unaffected, only hit rate.
+_CACHE_TTL_SECONDS = int(__import__("os").getenv("DASHBOARD_CACHE_TTL", "120"))
+_cache: dict[int, tuple[float, dict]] = {}
+_cache_lock = threading.Lock()
+_CACHE_MAX_ENTRIES = 64
+
+
+def invalidate_ops_dashboard_cache(restaurant_id: int | None = None) -> None:
+    """Drop cached dashboard results (all restaurants, or one). Call after any
+    write that should be reflected immediately (none exist today — the
+    dashboard is pure analytics — but the hook keeps that true by design)."""
+    with _cache_lock:
+        if restaurant_id is None:
+            _cache.clear()
+        else:
+            _cache.pop(restaurant_id, None)
+
+
+def _cache_get(restaurant_id: int) -> dict | None:
+    now = time.monotonic()
+    with _cache_lock:
+        hit = _cache.get(restaurant_id)
+        if hit and now - hit[0] < _CACHE_TTL_SECONDS:
+            # Shallow copy: routers.analytics._with_freshness pops the private
+            # _latest_order key off the dict it's handed — on the cached
+            # original that would be a destructive edit eroding later hits.
+            return dict(hit[1])
+    return None
+
+
+def _cache_put(restaurant_id: int, data: dict) -> None:
+    with _cache_lock:
+        if len(_cache) >= _CACHE_MAX_ENTRIES and restaurant_id not in _cache:
+            _cache.pop(next(iter(_cache)))  # simple FIFO bound
+        _cache[restaurant_id] = (time.monotonic(), data)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # MAIN ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
 def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
-    """Complete AI Operations Manager dashboard — exhaustive."""
+    """Complete AI Operations Manager dashboard — exhaustive.
+
+    Cached per restaurant for DASHBOARD_CACHE_TTL seconds (default 120) — see
+    the cache block above for why. The returned dict is shared across cache
+    hits; callers must treat it as read-only (the router only serializes it)."""
+    cached = _cache_get(restaurant_id)
+    if cached is not None:
+        return cached
+
     # "Today" for the snapshot = the most recent day the restaurant actually
     # had orders, not wall-clock UTC. For a live restaurant that IS today; for
     # data that doesn't reach the current wall-clock day (historical/imported,
@@ -43,12 +102,36 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
     today = now.date()
     yesterday = today - timedelta(days=1)
 
-    # Gather data from all AI services
-    menu_data = menu_engineer.get_menu_engineering(db, restaurant_id)
-    revenue_data = revenue_forecaster.get_revenue_forecast(db, restaurant_id)
-    kds_data = kds_intelligence.get_kds_intelligence(db, restaurant_id)
-    inventory_data = inventory_predictor.get_inventory_predictions(db, restaurant_id)
-    reservation_data = reservation_optimizer.get_reservation_insights(db, restaurant_id)
+    # Gather data from all AI services. The five modules are independent of
+    # each other and each is DB-bound (a month+ of order history per module),
+    # so they run concurrently — one thread + one Session each, since a
+    # SQLAlchemy Session must not be shared across threads. Sequential, the
+    # wall time is the SUM of the modules (~95s against a 100k-order
+    # restaurant over a distant link, every cache miss); concurrent, it's the
+    # MAX (~70s). Failures degrade exactly as before: a module that raises
+    # yields its own per-module error dict and the rest of the dashboard
+    # still renders (same contract the modules already follow).
+    from concurrent.futures import ThreadPoolExecutor
+    from database import SessionLocal
+
+    def _run(fn):
+        session = SessionLocal()
+        try:
+            return fn(session, restaurant_id)
+        except Exception as exc:  # noqa: BLE001 — degrade, don't 500 the dashboard
+            return {"error": str(exc), "available": False}
+        finally:
+            session.close()
+
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        menu_f        = pool.submit(_run, menu_engineer.get_menu_engineering)
+        revenue_f     = pool.submit(_run, revenue_forecaster.get_revenue_forecast)
+        kds_f         = pool.submit(_run, kds_intelligence.get_kds_intelligence)
+        inventory_f   = pool.submit(_run, inventory_predictor.get_inventory_predictions)
+        reservation_f = pool.submit(_run, reservation_optimizer.get_reservation_insights)
+        menu_data, revenue_data, kds_data, inventory_data, reservation_data = (
+            f.result() for f in (menu_f, revenue_f, kds_f, inventory_f, reservation_f)
+        )
 
     # ─────────────────────────────────────────────
     # 1. MULTI-DIMENSIONAL HEALTH SCORE
@@ -255,7 +338,7 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
     except Exception:
         recent_ai_actions = []
 
-    return {
+    result = {
         "health_score": overall_health,
         "health_breakdown": scores,
         "quick_stats": quick_stats,
@@ -272,6 +355,8 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
         # utcnow()).
         "_latest_order": latest_order,
     }
+    _cache_put(restaurant_id, result)
+    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────

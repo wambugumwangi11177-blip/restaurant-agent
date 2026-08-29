@@ -55,3 +55,23 @@
     LLM with a stateful async function that returns a tool-call on iteration 1 and a final
     answer on iteration 2. Each concurrent worker MUST get its own `AsyncSession` to avoid
     `InvalidRequestError: This session is provisioning a new connection`.
+-   **FK `ondelete=` + SQLAlchemy relationships (2026-07-16 DB audit)**: setting
+    `ForeignKey(..., ondelete="RESTRICT")` on a column is NOT enough if the parent model
+    also has a plain `relationship()` back-populating to that child with no cascade config —
+    SQLAlchemy's unit-of-work will proactively `UPDATE` the child's FK to NULL on parent
+    delete (to "disassociate" it) BEFORE the DELETE ever reaches the DB, silently defeating
+    the DB-level RESTRICT/CASCADE. Fix: add `passive_deletes=True` to that relationship so
+    the DB's `ON DELETE` clause is actually authoritative. See migration
+    `028_add_fk_ondelete_policy.py` and the `passive_deletes=True` comments next to
+    `MenuItem.order_items`, `InventoryItem.movements`, `Supplier.purchase_orders` in
+    `backend/models.py`. Caught by `backend/tests/test_fk_ondelete.py` — SQLite doesn't
+    enforce FK constraints by default either (needs `PRAGMA foreign_keys=ON` per connection,
+    which that test file's own `db_session` fixture enables locally, without touching the
+    shared `conftest.py` fixtures other tests rely on).
+-   **Partial unique indexes for nullable "should be unique when present" columns**: use
+    `Index(name, col, unique=True, postgresql_where=text(...), sqlite_where=text(...))` (see
+    `orders.mpesa_receipt` and `staff_members(restaurant_id, phone)`) rather than a plain
+    `UniqueConstraint`, when NULL is a legitimate, expected, repeatable value (an unpaid
+    order, a staff member with no phone). A plain unique constraint on Postgres already
+    treats NULLs as distinct so this mostly matters for intent/readability and for matching
+    behavior across dialects.

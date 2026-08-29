@@ -33,18 +33,28 @@ the history window. Record the actual values here once verified:
 - Provider: __________  Schedule: __________  Retention: __________  PITR window: __________
 
 **Secondary (recommended) — logical dump to object storage.** Belt-and-suspenders
-against "provider account compromised / project deleted":
+against "provider account compromised / project deleted". Implemented (not just
+described) as `backend/scripts/backup_db.sh`, run daily by
+`.github/workflows/backup.yml` (GitHub Actions scheduled workflow, 03:17 UTC +
+manual `workflow_dispatch`):
 
 ```bash
-# Run from anywhere with DATABASE_URL set (read-only role if possible).
-pg_dump "$DATABASE_URL" --no-owner --format=custom \
-  --file "backup_$(date +%Y%m%d_%H%M%S).dump"
-# Upload the .dump to S3/R2/GCS with lifecycle expiry (e.g. keep 30 days).
+DATABASE_URL=...        # a read-only DB role if possible
+BACKUP_S3_BUCKET=...
+bash backend/scripts/backup_db.sh
 ```
 
-Schedule this as an external cron (GitHub Actions scheduled workflow, or a
-Railway cron service). Verify a dump restores (§2) — an untested backup is not a
-backup.
+Set an S3 lifecycle rule on the bucket/prefix to expire old backups (e.g. keep
+30 days) — the script does not manage retention itself.
+
+**Still required before this is live** (not fixable by editing files —
+credential/dashboard access needed): add `DATABASE_URL`, `BACKUP_S3_BUCKET`,
+`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` as GitHub Actions repo secrets.
+Until then the scheduled workflow will fail at the "Run backup" step every
+night — that failure is itself a signal the secrets are still missing.
+
+Verify a dump restores (§2 — also now scripted, `backend/scripts/restore_drill.sh`)
+— an untested backup is not a backup.
 
 ---
 
@@ -56,13 +66,21 @@ target DB — never restore over production during a drill.
 1. Provision a scratch Postgres (Railway "new database" or local Docker).
 2. Restore the latest backup into it:
    - Managed snapshot: use the provider's "restore to new database" flow.
-   - Logical dump: `pg_restore --no-owner --dbname "$SCRATCH_URL" backup_XXXX.dump`
+   - Logical dump: run `backend/scripts/restore_drill.sh` (mechanizes steps
+     2-3 below — restore, migrate, health-check, print row timestamps) with
+     `SCRATCH_DATABASE_URL` and `DUMP_FILE` set. It refuses to run if
+     `SCRATCH_DATABASE_URL` contains "prod".
 3. Point a local app at it: `DATABASE_URL=$SCRATCH_URL alembic upgrade head` then
    boot the app; hit `/health/db` (expect 200) and spot-check row counts for
    `orders`, `token_usage`, `customer_consents`.
 4. **Record** the wall-clock time taken (→ RTO) and the age of the newest data
    restored (→ RPO) in the table above.
 5. Tear down the scratch DB.
+
+**Still required before this is done** (not fixable by editing files — needs a
+real scratch DB and real credentials): actually run `restore_drill.sh` once
+end-to-end and fill in §0's RTO/RPO/provider/schedule/retention blanks with
+the real, observed values.
 
 ---
 

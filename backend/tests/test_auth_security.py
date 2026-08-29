@@ -14,7 +14,7 @@ def _register_user(client, email="lockouttest@example.com", password="CorrectHor
     resp = client.post("/api/v1/auth/register", json={
         "email": email, "password": password, "tenant_name": "Lockout Test Co",
     })
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     return email, password
 
 

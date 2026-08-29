@@ -43,7 +43,7 @@ def send_email(to: str, subject: str, body: str) -> bool:
     if not _SMTP_CONFIGURED:
         # The body carries raw single-use auth tokens (reset/verify links) —
         # anyone with log access could use them to take over the account.
-        redacted = re.sub(r"(token=)[^\s&'\"]+", r"\1[REDACTED]", body)
+        redacted = re.sub(r"(token=)[^\s&'"]+", r"\1[REDACTED]", body)
         logger.info("[email] (SMTP not configured) to=%s subject=%r body=%r", to, subject, redacted)
         return False
 
@@ -55,7 +55,9 @@ def send_email(to: str, subject: str, body: str) -> bool:
 
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+            server.ehlo()
             server.starttls()
+            server.ehlo()
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.send_message(msg)
         return True

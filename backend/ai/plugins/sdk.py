@@ -1,6 +1,6 @@
 """
 backend/ai/plugins/sdk.py
-───────────────────────────
+───────────────────
 Marketplace / Plugin SDK (Phase 11). Lets third parties contribute agents
 (payroll, accounting, loyalty, …) that run on the platform as first-class
 citizens of the Decision Intelligence stream — WITHOUT handing them the keys.
@@ -179,6 +179,24 @@ class PluginRegistry:
 registry = PluginRegistry()
 
 
+def _safe_int(value: object, default: int) -> int:
+    """Convert *value* to int, returning *default* on any failure."""
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_impact(value: object) -> int | None:
+    """Return *value* as int if convertible, else None."""
+    if value is None:
+        return None
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
 def collect_plugin_decisions(db: Session, restaurant_id: int):
     """
     Invoke every registered read-only plugin that `provides` "decisions" and
@@ -197,15 +215,21 @@ def collect_plugin_decisions(db: Session, restaurant_id: int):
         for d in res.get("result") or []:
             if not isinstance(d, dict) or "action" not in d:
                 continue
-            out.append(Decision(
-                agent=f"plugin:{p.manifest.name}",
-                category=d.get("category", "plugin"),
-                action=str(d["action"]),
-                rationale=str(d.get("rationale", "")),
-                confidence_pct=int(d.get("confidence_pct", 50)),
-                risk=int(d.get("risk", 3)),
-                difficulty=int(d.get("difficulty", 3)),
-                impact_cents_month=d.get("impact_cents_month"),
-                data_sources=[f"plugin:{p.manifest.name}"],
-            ))
+            try:
+                out.append(Decision(
+                    agent=f"plugin:{p.manifest.name}",
+                    category=d.get("category", "plugin"),
+                    action=str(d["action"]),
+                    rationale=str(d.get("rationale", "")),
+                    confidence_pct=_safe_int(d.get("confidence_pct", 50), 50),
+                    risk=_safe_int(d.get("risk", 3), 3),
+                    difficulty=_safe_int(d.get("difficulty", 3), 3),
+                    impact_cents_month=_safe_impact(d.get("impact_cents_month")),
+                    data_sources=[f"plugin:{p.manifest.name}"],
+                ))
+            except Exception as exc:  # noqa: BLE001 — isolate a single bad decision dict
+                logger.warning(
+                    "plugin '%s' produced an invalid decision dict (skipped): %s",
+                    p.manifest.name, exc,
+                )
     return out

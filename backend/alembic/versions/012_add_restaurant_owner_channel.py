@@ -23,17 +23,19 @@ depends_on = None
 
 
 def _column_exists(table_name: str, column_name: str) -> bool:
-    return any(c["name"] == column_name for c in sa.inspect(op.get_bind()).get_columns(table_name))
+    bind = op.get_context().bind
+    return any(c["name"] == column_name for c in sa.inspect(bind).get_columns(table_name))
 
 
 def upgrade() -> None:
     if not _column_exists("restaurants", "owner_channel"):
         op.add_column(
             "restaurants",
-            sa.Column("owner_channel", sa.String(), nullable=True, server_default="whatsapp"),
+            sa.Column("owner_channel", sa.String(), nullable=True, server_default="'whatsapp'"),
         )
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("restaurants") as batch_op:
-        batch_op.drop_column("owner_channel")
+    if _column_exists("restaurants", "owner_channel"):
+        with op.batch_alter_table("restaurants") as batch_op:
+            batch_op.drop_column("owner_channel")

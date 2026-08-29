@@ -13,6 +13,7 @@ digits-only comparison rather than silently failing to match.
 STOP keywords follow the Twilio/industry-standard set; START/UNSTOP resume.
 """
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 import models
 from payments.mpesa_client import normalize_phone
@@ -68,9 +69,14 @@ def record_opt_out(db: Session, phone: str, source: str = "whatsapp_stop") -> bo
         return False
     if is_opted_out(db, phone):
         return False
-    db.add(models.CustomerOptOut(customer_phone=key, source=source))
-    db.commit()
-    return True
+    try:
+        db.add(models.CustomerOptOut(customer_phone=key, source=source))
+        db.commit()
+        return True
+    except IntegrityError:
+        # Another concurrent request already inserted this key (race condition).
+        db.rollback()
+        return False
 
 
 def remove_opt_out(db: Session, phone: str) -> bool:

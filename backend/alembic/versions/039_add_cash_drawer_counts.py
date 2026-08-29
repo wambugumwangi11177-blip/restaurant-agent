@@ -24,36 +24,35 @@ branch_labels = None
 depends_on = None
 
 
-def _insp():
-    return sa.inspect(op.get_bind())
-
-
 def _table_exists(name: str) -> bool:
-    return name in _insp().get_table_names()
+ bind = op.get_bind()
+ insp = sa.inspect(bind)
+ return name in insp.get_table_names()
 
 
 def upgrade():
-    if not _table_exists("cash_drawer_counts"):
-        op.create_table(
-            "cash_drawer_counts",
-            sa.Column("id", sa.Integer(), primary_key=True),
-            sa.Column("restaurant_id", sa.Integer(), sa.ForeignKey("restaurants.id"), nullable=False),
-            sa.Column("labor_shift_id", sa.Integer(),
-                      sa.ForeignKey("labor_shifts.id", ondelete="RESTRICT"), nullable=True),
-            sa.Column("window_start", sa.DateTime(), nullable=False),
-            sa.Column("window_end", sa.DateTime(), nullable=False),
-            sa.Column("expected_amount_cents", sa.Integer(), nullable=False),
-            sa.Column("counted_amount_cents", sa.Integer(), nullable=False),
-            sa.Column("counted_by_user_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
-            sa.Column("counted_at", sa.DateTime(), nullable=True),
-            sa.Column("notes", sa.Text(), nullable=True),
-        )
-        op.create_index(
-            "ix_cash_drawer_counts_restaurant_window", "cash_drawer_counts",
-            ["restaurant_id", "window_start"],
-        )
+ if not _table_exists("cash_drawer_counts"):
+ op.create_table(
+ "cash_drawer_counts",
+ sa.Column("id", sa.Integer(), primary_key=True),
+ sa.Column("restaurant_id", sa.Integer(), sa.ForeignKey("restaurants.id"), nullable=False),
+ sa.Column("labor_shift_id", sa.Integer(),
+ sa.ForeignKey("labor_shifts.id", ondelete="RESTRICT"), nullable=True),
+ sa.Column("window_start", sa.DateTime(timezone=True), nullable=False),
+ sa.Column("window_end", sa.DateTime(timezone=True), nullable=False),
+ sa.Column("expected_amount_cents", sa.Integer(), nullable=False),
+ sa.Column("counted_amount_cents", sa.Integer(), nullable=False),
+ sa.Column("counted_by_user_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
+ sa.Column("counted_at", sa.DateTime(timezone=True), nullable=True),
+ sa.Column("notes", sa.Text(), nullable=True),
+ )
+ op.create_index(
+ "ix_cash_drawer_counts_restaurant_window", "cash_drawer_counts",
+ ["restaurant_id", "window_start"],
+ )
 
 
 def downgrade():
-    if _table_exists("cash_drawer_counts"):
-        op.drop_table("cash_drawer_counts")
+ if _table_exists("cash_drawer_counts"):
+ op.drop_index("ix_cash_drawer_counts_restaurant_window", table_name="cash_drawer_counts")
+ op.drop_table("cash_drawer_counts")

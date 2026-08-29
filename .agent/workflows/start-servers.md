@@ -21,7 +21,7 @@ description: How to start the backend and frontend servers locally
 netstat -ano | findstr ":3000 :8000"
 ```
 
-2. Start the backend (from project root):
+2. Start the backend (from `backend/` directory):
 ```
 cmd /c ".\venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8000"
 ```

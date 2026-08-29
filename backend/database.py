@@ -47,6 +47,9 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
@@ -54,4 +57,3 @@ def get_db():
 def init_db():
     from models import Base
     Base.metadata.create_all(bind=engine)
-

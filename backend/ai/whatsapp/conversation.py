@@ -50,6 +50,7 @@ def save_turn(restaurant_id: int, role: str, content: str) -> None:
         ))
         session.commit()
     except Exception as exc:
+        session.rollback()
         logger.warning("[Conversation] save_turn failed: %s", exc)
     finally:
         session.close()

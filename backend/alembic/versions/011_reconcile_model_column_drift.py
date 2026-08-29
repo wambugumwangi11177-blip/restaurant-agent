@@ -91,19 +91,33 @@ def upgrade() -> None:
                 skipped.append(f"{table.name}.{col.name} (NOT NULL, no server_default)")
                 continue
 
+            # Copy the type so we don't mutate or re-attach the shared type object
+            # from the model metadata. Stateful types (e.g. Enum) can break if the
+            # same instance is used in two Column definitions.
+            col_type = col.type.copy() if hasattr(col.type, "copy") else col.type
+
             # Postgres: the enum TYPE must exist before a column can reference it.
             # checkfirst avoids a duplicate-type error when another column already
             # created it. Harmless no-op on SQLite.
-            if isinstance(col.type, sa.Enum):
-                col.type.create(bind, checkfirst=True)
+            if isinstance(col_type, sa.Enum):
+                col_type.create(bind, checkfirst=True)
+
+            # Extract the server_default argument in a form safe to pass to a new
+            # Column. A ColumnDefault wraps a clause/scalar; FetchedValue is used
+            # as-is. Passing the raw object from the source column works in
+            # SQLAlchemy but can carry references back to the original column, so
+            # we extract just the arg when it is a simple DefaultClause.
+            server_default = col.server_default
+            if isinstance(server_default, sa.schema.DefaultClause):
+                server_default = server_default.arg
 
             op.add_column(
                 table.name,
                 sa.Column(
                     col.name,
-                    col.type,
+                    col_type,
                     nullable=col.nullable,
-                    server_default=col.server_default,
+                    server_default=server_default,
                 ),
             )
             added.append(f"{table.name}.{col.name}")

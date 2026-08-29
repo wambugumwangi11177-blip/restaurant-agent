@@ -21,4 +21,5 @@ def get_impact(db: Session, restaurant_id: int, entity_type: str, ref_id) -> dic
     report = impact_report(graph, entity_type, ref_id)
     if isinstance(report, dict):
         report["graph_stats"] = graph.stats()
-    return report
+        return report
+    return {"error": "impact_report returned an unexpected result", "raw": str(report), "graph_stats": graph.stats()}

@@ -115,9 +115,12 @@ def recall_context(
     same_dow   = for_date.weekday()
 
     # Same month in prior years — seasonal pattern retrieval
+    # Respect lookback_years so we don't pull unbounded history
+    lookback_cutoff = date(for_date.year - lookback_years, 1, 1)
     seasonal_memories = db.query(models.MemoryEvent).filter(
         models.MemoryEvent.restaurant_id == restaurant_id,
         models.MemoryEvent.month_number  == same_month,
+        models.MemoryEvent.event_date    >= lookback_cutoff,
         models.MemoryEvent.event_date    < for_date,
     ).order_by(models.MemoryEvent.event_date.desc()).limit(10).all()
 

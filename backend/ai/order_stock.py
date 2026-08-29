@@ -21,6 +21,7 @@ for insufficient stock, it just deducts, possibly into negative, and the
 existing low-stock alert pipeline picks it up from there.
 """
 
+from events.bus import emit_async, EventType
 from sqlalchemy.orm import Session
 
 import models
@@ -120,18 +121,16 @@ def _autohide_menu_items_for_depleted_ingredient(db: Session, restaurant_id: int
     if not links:
         return
 
-    for link in links:
-        menu_item = db.query(models.MenuItem).filter(
-            models.MenuItem.id == link.menu_item_id,
-            models.MenuItem.restaurant_id == restaurant_id,
-            models.MenuItem.is_available.is_(True),
-        ).first()
-        if not menu_item:
-            continue
+    affected_menu_item_ids = {link.menu_item_id for link in links}
+    menu_items = db.query(models.MenuItem).filter(
+        models.MenuItem.id.in_(affected_menu_item_ids),
+        models.MenuItem.restaurant_id == restaurant_id,
+        models.MenuItem.is_available.is_(True),
+    ).all()
 
+    for menu_item in menu_items:
         menu_item.is_available = False
 
-        from events.bus import emit_async, EventType
         emit_async(EventType.MENU_ITEM_UNAVAILABLE, {
             "restaurant_id": restaurant_id,
             "item_name": menu_item.name,

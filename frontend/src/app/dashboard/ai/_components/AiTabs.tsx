@@ -1,31 +1,34 @@
 "use client";
 
 /**
- * AiTabs — the AI Command Center's module grouper. The hub previously
- * stacked ~20 section cards on one screen (overstimulating); modules now
- * live in four themed tabs so the default view is a calm summary.
+ * AiTabs — the Overview's two views. The whole product is now framed as one
+ * business system: **Today** (what's happening right now) and **Insights**
+ * (why, and what the data says). The earlier five themed tabs (Summary/Money/
+ * Operations/Growth/Trust) exposed internal architecture to the owner; their
+ * content lives on inside the Insights tab, grouped but not deleted.
  *
- * Keyboard: tabs are real buttons with role="tab"; ArrowLeft/ArrowRight move
- * between them (WAI-ARIA tabs pattern). The active tab is synced to the URL
- * hash (#money, #ops, #growth, #trust) so refresh/back keeps the tab.
+ * Keyboard: real buttons with role="tab"; ArrowLeft/ArrowRight move between
+ * them (WAI-ARIA tabs pattern). The active tab is synced to the URL hash so
+ * refresh/back keeps it. Legacy hashes (#money, #ops, #growth, #trust,
+ * #overview) all resolve to Insights so old bookmarks keep working.
  */
 import { KeyboardEvent } from "react";
 
 export const AI_TABS = [
-    { id: "overview", label: "Summary" },
-    { id: "money", label: "Money" },
-    { id: "ops", label: "Operations" },
-    { id: "growth", label: "Growth & Strategy" },
-    { id: "trust", label: "Trust & Safety" },
+    { id: "today", label: "Today" },
+    { id: "insights", label: "Insights" },
 ] as const;
 
 export type AiTabId = (typeof AI_TABS)[number]["id"];
 
+// Old 5-tab hashes — keep every existing bookmark/deep link landing somewhere
+// sensible instead of snapping back to the default.
+const LEGACY_INSIGHT_HASHES = new Set(["overview", "money", "ops", "growth", "trust"]);
+
 export function tabFromHash(hash: string): AiTabId {
     const id = hash.replace("#", "");
-    return (AI_TABS as readonly { id: string; label: string }[]).some((t) => t.id === id)
-        ? (id as AiTabId)
-        : "overview";
+    if (id === "insights" || LEGACY_INSIGHT_HASHES.has(id)) return "insights";
+    return "today";
 }
 
 export default function AiTabs({
@@ -48,7 +51,7 @@ export default function AiTabs({
     return (
         <div
             role="tablist"
-            aria-label="AI modules"
+            aria-label="Overview views"
             onKeyDown={handleKeyDown}
             className="flex items-center gap-1 border-b border-[var(--border)] overflow-x-auto"
         >

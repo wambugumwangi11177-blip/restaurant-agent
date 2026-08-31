@@ -1,15 +1,7 @@
 "use client";
 
 import { Zap, CheckCircle } from "lucide-react";
-
-// Turns the health breakdown into specific, prioritised "do this next" guidance.
-const HEALTH_ADVICE: Record<string, (detail: string) => string> = {
-    "Menu Health": () => "Rework or remove your 'Dog' items and reprice 'Plowhorses' — see Menu Engineering below. Fewer weak items lifts this fast.",
-    "Revenue Trend": () => "Revenue is trending down week-over-week. Run a promo on slow days and push high-margin items to reverse it.",
-    "Kitchen Efficiency": () => "Prep times are dragging on the flagged stations. Rebalance staff to the bottleneck stations during peak hours.",
-    "Inventory Status": () => "Restock the low items and use up near-expiry stock first (FIFO) to clear spoilage-risk flags.",
-    "Reservation Reliability": () => "Cut no-shows with SMS reminders and a small deposit on large parties — that lifts completion and recovers lost covers.",
-};
+import { HEALTH_ADVICE } from "./healthAdvice";
 
 export default function HealthBoostSection({ breakdown, score }: { breakdown: { category: string; score: number; detail: string }[]; score: number }) {
     const weak = breakdown.filter((b) => b.score < 70).sort((a, b) => a.score - b.score);

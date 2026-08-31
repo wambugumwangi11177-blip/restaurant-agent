@@ -2,7 +2,7 @@
 
 /**
  * /dashboard/ai/[module] — the full, extensive dashboard for one AI module.
- * The AI Command Center (/dashboard/ai) shows compact summaries; each module
+ * The Overview (/dashboard/ai) shows compact summaries; each module
  * links here for the complete payload. Registry-driven: add a module in
  * _full/registry.tsx and link it from the hub section via ModuleShell fullHref.
  */
@@ -21,7 +21,7 @@ export default function ModuleDashboardPage() {
         return (
             <div className="space-y-4">
                 <Link href="/dashboard/ai" className="flex items-center gap-2 text-text-dim text-sm hover:text-text">
-                    <ArrowLeft className="w-4 h-4" /> Back to AI Command Center
+                    <ArrowLeft className="w-4 h-4" /> Back to Overview
                 </Link>
                 <div className="rounded-xl border border-surface-hover bg-[#0f0f0f] p-8 text-center">
                     <Brain className="w-8 h-8 text-[var(--accent)] mx-auto mb-3" />
@@ -36,7 +36,7 @@ export default function ModuleDashboardPage() {
     return (
         <div className="space-y-5">
             <Link href="/dashboard/ai" className="flex items-center gap-2 text-text-dim text-sm hover:text-text w-fit">
-                <ArrowLeft className="w-4 h-4" /> AI Command Center
+                <ArrowLeft className="w-4 h-4" /> Overview
             </Link>
             <div>
                 <h1 className="text-2xl font-bold text-text">{mod.title}</h1>

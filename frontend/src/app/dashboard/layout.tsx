@@ -20,7 +20,7 @@ import {
     ShoppingBag,
     Package,
     CalendarDays,
-    Brain,
+    LayoutDashboard,
     LogOut,
     Repeat,
     Menu as MenuIcon,
@@ -55,17 +55,17 @@ interface NavItem {
 // links and forces visual scanning on every navigation.
 const navSections: { label: string; items: NavItem[] }[] = [
     {
-        label: "Main",
+        label: "Home",
         items: [
             { href: "/dashboard", label: "Home", icon: Home },
-            { href: "/dashboard/pos", label: "POS", icon: CreditCard },
-            { href: "/dashboard/kitchen", label: "Kitchen", icon: ChefHat },
-            { href: "/dashboard/orders", label: "Orders", icon: ShoppingBag },
         ],
     },
     {
-        label: "Operations",
+        label: "Operate",
         items: [
+            { href: "/dashboard/pos", label: "POS", icon: CreditCard },
+            { href: "/dashboard/kitchen", label: "Kitchen", icon: ChefHat },
+            { href: "/dashboard/orders", label: "Orders", icon: ShoppingBag },
             { href: "/dashboard/menu", label: "Menu", icon: UtensilsCrossed },
             { href: "/dashboard/inventory", label: "Stock", icon: Package },
             { href: "/dashboard/reservations", label: "Bookings", icon: CalendarDays },
@@ -75,10 +75,10 @@ const navSections: { label: string; items: NavItem[] }[] = [
     {
         label: "Insights",
         items: [
+            // The Overview — one coherent business view (Today + Insights). The
+            // module detail pages still live under /dashboard/ai/[module].
+            { href: "/dashboard/ai", label: "Overview", icon: LayoutDashboard },
             { href: "/dashboard/sales", label: "Sales", icon: DollarSign },
-            // The AI Command Center. Superseded /dashboard/insights, which served a
-            // hardcoded Lavy demo and was deleted 2026-07-08.
-            { href: "/dashboard/ai", label: "AI", icon: Brain },
             { href: "/dashboard/marketing", label: "Growth", icon: Megaphone },
             { href: "/dashboard/roi", label: "ROI", icon: Clock },
         ],

@@ -212,7 +212,132 @@ async def delete_reservation(
     return {"message": "Reservation deleted"}
 
 
+# ── Floor & Table Management ──
+
+@router.get("/tables/all")
+async def list_tables(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+    tables = db.query(models.Table).filter(
+        models.Table.restaurant_id == restaurant.id
+    ).order_by(models.Table.table_number.asc()).all()
+
+    # Find active seated bookings/orders
+    results = []
+    for t in tables:
+        results.append({
+            "id": t.id,
+            "table_number": t.table_number,
+            "capacity": t.capacity,
+            "status": t.status.value if t.status else "available",
+        })
+    return results
+
+
+@router.post("/tables/create")
+async def create_table(
+    table_number: int = Query(...),
+    capacity: int = Query(4),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+    existing = db.query(models.Table).filter(
+        models.Table.restaurant_id == restaurant.id,
+        models.Table.table_number == table_number,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Table {table_number} already exists")
+
+    t = models.Table(
+        restaurant_id=restaurant.id,
+        table_number=table_number,
+        capacity=capacity,
+        status=models.TableStatus.AVAILABLE,
+    )
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return {"id": t.id, "table_number": t.table_number, "capacity": t.capacity, "status": t.status.value}
+
+
+@router.patch("/tables/{table_id}/status")
+async def update_table_status(
+    table_id: int,
+    status: str = Query(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+    t = db.query(models.Table).filter(
+        models.Table.id == table_id,
+        models.Table.restaurant_id == restaurant.id,
+    ).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Table not found")
+
+    try:
+        t.status = models.TableStatus(status)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid table status: {status}")
+
+    db.commit()
+    db.refresh(t)
+    return {"id": t.id, "table_number": t.table_number, "status": t.status.value}
+
+
+@router.post("/walk-in")
+async def seat_walk_in(
+    table_id: int = Query(...),
+    party_size: int = Query(2),
+    customer_name: str = Query("Walk-in"),
+    notes: str = Query(""),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+    t = db.query(models.Table).filter(
+        models.Table.id == table_id,
+        models.Table.restaurant_id == restaurant.id,
+    ).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Table not found")
+
+    from time_utils import business_today
+    import datetime as dt
+
+    today = business_today(restaurant)
+    now_time = dt.datetime.now().time()
+
+    res = models.Reservation(
+        restaurant_id=restaurant.id,
+        customer_name=customer_name,
+        party_size=party_size,
+        reservation_date=today,
+        reservation_time=now_time,
+        duration_minutes=90,
+        table_id=t.id,
+        status=models.ReservationStatus.COMPLETED,
+        notes=f"Walk-in seated. {notes}".strip(),
+    )
+    t.status = models.TableStatus.OCCUPIED
+    db.add(res)
+    db.commit()
+    db.refresh(res)
+    return _res_to_dict(res)
+
+
 def _res_to_dict(r: models.Reservation) -> dict:
+    reminder_text = "Not required"
+    if r.deposit_paid:
+        reminder_text = "Deposit paid (KES 1,000)"
+    elif r.reminder_sent_at:
+        reminder_text = "Reminder sent"
+    elif r.status == models.ReservationStatus.CONFIRMED:
+        reminder_text = "Pending reminder"
+
     return {
         "id": r.id,
         "customer_name": r.customer_name or "",
@@ -224,7 +349,9 @@ def _res_to_dict(r: models.Reservation) -> dict:
         "duration_minutes": r.duration_minutes or 90,
         "status": r.status.value if r.status else "confirmed",
         "deposit_paid": r.deposit_paid or False,
+        "reminder_status": reminder_text,
         "notes": r.notes or "",
         "table_id": r.table_id,
         "created_at": r.created_at,
     }
+

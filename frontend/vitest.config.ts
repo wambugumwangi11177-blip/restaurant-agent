@@ -8,6 +8,9 @@ export default defineConfig({
         environment: "jsdom",
         setupFiles: ["./vitest.setup.ts"],
         globals: true,
+        // "threads" workers time out on this Windows setup ("Timeout waiting
+        // for worker to respond"); forks is the reliable pool here.
+        pool: "forks",
     },
     resolve: {
         alias: {

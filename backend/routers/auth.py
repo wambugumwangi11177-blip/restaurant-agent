@@ -14,12 +14,16 @@ FIXES:
 """
 
 from datetime import timedelta
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from sqlalchemy.orm import Session, joinedload
 from database import get_db
-import models, auth
+import models
+import auth
 from schemas import StrictModel
-from routers.deps import get_restaurant_or_none
+from routers.deps import get_restaurant_or_none, get_or_create_restaurant
 from rate_limit import limiter
 from time_utils import utcnow
 
@@ -69,7 +73,8 @@ class RestaurantUpdate(StrictModel):
     address: str | None = None
     currency: str | None = None
     timezone: str | None = None
-    owner_phone: str | None = None   # E.164, e.g. +2547...; used for WhatsApp owner routing
+    # E.164, e.g. +2547...; used for WhatsApp owner routing
+    owner_phone: str | None = None
 
 
 class PinSet(StrictModel):
@@ -143,12 +148,14 @@ async def register(request: Request, user_data: UserCreate, db: Session = Depend
 @router.post("/login", response_model=Token)
 @limiter.limit("10/minute")
 async def login(request: Request, login_data: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == login_data.email).first()
+    user = db.query(models.User).filter(
+        models.User.email == login_data.email).first()
 
     # Lockout check FIRST, before touching the password at all — rejects
     # locked accounts without a password-verification timing signal.
     if user and user.locked_until and user.locked_until > utcnow():
-        remaining = int((user.locked_until - utcnow()).total_seconds() / 60) + 1
+        remaining = int((user.locked_until - utcnow()
+                         ).total_seconds() / 60) + 1
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Account temporarily locked due to repeated failed logins. Try again in {remaining} minute(s).",
@@ -232,7 +239,8 @@ async def logout_all(
     # current_user instance (attached to get_current_user's session) and
     # committing a different session — that only persists while the two sessions
     # happen to be the same object, an implicit coupling we don't want to rely on.
-    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    user = db.query(models.User).filter(
+        models.User.id == current_user.id).first()
     user.token_version = (user.token_version or 0) + 1
     db.commit()
     return {"status": "all_sessions_revoked", "token_version": user.token_version}
@@ -249,7 +257,8 @@ async def mfa_setup(
     prove they can generate a valid code via /mfa/enable. Re-calling before enable
     rotates the pending secret.
     """
-    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    user = db.query(models.User).filter(
+        models.User.id == current_user.id).first()
     if user.mfa_enabled:
         raise HTTPException(status_code=400, detail="MFA is already enabled.")
     user.mfa_secret = auth.generate_mfa_secret()
@@ -267,11 +276,13 @@ async def mfa_enable(
     db: Session = Depends(get_db),
 ):
     """Activate MFA after verifying the first code against the pending secret."""
-    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    user = db.query(models.User).filter(
+        models.User.id == current_user.id).first()
     if not user.mfa_secret:
         raise HTTPException(status_code=400, detail="Call /mfa/setup first.")
     if not auth.verify_totp(user.mfa_secret, body.code):
-        raise HTTPException(status_code=400, detail="Invalid code — try again.")
+        raise HTTPException(
+            status_code=400, detail="Invalid code — try again.")
     user.mfa_enabled = True
     db.commit()
     return {"status": "mfa_enabled"}
@@ -285,7 +296,8 @@ async def mfa_disable(
 ):
     """Turn MFA off — requires a current valid code, so a stolen session alone
     can't strip the second factor."""
-    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    user = db.query(models.User).filter(
+        models.User.id == current_user.id).first()
     if not user.mfa_enabled:
         raise HTTPException(status_code=400, detail="MFA is not enabled.")
     if not auth.verify_totp(user.mfa_secret, body.code):
@@ -322,7 +334,8 @@ async def pin_set(
     this endpoint clears the failed-attempt counter, so without a limit it
     would be a way to reset the /pin/verify lockout at will."""
     _require_pin_format(body.pin)
-    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    user = db.query(models.User).filter(
+        models.User.id == current_user.id).first()
     user.pin_hash = auth.get_password_hash(body.pin)
     # Only fill in a display name that isn't set — re-setting a PIN shouldn't
     # silently rename someone who already has one.
@@ -385,7 +398,8 @@ async def pin_verify(
 
     if target.pin_locked_until:
         if target.pin_locked_until > utcnow():
-            remaining = int((target.pin_locked_until - utcnow()).total_seconds() / 60) + 1
+            remaining = int((target.pin_locked_until -
+                            utcnow()).total_seconds() / 60) + 1
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"PIN locked from repeated failed attempts. Try again in {remaining} minute(s).",
@@ -429,7 +443,8 @@ async def deactivate_user(
     if not target or target.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=404, detail="User not found")
     if target.id == current_user.id:
-        raise HTTPException(status_code=400, detail="Cannot deactivate your own account.")
+        raise HTTPException(
+            status_code=400, detail="Cannot deactivate your own account.")
 
     target.is_active = False
     target.token_version = (target.token_version or 0) + 1
@@ -491,3 +506,188 @@ async def update_restaurant(
         "address": restaurant.address,
         "owner_phone": restaurant.owner_phone,
     }
+
+
+# ── Staff Roster & Labor Clocking (Pass B9) ──
+
+class StaffMemberCreate(BaseModel):
+    name: str
+    role_title: str = "Staff"
+    hourly_rate_cents: int = 0
+    user_id: Optional[int] = None
+
+
+class ClockInOutRequest(BaseModel):
+    staff_member_id: int
+    notes: str = ""
+
+
+@router.get("/staff/roster")
+async def get_staff_roster(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+    staff = db.query(models.StaffMember).filter(
+        models.StaffMember.restaurant_id == restaurant.id,
+        models.StaffMember.is_active == True,
+    ).all()
+    return [
+        {
+            "id": s.id,
+            "name": s.name,
+            "role_title": s.role_title,
+            "hourly_rate_cents": s.hourly_rate or 0,
+            "user_id": s.user_id,
+            "is_active": s.is_active,
+        }
+        for s in staff
+    ]
+
+
+@router.post("/staff/roster")
+async def create_staff_member(
+    body: StaffMemberCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+    s = models.StaffMember(
+        restaurant_id=restaurant.id,
+        name=body.name,
+        role_title=body.role_title,
+        hourly_rate=body.hourly_rate_cents,
+        user_id=body.user_id,
+        is_active=True,
+    )
+    db.add(s)
+    db.commit()
+    db.refresh(s)
+    return {"id": s.id, "name": s.name, "role_title": s.role_title}
+
+
+@router.post("/staff/clock-in")
+async def staff_clock_in(
+    body: ClockInOutRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+    staff = db.query(models.StaffMember).filter(
+        models.StaffMember.id == body.staff_member_id,
+        models.StaffMember.restaurant_id == restaurant.id,
+    ).first()
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff member not found")
+
+    from time_utils import business_today
+    today = business_today(restaurant)
+    now = utcnow()
+
+    # Check if already clocked in today without clock-out
+    active_shift = db.query(models.LaborShift).filter(
+        models.LaborShift.staff_member_id == staff.id,
+        models.LaborShift.actual_end.is_(None),
+    ).first()
+    if active_shift:
+        return {"status": "already_clocked_in", "shift_id": active_shift.id, "clocked_in_at": active_shift.actual_start}
+
+    shift = models.LaborShift(
+        restaurant_id=restaurant.id,
+        staff_member_id=staff.id,
+        shift_date=today,
+        actual_start=now,
+        notes=body.notes or "",
+    )
+    db.add(shift)
+    db.commit()
+    db.refresh(shift)
+    return {"status": "clocked_in", "shift_id": shift.id, "clocked_in_at": shift.actual_start}
+
+
+@router.post("/staff/clock-out")
+async def staff_clock_out(
+    body: ClockInOutRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+    shift = db.query(models.LaborShift).filter(
+        models.LaborShift.staff_member_id == body.staff_member_id,
+        models.LaborShift.restaurant_id == restaurant.id,
+        models.LaborShift.actual_end.is_(None),
+    ).order_by(models.LaborShift.actual_start.desc()).first()
+
+    if not shift:
+        raise HTTPException(
+            status_code=400, detail="No active shift found to clock out")
+
+    now = utcnow()
+    shift.actual_end = now
+    duration_hours = max(
+        0.0, (now - shift.actual_start).total_seconds() / 3600.0)
+    shift.actual_hours = round(duration_hours, 2)
+    hourly_rate = shift.staff_member.hourly_rate if shift.staff_member else 0
+    shift.labor_cost = int(shift.actual_hours * hourly_rate)
+    if body.notes:
+        shift.notes = f"{shift.notes}\n{body.notes}".strip()
+
+    db.commit()
+    db.refresh(shift)
+    return {"status": "clocked_out", "shift_id": shift.id, "actual_hours": shift.actual_hours, "labor_cost_cents": shift.labor_cost}
+
+
+@router.get("/staff/on-floor")
+async def staff_on_floor(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+    active_shifts = db.query(models.LaborShift).options(
+        joinedload(models.LaborShift.staff_member)
+    ).filter(
+        models.LaborShift.restaurant_id == restaurant.id,
+        models.LaborShift.actual_end.is_(None),
+    ).all()
+
+    return [
+        {
+            "staff_id": s.staff_member_id,
+            "name": s.staff_member.name if s.staff_member else "Staff",
+            "role_title": s.staff_member.role_title if s.staff_member else "",
+            "shift_id": s.id,
+            "clocked_in_at": s.actual_start,
+        }
+        for s in active_shifts
+    ]
+
+
+@router.get("/staff/shifts")
+async def list_shifts(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+    shifts = db.query(models.LaborShift).options(
+        joinedload(models.LaborShift.staff_member)
+    ).filter(
+        models.LaborShift.restaurant_id == restaurant.id,
+    ).order_by(models.LaborShift.actual_start.desc()).limit(limit).all()
+
+    return [
+        {
+            "id": s.id,
+            "staff_member_id": s.staff_member_id,
+            "name": s.staff_member.name if s.staff_member else "",
+            "role_title": s.staff_member.role_title if s.staff_member else "",
+            "shift_date": s.shift_date,
+            "actual_start": s.actual_start,
+            "actual_end": s.actual_end,
+            "actual_hours": s.actual_hours or 0.0,
+            "labor_cost_cents": s.labor_cost or 0,
+            "is_overtime": (s.actual_hours or 0.0) > 8.0,
+            "notes": s.notes or "",
+        }
+        for s in shifts
+    ]

@@ -39,12 +39,23 @@ def _block_get(block, key):
         return block.get(key)
     return getattr(block, key, None)
 
+_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 _ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 _GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-_HEADROOM_ENABLED = os.getenv("HEADROOM_ENABLED", "true").lower() == "true"
-_HEADROOM_PROXY_URL = os.getenv("HEADROOM_PROXY_URL", "")
-_ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
-_GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+
+if _OPENAI_API_KEY and not _OPENAI_API_KEY.startswith("sk-your-"):
+    _PROVIDER = "openai"
+elif _ANTHROPIC_API_KEY:
+    _PROVIDER = "anthropic"
+elif _GROQ_API_KEY:
+    _PROVIDER = "groq"
+else:
+    _PROVIDER = None
+
+def get_provider() -> str | None:
+    global _PROVIDER
+    return _PROVIDER
+
 
 # Bound every LLM call: without a timeout a slow/hung provider ties up the
 # request (and, on a single gunicorn worker, starves all other traffic). Both
@@ -53,8 +64,6 @@ _GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 # env-tunable.
 _LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT_SECONDS", "30"))
 _LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
-
-_PROVIDER = "anthropic" if _ANTHROPIC_API_KEY else ("groq" if _GROQ_API_KEY else None)
 
 # ── Model tiers ──────────────────────────────────────────────────────────────
 # Callers pick a tier by task complexity; we resolve it to a concrete model for
@@ -67,19 +76,20 @@ _PROVIDER = "anthropic" if _ANTHROPIC_API_KEY else ("groq" if _GROQ_API_KEY else
 TIER_LOW, TIER_MEDIUM, TIER_HIGH = "low", "medium", "high"
 
 _MODEL_TIERS = {
+    "openai": {
+        TIER_LOW:    os.getenv("OPENAI_MODEL_LOW",    "gpt-4o-mini"),
+        TIER_MEDIUM: os.getenv("OPENAI_MODEL_MEDIUM", "gpt-4o"),
+        TIER_HIGH:   os.getenv("OPENAI_MODEL_HIGH",   "gpt-4o"),
+    },
     "anthropic": {
-        TIER_LOW:    os.getenv("ANTHROPIC_MODEL_LOW",    "claude-haiku-4-5-20251001"),
-        TIER_MEDIUM: os.getenv("ANTHROPIC_MODEL_MEDIUM", _ANTHROPIC_MODEL),
-        TIER_HIGH:   os.getenv("ANTHROPIC_MODEL_HIGH",   "claude-opus-4-8"),
+        TIER_LOW:    os.getenv("ANTHROPIC_MODEL_LOW",    "claude-3-5-haiku-20241022"),
+        TIER_MEDIUM: os.getenv("ANTHROPIC_MODEL_MEDIUM", "claude-3-5-sonnet-20241022"),
+        TIER_HIGH:   os.getenv("ANTHROPIC_MODEL_HIGH",   "claude-3-opus-20240229"),
     },
     "groq": {
-        # Groq has no equivalent to a big frontier model, so MEDIUM/HIGH both
-        # map to the largest configured model; only LOW drops to a smaller,
-        # faster one. When ANTHROPIC_API_KEY is added this table stops being
-        # used at all — the anthropic row above takes over.
         TIER_LOW:    os.getenv("GROQ_MODEL_LOW",    "llama-3.1-8b-instant"),
-        TIER_MEDIUM: os.getenv("GROQ_MODEL_MEDIUM", _GROQ_MODEL),
-        TIER_HIGH:   os.getenv("GROQ_MODEL_HIGH",   _GROQ_MODEL),
+        TIER_MEDIUM: os.getenv("GROQ_MODEL_MEDIUM", "llama-3.3-70b-versatile"),
+        TIER_HIGH:   os.getenv("GROQ_MODEL_HIGH",   "llama-3.3-70b-versatile"),
     },
 }
 
@@ -91,9 +101,10 @@ def model_for_tier(tier: str | None) -> str | None:
     given (callers then fall back to the provider default). Unknown tier names
     fall back to MEDIUM rather than erroring.
     """
-    if _PROVIDER is None or tier is None:
+    provider = get_provider()
+    if provider is None or tier is None:
         return None
-    tiers = _MODEL_TIERS.get(_PROVIDER, {})
+    tiers = _MODEL_TIERS.get(provider, {})
     return tiers.get(tier, tiers.get(TIER_MEDIUM))
 
 
@@ -102,7 +113,7 @@ _client = None
 
 def is_available() -> bool:
     """Check if any LLM provider is configured (used to feature-gate callers)."""
-    return _PROVIDER is not None
+    return get_provider() is not None
 
 
 def _get_client():
@@ -110,32 +121,36 @@ def _get_client():
     if _client is not None:
         return _client
 
-    if _PROVIDER == "anthropic":
+    provider = get_provider()
+    if provider == "openai":
+        from openai import OpenAI
+        _client = OpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            timeout=_LLM_TIMEOUT,
+            max_retries=_LLM_MAX_RETRIES,
+        )
+    elif provider == "anthropic":
         import anthropic
         kwargs = {
-            "api_key": _ANTHROPIC_API_KEY,
+            "api_key": os.getenv("ANTHROPIC_API_KEY"),
             "timeout": _LLM_TIMEOUT,
             "max_retries": _LLM_MAX_RETRIES,
         }
-        if _HEADROOM_ENABLED and _HEADROOM_PROXY_URL:
-            # Proxy mode: Headroom sits between us and Anthropic, compressing
-            # request bodies in transit. No other code changes required.
-            kwargs["base_url"] = _HEADROOM_PROXY_URL
+        if os.getenv("HEADROOM_ENABLED", "true").lower() == "true" and os.getenv("HEADROOM_PROXY_URL"):
+            kwargs["base_url"] = os.getenv("HEADROOM_PROXY_URL")
         _client = anthropic.Anthropic(**kwargs)
-    elif _PROVIDER == "groq":
-        # Groq exposes an OpenAI-compatible endpoint — reuse the openai SDK
-        # rather than adding a second HTTP client dependency.
+    elif provider == "groq":
         from openai import OpenAI
         _client = OpenAI(
-            api_key=_GROQ_API_KEY,
+            api_key=os.getenv("GROQ_API_KEY"),
             base_url="https://api.groq.com/openai/v1",
             timeout=_LLM_TIMEOUT,
             max_retries=_LLM_MAX_RETRIES,
         )
     else:
         raise RuntimeError(
-            "No LLM provider configured — set ANTHROPIC_API_KEY or GROQ_API_KEY "
-            "in backend/.env to enable LLM features."
+            "No LLM provider configured — set OPENAI_API_KEY, ANTHROPIC_API_KEY, or GROQ_API_KEY "
+            "in .env to enable LLM features."
         )
 
     return _client
@@ -176,11 +191,12 @@ def chat_with_usage(
     """
     client = _get_client()
     resolved = model or model_for_tier(tier)
+    provider = get_provider()
 
-    if _PROVIDER == "anthropic":
+    if provider == "anthropic":
         messages = _compress_if_library_mode(messages)
         kwargs = {
-            "model": resolved or _ANTHROPIC_MODEL,
+            "model": resolved or os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"),
             "max_tokens": max_tokens,
             "system": system,
             "messages": messages,
@@ -198,10 +214,11 @@ def chat_with_usage(
             ),
         )
 
-    # Groq / OpenAI-compatible
+    # OpenAI / Groq-compatible
+    default_model = "gpt-4o-mini" if provider == "openai" else os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
     openai_messages = ([{"role": "system", "content": system}] if system else []) + messages
     kwargs = {
-        "model": resolved or _GROQ_MODEL,
+        "model": resolved or default_model,
         "max_tokens": max_tokens,
         "messages": openai_messages,
     }
@@ -314,8 +331,9 @@ def chat_with_tools(
     """
     client = _get_client()
     resolved = model or model_for_tier(tier)
+    provider = get_provider()
 
-    if _PROVIDER == "anthropic":
+    if provider == "anthropic":
         messages = _compress_if_library_mode(messages)
         cached_tools = [dict(t) for t in tools]
         if cached_tools:
@@ -323,18 +341,19 @@ def chat_with_tools(
         system_blocks = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}] if system else []
 
         return client.messages.create(
-            model=resolved or _ANTHROPIC_MODEL,
+            model=resolved or os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"),
             max_tokens=max_tokens,
             system=system_blocks,
             tools=cached_tools,
             messages=messages,
         )
 
-    # Groq / OpenAI-compatible — translate request and response at the boundary
+    # OpenAI / Groq-compatible — translate request and response at the boundary
     # so ai/whatsapp/orchestrator.py's loop logic stays provider-agnostic.
+    default_model = "gpt-4o-mini" if provider == "openai" else os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
     openai_messages = ([{"role": "system", "content": system}] if system else []) + _canonical_messages_to_openai(messages)
     response = client.chat.completions.create(
-        model=resolved or _GROQ_MODEL,
+        model=resolved or default_model,
         max_tokens=max_tokens,
         messages=openai_messages,
         tools=_tools_to_openai_format(tools),

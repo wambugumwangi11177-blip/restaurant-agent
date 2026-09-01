@@ -199,39 +199,26 @@ class Order(Base):
     customer_phone = Column(String, default="")
     total = Column(Integer)  # In cents
     notes = Column(Text, default="")
+    discount_cents = Column(Integer, default=0)
+    discount_reason = Column(String, default="")
+    void_reason = Column(String, default="")
+    refund_cents = Column(Integer, default=0)
+    refund_reason = Column(String, default="")
+    tax_cents = Column(Integer, default=0)
+    service_charge_cents = Column(Integer, default=0)
     created_at = Column(DateTime, default=utcnow)
     completed_at = Column(DateTime, nullable=True)
-    # Client-generated key (migration 026, tech-debt D15): lets the POS offline
-    # queue safely replay a submission after a network drop without creating a
-    # duplicate order. Nullable: only orders submitted through the
-    # offline-aware POS flow set it. Unlike mpesa_checkout_request_id above —
-    # which really is globally unique (Safaricom issues it) — this is
-    # client-generated, so uniqueness is scoped to (restaurant_id,
-    # idempotency_key) in __table_args__, not global; a UUID collision across
-    # two different tenants must never 500 one of them.
     idempotency_key = Column(String, nullable=True)
-    # Shared-device PIN quick-switch (migration 028, tech-debt D16): who rang
-    # this order up, when the device session itself is logged in as a shared
-    # account. ATTRIBUTION ONLY — never used for authorization (see the
-    # User.pin_hash comment). SET NULL on user delete: this is metadata about
-    # who acted, not a record that should vanish or block cleanup.
     attributed_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     restaurant = relationship("Restaurant", back_populates="orders")
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    payments = relationship("OrderPayment", back_populates="order", cascade="all, delete-orphan")
     __table_args__ = (
-        # Tenant-scoped list/ordering and status filtering are the hot read paths;
-        # customer_phone drives export/erasure/customer resolution. FK columns
-        # aren't auto-indexed on Postgres — see migration 015.
         Index("ix_orders_restaurant_created", "restaurant_id", "created_at"),
         Index("ix_orders_restaurant_status", "restaurant_id", "status"),
         Index("ix_orders_customer_phone", "customer_phone"),
-        # An order total is money in cents — never negative. Allows 0 (comped/
-        # zero-total orders are legitimate). See migration 016.
         CheckConstraint("total >= 0", name="ck_orders_total_nonneg"),
-        # Per-tenant uniqueness (not global — see idempotency_key's comment).
-        # Postgres/SQLite both allow multiple NULLs through a unique
-        # constraint, so orders that never set the key are unaffected.
         UniqueConstraint("restaurant_id", "idempotency_key", name="uq_orders_restaurant_idempotency_key"),
     )
 
@@ -243,15 +230,34 @@ class OrderItem(Base):
     menu_item_id = Column(Integer, ForeignKey("menu_items.id"), index=True)
     quantity = Column(Integer, default=1)
     unit_price = Column(Integer)  # Snapshot of price at time of order
+    is_voided = Column(Boolean, default=False)
+    void_reason = Column(String, default="")
+    notes = Column(String, default="")
     
     order = relationship("Order", back_populates="items")
     menu_item = relationship("MenuItem", back_populates="order_items")
     prep_time = relationship("PrepTime", back_populates="order_item", uselist=False)
+    modifiers = relationship("OrderItemModifier", back_populates="order_item", cascade="all, delete-orphan")
     __table_args__ = (
-        # You cannot order a non-positive quantity; a line's unit price is money.
         CheckConstraint("quantity > 0", name="ck_order_items_qty_pos"),
         CheckConstraint("unit_price >= 0", name="ck_order_items_price_nonneg"),
     )
+
+class OrderPayment(Base):
+    """Split tender payment records per order."""
+    __tablename__ = "order_payments"
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), index=True, nullable=False)
+    payment_method = Column(String, nullable=False)  # "cash", "mpesa", "card"
+    amount_cents = Column(Integer, nullable=False)
+    reference = Column(String, default="")
+    created_at = Column(DateTime, default=utcnow)
+
+    order = relationship("Order", back_populates="payments")
+    __table_args__ = (
+        CheckConstraint("amount_cents > 0", name="ck_order_payments_amount_pos"),
+    )
+
 
 # ──────────────────────────────────────────────
 # KDS: PREP TIME TRACKING
@@ -952,3 +958,177 @@ class Region(Base):
     created_at      = Column(DateTime, default=utcnow)
 
     organization = relationship("Organization")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PASS B & C: OPERATIONAL CORE (Modifiers, Tills, Waste, Counts, Settings)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ModifierGroup(Base):
+    """Modifier groups attached to menu items (e.g. Milk choice, Extra shot, Size)."""
+    __tablename__ = "modifier_groups"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    name          = Column(String, nullable=False)
+    min_selection = Column(Integer, default=0)
+    max_selection = Column(Integer, default=1)
+    is_required   = Column(Boolean, default=False)
+    created_at    = Column(DateTime, default=utcnow)
+
+    restaurant = relationship("Restaurant")
+    options    = relationship("ModifierOption", back_populates="group", cascade="all, delete-orphan")
+
+
+class ModifierOption(Base):
+    """Concrete options within a modifier group (e.g. Oat Milk +KES 50)."""
+    __tablename__ = "modifier_options"
+
+    id                = Column(Integer, primary_key=True, index=True)
+    group_id          = Column(Integer, ForeignKey("modifier_groups.id"), nullable=False, index=True)
+    name              = Column(String, nullable=False)
+    price_delta_cents = Column(Integer, default=0)  # Cents added/subtracted
+    is_available      = Column(Boolean, default=True)
+
+    group = relationship("ModifierGroup", back_populates="options")
+
+
+class MenuItemModifierGroup(Base):
+    """Links modifier groups to menu items."""
+    __tablename__ = "menu_item_modifier_groups"
+
+    id                = Column(Integer, primary_key=True, index=True)
+    menu_item_id      = Column(Integer, ForeignKey("menu_items.id"), nullable=False, index=True)
+    modifier_group_id = Column(Integer, ForeignKey("modifier_groups.id"), nullable=False, index=True)
+
+    menu_item      = relationship("MenuItem")
+    modifier_group = relationship("ModifierGroup")
+
+    __table_args__ = (
+        UniqueConstraint("menu_item_id", "modifier_group_id", name="uq_menu_item_mod_group"),
+    )
+
+
+class OrderItemModifier(Base):
+    """Records the chosen modifiers for an order item line."""
+    __tablename__ = "order_item_modifiers"
+
+    id                 = Column(Integer, primary_key=True, index=True)
+    order_item_id      = Column(Integer, ForeignKey("order_items.id"), nullable=False, index=True)
+    modifier_option_id = Column(Integer, ForeignKey("modifier_options.id"), nullable=True)
+    name               = Column(String, nullable=False)
+    price_delta_cents  = Column(Integer, default=0)
+
+    order_item      = relationship("OrderItem", back_populates="modifiers")
+    modifier_option = relationship("ModifierOption")
+
+
+class TillSession(Base):
+    """
+    Cash drawer / till session for a shift:
+    Open float -> orders & tenders during shift -> X-report -> close (counted vs expected, variance logged).
+    """
+    __tablename__ = "till_sessions"
+
+    id                    = Column(Integer, primary_key=True, index=True)
+    restaurant_id         = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    user_id               = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    opening_float_cents   = Column(Integer, default=0)
+    closing_counted_cents = Column(Integer, nullable=True)
+    expected_cash_cents   = Column(Integer, nullable=True)
+    variance_cents        = Column(Integer, nullable=True)
+    variance_reason       = Column(Text, default="")
+    status                = Column(String, default="open")  # "open", "closed"
+    opened_at             = Column(DateTime, default=utcnow)
+    closed_at             = Column(DateTime, nullable=True)
+    notes                 = Column(Text, default="")
+
+    restaurant = relationship("Restaurant")
+    user       = relationship("User")
+
+    __table_args__ = (
+        Index("ix_till_sessions_restaurant_status", "restaurant_id", "status"),
+    )
+
+
+class InventoryCount(Base):
+    """Inventory count sheet (stock count vs theoretical)."""
+    __tablename__ = "inventory_counts"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    user_id       = Column(Integer, ForeignKey("users.id"), nullable=False)
+    count_date    = Column(Date, nullable=False)
+    status        = Column(String, default="draft")  # "draft", "posted"
+    notes         = Column(Text, default="")
+    created_at    = Column(DateTime, default=utcnow)
+    posted_at     = Column(DateTime, nullable=True)
+
+    restaurant = relationship("Restaurant")
+    user       = relationship("User")
+    lines      = relationship("InventoryCountLine", back_populates="count", cascade="all, delete-orphan")
+
+
+class InventoryCountLine(Base):
+    """Individual item line within an inventory count."""
+    __tablename__ = "inventory_count_lines"
+
+    id                = Column(Integer, primary_key=True, index=True)
+    count_id          = Column(Integer, ForeignKey("inventory_counts.id"), nullable=False, index=True)
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id"), nullable=False, index=True)
+    theoretical_qty   = Column(Float, default=0.0)
+    counted_qty       = Column(Float, default=0.0)
+    variance_qty      = Column(Float, default=0.0)
+
+    count          = relationship("InventoryCount", back_populates="lines")
+    inventory_item = relationship("InventoryItem")
+
+
+class WasteLog(Base):
+    """Waste log for stock loss tracking with mandatory reason."""
+    __tablename__ = "waste_logs"
+
+    id                = Column(Integer, primary_key=True, index=True)
+    restaurant_id     = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id"), nullable=False, index=True)
+    user_id           = Column(Integer, ForeignKey("users.id"), nullable=False)
+    quantity          = Column(Float, nullable=False)
+    unit              = Column(String, default="")
+    reason            = Column(String, nullable=False)  # "spoil", "trim", "staff_meal", "error", "theft"
+    cost_cents        = Column(Integer, default=0)
+    notes             = Column(Text, default="")
+    created_at        = Column(DateTime, default=utcnow)
+
+    restaurant     = relationship("Restaurant")
+    inventory_item = relationship("InventoryItem")
+    user           = relationship("User")
+
+
+class RestaurantSetting(Base):
+    """
+    Enterprise settings per restaurant: operating hours, VAT %, service charge %,
+    printers, tenders, service periods.
+    """
+    __tablename__ = "restaurant_settings"
+
+    id                     = Column(Integer, primary_key=True, index=True)
+    restaurant_id          = Column(Integer, ForeignKey("restaurants.id"), unique=True, nullable=False)
+    tax_rate_percent       = Column(Float, default=16.0)
+    service_charge_percent = Column(Float, default=0.0)
+    receipt_header         = Column(String, default="")
+    receipt_footer         = Column(String, default="Thank you for dining with us!")
+    currency               = Column(String, default="KES")
+    timezone               = Column(String, default="Africa/Nairobi")
+    opening_time           = Column(String, default="07:00")
+    closing_time           = Column(String, default="23:00")
+    lunch_start            = Column(String, default="11:30")
+    lunch_end              = Column(String, default="15:00")
+    dinner_start           = Column(String, default="18:00")
+    dinner_end             = Column(String, default="22:30")
+    stations_json          = Column(Text, default='["grill","fryer","salad","drinks","main","expo"]')
+    tenders_json           = Column(Text, default='["cash","mpesa","card"]')
+    kitchen_printer_url    = Column(String, default="")
+    receipt_printer_url    = Column(String, default="")
+
+    restaurant = relationship("Restaurant")
+

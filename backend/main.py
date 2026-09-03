@@ -253,11 +253,21 @@ default_origins = (
     "https://restaurant-agent-o38i.vercel.app"
 )
 cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", default_origins).split(",")]
-logger.info(f"[CORS] Allowed origins: {cors_origins}")
+# Safety net #2 (2026-09-03): the hardcoded origin above was found stale (the
+# Vercel project had been renamed/redeployed, so it 404'd) and the frontend got
+# browser-side "network error"s again. Vercel issues per-deployment subdomains
+# (project-<hash>.vercel.app, project-git-<branch>-<team>.vercel.app), so a
+# static allowlist silently breaks on every redeploy that changes the URL.
+# This regex keeps the boundary scoped to THIS project's Vercel hosts without
+# whitelisting arbitrary *.vercel.app tenants. CORS_ORIGINS remains the
+# authoritative, explicit allowlist for custom domains.
+cors_origin_regex = r"https://restaurant-agent[0-9a-z-]*\.vercel\.app"
+logger.info(f"[CORS] Allowed origins: {cors_origins} | regex fallback: {cors_origin_regex}")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
+    allow_origin_regex=cors_origin_regex,
     allow_credentials=True,
     # Tightened from ["*"] (tech-debt: audit finding, CORS wildcard methods/
     # headers). Origin allowlist above is the real boundary here; this just

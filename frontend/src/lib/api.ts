@@ -2,6 +2,24 @@ import axios from "axios";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// Fail loudly instead of silently (2026-09-03): when NEXT_PUBLIC_API_URL is
+// missing on a Vercel deployment, axios used to fall back to
+// http://localhost:8000 — the BROWSER's own machine — and every request died
+// with an opaque "Network Error" that looked like a backend outage. This
+// surfaces the real cause in the console at runtime.
+if (
+  typeof window !== "undefined" &&
+  process.env.NODE_ENV === "production" &&
+  !process.env.NEXT_PUBLIC_API_URL
+) {
+  console.error(
+    "[api] NEXT_PUBLIC_API_URL is NOT set — falling back to http://localhost:8000, " +
+      "which will fail from a deployed browser. Fix: Vercel → Project → Settings → " +
+      "Environment Variables → NEXT_PUBLIC_API_URL = your Railway backend URL " +
+      "(e.g. https://<service>.up.railway.app), then redeploy."
+  );
+}
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {

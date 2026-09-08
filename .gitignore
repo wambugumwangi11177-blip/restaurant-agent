@@ -37,6 +37,12 @@ graphify-out/
 _quarantine_untrusted/
 restaurant-agent/
 
+# Test/tooling artifacts (don't version local state)
+.coverage
+htmlcov/
+*.log
+
+
 
 # Local object-storage backend (Phase 9) — never commit uploaded blobs
 backend/.storage/

@@ -273,6 +273,12 @@ class ReservationOut(StrictModel):
     duration_minutes: int
     status: str
     deposit_paid: bool
+    # Human-readable reminder state computed in _res_to_dict (routers/reservations.py):
+    # "Not required" | "Deposit paid (KES 1,000)" | "Reminder sent" | "Pending reminder".
+    # Found 2026-09-08: the serializer emitted this field but the schema didn't declare
+    # it, and with extra="forbid" FastAPI rejected its own response on every
+    # reservation endpoint (ResponseValidationError) — 8 test failures.
+    reminder_status: str = "Not required"
     notes: str
     table_id: Optional[int]
     created_at: Optional[datetime] = None

@@ -239,9 +239,11 @@ def narrate(payload: dict, task: str, *, restaurant_id: int | None = None,
     # Same boundary pii_scrub was built for; it just was never wired here.
     # Grounding runs against the SCRUBBED text (exactly what the model saw).
     payload_json = _scrub_payload(payload_json, restaurant_id)
-    if not payload_json:
-        # Scrub failed and returning None (no narrative) is safer than
-        # sending unredacted data to a third-party LLM.
+    if payload_json is None or not payload_json:
+        # Fail-closed (AIS-102): scrub failed / indeterminate — a lost
+        # narrative (None) is safer than sending unredacted data to a
+        # third-party LLM. Callers treat None as "no narrative available"
+        # and fall back to the deterministic payload.
         return None
 
     cache_key = hashlib.sha256(f"{task}|{tier}|{payload_json}".encode("utf-8")).hexdigest()
@@ -352,11 +354,17 @@ def _build_system(cfg: dict) -> str:
     )
 
 
-def _scrub_payload(payload_json: str, restaurant_id: int | None) -> str:
+def _scrub_payload(payload_json: str, restaurant_id: int | None) -> str | None:
     """Run pii_scrub over a serialized payload before it reaches the LLM.
     When a tenant is known, its customer/staff name denylist is applied too.
-    Fail-open on scrubber/DB errors: redaction must not take down narration,
-    but any failure is logged so it's visible."""
+
+    FAIL-CLOSED (AIS-102): this is the last gate before a third-party LLM, so
+    any scrubber error — or an indeterminate result, e.g. the per-tenant
+    known-names denylist can't be built — returns None and narrate() bails
+    out BEFORE calling the LLM. A lost narrative is a graceful, additive
+    degradation (callers treat None as "no narrative"); an unredacted payload
+    at the provider is a leak. Returning None (not "") keeps the two failure
+    modes distinguishable for callers that care."""
     from ai import pii_scrub
     known_names: list[str] | None = None
     if restaurant_id is not None:
@@ -368,12 +376,21 @@ def _scrub_payload(payload_json: str, restaurant_id: int | None) -> str:
             finally:
                 session.close()
         except Exception as exc:
-            logger.warning("narrate(): known-names lookup failed (scrub continues): %s", exc)
+            # AIS-102: without the tenant denylist the redaction set is
+            # indeterminate — refuse the LLM call instead of guessing.
+            logger.warning(
+                "narrate(): known-names lookup failed — refusing to narrate "
+                "(fail-closed PII gate): %s", exc,
+            )
+            return None
     try:
         return pii_scrub.scrub_for_llm(payload_json, known_names)
     except Exception as exc:
-        logger.warning("narrate(): PII scrub failed (sending would leak — bailing out): %s", exc)
-        return ""
+        logger.warning(
+            "narrate(): PII scrub failed — refusing to narrate (fail-closed "
+            "PII gate): %s", exc,
+        )
+        return None
 
 
 def _shrink(payload: dict, keys: list[str] | None) -> str:

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getAccessToken, clearAccessToken } from "./tokenStore";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -9,10 +10,11 @@ const api = axios.create({
   },
 });
 
-// Attach JWT token to every request
+// Attach JWT token to every request. The token lives in the in-memory token
+// store (FE-101) — never in localStorage, which any XSS could read outright.
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("access_token");
+    const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -34,7 +36,7 @@ api.interceptors.response.use(
         window.location.pathname === "/order" ||
         (error.config?.url ?? "").includes("/auth/");
       if (!isAuthPath) {
-        localStorage.removeItem("access_token");
+        clearAccessToken();
         window.location.href = "/login";
       }
     }

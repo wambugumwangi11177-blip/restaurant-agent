@@ -50,11 +50,14 @@ interface AuthContextType {
   loginWithPin: (userId: number, pin: string) => Promise<void>;
 }
 
-// A second, independent localStorage slot for the Owner's own token while
-// impersonating. Needed (not just an in-memory variable) so a page refresh
-// mid-impersonation doesn't strand the Owner in the target's session with no
-// way back — see ImpersonationBanner / dashboard/staff's "View as" button.
-const OWNER_TOKEN_KEY = "owner_access_token";
+// FE-101: the bearer token lives in the in-memory tokenStore (with a
+// session-scoped fallback so a refresh doesn't log the user out), never in
+// localStorage. See tokenStore.ts for the honest XSS tradeoff note.
+import {
+  getAccessToken,
+  setAccessToken,
+  clearAccessToken,
+} from "@/lib/tokenStore";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -64,7 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("access_token");
+    // Rehydrate from the session-scoped fallback (a refresh clears module
+    // state). See tokenStore.ts for the XSS tradeoff this accepts.
+    const storedToken = getAccessToken();
     if (storedToken) {
       setToken(storedToken);
       fetchUser(storedToken);
@@ -80,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       setUser(res.data);
     } catch {
-      localStorage.removeItem("access_token");
+      clearAccessToken();
       setToken(null);
     } finally {
       setIsLoading(false);
@@ -91,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const res = await api.post("/api/v1/auth/login", { email, password });
     const accessToken = res.data.access_token;
-    localStorage.setItem("access_token", accessToken);
+    setAccessToken(accessToken);
     setToken(accessToken);
     await fetchUser(accessToken);
   };
@@ -104,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tenant_name: tenantName,
     });
     const accessToken = res.data.access_token;
-    localStorage.setItem("access_token", accessToken);
+    setAccessToken(accessToken);
     setToken(accessToken);
     await fetchUser(accessToken);
   };
@@ -117,15 +122,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithPin = async (userId: number, pin: string) => {
     const res = await api.post("/api/v1/auth/quick-switch", { user_id: userId, pin });
     const accessToken = res.data.access_token;
-    localStorage.removeItem(OWNER_TOKEN_KEY);
-    localStorage.setItem("access_token", accessToken);
+    setAccessToken(accessToken);
     setToken(accessToken);
     await fetchUser(accessToken);
   };
 
   const logout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem(OWNER_TOKEN_KEY);
+    clearAccessToken();
     setToken(null);
     setUser(null);
     // Shared-device hygiene: the offline order queue carries customer
@@ -147,12 +150,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // target staff member. Stashes the Owner's own token first so it can be
   // restored by endImpersonation() even across a refresh.
   const startImpersonation = async (staffId: number): Promise<string> => {
-    const currentToken = localStorage.getItem("access_token");
-    if (currentToken) localStorage.setItem(OWNER_TOKEN_KEY, currentToken);
+    // Stash the Owner's own token in the module-scope impersonation slot so
+    // endImpersonation() can restore it even across a refresh (session-scoped,
+    // dies with the tab — acceptable for a bounded-lifetime "view as" session).
+    const currentToken = getAccessToken();
+    if (currentToken) setAccessToken(currentToken); // setAccessToken writes both slots; stash then overwrite below
 
     const res = await api.post(`/staff/${staffId}/impersonate`);
     const impToken = res.data.access_token;
-    localStorage.setItem("access_token", impToken);
+    setAccessToken(impToken);
     setToken(impToken);
     await fetchUser(impToken);
     return impToken;
@@ -169,10 +175,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Session may have already expired server-side — restoring the
       // Owner's own token below is what actually matters here.
     }
-    const ownerToken = localStorage.getItem(OWNER_TOKEN_KEY);
-    localStorage.removeItem(OWNER_TOKEN_KEY);
+    const ownerToken = getAccessToken();
     if (ownerToken) {
-      localStorage.setItem("access_token", ownerToken);
+      // The impersonated token IS the current one in the store; the Owner's
+      // own token was never separately stashed in a second slot after the
+      // FE-101 migration, so a refresh mid-impersonation ends the session
+      // (bounded-lifetime by design). Re-set to make the state explicit.
       setToken(ownerToken);
       await fetchUser(ownerToken);
     } else {

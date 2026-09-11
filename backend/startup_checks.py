@@ -37,6 +37,11 @@ def _mpesa_configured() -> bool:
     ))
 
 
+# Kept for backwards compatibility with imports/tests that reference the
+# helper's old name; the token check itself no longer conditions on it (CYB-103).
+__all__ = ["is_production", "_mpesa_configured", "collect_problems", "enforce_startup_checks"]
+
+
 def collect_problems() -> tuple[list[str], list[str]]:
     """
     Return (hard_problems, soft_warnings).
@@ -54,12 +59,18 @@ def collect_problems() -> tuple[list[str], list[str]]:
 
     prod = is_production()
 
-    # The forgeable-payment gap: if M-Pesa credentials are present, the callback
-    # MUST be tokenized, or anyone with a CheckoutRequestID can forge a settlement.
-    if _mpesa_configured() and not os.getenv("MPESA_CALLBACK_TOKEN"):
-        msg = ("MPESA_CALLBACK_TOKEN is not set while M-Pesa is configured — the "
-               "payment callback would be UNAUTHENTICATED and forgeable")
-        (hard if prod else soft).append(msg)
+    # The M-Pesa callback's ONLY authentication is the secret embedded in the
+    # CallBackURL — Safaricom signs nothing. Require the token in production
+    # unconditionally (with or without Daraja creds configured: the creds are
+    # not what the callback authenticates against); outside production the
+    # same condition is a soft warning so dev/tests never block.
+    if not os.getenv("MPESA_CALLBACK_TOKEN", "").strip():
+        msg = ("MPESA_CALLBACK_TOKEN is not set — the M-Pesa callback has no "
+               "authentication and cannot be accepted")
+        if prod:
+            hard.append(msg)
+        else:
+            soft.append(msg)
 
     # CORS must be set explicitly in production; the built-in fallback list is a
     # dev safety net, not a production ACL.

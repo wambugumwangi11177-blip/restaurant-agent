@@ -74,8 +74,10 @@ def test_app_env_production_also_triggers_enforcement(monkeypatch):
         startup_checks.enforce_startup_checks()
 
 
-def test_mpesa_not_configured_means_no_token_requirement(monkeypatch):
-    # No M-Pesa creds → nothing to forge → token not required even in production.
+def test_mpesa_not_configured_token_still_required_in_production(monkeypatch):
+    # CYB-103: the CallBackURL token is the callback's ONLY authentication, so
+    # production requires it even with no Daraja creds configured (creds don't
+    # authenticate the inbound callback; the token does).
     monkeypatch.setenv("MPESA_ENV", "production")
     monkeypatch.setenv("SECRET_KEY", "x")
     monkeypatch.setenv("CORS_ORIGINS", "https://app.example.com")
@@ -84,12 +86,13 @@ def test_mpesa_not_configured_means_no_token_requirement(monkeypatch):
     monkeypatch.delenv("MPESA_CALLBACK_TOKEN", raising=False)
 
     hard, _soft = startup_checks.collect_problems()
-    assert hard == []
+    assert any("MPESA_CALLBACK_TOKEN" in h for h in hard)
 
 
 def test_local_storage_backend_in_production_is_a_soft_warning(monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("SECRET_KEY", "x")
+    monkeypatch.setenv("MPESA_CALLBACK_TOKEN", "set-so-other-checks-run")  # CYB-103 guard satisfied
     monkeypatch.delenv("STORAGE_BACKEND", raising=False)  # unset == "local"
 
     hard, soft = startup_checks.collect_problems()
@@ -122,6 +125,7 @@ def test_local_storage_backend_outside_production_has_no_warning(monkeypatch):
 def test_unconfigured_smtp_in_production_is_a_soft_warning(monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("SECRET_KEY", "x")
+    monkeypatch.setenv("MPESA_CALLBACK_TOKEN", "set-so-other-checks-run")  # CYB-103 guard satisfied
     for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"):
         monkeypatch.delenv(k, raising=False)
 

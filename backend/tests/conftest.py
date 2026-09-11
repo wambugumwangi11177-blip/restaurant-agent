@@ -46,8 +46,18 @@ Two hazards specific to this codebase, handled explicitly below:
    test's environment.
 """
 
-import importlib
 import os
+
+# AUD-24 fail-closed guard: this must run before ANY app import. If DATABASE_URL
+# points at a remote host (e.g. the production Neon pooler), refuse immediately.
+from tests._db_guard import assert_test_database
+
+assert_test_database(
+    os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL", ""),
+    allow=os.environ.get("AUDIT_ALLOW_NON_TEST_DB") == "1",
+)
+
+import importlib
 import uuid
 import pytest
 

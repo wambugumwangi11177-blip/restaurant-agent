@@ -11,6 +11,7 @@ import auth
 from routers.deps import get_or_create_restaurant
 from time_utils import utcnow
 from ai.order_stock import deduct_ingredients_for_order, reverse_ingredients_for_order
+from domain.pricing import build_order_lines
 
 logger = logging.getLogger("orders.router")
 
@@ -52,33 +53,31 @@ async def create_order(
         ).all()
     }
 
-    total = 0
-    order_items = []
-    for oi in order.items:
-        menu_item = menu_items_by_id.get(oi.menu_item_id)
-        if not menu_item:
-            raise HTTPException(status_code=404, detail=f"Menu item {oi.menu_item_id} not found")
-        line_total = menu_item.price * oi.quantity
-        total += line_total
-        order_items.append(models.OrderItem(
-            menu_item_id=menu_item.id,
-            quantity=oi.quantity,
-            unit_price=menu_item.price,
-        ))
-
-    # Map string enums safely
+    # Map string enums safely — AUD-004 (LAI-AUDIT-001): an invalid value used
+    # to be silently coerced to a default (order_type -> DINE_IN,
+    # payment_method -> PENDING, i.e. an order recorded as unpaid on a typo).
+    # update_order_status (below) already answered 400 for this; the create
+    # paths now do the same instead of mutating business meaning on bad input.
     try:
         order_type = models.OrderType(order.order_type)
     except ValueError:
-        order_type = models.OrderType.DINE_IN
+        raise HTTPException(status_code=400, detail=f"Invalid order_type: {order.order_type}")
     try:
         delivery_channel = models.DeliveryChannel(order.delivery_channel)
     except ValueError:
-        delivery_channel = models.DeliveryChannel.WALK_IN
+        raise HTTPException(status_code=400, detail=f"Invalid delivery_channel: {order.delivery_channel}")
     try:
         payment_method = models.PaymentMethod(order.payment_method)
     except ValueError:
-        payment_method = models.PaymentMethod.PENDING
+        raise HTTPException(status_code=400, detail=f"Invalid payment_method: {order.payment_method}")
+
+    # AUD-002: shared line-item/total builder (was duplicated inline here and
+    # in create_public_order, with the copies already divergent).
+    try:
+        order_items, total = build_order_lines(order.items, menu_items_by_id)
+    except ValueError as exc:
+        menu_item_id = exc.args[0].split(":", 1)[1]
+        raise HTTPException(status_code=404, detail=f"Menu item {menu_item_id} not found")
 
     is_paid = payment_method != models.PaymentMethod.PENDING
 
@@ -126,10 +125,15 @@ async def list_orders(
     ).filter(models.Order.restaurant_id == restaurant.id)
 
     if status_filter:
+        # AUD-005 (LAI-AUDIT-001): an unrecognised ?status= used to be
+        # swallowed and the endpoint returned the UNFILTERED list — a client
+        # asking for status=cooked silently received every order. A 400, the
+        # same answer update_order_status gives for an invalid status body.
         try:
-            q = q.filter(models.Order.status == models.OrderStatus(status_filter))
+            status_value = models.OrderStatus(status_filter)
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail=f"Invalid status filter: {status_filter}")
+        q = q.filter(models.Order.status == status_value)
 
     orders = q.order_by(models.Order.created_at.desc()).limit(200).all()
     return [_order_to_dict(o) for o in orders]
@@ -431,28 +435,26 @@ async def create_public_order(
         ).all()
     }
 
-    total = 0
-    order_items = []
-    for oi in order.items:
-        menu_item = menu_items_by_id.get(oi.menu_item_id)
-        if not menu_item:
-            raise HTTPException(status_code=404, detail=f"Menu item {oi.menu_item_id} not found or unavailable")
-        line_total = menu_item.price * oi.quantity
-        total += line_total
-        order_items.append(models.OrderItem(
-            menu_item_id=menu_item.id,
-            quantity=oi.quantity,
-            unit_price=menu_item.price,
-        ))
-
     try:
         order_type = models.OrderType(order.order_type)
     except ValueError:
-        order_type = models.OrderType.TAKEOUT
+        # AUD-004: was silently coerced to TAKEOUT on a typo — a business-meaning
+        # change on malformed input. 400, same as the staff-facing create path.
+        raise HTTPException(status_code=400, detail=f"Invalid order_type: {order.order_type}")
     try:
         payment_method = models.PaymentMethod(order.payment_method)
     except ValueError:
-        payment_method = models.PaymentMethod.PENDING
+        # AUD-004: was silently coerced to PENDING, i.e. the order was recorded
+        # as UNPAID because the client typo'd. 400 instead.
+        raise HTTPException(status_code=400, detail=f"Invalid payment_method: {order.payment_method}")
+
+    # AUD-002: the shared line-item/total builder (was duplicated inline here,
+    # already divergent from the staff path — this one filters is_available).
+    try:
+        order_items, total = build_order_lines(order.items, menu_items_by_id, require_available=True)
+    except ValueError as exc:
+        menu_item_id = exc.args[0].split(":", 1)[1]
+        raise HTTPException(status_code=404, detail=f"Menu item {menu_item_id} not found or unavailable")
 
     db_order = models.Order(
         restaurant_id=restaurant.id,

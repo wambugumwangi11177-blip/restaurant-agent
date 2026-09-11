@@ -30,8 +30,12 @@ completed work, also excluded.
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from collections import defaultdict
+import logging
+
 import models
 from ai.analysis_clock import analysis_anchor
+
+logger = logging.getLogger("ai.roi.savings")
 
 # ── Minutes-saved benchmarks ────────────────────────────────────────────────
 # Conservative estimates of the manual-staff-time each automated action
@@ -242,12 +246,21 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
     # normalized to CENTS here — the frontend divides by 100 exactly once, so a
     # source that reports in whole KES (inventory: cost_per_unit is a Float in
     # KES, not cents) must be ×100 at the point it's added.
+    #
+    # AUD-006 (LAI-AUDIT-001): these used to swallow the exception entirely —
+    # a failing source silently dropped a money figure from an ROI report
+    # with no log line, so the numbers could be quietly wrong. The degrading
+    # posture is kept (a bad source still can't crash the endpoint) but every
+    # failure is now logged with the source name and the reason.
     opportunities: list[dict] = []
 
     def _add(source: str, label: str, cents) -> None:
         cents = int(cents or 0)
         if cents > 0:
             opportunities.append({"source": source, "label": label, "monthly_value_cents": cents})
+
+    def _swallow(source: str, exc: Exception) -> None:
+        logger.warning("ROI opportunity source %r failed: %s: %s", source, type(exc).__name__, exc)
 
     # Pricing recommendations the owner hasn't approved yet — money on the table.
     try:
@@ -257,8 +270,8 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
         ).all()
         _add("pricing_pending", "Uncaptured margin in pending pricing recs",
              sum(r.monthly_impact_cents for r in pending_recs))
-    except Exception:  # noqa: BLE001 — ROI must degrade, not crash
-        pass
+    except Exception as exc:  # noqa: BLE001 — ROI must degrade, not crash
+        _swallow("pricing_pending", exc)
 
     # Profit leaks + portion drift (already in cents).
     try:
@@ -268,8 +281,8 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
              (profit.get("summary") or {}).get("total_leak_amount"))
         _add("portion_drift", "Lost to portion / discount drift",
              sum(d.get("estimated_monthly_leak", 0) for d in (profit.get("portion_drift") or [])))
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        _swallow("profit_leaks", exc)
 
     # Inventory waste (cost_per_unit is a Float in KES → ×100 to cents).
     try:
@@ -280,8 +293,8 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
             for p in (inv.get("predictions") or [])
         )
         _add("inventory_waste", "Stock lost to waste / spoilage", round(waste_kes * 100))
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        _swallow("inventory_waste", exc)
 
     # Reservation no-shows + overbooking recovery (already in cents).
     try:
@@ -291,8 +304,8 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
              (res.get("revenue_impact") or {}).get("estimated_revenue_lost"))
         _add("overbooking_recovery", "Recoverable via smarter overbooking",
              (res.get("overbooking") or {}).get("potential_monthly_recovery"))
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        _swallow("reservation_insights", exc)
 
     # Overtime cost flagged (already in cents).
     try:
@@ -300,8 +313,8 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
         labor = get_labor_intelligence(db, restaurant_id)
         _add("overtime_reduction", "Overtime cost flagged for review",
              (labor.get("summary") or {}).get("overtime_cost_30d"))
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        _swallow("overtime_reduction", exc)
 
     opportunities.sort(key=lambda o: -o["monthly_value_cents"])
 
@@ -323,8 +336,8 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
                 # Total systemic delay the AI has flagged as reclaimable.
                 "reclaimable_delay_minutes": round(sum(b.get("impact_score", 0) for b in bottlenecks), 1),
             }
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        _swallow("kds_capacity", exc)
 
     # ── 5. NET ROI (is the AI worth what it costs?) ──────────────────────────
     # AI cost = this restaurant's LLM token spend over the window, priced by the
@@ -343,8 +356,8 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
             cost_kes_cents(t.llm_model, t.input_tokens or 0, t.output_tokens or 0)
             for t in token_rows
         )
-    except Exception:  # noqa: BLE001 — ROI must degrade, not crash
-        pass
+    except Exception as exc:  # noqa: BLE001 — ROI must degrade, not crash
+        _swallow("ai_cost", exc)
 
     value_delivered_cents = money_saved_from_time_cents + monthly_impact_cents
     economics = {

@@ -46,7 +46,10 @@ class SyncCursor(Base):
 class MirrorEvent(Base):
     """Append-only record of what arrived and what happened to it. The audit trail."""
     __tablename__ = "mirror_events"
-    id = Column(BigInteger, primary_key=True)
+    id = Column(
+        BigInteger().with_variant(Integer, "sqlite"),  # sqlite only autoincrements INTEGER pk
+        primary_key=True,
+    )
     source_system_id = Column(Integer, nullable=False)
     entity = Column(String(64), nullable=False)
     source_id = Column(String(128), nullable=False)

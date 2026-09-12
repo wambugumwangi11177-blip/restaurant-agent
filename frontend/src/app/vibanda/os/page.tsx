@@ -45,11 +45,11 @@ function OsChatInner() {
   }
 
   return (
-    <div className="max-w-3xl space-y-4">
+    <div className="max-w-4xl space-y-4">
       <section>
-        <h1 className="text-2xl font-semibold">Ask anything about your restaurant</h1>
-        <p className="text-sm text-[var(--muted-foreground)] mt-1">
-          Every part of your restaurant is connected — money, kitchen, menu, stock, bookings, staff, purchasing.
+        <h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-semibold leading-[1.02] tracking-[-0.045em]">Ask anything<span className="text-[var(--v-primary)]">.</span></h1>
+        <p className="mt-3 text-sm text-[var(--v-muted-foreground)]">
+          Ask anything about your restaurant — every part is connected: money, kitchen, menu, stock, bookings, staff, purchasing.
         </p>
       </section>
 
@@ -61,7 +61,7 @@ function OsChatInner() {
               <span className="text-xs font-medium w-20 pt-1.5 text-[var(--muted-foreground)]">{domain}</span>
               {qs.map((q) => (
                 <button key={q} onClick={() => ask(q)}
-                  className="rounded-full border border-[var(--border)] px-3 py-1.5 text-sm hover:border-[var(--accent)]">
+                  className="rounded-lg border border-transparent px-2.5 py-2 text-left text-[12px] text-[hsl(208_29%_19_/_0.82)] transition-all hover:border-[var(--v-border)] hover:bg-[var(--v-card)] hover:text-[var(--v-primary)]">
                   {q}
                 </button>
               ))}
@@ -74,10 +74,10 @@ function OsChatInner() {
       <div className="space-y-3">
         {turns.map((t, i) => (
           <div key={i}
-            className={`rounded-2xl px-4 py-3 text-sm max-w-[85%] whitespace-pre-wrap ${
+            className={`rounded-xl px-4 py-3 text-[13px] max-w-[85%] whitespace-pre-wrap leading-relaxed ${
               t.role === "user"
-                ? "bg-[var(--accent)] text-white ml-auto"
-                : "border border-[var(--border)]"
+                ? "bg-[var(--v-primary)] text-[var(--v-primary-foreground)] ml-auto"
+                : "border border-[var(--v-border)] bg-[var(--v-card)]"
             }`}>
             {t.text}
           </div>
@@ -90,16 +90,16 @@ function OsChatInner() {
       {/* Composer */}
       <form
         onSubmit={(e) => { e.preventDefault(); ask(input); }}
-        className="sticky bottom-24 md:bottom-4 flex gap-2"
+        className="sticky bottom-24 md:bottom-4 flex items-center rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] shadow-[0_12px_40px_hsl(201_47%_29_/.07)] transition-all focus-within:border-[hsl(201_47%_29_/.65)]"
       >
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask anything about your restaurant…"
-          className="flex-1 rounded-full border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm outline-none focus:border-[var(--accent)]"
+          className="min-w-0 flex-1 bg-transparent px-3 py-4 text-sm outline-none placeholder:text-[hsl(207_12%_46_/_0.7)]"
         />
         <button type="submit" disabled={busy}
-          className="rounded-full px-5 py-3 text-sm bg-[var(--accent)] text-white disabled:opacity-50">
+          className="mr-2 rounded-lg bg-[var(--v-primary)] px-3.5 py-2.5 text-[11px] font-bold text-[var(--v-primary-foreground)] disabled:opacity-50">
           Ask
         </button>
       </form>

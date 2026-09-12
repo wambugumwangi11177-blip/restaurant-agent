@@ -15,9 +15,10 @@ const TABS = [
 export default function VibandaLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   return (
-    <div className="min-h-screen pb-20 md:pb-0">
+    <div className="vibanda-theme min-h-screen pb-20 md:pb-0">
       <header className="px-4 pt-6 pb-2 md:px-8">
-        <p className="text-xs text-[var(--muted-foreground)]">{fmtDate()} · Nairobi</p>
+        {/* Sketch: tiny uppercase eyebrow date line */}
+        <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">{fmtDate()} · Nairobi</p>
         <nav className="hidden md:flex gap-1 mt-3">
           {TABS.map(({ href, label, icon: Icon }) => {
             const active = pathname === href;
@@ -25,10 +26,10 @@ export default function VibandaLayout({ children }: { children: React.ReactNode 
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm ${
+                className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-[12px] font-medium ${
                   active
-                    ? "bg-[var(--accent)] text-white"
-                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                    ? "bg-[var(--v-primary)] text-[var(--v-primary-foreground)]"
+                    : "text-[var(--v-muted-foreground)] hover:bg-[var(--v-muted)] hover:text-[var(--v-foreground)]"
                 }`}
               >
                 <Icon size={16} /> {label}
@@ -37,8 +38,8 @@ export default function VibandaLayout({ children }: { children: React.ReactNode 
           })}
         </nav>
       </header>
-      <main className="px-4 md:px-8 py-4">{children}</main>
-      <nav className="fixed bottom-0 inset-x-0 md:hidden bg-[var(--card)] border-t border-[var(--border)] grid grid-cols-3">
+      <main className="mx-auto max-w-[1180px] px-4 pb-16 pt-4 sm:px-7 lg:px-10">{children}</main>
+      <nav className="fixed bottom-0 inset-x-0 md:hidden bg-[var(--v-card)] border-t border-[var(--v-border)] grid grid-cols-3">
         {TABS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (
@@ -46,7 +47,7 @@ export default function VibandaLayout({ children }: { children: React.ReactNode 
               key={href}
               href={href}
               className={`flex flex-col items-center gap-1 py-3 text-xs ${
-                active ? "text-[var(--accent)]" : "text-[var(--muted-foreground)]"
+                active ? "text-[var(--v-primary)]" : "text-[var(--v-muted-foreground)]"
               }`}
             >
               <Icon size={20} /> {label}

@@ -64,16 +64,17 @@ export default function PartHealth() {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold">How each part is doing</h2>
-      <p className="text-xs text-[var(--muted-foreground)]">Live from your restaurant · POS sync coming soon</p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+      <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">Connected restaurant</p>
+        <h2 className="font-display text-2xl font-semibold tracking-[-0.035em]">How each part is doing</h2>
+      <p className="text-xs text-[var(--v-muted-foreground)]">Live from your restaurant · POS sync coming soon</p>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 mt-3">
         {PARTS.map(({ key, label }) => {
           const h = health(key);
           return (
-            <div key={key} className="rounded-2xl border border-[var(--border)] p-4">
-              <p className="text-xs text-[var(--muted-foreground)]">{label}</p>
-              <p className={`text-sm font-medium mt-1 ${
-                h.tone === "warn" ? "text-amber-600" : h.tone === "muted" ? "text-[var(--muted-foreground)]" : ""
+            <div key={key} className="rounded-xl border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.72)] p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">{label}</p>
+              <p className={`font-display mt-1.5 text-lg font-semibold tracking-[-0.02em] ${
+                h.tone === "warn" ? "text-[var(--v-warn)]" : h.tone === "muted" ? "text-[var(--v-muted-foreground)]" : ""
               }`}>{h.label}</p>
             </div>
           );

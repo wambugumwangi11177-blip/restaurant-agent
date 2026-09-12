@@ -174,7 +174,7 @@ export default function OsHomePage() {
 }
 
 function askAi(title: string) {
-  router.push(`/dashboard/os/chat?q=${encodeURIComponent(title)}`);
+  window.location.assign(`/dashboard/os/chat?q=${encodeURIComponent(title)}`);
 }
 
 function Card({ label, headline, verdict, substats }: {

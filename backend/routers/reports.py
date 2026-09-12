@@ -4,6 +4,7 @@ period: daily | weekly | monthly | yearly. 422 for anything else.
 "Drafted" = markdown template + real numbers interpolated. No LLM.
 Shares _summarize() with the overview router (DRY).
 """
+import re
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
@@ -126,7 +127,10 @@ def _llm_narrative(period: str, label: str, core: dict, top: list) -> str | None
         "round differently. Write in clear, warm, direct English (the owner's "
         "tone). Structure: a 2-sentence overview, then 2-3 short bullet "
         "observations (what stands out), then one actionable recommendation. "
-        "Keep it under 180 words. Currency is KSh."
+        "Keep it under 180 words. Currency is KSh. "
+        "IMPORTANT: Output ONLY the finished report text. Do NOT write any "
+        "planning, reasoning, meta-commentary or notes about the task — the "
+        "first character of your answer is the first character of the report."
     )
     user = (
         f"Draft the {period} report ({label}).\n"
@@ -136,8 +140,43 @@ def _llm_narrative(period: str, label: str, core: dict, top: list) -> str | None
     )
     user += f"Top items:\n{tops}"
     try:
-        return llm_client.chat(
+        text = llm_client.chat(
             [{"role": "user", "content": user}],
             system=system, max_tokens=500, tier="medium")
+        return _strip_reasoning_leak(text)
     except Exception:  # noqa: BLE001 — LLM down never blocks a report
         return None
+
+
+_LEAK_STARTERS = re.compile(
+    r"^(we need|let me|i need|i'll|i will|to (produce|draft|write)|first|okay|sure|here's a plan|thinking|must have|should i|note:)",
+    re.IGNORECASE,
+)
+
+
+def _strip_reasoning_leak(text: str) -> str:
+    """nemotron-style reasoning models sometimes prepend their planning
+    ('We need to produce a daily report...'). Strip any leading lines that
+    are meta-commentary so the owner only sees the finished report. A line is
+    meta if it starts with a leak-starter AND the following content restarts
+    with a proper report line — simplest robust rule: drop leading lines that
+    match leak starters or mention 'report for'/'numbers exactly' style task
+    echo, until the first line that reads like report prose."""
+    lines = (text or "").strip().splitlines()
+    out: list[str] = []
+    started = False
+    for line in lines:
+        stripped = line.strip()
+        if not started and stripped and (
+            _LEAK_STARTERS.match(stripped)
+            or "report for" in stripped.lower()
+            or "numbers exactly" in stripped.lower()
+            or "we'll" in stripped.lower()
+            or "we need to" in stripped.lower()
+            or (stripped.endswith(":") and len(stripped) < 80)
+        ):
+            continue
+        if stripped:
+            started = True
+        out.append(line)
+    return "\n".join(out).strip() or text

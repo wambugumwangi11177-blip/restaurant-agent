@@ -13,6 +13,7 @@ import PinSetupModal from "@/components/PinSetupModal";
 import PageLoader from "@/components/ui/PageLoader";
 import SkipLink from "@/components/ui/SkipLink";
 import { tierHome, StaffTier } from "@/lib/permissions";
+import { isVibanda } from "@/lib/tenantHome";
 import { labelForPath } from "@/lib/pathTitle";
 import {
     Home,
@@ -115,6 +116,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (isLoading) return;
         if (!user) {
             router.push("/login");
+            return;
+        }
+        // Vibanda tenants live in their own 3-page shell — never in the
+        // generic dashboard (plan 2026-09-12). Bounce any deep link.
+        if (isVibanda(user.tenant_name)) {
+            router.push("/vibanda");
             return;
         }
         if (isStaffAccount && staffRole) {

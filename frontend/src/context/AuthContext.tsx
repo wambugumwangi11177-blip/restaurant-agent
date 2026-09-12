@@ -22,6 +22,8 @@ interface User {
   email: string;
   role: string;
   restaurant_name?: string;
+  // Tenant fork (Vibanda dedicated shell) — read fresh from /auth/me.
+  tenant_name?: string | null;
   // Directive 015 — fine-grained tier (owner/manager/supervisor/controller/
   // stockkeeper/kitchen/waiter), or null if not yet assigned. Read fresh from
   // /auth/me on every load rather than cached in a JWT claim, so a role

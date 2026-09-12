@@ -29,7 +29,7 @@ import models
 from database import get_db
 from auth import require_staff_role
 
-router = APIRouter(prefix="/ai/ask", tags=["ai"])
+router = APIRouter(prefix="/ai", tags=["ai"])
 
 try:  # limiter is optional here; the route is DB-bound but cheap
     from rate_limit import limiter
@@ -268,7 +268,7 @@ _HANDLERS = {
 }
 
 
-@router.get("", response_model=AnswerCard)
+@router.get("/ask", response_model=AnswerCard)
 def ask(
     question: str = Query(..., min_length=3, max_length=500),
     db: Session = Depends(get_db),

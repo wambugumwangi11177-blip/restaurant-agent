@@ -27,6 +27,7 @@ type Answer = {
   action: string;
   metric?: string;
   next?: string;
+  module?: string;
   aiHeadline?: string;
   aiSteps?: AiStep[];
 };
@@ -181,6 +182,7 @@ function OsChatInner() {
             why: card.why,
             impact: card.impact || "—",
             action: card.recommendation,
+            module: card.module,
             aiHeadline: aiHeadline || undefined,
             aiSteps: aiSteps.length ? aiSteps : (card.steps || []).map((s) => ({ action: s.action ?? "", why: s.why })),
           }

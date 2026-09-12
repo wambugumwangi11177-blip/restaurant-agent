@@ -10,7 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 import models
-from routers.deps import get_db
+from database import get_db
 from routers.overview import _summarize
 from auth import require_staff_role
 from time_utils import utcnow

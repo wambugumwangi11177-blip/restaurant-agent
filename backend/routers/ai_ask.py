@@ -288,3 +288,75 @@ def ask(
         card["steps"] = card.get("steps", [])
         card["data"] = {"fallback_reason": str(exc)[:120]}
     return card
+
+
+# ─── LLM chat (real-time, OpenRouter) ────────────────────────────────────────
+
+class ChatBody(BaseModel):
+    question: str
+    history: list[dict] = []  # [{"role","content"}] prior turns, optional
+
+
+@router.post("/chat")
+def chat_llm(body: ChatBody, db: Session = Depends(get_db),
+             user: models.User = Depends(require_staff_role())):
+    """Real-time conversational answer: routes the question to the right ai/
+    module for GROUNDED DATA, then lets the LLM (OpenRouter) write a
+    conversational reply from that data. The LLM never invents numbers — its
+    prompt contains only the module's real figures, and the raw data ships
+    alongside so the client can show both."""
+    rid = user.active_restaurant_id
+    if rid is None:
+        row = db.query(models.Restaurant.id).filter(
+            models.Restaurant.tenant_id == user.tenant_id).first()
+        rid = row[0] if row else 0
+        if not rid:
+            raise HTTPException(404, "No restaurant found for this account")
+
+    module = _route(body.question)
+    try:
+        card = _HANDLERS[module](db, rid, body.question)
+    except Exception as exc:  # noqa: BLE001 — grounding failure falls back to ops
+        card = _answer_ops(db, rid, body.question)
+        card["data"] = {"fallback_reason": str(exc)[:120]}
+
+    from ai import llm_client
+    llm_reply = None
+    if llm_client.is_available():
+        restaurant_name = db.query(models.Restaurant.name).filter(
+            models.Restaurant.id == rid).scalar() or "your restaurant"
+        context = (
+            f"Restaurant: {restaurant_name} (Nairobi, Kenya).\n"
+            f"Topic module: {module}\n"
+            f"Grounded data from our systems (REAL numbers — never contradict, "
+            f"never invent figures):\n"
+            f"- Finding: {card['finding']}\n"
+            f"- Why: {card['why']}\n"
+            f"- Impact: {card['impact']}\n"
+            f"- Recommended action: {card['recommendation']}\n"
+            f"- Steps: {[(s.get('action'), s.get('why', '')) for s in card.get('steps', [])]}\n"
+            f"- Extra data: {card.get('data', {})}\n"
+        )
+        system = (
+            "You are the Restaurant OS assistant for a Kenyan restaurant owner. "
+            "Answer in the same language the owner uses. Be warm, direct and "
+            "practical — like a sharp operations partner, not a corporate report. "
+            "Use ONLY the grounded data provided; never invent numbers. Money is "
+            "KSh. Keep answers under 120 words unless the owner asks for detail. "
+            "End with one concrete next action when relevant.\n\n" + context
+        )
+        messages = (body.history or [])[-6:] + [
+            {"role": "user", "content": body.question}]
+        try:
+            llm_reply = llm_client.chat(
+                messages, system=system, max_tokens=400, tier="medium")
+        except Exception as exc:  # noqa: BLE001 — LLM down ≠ chat down
+            llm_reply = None
+            card["data"]["llm_error"] = str(exc)[:120]
+
+    return {
+        "module": module,
+        "grounded": card,
+        "llm_reply": llm_reply,
+        "llm_used": llm_reply is not None,
+    }

@@ -30,6 +30,7 @@ type Answer = {
   module?: string;
   aiHeadline?: string;
   aiSteps?: AiStep[];
+  llmReply?: string;
 };
 
 type Turn = { question: string; answer: Answer | null; error?: boolean };
@@ -150,18 +151,21 @@ function OsChatInner() {
       // returns a grounded plan (LLM when GROQ_API_KEY is set, deterministic
       // otherwise). We also compute a deterministic grounded answer from the
       // overview feed so the card is always truthful even if the AI errors.
-      // Real backend, topic-routed: /ai/ask sends the question to the RIGHT
-      // ai/ module (inventory_predictor, revenue_forecaster,
-      // reservation_optimizer, kds_intelligence, labor, menu_engineer,
-      // pricing, profit, ops_manager) and returns a Finding card. /ai/strategy
-      // is still consulted for the cross-cutting decision list. If both fail,
-      // the overview-grounded deterministic answer keeps the card truthful.
+      // Real-time LLM chat: POST /ai/chat grounds the question in the RIGHT
+      // ai/ module's real data, then OpenRouter writes the conversational
+      // reply from those numbers. Strategy steps + deterministic card remain
+      // as fallbacks so the chat never goes dark.
       let card: AskCard | null = null;
+      let llmReply: string | undefined;
       let aiSteps: { action: string; why?: string; expected_impact?: string }[] = [];
       let aiHeadline = "";
       try {
-        const r = await api.get<AskCard>("/api/v1/ai/ask", { params: { question: q } });
-        card = r.data;
+        const r = await api.post("/api/v1/ai/chat", {
+          question: q,
+          history: turns.slice(-4).map((t) => ({ role: "user", content: t.question })),
+        });
+        card = r.data?.grounded ?? null;
+        llmReply = r.data?.llm_reply ?? undefined;
       } catch { card = null; }
       try {
         const r2 = await api.post("/api/v1/ai/strategy", { goal: q, timeframe: "today" });
@@ -183,12 +187,13 @@ function OsChatInner() {
             impact: card.impact || "—",
             action: card.recommendation,
             module: card.module,
+            llmReply,
             aiHeadline: aiHeadline || undefined,
             aiSteps: aiSteps.length ? aiSteps : (card.steps || []).map((s) => ({ action: s.action ?? "", why: s.why })),
           }
         : (() => {
             const g = groundingAnswer(q, overview);
-            return { ...g, aiSteps: aiSteps.length ? aiSteps : undefined, aiHeadline: aiSteps.length ? aiHeadline : undefined };
+            return { ...g, llmReply, aiSteps: aiSteps.length ? aiSteps : undefined, aiHeadline: aiSteps.length ? aiHeadline : undefined };
           })();
       setTurns((t) => t.map((turn, i) => (i === t.length - 1 ? { question: q, answer } : turn)));
     } finally {
@@ -286,6 +291,11 @@ function OsChatInner() {
                         <p className="mt-1 text-[13px] font-semibold">{t.question}</p>
                       </div>
                       <div className="space-y-5 p-4 sm:p-5">
+                        {t.answer.llmReply && (
+                          <div className="rounded-xl bg-[hsl(42_71%_75_/_0.18)] p-3.5">
+                            <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[hsl(208_29%_19_/_0.92)]">{t.answer.llmReply}</p>
+                          </div>
+                        )}
                         <div>
                           <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--v-primary)]">Finding</p>
                           <p className="text-[13px] leading-relaxed text-[hsl(208_29%_19_/_0.86)]">{t.answer.finding}</p>

@@ -3,12 +3,13 @@
 // top tabs on desktop. Only Vibanda-tenant users ever see this tree.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MessageCircle, LifeBuoy } from "lucide-react";
+import { Home, MessageCircle, FileText, LifeBuoy } from "lucide-react";
 import { fmtDate } from "@/lib/format";
 
 const TABS = [
   { href: "/vibanda", label: "Home", icon: Home },
   { href: "/vibanda/os", label: "OS", icon: MessageCircle },
+  { href: "/vibanda/reports", label: "Reports", icon: FileText },
   { href: "/vibanda/support", label: "Support", icon: LifeBuoy },
 ];
 
@@ -39,7 +40,7 @@ export default function VibandaLayout({ children }: { children: React.ReactNode 
         </nav>
       </header>
       <main className="mx-auto max-w-[1180px] px-4 pb-16 pt-4 sm:px-7 lg:px-10">{children}</main>
-      <nav className="fixed bottom-0 inset-x-0 md:hidden bg-[var(--v-card)] border-t border-[var(--v-border)] grid grid-cols-3">
+      <nav className="fixed bottom-0 inset-x-0 md:hidden bg-[var(--v-card)] border-t border-[var(--v-border)] grid grid-cols-4">
         {TABS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (

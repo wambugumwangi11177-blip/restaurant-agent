@@ -93,18 +93,19 @@ def rank(decisions: list[Decision]) -> list[dict]:
     # steps (verified 2026-09-12 in the OS chat: steps 1, 2 and 5 were the same
     # advice for different items). Keep the best-ranked of each action+item
     # gist; the owner sees distinct actions, not echoes.
-    seen_gists: set[str] = set()
+    seen_actions: set[str] = set()
     deduped: list[tuple[float, Decision]] = []
     for s, d in scored:
-        # Two-level gist: identical action + rationale prefix = echo (exact
-        # duplicates). Identical GENERIC action ("Reduce food cost" without an
-        # item qualifier) with only numbers differing = the same advice for a
-        # different item — the owner still reads it as a repeat, so keep only
-        # the best-ranked instance and fold the count into the rationale.
-        gist = f"{d.action}|{(d.rationale or '')[:24]}"
-        if gist in seen_gists:
+        # The owner-facing list must show DISTINCT actions. menu_engineer emits
+        # one rec per item ("Reduce food cost" for chicken at 50%, beef at 40%…)
+        # — to the owner those read as the same advice repeated. Keep the
+        # best-ranked instance per action and fold the item count into its
+        # rationale (verified 2026-09-12: steps 1, 2, 5 were all "Reduce food
+        # cost"; 3 & 6 both "Capitalize on momentum").
+        key = d.action.strip().lower()
+        if key in seen_actions:
             continue
-        seen_gists.add(gist)
+        seen_actions.add(key)
         deduped.append((s, d))
 
     out: list[dict] = []

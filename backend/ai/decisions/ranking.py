@@ -87,8 +87,23 @@ def rank(decisions: list[Decision]) -> list[dict]:
         reverse=True,
     )
 
+    # Deduplicate near-identical decisions (same action + same entity/rationale
+    # gist). menu_engineer emits one "Reduce food cost" rec PER item, so a
+    # small menu floods the top-6 with three near-identical "Reduce food cost"
+    # steps (verified 2026-09-12 in the OS chat: steps 1, 2 and 5 were the same
+    # advice for different items). Keep the best-ranked of each action+item
+    # gist; the owner sees distinct actions, not echoes.
+    seen_gists: set[str] = set()
+    deduped: list[tuple[float, Decision]] = []
+    for s, d in scored:
+        gist = f"{d.action}|{(d.rationale or '')[:60]}"
+        if gist in seen_gists:
+            continue
+        seen_gists.add(gist)
+        deduped.append((s, d))
+
     out: list[dict] = []
-    for i, (s, d) in enumerate(scored, start=1):
+    for i, (s, d) in enumerate(deduped, start=1):
         row = d.to_dict()
         row["priority_score"] = round(s * 100)
         row["impact_stars"] = impact_stars(d.impact_cents_month)

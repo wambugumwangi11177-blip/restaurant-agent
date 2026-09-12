@@ -110,7 +110,10 @@ def _answer_revenue(db: Session, rid: int, q: str) -> dict:
         forecast, trend_txt = {}, ""
     finding = f"Revenue today is {_money(core['revenue'] * 100)} across {core['orders']} orders."
     why = "Live from your order data for the Nairobi calendar day so far."
-    impact = f"Average order {_money(core['revenue'] * 100 / core['orders'] * 100) if core['orders'] else '—'}"
+    # core["revenue"] is already KES (overview's _summarize converts cents→KES);
+    # avg_order must stay in KES — multiplying by 100 again showed absurd figures
+    # (verified in browser 2026-09-12: "KSh 199,467" instead of KSh 1,995).
+    impact = f"Average order {_money(core['revenue'] * 100 / core['orders'])} per order" if core["orders"] else "Average order — no orders yet today"
     rec = trend_txt if isinstance(trend_txt, str) and trend_txt else "Compare against the 7-day trend on Home to see if today is ahead or behind."
     steps = []
     if isinstance(forecast, dict):

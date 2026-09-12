@@ -40,7 +40,9 @@ def _top_items(db: Session, rid: int, start, end, limit=5) -> list:
         models.MenuItem.name,
         func.sum(models.OrderItem.quantity).label("qty"),
         func.sum(models.OrderItem.unit_price * models.OrderItem.quantity).label("sales"),
-    ).join(models.Order, models.OrderItem.order_id == models.Order.id).filter(
+    ).join(models.Order, models.OrderItem.order_id == models.Order.id
+    ).join(models.MenuItem, models.OrderItem.menu_item_id == models.MenuItem.id
+    ).filter(
         models.Order.restaurant_id == rid,
         models.Order.created_at >= start, models.Order.created_at < end,
     ).group_by(models.MenuItem.name).order_by(func.sum(models.OrderItem.quantity).desc()).limit(limit).all()

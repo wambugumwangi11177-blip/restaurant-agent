@@ -72,7 +72,7 @@ def _orders_card(db: Session, rid: int, start, end, core: dict) -> dict:
     active = db.query(func.count(models.Order.id)).filter(
         models.Order.restaurant_id == rid,
         models.Order.created_at >= start, models.Order.created_at < end,
-        models.Order.status.in_([models.OrderStatus.PENDING, models.OrderStatus.PREPARING]),
+        models.Order.status.in_([models.OrderStatus.PENDING, models.OrderStatus.PREP]),
     ).scalar()
     return {**core, "delayed": 0, "active_now": int(active), "split": split}
 

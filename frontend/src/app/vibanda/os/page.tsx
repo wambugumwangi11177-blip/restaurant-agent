@@ -15,6 +15,11 @@ import { QUESTION_GROUPS } from "@/lib/osSuggestions";
 import { OsLoading } from "@/components/os/States";
 
 type AiStep = { action: string; why?: string; expected_impact?: string };
+type AskCard = {
+  finding: string; why: string; impact: string; recommendation: string;
+  module: string; steps: { action?: string; why?: string }[]; data?: Record<string, unknown>;
+};
+
 type Answer = {
   finding: string;
   why: string;
@@ -144,15 +149,22 @@ function OsChatInner() {
       // returns a grounded plan (LLM when GROQ_API_KEY is set, deterministic
       // otherwise). We also compute a deterministic grounded answer from the
       // overview feed so the card is always truthful even if the AI errors.
-      // Real backend: /ai/strategy returns { mode, strategy: { headline,
-      // steps: [{action, why, expected_impact, priority_score}] } } — render
-      // steps as numbered next steps. Falls back to the deterministic
-      // overview-grounded answer if the call fails or returns nothing.
+      // Real backend, topic-routed: /ai/ask sends the question to the RIGHT
+      // ai/ module (inventory_predictor, revenue_forecaster,
+      // reservation_optimizer, kds_intelligence, labor, menu_engineer,
+      // pricing, profit, ops_manager) and returns a Finding card. /ai/strategy
+      // is still consulted for the cross-cutting decision list. If both fail,
+      // the overview-grounded deterministic answer keeps the card truthful.
+      let card: AskCard | null = null;
       let aiSteps: { action: string; why?: string; expected_impact?: string }[] = [];
       let aiHeadline = "";
       try {
-        const r = await api.post("/api/v1/ai/strategy", { goal: q, timeframe: "today" });
-        const st = r.data?.strategy;
+        const r = await api.get<AskCard>("/api/v1/ai/ask", { params: { question: q } });
+        card = r.data;
+      } catch { card = null; }
+      try {
+        const r2 = await api.post("/api/v1/ai/strategy", { goal: q, timeframe: "today" });
+        const st = r2.data?.strategy;
         if (st?.steps?.length) {
           aiHeadline = st.headline ?? "";
           aiSteps = st.steps.slice(0, 5).map((s: { action?: string; why?: string; expected_impact?: string }) => ({
@@ -161,25 +173,22 @@ function OsChatInner() {
             expected_impact: s.expected_impact === "not quantified" ? undefined : s.expected_impact,
           }));
         }
-      } catch {
-        aiSteps = []; // AI unavailable → deterministic fallback below
-      }
-      const grounded = groundingAnswer(q, overview);
-      setTurns((t) =>
-        t.map((turn, i) =>
-          i === t.length - 1
-            ? {
-                question: q,
-                answer: {
-                  ...grounded,
-                  ...(aiSteps.length
-                    ? { aiHeadline, aiSteps }
-                    : {}),
-                },
-              }
-            : turn,
-        ),
-      );
+      } catch { aiSteps = []; }
+
+      const answer: Answer = card
+        ? {
+            finding: card.finding,
+            why: card.why,
+            impact: card.impact || "—",
+            action: card.recommendation,
+            aiHeadline: aiHeadline || undefined,
+            aiSteps: aiSteps.length ? aiSteps : (card.steps || []).map((s) => ({ action: s.action ?? "", why: s.why })),
+          }
+        : (() => {
+            const g = groundingAnswer(q, overview);
+            return { ...g, aiSteps: aiSteps.length ? aiSteps : undefined, aiHeadline: aiSteps.length ? aiHeadline : undefined };
+          })();
+      setTurns((t) => t.map((turn, i) => (i === t.length - 1 ? { question: q, answer } : turn)));
     } finally {
       setBusy(false);
     }
@@ -271,7 +280,7 @@ function OsChatInner() {
                   {t.answer && (
                     <div className="ml-11 overflow-hidden rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] shadow-[0_10px_35px_hsl(201_47%_29_/.05)]">
                       <div className="border-b border-[var(--v-border)] bg-[hsl(39_26%_93_/_0.45)] px-4 py-3">
-                        <p className="text-[11px] font-medium text-[var(--v-muted-foreground)]">You asked</p>
+                        <p className="text-[11px] font-medium text-[var(--v-muted-foreground)]">You asked · answered from {t.answer.module ? `the ${t.answer.module} module` : "your data"}</p>
                         <p className="mt-1 text-[13px] font-semibold">{t.question}</p>
                       </div>
                       <div className="space-y-5 p-4 sm:p-5">

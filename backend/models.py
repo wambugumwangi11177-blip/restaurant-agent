@@ -1046,6 +1046,18 @@ class PurchaseOrder(Base):
     )
 
 
+class AttentionDecision(Base):
+    """Owner decision on a Restaurant OS attention card (approve/later/reject).
+    Persisted so decided cards leave the home feed instead of nagging forever."""
+    __tablename__ = "attention_decisions"
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), index=True, nullable=False)
+    card_key = Column(String, nullable=False)   # e.g. "stock-12", "po-pending"
+    decision = Column(String, nullable=False)   # approved | later | rejected
+    decided_at = Column(DateTime, default=utcnow)
+    decided_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+
 class StockTransfer(Base):
     """
     Store→kitchen leg of the chain of custody (directive 016). Deliberately a

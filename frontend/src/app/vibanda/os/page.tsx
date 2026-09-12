@@ -14,6 +14,7 @@ import { fmtKes } from "@/lib/format";
 import { QUESTION_GROUPS } from "@/lib/osSuggestions";
 import { OsLoading } from "@/components/os/States";
 
+type AiStep = { action: string; why?: string; expected_impact?: string };
 type Answer = {
   finding: string;
   why: string;
@@ -21,6 +22,8 @@ type Answer = {
   action: string;
   metric?: string;
   next?: string;
+  aiHeadline?: string;
+  aiSteps?: AiStep[];
 };
 
 type Turn = { question: string; answer: Answer | null; error?: boolean };
@@ -141,13 +144,25 @@ function OsChatInner() {
       // returns a grounded plan (LLM when GROQ_API_KEY is set, deterministic
       // otherwise). We also compute a deterministic grounded answer from the
       // overview feed so the card is always truthful even if the AI errors.
-      let aiText = "";
+      // Real backend: /ai/strategy returns { mode, strategy: { headline,
+      // steps: [{action, why, expected_impact, priority_score}] } } — render
+      // steps as numbered next steps. Falls back to the deterministic
+      // overview-grounded answer if the call fails or returns nothing.
+      let aiSteps: { action: string; why?: string; expected_impact?: string }[] = [];
+      let aiHeadline = "";
       try {
         const r = await api.post("/api/v1/ai/strategy", { goal: q, timeframe: "today" });
-        const d = r.data;
-        aiText = typeof d === "string" ? d : d?.plan ?? d?.narrative ?? d?.answer ?? "";
+        const st = r.data?.strategy;
+        if (st?.steps?.length) {
+          aiHeadline = st.headline ?? "";
+          aiSteps = st.steps.slice(0, 5).map((s: { action?: string; why?: string; expected_impact?: string }) => ({
+            action: s.action ?? "",
+            why: s.why,
+            expected_impact: s.expected_impact === "not quantified" ? undefined : s.expected_impact,
+          }));
+        }
       } catch {
-        aiText = ""; // AI unavailable → deterministic fallback below
+        aiSteps = []; // AI unavailable → deterministic fallback below
       }
       const grounded = groundingAnswer(q, overview);
       setTurns((t) =>
@@ -157,8 +172,9 @@ function OsChatInner() {
                 question: q,
                 answer: {
                   ...grounded,
-                  // If the backend produced a plan, surface it as the next step.
-                  next: aiText ? String(aiText).slice(0, 1200) : grounded.next,
+                  ...(aiSteps.length
+                    ? { aiHeadline, aiSteps }
+                    : {}),
                 },
               }
             : turn,
@@ -283,6 +299,30 @@ function OsChatInner() {
                           <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--v-primary)]">The recommendation</p>
                           <p className="text-sm leading-relaxed">{t.answer.action}</p>
                         </div>
+                        {t.answer.aiSteps && t.answer.aiSteps.length > 0 && (
+                          <div>
+                            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--v-primary)]">
+                              {t.answer.aiHeadline || "Recommended next steps"}
+                            </p>
+                            <div className="space-y-2">
+                              {t.answer.aiSteps.map((s, si) => (
+                                <div key={si} className="rounded-lg border border-[var(--v-border)] p-3">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <p className="text-[13px] font-semibold">{si + 1}. {s.action}</p>
+                                    {s.expected_impact && (
+                                      <span className="shrink-0 rounded-md bg-[hsl(42_71%_75_/_0.35)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--v-primary)]">
+                                        {s.expected_impact}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {s.why && (
+                                    <p className="mt-1 text-[11px] leading-relaxed text-[hsl(208_29%_19_/_0.62)]">{s.why}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         {t.answer.next && (
                           <div>
                             <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--v-muted-foreground)]">Next step</p>

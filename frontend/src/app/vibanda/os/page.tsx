@@ -2,7 +2,7 @@
 // Restaurant OS — CHAT ("Ask anything about your restaurant").
 // Tracer build: wire to existing POST /ai/strategy (goal -> grounded plan,
 // deterministic fallback when no LLM). Suggestions per domain; ?q= prefill.
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import { OsLoading, OsError } from "@/components/os/States";
@@ -10,7 +10,7 @@ import { SUGGESTIONS } from "@/lib/osSuggestions";
 
 type Turn = { role: "user" | "assistant"; text: string };
 
-export default function OsChatPage() {
+function OsChatInner() {
   const params = useSearchParams();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
@@ -104,5 +104,13 @@ export default function OsChatPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function OsChatPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-[var(--muted-foreground)]">Loading…</div>}>
+      <OsChatInner />
+    </Suspense>
   );
 }

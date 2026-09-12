@@ -15,16 +15,25 @@ import sqlalchemy as sa
 
 
 def upgrade() -> None:
-    op.create_table(
-        "attention_decisions",
-        sa.Column("id", sa.Integer(), primary_key=True, index=True),
-        sa.Column("tenant_id", sa.Integer(),
-                  sa.ForeignKey("tenants.id"), nullable=False, index=True),
-        sa.Column("card_key", sa.String(), nullable=False),
-        sa.Column("decision", sa.String(), nullable=False),
-        sa.Column("decided_at", sa.DateTime(), nullable=True),
-        sa.Column("decided_by", sa.Integer(), sa.ForeignKey("users.id"), nullable=True),
+    # init_db() runs Base.metadata.create_all() before Alembic on a fresh DB,
+    # so the table may already exist — CREATE TABLE would crash the deploy
+    # with DuplicateTable (found 2026-09-11, Railway). Use raw SQL with
+    # IF NOT EXISTS; the column list matches the model exactly.
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS attention_decisions (
+            id SERIAL NOT NULL,
+            tenant_id INTEGER NOT NULL REFERENCES tenants (id),
+            card_key VARCHAR NOT NULL,
+            decision VARCHAR NOT NULL,
+            decided_at TIMESTAMP WITHOUT TIME ZONE,
+            decided_by INTEGER REFERENCES users (id),
+            PRIMARY KEY (id)
+        )
+        """
     )
+    op.execute("CREATE INDEX IF NOT EXISTS ix_attention_decisions_id ON attention_decisions (id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_attention_decisions_tenant_id ON attention_decisions (tenant_id)")
 
 
 def downgrade() -> None:

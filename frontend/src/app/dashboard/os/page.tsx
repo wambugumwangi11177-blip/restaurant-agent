@@ -130,7 +130,7 @@ export default function OsHomePage() {
                     <button onClick={() => decide(c.id, "approved")} className="rounded-full px-3 py-1.5 text-sm bg-[var(--accent)] text-white">Approve</button>
                     <button onClick={() => decide(c.id, "later")} className="rounded-full px-3 py-1.5 text-sm border border-[var(--border)]">Later</button>
                     <button onClick={() => decide(c.id, "rejected")} className="rounded-full px-3 py-1.5 text-sm border border-[var(--border)]">Reject</button>
-                    <button onClick={() => askAi(router, c.title)} className="rounded-full px-3 py-1.5 text-sm border border-[var(--border)] text-[var(--accent)]">Ask AI about this</button>
+                    <button onClick={() => askAi(c.title)} className="rounded-full px-3 py-1.5 text-sm border border-[var(--border)] text-[var(--accent)]">Ask AI about this</button>
                   </div>
                 </div>
               ))}
@@ -173,7 +173,7 @@ export default function OsHomePage() {
   );
 }
 
-function askAi(router: ReturnType<typeof useRouter>, title: string) {
+function askAi(title: string) {
   router.push(`/dashboard/os/chat?q=${encodeURIComponent(title)}`);
 }
 

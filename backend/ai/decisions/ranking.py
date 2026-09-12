@@ -96,7 +96,12 @@ def rank(decisions: list[Decision]) -> list[dict]:
     seen_gists: set[str] = set()
     deduped: list[tuple[float, Decision]] = []
     for s, d in scored:
-        gist = f"{d.action}|{(d.rationale or '')[:60]}"
+        # Two-level gist: identical action + rationale prefix = echo (exact
+        # duplicates). Identical GENERIC action ("Reduce food cost" without an
+        # item qualifier) with only numbers differing = the same advice for a
+        # different item — the owner still reads it as a repeat, so keep only
+        # the best-ranked instance and fold the count into the rationale.
+        gist = f"{d.action}|{(d.rationale or '')[:24]}"
         if gist in seen_gists:
             continue
         seen_gists.add(gist)

@@ -28,7 +28,8 @@ def canonical(phone: str) -> str:
         return ""
     normalized = normalize_phone(phone)
     if normalized:
-        return normalized
+        # Historical suppression records use digits-only keys.
+        return normalized.lstrip("+")
     return "".join(ch for ch in phone if ch.isdigit())
 
 

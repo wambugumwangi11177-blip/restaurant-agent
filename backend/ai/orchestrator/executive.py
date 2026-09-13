@@ -10,7 +10,7 @@ What it does:
   1. subscribe() — registers handlers on the event bus at startup
   2. When an event fires (inventory low, order spike, recommendation generated),
      it pulls context from multiple agents + memory, then decides what to do.
-  3. It produces: WhatsApp messages, purchase recommendations, campaign triggers.
+  3. It produces: in-app owner notices and purchase recommendations.
   4. All decisions are written to the audit log.
 
 The reasoning pattern for each event:
@@ -19,7 +19,7 @@ The reasoning pattern for each event:
   → What is the current state? (agent queries)
   → What's the impact? (knowledge graph traversal)
   → What should we do? (decision)
-  → Who needs to know? (WhatsApp / audit log)
+  → Who needs to know? (in-app inbox / audit log)
 
 Design principle: the orchestrator never calls database queries directly.
 It always calls agent functions. The agents own the data logic.
@@ -27,7 +27,7 @@ It always calls agent functions. The agents own the data logic.
 
 import logging
 from datetime import date
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from database import SessionLocal
 import models
 from events.bus import subscribe, EventType, emit_async
@@ -82,7 +82,7 @@ def on_stock_critical(payload: dict) -> None:
       2. How many covers are booked tonight? (reservations)
       3. What's our daily usage rate? (inventory agent)
       4. Should we order now or substitute? (decision)
-      5. Notify owner with full context. (WhatsApp)
+      5. Notify owner with full context in-app.
     """
     restaurant_id = payload.get("restaurant_id")
     item_name     = payload.get("item_name", "Unknown item")
@@ -124,8 +124,8 @@ def on_stock_critical(payload: dict) -> None:
 
         reasoning = " ".join(reasoning_parts)
 
-        # Decision: compose WhatsApp alert
-        from ai.whatsapp import send_whatsapp_message
+        # Decision: compose an in-app owner alert
+
 
         msg = _compose_orchestrated_stock_alert(
             item_name     = item_name,
@@ -135,11 +135,10 @@ def on_stock_critical(payload: dict) -> None:
             past_stockouts = len(past_stockouts),
         )
 
-        # Was env-var only, so a restaurant onboarded via the owner_phone column
-        # (migration 006) got no critical-stock alerts at all.
-        owner_phone = _owner_phone(restaurant)
-        if owner_phone:
-            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+        # Owner notices must not depend on phone configuration.
+        owner_recipient = _owner_recipient(restaurant)
+        if owner_recipient:
+            _notify_owner(owner_recipient, msg, db=db, restaurant_id=restaurant_id,
                                   message_type="orchestrated_stock_critical")
 
         # Memory: auto-record near-stockout
@@ -183,15 +182,15 @@ def on_stock_depleted(payload: dict) -> None:
         restaurant = db.query(models.Restaurant).filter(
             models.Restaurant.id == restaurant_id
         ).first()
-        owner_phone = _owner_phone(restaurant)
-        if owner_phone:
-            from ai.whatsapp import send_whatsapp_message
+        owner_recipient = _owner_recipient(restaurant)
+        if owner_recipient:
+
             msg = (
                 f"🚨 *Out of Stock*\n\n"
                 f"{item_name} has hit zero.\n"
                 f"Dishes using it cannot be served until it's restocked."
             )
-            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+            _notify_owner(owner_recipient, msg, db=db, restaurant_id=restaurant_id,
                                   message_type="stock_depleted")
     except Exception as exc:
         logger.error(f"[Orchestrator] on_stock_depleted failed: {exc}")
@@ -219,11 +218,11 @@ def on_stock_transfer_discrepancy(payload: dict) -> None:
         if not restaurant:
             return
 
-        owner_phone = _owner_phone(restaurant)
-        if owner_phone:
+        owner_recipient = _owner_recipient(restaurant)
+        if owner_recipient:
             direction = "less" if confirmed_quantity < declared_quantity else "more"
             gap = abs(confirmed_quantity - declared_quantity)
-            from ai.whatsapp import send_whatsapp_message
+
             msg = (
                 f"⚠️ *Stock Transfer Mismatch*\n\n"
                 f"Transfer #{transfer_id} of {item_name}: sender declared "
@@ -231,7 +230,7 @@ def on_stock_transfer_discrepancy(payload: dict) -> None:
                 f"({gap}{unit} {direction} than declared).\n"
                 f"Flagged for review — not auto-corrected."
             )
-            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+            _notify_owner(owner_recipient, msg, db=db, restaurant_id=restaurant_id,
                                   message_type="stock_transfer_discrepancy")
 
         write_audit_log(
@@ -265,8 +264,8 @@ def on_stock_variance_flagged(payload: dict) -> None:
         if not restaurant:
             return
 
-        owner_phone = _owner_phone(restaurant)
-        if owner_phone:
+        owner_recipient = _owner_recipient(restaurant)
+        if owner_recipient:
             from ai.stock_custody import VARIANCE_THRESHOLD
             lines = [
                 f"• {i['item_name']}: {i['variance_pct']*100:.1f}% variance "
@@ -274,14 +273,14 @@ def on_stock_variance_flagged(payload: dict) -> None:
                 for i in items[:5]
             ]
             more = f"\n…and {len(items) - 5} more" if len(items) > 5 else ""
-            from ai.whatsapp import send_whatsapp_message
+
             msg = (
                 f"📊 *Stock Variance Report*\n\n"
                 f"{len(items)} item(s) over the {VARIANCE_THRESHOLD*100:.0f}% variance threshold "
                 f"in the last 24h:\n\n" + "\n".join(lines) + more +
                 f"\n\nWorth a physical count if this keeps recurring on the same item."
             )
-            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+            _notify_owner(owner_recipient, msg, db=db, restaurant_id=restaurant_id,
                                   message_type="stock_variance_flagged")
 
         write_audit_log(
@@ -316,18 +315,18 @@ def on_stock_count_discrepancy(payload: dict) -> None:
         if not restaurant:
             return
 
-        owner_phone = _owner_phone(restaurant)
-        if owner_phone:
+        owner_recipient = _owner_recipient(restaurant)
+        if owner_recipient:
             direction = "less" if counted_quantity < expected_quantity else "more"
             gap = abs(counted_quantity - expected_quantity)
-            from ai.whatsapp import send_whatsapp_message
+
             msg = (
                 f"🔍 *Stock Count Discrepancy*\n\n"
                 f"{item_name}: system expected {expected_quantity}{unit}, physical count found "
                 f"{counted_quantity}{unit} ({gap}{unit} {direction} than expected).\n"
                 f"Worth investigating if this isn't a one-off."
             )
-            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+            _notify_owner(owner_recipient, msg, db=db, restaurant_id=restaurant_id,
                                   message_type="stock_count_discrepancy")
 
         write_audit_log(
@@ -405,23 +404,7 @@ def on_order_paid(payload: dict) -> None:
 
     db = SessionLocal()
     try:
-        if customer_phone:
-            from ai.whatsapp import send_whatsapp_message
-            from ai.whatsapp.brain import compose_receipt
-            order = (
-                db.query(models.Order)
-                .options(
-                    joinedload(models.Order.items).joinedload(models.OrderItem.menu_item)
-                )
-                .filter(models.Order.id == order_id)
-                .first()
-            )
-            if order:
-                msg = compose_receipt(db, order, mpesa_ref=mpesa_ref)
-                send_whatsapp_message(customer_phone, msg, db=db,
-                                      restaurant_id=restaurant_id, message_type="receipt",
-                                      channel="whatsapp", fallback_sms=True)
-
+        # Customer receipt dispatch is retired. Preserve the payment audit only.
         write_audit_log(
             db, restaurant_id, "payment_received", "executive_orchestrator",
             entity_type = "order",
@@ -437,19 +420,16 @@ def on_order_paid(payload: dict) -> None:
         db.close()
 
 
-def _owner_phone(restaurant) -> str:
-    """
-    The owner's WhatsApp number, or "" if none is configured. Delegates to
-    `brain.owner_phone_for` (DB column first, legacy OWNER_PHONE_{id} /
-    OWNER_PHONE env vars as fallback) rather than re-implementing that
-    precedence — it must stay identical to the inbound resolution in
-    `routers/webhooks._resolve_restaurant_by_phone`, or an owner who can reply
-    to the bot can't be reached by it.
-    """
-    if restaurant is None:
-        return ""
-    from ai.whatsapp.brain import owner_phone_for
-    return owner_phone_for(restaurant)
+def _owner_recipient(restaurant):
+    """An owner notice is scoped by restaurant, never by a phone number."""
+    return restaurant
+
+
+def _notify_owner(restaurant, message, *, db, restaurant_id, message_type):
+    """Persist enriched owner advice through the tenant-scoped in-app inbox."""
+    from ai.whatsapp.brain import send_to_owner
+    if restaurant is not None and restaurant.id == restaurant_id:
+        send_to_owner(db, restaurant, message, message_type)
 
 
 def on_mpesa_payment_failed(payload: dict) -> None:
@@ -478,21 +458,21 @@ def on_mpesa_payment_failed(payload: dict) -> None:
             models.Restaurant.id == restaurant_id
         ).first()
 
-        owner_phone = _owner_phone(restaurant)
-        if owner_phone:
-            from ai.whatsapp import send_whatsapp_message
+        owner_recipient = _owner_recipient(restaurant)
+        if owner_recipient:
+
             msg = (
                 f"⚠️ *Payment Failed*\n\n"
                 f"M-Pesa payment for order #{order_id} did not go through.\n"
                 f"Reason: {reason}\n\n"
                 f"_The order is still marked unpaid._"
             )
-            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+            _notify_owner(owner_recipient, msg, db=db, restaurant_id=restaurant_id,
                                   message_type="mpesa_payment_failed")
         else:
             logger.warning(
                 f"[Orchestrator] M-Pesa payment failed for order {order_id} but no "
-                f"owner phone is configured for restaurant {restaurant_id} — nobody notified"
+                f"restaurant record exists for {restaurant_id} — nobody notified"
             )
 
         write_audit_log(
@@ -530,35 +510,14 @@ def on_reservation_no_show(payload: dict) -> None:
             agent_notes       = f"Party of {party_size} did not arrive. Phone: {customer_phone}.",
         )
 
-        # For large parties (4+) from known customers, trigger winback
-        if party_size >= 4 and customer_phone:
-            # Same marketing-consent gate broadcast_winback/promo enforce
-            # (brain.py): a "come back" promo is marketing traffic and needs a
-            # positive consent signal, not just the absence of a STOP opt-out.
-            from ai.whatsapp.optout import canonical as _canonical_phone, is_opted_out
-            consented = {
-                _canonical_phone(row[0])
-                for row in db.query(models.CustomerConsent.customer_phone)
-                .filter(models.CustomerConsent.restaurant_id == restaurant_id)
-                .all()
-            }
-            if _canonical_phone(customer_phone) not in consented or is_opted_out(db, customer_phone):
-                logger.info(
-                    "[Orchestrator] no-show winback skipped for %s — no marketing consent",
-                    _canonical_phone(customer_phone),
-                )
-                return
-            restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
-            r_name = restaurant.name if restaurant else "us"
-            from ai.whatsapp import compose_winback_message, send_whatsapp_message
-            # 24-hour delay winback (customer gets space, not immediate marketing)
-            msg = (
-                f"Hi {customer_name or 'there'}! We had a table reserved for you at {r_name} today.\n\n"
-                f"Life happens — we understand! We'd love to host you another time.\n"
-                f"Reply YES and we'll reserve your table again. 🍽️"
-            )
-            send_whatsapp_message(customer_phone, msg, db=db,
-                                  restaurant_id=restaurant_id, message_type="no_show_winback")
+        # Record the no-show for owner review; never contact the customer.
+        restaurant = db.query(models.Restaurant).filter(
+            models.Restaurant.id == restaurant_id
+        ).first()
+        _notify_owner(restaurant,
+                      f"No-show recorded: {customer_name or 'unknown'}, party of {party_size}. "
+                      "Review the booking in the app; no customer message has been sent.",
+                      db=db, restaurant_id=restaurant_id, message_type="reservation_no_show")
 
     except Exception as exc:
         logger.error(f"[Orchestrator] on_reservation_no_show failed: {exc}")
@@ -604,9 +563,9 @@ def on_purchase_order_late(payload: dict) -> None:
         # A restaurant onboarded via the DB column (the normal path today)
         # got zero supplier-late alerts. Switched to the shared helper.
         restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
-        from ai.whatsapp import send_whatsapp_message
-        owner_phone = _owner_phone(restaurant)
-        if owner_phone:
+
+        owner_recipient = _owner_recipient(restaurant)
+        if owner_recipient:
             msg = (
                 f"🚚 *Supplier Alert*\n\n"
                 f"*{supplier_name}* delivery is {days_late} day(s) late.\n"
@@ -614,7 +573,7 @@ def on_purchase_order_late(payload: dict) -> None:
                 f"Reliability score: {supplier.reliability_score if supplier else 'N/A'}%\n"
                 f"Consider calling the supplier or sourcing from an alternative."
             )
-            send_whatsapp_message(owner_phone, msg, db=db,
+            _notify_owner(owner_recipient, msg, db=db,
                                   restaurant_id=restaurant_id, message_type="supplier_late")
 
         if crossed_watch_threshold and supplier:
@@ -652,15 +611,15 @@ def on_purchase_order_created(payload: dict) -> None:
         if not restaurant:
             return
 
-        owner_phone = _owner_phone(restaurant)
-        if owner_phone:
-            from ai.whatsapp import send_whatsapp_message
+        owner_recipient = _owner_recipient(restaurant)
+        if owner_recipient:
+
             msg = (
                 f"📝 *Purchase Order Drafted*\n\n"
                 f"{quantity}{unit} {item_name} from {supplier_name} — stock hit its reorder point.\n"
-                f"Reply or open the dashboard to approve before it's sent."
+                f"Open the dashboard to review the draft. No order has been sent."
             )
-            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+            _notify_owner(owner_recipient, msg, db=db, restaurant_id=restaurant_id,
                                   message_type="purchase_order_drafted")
 
         write_audit_log(
@@ -696,16 +655,16 @@ def on_purchase_order_delivered(payload: dict) -> None:
         if not restaurant:
             return
 
-        owner_phone = _owner_phone(restaurant)
-        if owner_phone:
-            from ai.whatsapp import send_whatsapp_message
+        owner_recipient = _owner_recipient(restaurant)
+        if owner_recipient:
+
             msg = (
                 f"📦 *Short Delivery*\n\n"
                 f"PO #{po_id} for {item_name}: ordered {quantity_ordered}{unit}, "
                 f"received {quantity_received}{unit} — {shortfall}{unit} short.\n"
                 f"Recorded as-is; follow up with the supplier if this keeps happening."
             )
-            send_whatsapp_message(owner_phone, msg, db=db, restaurant_id=restaurant_id,
+            _notify_owner(owner_recipient, msg, db=db, restaurant_id=restaurant_id,
                                   message_type="purchase_order_short_delivery")
 
         write_audit_log(
@@ -749,21 +708,21 @@ def on_agent_failed(payload: dict) -> None:
             # Resolve the restaurant's own owner number (DB column, env
             # fallback) — the global OWNER_PHONE env var ignores per-tenant
             # routing and can text the wrong owner.
-            owner_phone = ""
+            owner_recipient = ""
             if restaurant_id:
                 restaurant = db.query(models.Restaurant).filter(
                     models.Restaurant.id == restaurant_id
                 ).first()
-                owner_phone = _owner_phone(restaurant)
-            if owner_phone:
-                from ai.whatsapp import send_whatsapp_message
+                owner_recipient = _owner_recipient(restaurant)
+            if owner_recipient:
+
                 msg = (
                     f"⚠️ *AI System Alert*\n\n"
                     f"*{agent_name}* has failed {recent_failures} times in the last hour.\n"
                     f"Last error: {error[:200]}\n\n"
-                    f"Analytics may be temporarily unavailable. Team has been notified."
+                    f"Analytics may be temporarily unavailable. Review this in the app."
                 )
-                send_whatsapp_message(owner_phone, msg, db=db,
+                _notify_owner(owner_recipient, msg, db=db,
                                       restaurant_id=restaurant_id, message_type="agent_failure")
 
     except Exception as exc:

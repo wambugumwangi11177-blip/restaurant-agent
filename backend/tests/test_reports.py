@@ -26,3 +26,19 @@ def test_reports_all_periods(client):
     for p in ("weekly", "monthly", "yearly"):
         assert client.get(f"/api/v1/reports/{p}", headers=headers).status_code == 200
     assert client.get("/api/v1/reports/hourly", headers=headers).status_code == 422
+
+
+def test_report_discards_invented_narrative_figures(monkeypatch):
+    from routers.reports import _llm_narrative
+    from ai import llm_client
+    monkeypatch.setattr(llm_client, "is_available", lambda: True)
+    monkeypatch.setattr(llm_client, "chat", lambda *args, **kwargs: "Revenue is KSh 999,999.")
+    assert _llm_narrative("daily", "13 Sep", {"revenue": 500, "orders": 2}, []) is None
+
+
+def test_report_keeps_grounded_narrative(monkeypatch):
+    from routers.reports import _llm_narrative
+    from ai import llm_client
+    monkeypatch.setattr(llm_client, "is_available", lambda: True)
+    monkeypatch.setattr(llm_client, "chat", lambda *args, **kwargs: "Revenue is KSh 500.")
+    assert _llm_narrative("daily", "13 Sep", {"revenue": 500, "orders": 2}, []) == "Revenue is KSh 500."

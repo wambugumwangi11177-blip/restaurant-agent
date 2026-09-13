@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session
 import models
 from database import get_db
 from auth import require_staff_role
-from routers.reports import _strip_reasoning_leak
+from routers.reports import _grounded_reply
 from routers.overview import _restaurant_id
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -358,7 +358,7 @@ def chat_llm(body: ChatBody, db: Session = Depends(get_db),
         try:
             llm_reply = llm_client.chat(
                 messages, system=system, max_tokens=400, tier="medium")
-            llm_reply = _strip_reasoning_leak(llm_reply)
+            llm_reply = _grounded_reply(llm_reply, context)
         except Exception:  # LLM failure never exposes provider diagnostics to the client.
             llm_reply = None
 

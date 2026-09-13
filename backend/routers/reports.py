@@ -139,9 +139,17 @@ def _llm_narrative(period: str, label: str, core: dict, top: list) -> str | None
         text = llm_client.chat(
             [{"role": "user", "content": user}],
             system=system, max_tokens=500, tier="medium")
-        return _strip_reasoning_leak(text)
+        return _grounded_reply(text, user)
     except Exception:  # noqa: BLE001 — LLM down never blocks a report
         return None
+
+
+def _grounded_reply(text: str, evidence: str) -> str | None:
+    """Keep deterministic output when an optional narrative invents figures."""
+    from ai.reasoning.grounding import verify
+    cleaned = _strip_reasoning_leak(text)
+    checked = verify({"headline": cleaned}, evidence)
+    return cleaned if cleaned and checked["verified"] else None
 
 
 _LEAK_STARTERS = re.compile(

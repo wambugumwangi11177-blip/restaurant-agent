@@ -11,6 +11,8 @@ def test_threshold_alert_without_usage_does_not_claim_forecast(monkeypatch):
     assert "threshold" in card["why"]
     assert "timing is unavailable" in card["steps"][0]["why"]
     assert "14 days" not in str(card)
+    assert card["data"]["stockout_timing_available"] is False
+    assert card["data"]["narrative_allowed"] is False
 
 
 def test_empty_predictions_do_not_assert_stock_is_safe(monkeypatch):
@@ -18,3 +20,36 @@ def test_empty_predictions_do_not_assert_stock_is_safe(monkeypatch):
     card = _answer_stock(None, 1, "What stock is low?")
     assert "Missing usage history" in card["why"]
     assert "No reorder needed" not in card["recommendation"]
+
+
+def test_measured_stockout_prediction_can_be_narrated(monkeypatch):
+    monkeypatch.setattr(inventory_predictor, "get_inventory_predictions", lambda *args: {
+        "predictions": [{"item_name": "Tomatoes", "status": "low", "days_until_stockout": 2}]})
+    card = _answer_stock(None, 1, "What will run out soon?")
+    assert "projected" in card["finding"]
+    assert card["data"]["stockout_timing_available"] is True
+    assert card["data"]["narrative_allowed"] is True
+
+
+def test_threshold_chat_skips_unverifiable_narrative(monkeypatch):
+    from routers import ai_ask
+    from ai import llm_client
+
+    monkeypatch.setattr(ai_ask, "_restaurant_id", lambda *args: 1)
+    monkeypatch.setattr(inventory_predictor, "get_inventory_predictions", lambda *args: {
+        "predictions": [{"item_name": "Tomatoes", "status": "low"}]})
+    monkeypatch.setattr(llm_client, "is_available", lambda: True)
+
+    calls = []
+
+    def forbidden_chat(*args, **kwargs):
+        calls.append(True)
+        raise AssertionError("Threshold-only evidence must not reach free-form narration")
+
+    monkeypatch.setattr(llm_client, "chat", forbidden_chat)
+    # No DB methods are required when narration is suppressed.
+    result = ai_ask.chat_llm(ai_ask.ChatBody(question="What will run out soon?"), None, None)
+    assert result["llm_used"] is False
+    assert result["llm_reply"] is None
+    assert calls == []
+    assert "Stockout timing is not established" in result["grounded"]["why"]

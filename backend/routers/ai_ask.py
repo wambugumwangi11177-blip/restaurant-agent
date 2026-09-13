@@ -100,7 +100,9 @@ def _answer_stock(db: Session, rid: int, q: str) -> dict:
         rec = "Confirm current quantities and usage history before deciding whether to reorder."
         steps = []
     return {"finding": finding, "why": why, "impact": impact, "recommendation": rec,
-            "module": "reorder", "steps": steps, "data": {"candidates": len(focus)}}
+            "module": "reorder", "steps": steps,
+            "data": {"candidates": len(focus), "stockout_timing_available": bool(soon),
+                     "narrative_allowed": bool(soon)}}
 
 
 def _answer_revenue(db: Session, rid: int, q: str) -> dict:
@@ -333,7 +335,9 @@ def chat_llm(body: ChatBody, db: Session = Depends(get_db),
 
     from ai import llm_client
     llm_reply = None
-    if card.get("data", {}).get("available") is not False and llm_client.is_available():
+    if (card.get("data", {}).get("available") is not False
+            and card.get("data", {}).get("narrative_allowed") is not False
+            and llm_client.is_available()):
         restaurant_name = db.query(models.Restaurant.name).filter(
             models.Restaurant.id == rid).scalar() or "your restaurant"
         context = (

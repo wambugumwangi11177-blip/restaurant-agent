@@ -276,7 +276,7 @@ export default function VibandaHomePage() {
           )}
 
           {/* How each part is doing */}
-          <PartHealth />
+          <PartHealth feed={feed} />
 
           {/* Business performance */}
           <section aria-labelledby="performance-heading" className="mt-10 rounded-xl border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.55)] p-4 sm:p-5">

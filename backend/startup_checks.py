@@ -27,7 +27,6 @@ logger = logging.getLogger("startup")
 def is_production() -> bool:
     return (
         os.getenv("APP_ENV", "").strip().lower() == "production"
-        or os.getenv("MPESA_ENV", "").strip().lower() == "production"
     )
 
 
@@ -64,13 +63,6 @@ def collect_problems() -> tuple[list[str], list[str]]:
     # unconditionally (with or without Daraja creds configured: the creds are
     # not what the callback authenticates against); outside production the
     # same condition is a soft warning so dev/tests never block.
-    if not os.getenv("MPESA_CALLBACK_TOKEN", "").strip():
-        msg = ("MPESA_CALLBACK_TOKEN is not set — the M-Pesa callback has no "
-               "authentication and cannot be accepted")
-        if prod:
-            hard.append(msg)
-        else:
-            soft.append(msg)
 
     # CORS must be set explicitly in production; the built-in fallback list is a
     # dev safety net, not a production ACL.

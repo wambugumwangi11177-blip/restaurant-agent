@@ -27,7 +27,6 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 import models
 from time_utils import utcnow
-from . import twilio_client
 
 logger = logging.getLogger("ai.whatsapp.brain")
 
@@ -713,21 +712,10 @@ def send_whatsapp_message(
                 _log_message(db, restaurant_id, to_number, message, message_type, "suppressed_optout")
             return {"status": "suppressed_optout", "sid": None}
 
-    result = twilio_client.send(to_number, message, channel=channel, media_url=media_url)
+    # Retired compatibility entry point. No phone transport is available.
+    # Never fan customer messages into an owner's inbox (privacy boundary).
+    return {"status": "retired", "sid": None}
 
-    # Fallback: if a WhatsApp send didn't actually go out (not configured / error /
-    # undeliverable) and the caller allowed it, try SMS — the customer may simply
-    # not be on WhatsApp. Never fall back on an opt-out suppression.
-    used_channel = channel
-    if fallback_sms and channel == "whatsapp" and result["status"] not in ("sent", "suppressed_optout"):
-        sms_result = twilio_client.send(to_number, message, channel="sms")
-        if sms_result["status"] == "sent":
-            result, used_channel = sms_result, "sms"
-
-    if db and restaurant_id:
-        _log_message(db, restaurant_id, to_number, message, f"{message_type}:{used_channel}",
-                     result["status"], result.get("sid"))
-    return result
 
 
 def owner_channel_for(restaurant) -> str:

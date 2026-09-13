@@ -150,12 +150,6 @@ def _page_managers(db: Session, notif: "models.Notification") -> None:
         models.StaffMember.is_active == True,  # noqa: E712
     ).all()
 
-    from ai.whatsapp.brain import send_whatsapp_message
-    for staff in staff_rows:
-        send_whatsapp_message(
-            staff.phone, escalated_body, db=db, restaurant_id=restaurant.id,
-            message_type="escalation", channel="whatsapp", fallback_sms=True,
-        )
 
 
 def _call_owner(db: Session, notif: "models.Notification") -> None:
@@ -163,11 +157,8 @@ def _call_owner(db: Session, notif: "models.Notification") -> None:
     if not restaurant:
         return
 
-    from ai.whatsapp.brain import owner_phone_for
-    phone = owner_phone_for(restaurant)
-    if not phone:
-        logger.warning(f"[Escalation] No owner phone to call for restaurant {restaurant.id}")
-        return
-
-    from ai.whatsapp.twilio_client import call
-    call(phone, f"Urgent alert from Leviii. {notif.title}. Please check your dashboard immediately.")
+    owners = get_staff_users_for_restaurant(db, restaurant, [models.StaffRole.OWNER])
+    # The terminal escalation is an in-app reminder, not a new escalation
+    # chain. No severity is assigned, preventing recursive escalation.
+    notify_users(db, [owner.id for owner in owners], f"[URGENT] {notif.title}",
+                 notif.body, "owner_escalation", notif.url)

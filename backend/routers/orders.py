@@ -482,8 +482,6 @@ async def create_public_order(
         db.rollback()
         logger.error(f"Ingredient deduction failed for public order {db_order.id}: {exc}")
 
-    if payment_method == models.PaymentMethod.MPESA:
-        _trigger_mpesa_stk_push(db, db_order)
 
     # 2026-07-18 event-map pass: unlike a staff-rung dine-in order (the waiter
     # is right there, the KDS shows it), an online order arrives with *no staff
@@ -507,21 +505,7 @@ def _trigger_mpesa_stk_push(db: Session, order: models.Order) -> None:
     creation. The customer/staff can retry payment through other means
     (cash, card, or a manual STK retry) — the order itself is already valid.
     """
-    from payments import mpesa_client
-
-    phone = mpesa_client.normalize_phone(order.customer_phone or "")
-    if not phone:
-        return
-
-    result = mpesa_client.initiate_stk_push(
-        phone_number=phone,
-        amount_cents=order.total or 0,
-        account_reference=f"ORDER-{order.id}",
-        description=f"Order #{order.id}",
-    )
-    if result["status"] == "initiated":
-        order.mpesa_checkout_request_id = result["checkout_request_id"]
-        db.commit()
+    raise RuntimeError("External payment initiation has been removed")
 
 
 def _order_to_dict(order: models.Order) -> dict:

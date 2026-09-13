@@ -675,6 +675,7 @@ async def ai_marketing_promo(
     `PROMO <offer>` command. Returns the audience it will reach; the send runs in
     the background.
     """
+    raise HTTPException(status_code=410, detail="External customer messaging has been removed. Marketing advice remains available in-app.")
     restaurant = get_or_create_restaurant(db, current_user)
     offer_text = body.offer_text.strip()
     if not offer_text:
@@ -707,6 +708,7 @@ async def ai_marketing_winback(
     reachable audience; the send runs in the background and logs
     message_type="campaign_winback".
     """
+    raise HTTPException(status_code=410, detail="External customer messaging has been removed. Marketing advice remains available in-app.")
     restaurant = get_or_create_restaurant(db, current_user)
 
     from ai.whatsapp import brain

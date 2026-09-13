@@ -208,24 +208,24 @@ export default function VibandaHomePage() {
               <PillarCard label="Revenue" primaryLabel="Revenue so far" primary={fmtKes(feed.revenue.revenue)}
                 comparison={feed.revenue.orders ? `Average order · ${fmtKes(feed.revenue.avg_order)}` : ""}
                 signals={[
-                  feed.revenue.pace_projection ? `On pace for ~${fmtKes(feed.revenue.pace_projection)} today` : "No sales in this period yet",
+                  "Paid, non-cancelled orders in this period",
                 ]}
                 onAsk={() => ask("How are my sales today?")} />
               <PillarCard label="Orders" primaryLabel="Orders today" primary={`${feed.orders.orders} orders`}
                 comparison={feed.orders.active_now ? `${feed.orders.active_now} active now` : ""}
                 signals={[Object.entries(feed.orders.split).filter(([, v]) => v > 0).map(([k, v]) => `${v} ${k.replace("_", "-")}`).join(" · ") || "—"]}
                 onAsk={() => ask("Are there any delayed orders?")} />
-              <PillarCard label="Kitchen" primaryLabel="Kitchen" primary={feed.kitchen.avg_prep_min ? `${feed.kitchen.avg_prep_min} min prep` : "On pace"}
-                comparison={feed.kitchen.delay_risk ? `${feed.kitchen.delay_risk} orders approaching delay` : ""}
-                signals={[feed.kitchen.bottleneck ? `Bottleneck: ${feed.kitchen.bottleneck}` : "No delays reported"]}
+              <PillarCard label="Kitchen" primaryLabel="Kitchen" primary="Not available"
+                comparison=""
+                signals={["Kitchen timing data is not connected"]}
                 onAsk={() => ask("Are there any delayed orders?")} />
-              <PillarCard label="Stock" primaryLabel="Stock" primary={feed.stock.low_stock.length ? `${feed.stock.low_stock.length} to watch` : "Healthy"}
-                comparison={feed.stock.low_stock[0] ? `${feed.stock.low_stock[0].name} projected to run out` : ""}
+              <PillarCard label="Stock" primaryLabel="Stock" primary={feed.stock.low_stock.length ? `${feed.stock.low_stock.length} to watch` : "No low-stock flags"}
+                comparison={feed.stock.low_stock[0] ? `${feed.stock.low_stock[0].name} is below its reorder point` : "Based on recorded inventory only"}
                 signals={feed.stock.low_stock.slice(0, 2).map((i) => `${i.name} · ${i.qty} left`)}
                 onAsk={() => ask("What am I about to run out of?")} />
               <PillarCard label="Bookings" primaryLabel="Covers expected" primary={`${feed.bookings.covers_today} covers`}
                 comparison={feed.bookings.next_reservation_min ? `Next reservation in ${feed.bookings.next_reservation_min} min` : ""}
-                signals={[feed.bookings.waitlist ? `${feed.bookings.waitlist} tables on the waitlist` : "No waitlist"]}
+                signals={["Waitlist data is not available"]}
                 onAsk={() => ask("Who's booked tonight?")} />
               <PillarCard label="Staff" primaryLabel="Coverage" primary={`${feed.staff.scheduled} scheduled`}
                 comparison={feed.staff.overtime_risk ? `${feed.staff.overtime_risk} overtime risk` : ""}
@@ -242,9 +242,9 @@ export default function VibandaHomePage() {
               {feed.attention.length === 0 && (
                 <div className="rounded-xl border border-[hsl(150_28%_41_/_0.24)] bg-[hsl(150_28%_41_/_0.06)] px-5 py-8 text-center sm:px-10">
                   <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[hsl(150_28%_41_/_0.12)] text-[var(--v-good)]">✓</div>
-                  <h3 className="font-display mt-3 text-xl font-semibold tracking-[-0.02em]">You&apos;re on track</h3>
+                  <h3 className="font-display mt-3 text-xl font-semibold tracking-[-0.02em]">No open attention cards</h3>
                   <p className="mx-auto mt-1.5 max-w-md text-xs text-[var(--v-muted-foreground)]">
-                    There are no high-priority issues requiring your attention right now.
+                    No issues were flagged in the available records. Unconnected areas have not been assessed.
                   </p>
                 </div>
               )}

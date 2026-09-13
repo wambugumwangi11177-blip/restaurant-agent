@@ -164,3 +164,21 @@ def test_nairobi_day_does_not_include_previous_day_reservations(db_session, scop
     db_session.commit()
     card = _bookings_card(db_session, 202, datetime(2026, 9, 12, 21), datetime(2026, 9, 12, 22))
     assert card["covers_today"] == 4
+
+
+def test_revenue_excludes_unpaid_cancelled_and_out_of_window_orders(db_session, scoped_owner):
+    from datetime import datetime
+    from routers.overview import _summarize, _orders_card
+    start, end = datetime(2026, 9, 12, 21), datetime(2026, 9, 13, 21)
+    for paid, status, total, created in [
+        (True, models.OrderStatus.SERVED, 12345, start),
+        (False, models.OrderStatus.PENDING, 20000, start),
+        (True, models.OrderStatus.CANCELLED, 30000, start),
+        (True, models.OrderStatus.SERVED, 40000, end),
+    ]:
+        db_session.add(models.Order(restaurant_id=202, is_paid=paid, status=status,
+                                    total=total, created_at=created))
+    db_session.commit()
+    core = _summarize(db_session, 202, start, end)
+    assert core == {"revenue": 123.45, "orders": 1}
+    assert _orders_card(db_session, 202, start, end, core)["orders"] == 3

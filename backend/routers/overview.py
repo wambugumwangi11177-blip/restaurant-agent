@@ -59,8 +59,12 @@ def _eat_range(period: str):
 
 
 def _summarize(db: Session, rid: int, start, end) -> dict:
-    """One aggregation shared by overview and reports (DRY)."""
-    base = lambda q, col: q.filter(models.Order.restaurant_id == rid, col >= start, col < end)
+    """Paid, non-cancelled order value by creation time; not payment cash flow."""
+    base = lambda q, col: q.filter(
+        models.Order.restaurant_id == rid, col >= start, col < end,
+        models.Order.is_paid.is_(True),
+        models.Order.status != models.OrderStatus.CANCELLED,
+    )
     revenue = base(db.query(func.coalesce(func.sum(models.Order.total), 0)),
                    models.Order.created_at).scalar()
     orders = base(db.query(func.count(models.Order.id)), models.Order.created_at).scalar()
@@ -86,7 +90,8 @@ def _orders_card(db: Session, rid: int, start, end, core: dict) -> dict:
         models.Order.created_at >= start, models.Order.created_at < end,
         models.Order.status.in_([models.OrderStatus.PENDING, models.OrderStatus.PREP]),
     ).scalar()
-    return {**core, "delayed": 0, "active_now": int(active), "split": split}
+    return {**core, "orders": sum(split.values()), "delayed": 0,
+            "active_now": int(active), "split": split}
 
 
 def _stock_card(db: Session, rid: int) -> dict:
@@ -131,6 +136,8 @@ def _staff_card(db: Session, rid: int, start, end) -> dict:
     if core_rev := db.query(func.coalesce(func.sum(models.Order.total), 0)).filter(
         models.Order.restaurant_id == rid,
         models.Order.created_at >= start, models.Order.created_at < end,
+        models.Order.is_paid.is_(True),
+        models.Order.status != models.OrderStatus.CANCELLED,
     ).scalar():
         labor_pct = round((cost_cents / core_rev) * 100, 1) if core_rev else 0.0
     return {"scheduled": int(sched), "on_shift": int(worked), "overtime_risk": 0,
@@ -201,7 +208,9 @@ def _performance(db: Session, rid: int) -> dict:
             func.count(models.Order.id),
         ).filter(models.Order.restaurant_id == rid,
                  models.Order.created_at >= start_utc,
-                 models.Order.created_at < end_utc).first()
+                 models.Order.created_at < end_utc,
+                 models.Order.is_paid.is_(True),
+                 models.Order.status != models.OrderStatus.CANCELLED).first()
         trend.append({"date": s, "revenue": float(rev) / 100.0, "orders": int(cnt)})
     return {"revenue_trend": trend, "orders_trend": trend}
 
@@ -217,10 +226,7 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
         "avg_order": round(core["revenue"] / core["orders"], 2) if core["orders"] else 0.0,
         "pace_projection": 0.0,
     }
-    if period == "today":
-        now_eat = _eat_now()
-        hours_open = max(now_eat.hour + now_eat.minute / 60, 1.0)
-        revenue_card["pace_projection"] = round(core["revenue"] / hours_open * 14, 2)  # 14h day
+    # No pace forecast without verified opening hours and comparable history.
     stock = _stock_card(db, rid)
     bookings = _bookings_card(db, rid, start, end)
     return {
@@ -228,6 +234,9 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
         "restaurant_name": db.query(models.Restaurant.name).filter(
             models.Restaurant.id == rid).scalar() or "Vibanda Village",
         "period": period,
+        "revenue_basis": "paid_non_cancelled_orders_by_creation_time",
+        "unavailable_metrics": ["pace_projection", "kitchen", "delayed_orders",
+                                "expiry", "waste", "waitlist", "no_show_rate", "overtime_risk"],
         "revenue": revenue_card,
         "orders": _orders_card(db, rid, start, end, core),
         "kitchen": {"avg_prep_min": 0, "delay_risk": 0, "bottleneck": None},

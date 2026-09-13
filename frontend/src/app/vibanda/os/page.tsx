@@ -4,8 +4,7 @@
 // prototype-data badge, ask bar, searchable question groups, transcript
 // ("You asked" → Finding / Why this matters / Estimated impact / Recommended
 // next step card), "This period" aside with REAL numbers from /overview/today.
-// Backend wiring (tracer): POST /api/v1/ai/strategy (goal→grounded plan,
-// deterministic fallback when no LLM key).
+// POST /api/v1/ai/chat, with GET /api/v1/ai/ask as the deterministic fallback.
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Search, Send, Sparkles, ShieldCheck, Info, ChevronRight } from "lucide-react";

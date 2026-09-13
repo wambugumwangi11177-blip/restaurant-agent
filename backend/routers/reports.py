@@ -46,6 +46,8 @@ def _top_items(db: Session, rid: int, start, end, limit=5) -> list:
     ).filter(
         models.Order.restaurant_id == rid,
         models.Order.created_at >= start, models.Order.created_at < end,
+        models.Order.is_paid.is_(True),
+        models.Order.status != models.OrderStatus.CANCELLED,
     ).group_by(models.MenuItem.name).order_by(func.sum(models.OrderItem.quantity).desc()).limit(limit).all()
     return [{"name": name, "qty": int(qty), "sales_kes": float(sales) / 100.0}
             for name, qty, sales in rows]
@@ -71,7 +73,7 @@ def _draft(period: str, range_label: str, core: dict, top: list) -> str:
     lines += [
         "",
         "---",
-        "Numbers are generated directly from your restaurant's data — no estimates.",
+        "Revenue includes paid, non-cancelled orders created in this period. This is not a payment cash-flow report.",
     ]
     return "\n".join(lines)
 
@@ -98,6 +100,7 @@ def report(period: str, narrate: bool = True, db: Session = Depends(get_db), use
         "period": period,
         "range": label,
         "revenue": core["revenue"],
+        "revenue_basis": "paid_non_cancelled_orders_by_creation_time",
         "orders": core["orders"],
         "top_items": top,
         "report_text": _draft(period, label, core, top),

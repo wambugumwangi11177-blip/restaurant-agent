@@ -111,8 +111,8 @@ def _answer_revenue(db: Session, rid: int, q: str) -> dict:
         trend_txt = fc.get("trend") or fc.get("summary") or ""
     except Exception:
         forecast, trend_txt = {}, ""
-    finding = f"Revenue today is {_money(core['revenue'] * 100)} across {core['orders']} orders."
-    why = "Live from your order data for the Nairobi calendar day so far."
+    finding = f"Revenue today is {_money(core['revenue'] * 100)} across {core['orders']} paid orders."
+    why = "Paid, non-cancelled orders created during the Nairobi calendar day so far. This is not payment cash flow."
     # core["revenue"] is already KES (overview's _summarize converts cents→KES);
     # avg_order must stay in KES — multiplying by 100 again showed absurd figures
     # (verified in browser 2026-09-12: "KSh 199,467" instead of KSh 1,995).

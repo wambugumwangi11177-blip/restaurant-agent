@@ -105,7 +105,7 @@ export default function VibandaReportsPage() {
           </details>
 
           {report.orders === 0 && (
-            <OsEmpty message="This period has no sales yet." hint="Reports fill in automatically as orders come in." />
+            <OsEmpty message="No paid, non-cancelled orders are recorded for this period." hint="Macsoft is not connected, so these records do not establish the restaurant's actual sales or customer activity." />
           )}
         </div>
       )}

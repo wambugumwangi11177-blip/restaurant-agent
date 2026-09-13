@@ -42,3 +42,15 @@ def test_report_keeps_grounded_narrative(monkeypatch):
     monkeypatch.setattr(llm_client, "is_available", lambda: True)
     monkeypatch.setattr(llm_client, "chat", lambda *args, **kwargs: "Revenue is KSh 500.")
     assert _llm_narrative("daily", "13 Sep", {"revenue": 500, "orders": 2}, []) == "Revenue is KSh 500."
+
+
+def test_empty_report_does_not_request_speculative_narrative(monkeypatch):
+    from routers.reports import _llm_narrative
+    from ai import llm_client
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Empty records do not prove absent customer activity")
+
+    monkeypatch.setattr(llm_client, "chat", forbidden)
+    monkeypatch.setattr(llm_client, "is_available", lambda: True)
+    assert _llm_narrative("daily", "13 Sep", {"revenue": 0, "orders": 0}, []) is None

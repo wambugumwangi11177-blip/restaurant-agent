@@ -116,6 +116,10 @@ def _llm_narrative(period: str, label: str, core: dict, top: list) -> str | None
     only real figures; the model is forbidden from inventing any. Returns None
     when no provider is configured or the call fails — the deterministic
     template remains the fallback, so a report is never blocked on the LLM."""
+    # No recorded orders cannot establish an absence of customer activity.
+    # Keep the deterministic empty state rather than soliciting speculation.
+    if not core["orders"]:
+        return None
     from ai import llm_client
     if not llm_client.is_available():
         return None

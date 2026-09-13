@@ -276,7 +276,7 @@ export default function MarketingPage() {
                         ))}
                         {wb.candidates[0]?.message && (
                             <details className="mt-2">
-                                <summary className="text-xs text-[var(--accent)] cursor-pointer hover:underline">Preview the message they&apos;ll receive</summary>
+                                <summary className="text-xs text-[var(--accent)] cursor-pointer hover:underline">Suggested wording — not sent</summary>
                                 <pre className="mt-2 whitespace-pre-wrap text-[11px] text-[#a3a3a3] bg-bg border border-surface-hover rounded-lg p-3 font-sans">{wb.candidates[0].message}</pre>
                             </details>
                         )}
@@ -287,12 +287,12 @@ export default function MarketingPage() {
             {/* Audience & consent */}
             <div className="rounded-xl border border-surface-hover bg-[#0f0f0f] p-5">
                 <h2 className="text-sm font-semibold text-text flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-[var(--accent)]" /> Who you can reach — and how customers are protected
+                    <ShieldCheck className="w-4 h-4 text-[var(--accent)]" /> Historical audience and consent records
                 </h2>
                 <HowItWorks id="consent" />
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
                     <div className="rounded-lg bg-surface border border-surface-hover p-3">
-                        <p className="text-xs text-text-dim mb-1">Promo reach now</p>
+                        <p className="text-xs text-text-dim mb-1">Consented recent diners</p>
                         <p className="text-sm font-bold text-text">{d.audience.promo_reachable}</p>
                     </div>
                     <div className="rounded-lg bg-surface border border-surface-hover p-3">
@@ -304,8 +304,8 @@ export default function MarketingPage() {
                         <p className="text-sm font-bold text-text">{d.audience.order_window_days} days</p>
                     </div>
                     <div className="rounded-lg bg-surface border border-surface-hover p-3">
-                        <p className="text-xs text-text-dim mb-1">Per-send cap</p>
-                        <p className="text-sm font-bold text-text">{d.audience.send_cap}</p>
+                        <p className="text-xs text-text-dim mb-1">Customer messaging</p>
+                        <p className="text-sm font-bold text-text">Retired</p>
                     </div>
                 </div>
             </div>
@@ -314,7 +314,7 @@ export default function MarketingPage() {
             {d.history.length > 0 && (
                 <div className="rounded-xl border border-surface-hover bg-[#0f0f0f] p-5">
                     <h2 className="text-sm font-semibold text-text flex items-center gap-2 mb-4">
-                        <Clock className="w-4 h-4 text-[var(--accent)]" /> What&apos;s gone out (last 90 days)
+                        <Clock className="w-4 h-4 text-[var(--accent)]" /> Historical campaigns (last 90 days)
                     </h2>
                     <div className="space-y-2">
                         {d.history.map((h) => {

@@ -386,14 +386,11 @@ def on_recommendation_approved(payload: dict) -> None:
 def on_order_paid(payload: dict) -> None:
     """
     Reacts to an ORDER_PAID event (past tense — the order is ALREADY settled by
-    the emitter, whether the M-Pesa webhook or the POS payment endpoint, before
-    this fires). Side-effects only: send an itemized customer receipt + write the
+    the emitter before this fires). Side-effects only: write the
     audit log. It deliberately does NOT mutate is_paid — settlement is the
     emitter's job, so a failure here can never leave the order half-paid.
 
-    Channel: tries WhatsApp, falls back to SMS (many Kenyan customers aren't on
-    WhatsApp). Opt-out (STOP) is honoured by the send choke point. The receipt is
-    itemized via brain.compose_receipt and works for any payment method.
+    External customer receipt dispatch is retired.
     """
     restaurant_id  = payload.get("restaurant_id")
     order_id       = payload.get("order_id")

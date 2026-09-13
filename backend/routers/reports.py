@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 import models
 from database import get_db
-from routers.overview import _summarize
+from routers.overview import _restaurant_id, _summarize
 from auth import require_staff_role
 from time_utils import utcnow
 
@@ -46,6 +46,8 @@ def _top_items(db: Session, rid: int, start, end, limit=5) -> list:
     ).filter(
         models.Order.restaurant_id == rid,
         models.Order.created_at >= start, models.Order.created_at < end,
+        models.Order.is_paid.is_(True),
+        models.Order.status != models.OrderStatus.CANCELLED,
     ).group_by(models.MenuItem.name).order_by(func.sum(models.OrderItem.quantity).desc()).limit(limit).all()
     return [{"name": name, "qty": int(qty), "sales_kes": float(sales) / 100.0}
             for name, qty, sales in rows]
@@ -71,7 +73,7 @@ def _draft(period: str, range_label: str, core: dict, top: list) -> str:
     lines += [
         "",
         "---",
-        "Numbers are generated directly from your restaurant's data — no estimates.",
+        "Revenue includes paid, non-cancelled orders created in this period. This is not a payment cash-flow report.",
     ]
     return "\n".join(lines)
 
@@ -80,11 +82,7 @@ def _draft(period: str, range_label: str, core: dict, top: list) -> str:
 def report(period: str, narrate: bool = True, db: Session = Depends(get_db), user=Depends(require_staff_role())):
     if period not in _PERIOD_SPANS:
         raise HTTPException(422, f"period must be one of {list(_PERIOD_SPANS)}")
-    rid = user.active_restaurant_id
-    if rid is None:
-        row = db.query(models.Restaurant.id).filter(
-            models.Restaurant.tenant_id == user.tenant_id).first()
-        rid = row[0] if row else 0
+    rid = _restaurant_id(db, user)
     start, end = _range(period)
     core = _summarize(db, rid, start, end)
     top = _top_items(db, rid, start, end)
@@ -102,6 +100,7 @@ def report(period: str, narrate: bool = True, db: Session = Depends(get_db), use
         "period": period,
         "range": label,
         "revenue": core["revenue"],
+        "revenue_basis": "paid_non_cancelled_orders_by_creation_time",
         "orders": core["orders"],
         "top_items": top,
         "report_text": _draft(period, label, core, top),
@@ -117,6 +116,10 @@ def _llm_narrative(period: str, label: str, core: dict, top: list) -> str | None
     only real figures; the model is forbidden from inventing any. Returns None
     when no provider is configured or the call fails — the deterministic
     template remains the fallback, so a report is never blocked on the LLM."""
+    # No recorded orders cannot establish an absence of customer activity.
+    # Keep the deterministic empty state rather than soliciting speculation.
+    if not core["orders"]:
+        return None
     from ai import llm_client
     if not llm_client.is_available():
         return None
@@ -143,9 +146,17 @@ def _llm_narrative(period: str, label: str, core: dict, top: list) -> str | None
         text = llm_client.chat(
             [{"role": "user", "content": user}],
             system=system, max_tokens=500, tier="medium")
-        return _strip_reasoning_leak(text)
+        return _grounded_reply(text, user)
     except Exception:  # noqa: BLE001 — LLM down never blocks a report
         return None
+
+
+def _grounded_reply(text: str, evidence: str) -> str | None:
+    """Keep deterministic output when an optional narrative invents figures."""
+    from ai.reasoning.grounding import verify
+    cleaned = _strip_reasoning_leak(text)
+    checked = verify({"headline": cleaned}, evidence)
+    return cleaned if cleaned and checked["verified"] else None
 
 
 _LEAK_STARTERS = re.compile(

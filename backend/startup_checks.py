@@ -3,19 +3,15 @@ backend/startup_checks.py
 ──────────────────────────
 Fail-closed configuration validation at boot.
 
-Several security properties in this app depend on an env var being SET, not on
-code — most importantly MPESA_CALLBACK_TOKEN: without it the M-Pesa settlement
-callback is unauthenticated and forgeable (see routers/webhooks.py). Today that
-gap only surfaces as a log warning when a callback happens to arrive — far too
-late. This module turns those into a startup gate:
+Required application configuration is validated before serving requests.
+External settlement and phone integrations are no longer part of the app.
 
   • In PRODUCTION, a hard problem raises and the app refuses to boot — better a
-    loud, immediate deploy failure than a silently forgeable payment endpoint.
+    loud, immediate deploy failure than insecure application configuration.
   • Outside production (sandbox/local/tests), the same problems are logged as
     warnings and tolerated, so dev and CI are never blocked.
 
-"Production" = APP_ENV=production OR MPESA_ENV=production (the latter means real
-money is moving, which is exactly when these must hold).
+"Production" = APP_ENV=production.
 """
 
 import os
@@ -27,19 +23,10 @@ logger = logging.getLogger("startup")
 def is_production() -> bool:
     return (
         os.getenv("APP_ENV", "").strip().lower() == "production"
-        or os.getenv("MPESA_ENV", "").strip().lower() == "production"
     )
 
 
-def _mpesa_configured() -> bool:
-    return all(os.getenv(k) for k in (
-        "MPESA_CONSUMER_KEY", "MPESA_CONSUMER_SECRET", "MPESA_SHORTCODE", "MPESA_PASSKEY",
-    ))
-
-
-# Kept for backwards compatibility with imports/tests that reference the
-# helper's old name; the token check itself no longer conditions on it (CYB-103).
-__all__ = ["is_production", "_mpesa_configured", "collect_problems", "enforce_startup_checks"]
+__all__ = ["is_production", "collect_problems", "enforce_startup_checks"]
 
 
 def collect_problems() -> tuple[list[str], list[str]]:
@@ -58,19 +45,6 @@ def collect_problems() -> tuple[list[str], list[str]]:
         hard.append("SECRET_KEY is not set")
 
     prod = is_production()
-
-    # The M-Pesa callback's ONLY authentication is the secret embedded in the
-    # CallBackURL — Safaricom signs nothing. Require the token in production
-    # unconditionally (with or without Daraja creds configured: the creds are
-    # not what the callback authenticates against); outside production the
-    # same condition is a soft warning so dev/tests never block.
-    if not os.getenv("MPESA_CALLBACK_TOKEN", "").strip():
-        msg = ("MPESA_CALLBACK_TOKEN is not set — the M-Pesa callback has no "
-               "authentication and cannot be accepted")
-        if prod:
-            hard.append(msg)
-        else:
-            soft.append(msg)
 
     # CORS must be set explicitly in production; the built-in fallback list is a
     # dev safety net, not a production ACL.

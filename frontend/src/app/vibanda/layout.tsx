@@ -2,9 +2,14 @@
 // Vibanda Village shell — 3-tab nav (Home/OS/Support). Bottom bar on mobile,
 // top tabs on desktop. Only Vibanda-tenant users ever see this tree.
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { Home, MessageCircle, FileText, LifeBuoy } from "lucide-react";
 import { fmtDate } from "@/lib/format";
+import { useAuth } from "@/context/AuthContext";
+import { isVibanda } from "@/lib/tenantHome";
+import { tierHome, type StaffTier } from "@/lib/permissions";
+import NotificationBell from "@/components/NotificationBell";
 
 const TABS = [
   { href: "/vibanda", label: "Home", icon: Home },
@@ -15,9 +20,23 @@ const TABS = [
 
 export default function VibandaLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, isLoading } = useAuth();
+  const owner = user?.role === "admin" || user?.role === "superadmin";
+  const allowed = owner && isVibanda(user?.tenant_name);
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) router.replace("/login");
+    else if (!owner) router.replace(tierHome(user.staff_role as StaffTier | null));
+    else if (!allowed) router.replace("/dashboard");
+  }, [user, isLoading, owner, allowed, router]);
+  if (isLoading || !allowed) {
+    return <p role="status" className="p-6">Checking account access…</p>;
+  }
   return (
     <div className="vibanda-theme min-h-screen pb-20 md:pb-0">
       <header className="px-4 pt-6 pb-2 md:px-8">
+        <div className="float-right"><NotificationBell ownerHome="/vibanda" /></div>
         {/* Sketch: tiny uppercase eyebrow date line */}
         <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">{fmtDate()} · Nairobi</p>
         <nav className="hidden md:flex gap-1 mt-3">

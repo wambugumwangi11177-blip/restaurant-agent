@@ -37,6 +37,18 @@ def _eat_now():
     return utcnow() + _EAT_OFFSET
 
 
+def _restaurant_id(db: Session, user) -> int:
+    """Resolve the selected restaurant inside the authenticated tenant."""
+    query = db.query(models.Restaurant.id).filter(
+        models.Restaurant.tenant_id == user.tenant_id)
+    if user.active_restaurant_id is not None:
+        query = query.filter(models.Restaurant.id == user.active_restaurant_id)
+    row = query.order_by(models.Restaurant.id).first()
+    if row is None and user.active_restaurant_id is not None:
+        raise HTTPException(404, "Restaurant not found")
+    return row[0] if row else 0
+
+
 def _eat_range(period: str):
     now_eat = _eat_now()
     if period == "today":
@@ -47,8 +59,12 @@ def _eat_range(period: str):
 
 
 def _summarize(db: Session, rid: int, start, end) -> dict:
-    """One aggregation shared by overview and reports (DRY)."""
-    base = lambda q, col: q.filter(models.Order.restaurant_id == rid, col >= start, col < end)
+    """Paid, non-cancelled order value by creation time; not payment cash flow."""
+    base = lambda q, col: q.filter(
+        models.Order.restaurant_id == rid, col >= start, col < end,
+        models.Order.is_paid.is_(True),
+        models.Order.status != models.OrderStatus.CANCELLED,
+    )
     revenue = base(db.query(func.coalesce(func.sum(models.Order.total), 0)),
                    models.Order.created_at).scalar()
     orders = base(db.query(func.count(models.Order.id)), models.Order.created_at).scalar()
@@ -74,12 +90,13 @@ def _orders_card(db: Session, rid: int, start, end, core: dict) -> dict:
         models.Order.created_at >= start, models.Order.created_at < end,
         models.Order.status.in_([models.OrderStatus.PENDING, models.OrderStatus.PREP]),
     ).scalar()
-    return {**core, "delayed": 0, "active_now": int(active), "split": split}
+    return {**core, "orders": sum(split.values()), "delayed": 0,
+            "active_now": int(active), "split": split}
 
 
 def _stock_card(db: Session, rid: int) -> dict:
     low = db.query(models.InventoryItem).join(models.Restaurant).filter(
-        models.Restaurant.tenant_id == rid,
+        models.Restaurant.id == rid,
         models.InventoryItem.quantity <= models.InventoryItem.low_stock_threshold,
     ).all()
     return {"low_stock": [{"name": i.item_name, "qty": float(i.quantity)} for i in low],
@@ -89,8 +106,8 @@ def _stock_card(db: Session, rid: int) -> dict:
 def _bookings_card(db: Session, rid: int, start, end) -> dict:
     covers = db.query(func.coalesce(func.sum(models.Reservation.party_size), 0)).filter(
         models.Reservation.restaurant_id == rid,
-        models.Reservation.reservation_date >= start.date(),
-        models.Reservation.reservation_date <= end.date(),
+        models.Reservation.reservation_date >= (start + _EAT_OFFSET).date(),
+        models.Reservation.reservation_date <= (end + _EAT_OFFSET).date(),
     ).scalar()
     return {"covers_today": int(covers), "next_reservation_min": None,
             "waitlist": 0, "no_show_pct": 0.0}
@@ -98,38 +115,39 @@ def _bookings_card(db: Session, rid: int, start, end) -> dict:
 
 def _staff_card(db: Session, rid: int, start, end) -> dict:
     sched = db.query(func.count(models.LaborShift.id)).join(models.Restaurant).filter(
-        models.Restaurant.tenant_id == rid,
-        models.LaborShift.shift_date >= start.date(),
-        models.LaborShift.shift_date <= end.date(),
+        models.Restaurant.id == rid,
+        models.LaborShift.shift_date >= (start + _EAT_OFFSET).date(),
+        models.LaborShift.shift_date <= (end + _EAT_OFFSET).date(),
     ).scalar()
     worked = db.query(func.count(models.LaborShift.id)).join(models.Restaurant).filter(
-        models.Restaurant.tenant_id == rid,
-        models.LaborShift.shift_date >= start.date(),
-        models.LaborShift.shift_date <= end.date(),
+        models.Restaurant.id == rid,
+        models.LaborShift.shift_date >= (start + _EAT_OFFSET).date(),
+        models.LaborShift.shift_date <= (end + _EAT_OFFSET).date(),
         models.LaborShift.actual_start.isnot(None),
         models.LaborShift.actual_end.is_(None),
     ).scalar()
     cost_cents = db.query(func.coalesce(func.sum(models.LaborShift.labor_cost), 0)).join(
         models.Restaurant).filter(
-        models.Restaurant.tenant_id == rid,
-        models.LaborShift.shift_date >= start.date(),
-        models.LaborShift.shift_date <= end.date(),
+        models.Restaurant.id == rid,
+        models.LaborShift.shift_date >= (start + _EAT_OFFSET).date(),
+        models.LaborShift.shift_date <= (end + _EAT_OFFSET).date(),
     ).scalar()
     labor_pct = 0.0
     if core_rev := db.query(func.coalesce(func.sum(models.Order.total), 0)).filter(
-        models.Order.restaurant_id.in_(
-            db.query(models.Restaurant.id).filter(models.Restaurant.tenant_id == rid)),
+        models.Order.restaurant_id == rid,
         models.Order.created_at >= start, models.Order.created_at < end,
+        models.Order.is_paid.is_(True),
+        models.Order.status != models.OrderStatus.CANCELLED,
     ).scalar():
         labor_pct = round((cost_cents / core_rev) * 100, 1) if core_rev else 0.0
     return {"scheduled": int(sched), "on_shift": int(worked), "overtime_risk": 0,
             "labor_cost_pct": labor_pct}
 
 
-def _attention_cards(db: Session, rid: int) -> list:
+def _attention_cards(db: Session, rid: int, tenant_id: int) -> list:
     cards = []
     low = db.query(models.InventoryItem).join(models.Restaurant).filter(
-        models.Restaurant.tenant_id == rid,
+        models.Restaurant.id == rid,
         models.InventoryItem.quantity <= models.InventoryItem.low_stock_threshold,
     ).all()
     for item in low:
@@ -143,8 +161,8 @@ def _attention_cards(db: Session, rid: int) -> list:
             "status": "open",
         })
     pending_po = db.query(func.count(models.PurchaseOrder.id)).join(models.Restaurant).filter(
-        models.Restaurant.tenant_id == rid,
-        models.PurchaseOrder.status == "pending",
+        models.Restaurant.id == rid,
+        func.lower(models.PurchaseOrder.status) == "pending",
     ).scalar()
     if pending_po:
         cards.append({
@@ -156,7 +174,7 @@ def _attention_cards(db: Session, rid: int) -> list:
         })
     # decided cards are filtered out by the decision endpoint read below
     decided = {d.card_key for d in db.query(models.AttentionDecision).filter(
-        models.AttentionDecision.tenant_id == rid).all()}
+        models.AttentionDecision.tenant_id == tenant_id).all()}
     return [c for c in cards if c["id"] not in decided]
 
 
@@ -190,7 +208,9 @@ def _performance(db: Session, rid: int) -> dict:
             func.count(models.Order.id),
         ).filter(models.Order.restaurant_id == rid,
                  models.Order.created_at >= start_utc,
-                 models.Order.created_at < end_utc).first()
+                 models.Order.created_at < end_utc,
+                 models.Order.is_paid.is_(True),
+                 models.Order.status != models.OrderStatus.CANCELLED).first()
         trend.append({"date": s, "revenue": float(rev) / 100.0, "orders": int(cnt)})
     return {"revenue_trend": trend, "orders_trend": trend}
 
@@ -198,11 +218,7 @@ def _performance(db: Session, rid: int) -> dict:
 @router.get("/today")
 def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
           db: Session = Depends(get_db), user=Depends(require_staff_role())):
-    rid = user.active_restaurant_id
-    if rid is None:
-        row = db.query(models.Restaurant.id, models.Restaurant.name).filter(
-            models.Restaurant.tenant_id == user.tenant_id).first()
-        rid = row[0] if row else 0
+    rid = _restaurant_id(db, user)
     start, end = _eat_range(period)
     core = _summarize(db, rid, start, end)
     revenue_card = {
@@ -210,25 +226,26 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
         "avg_order": round(core["revenue"] / core["orders"], 2) if core["orders"] else 0.0,
         "pace_projection": 0.0,
     }
-    if period == "today":
-        now_eat = _eat_now()
-        hours_open = max(now_eat.hour + now_eat.minute / 60, 1.0)
-        revenue_card["pace_projection"] = round(core["revenue"] / hours_open * 14, 2)  # 14h day
+    # No pace forecast without verified opening hours and comparable history.
     stock = _stock_card(db, rid)
-    bookings = _bookings_card(db, rid, start, end)
+    operational_start, operational_end = _eat_range("today")
+    bookings = _bookings_card(db, rid, operational_start, operational_end)
     return {
         "greeting_date": _eat_now().date().isoformat(),
         "restaurant_name": db.query(models.Restaurant.name).filter(
             models.Restaurant.id == rid).scalar() or "Vibanda Village",
         "period": period,
+        "revenue_basis": "paid_non_cancelled_orders_by_creation_time",
+        "unavailable_metrics": ["pace_projection", "kitchen", "delayed_orders",
+                                "expiry", "waste", "waitlist", "no_show_rate", "overtime_risk"],
         "revenue": revenue_card,
         "orders": _orders_card(db, rid, start, end, core),
         "kitchen": {"avg_prep_min": 0, "delay_risk": 0, "bottleneck": None},
         "stock": stock,
         "bookings": bookings,
-        "staff": _staff_card(db, rid, start, end),
-        "attention": _attention_cards(db, rid),
-        "pulse": _pulse(db, rid, core, stock, bookings),
+        "staff": _staff_card(db, rid, operational_start, operational_end),
+        "attention": _attention_cards(db, rid, user.tenant_id),
+        "pulse": _pulse(db, rid, _summarize(db, rid, operational_start, operational_end), stock, bookings),
         "performance": _performance(db, rid),
     }
 
@@ -236,6 +253,7 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
 @router.post("/attention/{card_key}/decision")
 def decide(card_key: str, body: dict, db: Session = Depends(get_db),
            user=Depends(require_staff_role())):
+    _restaurant_id(db, user)  # Apply the same ownership check as the feed.
     if body.get("decision") not in ("approved", "later", "rejected"):
         raise HTTPException(422, "decision must be approved|later|rejected")
     row = models.AttentionDecision(

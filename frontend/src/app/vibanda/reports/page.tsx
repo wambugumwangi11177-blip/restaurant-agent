@@ -2,7 +2,7 @@
 // Vibanda Reports — Daily / Weekly / Monthly / Yearly. Deterministic numbers
 // from /reports/{period}; LLM (OpenRouter) drafts the narrative when available,
 // deterministic template stays as fallback so a report NEVER fails.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import { fmtKes } from "@/lib/format";
 import { OsLoading, OsEmpty, OsError } from "@/components/os/States";
@@ -21,14 +21,19 @@ export default function VibandaReportsPage() {
   const [period, setPeriod] = useState<string>("daily");
   const [report, setReport] = useState<Report | null>(null);
   const [err, setErr] = useState(false);
+  const requestId = useRef(0);
 
   const load = useCallback((p: string) => {
+    const id = ++requestId.current;
     setErr(false); setReport(null);
     api.get<Report>(`/api/v1/reports/${p}`)
-      .then((r) => setReport(r.data))
-      .catch(() => setErr(true));
+      .then((r) => { if (id === requestId.current) setReport(r.data); })
+      .catch(() => { if (id === requestId.current) setErr(true); });
   }, []);
-  useEffect(() => { load(period); }, [period, load]);
+  useEffect(() => {
+    load(period);
+    return () => { requestId.current += 1; };
+  }, [period, load]);
 
   return (
     <div className="animate-rise-in max-w-4xl space-y-4">
@@ -38,6 +43,7 @@ export default function VibandaReportsPage() {
           Reports<span className="text-[var(--v-primary)]">.</span>
         </h1>
         <p className="mt-3 text-sm text-[var(--v-muted-foreground)]">Daily, weekly, monthly and yearly — real numbers, plainly explained.</p>
+        <p className="mt-2 text-sm text-[var(--v-muted-foreground)]">Prototype data · Macsoft is not connected</p>
       </div>
 
       <div className="inline-flex rounded-lg border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.68)] p-1">
@@ -99,7 +105,7 @@ export default function VibandaReportsPage() {
           </details>
 
           {report.orders === 0 && (
-            <OsEmpty message="This period has no sales yet." hint="Reports fill in automatically as orders come in." />
+            <OsEmpty message="No paid, non-cancelled orders are recorded for this period." hint="Macsoft is not connected, so these records do not establish the restaurant's actual sales or customer activity." />
           )}
         </div>
       )}

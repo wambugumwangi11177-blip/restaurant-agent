@@ -74,11 +74,20 @@ def test_lower_risk_and_effort_rank_higher_all_else_equal():
 
 
 def test_ranking_is_deterministic_and_ranks_are_1_based():
-    ds = [_d(confidence_pct=c) for c in (40, 90, 60)]
+    # These must be distinct actions: repeated actions are intentionally
+    # deduplicated before assigning the owner-facing rank.
+    ds = [_d(action=f"Action {c}", confidence_pct=c) for c in (40, 90, 60)]
     r1 = ranking.rank(ds)
     r2 = ranking.rank(ds)
     assert [x["priority_score"] for x in r1] == [x["priority_score"] for x in r2]
     assert [x["rank"] for x in r1] == [1, 2, 3]
+
+
+def test_duplicate_actions_keep_highest_ranked_recommendation():
+    ranked = ranking.rank([_d(confidence_pct=c) for c in (40, 90, 60)])
+    assert len(ranked) == 1
+    assert ranked[0]["rank"] == 1
+    assert ranked[0]["confidence_pct"] == 90
 
 
 def test_impact_stars_scale():

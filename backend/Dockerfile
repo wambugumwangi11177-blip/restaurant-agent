@@ -1,5 +1,10 @@
 FROM python:3.12-slim
 
+# Apply Debian security fixes that may postdate the published Python image.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Install deps

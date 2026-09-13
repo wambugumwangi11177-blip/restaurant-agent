@@ -11,9 +11,7 @@
  *   - Recent campaign history from the message log
  *   - A static offer playbook library
  *
- * The AI only SUGGESTS. Every send is explicit and confirmed by the owner, goes
- * through the existing consent-gated / opt-out-respecting WhatsApp path
- * (POST /ai/marketing/promo and /ai/marketing/winback), and never runs on its own.
+ * Suggestions remain in-app. External customer messaging is retired.
  */
 
 import { useEffect, useState } from "react";
@@ -25,13 +23,11 @@ import { HowItWorks } from "@/components/ai/HowItWorks";
 import { NarrativeBlock, type Narrative } from "@/components/ai/NarrativeBlock";
 import {
     Megaphone, RefreshCw, AlertTriangle, Users, ShieldCheck, Gift,
-    Sparkles, Send, CheckCircle, Clock, BookOpen, TrendingUp,
+    Sparkles, Clock, BookOpen, TrendingUp,
 } from "lucide-react";
 import EmptyState from "@/components/ui/EmptyState";
-import type { ConfirmTarget } from "./_components/CampaignForm";
 import { getErrorMessage } from "@/lib/errors";
 
-const ConfirmSend = dynamic(() => import("./_components/ConfirmSend"));
 const CampaignForm = dynamic(() => import("./_components/CampaignForm"));
 
 interface Offer {
@@ -129,8 +125,6 @@ export default function MarketingPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-    const [confirm, setConfirm] = useState<ConfirmTarget | null>(null);
-    const [banner, setBanner] = useState("");
 
     const restaurantName = user?.restaurant_name || "Your Restaurant";
 
@@ -206,14 +200,6 @@ export default function MarketingPage() {
                 </button>
             </div>
 
-            {/* Success banner after a send */}
-            {banner && (
-                <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
-                    <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                    <p className="text-sm text-text">{banner}</p>
-                </div>
-            )}
-
             {/* How campaigns work */}
             <div className="rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/[0.04] p-5">
                 <div className="flex items-center gap-2 text-[var(--accent)] mb-1">
@@ -233,7 +219,7 @@ export default function MarketingPage() {
             <NarrativeBlock n={d.narrative} />
 
             {/* Suggested offers */}
-            <CampaignForm offers={d.suggested_offers} onPick={setConfirm} />
+            <CampaignForm offers={d.suggested_offers} />
 
             {/* Win-back */}
             <div className="rounded-xl border border-surface-hover bg-[#0f0f0f] p-5">
@@ -246,19 +232,7 @@ export default function MarketingPage() {
                             Customers who used to visit but have gone quiet for {wb.lapse_days}+ days.
                         </p>
                     </div>
-                    {wb.reachable > 0 && (
-                        <button
-                            onClick={() => setConfirm({
-                                title: `Win back ${wb.reachable} lapsed regular${wb.reachable === 1 ? "" : "s"}`,
-                                offer_text: "10% off your next visit (personalised with each customer's favourite dish)",
-                                audience_label: `${wb.reachable} reachable now`,
-                                action: "winback",
-                            })}
-                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent)] text-bg font-semibold text-sm hover:bg-[var(--accent-hover)] transition-colors"
-                        >
-                            <Send className="w-3.5 h-3.5" /> Send win-back
-                        </button>
-                    )}
+                    <p className="text-xs text-text-dim">In-app advice only; no customer messages are sent.</p>
                 </div>
 
                 <HowItWorks id="winback" />
@@ -302,7 +276,7 @@ export default function MarketingPage() {
                         ))}
                         {wb.candidates[0]?.message && (
                             <details className="mt-2">
-                                <summary className="text-xs text-[var(--accent)] cursor-pointer hover:underline">Preview the message they&apos;ll receive</summary>
+                                <summary className="text-xs text-[var(--accent)] cursor-pointer hover:underline">Suggested wording — not sent</summary>
                                 <pre className="mt-2 whitespace-pre-wrap text-[11px] text-[#a3a3a3] bg-bg border border-surface-hover rounded-lg p-3 font-sans">{wb.candidates[0].message}</pre>
                             </details>
                         )}
@@ -313,12 +287,12 @@ export default function MarketingPage() {
             {/* Audience & consent */}
             <div className="rounded-xl border border-surface-hover bg-[#0f0f0f] p-5">
                 <h2 className="text-sm font-semibold text-text flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-[var(--accent)]" /> Who you can reach — and how customers are protected
+                    <ShieldCheck className="w-4 h-4 text-[var(--accent)]" /> Historical audience and consent records
                 </h2>
                 <HowItWorks id="consent" />
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
                     <div className="rounded-lg bg-surface border border-surface-hover p-3">
-                        <p className="text-xs text-text-dim mb-1">Promo reach now</p>
+                        <p className="text-xs text-text-dim mb-1">Consented recent diners</p>
                         <p className="text-sm font-bold text-text">{d.audience.promo_reachable}</p>
                     </div>
                     <div className="rounded-lg bg-surface border border-surface-hover p-3">
@@ -330,8 +304,8 @@ export default function MarketingPage() {
                         <p className="text-sm font-bold text-text">{d.audience.order_window_days} days</p>
                     </div>
                     <div className="rounded-lg bg-surface border border-surface-hover p-3">
-                        <p className="text-xs text-text-dim mb-1">Per-send cap</p>
-                        <p className="text-sm font-bold text-text">{d.audience.send_cap}</p>
+                        <p className="text-xs text-text-dim mb-1">Customer messaging</p>
+                        <p className="text-sm font-bold text-text">Retired</p>
                     </div>
                 </div>
             </div>
@@ -340,7 +314,7 @@ export default function MarketingPage() {
             {d.history.length > 0 && (
                 <div className="rounded-xl border border-surface-hover bg-[#0f0f0f] p-5">
                     <h2 className="text-sm font-semibold text-text flex items-center gap-2 mb-4">
-                        <Clock className="w-4 h-4 text-[var(--accent)]" /> What&apos;s gone out (last 90 days)
+                        <Clock className="w-4 h-4 text-[var(--accent)]" /> Historical campaigns (last 90 days)
                     </h2>
                     <div className="space-y-2">
                         {d.history.map((h) => {
@@ -384,13 +358,6 @@ export default function MarketingPage() {
                 </div>
             </div>
 
-            {confirm && (
-                <ConfirmSend
-                    offer={confirm}
-                    onClose={() => setConfirm(null)}
-                    onSent={(msg) => { setConfirm(null); setBanner(msg); }}
-                />
-            )}
         </div>
     );
 }

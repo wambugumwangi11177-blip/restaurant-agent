@@ -399,10 +399,8 @@ async def create_public_order(
     db: Session = Depends(get_db),
 ):
     """
-    Customer-facing order endpoint — no login required. Rate limited
-    (security pass 2026-07-07): unauthenticated, and a real M-Pesa STK push
-    can be triggered per request — unlimited requests here means both order-
-    spam/DB-bloat risk and a real cost/abuse vector once M-Pesa is live.
+    Customer-facing order endpoint — no login required. Rate limited to
+    mitigate order spam. Records an unpaid order; never initiates a payment.
     """
     restaurant = db.query(models.Restaurant).filter(
         models.Restaurant.id == restaurant_id

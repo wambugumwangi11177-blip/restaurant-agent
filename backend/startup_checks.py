@@ -3,19 +3,15 @@ backend/startup_checks.py
 ──────────────────────────
 Fail-closed configuration validation at boot.
 
-Several security properties in this app depend on an env var being SET, not on
-code — most importantly MPESA_CALLBACK_TOKEN: without it the M-Pesa settlement
-callback is unauthenticated and forgeable (see routers/webhooks.py). Today that
-gap only surfaces as a log warning when a callback happens to arrive — far too
-late. This module turns those into a startup gate:
+Required application configuration is validated before serving requests.
+External settlement and phone integrations are no longer part of the app.
 
   • In PRODUCTION, a hard problem raises and the app refuses to boot — better a
-    loud, immediate deploy failure than a silently forgeable payment endpoint.
+    loud, immediate deploy failure than insecure application configuration.
   • Outside production (sandbox/local/tests), the same problems are logged as
     warnings and tolerated, so dev and CI are never blocked.
 
-"Production" = APP_ENV=production OR MPESA_ENV=production (the latter means real
-money is moving, which is exactly when these must hold).
+"Production" = APP_ENV=production.
 """
 
 import os

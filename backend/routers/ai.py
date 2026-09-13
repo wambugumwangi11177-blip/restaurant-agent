@@ -640,27 +640,6 @@ async def ai_marketing(
     return data
 
 
-def _background_send(fn, *args) -> None:
-    """
-    Run a (slow, throttled) send loop on its own thread with its own DB session,
-    so the request returns immediately. The send functions are opt-out- and
-    consent-gated internally; this only handles the threading + session lifecycle.
-    """
-    import threading
-
-    def _run():
-        from database import SessionLocal
-        bg = SessionLocal()
-        try:
-            fn(bg, *args)
-        except Exception as exc:  # background thread — never surfaces to a caller
-            logger.warning(f"Background send failed: {exc}")
-        finally:
-            bg.close()
-
-    threading.Thread(target=_run, daemon=True).start()
-
-
 @router.post("/marketing/promo")
 @limiter.limit("30/minute")
 async def ai_marketing_promo(

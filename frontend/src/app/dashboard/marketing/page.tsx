@@ -246,19 +246,7 @@ export default function MarketingPage() {
                             Customers who used to visit but have gone quiet for {wb.lapse_days}+ days.
                         </p>
                     </div>
-                    {false && (
-                        <button
-                            onClick={() => setConfirm({
-                                title: `Win back ${wb.reachable} lapsed regular${wb.reachable === 1 ? "" : "s"}`,
-                                offer_text: "10% off your next visit (personalised with each customer's favourite dish)",
-                                audience_label: `${wb.reachable} reachable now`,
-                                action: "winback",
-                            })}
-                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent)] text-bg font-semibold text-sm hover:bg-[var(--accent-hover)] transition-colors"
-                        >
-                            <Send className="w-3.5 h-3.5" /> Send win-back
-                        </button>
-                    )}
+                    <p className="text-xs text-text-dim">In-app advice only; no customer messages are sent.</p>
                 </div>
 
                 <HowItWorks id="winback" />

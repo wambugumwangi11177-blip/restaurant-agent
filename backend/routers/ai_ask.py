@@ -83,18 +83,21 @@ def _answer_stock(db: Session, rid: int, q: str) -> dict:
         names = ", ".join(p.get("item_name") or p.get("name", "?") for p in focus[:3])
         finding = (f"{len(focus)} item(s) projected to run out within a week: {names}."
                    if soon else f"{len(low)} item(s) below reorder point: {names}.")
-        why = "Based on your last 14 days of usage velocity versus current quantity on hand."
+        why = ("Based on recorded usage velocity versus current quantity on hand."
+               if soon else "Current recorded quantity is at or below the reorder threshold. Stockout timing is not established.")
         impact = "Avoids emergency buying at higher prices and mid-service menu gaps"
         rec = f"Raise today's order for {focus[0].get('item_name') or focus[0].get('name', 'the affected items')} and confirm the next delivery slot."
         steps = [
-            {"action": f"Reorder {p.get('item_name') or p.get('name')}", "why": f"{p.get('days_until_stockout', '?')} days of stock left at current usage"}
+            {"action": f"Reorder {p.get('item_name') or p.get('name')}",
+             "why": (f"{p['days_until_stockout']} days of stock left at recorded usage"
+                     if p.get('days_until_stockout') is not None else "Below reorder threshold; stockout timing is unavailable")}
             for p in focus[:4]
         ]
     else:
-        finding = "Nothing is projected to run out in the next 7 days."
-        why = "All tracked items have enough cover at current usage rates."
+        finding = "No low-stock or imminent stockout candidates were identified in the recorded data."
+        why = "Missing usage history cannot establish stock cover for every item."
         impact = "—"
-        rec = "No reorder needed today. Re-check after tomorrow's service."
+        rec = "Confirm current quantities and usage history before deciding whether to reorder."
         steps = []
     return {"finding": finding, "why": why, "impact": impact, "recommendation": rec,
             "module": "reorder", "steps": steps, "data": {"candidates": len(focus)}}

@@ -50,10 +50,15 @@ function OsChatInner() {
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState(false);
   const [overview, setOverview] = useState<Overview | null>(null);
+  const [overviewError, setOverviewError] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    api.get<Overview>("/api/v1/overview/today").then((r) => setOverview(r.data)).catch(() => {});
+    let active = true;
+    api.get<Overview>("/api/v1/overview/today")
+      .then((r) => { if (active) setOverview(r.data); })
+      .catch(() => { if (active) setOverviewError(true); });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [turns]);
@@ -299,7 +304,11 @@ function OsChatInner() {
             <div className="mb-3 flex items-center justify-between">
               <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--v-muted-foreground)]">This period</p>
             </div>
-            <div className="space-y-4">
+            {!overview ? (
+              <p role={overviewError ? "alert" : "status"} className="text-sm text-[var(--v-muted-foreground)]">
+                {overviewError ? "Today's figures are unavailable. Reload to retry." : "Loading today's figures…"}
+              </p>
+            ) : <div className="space-y-4">
               <div>
                 <p className="text-[10px] text-[var(--v-muted-foreground)]">Revenue</p>
                 <p className="font-display mt-1 text-xl font-semibold">{fmtKes(overview?.revenue.revenue ?? 0)}</p>
@@ -317,7 +326,7 @@ function OsChatInner() {
                   <p className="mt-1 text-sm font-semibold">{fmtKes(overview?.revenue.avg_order ?? 0)}</p>
                 </div>
               </div>
-            </div>
+            </div>}
           </div>
           <div className="rounded-xl border border-[var(--v-border)] bg-[var(--v-primary)] p-4 text-[var(--v-primary-foreground)]">
             <div className="flex items-center gap-2">

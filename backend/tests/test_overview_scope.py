@@ -93,6 +93,16 @@ def test_missing_selection_resolves_inside_owner_tenant(client, db_session, scop
     assert response.json()["restaurant_name"] == "Selected restaurant"
 
 
+def test_decision_rejects_foreign_selection_without_persisting(client, db_session, scoped_owner):
+    user, headers = scoped_owner
+    user.active_restaurant_id = 303
+    db_session.commit()
+    response = client.post("/api/v1/overview/attention/po-pending/decision",
+                           json={"decision": "approved"}, headers=headers)
+    assert response.status_code == 404
+    assert db_session.query(models.AttentionDecision).count() == 0
+
+
 def test_chat_rejects_foreign_selection(client, db_session, scoped_owner):
     user, headers = scoped_owner
     user.active_restaurant_id = 303

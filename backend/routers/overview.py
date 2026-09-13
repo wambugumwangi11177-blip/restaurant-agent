@@ -252,6 +252,7 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
 @router.post("/attention/{card_key}/decision")
 def decide(card_key: str, body: dict, db: Session = Depends(get_db),
            user=Depends(require_staff_role())):
+    _restaurant_id(db, user)  # Apply the same ownership check as the feed.
     if body.get("decision") not in ("approved", "later", "rejected"):
         raise HTTPException(422, "decision must be approved|later|rejected")
     row = models.AttentionDecision(

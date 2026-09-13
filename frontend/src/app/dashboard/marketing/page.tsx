@@ -28,10 +28,8 @@ import {
     Sparkles, Send, CheckCircle, Clock, BookOpen, TrendingUp,
 } from "lucide-react";
 import EmptyState from "@/components/ui/EmptyState";
-import type { ConfirmTarget } from "./_components/CampaignForm";
 import { getErrorMessage } from "@/lib/errors";
 
-const ConfirmSend = dynamic(() => import("./_components/ConfirmSend"));
 const CampaignForm = dynamic(() => import("./_components/CampaignForm"));
 
 interface Offer {
@@ -129,8 +127,6 @@ export default function MarketingPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-    const [confirm, setConfirm] = useState<ConfirmTarget | null>(null);
-    const [banner, setBanner] = useState("");
 
     const restaurantName = user?.restaurant_name || "Your Restaurant";
 
@@ -206,14 +202,6 @@ export default function MarketingPage() {
                 </button>
             </div>
 
-            {/* Success banner after a send */}
-            {banner && (
-                <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
-                    <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                    <p className="text-sm text-text">{banner}</p>
-                </div>
-            )}
-
             {/* How campaigns work */}
             <div className="rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/[0.04] p-5">
                 <div className="flex items-center gap-2 text-[var(--accent)] mb-1">
@@ -233,7 +221,7 @@ export default function MarketingPage() {
             <NarrativeBlock n={d.narrative} />
 
             {/* Suggested offers */}
-            <CampaignForm offers={d.suggested_offers} onPick={setConfirm} />
+            <CampaignForm offers={d.suggested_offers} />
 
             {/* Win-back */}
             <div className="rounded-xl border border-surface-hover bg-[#0f0f0f] p-5">
@@ -372,13 +360,6 @@ export default function MarketingPage() {
                 </div>
             </div>
 
-            {confirm && (
-                <ConfirmSend
-                    offer={confirm}
-                    onClose={() => setConfirm(null)}
-                    onSent={(msg) => { setConfirm(null); setBanner(msg); }}
-                />
-            )}
         </div>
     );
 }

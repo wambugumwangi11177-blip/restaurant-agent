@@ -11,9 +11,7 @@
  *   - Recent campaign history from the message log
  *   - A static offer playbook library
  *
- * The AI only SUGGESTS. Every send is explicit and confirmed by the owner, goes
- * through the existing consent-gated / opt-out-respecting WhatsApp path
- * (POST /ai/marketing/promo and /ai/marketing/winback), and never runs on its own.
+ * Suggestions remain in-app. External customer messaging is retired.
  */
 
 import { useEffect, useState } from "react";
@@ -25,7 +23,7 @@ import { HowItWorks } from "@/components/ai/HowItWorks";
 import { NarrativeBlock, type Narrative } from "@/components/ai/NarrativeBlock";
 import {
     Megaphone, RefreshCw, AlertTriangle, Users, ShieldCheck, Gift,
-    Sparkles, Send, CheckCircle, Clock, BookOpen, TrendingUp,
+    Sparkles, Clock, BookOpen, TrendingUp,
 } from "lucide-react";
 import EmptyState from "@/components/ui/EmptyState";
 import { getErrorMessage } from "@/lib/errors";

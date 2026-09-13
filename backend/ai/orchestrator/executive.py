@@ -719,7 +719,7 @@ def on_agent_failed(payload: dict) -> None:
                 msg = (
                     f"⚠️ *AI System Alert*\n\n"
                     f"*{agent_name}* has failed {recent_failures} times in the last hour.\n"
-                    f"Last error: {error[:200]}\n\n"
+                    f"Technical details are available to the operator in secured logs.\n\n"
                     f"Analytics may be temporarily unavailable. Review this in the app."
                 )
                 _notify_owner(owner_recipient, msg, db=db,

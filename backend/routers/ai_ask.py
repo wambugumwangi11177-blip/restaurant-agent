@@ -20,15 +20,17 @@ Routing map (all modules already existed in ai/ — this router just connects th
 from __future__ import annotations
 
 import re
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 import models
 from database import get_db
 from auth import require_staff_role
 from routers.reports import _strip_reasoning_leak
+from routers.overview import _restaurant_id
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -275,27 +277,37 @@ def ask(
     db: Session = Depends(get_db),
     user: models.User = Depends(require_staff_role()),
 ):
-    rid = user.active_restaurant_id
-    if rid is None:
-        row = db.query(models.Restaurant.id).filter(models.Restaurant.tenant_id == user.tenant_id).first()
-        rid = row[0] if row else 0
-        if not rid:
-            raise HTTPException(404, "No restaurant found for this account")
+    rid = _restaurant_id(db, user)
+    if not rid:
+        raise HTTPException(404, "No restaurant found for this account")
     module = _route(question)
     try:
         card = _HANDLERS[module](db, rid, question)
-    except Exception as exc:  # module failure must not 500 the chat — degrade to ops
-        card = _answer_ops(db, rid, question)
-        card["steps"] = card.get("steps", [])
-        card["data"] = {"fallback_reason": str(exc)[:120]}
+    except Exception:  # Do not substitute unrelated facts or expose internal errors.
+        card = _unavailable_card(module)
     return card
 
 
 # ─── LLM chat (real-time, OpenRouter) ────────────────────────────────────────
 
+class HistoryTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
 class ChatBody(BaseModel):
-    question: str
-    history: list[dict] = []  # [{"role","content"}] prior turns, optional
+    question: str = Field(min_length=3, max_length=500)
+    history: list[HistoryTurn] = Field(default_factory=list, max_length=6)
+
+
+def _unavailable_card(module: str) -> dict:
+    return {
+        "finding": "The data needed to answer this question is unavailable.",
+        "why": "The requested analysis could not be completed. No conclusion was verified.",
+        "impact": "Not available",
+        "recommendation": "Retry the question or review the source records in Macsoft.",
+        "module": module, "steps": [], "data": {"available": False},
+    }
 
 
 @router.post("/chat")
@@ -306,24 +318,19 @@ def chat_llm(body: ChatBody, db: Session = Depends(get_db),
     conversational reply from that data. The LLM never invents numbers — its
     prompt contains only the module's real figures, and the raw data ships
     alongside so the client can show both."""
-    rid = user.active_restaurant_id
-    if rid is None:
-        row = db.query(models.Restaurant.id).filter(
-            models.Restaurant.tenant_id == user.tenant_id).first()
-        rid = row[0] if row else 0
-        if not rid:
-            raise HTTPException(404, "No restaurant found for this account")
+    rid = _restaurant_id(db, user)
+    if not rid:
+        raise HTTPException(404, "No restaurant found for this account")
 
     module = _route(body.question)
     try:
         card = _HANDLERS[module](db, rid, body.question)
-    except Exception as exc:  # noqa: BLE001 — grounding failure falls back to ops
-        card = _answer_ops(db, rid, body.question)
-        card["data"] = {"fallback_reason": str(exc)[:120]}
+    except Exception:  # Grounding failure must be visible, not replaced by another topic.
+        card = _unavailable_card(module)
 
     from ai import llm_client
     llm_reply = None
-    if llm_client.is_available():
+    if card.get("data", {}).get("available") is not False and llm_client.is_available():
         restaurant_name = db.query(models.Restaurant.name).filter(
             models.Restaurant.id == rid).scalar() or "your restaurant"
         context = (
@@ -346,15 +353,14 @@ def chat_llm(body: ChatBody, db: Session = Depends(get_db),
             "KSh. Keep answers under 120 words unless the owner asks for detail. "
             "End with one concrete next action when relevant.\n\n" + context
         )
-        messages = (body.history or [])[-6:] + [
+        messages = [turn.model_dump() for turn in body.history] + [
             {"role": "user", "content": body.question}]
         try:
             llm_reply = llm_client.chat(
                 messages, system=system, max_tokens=400, tier="medium")
             llm_reply = _strip_reasoning_leak(llm_reply)
-        except Exception as exc:  # noqa: BLE001 — LLM down ≠ chat down
+        except Exception:  # LLM failure never exposes provider diagnostics to the client.
             llm_reply = None
-            card["data"]["llm_error"] = str(exc)[:120]
 
     return {
         "module": module,

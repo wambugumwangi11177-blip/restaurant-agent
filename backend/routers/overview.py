@@ -101,8 +101,8 @@ def _stock_card(db: Session, rid: int) -> dict:
 def _bookings_card(db: Session, rid: int, start, end) -> dict:
     covers = db.query(func.coalesce(func.sum(models.Reservation.party_size), 0)).filter(
         models.Reservation.restaurant_id == rid,
-        models.Reservation.reservation_date >= start.date(),
-        models.Reservation.reservation_date <= end.date(),
+        models.Reservation.reservation_date >= (start + _EAT_OFFSET).date(),
+        models.Reservation.reservation_date <= (end + _EAT_OFFSET).date(),
     ).scalar()
     return {"covers_today": int(covers), "next_reservation_min": None,
             "waitlist": 0, "no_show_pct": 0.0}
@@ -111,21 +111,21 @@ def _bookings_card(db: Session, rid: int, start, end) -> dict:
 def _staff_card(db: Session, rid: int, start, end) -> dict:
     sched = db.query(func.count(models.LaborShift.id)).join(models.Restaurant).filter(
         models.Restaurant.id == rid,
-        models.LaborShift.shift_date >= start.date(),
-        models.LaborShift.shift_date <= end.date(),
+        models.LaborShift.shift_date >= (start + _EAT_OFFSET).date(),
+        models.LaborShift.shift_date <= (end + _EAT_OFFSET).date(),
     ).scalar()
     worked = db.query(func.count(models.LaborShift.id)).join(models.Restaurant).filter(
         models.Restaurant.id == rid,
-        models.LaborShift.shift_date >= start.date(),
-        models.LaborShift.shift_date <= end.date(),
+        models.LaborShift.shift_date >= (start + _EAT_OFFSET).date(),
+        models.LaborShift.shift_date <= (end + _EAT_OFFSET).date(),
         models.LaborShift.actual_start.isnot(None),
         models.LaborShift.actual_end.is_(None),
     ).scalar()
     cost_cents = db.query(func.coalesce(func.sum(models.LaborShift.labor_cost), 0)).join(
         models.Restaurant).filter(
         models.Restaurant.id == rid,
-        models.LaborShift.shift_date >= start.date(),
-        models.LaborShift.shift_date <= end.date(),
+        models.LaborShift.shift_date >= (start + _EAT_OFFSET).date(),
+        models.LaborShift.shift_date <= (end + _EAT_OFFSET).date(),
     ).scalar()
     labor_pct = 0.0
     if core_rev := db.query(func.coalesce(func.sum(models.Order.total), 0)).filter(

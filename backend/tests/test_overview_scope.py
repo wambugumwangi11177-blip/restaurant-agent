@@ -150,3 +150,17 @@ def test_invented_chat_figures_fall_back_to_deterministic_card(client, scoped_ow
     assert response.json()["llm_used"] is False
     assert response.json()["grounded"]["finding"] == "Revenue is KSh 500."
     assert "999,999" not in response.text
+
+
+def test_nairobi_day_does_not_include_previous_day_reservations(db_session, scoped_owner):
+    from datetime import datetime, date, time
+    from routers.overview import _bookings_card
+    db_session.add_all([
+        models.Reservation(restaurant_id=202, customer_name="Previous", party_size=20,
+                           reservation_date=date(2026, 9, 12), reservation_time=time(12)),
+        models.Reservation(restaurant_id=202, customer_name="Today", party_size=4,
+                           reservation_date=date(2026, 9, 13), reservation_time=time(12)),
+    ])
+    db_session.commit()
+    card = _bookings_card(db_session, 202, datetime(2026, 9, 12, 21), datetime(2026, 9, 12, 22))
+    assert card["covers_today"] == 4

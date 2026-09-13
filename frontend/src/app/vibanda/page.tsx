@@ -4,7 +4,7 @@
 // headings, rounded-xl cards on translucent card surface, teal primary,
 // gold accents, sketch section order (6 cards → attention → pulse →
 // parts → performance).
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight, TrendingUp } from "lucide-react";
 import api from "@/lib/api";
 import { fmtKes, fmtPct, greetingFor } from "@/lib/format";
@@ -131,17 +131,23 @@ export default function VibandaHomePage() {
   const [period, setPeriod] = useState("today");
   const [dailyReport, setDailyReport] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);
+  const requestId = useRef(0);
 
   const load = useCallback((p: string) => {
+    const id = ++requestId.current;
     setErr(false);
+    setFeed(null);
     api.get<Feed>(`/api/v1/overview/today?period=${p}`)
-      .then((r) => setFeed(r.data))
-      .catch(() => setErr(true));
+      .then((r) => { if (id === requestId.current) setFeed(r.data); })
+      .catch(() => { if (id === requestId.current) setErr(true); });
   }, []);
 
-  useEffect(() => { load(period); }, [period, load]);
   useEffect(() => {
-    api.get("/api/v1/reports/daily").then((r) => setDailyReport(r.data.report_text)).catch(() => {});
+    load(period);
+    return () => { requestId.current += 1; };
+  }, [period, load]);
+  useEffect(() => {
+    api.get("/api/v1/reports/daily?narrate=false").then((r) => setDailyReport(r.data.report_text)).catch(() => {});
   }, []);
 
   const decide = async (cardId: string, decision: "approved" | "later" | "rejected") => {
@@ -187,7 +193,7 @@ export default function VibandaHomePage() {
       </div>
       <p className="flex items-center gap-2 rounded-lg border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.55)] px-3 py-2 text-[10px] text-[var(--v-muted-foreground)]">
         <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--v-accent)] text-[var(--v-accent-foreground)]">i</span>
-        Prototype data · live POS sync coming soon
+        Prototype data · Macsoft is not connected
       </p>
 
       {err && <OsError message="Couldn't reach the kitchen right now." onRetry={() => load(period)} />}

@@ -140,17 +140,6 @@ def _page_managers(db: Session, notif: "models.Notification") -> None:
         )
         return
 
-    # WhatsApp/SMS to every manager with a phone on file. StaffMember.phone is
-    # the reachable-number field (models.py's own docstring); join via
-    # user_id since that's how a roster entry links to a dashboard login.
-    staff_rows = db.query(models.StaffMember).filter(
-        models.StaffMember.restaurant_id == restaurant.id,
-        models.StaffMember.user_id.in_(manager_ids),
-        models.StaffMember.phone.isnot(None),
-        models.StaffMember.is_active == True,  # noqa: E712
-    ).all()
-
-
 
 def _call_owner(db: Session, notif: "models.Notification") -> None:
     restaurant = _restaurant_for_notification(db, notif)

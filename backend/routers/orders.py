@@ -499,15 +499,6 @@ async def create_public_order(
     return _order_to_dict(db_order)
 
 
-def _trigger_mpesa_stk_push(db: Session, order: models.Order) -> None:
-    """
-    Best-effort: a failed/unconfigured STK push should never break order
-    creation. The customer/staff can retry payment through other means
-    (cash, card, or a manual STK retry) — the order itself is already valid.
-    """
-    raise RuntimeError("External payment initiation has been removed")
-
-
 def _order_to_dict(order: models.Order) -> dict:
     """Convert Order model to dict matching OrderOut schema."""
     items_out = []

@@ -30,15 +30,7 @@ def is_production() -> bool:
     )
 
 
-def _mpesa_configured() -> bool:
-    return all(os.getenv(k) for k in (
-        "MPESA_CONSUMER_KEY", "MPESA_CONSUMER_SECRET", "MPESA_SHORTCODE", "MPESA_PASSKEY",
-    ))
-
-
-# Kept for backwards compatibility with imports/tests that reference the
-# helper's old name; the token check itself no longer conditions on it (CYB-103).
-__all__ = ["is_production", "_mpesa_configured", "collect_problems", "enforce_startup_checks"]
+__all__ = ["is_production", "collect_problems", "enforce_startup_checks"]
 
 
 def collect_problems() -> tuple[list[str], list[str]]:
@@ -57,12 +49,6 @@ def collect_problems() -> tuple[list[str], list[str]]:
         hard.append("SECRET_KEY is not set")
 
     prod = is_production()
-
-    # The M-Pesa callback's ONLY authentication is the secret embedded in the
-    # CallBackURL — Safaricom signs nothing. Require the token in production
-    # unconditionally (with or without Daraja creds configured: the creds are
-    # not what the callback authenticates against); outside production the
-    # same condition is a soft warning so dev/tests never block.
 
     # CORS must be set explicitly in production; the built-in fallback list is a
     # dev safety net, not a production ACL.

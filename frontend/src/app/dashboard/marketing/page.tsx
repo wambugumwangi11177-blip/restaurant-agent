@@ -246,7 +246,7 @@ export default function MarketingPage() {
                             Customers who used to visit but have gone quiet for {wb.lapse_days}+ days.
                         </p>
                     </div>
-                    {wb.reachable > 0 && (
+                    {false && (
                         <button
                             onClick={() => setConfirm({
                                 title: `Win back ${wb.reachable} lapsed regular${wb.reachable === 1 ? "" : "s"}`,

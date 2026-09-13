@@ -55,10 +55,10 @@ export default function CampaignForm({ offers, onPick }: { offers: Offer[]; onPi
                             </p>
                             {o.margin_note && <p className="text-[11px] text-text-dim mt-2">💡 {o.margin_note}</p>}
                             <button
-                                onClick={() => onPick({ title: o.title, offer_text: o.offer_text, audience_label: o.audience_label, action: o.action })}
+                                disabled
                                 className="mt-4 self-start flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent)] text-bg font-semibold text-sm hover:bg-[var(--accent-hover)] transition-colors"
                             >
-                                <Send className="w-3.5 h-3.5" /> Send this
+                                Advice only — external sending removed
                             </button>
                         </div>
                     ))}

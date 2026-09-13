@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 import models
 from database import get_db
-from routers.overview import _summarize
+from routers.overview import _restaurant_id, _summarize
 from auth import require_staff_role
 from time_utils import utcnow
 
@@ -80,11 +80,7 @@ def _draft(period: str, range_label: str, core: dict, top: list) -> str:
 def report(period: str, narrate: bool = True, db: Session = Depends(get_db), user=Depends(require_staff_role())):
     if period not in _PERIOD_SPANS:
         raise HTTPException(422, f"period must be one of {list(_PERIOD_SPANS)}")
-    rid = user.active_restaurant_id
-    if rid is None:
-        row = db.query(models.Restaurant.id).filter(
-            models.Restaurant.tenant_id == user.tenant_id).first()
-        rid = row[0] if row else 0
+    rid = _restaurant_id(db, user)
     start, end = _range(period)
     core = _summarize(db, rid, start, end)
     top = _top_items(db, rid, start, end)

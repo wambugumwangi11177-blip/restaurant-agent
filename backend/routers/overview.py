@@ -37,6 +37,18 @@ def _eat_now():
     return utcnow() + _EAT_OFFSET
 
 
+def _restaurant_id(db: Session, user) -> int:
+    """Resolve the selected restaurant inside the authenticated tenant."""
+    query = db.query(models.Restaurant.id).filter(
+        models.Restaurant.tenant_id == user.tenant_id)
+    if user.active_restaurant_id is not None:
+        query = query.filter(models.Restaurant.id == user.active_restaurant_id)
+    row = query.order_by(models.Restaurant.id).first()
+    if row is None and user.active_restaurant_id is not None:
+        raise HTTPException(404, "Restaurant not found")
+    return row[0] if row else 0
+
+
 def _eat_range(period: str):
     now_eat = _eat_now()
     if period == "today":
@@ -79,7 +91,7 @@ def _orders_card(db: Session, rid: int, start, end, core: dict) -> dict:
 
 def _stock_card(db: Session, rid: int) -> dict:
     low = db.query(models.InventoryItem).join(models.Restaurant).filter(
-        models.Restaurant.tenant_id == rid,
+        models.Restaurant.id == rid,
         models.InventoryItem.quantity <= models.InventoryItem.low_stock_threshold,
     ).all()
     return {"low_stock": [{"name": i.item_name, "qty": float(i.quantity)} for i in low],
@@ -98,12 +110,12 @@ def _bookings_card(db: Session, rid: int, start, end) -> dict:
 
 def _staff_card(db: Session, rid: int, start, end) -> dict:
     sched = db.query(func.count(models.LaborShift.id)).join(models.Restaurant).filter(
-        models.Restaurant.tenant_id == rid,
+        models.Restaurant.id == rid,
         models.LaborShift.shift_date >= start.date(),
         models.LaborShift.shift_date <= end.date(),
     ).scalar()
     worked = db.query(func.count(models.LaborShift.id)).join(models.Restaurant).filter(
-        models.Restaurant.tenant_id == rid,
+        models.Restaurant.id == rid,
         models.LaborShift.shift_date >= start.date(),
         models.LaborShift.shift_date <= end.date(),
         models.LaborShift.actual_start.isnot(None),
@@ -111,14 +123,13 @@ def _staff_card(db: Session, rid: int, start, end) -> dict:
     ).scalar()
     cost_cents = db.query(func.coalesce(func.sum(models.LaborShift.labor_cost), 0)).join(
         models.Restaurant).filter(
-        models.Restaurant.tenant_id == rid,
+        models.Restaurant.id == rid,
         models.LaborShift.shift_date >= start.date(),
         models.LaborShift.shift_date <= end.date(),
     ).scalar()
     labor_pct = 0.0
     if core_rev := db.query(func.coalesce(func.sum(models.Order.total), 0)).filter(
-        models.Order.restaurant_id.in_(
-            db.query(models.Restaurant.id).filter(models.Restaurant.tenant_id == rid)),
+        models.Order.restaurant_id == rid,
         models.Order.created_at >= start, models.Order.created_at < end,
     ).scalar():
         labor_pct = round((cost_cents / core_rev) * 100, 1) if core_rev else 0.0
@@ -126,10 +137,10 @@ def _staff_card(db: Session, rid: int, start, end) -> dict:
             "labor_cost_pct": labor_pct}
 
 
-def _attention_cards(db: Session, rid: int) -> list:
+def _attention_cards(db: Session, rid: int, tenant_id: int) -> list:
     cards = []
     low = db.query(models.InventoryItem).join(models.Restaurant).filter(
-        models.Restaurant.tenant_id == rid,
+        models.Restaurant.id == rid,
         models.InventoryItem.quantity <= models.InventoryItem.low_stock_threshold,
     ).all()
     for item in low:
@@ -143,8 +154,8 @@ def _attention_cards(db: Session, rid: int) -> list:
             "status": "open",
         })
     pending_po = db.query(func.count(models.PurchaseOrder.id)).join(models.Restaurant).filter(
-        models.Restaurant.tenant_id == rid,
-        models.PurchaseOrder.status == "pending",
+        models.Restaurant.id == rid,
+        func.lower(models.PurchaseOrder.status) == "pending",
     ).scalar()
     if pending_po:
         cards.append({
@@ -156,7 +167,7 @@ def _attention_cards(db: Session, rid: int) -> list:
         })
     # decided cards are filtered out by the decision endpoint read below
     decided = {d.card_key for d in db.query(models.AttentionDecision).filter(
-        models.AttentionDecision.tenant_id == rid).all()}
+        models.AttentionDecision.tenant_id == tenant_id).all()}
     return [c for c in cards if c["id"] not in decided]
 
 
@@ -198,11 +209,7 @@ def _performance(db: Session, rid: int) -> dict:
 @router.get("/today")
 def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
           db: Session = Depends(get_db), user=Depends(require_staff_role())):
-    rid = user.active_restaurant_id
-    if rid is None:
-        row = db.query(models.Restaurant.id, models.Restaurant.name).filter(
-            models.Restaurant.tenant_id == user.tenant_id).first()
-        rid = row[0] if row else 0
+    rid = _restaurant_id(db, user)
     start, end = _eat_range(period)
     core = _summarize(db, rid, start, end)
     revenue_card = {
@@ -227,7 +234,7 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
         "stock": stock,
         "bookings": bookings,
         "staff": _staff_card(db, rid, start, end),
-        "attention": _attention_cards(db, rid),
+        "attention": _attention_cards(db, rid, user.tenant_id),
         "pulse": _pulse(db, rid, core, stock, bookings),
         "performance": _performance(db, rid),
     }

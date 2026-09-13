@@ -81,8 +81,13 @@ def get_staff_users_for_restaurant(
     rationale above (near-identical restaurant/user lookups scattered across
     routers is the exact DRY violation this module was extracted to fix).
     """
+    recipient_role = models.User.staff_role.in_(staff_roles)
+    if models.StaffRole.OWNER in staff_roles:
+        from sqlalchemy import or_
+        recipient_role = or_(recipient_role, models.User.role.in_(
+            [models.Role.ADMIN, models.Role.SUPERADMIN]))
     return db.query(models.User).filter(
         models.User.tenant_id == restaurant.tenant_id,
-        models.User.staff_role.in_(staff_roles),
+        recipient_role,
         models.User.is_active == True,  # noqa: E712 - SQLAlchemy filter, not a Python bool compare
     ).all()

@@ -736,28 +736,14 @@ def owner_channel_for(restaurant) -> str:
 
 
 def send_to_owner(db: Session, restaurant, message: str, message_type: str) -> None:
-    """
-    Deliver an owner alert over their preferred channel(s). 'both' sends WhatsApp
-    and SMS; 'sms' sends SMS only; anything else defaults to WhatsApp with an SMS
-    fallback if WhatsApp doesn't go through. Resolves the owner phone once.
-    """
-    phone = owner_phone_for(restaurant)
-    if not phone:
-        logger.warning(f"[WhatsApp Brain] No owner phone for restaurant {restaurant.id}")
-        return
+    """Persist owner intelligence in the software; no owner phone is required."""
+    from ai.notify import notify_users
+    from routers.deps import get_staff_users_for_restaurant
 
-    pref = owner_channel_for(restaurant)
-    if pref == "sms":
-        send_whatsapp_message(phone, message, db=db, restaurant_id=restaurant.id,
-                              message_type=message_type, channel="sms")
-    elif pref == "both":
-        send_whatsapp_message(phone, message, db=db, restaurant_id=restaurant.id,
-                              message_type=message_type, channel="whatsapp")
-        send_whatsapp_message(phone, message, db=db, restaurant_id=restaurant.id,
-                              message_type=message_type, channel="sms")
-    else:
-        send_whatsapp_message(phone, message, db=db, restaurant_id=restaurant.id,
-                              message_type=message_type, channel="whatsapp", fallback_sms=True)
+    owners = get_staff_users_for_restaurant(db, restaurant, [models.StaffRole.OWNER])
+    notify_users(db, [owner.id for owner in owners],
+                 message_type.replace("_", " ").capitalize(),
+                 message, message_type, "/dashboard")
 
 
 def _log_message(db, restaurant_id, to_number, message, message_type, status, sid=None):

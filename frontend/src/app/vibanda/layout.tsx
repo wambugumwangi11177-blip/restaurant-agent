@@ -9,6 +9,7 @@ import { fmtDate } from "@/lib/format";
 import { useAuth } from "@/context/AuthContext";
 import { isVibanda } from "@/lib/tenantHome";
 import { tierHome, type StaffTier } from "@/lib/permissions";
+import NotificationBell from "@/components/NotificationBell";
 
 const TABS = [
   { href: "/vibanda", label: "Home", icon: Home },
@@ -35,6 +36,7 @@ export default function VibandaLayout({ children }: { children: React.ReactNode 
   return (
     <div className="vibanda-theme min-h-screen pb-20 md:pb-0">
       <header className="px-4 pt-6 pb-2 md:px-8">
+        <div className="float-right"><NotificationBell ownerHome="/vibanda" /></div>
         {/* Sketch: tiny uppercase eyebrow date line */}
         <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">{fmtDate()} · Nairobi</p>
         <nav className="hidden md:flex gap-1 mt-3">

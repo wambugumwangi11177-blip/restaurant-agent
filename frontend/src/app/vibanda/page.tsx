@@ -211,7 +211,7 @@ export default function VibandaHomePage() {
                   "Paid, non-cancelled orders in this period",
                 ]}
                 onAsk={() => ask("How are my sales today?")} />
-              <PillarCard label="Orders" primaryLabel="Orders today" primary={`${feed.orders.orders} orders`}
+              <PillarCard label="Orders" primaryLabel={feed.period === "today" ? "Orders today" : "Orders in selected period"} primary={`${feed.orders.orders} orders`}
                 comparison={feed.orders.active_now ? `${feed.orders.active_now} active now` : ""}
                 signals={[Object.entries(feed.orders.split).filter(([, v]) => v > 0).map(([k, v]) => `${v} ${k.replace("_", "-")}`).join(" · ") || "—"]}
                 onAsk={() => ask("Are there any delayed orders?")} />

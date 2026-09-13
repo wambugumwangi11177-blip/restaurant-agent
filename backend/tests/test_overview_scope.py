@@ -60,6 +60,35 @@ def test_overview_cards_are_scoped_to_selected_restaurant(client, db_session, sc
     assert not any("Sibling" in title or "Foreign" in title for title in titles)
 
 
+@pytest.mark.parametrize("period", ["1h", "today", "7d", "30d"])
+def test_operational_cards_remain_today_when_sales_period_changes(
+        client, db_session, scoped_owner, monkeypatch, period):
+    from routers import overview
+
+    now = utcnow() + timedelta(hours=3)
+    monkeypatch.setattr(overview, "_eat_now", lambda: now)
+    day = now.date()
+    staff = db_session.query(models.StaffMember).filter_by(restaurant_id=202).one()
+    db_session.add(models.LaborShift(restaurant_id=202, staff_member_id=staff.id,
+                                    shift_date=day - timedelta(days=1), labor_cost=500))
+    db_session.add_all([
+        models.Reservation(restaurant_id=202, customer_name="Today", party_size=2,
+                           reservation_date=day),
+        models.Reservation(restaurant_id=202, customer_name="Yesterday", party_size=10,
+                           reservation_date=day - timedelta(days=1)),
+    ])
+    db_session.commit()
+    _, headers = scoped_owner
+    response = client.get(f"/api/v1/overview/today?period={period}", headers=headers)
+    assert response.status_code == 200, response.text
+    feed = response.json()
+    assert feed["period"] == period
+    assert feed["bookings"]["covers_today"] == 2
+    assert feed["staff"]["scheduled"] == 1
+    booking_pulse = next(item for item in feed["pulse"] if item["domain"] == "Bookings")
+    assert booking_pulse["headline"] == "2 covers expected"
+
+
 def test_attention_decision_uses_tenant_key_not_restaurant_key(client, db_session, scoped_owner):
     user, headers = scoped_owner
     stock = db_session.query(models.InventoryItem).filter_by(restaurant_id=202).one()

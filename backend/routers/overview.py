@@ -228,7 +228,8 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
     }
     # No pace forecast without verified opening hours and comparable history.
     stock = _stock_card(db, rid)
-    bookings = _bookings_card(db, rid, start, end)
+    operational_start, operational_end = _eat_range("today")
+    bookings = _bookings_card(db, rid, operational_start, operational_end)
     return {
         "greeting_date": _eat_now().date().isoformat(),
         "restaurant_name": db.query(models.Restaurant.name).filter(
@@ -242,9 +243,9 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
         "kitchen": {"avg_prep_min": 0, "delay_risk": 0, "bottleneck": None},
         "stock": stock,
         "bookings": bookings,
-        "staff": _staff_card(db, rid, start, end),
+        "staff": _staff_card(db, rid, operational_start, operational_end),
         "attention": _attention_cards(db, rid, user.tenant_id),
-        "pulse": _pulse(db, rid, core, stock, bookings),
+        "pulse": _pulse(db, rid, _summarize(db, rid, operational_start, operational_end), stock, bookings),
         "performance": _performance(db, rid),
     }
 

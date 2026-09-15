@@ -23,7 +23,7 @@ import { HowItWorks } from "@/components/ai/HowItWorks";
 import { NarrativeBlock, type Narrative } from "@/components/ai/NarrativeBlock";
 import {
     Megaphone, RefreshCw, AlertTriangle, Users, ShieldCheck, Gift,
-    Sparkles, Clock, BookOpen, TrendingUp,
+    Sparkles, Clock, BookOpen, TrendingUp, CheckCircle,
 } from "lucide-react";
 import EmptyState from "@/components/ui/EmptyState";
 import { getErrorMessage } from "@/lib/errors";

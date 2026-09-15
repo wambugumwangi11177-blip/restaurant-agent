@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { homeFor } from "@/lib/tenantHome";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Loader2, Eye, EyeOff, ShieldCheck, Lock, GitBranch } from "lucide-react";
 import api from "@/lib/api";
 
 export default function LoginPage() {
-    const { login, register } = useAuth();
+    const { login, register, user } = useAuth();
     const router = useRouter();
     const [isRegister, setIsRegister] = useState(false);
     const [email, setEmail] = useState("");
@@ -35,7 +36,7 @@ export default function LoginPage() {
             } else {
                 await login(email, password);
             }
-            router.push("/dashboard");
+            router.push(homeFor(user?.tenant_name));
         } catch (err: unknown) {
             let message = "Authentication failed";
             if (err && typeof err === "object" && "response" in err) {

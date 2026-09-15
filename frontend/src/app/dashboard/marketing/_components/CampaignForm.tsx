@@ -1,6 +1,6 @@
 "use client";
 
-import { Gift, ShieldCheck, Users, Send } from "lucide-react";
+import { Gift, ShieldCheck, Users } from "lucide-react";
 
 interface Offer {
     id: string;
@@ -17,13 +17,8 @@ interface Offer {
     reachable?: number;
 }
 
-export type ConfirmTarget = { title: string; offer_text: string; audience_label: string; action: "winback" | "promo" };
-
-// The "offers worth running now" picker — reads the AI's suggested campaigns
-// and lets the owner kick off the send-confirmation flow (ConfirmSend) for
-// any one of them. Nothing here sends a message directly; onPick just opens
-// the confirmation dialog in the parent.
-export default function CampaignForm({ offers, onPick }: { offers: Offer[]; onPick: (target: ConfirmTarget) => void }) {
+// Read-only campaign advice; there is no external dispatch workflow.
+export default function CampaignForm({ offers }: { offers: Offer[] }) {
     return (
         <div>
             <h2 className="text-sm font-semibold text-text mb-1 flex items-center gap-2">
@@ -54,12 +49,7 @@ export default function CampaignForm({ offers, onPick }: { offers: Offer[]; onPi
                                 <span className="text-text-muted font-medium">Why: </span>{o.why}
                             </p>
                             {o.margin_note && <p className="text-[11px] text-text-dim mt-2">💡 {o.margin_note}</p>}
-                            <button
-                                onClick={() => onPick({ title: o.title, offer_text: o.offer_text, audience_label: o.audience_label, action: o.action })}
-                                className="mt-4 self-start flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent)] text-bg font-semibold text-sm hover:bg-[var(--accent-hover)] transition-colors"
-                            >
-                                <Send className="w-3.5 h-3.5" /> Send this
-                            </button>
+                            <p className="mt-4 text-xs text-text-dim">Advice only — no customer messages are sent.</p>
                         </div>
                     ))}
                 </div>

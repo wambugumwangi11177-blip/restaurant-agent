@@ -1,0 +1,6 @@
+{
+  "sale_id": "REPLACE_WITH_STABLE_SALE_ID_COLUMN",
+  "sale_timestamp": "REPLACE_WITH_TIMESTAMP_COLUMN",
+  "sale_amount_minor": "REPLACE_WITH_INTEGER_MINOR_UNIT_AMOUNT_COLUMN",
+  "sale_status": "REPLACE_WITH_SALE_STATUS_COLUMN"
+}

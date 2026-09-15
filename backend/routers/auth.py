@@ -158,6 +158,9 @@ class MeOut(StrictModel):
     is_email_verified: bool
     restaurant_name: str | None = None
     restaurant_id: int | None = None
+    # Vibanda dedicated-dashboard routing (plan 2026-09-12): the frontend
+    # forks on tenant, not restaurant — a tenant may have several restaurants.
+    tenant_name: str | None = None
     impersonation: ImpersonationBanner | None = None
 
 
@@ -359,6 +362,7 @@ async def read_users_me(
         "is_email_verified": current_user.is_email_verified,
         "restaurant_name": restaurant.name if restaurant else None,
         "restaurant_id": restaurant.id if restaurant else None,
+        "tenant_name": current_user.tenant.name if current_user.tenant else None,
         # Real Owner impersonation (see routers/staff.py /impersonate):
         # non-null only when this request is running as the target of an
         # active session. Lets the frontend show the "Viewing as..." banner

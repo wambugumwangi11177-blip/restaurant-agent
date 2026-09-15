@@ -16,7 +16,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from logging_config import configure_logging
-from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support, tables, attendance, fraud, cash_reconciliation, restaurants
+from routers import orders, inventory, health, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support, tables, attendance, fraud, cash_reconciliation, restaurants, overview, reports, ai_ask, observer
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
@@ -85,6 +85,11 @@ def on_startup():
         logger.info("[OK] Database tables initialised")
     except Exception as e:
         logger.warning(f"[WARN] DB init deferred: {e}")
+
+    from observer_mode import observer_mode_enabled
+    if observer_mode_enabled():
+        logger.warning("Observer mode enabled: operational subscribers and scheduler are disabled")
+        return
 
     # 2. Wire the event bus — THIS WAS MISSING.
     #    Without this call, all orchestrator handlers were registered as
@@ -577,6 +582,8 @@ app.add_middleware(BodySizeLimitMiddleware)
 # middleware or route runs (so their logs carry it) and the oversized-body
 # rejection above still emits under the correlation id.
 app.add_middleware(CorrelationIdMiddleware)
+from observer_mode import ObserverModeMiddleware
+app.add_middleware(ObserverModeMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 #
@@ -598,11 +605,10 @@ _VERSIONED_ROUTERS = [
     billing.router, enterprise.router, staff.router, stock_custody.router,
     suppliers.router, purchase_orders.router, notifications.router, support.router,
     tables.router, attendance.router, fraud.router, cash_reconciliation.router,
-    restaurants.router,
-]
+    restaurants.router, overview.router, reports.router, ai_ask.router, observer.router,
+    ]
 
 app.include_router(auth.router)
-app.include_router(webhooks.router)
 app.include_router(health.router)
 for _r in _VERSIONED_ROUTERS:
     app.include_router(_r, prefix="/api/v1")          # canonical, documented

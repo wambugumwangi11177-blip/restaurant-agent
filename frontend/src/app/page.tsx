@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { homeFor } from "@/lib/tenantHome";
 
 export default function HomePage() {
   const { user, isLoading } = useAuth();
@@ -11,7 +12,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!isLoading) {
       if (user) {
-        router.push("/dashboard");
+        router.push(homeFor(user.tenant_name));
       } else {
         router.push("/login");
       }

@@ -106,13 +106,11 @@ the real, observed values.
 - Roll back the deploy in Railway to the last green image to restore service
   while you fix the migration.
 
-### 3c. Third-party outage (Twilio / M-Pesa / LLM)
-- The app **degrades, not dies**: external calls have timeouts + (LLM) bounded
-  retries; a failed send/STK-push is best-effort and never blocks order/payment
-  state. Confirm via `/health` staying 200.
-- M-Pesa down: orders can still be created and paid by cash/card at the POS;
-  Safaricom **retries** its callback, so a temporarily-down webhook self-heals.
-- Twilio down: owner alerts/receipts queue as failures in logs; no data loss.
+### 3c. Optional AI provider outage
+- External AI calls have timeouts and bounded retries. Confirm database
+  readiness through `/health/db`; this does not prove provider availability.
+- Owner communication uses the in-app inbox. M-Pesa and Twilio transports
+  are retired; do not recreate their credentials or callbacks during recovery.
 - LLM down: `is_available()` gates it — dashboards serve deterministic numbers
   with no narrative. Nothing customer-facing breaks.
 - Action: confirm it's the provider (status page), not us; no restore needed.
@@ -134,14 +132,13 @@ the real, observed values.
 - [ ] `alembic upgrade head` clean against the restored DB.
 - [ ] `/health/db` returns 200.
 - [ ] Spot-check latest `orders` / `token_usage` timestamps match expected RPO.
-- [ ] `MPESA_CALLBACK_TOKEN`, `SECRET_KEY`, `CORS_ORIGINS` present on the service.
+- [ ] `APP_ENV=production`, `SECRET_KEY`, `DATABASE_URL`, `CORS_ORIGINS` configured.
 - [ ] Frontend reaches the API (login works end-to-end).
 - [ ] Announce restored; note RTO/RPO actually achieved.
 
 ## 5. Required env vars (keep an offline copy; values NOT here)
-`SECRET_KEY`, `DATABASE_URL`, `CORS_ORIGINS`, `MPESA_CONSUMER_KEY`,
-`MPESA_CONSUMER_SECRET`, `MPESA_SHORTCODE`, `MPESA_PASSKEY`,
-`MPESA_CALLBACK_URL`, `MPESA_CALLBACK_TOKEN`, `MPESA_ENV`,
-`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`,
-`GROQ_API_KEY` (or `ANTHROPIC_API_KEY`), `SENTRY_DSN`.
+Required: `APP_ENV=production`, `SECRET_KEY`, `DATABASE_URL`, `CORS_ORIGINS`.
+Optional AI, SMTP, monitoring and off-site backup credentials must match the
+configured providers. Verify delivery, monitoring and backup operation separately;
+their presence alone is not evidence that recovery or alerting works.
 See `backend/.env.example` for the full annotated list.

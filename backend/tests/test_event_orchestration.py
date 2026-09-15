@@ -151,9 +151,9 @@ def test_mpesa_payment_failed_notifies_the_owner_once(db_session, monkeypatch):
     _seed_restaurant_with_owner(db_session)
 
     sent = []
-    import ai.whatsapp as whatsapp_mod
-    monkeypatch.setattr(whatsapp_mod, "send_whatsapp_message",
-                        lambda to, msg, **kw: sent.append((to, msg)))
+    from ai.whatsapp import brain
+    monkeypatch.setattr(brain, "send_to_owner",
+                        lambda db, restaurant, msg, message_type: sent.append((restaurant.id, msg)))
 
     clear_handlers()
     from ai.orchestrator.executive import register_all_handlers, on_mpesa_payment_failed
@@ -165,7 +165,7 @@ def test_mpesa_payment_failed_notifies_the_owner_once(db_session, monkeypatch):
 
     assert len(sent) == 1
     to, msg = sent[0]
-    assert to == "+254712345678"           # the owner, not the customer
+    assert to == 1                        # tenant-scoped restaurant, not a phone
     assert "#7" in msg
     assert "Request cancelled by user" in msg
 
@@ -177,14 +177,15 @@ def test_mpesa_payment_failed_audits_even_with_no_owner_phone(db_session, monkey
     monkeypatch.delenv("OWNER_PHONE_1", raising=False)
 
     sent = []
-    import ai.whatsapp as whatsapp_mod
-    monkeypatch.setattr(whatsapp_mod, "send_whatsapp_message",
-                        lambda to, msg, **kw: sent.append((to, msg)))
+    from ai.whatsapp import brain
+    monkeypatch.setattr(brain, "send_to_owner",
+                        lambda db, restaurant, msg, message_type: sent.append((restaurant.id, msg)))
 
     from ai.orchestrator.executive import on_mpesa_payment_failed
     on_mpesa_payment_failed({"restaurant_id": 1, "order_id": 7, "reason": "Timeout"})
 
-    assert sent == []
+    assert len(sent) == 1
+    assert sent[0][0] == 1
     logs = db_session.query(models.AgentAuditLog).filter(
         models.AgentAuditLog.action_type == "mpesa_payment_failed"
     ).all()

@@ -19,7 +19,7 @@ def test_legacy_and_versioned_data_paths_both_resolve(client):
 def test_health_and_webhooks_are_not_versioned(client):
     assert client.get("/health/").status_code == 200
     assert client.get("/api/v1/health/").status_code == 404          # not versioned
-    assert client.post("/webhooks/stripe", content=b"{}").status_code == 501
+    assert client.post("/webhooks/stripe", content=b"{}").status_code == 404
     assert client.post("/api/v1/webhooks/stripe", content=b"{}").status_code == 404  # not versioned
 
 

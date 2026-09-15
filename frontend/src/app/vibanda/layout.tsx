@@ -4,10 +4,10 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Home, MessageCircle, FileText, LifeBuoy } from "lucide-react";
+import { Home, MessageCircle, FileText } from "lucide-react";
 import { fmtDate } from "@/lib/format";
 import { useAuth } from "@/context/AuthContext";
-import { isVibanda } from "@/lib/tenantHome";
+import { isVibanda, VIBANDA_SYNTHETIC_TENANT } from "@/lib/tenantHome";
 import { tierHome, type StaffTier } from "@/lib/permissions";
 import NotificationBell from "@/components/NotificationBell";
 
@@ -15,7 +15,6 @@ const TABS = [
   { href: "/vibanda", label: "Home", icon: Home },
   { href: "/vibanda/os", label: "OS", icon: MessageCircle },
   { href: "/vibanda/reports", label: "Reports", icon: FileText },
-  { href: "/vibanda/support", label: "Support", icon: LifeBuoy },
 ];
 
 export default function VibandaLayout({ children }: { children: React.ReactNode }) {
@@ -39,6 +38,9 @@ export default function VibandaLayout({ children }: { children: React.ReactNode 
         <div className="float-right"><NotificationBell ownerHome="/vibanda" /></div>
         {/* Sketch: tiny uppercase eyebrow date line */}
         <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">{fmtDate()} · Nairobi</p>
+        {process.env.NEXT_PUBLIC_SYNTHETIC_DEMO === "true" && user?.tenant_name === VIBANDA_SYNTHETIC_TENANT && (
+          <p className="mb-2 inline-flex rounded-full border border-[hsl(43_76%_57_/.45)] bg-[hsl(43_76%_57_/.12)] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">Synthetic staging data · not Macsoft</p>
+        )}
         <nav className="hidden md:flex gap-1 mt-3">
           {TABS.map(({ href, label, icon: Icon }) => {
             const active = pathname === href;
@@ -59,7 +61,7 @@ export default function VibandaLayout({ children }: { children: React.ReactNode 
         </nav>
       </header>
       <main className="mx-auto max-w-[1180px] px-4 pb-16 pt-4 sm:px-7 lg:px-10">{children}</main>
-      <nav className="fixed bottom-0 inset-x-0 md:hidden bg-[var(--v-card)] border-t border-[var(--v-border)] grid grid-cols-4">
+      <nav className="fixed bottom-0 inset-x-0 md:hidden bg-[var(--v-card)] border-t border-[var(--v-border)] grid grid-cols-3">
         {TABS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (

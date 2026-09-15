@@ -11,6 +11,9 @@ import { fmtKes, fmtPct, greetingFor } from "@/lib/format";
 import { OsLoading, OsEmpty, OsError } from "@/components/os/States";
 import PartHealth from "@/components/vibanda/PartHealth";
 import { useAuth } from "@/context/AuthContext";
+import SourceUnavailable from "@/components/vibanda/SourceUnavailable";
+
+const observerMode = process.env.NEXT_PUBLIC_OBSERVER_MODE === "true";
 
 type Feed = {
   greeting_date: string;
@@ -125,6 +128,10 @@ function AttentionCard({ card, onDecide }: {
 }
 
 export default function VibandaHomePage() {
+  return observerMode ? <SourceUnavailable title="Overview" detail="Verified restaurant facts will appear here once the approved read-only source is connected." /> : <VibandaOperationalHome />;
+}
+
+function VibandaOperationalHome() {
   const { user } = useAuth();
   const [feed, setFeed] = useState<Feed | null>(null);
   const [err, setErr] = useState(false);

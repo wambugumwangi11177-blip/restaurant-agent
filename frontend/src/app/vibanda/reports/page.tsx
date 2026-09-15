@@ -6,6 +6,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import { fmtKes } from "@/lib/format";
 import { OsLoading, OsEmpty, OsError } from "@/components/os/States";
+import SourceUnavailable from "@/components/vibanda/SourceUnavailable";
+
+const observerMode = process.env.NEXT_PUBLIC_OBSERVER_MODE === "true";
 
 type Report = {
   period: string; range: string; revenue: number; orders: number;
@@ -18,6 +21,10 @@ type Report = {
 const TABS = ["daily", "weekly", "monthly", "yearly"] as const;
 
 export default function VibandaReportsPage() {
+  return observerMode ? <SourceUnavailable title="Reports" detail="Daily, weekly, monthly and yearly reports will be generated only after Macsoft periods and totals are reconciled." /> : <VibandaReportsContent />;
+}
+
+function VibandaReportsContent() {
   const [period, setPeriod] = useState<string>("daily");
   const [report, setReport] = useState<Report | null>(null);
   const [err, setErr] = useState(false);

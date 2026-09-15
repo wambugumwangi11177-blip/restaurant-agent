@@ -12,6 +12,9 @@ import api from "@/lib/api";
 import { fmtKes } from "@/lib/format";
 import { QUESTION_GROUPS } from "@/lib/osSuggestions";
 import { OsLoading, OsError } from "@/components/os/States";
+import SourceUnavailable from "@/components/vibanda/SourceUnavailable";
+
+const observerMode = process.env.NEXT_PUBLIC_OBSERVER_MODE === "true";
 
 type AiStep = { action: string; why?: string; expected_impact?: string };
 type AskCard = {
@@ -351,6 +354,10 @@ function OsChatInner() {
 }
 
 export default function VibandaOsPage() {
+  return observerMode ? <SourceUnavailable title="Ask" detail="Questions unlock when their answers can be grounded in validated Macsoft facts." /> : <VibandaOsContent />;
+}
+
+function VibandaOsContent() {
   return (
     <Suspense fallback={<div className="p-6 text-sm text-[var(--v-muted-foreground)]">Loading…</div>}>
       <OsChatInner />

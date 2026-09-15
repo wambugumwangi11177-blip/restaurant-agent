@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight, TrendingUp } from "lucide-react";
 import api from "@/lib/api";
 import { fmtKes, fmtPct, greetingFor } from "@/lib/format";
-import { OsLoading, OsEmpty, OsError } from "@/components/os/States";
+import { OsLoading, OsError } from "@/components/os/States";
 import PartHealth from "@/components/vibanda/PartHealth";
 import { useAuth } from "@/context/AuthContext";
 import SourceUnavailable from "@/components/vibanda/SourceUnavailable";
@@ -150,6 +150,9 @@ function VibandaOperationalHome() {
   }, []);
 
   useEffect(() => {
+    // The request itself is the external synchronization performed here.
+    // Loading/error state is deliberately reset by the request helper.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load(period);
     return () => { requestId.current += 1; };
   }, [period, load]);

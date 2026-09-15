@@ -38,6 +38,9 @@ function VibandaReportsContent() {
       .catch(() => { if (id === requestId.current) setErr(true); });
   }, []);
   useEffect(() => {
+    // The request itself is the external synchronization performed here.
+    // Loading/error state is deliberately reset by the request helper.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load(period);
     return () => { requestId.current += 1; };
   }, [period, load]);

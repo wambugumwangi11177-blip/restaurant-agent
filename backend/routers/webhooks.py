@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi import APIRouter, Request, HTTPException, Depends, Header
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -305,6 +305,49 @@ async def _handle_mpesa_callback(request: Request, db: Session, token: str | Non
     })
 
     return _MPESA_ACK
+
+
+def _verify_macsoft_key(supplied: str | None) -> None:
+    """
+    Origin check for the MacSoft data-push endpoint, same fail-closed shape as
+    _verify_mpesa_token above: an unset MACSOFT_API_KEY means nothing can be
+    compared against, so every request is rejected (401) rather than trusted.
+    Uses hmac.compare_digest, not `==`, so response timing can't be used to
+    brute-force the key byte-by-byte.
+    """
+    expected = os.getenv("MACSOFT_API_KEY", "").strip()
+    if not expected:
+        logger.error(
+            "[MacSoft Webhook] MACSOFT_API_KEY is unset or empty — "
+            "rejecting request (fail closed)."
+        )
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if supplied is None or not hmac.compare_digest(supplied, expected):
+        logger.warning("[MacSoft Webhook] Rejected request with missing/incorrect x-api-key")
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+@router.post("/macsoft/data")
+@limiter.limit("60/minute")
+async def receive_macsoft_data(request: Request, x_api_key: str | None = Header(default=None)):
+    """
+    Inbound data push from MacSoft. Intentionally schema-less for now: we
+    don't yet have field-level confirmation of what MacSoft sends, so this
+    accepts and logs the raw payload rather than validating against a
+    Pydantic model guessed in advance. Tighten to a strict schema — and add
+    the staging-table write + idempotency dedupe on MacSoft's transaction ID,
+    matching the _settle_order_once pattern above — once a real payload has
+    been inspected.
+    """
+    _verify_macsoft_key(x_api_key)
+    try:
+        payload = await request.json()
+    except Exception as e:
+        logger.error(f"[MacSoft Webhook] Could not parse request JSON: {e}")
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    logger.info(f"[MacSoft Webhook] Received payload: {payload}")
+    return {"status": "received"}
 
 
 @router.post("/whatsapp")

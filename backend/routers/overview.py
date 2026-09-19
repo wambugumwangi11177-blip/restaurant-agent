@@ -238,6 +238,13 @@ def _decision_cards(db: Session, rid: int) -> list:
             ),
             "agent": agent,
             "recommendation_id": rec_id,
+            # Carried so a decision on this card can be measured later
+            # (ai/evaluation/outcomes.py). Stage five had no input at all
+            # before: AttentionDecision recorded the click and nothing read it
+            # except the filter that hides the card.
+            "entity_type": d.get("entity_type"),
+            "entity_id": d.get("entity_id"),
+            "impact_cents_month": impact_cents,
         })
     return cards
 
@@ -415,6 +422,52 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
     }
 
 
+# A Home card and an escalating notification are two views of one finding. The
+# escalation ladder (ai/escalation/engine.py) pages managers at 15 minutes and
+# phones the owner at 45 unless someone acknowledges — and until now nothing in
+# this product could acknowledge anything. POST /notifications/{id}/acknowledge
+# exists and has no caller, and /read sets is_read, which the sweep explicitly
+# ignores. So every critical event ran the whole ladder, every time, because the
+# owner had no button that stopped the clock.
+#
+# They do have a button: the one on the card. Deciding a card is the owner
+# saying "I have seen this and dealt with it", which is exactly what
+# acknowledged_at means. This maps the card back to the events it came from.
+_CARD_AGENT_EVENTS = {
+    "stock_custody": ("stock.variance_flagged",),
+    "fraud_detection": ("fraud.suspicious_transaction_flagged",),
+    "cash_reconciliation": ("cash.reconciliation_flagged",),
+    "stock": ("stock.critical", "stock.depleted"),
+}
+
+
+def _acknowledge_related(db: Session, tenant_id: int, card: dict) -> int:
+    """Stop the escalation clock for the finding this card represents.
+
+    Scoped to the deciding owner's own tenant and to the event types this card
+    came from — acknowledging a theft flag must not silence an unrelated
+    stock alert. Returns how many notifications were acknowledged.
+    """
+    events = _CARD_AGENT_EVENTS.get(card.get("agent") or "")
+    if not events:
+        return 0
+    user_ids = [row[0] for row in db.query(models.User.id).filter(
+        models.User.tenant_id == tenant_id).all()]
+    if not user_ids:
+        return 0
+    rows = db.query(models.Notification).filter(
+        models.Notification.user_id.in_(user_ids),
+        models.Notification.event_type.in_(events),
+        models.Notification.severity.isnot(None),
+        models.Notification.acknowledged_at.is_(None),
+    ).all()
+    now = utcnow()
+    for row in rows:
+        row.acknowledged_at = now
+        row.is_read = True
+    return len(rows)
+
+
 def _apply_decision(db: Session, rid: int, card: dict, decision: str, user) -> dict:
     """Carry out what the owner just approved, where this system can.
 
@@ -501,11 +554,32 @@ def decide(card_key: str, body: dict, db: Session = Depends(get_db),
         logger.exception("[overview] could not rebuild cards for %s", card_key)
 
     outcome = _apply_decision(db, rid, card, decision, user) if card else {
-        "applied": False,
         # A card that is no longer in the feed has usually been overtaken —
         # the recommendation expired, or someone else acted on it.
-        "message": "" if card_key else "",
+        "applied": False, "message": "",
     }
+
+    # Any decision stops the clock, including "Later": the owner has seen it,
+    # which is what the escalation ladder is checking for. Continuing to page
+    # managers about something already on the owner's screen is the alert
+    # fatigue this system is meant to prevent.
+    acknowledged = 0
+    if card:
+        try:
+            acknowledged = _acknowledge_related(db, user.tenant_id, card)
+        except Exception:  # noqa: BLE001 — never lose the decision over this
+            logger.exception("[overview] acknowledging alerts for %s failed", card_key)
+
+        # Record what was claimed so it can be checked in a fortnight. Only
+        # decisions with a countable outcome are scoreable; the rest are
+        # recorded as advice given and never scored, because marking an
+        # unscoreable decision a miss would punish an agent for the shape of
+        # its advice rather than its quality.
+        try:
+            from ai.evaluation.outcomes import record_decision_outcome
+            record_decision_outcome(db, rid, card, decision)
+        except Exception:  # noqa: BLE001
+            logger.exception("[overview] recording outcome for %s failed", card_key)
 
     row = models.AttentionDecision(
         tenant_id=user.tenant_id, card_key=card_key, decision=decision,
@@ -513,9 +587,14 @@ def decide(card_key: str, body: dict, db: Session = Depends(get_db),
     )
     db.add(row)
     db.commit()
+    message = outcome["message"]
+    if acknowledged and not message:
+        message = (f"Noted. {acknowledged} alert(s) acknowledged — "
+                   f"managers will not be paged about this.")
     return {
         "card_key": card_key,
         "status": decision,
         "applied": outcome["applied"],
-        "message": outcome["message"],
+        "message": message,
+        "alerts_acknowledged": acknowledged,
     }

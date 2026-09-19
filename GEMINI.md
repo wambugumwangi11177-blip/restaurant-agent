@@ -38,6 +38,55 @@ Before writing a script, check `execution/` per your directive. Only create new 
 **3. Update directives as you learn**
 Directives are living documents. When you discover API constraints, better approaches, common errors, or timing expectations—update the directive. But don't create or overwrite directives without asking unless explicitly told to. Directives are your instruction set and must be preserved (and improved upon over time, not extemporaneously used and then discarded).
 
+## Verification discipline
+
+These four rules exist because breaking them produced three wrong answers to the
+owner in one session, each stated with confidence. All three shared one cause:
+trusting a *description* of behaviour instead of the behaviour.
+
+  - A commit message said an endpoint stored data. It logged the payload and
+    threw it away. The owner was told to hand the endpoint to a client.
+  - A startup warning said password-reset tokens were exposed in logs. They were
+    redacted one function away, in the same file.
+  - An earlier conclusion of my own ("the home page uses no AI, which keeps it
+    simple") was reused as a premise. It was the product's central defect.
+
+**1. Primary sources only.**
+Commit messages, docstrings, comments, READMEs, variable names and startup
+warnings state INTENT. Only the code and a run state BEHAVIOUR. Never report
+behaviour from a description of it. If you have not read the function or watched
+it execute, you do not know what it does.
+
+**2. Every production claim ships with a command the user can run.**
+"It is deployed" and "it works" are different sentences. A claim about
+production carries the exact command that proves it and what a correct response
+looks like. If you cannot produce that command, you have not verified the claim
+— say so plainly instead of rounding up.
+
+Prefer a check that reads from a different path than the one that wrote: a
+status code reports what the writer believes, a separate read reports what is
+actually stored. `200 OK` proved nothing; `total_records: 0 -> 1` proved the
+chain. See `GET /webhooks/macsoft/status` for the shape.
+
+**3. Separate what you verified from what you inferred.**
+"I ran it and saw X" and "I read it and believe X" are different claims.
+Collapsing them is how a confident wrong answer gets made. Where a conclusion
+rests on inference, say which step is inferred. Anything about infrastructure
+the agent cannot reach — a live database, a deployed URL, a hosting dashboard —
+is inference until the user runs the check.
+
+**4. Load the relevant skill before working in its area.**
+`.claude/skills/` holds skills written for specific parts of this codebase
+(stock loss and theft detection, staff roles and permissions, AI dashboard
+onboarding). Open the one that covers the area BEFORE designing or editing in
+it, not after. A skill exists because someone already litigated the decisions
+you are about to re-derive, usually worse.
+
+**Reporting.** Corrections belong in the work, not in the conversation. Fix the
+thing and state the corrected fact once; do not narrate the stumble. An owner
+reading a stream of self-corrections learns nothing about their software and
+loses the ability to tell a small slip from a serious one.
+
 ## Self-annealing loop
 
 Errors are learning opportunities. When something breaks:

@@ -51,11 +51,28 @@ _PRICING_RISK = {"REPRICE": 2, "SURGE": 3, "STIMULATE": 3}
 
 
 def from_pricing(db: Session, restaurant_id: int) -> list[Decision]:
-    from ai.pricing.recommendations import get_pricing_intelligence
+    from ai.pricing.recommendations import (
+        get_pricing_intelligence, sync_pending_recommendations,
+    )
 
     data = get_pricing_intelligence(db, restaurant_id)
+    recommendations = data.get("recommendations", [])
+    # Materialize into PENDING rows so each recommendation carries a persisted
+    # id. Without it the Home card has nothing to act on — approving it could
+    # only record a click, which is exactly what Approve used to do. Documented
+    # safe to call on every read: it converges rather than duplicating, and
+    # keeps the stored numbers in lock-step so an approval always applies the
+    # price currently on screen. Guarded: a failure here degrades to advisory
+    # cards, never takes down Home.
+    try:
+        recommendations = sync_pending_recommendations(db, restaurant_id, recommendations)
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        logger.exception("pricing sync failed for restaurant %s — cards will be advisory only",
+                         restaurant_id)
+
     out: list[Decision] = []
-    for rec in data.get("recommendations", []):
+    for rec in recommendations:
         rtype = rec.get("type")
         if not rtype:
             continue
@@ -72,12 +89,16 @@ def from_pricing(db: Session, restaurant_id: int) -> list[Decision]:
             impact_cents_month=rec.get("monthly_impact_cents"),
             data_sources=["orders (30-day velocity)", "menu_items.cost_price"],
             alternatives=["Keep current price", "Reject recommendation"],
+            recommendation_id=rec.get("id"),
             entity_type="menu_item",
             entity_id=rec.get("item_id"),
             meta={
                 "type": rtype,
                 "price_change_pct": rec.get("price_change_pct"),
                 "when_to_apply": rec.get("when"),
+                "suggested_price": suggested,
+                "current_price": rec.get("current_price"),
+                "item_name": rec.get("item_name"),
             },
         ))
     return out

@@ -101,7 +101,12 @@ def test_attention_decision_uses_tenant_key_not_restaurant_key(client, db_sessio
     decision = db_session.query(models.AttentionDecision).filter_by(card_key=key).one()
     assert decision.tenant_id == user.tenant_id == 101
     db_session.refresh(stock)
-    assert stock.quantity == 1  # Recording advice never changes operational stock.
+    # Deciding a STOCK card changes no stock: restocking is done by a person in
+    # a store room, not by this endpoint. Narrower than it used to read —
+    # approving a PRICING card does now move the price, and approving the
+    # purchase-order card does send the orders. See
+    # tests/test_home_approve_applies.py for those.
+    assert stock.quantity == 1
 
 
 @pytest.mark.parametrize("path", ["/api/v1/overview/today", "/api/v1/reports/daily?narrate=false"])

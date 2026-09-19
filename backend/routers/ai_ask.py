@@ -20,15 +20,17 @@ Routing map (all modules already existed in ai/ — this router just connects th
 from __future__ import annotations
 
 import re
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 import models
 from database import get_db
 from auth import require_staff_role
-from routers.reports import _strip_reasoning_leak
+from routers.reports import _grounded_reply
+from routers.overview import _restaurant_id
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -81,21 +83,26 @@ def _answer_stock(db: Session, rid: int, q: str) -> dict:
         names = ", ".join(p.get("item_name") or p.get("name", "?") for p in focus[:3])
         finding = (f"{len(focus)} item(s) projected to run out within a week: {names}."
                    if soon else f"{len(low)} item(s) below reorder point: {names}.")
-        why = "Based on your last 14 days of usage velocity versus current quantity on hand."
+        why = ("Based on recorded usage velocity versus current quantity on hand."
+               if soon else "Current recorded quantity is at or below the reorder threshold. Stockout timing is not established.")
         impact = "Avoids emergency buying at higher prices and mid-service menu gaps"
         rec = f"Raise today's order for {focus[0].get('item_name') or focus[0].get('name', 'the affected items')} and confirm the next delivery slot."
         steps = [
-            {"action": f"Reorder {p.get('item_name') or p.get('name')}", "why": f"{p.get('days_until_stockout', '?')} days of stock left at current usage"}
+            {"action": f"Reorder {p.get('item_name') or p.get('name')}",
+             "why": (f"{p['days_until_stockout']} days of stock left at recorded usage"
+                     if p.get('days_until_stockout') is not None else "Below reorder threshold; stockout timing is unavailable")}
             for p in focus[:4]
         ]
     else:
-        finding = "Nothing is projected to run out in the next 7 days."
-        why = "All tracked items have enough cover at current usage rates."
+        finding = "No low-stock or imminent stockout candidates were identified in the recorded data."
+        why = "Missing usage history cannot establish stock cover for every item."
         impact = "—"
-        rec = "No reorder needed today. Re-check after tomorrow's service."
+        rec = "Confirm current quantities and usage history before deciding whether to reorder."
         steps = []
     return {"finding": finding, "why": why, "impact": impact, "recommendation": rec,
-            "module": "reorder", "steps": steps, "data": {"candidates": len(focus)}}
+            "module": "reorder", "steps": steps,
+            "data": {"candidates": len(focus), "stockout_timing_available": bool(soon),
+                     "narrative_allowed": bool(soon)}}
 
 
 def _answer_revenue(db: Session, rid: int, q: str) -> dict:
@@ -109,8 +116,8 @@ def _answer_revenue(db: Session, rid: int, q: str) -> dict:
         trend_txt = fc.get("trend") or fc.get("summary") or ""
     except Exception:
         forecast, trend_txt = {}, ""
-    finding = f"Revenue today is {_money(core['revenue'] * 100)} across {core['orders']} orders."
-    why = "Live from your order data for the Nairobi calendar day so far."
+    finding = f"Revenue today is {_money(core['revenue'] * 100)} across {core['orders']} paid orders."
+    why = "Paid, non-cancelled orders created during the Nairobi calendar day so far. This is not payment cash flow."
     # core["revenue"] is already KES (overview's _summarize converts cents→KES);
     # avg_order must stay in KES — multiplying by 100 again showed absurd figures
     # (verified in browser 2026-09-12: "KSh 199,467" instead of KSh 1,995).
@@ -275,27 +282,37 @@ def ask(
     db: Session = Depends(get_db),
     user: models.User = Depends(require_staff_role()),
 ):
-    rid = user.active_restaurant_id
-    if rid is None:
-        row = db.query(models.Restaurant.id).filter(models.Restaurant.tenant_id == user.tenant_id).first()
-        rid = row[0] if row else 0
-        if not rid:
-            raise HTTPException(404, "No restaurant found for this account")
+    rid = _restaurant_id(db, user)
+    if not rid:
+        raise HTTPException(404, "No restaurant found for this account")
     module = _route(question)
     try:
         card = _HANDLERS[module](db, rid, question)
-    except Exception as exc:  # module failure must not 500 the chat — degrade to ops
-        card = _answer_ops(db, rid, question)
-        card["steps"] = card.get("steps", [])
-        card["data"] = {"fallback_reason": str(exc)[:120]}
+    except Exception:  # Do not substitute unrelated facts or expose internal errors.
+        card = _unavailable_card(module)
     return card
 
 
 # ─── LLM chat (real-time, OpenRouter) ────────────────────────────────────────
 
+class HistoryTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
 class ChatBody(BaseModel):
-    question: str
-    history: list[dict] = []  # [{"role","content"}] prior turns, optional
+    question: str = Field(min_length=3, max_length=500)
+    history: list[HistoryTurn] = Field(default_factory=list, max_length=6)
+
+
+def _unavailable_card(module: str) -> dict:
+    return {
+        "finding": "The data needed to answer this question is unavailable.",
+        "why": "The requested analysis could not be completed. No conclusion was verified.",
+        "impact": "Not available",
+        "recommendation": "Retry the question or review the source records in Macsoft.",
+        "module": module, "steps": [], "data": {"available": False},
+    }
 
 
 @router.post("/chat")
@@ -306,24 +323,21 @@ def chat_llm(body: ChatBody, db: Session = Depends(get_db),
     conversational reply from that data. The LLM never invents numbers — its
     prompt contains only the module's real figures, and the raw data ships
     alongside so the client can show both."""
-    rid = user.active_restaurant_id
-    if rid is None:
-        row = db.query(models.Restaurant.id).filter(
-            models.Restaurant.tenant_id == user.tenant_id).first()
-        rid = row[0] if row else 0
-        if not rid:
-            raise HTTPException(404, "No restaurant found for this account")
+    rid = _restaurant_id(db, user)
+    if not rid:
+        raise HTTPException(404, "No restaurant found for this account")
 
     module = _route(body.question)
     try:
         card = _HANDLERS[module](db, rid, body.question)
-    except Exception as exc:  # noqa: BLE001 — grounding failure falls back to ops
-        card = _answer_ops(db, rid, body.question)
-        card["data"] = {"fallback_reason": str(exc)[:120]}
+    except Exception:  # Grounding failure must be visible, not replaced by another topic.
+        card = _unavailable_card(module)
 
     from ai import llm_client
     llm_reply = None
-    if llm_client.is_available():
+    if (card.get("data", {}).get("available") is not False
+            and card.get("data", {}).get("narrative_allowed") is not False
+            and llm_client.is_available()):
         restaurant_name = db.query(models.Restaurant.name).filter(
             models.Restaurant.id == rid).scalar() or "your restaurant"
         context = (
@@ -346,15 +360,14 @@ def chat_llm(body: ChatBody, db: Session = Depends(get_db),
             "KSh. Keep answers under 120 words unless the owner asks for detail. "
             "End with one concrete next action when relevant.\n\n" + context
         )
-        messages = (body.history or [])[-6:] + [
+        messages = [turn.model_dump() for turn in body.history] + [
             {"role": "user", "content": body.question}]
         try:
             llm_reply = llm_client.chat(
                 messages, system=system, max_tokens=400, tier="medium")
-            llm_reply = _strip_reasoning_leak(llm_reply)
-        except Exception as exc:  # noqa: BLE001 — LLM down ≠ chat down
+            llm_reply = _grounded_reply(llm_reply, context)
+        except Exception:  # LLM failure never exposes provider diagnostics to the client.
             llm_reply = None
-            card["data"]["llm_error"] = str(exc)[:120]
 
     return {
         "module": module,

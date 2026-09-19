@@ -13,6 +13,9 @@ Model-name findings (Task 2, verified against backend/models.py):
   Restaurant.tenant_id — tenant scoping goes Order.restaurant -> Restaurant.
   require_staff_role(*roles) from auth.py: ADMIN/SUPERADMIN always pass.
 """
+import hashlib
+import logging
+
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
@@ -22,6 +25,8 @@ import models
 from database import get_db
 from auth import require_staff_role
 from time_utils import utcnow
+
+logger = logging.getLogger("overview")
 
 router = APIRouter(prefix="/overview", tags=["overview"])
 
@@ -144,17 +149,88 @@ def _staff_card(db: Session, rid: int, start, end) -> dict:
             "labor_cost_pct": labor_pct}
 
 
-def _attention_cards(db: Session, rid: int, tenant_id: int) -> list:
+# Category -> the word the owner sees. The AI layer names things after its own
+# agents ("supply_chain"); the Home page speaks the restaurant's language.
+_DOMAIN_LABEL = {
+    "pricing": "Pricing",
+    "inventory": "Stock",
+    "menu": "Menu",
+    "labor": "Staff",
+    "labour": "Staff",
+    "supply_chain": "Purchasing",
+    "marketing": "Growth",
+    "profit": "Profit",
+    "revenue": "Sales",
+}
+
+
+def _card_key(agent: str, action: str) -> str:
+    """A stable id for one piece of advice.
+
+    The owner's approve/later/reject is recorded against this key
+    (models.AttentionDecision), so it MUST NOT move when the ranking reshuffles
+    — keying on rank would resurrect a dismissed card the moment something else
+    outranked it. Agent + the advice itself is stable for as long as the advice
+    is, and changes when the advice does, which is the behaviour we want.
+    """
+    digest = hashlib.sha1(f"{agent}|{action}".encode("utf-8")).hexdigest()[:10]
+    return f"d-{digest}"
+
+
+def _decision_cards(db: Session, rid: int) -> list:
+    """What needs attention, from the Decision Intelligence layer.
+
+    This is the point of the Home page: the owner should not have to ask. Every
+    specialist agent's recommendations (pricing, inventory, menu, labour, supply
+    chain, marketing) are collected, scored on impact/confidence/risk/effort and
+    returned best-first, so the thing most worth doing today is at the top.
+
+    Deterministic — no LLM. The agents computed these numbers; this only orders
+    and relabels them.
+    """
+    from ai.decisions import get_ranked_decisions
+
+    data = get_ranked_decisions(db, rid)
+    cards = []
+    for d in data.get("decisions", [])[:8]:
+        action = (d.get("action") or "").strip()
+        if not action:
+            continue
+        impact_cents = d.get("impact_cents_month") if d.get("quantified") else None
+        category = (d.get("category") or "").lower()
+        cards.append({
+            "id": _card_key(d.get("agent") or "agent", action),
+            "domain": _DOMAIN_LABEL.get(category, category.replace("_", " ").title() or "Business"),
+            "title": action,
+            "why": (d.get("rationale") or "").strip(),
+            "what_to_do": action,
+            "impact": f"About KSh {impact_cents // 100:,} a month" if impact_cents else "",
+            "status": "open",
+            # Surfaced so the UI can show WHY this is first, not just that it is.
+            "priority_score": d.get("priority_score"),
+            "confidence_pct": d.get("confidence_pct"),
+        })
+    return cards
+
+
+def _operational_cards(db: Session, rid: int) -> list:
+    """Time-critical facts, not recommendations.
+
+    A stockout today is not a ranked suggestion — it is happening. These are
+    computed directly so the page still warns the owner when the AI layer has
+    nothing to say (a brand-new restaurant) or cannot run.
+    """
     cards = []
     low = db.query(models.InventoryItem).join(models.Restaurant).filter(
         models.Restaurant.id == rid,
         models.InventoryItem.quantity <= models.InventoryItem.low_stock_threshold,
     ).all()
     for item in low:
+        title = f"{item.item_name} is running low ({float(item.quantity)} left)"
         cards.append({
-            "id": f"stock-{item.id}",
+            "id": _card_key("stock", title),
             "domain": "Stock",
-            "title": f"{item.item_name} is running low ({float(item.quantity)} left)",
+            "title": title,
             "why": "Current stock has reached the reorder point.",
             "what_to_do": f"Raise today's order to restock {item.item_name}.",
             "impact": "",
@@ -165,14 +241,61 @@ def _attention_cards(db: Session, rid: int, tenant_id: int) -> list:
         func.lower(models.PurchaseOrder.status) == "pending",
     ).scalar()
     if pending_po:
+        title = f"{pending_po} purchase order(s) awaiting approval"
         cards.append({
-            "id": "po-pending", "domain": "Purchasing",
-            "title": f"{pending_po} purchase order(s) awaiting approval",
+            "id": _card_key("purchasing", title),
+            "domain": "Purchasing",
+            "title": title,
             "why": "Approving keeps deliveries on schedule.",
             "what_to_do": "Review and approve the pending purchase orders.",
-            "impact": "", "status": "open",
+            "impact": "",
+            "status": "open",
         })
-    # decided cards are filtered out by the decision endpoint read below
+    return cards
+
+
+def _attention_cards(db: Session, rid: int, tenant_id: int) -> list:
+    """The Home page's "what needs your attention", operational first.
+
+    Order is deliberate: what is happening now (a stockout, an unapproved
+    order) outranks what would be profitable to change, however large the
+    modelled impact. The owner cannot act on a pricing recommendation while
+    the kitchen is out of beef.
+
+    The AI layer is wrapped: if an adapter raises, the owner still gets the
+    operational warnings rather than an empty page. A silent degrade is the
+    right trade here — Home must always render.
+    """
+    cards = _operational_cards(db, rid)
+    try:
+        ai_cards = _decision_cards(db, rid)
+    except Exception:  # noqa: BLE001 — Home must render even if an agent fails
+        logger.exception("[overview] decision layer failed for restaurant %s", rid)
+        ai_cards = []
+
+    # Drop AI advice that restates an operational card. "Beef is running low"
+    # and "Reorder Beef soon" are one problem; showing both makes the page look
+    # like it cannot count. Match on the subject (the inventory item's name),
+    # not the wording, because the two layers phrase it differently.
+    subjects = {
+        item.item_name.lower()
+        for item in db.query(models.InventoryItem).join(models.Restaurant).filter(
+            models.Restaurant.id == rid,
+            models.InventoryItem.quantity <= models.InventoryItem.low_stock_threshold,
+        ).all()
+    }
+    seen = {c["id"] for c in cards}
+    seen_titles = {c["title"].lower() for c in cards}
+    for c in ai_cards:
+        title_l = c["title"].lower()
+        if c["id"] in seen or title_l in seen_titles:
+            continue
+        if c["domain"] == "Stock" and any(name in title_l for name in subjects):
+            continue
+        seen.add(c["id"])
+        seen_titles.add(title_l)
+        cards.append(c)
+
     decided = {d.card_key for d in db.query(models.AttentionDecision).filter(
         models.AttentionDecision.tenant_id == tenant_id).all()}
     return [c for c in cards if c["id"] not in decided]

@@ -121,6 +121,17 @@ def collect_problems() -> tuple[list[str], list[str]]:
             "SMTP_HOST/SMTP_USER/SMTP_PASSWORD/SMTP_FROM."
         )
 
+    # Without Sentry, a production exception is a line in a log nobody reads.
+    # Soft, not hard: the app is fully functional without it, and blocking a
+    # boot over observability would be its own outage. But an operator running
+    # a client's live business blind to errors should be told, every boot.
+    if prod and not os.getenv("SENTRY_DSN", "").strip():
+        soft.append(
+            "SENTRY_DSN is not set in production — unhandled exceptions are "
+            "logged and never reported, so a failure reaches you only when "
+            "the customer complains. Set SENTRY_DSN."
+        )
+
     # storage.py defaults to writing to the container's own disk. That's fine
     # until something is actually uploaded through it — but Railway's
     # filesystem is ephemeral, so any file saved there is lost on the next

@@ -17,7 +17,7 @@ Pulls deep insights from all AI services and produces:
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import timedelta
+from datetime import datetime, timedelta
 import threading
 import time
 import models
@@ -99,8 +99,15 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
         .scalar()
     )
     now = latest_order or utcnow()
-    today = now.date()
+    # Nairobi calendar day (EAT = UTC+3): the owner's "today" is the wall-clock
+    # day in Kenya, not the UTC day. `func.date(created_at)` compares the raw
+    # UTC date, which flips at 03:00 EAT — orders placed 00:00-03:00 Nairobi
+    # were counted in the wrong day (verified 2026-09-12: UTC-day revenue was
+    # KSh 13,310 vs the true EAT-day KSh 29,920 on the same data).
+    today = (now + timedelta(hours=3)).date()
     yesterday = today - timedelta(days=1)
+    today_start_utc = datetime.combine(today, datetime.min.time()) - timedelta(hours=3)
+    yesterday_start_utc = today_start_utc - timedelta(days=1)
 
     # Gather data from all AI services. The five modules are independent of
     # each other and each is DB-bound (a month+ of order history per module),
@@ -206,18 +213,21 @@ def get_operations_dashboard(db: Session, restaurant_id: int) -> dict:
     # ─────────────────────────────────────────────
     today_orders = db.query(models.Order).filter(
         models.Order.restaurant_id == restaurant_id,
-        func.date(models.Order.created_at) == today,
+        models.Order.created_at >= today_start_utc,
+        models.Order.created_at < today_start_utc + timedelta(days=1),
     ).count()
 
     today_revenue = db.query(func.sum(models.Order.total)).filter(
         models.Order.restaurant_id == restaurant_id,
-        func.date(models.Order.created_at) == today,
+        models.Order.created_at >= today_start_utc,
+        models.Order.created_at < today_start_utc + timedelta(days=1),
         models.Order.status != models.OrderStatus.CANCELLED,
     ).scalar() or 0
 
     yesterday_revenue = db.query(func.sum(models.Order.total)).filter(
         models.Order.restaurant_id == restaurant_id,
-        func.date(models.Order.created_at) == yesterday,
+        models.Order.created_at >= yesterday_start_utc,
+        models.Order.created_at < today_start_utc,
         models.Order.status != models.OrderStatus.CANCELLED,
     ).scalar() or 0
 

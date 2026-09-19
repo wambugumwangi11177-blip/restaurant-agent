@@ -43,8 +43,19 @@ def ingest(
     source_id: str,
     source_version: str,
     payload: dict[str, Any],
+    commit: bool = True,
 ) -> str:
-    """Return the action taken: inserted | superseded | skipped."""
+    """Return the action taken: inserted | superseded | skipped.
+
+    `commit=False` lets a caller ingest a whole batch inside one transaction:
+    the row is flushed (so the very next latest_version() in the same batch can
+    see it) but not committed, and the caller commits once at the end. COMMIT
+    is the expensive part — one fsync per record turns a 500-record push into
+    hundreds of round trips, which is how a batch ingest hits the gunicorn
+    timeout. The flush is NOT optional: SessionLocal is autoflush=False, so
+    without it a record repeated inside a single batch would not be seen by the
+    dedupe check and would insert twice.
+    """
     current = latest_version(db, source_system_id, entity, source_id)
     if current == source_version:
         action = "skipped"
@@ -68,5 +79,8 @@ def ingest(
             raw=payload,
         )
     )
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     return action

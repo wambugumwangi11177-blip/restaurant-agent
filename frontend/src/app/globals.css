@@ -1,19 +1,42 @@
 @import "tailwindcss";
 
-:root {
-  --bg: #0a0a0a;
-  --surface: #141414;
-  --surface-hover: #1a1a1a;
-  --border: #262626;
-  --accent: #d4a853;
-  --accent-hover: #e0b96a;
-  --text: #e5e5e5;
-  --text-muted: #737373;
-  --text-dim: #525252;
-  --success: #22c55e;
-  --warning: #eab308;
-  --danger: #ef4444;
-  --info: #3b82f6;
+/*
+ * Vibanda Restaurant OS theme — copied from the approved sketch
+ * (restaurant-os-ai-frontend--wambugumwangi11.replit.app):
+ * warm cream light theme, deep-teal primary, gold accent, DM Sans body,
+ * Space Grotesk display. Applied ONLY inside .vibanda-theme so the
+ * generic dashboard keeps its own dark look untouched.
+ */
+
+.vibanda-theme {
+  --v-bg: hsl(42 33% 96%);
+  --v-foreground: hsl(208 29% 19%);
+  --v-card: hsl(42 40% 99%);
+  --v-card-foreground: hsl(208 29% 19%);
+  --v-primary: hsl(201 47% 29%);
+  --v-primary-foreground: hsl(42 40% 99%);
+  --v-secondary: hsl(39 34% 91%);
+  --v-secondary-foreground: hsl(208 29% 19%);
+  --v-muted: hsl(39 26% 93%);
+  --v-muted-foreground: hsl(207 12% 46%);
+  --v-accent: hsl(42 71% 75%);
+  --v-accent-foreground: hsl(204 33% 18%);
+  --v-border: hsl(37 22% 87%);
+  --v-destructive: hsl(4 61% 52%);
+  --v-good: hsl(150 28% 41%);
+  --v-warn: hsl(38 80% 44%);
+  --v-radius: 0.75rem;
+  --v-sidebar: hsl(201 35% 15%);
+  --v-sidebar-primary: hsl(43 82% 65%);
+  --v-sidebar-foreground: hsl(39 25% 92%);
+
+  background-color: var(--v-bg);
+  color: var(--v-foreground);
+  font-family: var(--font-dm-sans), "DM Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+.vibanda-theme .font-display {
+  font-family: var(--font-space-grotesk), "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
 }
 
 @theme {
@@ -37,6 +60,11 @@ body {
   color: var(--text);
 }
 
+.vibanda-theme {
+  background-color: var(--v-bg);
+  color: var(--v-foreground);
+}
+
 /* Minimal scrollbar */
 ::-webkit-scrollbar {
   width: 4px;
@@ -51,7 +79,11 @@ body {
   border-radius: 2px;
 }
 
-/* Card surface */
+.vibanda-theme ::-webkit-scrollbar-thumb {
+  background: var(--v-border);
+}
+
+/* Card surface (generic app, dark) */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -85,13 +117,13 @@ body {
 
 :focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
-/* Respect prefers-reduced-motion: no animations, instant transitions.
-   Covers the global * transition above plus Tailwind's animate-* utilities
-   used for skeletons/spinners (overridden via !important since those set
-   the animation shorthand). */
+.vibanda-theme :focus-visible {
+  outline-color: var(--v-primary);
+}
+
+/* Respect prefers-reduced-motion: no animations, instant transitions. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -100,4 +132,20 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+/* Sketch motion: content rises in */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.vibanda-theme .animate-rise-in {
+  animation: rise-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }

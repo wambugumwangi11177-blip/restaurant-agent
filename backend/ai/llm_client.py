@@ -44,6 +44,17 @@ def _block_get(block, key):
 
 _ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 _GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+# OpenRouter (2026-09-12): the owner's chosen chat/report LLM gateway — one key,
+# access to every model. Takes priority over Anthropic/Groq when set. Free-tier
+# models (":free" suffix) are the default for a Kenyan SME deployment; bump the
+# env vars to move to paid frontier models without a code change.
+_OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+# Free-tier models VERIFIED working against the owner's key (2026-09-12):
+#   HIGH/MEDIUM: nvidia/nemotron-3-super-120b-a12b:free (1M-class MoE, best free quality)
+#   LOW:         nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free (small/fast narration)
+# deepseek/gemma/llama ":free" variants were 404 for this account (checked live).
+_OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-super-120b-a12b:free")
+_OPENROUTER_MODEL_LOW = os.getenv("OPENROUTER_MODEL_LOW", "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free")
 _HEADROOM_ENABLED = os.getenv("HEADROOM_ENABLED", "true").lower() == "true"
 _HEADROOM_PROXY_URL = os.getenv("HEADROOM_PROXY_URL", "")
 _ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
@@ -57,7 +68,10 @@ _GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 _LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT_SECONDS", "30"))
 _LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
 
-_PROVIDER = "anthropic" if _ANTHROPIC_API_KEY else ("groq" if _GROQ_API_KEY else None)
+_PROVIDER = ("openrouter" if _OPENROUTER_API_KEY
+             else "anthropic" if _ANTHROPIC_API_KEY
+             else "groq" if _GROQ_API_KEY
+             else None)
 
 # ── Model tiers ──────────────────────────────────────────────────────────────
 # Callers pick a tier by task complexity; we resolve it to a concrete model for
@@ -70,6 +84,11 @@ _PROVIDER = "anthropic" if _ANTHROPIC_API_KEY else ("groq" if _GROQ_API_KEY else
 TIER_LOW, TIER_MEDIUM, TIER_HIGH = "low", "medium", "high"
 
 _MODEL_TIERS = {
+    "openrouter": {
+        TIER_LOW:    _OPENROUTER_MODEL_LOW,
+        TIER_MEDIUM: _OPENROUTER_MODEL,
+        TIER_HIGH:   os.getenv("OPENROUTER_MODEL_HIGH", _OPENROUTER_MODEL),
+    },
     "anthropic": {
         TIER_LOW:    os.getenv("ANTHROPIC_MODEL_LOW",    "claude-haiku-4-5-20251001"),
         TIER_MEDIUM: os.getenv("ANTHROPIC_MODEL_MEDIUM", _ANTHROPIC_MODEL),
@@ -88,6 +107,17 @@ _MODEL_TIERS = {
         TIER_HIGH:   os.getenv("GROQ_MODEL_HIGH",   _GROQ_MODEL),
     },
 }
+
+
+def _default_model() -> str:
+    """The active provider's default model for the OpenAI-compatible branches,
+    used when a caller passes neither an explicit `model` nor a `tier`.
+
+    Must be provider-aware: Groq and OpenRouter have different id namespaces, so
+    the previous unconditional `_GROQ_MODEL` fallback sent "openai/gpt-oss-120b"
+    to OpenRouter (404). Reachable today via ai/whatsapp/orchestrator.py, which
+    calls chat_with_tools() with neither argument."""
+    return _OPENROUTER_MODEL if _PROVIDER == "openrouter" else _GROQ_MODEL
 
 
 def model_for_tier(tier: str | None) -> str | None:
@@ -116,7 +146,20 @@ def _get_client():
     if _client is not None:
         return _client
 
-    if _PROVIDER == "anthropic":
+    if _PROVIDER == "openrouter":
+        from openai import OpenAI
+        _client = OpenAI(
+            api_key=_OPENROUTER_API_KEY,
+            base_url="https://openrouter.ai/api/v1",
+            timeout=_LLM_TIMEOUT,
+            max_retries=_LLM_MAX_RETRIES,
+            default_headers={
+                # OpenRouter attribution headers (recommended by their docs).
+                "HTTP-Referer": "https://vibanda.restaurant-os.app",
+                "X-Title": "Vibanda Restaurant OS",
+            },
+        )
+    elif _PROVIDER == "anthropic":
         import anthropic
         kwargs = {
             "api_key": _ANTHROPIC_API_KEY,
@@ -207,7 +250,7 @@ def chat_with_usage(
     # Groq / OpenAI-compatible
     openai_messages = ([{"role": "system", "content": system}] if system else []) + messages
     kwargs = {
-        "model": resolved or _GROQ_MODEL,
+        "model": resolved or _default_model(),
         "max_tokens": max_tokens,
         "messages": openai_messages,
     }
@@ -344,7 +387,7 @@ def chat_with_tools(
     # so ai/whatsapp/orchestrator.py's loop logic stays provider-agnostic.
     openai_messages = ([{"role": "system", "content": system}] if system else []) + _canonical_messages_to_openai(messages)
     kwargs = {
-        "model": resolved or _GROQ_MODEL,
+        "model": resolved or _default_model(),
         "max_tokens": max_tokens,
         "messages": openai_messages,
     }

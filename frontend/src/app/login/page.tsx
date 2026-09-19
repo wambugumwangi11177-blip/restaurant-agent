@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { homeFor } from "@/lib/tenantHome";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Loader2, Eye, EyeOff, ShieldCheck, Lock, GitBranch } from "lucide-react";
@@ -30,12 +31,18 @@ export default function LoginPage() {
         setError("");
         setLoading(true);
         try {
-            if (isRegister) {
-                await register(email, password, tenantName);
-            } else {
-                await login(email, password);
-            }
-            router.push("/dashboard");
+            // Route on the user THIS call returned, never on the `user` state
+            // read from the enclosing closure: React has not committed the
+            // setUser() from login()/register() by the time this line runs, so
+            // `user` is still the previous value (null on a first login). That
+            // made homeFor() fall through to /dashboard for every account,
+            // including Vibanda — the generic dashboard would paint, then its
+            // layout's isVibanda() effect bounced to /vibanda. That flash is
+            // the "it shows the old dashboard first, then the new one".
+            const signedIn = isRegister
+                ? await register(email, password, tenantName)
+                : await login(email, password);
+            router.replace(homeFor(signedIn?.tenant_name));
         } catch (err: unknown) {
             let message = "Authentication failed";
             if (err && typeof err === "object" && "response" in err) {

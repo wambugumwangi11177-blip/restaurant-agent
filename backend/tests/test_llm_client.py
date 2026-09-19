@@ -38,12 +38,13 @@ def test_openrouter_selected_when_only_openrouter_key_present(monkeypatch):
     assert llm_client.is_available() is True
 
 
-def test_groq_preferred_over_openrouter(monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+def test_openrouter_preferred_over_groq_and_anthropic(monkeypatch):
+    """OpenRouter is the owner's configured gateway, so it wins when set."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake_anthropic_key")
     monkeypatch.setenv("GROQ_API_KEY", "fake_groq_key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "fake_openrouter_key")
     llm_client = _reload_llm_client()
-    assert llm_client._PROVIDER == "groq"
+    assert llm_client._PROVIDER == "openrouter"
 
 
 def test_openrouter_default_model_is_not_a_groq_id(monkeypatch):
@@ -72,7 +73,7 @@ def test_groq_selected_when_only_groq_key_present(monkeypatch):
 def test_anthropic_preferred_when_both_keys_present(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "fake_anthropic_key")
     monkeypatch.setenv("GROQ_API_KEY", "fake_groq_key")
-    monkeypatch.setenv("OPENROUTER_API_KEY", "fake_openrouter_key")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     llm_client = _reload_llm_client()
     assert llm_client._PROVIDER == "anthropic"
 

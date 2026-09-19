@@ -17,3 +17,22 @@ export function formatKESCompact(cents: number | null | undefined): string {
     if (kes >= 1_000) return `KES ${(kes / 1_000).toFixed(1)}k`;
     return `KES ${Math.round(kes).toLocaleString("en-KE")}`;
 }
+
+
+/** ── Restaurant OS additions ────────────────────────────────────────────── */
+
+const kes = new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 });
+
+/** KES from a WHOLE-KES value (overview/reports feed). Distinct from formatKES(cents). */
+export const fmtKes = (n: number) => kes.format(n || 0);
+export const fmtPct = (n: number) => `${(n || 0).toFixed(1)}%`;
+
+export function greetingFor(hour: number): string {
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+export const greetingNow = () => greetingFor(new Date().getHours());
+
+export const fmtDate = () =>
+  new Date().toLocaleDateString("en-KE", { weekday: "long", day: "numeric", month: "long" });

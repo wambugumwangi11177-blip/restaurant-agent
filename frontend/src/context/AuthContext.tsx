@@ -22,6 +22,8 @@ interface User {
   email: string;
   role: string;
   restaurant_name?: string;
+  // Tenant fork (Vibanda dedicated shell) — read fresh from /auth/me.
+  tenant_name?: string | null;
   // Directive 015 — fine-grained tier (owner/manager/supervisor/controller/
   // stockkeeper/kitchen/waiter), or null if not yet assigned. Read fresh from
   // /auth/me on every load rather than cached in a JWT claim, so a role
@@ -41,8 +43,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, tenantName: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User | null>;
+  register: (email: string, password: string, tenantName: string) => Promise<User | null>;
   logout: () => void;
   isLoading: boolean;
   startImpersonation: (staffId: number) => Promise<string>;
@@ -78,15 +80,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const fetchUser = async (accessToken: string) => {
+  // Returns the freshly-fetched user (or null on failure) as well as setting
+  // it. Callers that need to route on the result — login/register — must use
+  // the RETURN value: `user` state is not committed until React re-renders, so
+  // reading it in the same handler yields the PREVIOUS value (null on a first
+  // login), which is what sent every Vibanda owner to /dashboard first and only
+  // then bounced them to /vibanda.
+  const fetchUser = async (accessToken: string): Promise<User | null> => {
     try {
       const res = await api.get("/api/v1/auth/me", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       setUser(res.data);
+      return res.data as User;
     } catch {
       clearAccessToken();
       setToken(null);
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -98,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const accessToken = res.data.access_token;
     setAccessToken(accessToken);
     setToken(accessToken);
-    await fetchUser(accessToken);
+    return await fetchUser(accessToken);
   };
 
   // BUG 1 FIX: was /auth/register (404) — corrected to /api/v1/auth/register
@@ -111,7 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const accessToken = res.data.access_token;
     setAccessToken(accessToken);
     setToken(accessToken);
-    await fetchUser(accessToken);
+    return await fetchUser(accessToken);
   };
 
   // Shared-device quick-switch (audit remediation, Tier 5 item 12) — mirrors

@@ -1,9 +1,36 @@
 name: ci
 
 on:
+  # Feature-branch pushes ran NO checks until a PR existed: `on.push` was
+  # limited to main/master, so `git push -u origin feat/x` reported nothing and
+  # the first signal arrived only at PR time. The branch globs below cover every
+  # prefix this repo actually uses (claude/, codex/, feat/, fix/, chore/,
+  # postmortem/) plus the release branches.
+  #
+  # Tradeoff, stated deliberately: a branch that already has an open PR now runs
+  # twice (once for the push, once for the PR). That is GitHub's standard
+  # behaviour with both triggers, and the `concurrency` block below cancels
+  # superseded runs so the cost is bounded. Verified-on-every-push is worth more
+  # than the saved runner minutes.
   push:
-    branches: ["main", "master"]
+    branches:
+      - main
+      - master
+      - "claude/**"
+      - "codex/**"
+      - "feat/**"
+      - "fix/**"
+      - "chore/**"
+      - "postmortem/**"
   pull_request:
+  workflow_dispatch: {}
+
+# Cancel a run that a newer push to the same ref has already superseded. Keyed
+# so a PR run and a push run never cancel each other — branch protection needs
+# the PR run to complete.
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   pytest:
@@ -23,12 +50,16 @@ jobs:
 
       - name: Run test suite (with coverage)
         # pytest-cov is a CI-only tool (kept out of requirements.txt so it never
-        # ships in the runtime image). Coverage is MEASURED and printed, not yet
-        # gated on a threshold — we establish the real number before setting a
-        # --cov-fail-under floor, so the gate reflects reality instead of a guess.
+        # ships in the runtime image).
+        #
+        # The floor is now SET. The comment here used to say the real number had
+        # to be established first — it has been: a full local run on 2026-09-19
+        # measured 85% over 18,991 statements. 84 leaves one point of slack so a
+        # legitimate refactor does not fail the build, while a PR that adds a
+        # meaningful block of untested code does.
         run: |
           pip install pytest-cov
-          pytest -v --cov=. --cov-report=term-missing --cov-report=xml
+          pytest -v --cov=. --cov-report=term-missing --cov-report=xml --cov-fail-under=84
 
   dependency-audit:
     runs-on: ubuntu-latest
@@ -54,10 +85,14 @@ jobs:
       # reason — never with a blanket continue-on-error, so a NEW starlette or
       # ecdsa CVE still blocks:
       #
-      #   PYSEC-2026-161 / -248 / -249, CVE-2026-48817 / -48818 (starlette)
-      #     All fixes require starlette >= 1.0. fastapi 0.128.8 pins
-      #     `starlette < 1.0.0`, so they cannot be taken without a fastapi major
-      #     upgrade — tracked separately, not smuggled into a hardening pass.
+      #   The five starlette ids that used to sit here (PYSEC-2026-161 / -248 /
+      #   -249, CVE-2026-48817 / -48818) were REMOVED on 2026-09-19. Their
+      #   justification had gone stale: it said fastapi pinned `starlette < 1.0`,
+      #   but requirements.txt now pins fastapi 0.141.1 with starlette 1.3.1,
+      #   which carries the fixes. Verified by running pip-audit against
+      #   requirements.txt with no --ignore-vuln flags: the only advisory
+      #   returned is the ecdsa one below. An ignore list that outlives its
+      #   reason is a lie the next reader has to disprove.
       #
       #   PYSEC-2026-1325 (ecdsa, a python-jose transitive dep)
       #     A timing side-channel (Minerva) in ECDSA verification, with NO fix
@@ -70,11 +105,6 @@ jobs:
       - name: Audit dependencies
         run: |
           pip-audit -r requirements.txt \
-            --ignore-vuln PYSEC-2026-161 \
-            --ignore-vuln PYSEC-2026-248 \
-            --ignore-vuln PYSEC-2026-249 \
-            --ignore-vuln CVE-2026-48817 \
-            --ignore-vuln CVE-2026-48818 \
             --ignore-vuln PYSEC-2026-1325
 
   sast:

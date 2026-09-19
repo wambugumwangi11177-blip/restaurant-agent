@@ -221,6 +221,18 @@ def _start_scheduler():
             replace_existing=True,
         )
 
+        # Daily reporting-fact rollup. 00:30 UTC is 03:30 EAT — after the
+        # Nairobi day has closed (21:00 UTC) so yesterday is complete, and
+        # before learning_cycle at 02:00 UTC and the 04:00 UTC briefing, both of
+        # which read report numbers.
+        scheduler.add_job(
+            _run_reporting_rollup_job,
+            CronTrigger(hour=0, minute=30),   # 03:30 EAT
+            id="reporting_rollup",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+
         # Sprint 2 — manager escalation sweep. Every 5 min, not daily/hourly
         # like everything else above: the whole point is catching an
         # unacknowledged critical alert within its 15-minute timeout, so the
@@ -353,6 +365,42 @@ def _run_variance_check_job():
             db.close()
     except Exception as exc:
         logger.error(f"[Variance Check] Scheduler job failed: {exc}")
+
+
+def _run_reporting_rollup_job():
+    """Nightly: re-aggregate the daily reporting facts for every restaurant.
+
+    TRAILING, not incremental. An order mutates after it is created — is_paid
+    flips when payment lands, status becomes CANCELLED — so a job that appended
+    only yesterday would let the facts drift away from `orders` and then serve
+    that drift as a revenue figure. Re-running the last 7 complete Nairobi days
+    absorbs those late changes.
+
+    Today is deliberately never built: it is still accumulating, and
+    reporting/rollup.py answers the current partial day from the live tables.
+
+    A failure here is not an outage. Every read falls back to the live query
+    when coverage is incomplete, so a missed run costs report latency, not
+    correctness.
+    """
+    try:
+        from database import SessionLocal
+        from reporting import rollup
+        import models
+
+        db = SessionLocal()
+        try:
+            for restaurant in db.query(models.Restaurant).all():
+                try:
+                    rollup.refresh_trailing(db, restaurant.id, days=7)
+                except Exception:
+                    logger.exception(
+                        "[rollup] refresh failed for restaurant %s", restaurant.id)
+                    db.rollback()
+        finally:
+            db.close()
+    except Exception:
+        logger.exception("[rollup] nightly reporting rollup job failed")
 
 
 def _run_fraud_check_job():

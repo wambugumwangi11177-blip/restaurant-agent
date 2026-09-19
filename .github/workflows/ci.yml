@@ -120,13 +120,20 @@ jobs:
 
       # JS dependency audit — the Python deps are audited (pip-audit) but the
       # frontend's were not. BLOCKING as of 2026-07-11 (was continue-on-error):
-      # the baseline was verified clean at --audit-level=high on that date
-      # (`npm audit --audit-level=high` exits 0; only 4 *moderate* transitive
-      # advisories via next-auth remain, below the gate). A NEW high/critical
-      # advisory now fails CI instead of printing a warning nobody reads —
-      # mirroring how pip-audit was made blocking on 2026-07-08.
+      # a NEW high/critical advisory fails CI instead of printing a warning
+      # nobody reads, mirroring how pip-audit was made blocking on 2026-07-08.
+      # Baseline re-verified 2026-09-19 after next-auth was removed and vitest
+      # added: `npm audit --audit-level=high` exits 0; the remaining moderate
+      # advisories are dev-only (vitest) and below the gate.
       - name: Audit npm dependencies
         run: npm audit --audit-level=high
+
+      # Unit tests for pure logic — routing decisions, the permission matrix.
+      # Added 2026-09-19: 16,000 lines of frontend had no tests at all, and the
+      # bug that dropped a Vibanda waiter on a page of 403s was three lines in
+      # homeFor(). Runs before the build so a logic break fails fast.
+      - name: Unit tests
+        run: npm test
 
       # Type errors and build breaks currently only surface on a Vercel deploy —
       # too late, and Vercel does not catch the untyped `json()` contract drifts

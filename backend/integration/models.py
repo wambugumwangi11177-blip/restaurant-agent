@@ -79,3 +79,35 @@ class ReconcileRun(Base):
     detail = Column(JSON, nullable=True)
     started_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
     finished_at = Column(DateTime, nullable=True)
+
+
+class ProjectionLink(Base):
+    """One row per mirrored record, recording what it became in the domain.
+
+    The mirror is append-only staging; the domain tables are what the product
+    reads. This is the join between them, and the reason re-projection is safe:
+    a second projection of the same (source_system, entity, source_id) updates
+    `domain_id`'s row rather than inserting a duplicate.
+
+    `status` is 'projected' or 'unmapped'. An unmapped row is not a failure to
+    hide — MacSoft's field names have not been seen yet, so some records will
+    not resolve on the first pass. Recording why (in `reason`) is what makes
+    the next mapping pass targeted instead of guesswork, and it is surfaced by
+    GET /webhooks/macsoft/status so nobody has to read logs to find it.
+    """
+    __tablename__ = "projection_links"
+    id = Column(Integer, primary_key=True)
+    source_system_id = Column(Integer, nullable=False)
+    entity = Column(String(64), nullable=False)
+    source_id = Column(String(256), nullable=False)
+    status = Column(String(16), nullable=False)          # projected | unmapped
+    domain_table = Column(String(64), nullable=True)     # orders | menu_items | inventory_items
+    domain_id = Column(Integer, nullable=True)
+    projected_version = Column(String(128), nullable=True)
+    reason = Column(String(256), nullable=True)
+    projected_at = Column(DateTime, nullable=True, default=datetime.datetime.utcnow)
+    __table_args__ = (
+        UniqueConstraint("source_system_id", "entity", "source_id",
+                         name="uq_projection_link_identity"),
+        Index("ix_projection_links_status", "source_system_id", "status"),
+    )

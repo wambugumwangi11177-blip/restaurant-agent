@@ -1,20 +1,27 @@
 name: db-backup
 
-# Scheduled logical (pg_dump) backup of production Postgres to S3 — the
-# "secondary — recommended" backup from backend/DISASTER_RECOVERY.md §1.
-# Separate from ci.yml on purpose: this must run on a schedule regardless of
-# pushes/PRs, and never blocks or is blocked by the normal CI pipeline.
+# OPT-IN, OFF-PROVIDER backup of production Postgres to AWS S3.
 #
-# Requires these secrets to be set on the repo before this can do anything
-# (Settings -> Secrets and variables -> Actions):
+# NOT the primary backup. The primary is the Railway cron service in
+# backend/scripts/backup/, which dumps to a Railway bucket nightly and needs no
+# credentials from anyone — see backend/DISASTER_RECOVERY.md.
+#
+# This one exists for a failure the primary cannot survive: the Railway account
+# itself being lost, compromised or closed. The database and the bucket live
+# with the same provider, so a copy somewhere else is the only defence against
+# losing both at once. Worth enabling before the data is irreplaceable; not
+# worth blocking on today.
+#
+# The nightly schedule was REMOVED deliberately. Without the secrets below it
+# failed every night at 03:17 UTC, and a backup job that is always red teaches
+# everyone to ignore it — including on the night it is red for a real reason.
+# Re-add the `schedule:` block once the secrets exist.
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
 #   DATABASE_URL          — ideally a read-only DB role
 #   BACKUP_S3_BUCKET
-#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (or use an OIDC role instead)
-# Until those are added, this workflow will simply fail at the "Run backup"
-# step when the schedule fires — safe to merge before secrets exist.
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (or an OIDC role instead)
 on:
-  schedule:
-    - cron: "17 3 * * *"  # 03:17 UTC daily — off-the-hour, avoids the crowd
   workflow_dispatch: {}
 
 jobs:

@@ -5,10 +5,14 @@ unset or empty.
 Before the fix, _verify_mpesa_token() with an unconfigured token logged a
 one-time warning and ACCEPTED tokenless callbacks (POST /webhooks/mpesa) when
 M-Pesa itself was unconfigured — an accept-by-default posture. Now the token
-is required unconditionally: unset/empty -> 403 with a log, always. The
-startup guard (startup_checks.collect_problems) mirrors this: production
-without the token is a hard (boot-blocking) problem even when M-Pesa creds
-are absent; dev logs a warning.
+is required unconditionally: unset/empty -> 403 with a log, always. That
+runtime behaviour is the fix, and it is unconditional.
+
+The startup guard is a separate, weaker thing: a deploy-time alarm so the
+gap is loud at release rather than discovered on the first callback. It
+fires when M-Pesa is in use (Daraja creds present, or MPESA_ENV set). A
+deployment with no M-Pesa at all boots with a warning — it has no callback
+to endanger, and the 403 above holds regardless.
 
 Reuses the callback fixtures/shape from test_mpesa_webhook.py.
 """
@@ -89,18 +93,42 @@ def test_invalid_token_rejected(client, db_session, monkeypatch):
 
 
 # ── Startup guard ─────────────────────────────────────────────────────────────
-# Production requires the token even without M-Pesa creds (the token IS the
-# callback's only authentication); non-production warns.
+# The boot gate is a DEPLOY-TIME alarm, not the protection itself. The
+# protection is test_unset_token_rejects_callback / test_empty_token_rejects_
+# callback above: while the token is unset, every callback is 403'd whatever
+# else is configured. Those two are what CYB-103 rests on and they are
+# unchanged.
+#
+# The gate fires when M-Pesa is actually in use — Daraja credentials present,
+# or MPESA_ENV set to declare the integration live. A deployment that takes no
+# M-Pesa payments at all has no callback to endanger, and must still be able to
+# boot: requiring it to invent a token for a provider it never calls teaches
+# people to satisfy checks rather than to secure things.
 
-def test_startup_production_requires_token_even_without_mpesa_creds(monkeypatch):
+def test_startup_production_requires_token_when_mpesa_is_in_use(monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("SECRET_KEY", "x")
+    monkeypatch.setenv("MPESA_ENV", "sandbox")  # integration declared live
     monkeypatch.delenv("MPESA_CALLBACK_TOKEN", raising=False)
 
     hard, soft = startup_checks.collect_problems()
     assert any("MPESA_CALLBACK_TOKEN" in h for h in hard)
     with pytest.raises(RuntimeError):
         startup_checks.enforce_startup_checks()
+
+
+def test_startup_production_without_mpesa_at_all_boots_with_a_warning(monkeypatch):
+    """No credentials and no MPESA_ENV: not an M-Pesa deployment. Boots."""
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("SECRET_KEY", "x")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@db.example.com/app")
+    monkeypatch.delenv("MPESA_ENV", raising=False)
+    monkeypatch.delenv("MPESA_CALLBACK_TOKEN", raising=False)
+
+    hard, soft = startup_checks.collect_problems()
+    assert not any("MPESA_CALLBACK_TOKEN" in h for h in hard)
+    assert any("MPESA_CALLBACK_TOKEN" in s for s in soft)
+    startup_checks.enforce_startup_checks()
 
 
 def test_startup_dev_without_token_warns_only(monkeypatch):

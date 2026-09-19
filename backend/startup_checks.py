@@ -37,6 +37,19 @@ def _mpesa_configured() -> bool:
     ))
 
 
+def _mpesa_in_use() -> bool:
+    """True when this deployment has M-Pesa switched on in any form.
+
+    Either Daraja credentials are present, or MPESA_ENV has been set at all —
+    setting it is an explicit statement that the M-Pesa integration is live,
+    even before the credentials land.
+
+    A deployment with neither is not using M-Pesa, so there is no payment
+    callback for a missing token to endanger.
+    """
+    return _mpesa_configured() or bool(os.getenv("MPESA_ENV", "").strip())
+
+
 # Kept for backwards compatibility with imports/tests that reference the
 # helper's old name; the token check itself no longer conditions on it (CYB-103).
 __all__ = ["is_production", "_mpesa_configured", "collect_problems", "enforce_startup_checks"]
@@ -60,14 +73,25 @@ def collect_problems() -> tuple[list[str], list[str]]:
     prod = is_production()
 
     # The M-Pesa callback's ONLY authentication is the secret embedded in the
-    # CallBackURL — Safaricom signs nothing. Require the token in production
-    # unconditionally (with or without Daraja creds configured: the creds are
-    # not what the callback authenticates against); outside production the
-    # same condition is a soft warning so dev/tests never block.
+    # CallBackURL — Safaricom signs nothing. Missing token in production is a
+    # hard failure WHEN M-PESA IS IN USE (see _mpesa_in_use): credentials
+    # present, or MPESA_ENV set to declare the integration live.
+    #
+    # It is NOT hard for a deployment with no M-Pesa at all. This used to be
+    # unconditional, which meant a tenant that never took an M-Pesa payment
+    # could not boot in production without inventing a token for a provider it
+    # does not use — and inventing a secret to satisfy a check teaches people
+    # to satisfy checks rather than to secure things.
+    #
+    # The property this protects is preserved either way: _verify_mpesa_token()
+    # in routers/webhooks.py rejects EVERY callback with 403 while the token is
+    # unset, credentials or not (CYB-103). The runtime is fail-closed on its
+    # own; this gate exists to turn "silently forgeable" into "loud at deploy"
+    # for deployments where the callback is actually part of a payment flow.
     if not os.getenv("MPESA_CALLBACK_TOKEN", "").strip():
         msg = ("MPESA_CALLBACK_TOKEN is not set — the M-Pesa callback has no "
                "authentication and cannot be accepted")
-        if prod:
+        if prod and _mpesa_in_use():
             hard.append(msg)
         else:
             soft.append(msg)

@@ -521,6 +521,106 @@ async def receive_macsoft_data(
     }
 
 
+@router.get("/macsoft/status")
+@limiter.limit("60/minute")
+async def macsoft_status(
+    request: Request,
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    """
+    Prove the pipeline end to end, from outside.
+
+    This is the tracer bullet for the MacSoft integration. Without it, the only
+    way to confirm a push actually landed is to read Railway's logs — which
+    MacSoft cannot do and the owner should not have to. "It returned 200" is
+    not evidence: the endpoint returned 200 for weeks while storing nothing.
+
+    Pair it with a push and the whole chain is verified in two calls that
+    anyone with the key can make:
+
+        POST /webhooks/macsoft/data   -> {"inserted": 1, ...}
+        GET  /webhooks/macsoft/status -> total_records goes up by 1
+
+    That single round trip exercises DNS, TLS, the API key, JSON parsing,
+    identity extraction, the database write, and the read back. If the number
+    moves, the integration works. If it does not, it does not — regardless of
+    what any status code said.
+
+    Read-only, and deliberately returns NO payload contents: counts and
+    timestamps only. Someone holding the push key should be able to confirm
+    delivery without being handed back the restaurant's transactions.
+    """
+    _verify_macsoft_key(x_api_key)
+
+    from sqlalchemy import func as _func
+    from integration.models import MirrorEvent, SourceSystem
+
+    try:
+        row = db.query(SourceSystem).filter(
+            SourceSystem.slug == MACSOFT_SOURCE_SLUG).first()
+        if row is None:
+            # Nothing has ever been pushed. Not an error — the honest answer
+            # before the first delivery, and what MacSoft should see while
+            # they are still building.
+            return {
+                "status": "ready",
+                "connected": False,
+                "detail": "No data received yet. Push a record to "
+                          "POST /webhooks/macsoft/data and call this again.",
+                "total_records": 0,
+                "by_entity": {},
+                "last_received_at": None,
+            }
+
+        total = db.query(_func.count(MirrorEvent.id)).filter(
+            MirrorEvent.source_system_id == row.id).scalar() or 0
+
+        by_entity = {
+            entity: int(count)
+            for entity, count in db.query(
+                MirrorEvent.entity, _func.count(MirrorEvent.id)
+            ).filter(MirrorEvent.source_system_id == row.id)
+             .group_by(MirrorEvent.entity).all()
+        }
+
+        # Split by what actually happened to each record, so a caller can tell
+        # "you sent 500 and we stored 500" from "you sent 500 and 499 were
+        # repeats" without reading a log.
+        by_action = {
+            action: int(count)
+            for action, count in db.query(
+                MirrorEvent.action, _func.count(MirrorEvent.id)
+            ).filter(MirrorEvent.source_system_id == row.id)
+             .group_by(MirrorEvent.action).all()
+        }
+
+        latest = db.query(MirrorEvent).filter(
+            MirrorEvent.source_system_id == row.id
+        ).order_by(MirrorEvent.id.desc()).first()
+
+        return {
+            "status": "ok",
+            "connected": total > 0,
+            "total_records": int(total),
+            "by_entity": by_entity,
+            "by_action": by_action,
+            "last_received_at": latest.received_at.isoformat() + "Z" if latest else None,
+            # The source_id is MacSoft's own identifier, echoed so they can
+            # confirm WHICH record landed — not restaurant data.
+            "last_source_id": latest.source_id if latest else None,
+        }
+    except Exception as exc:  # noqa: BLE001
+        # A failure here means the mirror tables are unreachable — migration
+        # 046 never applied, or the database is down. Say so plainly: a
+        # silent 500 would look identical to "no data yet".
+        logger.exception("[MacSoft] status check failed")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Storage unavailable — the integration cannot accept data: {type(exc).__name__}",
+        )
+
+
 @router.post("/whatsapp")
 async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
     """

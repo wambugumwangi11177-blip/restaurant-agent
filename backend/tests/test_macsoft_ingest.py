@@ -287,3 +287,99 @@ def test_large_batch_commits_once(client, db_session, monkeypatch):
     # One for the source_systems row on first use, one for the batch. The point
     # is that it does not scale with record count.
     assert commits["n"] <= 3, f"expected a handful of commits, got {commits['n']}"
+
+
+# ── The tracer bullet: prove the pipeline from outside ───────────────────────
+
+def _status(client, key=_KEY):
+    headers = {"x-api-key": key} if key is not None else {}
+    return client.get("/webhooks/macsoft/status", headers=headers)
+
+
+def test_status_requires_the_same_key(client):
+    assert _status(client, key=None).status_code == 401
+    assert _status(client, key="wrong").status_code == 401
+
+
+def test_status_before_any_push_says_ready_not_broken(client):
+    res = _status(client)
+    assert res.status_code == 200
+    body = res.json()
+    assert body["connected"] is False
+    assert body["total_records"] == 0
+    # "No data yet" and "storage is broken" must never look the same.
+    assert body["status"] == "ready"
+
+
+def test_push_then_status_is_the_whole_chain(client):
+    """
+    The tracer. This is the test that would have caught the endpoint storing
+    nothing while returning 200 for weeks: the count comes from a SEPARATE
+    read of the database, so it cannot be satisfied by the write path lying.
+    """
+    before = _status(client).json()["total_records"]
+
+    _post(client, _sale(source_id="TRACE-1"))
+
+    after = _status(client).json()
+    assert after["total_records"] == before + 1
+    assert after["connected"] is True
+    assert after["by_entity"]["sale"] == 1
+    assert after["by_action"]["inserted"] == 1
+    assert after["last_source_id"] == "TRACE-1"
+    assert after["last_received_at"] is not None
+
+
+def test_status_distinguishes_stored_from_duplicate(client):
+    """Sent 2 but stored 1 must be visible without reading a log."""
+    _post(client, _sale(source_id="TRACE-DUP"))
+    _post(client, _sale(source_id="TRACE-DUP"))
+
+    body = _status(client).json()
+    assert body["by_action"]["inserted"] == 1
+    assert body["by_action"]["skipped"] == 1
+    assert body["total_records"] == 2, "both attempts are audited"
+
+
+def test_status_never_returns_payload_contents(client):
+    """
+    Whoever holds the push key can confirm delivery. They should not get the
+    restaurant's transactions back out of it.
+    """
+    _post(client, {"entity": "sale", "records": [{
+        "source_id": "TRACE-PII", "version": 1,
+        "customer_name": "Wanjiku Kamau",
+        "customer_phone": "254712345678",
+        "total_cents": 4500,
+    }]})
+
+    raw = _status(client).text
+    assert "Wanjiku Kamau" not in raw
+    assert "254712345678" not in raw
+    assert "4500" not in raw
+    # The source_id IS echoed — it is MacSoft's own id, not restaurant data.
+    assert "TRACE-PII" in raw
+
+
+def test_status_reports_unavailable_when_storage_is_broken(client, monkeypatch):
+    """
+    Migration never applied, or the database is down. That must NOT read as
+    "no data yet" — the two look identical from outside otherwise, and the
+    first one silently loses every record MacSoft sends.
+    """
+    import routers.webhooks as wh
+
+    real_ingest = wh.ingest
+    _post(client, _sale(source_id="TRACE-OK"))  # make a source system exist
+
+    class Boom:
+        def __getattr__(self, _):
+            raise RuntimeError("relation mirror_events does not exist")
+
+    import integration.models as im
+    monkeypatch.setattr(im, "MirrorEvent", Boom())
+
+    res = _status(client)
+    assert res.status_code == 503
+    assert "cannot accept data" in res.json()["detail"]
+    assert real_ingest is wh.ingest

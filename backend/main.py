@@ -27,13 +27,19 @@ configure_logging()
 logger = logging.getLogger(__name__)
 
 # ── Sentry (optional) ─────────────────────────────────────────────────────────
+# Error reporting. Losing this is the failure you most need to see, so an init
+# problem is logged rather than swallowed — a bare `except: pass` here means
+# believing you have error reporting while having none. Absence of SENTRY_DSN
+# in production is surfaced by startup_checks, not here.
 try:
     import sentry_sdk
     sentry_dsn = os.getenv("SENTRY_DSN")
     if sentry_dsn:
         sentry_sdk.init(dsn=sentry_dsn, traces_sample_rate=0.2)
 except Exception:
-    pass
+    logging.getLogger("startup").exception(
+        "[sentry] init failed — errors in this process will NOT be reported"
+    )
 
 # ── Rate limiting ───────────────────────────────────────────────────────────
 # limiter now lives in rate_limit.py so routers can import it too — see that

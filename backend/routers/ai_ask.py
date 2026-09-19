@@ -54,22 +54,57 @@ def _money(cents: float | None) -> str:
     return f"KSh {(cents or 0) / 100:,.0f}"
 
 
+# Question -> module routing.
+#
+# Scored, not first-match. The previous version walked an ordered list and took
+# the first rule with any keyword hit, which made generic words upstream beat
+# specific words downstream: "today" under revenue captured "Who is working
+# today?" (staff) and "How many customers are expected today?" (bookings), and
+# "increase" under pricing captured "How can I increase my profit?". Eight of
+# the OS page's own 78 suggested questions landed on the wrong module — the
+# owner pressed a button and got an answer about something else.
+#
+# Now every rule is scored by its LONGEST matching keyword and the highest wins,
+# so a specific phrase beats an incidental word regardless of rule order.
+# "Why is my kitchen slow?" scores kitchen(7) over revenue(4) and routes to the
+# kitchen; "Which days are slow?" matches only revenue.
+#
+# Some questions are genuinely ambiguous and that is fine — best-sellers are
+# menu engineering even though the UI groups them under Sales, and a stuck
+# order is a kitchen question. tests/test_os_question_routing.py pins every
+# built-in question and names the ones with more than one defensible answer.
+_ROUTING_RULES: list[tuple[str, tuple[str, ...]]] = [
+    ("stock", ("run out", "running out", "about to run out", "stock", "stock-out", "waste",
+               "wastage", "wasting", "reorder", "re-order", "expir", "spoil", "inventory",
+               "low stock", "shortage", "ingredient")),
+    ("bookings", ("book", "booking", "reservation", "reserve", "no-show", "no show",
+                  "not showing", "showing up", "covers", "waitlist", "table", "guest",
+                  "customers expected", "how many customers")),
+    ("kitchen", ("kitchen", "prep", "preparation", "station", "backed up", "bottleneck",
+                 "ticket", "take too long", "taking too long")),
+    ("staff", ("staff", "labour", "labor", "shift", "who is working", "who's working",
+               "understaff", "overstaff", "schedule", "rota", "overtime", "productivity",
+               "worked the most")),
+    ("pricing", ("price", "pricing", "underpriced", "overpriced", "price increase",
+                 "charge more", "covering my costs", "prices compare")),
+    ("menu", ("menu", "best-sell", "best sell", "selling", "sell the most", "promote",
+              "dish", "remove", "worth keeping", "popular", "most money")),
+    ("profit", ("profit", "margin", "losing money", "money losing", "food cost", "cost",
+                "expense", "leak", "most profit")),
+    ("revenue", ("sale", "sales", "revenue", "income", "forecast", "trending", "slow",
+                 "busiest", "how much did i make", "takings")),
+]
+
+
 def _route(question: str) -> str:
+    """Pick the module best matching `question`; "ops" when nothing matches."""
     q = question.lower()
-    rules: list[tuple[str, tuple[str, ...]]] = [
-        ("stock", ("run out", "stock", "waste", "wast", "reorder", "expire", "inventory", "low stock", "shortage", "out of")),
-        ("bookings", ("book", "reservation", "no-show", "no show", "covers", "table", "waitlist")),
-        ("kitchen", ("kitchen", "prep", "station", "backed up", "bottleneck", "delay", "ticket")),
-        ("staff", ("staff", "labor", "shift", "understaff", "overstaff", "schedule", "overtime", "productivity")),
-        ("pricing", ("price", "pricing", "margin", "increase", "underpriced", "overpriced")),
-        ("menu", ("menu", "popular", "remove", "promote", "best-sell", "best sell", "dish", "item")),
-        ("profit", ("profit", "losing money", "money losing", "cost", "expense", "leak")),
-        ("revenue", ("sale", "revenue", "sell", "income", "today", "forecast", "trending", "slow")),
-    ]
-    for module, keywords in rules:
-        if any(k in q for k in keywords):
-            return module
-    return "ops"
+    best, best_score = "ops", 0
+    for module, keywords in _ROUTING_RULES:
+        score = max((len(k) for k in keywords if k in q), default=0)
+        if score > best_score:
+            best, best_score = module, score
+    return best
 
 
 def _answer_stock(db: Session, rid: int, q: str) -> dict:

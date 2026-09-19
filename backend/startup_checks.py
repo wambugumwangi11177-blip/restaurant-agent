@@ -77,17 +77,23 @@ def collect_problems() -> tuple[list[str], list[str]]:
     if prod and not os.getenv("CORS_ORIGINS"):
         soft.append("CORS_ORIGINS is not set — using built-in default origins in production")
 
-    # email_utils.py: unconfigured SMTP means password-reset/email-verify
-    # links are logged instead of emailed — fine in dev, but in production
-    # that puts a working account-takeover token in plaintext application
-    # logs instead of a user's inbox. Soft, not hard: the reset/verify flow
-    # still works end-to-end via the logged link (see email_utils.py), so a
-    # business that hasn't set up SMTP yet shouldn't be locked out of booting.
+    # email_utils.py: unconfigured SMTP means password-reset/email-verify mail
+    # is never delivered. The token itself is NOT exposed — send_email()
+    # redacts `token=...` before logging (email_utils.py, with a regression
+    # test in tests/test_email_redaction.py). So this is a broken user-facing
+    # flow, not a credential leak: nobody can complete a password reset or
+    # verify an address, because the link only ever reaches the log.
+    #
+    # Soft, not hard: an operator can still recover an account out-of-band, and
+    # a business that has not set up SMTP yet should not be locked out of
+    # booting. It does block real customer self-service, so it must be set
+    # before any account the operator does not personally control.
     if prod and not (os.getenv("SMTP_HOST") and os.getenv("SMTP_USER") and os.getenv("SMTP_PASSWORD")):
         soft.append(
-            "SMTP is not configured in production — password reset / email "
-            "verification links will be logged instead of emailed, exposing "
-            "them in application logs instead of the user's inbox. Set "
+            "SMTP is not configured in production — password reset and email "
+            "verification links are logged, never delivered, so no user can "
+            "reset their own password. The token is redacted in the log, so "
+            "this is a broken flow rather than an exposure. Set "
             "SMTP_HOST/SMTP_USER/SMTP_PASSWORD/SMTP_FROM."
         )
 

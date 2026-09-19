@@ -468,19 +468,35 @@ async def receive_macsoft_data(
     counts = {"inserted": 0, "superseded": 0, "skipped": 0}
     derived_identity = 0
 
-    for record in records:
-        source_id, version, derived = _identity(record)
-        if derived:
-            derived_identity += 1
-        action = ingest(
-            db,
-            source_system_id=source_system_id,
-            entity=entity,
-            source_id=source_id,
-            source_version=version,
-            payload=record,
-        )
-        counts[action] = counts.get(action, 0) + 1
+    # One transaction for the whole batch, committed once at the end. A commit
+    # per record is an fsync per record, and a 500-record push would then spend
+    # most of the 60s gunicorn timeout waiting on the database. ingest() still
+    # flushes each row, so dedupe inside a single batch works (SessionLocal is
+    # autoflush=False, so the flush is what makes a repeated record visible to
+    # the next lookup).
+    try:
+        for record in records:
+            source_id, version, derived = _identity(record)
+            if derived:
+                derived_identity += 1
+            action = ingest(
+                db,
+                source_system_id=source_system_id,
+                entity=entity,
+                source_id=source_id,
+                source_version=version,
+                payload=record,
+                commit=False,
+            )
+            counts[action] = counts.get(action, 0) + 1
+        db.commit()
+    except Exception:
+        # All-or-nothing: a partly-applied batch that still returned an error
+        # would make MacSoft's retry ambiguous. Roll back and let them resend
+        # the whole thing — that is free, because ingest is idempotent.
+        db.rollback()
+        logger.exception("[MacSoft] batch failed, rolled back (entity=%s, n=%d)", entity, len(records))
+        raise HTTPException(status_code=500, detail="Could not store batch — please retry.")
 
     # Counts and shape only — never the payload itself. The records are already
     # durably stored in mirror_events; repeating them in the application log

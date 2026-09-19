@@ -207,3 +207,83 @@ def test_payload_contents_never_reach_the_application_log(client, caplog):
     assert "254712345678" not in logged
     # The operational counts we DO want are still there.
     assert "entity=sale" in logged
+
+
+# ── Batch transaction semantics ──────────────────────────────────────────────
+
+def test_record_repeated_inside_one_batch_stores_once(client, db_session):
+    """
+    The batch commits once at the end, and SessionLocal is autoflush=False, so
+    without an explicit flush per row the dedupe lookup would not see earlier
+    rows of the same batch and a repeat would insert twice. MacSoft batching
+    a record that also appeared earlier in the same push is exactly the case.
+    """
+    body = {"entity": "sale", "records": [
+        {"source_id": "INV-DUP", "version": 1, "total_cents": 100},
+        {"source_id": "INV-DUP", "version": 1, "total_cents": 100},
+    ]}
+    res = _post(client, body)
+    assert res.json()["inserted"] == 1
+    assert res.json()["duplicates_ignored"] == 1
+    assert [e.action for e in _events(db_session)] == ["inserted", "skipped"]
+
+
+def test_correction_later_in_the_same_batch_supersedes(client, db_session):
+    body = {"entity": "sale", "records": [
+        {"source_id": "INV-FIX", "version": 1, "total_cents": 100},
+        {"source_id": "INV-FIX", "version": 2, "total_cents": 250},
+    ]}
+    res = _post(client, body)
+    assert res.json()["inserted"] == 1
+    assert res.json()["updated"] == 1
+    rows = _events(db_session)
+    assert [e.action for e in rows] == ["inserted", "superseded"]
+    assert rows[1].raw["total_cents"] == 250
+
+
+def test_a_failing_batch_stores_nothing(client, db_session, monkeypatch):
+    """
+    All-or-nothing. A partly-applied batch that still returned an error would
+    make MacSoft's retry ambiguous; a clean rollback makes resending free.
+    """
+    import routers.webhooks as wh
+
+    calls = {"n": 0}
+    real = wh.ingest
+
+    def exploding(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 3:
+            raise RuntimeError("database went away mid-batch")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(wh, "ingest", exploding)
+
+    body = {"entity": "sale", "records": [
+        {"source_id": f"INV-{i}", "version": 1, "total_cents": 100} for i in range(5)
+    ]}
+    assert _post(client, body).status_code == 500
+    assert _events(db_session) == [], "the two rows written before the failure must be rolled back"
+
+
+def test_large_batch_commits_once(client, db_session, monkeypatch):
+    """Guards the batching itself: 500 records must not mean 500 commits."""
+    import database
+    real_commit = database.SessionLocal.class_.commit
+    commits = {"n": 0}
+
+    def counting_commit(self, *a, **k):
+        commits["n"] += 1
+        return real_commit(self, *a, **k)
+
+    monkeypatch.setattr(database.SessionLocal.class_, "commit", counting_commit)
+
+    body = {"entity": "sale", "records": [
+        {"source_id": f"B-{i}", "version": 1, "total_cents": i} for i in range(500)
+    ]}
+    res = _post(client, body)
+    assert res.json()["inserted"] == 500
+    assert len(_events(db_session)) == 500
+    # One for the source_systems row on first use, one for the batch. The point
+    # is that it does not scale with record count.
+    assert commits["n"] <= 3, f"expected a handful of commits, got {commits['n']}"

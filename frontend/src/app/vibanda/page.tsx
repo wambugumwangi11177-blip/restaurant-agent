@@ -23,7 +23,15 @@ type Feed = {
   stock: { low_stock: { name: string; qty: number }[]; expiring_48h: string[]; waste_pct_week: number };
   bookings: { covers_today: number; next_reservation_min: number | null; waitlist: number; no_show_pct: number };
   staff: { scheduled: number; on_shift: number; overtime_risk: number; labor_cost_pct: number };
-  attention: { id: string; domain: string; title: string; why: string; what_to_do: string; impact: string; status: string }[];
+  attention: {
+    id: string; domain: string; title: string; why: string; what_to_do: string;
+    impact: string; status: string;
+    // Present only on cards produced by the decision layer. An operational
+    // alert ("Beef is running low") is a fact and carries neither: it is not an
+    // inference, so a trust % on it would be theatre.
+    priority_score?: number;
+    confidence_pct?: number;
+  }[];
   pulse: { domain: string; headline: string; detail: string }[];
   performance: { revenue_trend: { date: string; revenue: number; orders: number }[] };
 };
@@ -84,6 +92,33 @@ function PillarCard({ label, primaryLabel, primary, comparison, signals, askLabe
   );
 }
 
+// How much the system trusts its own recommendation.
+//
+// Shown ONLY on cards the decision layer produced. An operational alert is a
+// measured fact — the beef really is below its reorder point — and putting a
+// percentage on it would imply doubt that does not exist. A recommendation is
+// an inference, and the owner deserves to know whether it is a near-certainty
+// or a hunch before acting on it.
+//
+// The number is the agent's own confidence, already scaled by that agent's
+// recent forecast accuracy (ai/decisions/__init__.py::_apply_reliability), so
+// an agent that has been getting it wrong reports lower confidence here.
+function ConfidenceChip({ pct }: { pct: number }) {
+  const band =
+    pct >= 75 ? { label: "high confidence", tone: "var(--v-good)" }
+    : pct >= 50 ? { label: "moderate confidence", tone: "var(--v-primary)" }
+    : { label: "low confidence", tone: "var(--v-muted-foreground)" };
+  return (
+    <span
+      className="text-[10px] font-semibold"
+      style={{ color: band.tone }}
+      title={`The system is ${pct}% confident in this recommendation, adjusted for how accurate this agent has been recently. Not a guarantee.`}
+    >
+      {pct}% · {band.label}
+    </span>
+  );
+}
+
 // Sketch attention card: icon square, source · impact row, Why/What-to-do
 // grid under a top border, action buttons.
 function AttentionCard({ card, onDecide, onAsk }: {
@@ -100,8 +135,14 @@ function AttentionCard({ card, onDecide, onAsk }: {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)]">{card.domain}</span>
-            <span className="h-1 w-1 rounded-full bg-[var(--v-border)]" />
+            {card.impact && <span className="h-1 w-1 rounded-full bg-[var(--v-border)]" />}
             {card.impact && <span className="text-[10px] font-semibold text-[var(--v-primary)]">{card.impact}</span>}
+            {typeof card.confidence_pct === "number" && (
+              <>
+                <span className="h-1 w-1 rounded-full bg-[var(--v-border)]" />
+                <ConfidenceChip pct={card.confidence_pct} />
+              </>
+            )}
           </div>
           <h3 className="mt-2 text-sm font-bold leading-snug">{card.title}</h3>
         </div>

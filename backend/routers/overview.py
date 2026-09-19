@@ -152,6 +152,12 @@ def _staff_card(db: Session, rid: int, start, end) -> dict:
 # Category -> the word the owner sees. The AI layer names things after its own
 # agents ("supply_chain"); the Home page speaks the restaurant's language.
 _DOMAIN_LABEL = {
+    # Loss prevention gets its own label, and must NOT be "Stock". The dedupe
+    # below drops a Stock card that names an already-low item, which is right
+    # for "reorder beef" beside "beef is low" — and wrong for "beef usage does
+    # not match the recipes". Running low and being stolen are different
+    # problems about the same ingredient, and the owner needs both.
+    "loss_prevention": "Loss",
     "pricing": "Pricing",
     "inventory": "Stock",
     "menu": "Menu",
@@ -181,9 +187,11 @@ def _decision_cards(db: Session, rid: int) -> list:
     """What needs attention, from the Decision Intelligence layer.
 
     This is the point of the Home page: the owner should not have to ask. Every
-    specialist agent's recommendations (pricing, inventory, menu, labour, supply
-    chain, marketing) are collected, scored on impact/confidence/risk/effort and
-    returned best-first, so the thing most worth doing today is at the top.
+    specialist agent's findings are collected, scored on impact, confidence,
+    risk and effort, and returned best-first — loss prevention (theft, stock
+    variance, cash shortfalls, missing cost data) alongside optimisation
+    (pricing, inventory, menu, labour, supply chain, marketing), so the thing
+    most worth doing today is at the top whichever kind it is.
 
     Deterministic — no LLM. The agents computed these numbers; this only orders
     and relabels them.
@@ -192,7 +200,10 @@ def _decision_cards(db: Session, rid: int) -> list:
 
     data = get_ranked_decisions(db, rid)
     cards = []
-    for d in data.get("decisions", [])[:8]:
+    # Ten sources feed this now, four of them loss prevention. Eight cards was
+    # sized for six optimisation sources; keeping it would let a busy pricing
+    # day push a theft flag off the page entirely.
+    for d in data.get("decisions", [])[:12]:
         action = (d.get("action") or "").strip()
         if not action:
             continue

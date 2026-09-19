@@ -13,7 +13,44 @@ import models
 from ai.plugins import (
     PluginManifest, PluginRegistry, registry, collect_plugin_decisions,
 )
-from ai.plugins.examples import register_examples, HAPPY_HOUR
+# The sample plugin lives here rather than in ai/plugins/examples.py. It exists
+# to exercise the SDK's registration path, which makes it a test fixture, not
+# shipped code — as production code it was 37 lines imported by nothing but
+# this file, which is the definition of dead weight. The SDK itself is live:
+# ai/decisions/__init__.py:38 calls collect_plugin_decisions on every Home load.
+HAPPY_HOUR = PluginManifest(
+    name="happy_hour_suggester",
+    version="1.0.0",
+    author="Community",
+    description="Suggests a happy-hour promo on the highest-margin drink.",
+    provides=["decisions"],
+    scopes=["menu"],
+    mutating=False,
+)
+
+
+def _happy_hour_handler(ctx, _payload: dict) -> list[dict]:
+    """Pick the highest-margin drink and propose a happy hour."""
+    drinks = [
+        m for m in ctx.get_menu()
+        if (m.get("category") or "").lower() in ("drink", "drinks", "beverage", "beverages")
+        and m.get("price") and m.get("cost_price") is not None
+    ]
+    if not drinks:
+        return []
+    best = max(drinks, key=lambda m: (m["price"] - (m["cost_price"] or 0)) / max(m["price"], 1))
+    return [{
+        "action": f"Run a happy-hour on {best['name']}",
+        "rationale": "Highest-margin drink — a slow-hour discount lifts volume with room to spare.",
+        "category": "marketing",
+        "confidence_pct": 55,
+        "risk": 2,
+        "difficulty": 1,
+    }]
+
+
+def register_examples() -> None:
+    registry.register(HAPPY_HOUR, _happy_hour_handler)
 
 
 @pytest.fixture

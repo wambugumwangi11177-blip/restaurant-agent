@@ -49,3 +49,7 @@ backend/.storage/
 
 .vercel
 backend/local_dev.db
+
+# Local run artifacts — these were committed once and should not be again.
+*.log
+smoke_test_results.txt

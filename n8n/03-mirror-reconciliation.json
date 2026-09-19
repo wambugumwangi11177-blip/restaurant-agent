@@ -1,0 +1,153 @@
+{
+  "name": "LEVIII \u2014 mirror reconciliation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 21 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Nightly after last push",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_API_BASE }}/internal/jobs/mirror_reconcile",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-job-key",
+              "value": "={{ $env.LEVIII_JOB_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "name": "Reconcile mirror",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.result.status }}",
+              "operation": "equals",
+              "value2": "clean"
+            }
+          ]
+        }
+      },
+      "name": "Clean?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        800,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_ALERT_WEBHOOK }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "*The MacSoft mirror does not match the source*\nReconciliation returned {{ $json.result.status }}. integration/reconcile.py fails closed \u2014 this is never a false alarm."
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Alert: mirror mismatch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1080,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Nightly after last push": {
+      "main": [
+        [
+          {
+            "node": "Reconcile mirror",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconcile mirror": {
+      "main": [
+        [
+          {
+            "node": "Clean?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Alert: mirror mismatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true
+  },
+  "meta": {
+    "leviiiNotes": [
+      "Every mirrored record must have a ProjectionLink saying what became of it \u2014",
+      "a domain row, or a recorded reason it could not be mapped. A record with no link",
+      "fell between the two layers and was silently dropped: the same failure class that",
+      "let MacSoft data land perfectly and change nothing on screen for weeks.",
+      "NOT a source-vs-mirror reconciliation. MacSoft is push-only with no list endpoint,",
+      "so we cannot ask them what they think they sent; claiming otherwise would be a",
+      "reassuring check that proves nothing. Fails closed via integration/reconcile.py."
+    ]
+  },
+  "active": false
+}

@@ -1,0 +1,97 @@
+name: restore-drill
+
+# PROVE THE BACKUPS RESTORE.
+#
+# backend/scripts/backup/ dumps production to a Railway bucket nightly. That
+# script has never been observed reading one back, which means the backups are
+# configured, not proven — and a backup you have never restored is a belief,
+# not a recovery plan. backend/scripts/restore_drill.sh mechanizes
+# DISASTER_RECOVERY.md steps 1-3: restore the latest dump into a THROWAWAY
+# database, run migrations against it, and confirm the app boots on the result.
+#
+# Monthly, plus on demand. Monthly rather than nightly because a restore is
+# expensive and the thing it catches — a dump that cannot be read — does not
+# appear overnight. On demand because the first run should be today, by hand,
+# not in four weeks.
+#
+# Required repo secrets:
+#   SCRATCH_DATABASE_URL — a throwaway Postgres. NEVER production.
+#   BACKUP_S3_BUCKET / AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY — where the
+#     dumps live, if pulling from S3 rather than the Railway bucket.
+#
+# Without the secrets this job is skipped rather than failed: a drill that is
+# permanently red teaches everyone to ignore it, which is the same reasoning
+# that removed backup.yml's nightly schedule.
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 3 1 * *"   # 06:00 EAT on the 1st
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the drill is configured
+        id: guard
+        env:
+          SCRATCH_DATABASE_URL: ${{ secrets.SCRATCH_DATABASE_URL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        run: |
+          if [ -z "$SCRATCH_DATABASE_URL" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::SCRATCH_DATABASE_URL is not set — skipping the restore drill."
+            echo "::notice::Until this runs once, the backups are configured but not proven."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+          # The `secrets` context is not available in a step-level `if:`, only
+          # in `env:` and `with:` — so credential presence is resolved here and
+          # carried forward as an output.
+          if [ -n "$AWS_ACCESS_KEY_ID" ]; then
+            echo "has_aws=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_aws=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install postgresql-client
+        if: steps.guard.outputs.configured == 'true'
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Configure AWS credentials
+        if: steps.guard.outputs.configured == 'true' && steps.guard.outputs.has_aws == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Fetch the most recent dump
+        if: steps.guard.outputs.configured == 'true'
+        env:
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+        run: |
+          set -euo pipefail
+          LATEST=$(aws s3 ls "s3://${BACKUP_S3_BUCKET}/" | sort | tail -n 1 | awk '{print $4}')
+          if [ -z "$LATEST" ]; then
+            echo "::error::No dump found in s3://${BACKUP_S3_BUCKET}/ — there is nothing to restore."
+            exit 1
+          fi
+          aws s3 cp "s3://${BACKUP_S3_BUCKET}/${LATEST}" ./latest.dump
+          SIZE=$(stat -c%s ./latest.dump)
+          echo "Fetched ${LATEST} (${SIZE} bytes)"
+          # run_backup.sh refuses to upload anything under 1024 bytes; a dump at
+          # or below that never held a database.
+          if [ "$SIZE" -le 1024 ]; then
+            echo "::error::Dump is ${SIZE} bytes — that is not a database."
+            exit 1
+          fi
+
+      - name: Restore, migrate, and boot against it
+        if: steps.guard.outputs.configured == 'true'
+        env:
+          SCRATCH_DATABASE_URL: ${{ secrets.SCRATCH_DATABASE_URL }}
+          DUMP_FILE: ./latest.dump
+        run: bash backend/scripts/restore_drill.sh

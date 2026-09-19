@@ -1,0 +1,864 @@
+{
+  "name": "LEVIII \u2014 scheduled jobs",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Every: learning_cycle",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_API_BASE }}/internal/jobs/learning_cycle",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-job-key",
+              "value": "={{ $env.LEVIII_JOB_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "name": "Run learning_cycle",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Every: reorder_check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_API_BASE }}/internal/jobs/reorder_check",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-job-key",
+              "value": "={{ $env.LEVIII_JOB_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "name": "Run reorder_check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 4 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Every: morning_briefing",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_API_BASE }}/internal/jobs/morning_briefing",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-job-key",
+              "value": "={{ $env.LEVIII_JOB_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "name": "Run morning_briefing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 5 * * 1"
+            }
+          ]
+        }
+      },
+      "name": "Every: strategist_review",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_API_BASE }}/internal/jobs/strategist_review",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-job-key",
+              "value": "={{ $env.LEVIII_JOB_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "name": "Run strategist_review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Every: reservation_reminders",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_API_BASE }}/internal/jobs/reservation_reminders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-job-key",
+              "value": "={{ $env.LEVIII_JOB_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "name": "Run reservation_reminders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 11 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Every: slow_day_check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_API_BASE }}/internal/jobs/slow_day_check",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-job-key",
+              "value": "={{ $env.LEVIII_JOB_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "name": "Run slow_day_check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Every: variance_check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_API_BASE }}/internal/jobs/variance_check",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-job-key",
+              "value": "={{ $env.LEVIII_JOB_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "name": "Run variance_check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 1 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Every: audit_log_purge",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        1180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_API_BASE }}/internal/jobs/audit_log_purge",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-job-key",
+              "value": "={{ $env.LEVIII_JOB_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "name": "Run audit_log_purge",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        1180
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 */2 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Every: po_late_check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        1320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_API_BASE }}/internal/jobs/po_late_check",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-job-key",
+              "value": "={{ $env.LEVIII_JOB_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "name": "Run po_late_check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        1320
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 */2 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Every: fraud_check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        1460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_API_BASE }}/internal/jobs/fraud_check",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-job-key",
+              "value": "={{ $env.LEVIII_JOB_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "name": "Run fraud_check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        1460
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8-22/2 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Every: stock_check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        1600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_API_BASE }}/internal/jobs/stock_check",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-job-key",
+              "value": "={{ $env.LEVIII_JOB_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "name": "Run stock_check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        1600
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/5 * * * *"
+            }
+          ]
+        }
+      },
+      "name": "Every: escalation_sweep",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        1740
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_API_BASE }}/internal/jobs/escalation_sweep",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-job-key",
+              "value": "={{ $env.LEVIII_JOB_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "name": "Run escalation_sweep",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        1740
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/5 * * * *"
+            }
+          ]
+        }
+      },
+      "name": "Every: outbox_sweep",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        1880
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_API_BASE }}/internal/jobs/outbox_sweep",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-job-key",
+              "value": "={{ $env.LEVIII_JOB_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "name": "Run outbox_sweep",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        1880
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 21 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Every: mirror_reconcile",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        2020
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_API_BASE }}/internal/jobs/mirror_reconcile",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-job-key",
+              "value": "={{ $env.LEVIII_JOB_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "name": "Run mirror_reconcile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        2020
+      ]
+    }
+  ],
+  "connections": {
+    "Every: learning_cycle": {
+      "main": [
+        [
+          {
+            "node": "Run learning_cycle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every: reorder_check": {
+      "main": [
+        [
+          {
+            "node": "Run reorder_check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every: morning_briefing": {
+      "main": [
+        [
+          {
+            "node": "Run morning_briefing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every: strategist_review": {
+      "main": [
+        [
+          {
+            "node": "Run strategist_review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every: reservation_reminders": {
+      "main": [
+        [
+          {
+            "node": "Run reservation_reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every: slow_day_check": {
+      "main": [
+        [
+          {
+            "node": "Run slow_day_check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every: variance_check": {
+      "main": [
+        [
+          {
+            "node": "Run variance_check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every: audit_log_purge": {
+      "main": [
+        [
+          {
+            "node": "Run audit_log_purge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every: po_late_check": {
+      "main": [
+        [
+          {
+            "node": "Run po_late_check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every: fraud_check": {
+      "main": [
+        [
+          {
+            "node": "Run fraud_check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every: stock_check": {
+      "main": [
+        [
+          {
+            "node": "Run stock_check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every: escalation_sweep": {
+      "main": [
+        [
+          {
+            "node": "Run escalation_sweep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every: outbox_sweep": {
+      "main": [
+        [
+          {
+            "node": "Run outbox_sweep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every: mirror_reconcile": {
+      "main": [
+        [
+          {
+            "node": "Run mirror_reconcile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true
+  },
+  "meta": {
+    "leviiiNotes": [
+      "Replaces main.py's in-process APScheduler. Same thirteen jobs, same times.",
+      "The app still holds the logic; this only owns the trigger, the retry and the history.",
+      "Set ENABLE_INTERNAL_SCHEDULER=false on Railway ONLY after this has run clean for a day \u2014",
+      "running both is duplicated work, running neither is silence, and silence is worse.",
+      "Each job returns 500 on failure so n8n's own retry and alerting fire.",
+      "A job already running returns 409, so a retry cannot double-send WhatsApp messages."
+    ]
+  },
+  "active": false
+}

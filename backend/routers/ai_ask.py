@@ -107,32 +107,74 @@ def _route(question: str) -> str:
     return best
 
 
+def _first_action(recs: list, fallback: str) -> str:
+    """First recommendation's action text. Agent recommendations are dicts with
+    an "action" key, but a few modules emit plain strings — handle both rather
+    than indexing into recs[0] and hoping."""
+    for r in recs:
+        if isinstance(r, str) and r.strip():
+            return r
+        if isinstance(r, dict):
+            action = r.get("action") or r.get("message")
+            if action:
+                return action
+    return fallback
+
+
+def _rec_steps(recs: list, limit: int) -> list[dict]:
+    """Recommendations as answer-card steps, skipping any that carry no action."""
+    steps = []
+    for r in recs[:limit]:
+        if isinstance(r, str):
+            steps.append({"action": r, "why": ""})
+        elif isinstance(r, dict) and (r.get("action") or r.get("message")):
+            steps.append({"action": r.get("action") or r.get("message"),
+                          "why": r.get("message", "") if r.get("action") else ""})
+    return steps
+
+
+# Every answer below reads keys the agent modules ACTUALLY return. They did
+# not: _answer_profit looked for "leaks"/"issues" (the payload has
+# "profit_leaks"), _answer_staff for "labor_cost_pct" (it is
+# summary.labor_pct), _answer_bookings for "no_show" (it is
+# no_show_analysis.no_show_rate), _answer_kitchen for "stations" (it is
+# station_performance), _answer_revenue for "trend" (it is "trends"), and
+# _answer_stock for "days_until_stockout"/"item_name" (they are
+# days_until_depletion/name). Each mismatch resolved to None and fell through
+# to a calm, confident "nothing to report" — the OS page told the owner
+# everything was fine because it was reading fields that never existed.
+# Verified against each module's return statement, not its docstring.
+
+
 def _answer_stock(db: Session, rid: int, q: str) -> dict:
     from ai.inventory_predictor import get_inventory_predictions
     preds = get_inventory_predictions(db, rid)
-    items = preds.get("predictions") or preds.get("items") or []
-    soon = [p for p in items if (p.get("days_until_stockout") is not None and p["days_until_stockout"] <= 7)]
-    low = [p for p in items if p.get("status") in ("low", "critical") or p.get("is_low")]
+    items = preds.get("predictions") or []
+    soon = [p for p in items
+            if p.get("days_until_depletion") is not None and p["days_until_depletion"] <= 7]
+    low = [p for p in items if p.get("status") in ("critical", "low", "reorder")]
     focus = soon or low
     if focus:
-        names = ", ".join(p.get("item_name") or p.get("name", "?") for p in focus[:3])
-        finding = (f"{len(focus)} item(s) projected to run out within a week: {names}."
-                   if soon else f"{len(low)} item(s) below reorder point: {names}.")
-        why = ("Based on recorded usage velocity versus current quantity on hand."
-               if soon else "Current recorded quantity is at or below the reorder threshold. Stockout timing is not established.")
+        names = ", ".join(p.get("name", "?") for p in focus[:3])
+        finding = (f"{len(soon)} item(s) projected to run out within a week: {names}."
+                   if soon else f"{len(low)} item(s) at or below reorder point: {names}.")
+        why = ("Based on recorded usage velocity against current quantity on hand."
+               if soon else
+               "Current quantity is at or below the reorder threshold. Stockout timing is not established.")
         impact = "Avoids emergency buying at higher prices and mid-service menu gaps"
-        rec = f"Raise today's order for {focus[0].get('item_name') or focus[0].get('name', 'the affected items')} and confirm the next delivery slot."
+        rec = f"Raise today's order for {focus[0].get('name', 'the affected items')} and confirm the next delivery slot."
         steps = [
-            {"action": f"Reorder {p.get('item_name') or p.get('name')}",
-             "why": (f"{p['days_until_stockout']} days of stock left at recorded usage"
-                     if p.get('days_until_stockout') is not None else "Below reorder threshold; stockout timing is unavailable")}
+            {"action": f"Reorder {p.get('name')}",
+             "why": (f"{p['days_until_depletion']} days of stock left at recorded usage"
+                     if p.get("days_until_depletion") is not None
+                     else f"At {p.get('current_stock')} {p.get('unit', '')}, reorder point {p.get('reorder_point')}")}
             for p in focus[:4]
         ]
     else:
-        finding = "No low-stock or imminent stockout candidates were identified in the recorded data."
-        why = "Missing usage history cannot establish stock cover for every item."
+        finding = "No low-stock or imminent stockout candidates in the recorded data."
+        why = "Every tracked item is above its reorder point with usage history to support it."
         impact = "—"
-        rec = "Confirm current quantities and usage history before deciding whether to reorder."
+        rec = "Nothing to reorder on stock levels alone today."
         steps = []
     return {"finding": finding, "why": why, "impact": impact, "recommendation": rec,
             "module": "reorder", "steps": steps,
@@ -145,139 +187,227 @@ def _answer_revenue(db: Session, rid: int, q: str) -> dict:
     from routers.overview import _summarize, _eat_range  # EAT-day truth
     start, end = _eat_range("today")
     core = _summarize(db, rid, start, end)
+    trends, anomalies, forecast = {}, [], []
     try:
         fc = get_revenue_forecast(db, rid)
-        forecast = fc.get("forecast") or fc.get("predictions") or {}
-        trend_txt = fc.get("trend") or fc.get("summary") or ""
-    except Exception:
-        forecast, trend_txt = {}, ""
+        trends = fc.get("trends") or {}
+        anomalies = fc.get("anomalies") or []
+        forecast = fc.get("forecast") or []
+    except Exception:  # noqa: BLE001 — today's figure stands without the forecast
+        pass
+
     finding = f"Revenue today is {_money(core['revenue'] * 100)} across {core['orders']} paid orders."
-    why = "Paid, non-cancelled orders created during the Nairobi calendar day so far. This is not payment cash flow."
+    # An anomaly is the most useful thing the forecaster knows. It was computed
+    # on every call and never surfaced anywhere the owner could see it.
+    if anomalies:
+        a0 = anomalies[0]
+        finding += (f" {a0['date']} was a {a0['type']} at {a0['deviation_pct']:+.1f}% "
+                    f"versus the period average.")
+    why = ("Paid, non-cancelled orders created during the Nairobi calendar day so far. "
+           "This is not payment cash flow.")
     # core["revenue"] is already KES (overview's _summarize converts cents→KES);
     # avg_order must stay in KES — multiplying by 100 again showed absurd figures
     # (verified in browser 2026-09-12: "KSh 199,467" instead of KSh 1,995).
-    impact = f"Average order {_money(core['revenue'] * 100 / core['orders'])} per order" if core["orders"] else "Average order — no orders yet today"
-    rec = trend_txt if isinstance(trend_txt, str) and trend_txt else "Compare against the 7-day trend on Home to see if today is ahead or behind."
+    impact = (f"Average order {_money(core['revenue'] * 100 / core['orders'])} per order"
+              if core["orders"] else "Average order — no orders yet today")
+    wow = trends.get("week_over_week_growth")
+    if wow is not None:
+        rec = (f"Week-over-week revenue is {wow:+.1f}%. "
+               + ("Hold the current mix." if wow >= 0 else "Review what changed in the last seven days."))
+    else:
+        rec = "Compare against the 7-day trend on Home to see if today is ahead or behind."
     steps = []
-    if isinstance(forecast, dict):
-        for k, v in list(forecast.items())[:3]:
-            steps.append({"action": f"{k}: {v}" if not isinstance(v, (int, float)) else f"{k}: {v}"})
+    for a in anomalies[:3]:
+        steps.append({"action": f"Check {a['date']}: {a['type']} of {a['deviation_pct']:+.1f}%",
+                      "why": f"Revenue {_money(a['revenue'] * 100)} against an expected {_money(a['expected'] * 100)}"})
+    if not steps and isinstance(forecast, list):
+        for day in forecast[:3]:
+            if isinstance(day, dict):
+                steps.append({"action": f"{day.get('date', 'Next')}: forecast {_money((day.get('predicted_revenue') or 0) * 100)}"})
     return {"finding": finding, "why": why, "impact": impact, "recommendation": rec,
-            "module": "revenue", "steps": steps, "data": {"today": core}}
+            "module": "revenue", "steps": steps,
+            "data": {"today": core, "anomalies_found": len(anomalies)}}
 
 
 def _answer_bookings(db: Session, rid: int, q: str) -> dict:
     from ai.reservation_optimizer import get_reservation_insights
     ins = get_reservation_insights(db, rid)
-    no_show = ins.get("no_show") or ins.get("no_show_rate") or {}
-    covers = ins.get("today") or ins.get("covers_today") or {}
-    rate = no_show.get("rate") if isinstance(no_show, dict) else no_show
-    lost = no_show.get("lost_revenue") if isinstance(no_show, dict) else None
-    finding = f"No-show rate is {rate if rate is not None else 'n/a'}{' · ' + _money(lost) + ' lost to no-shows' if lost else ''}."
+    ns = ins.get("no_show_analysis") or {}
+    rate = ns.get("no_show_rate")
+    total = ns.get("total_reservations") or 0
+    lost = (ins.get("revenue_impact") or {}).get("estimated_revenue_lost")
     recs = ins.get("recommendations") or []
-    why = "Computed from your reservation history: completion rate, lead time and party size patterns."
-    impact = _money(lost) if lost else "Protects table availability"
-    rec = (recs[0] if isinstance(recs[0], str) else recs[0].get("action", "Enable deposit requests for peak slots")) if recs else "Enable deposit requests for peak slots."
-    steps = [{"action": r if isinstance(r, str) else r.get("action", ""), "why": r.get("why", "") if isinstance(r, dict) else ""}
-             for r in recs[:4] if (isinstance(r, str) or r.get("action"))]
+
+    if total == 0:
+        finding = "No reservations recorded in the analysed period."
+        why = "No-show and utilisation figures need booking history to compute."
+        impact = "—"
+    else:
+        finding = (f"No-show rate is {rate}% across {total} reservation(s); "
+                   f"completion rate {ns.get('completion_rate', '—')}%.")
+        why = ("Computed from your reservation history: completion rate, lead time "
+               "and party-size patterns.")
+        impact = _money(lost) if lost else "Protects table availability"
+    rec = _first_action(recs, "Enable deposit requests for peak slots.")
+    steps = _rec_steps(recs, 4)
     return {"finding": finding, "why": why, "impact": impact, "recommendation": rec,
-            "module": "reservations", "steps": steps, "data": {}}
+            "module": "reservations", "steps": steps,
+            "data": {"no_show_rate": rate, "total_reservations": total}}
 
 
 def _answer_kitchen(db: Session, rid: int, q: str) -> dict:
     from ai.kds_intelligence import get_kds_intelligence
     kds = get_kds_intelligence(db, rid)
     bottlenecks = kds.get("bottlenecks") or []
-    stations = kds.get("stations") or []
+    stations = kds.get("station_performance") or []
     if bottlenecks:
         b0 = bottlenecks[0]
-        name = b0.get("station") or b0.get("name") or "a station"
-        finding = f"{name} is the current bottleneck: {b0.get('detail', b0.get('reason', 'queue above target'))}."
+        finding = (f"{b0['station']} is the bottleneck at {b0['avg_minutes']} min average, "
+                   f"{b0['above_avg_by']} min above the kitchen average of {b0['kitchen_avg']} "
+                   f"({b0['severity']}).")
     elif stations:
-        slowest = max(stations, key=lambda s: s.get("avg_minutes", 0) if isinstance(s.get("avg_minutes"), (int, float)) else 0)
-        finding = f"Slowest station: {slowest.get('station') or slowest.get('name')} at {slowest.get('avg_minutes')} min average."
+        slowest = max(stations, key=lambda st: st.get("avg_minutes") or 0)
+        finding = (f"No station is above the bottleneck threshold. Slowest is "
+                   f"{slowest.get('station')} at {slowest.get('avg_minutes')} min average.")
     else:
-        finding = "No bottlenecks detected right now — the kitchen is on pace."
-    why = "From live kitchen display data: prep times per item and queue depth per station."
+        finding = "No kitchen timing data recorded yet for this period."
+    why = "From recorded prep times per item and per station."
     impact = "Protects ticket times during rush"
     recs = kds.get("recommendations") or []
-    rec = (recs[0] if isinstance(recs[0], str) else recs[0].get("action", "")) if recs else "Keep the current line setup."
-    steps = [{"action": r if isinstance(r, str) else r.get("action", "")} for r in recs[:4]]
+    rec = _first_action(recs, "Keep the current line setup.")
+    steps = _rec_steps(recs, 4)
     return {"finding": finding, "why": why, "impact": impact, "recommendation": rec,
-            "module": "kitchen", "steps": steps, "data": {}}
+            "module": "kitchen", "steps": steps,
+            "data": {"bottlenecks": len(bottlenecks), "stations": len(stations)}}
 
 
 def _answer_staff(db: Session, rid: int, q: str) -> dict:
     from ai.labor.intelligence import get_labor_intelligence
     labor = get_labor_intelligence(db, rid)
-    pct = labor.get("labor_cost_pct") or labor.get("cost_pct")
+    summary = labor.get("summary") or {}
+    pct = summary.get("labor_pct")
+    shifts = summary.get("shifts_logged") or 0
     recs = labor.get("recommendations") or []
-    finding = f"Labor cost is {pct}% of revenue." if pct is not None else "Labor intelligence loaded."
-    if pct is not None:
-        finding += " " + ("Within the 25-35% healthy range." if 25 <= float(pct) <= 35 else "Outside the 25-35% healthy band — review shift lengths.")
-    why = "From clocked shifts versus revenue over the current period."
-    impact = "Labor is typically your largest controllable cost"
-    rec = (recs[0] if isinstance(recs[0], str) else recs[0].get("action", "")) if recs else "Align the biggest shifts with your peak windows."
-    steps = [{"action": r if isinstance(r, str) else r.get("action", "")} for r in recs[:4]]
+
+    if not shifts:
+        finding = "No shifts logged in the last 30 days, so labour cost cannot be measured."
+        why = "Labour percentage needs clocked shifts to divide against revenue."
+        impact = "—"
+    else:
+        status = summary.get("labor_status", "")
+        finding = (f"Labour is {pct}% of revenue across {shifts} logged shift(s) "
+                   f"— {'within' if status == 'HEALTHY' else 'above'} the healthy band.")
+        overtime = summary.get("overtime_hours_30d") or 0
+        if overtime:
+            finding += f" {overtime} overtime hour(s) recorded, costing {_money(summary.get('overtime_cost_30d'))}."
+        why = "From clocked shifts against revenue over the last 30 days."
+        impact = f"Sales per labour hour: {_money(summary.get('sales_per_hour'))}"
+    rec = _first_action(recs, "Align the longest shifts with your peak windows.")
+    steps = _rec_steps(recs, 4)
     return {"finding": finding, "why": why, "impact": impact, "recommendation": rec,
-            "module": "labor", "steps": steps, "data": {}}
+            "module": "labor", "steps": steps,
+            "data": {"labor_pct": pct, "shifts_logged": shifts}}
 
 
 def _answer_menu(db: Session, rid: int, q: str) -> dict:
     from ai.menu_engineer import get_menu_engineering
     me = get_menu_engineering(db, rid)
     summary = me.get("summary") or {}
-    stars = me.get("stars") or summary.get("stars") or []
-    dogs = me.get("dogs") or summary.get("dogs") or []
-    parts = []
-    if stars:
-        parts.append(f"{len(stars)} star item(s) driving profit")
-    if dogs:
-        parts.append(f"{len(dogs)} dog item(s) dragging the menu")
-    finding = "Menu mix: " + (" · ".join(parts) if parts else "no clear stars or dogs yet — needs more order history.")
-    why = "Menu engineering classifies items by popularity vs margin (Star/Plowhorse/Puzzle/Dog)."
-    impact = f"Avg food cost {summary.get('avg_food_cost_pct', '—')}" if summary else "—"
-    rec = f"Promote {stars[0] if stars else 'your margin leaders'}; {('review or rework ' + dogs[0]) if dogs else 'keep testing puzzles'}." if (stars or dogs) else "Keep collecting order data for classification."
-    steps = [{"action": f"Promote: {s}" if isinstance(s, str) else s.get("name", "")} for s in stars[:3]]
-    steps += [{"action": f"Review/rework: {d}" if isinstance(d, str) else d.get("name", "")} for d in dogs[:2]]
+    matrix = me.get("matrix") or []
+    # summary.stars/dogs are COUNTS, not lists. `len()` on an integer raised
+    # TypeError here, which the route swallowed into a generic failure — the
+    # item names live in `matrix`, keyed by classification.
+    star_items = [m for m in matrix if m.get("classification") == "Star"]
+    dog_items = [m for m in matrix if m.get("classification") == "Dog"]
+    puzzle_items = [m for m in matrix if m.get("classification") == "Puzzle"]
+
+    if not matrix:
+        finding = "Not enough order history yet to classify the menu."
+    else:
+        finding = (f"Menu mix across {summary.get('total_items', len(matrix))} item(s): "
+                   f"{len(star_items)} Star, {len(puzzle_items)} Puzzle, {len(dog_items)} Dog. "
+                   f"Optimisation score {summary.get('menu_optimization_score', '—')}/100.")
+    why = "Menu engineering classifies items by popularity against margin (Star, Plowhorse, Puzzle, Dog)."
+    impact = (f"Average food cost {summary.get('avg_food_cost_pct')}%, average margin "
+              f"{summary.get('avg_margin_pct')}%") if summary else "—"
+    recs = me.get("recommendations") or []
+    rec = _first_action(recs, "Keep collecting order data for classification.")
+    steps = [{"action": f"Promote {m.get('item_name') or m.get('name')}",
+              "why": f"Star — {m.get('margin_pct', '?')}% margin at {m.get('qty_sold', '?')} sold"}
+             for m in star_items[:3]]
+    steps += [{"action": f"Rework or cut {m.get('item_name') or m.get('name')}",
+               "why": f"Dog — {m.get('margin_pct', '?')}% margin at {m.get('qty_sold', '?')} sold"}
+              for m in dog_items[:2]]
     return {"finding": finding, "why": why, "impact": impact, "recommendation": rec,
-            "module": "menu", "steps": steps, "data": {}}
+            "module": "menu", "steps": steps,
+            "data": {"stars": len(star_items), "dogs": len(dog_items)}}
 
 
 def _answer_pricing(db: Session, rid: int, q: str) -> dict:
     from ai.pricing.recommendations import get_pricing_intelligence
     pi = get_pricing_intelligence(db, rid)
-    recs = pi.get("recommendations") or pi.get("items") or []
+    recs = pi.get("recommendations") or []
+    summary = pi.get("summary") or {}
+    opportunity = summary.get("total_revenue_opportunity_cents") or 0
+
     if recs:
         r0 = recs[0]
-        finding = f"{len(recs)} pricing recommendation(s) open. Top: {r0.get('item') or r0.get('name', '?')} — {r0.get('suggestion', r0.get('reason', ''))}."
+        finding = (f"{len(recs)} pricing change(s) recommended. Top: {r0['item_name']} "
+                   f"from {_money(r0['current_price'])} to {_money(r0['suggested_price'])} "
+                   f"({r0['type'].lower()}) — {r0['reason']}.")
+        impact = f"{_money(opportunity)}/month across all recommendations"
+        rec = (f"Approve the {r0['item_name']} change on Home to apply it "
+               f"({_money(r0['monthly_impact_cents'])}/month).")
     else:
         finding = "No pricing changes recommended right now."
-    why = "Item margins versus your target band and recent cost movements."
-    impact = (r0.get("expected_impact") if recs and isinstance(recs[0], dict) else None) or "Restores margin floor"
-    rec = "Open the pricing recommendation and approve the change to apply it."
-    steps = [{"action": (r.get("item", "") + ": " + r.get("suggestion", "")) if isinstance(r, dict) else str(r)} for r in recs[:4]]
+        impact = "—"
+        rec = "Margins are inside the target band on every item with enough sales history."
+    why = ("Item margins against the 40% floor and recent selling velocity, "
+           "with a 7-day cooldown after each change.")
+    steps = [{"action": (f"{r['item_name']}: {_money(r['current_price'])} → "
+                         f"{_money(r['suggested_price'])} ({r['price_change_pct']:+.1f}%)"),
+              "why": r["reason"]}
+             for r in recs[:4]]
     return {"finding": finding, "why": why, "impact": impact, "recommendation": rec,
-            "module": "pricing", "steps": steps, "data": {}}
+            "module": "pricing", "steps": steps,
+            "data": {"open_recommendations": len(recs), "opportunity_cents": opportunity}}
 
 
 def _answer_profit(db: Session, rid: int, q: str) -> dict:
     from ai.profit.intelligence import get_profit_intelligence
     pi = get_profit_intelligence(db, rid)
-    leaks = pi.get("leaks") or pi.get("issues") or []
-    total = pi.get("total_leak") or pi.get("monthly_impact")
+    summary = pi.get("summary") or {}
+    leaks = pi.get("profit_leaks") or []
+    uncosted = pi.get("uncosted_items") or []
+    total_leak = summary.get("total_leak_amount") or 0
+    coverage = summary.get("cost_coverage_pct")
+
     if leaks:
         l0 = leaks[0]
-        finding = f"Biggest leak: {l0.get('area') or l0.get('name', '?')} — {l0.get('detail', '')}"
+        finding = (f"Biggest leak: {l0['item_name']} at {l0['current_margin_pct']}% margin, "
+                   f"{_money(l0['monthly_leak_cents'])}/month. "
+                   f"{len(leaks)} item(s) below the {40}% floor.")
+    elif uncosted:
+        finding = (f"No measurable leaks, but {len(uncosted)} item(s) have no cost price — "
+                   f"{_money(summary.get('uncosted_revenue_30d'))} of sales cannot be checked.")
     else:
-        finding = "No significant profit leaks detected this period."
-    why = "Cross-references food cost, waste, discounts and labor against revenue."
-    impact = _money(total) if total else "—"
+        finding = (f"No items below the margin floor. Gross margin "
+                   f"{summary.get('gross_margin_pct', '—')}%, food cost "
+                   f"{summary.get('food_cost_pct', '—')}%.")
+    why = "Per-item contribution margin against the critical floor, over the last 30 days."
+    if coverage is not None and coverage < 100:
+        why += f" Covers {coverage}% of revenue — the rest has no cost price entered."
+    impact = _money(total_leak) if total_leak else "—"
     recs = pi.get("recommendations") or []
-    rec = (recs[0] if isinstance(recs[0], str) else recs[0].get("action", "")) if recs else "Maintain current cost controls."
-    steps = [{"action": r if isinstance(r, str) else r.get("action", ""), "why": (r.get("why", "") if isinstance(r, dict) else "")} for r in leaks[:4] or recs[:4]]
+    rec = _first_action(recs, "Maintain current cost controls.")
+    steps = [{"action": l["action"], "why": f"{l['item_name']} at {l['current_margin_pct']}% margin"}
+             for l in leaks[:4]]
+    if not steps:
+        steps = _rec_steps(recs, 4)
     return {"finding": finding, "why": why, "impact": impact, "recommendation": rec,
-            "module": "profit", "steps": steps, "data": {}}
+            "module": "profit", "steps": steps,
+            "data": {"leaks": len(leaks), "uncosted_items": len(uncosted),
+                     "cost_coverage_pct": coverage}}
 
 
 def _answer_ops(db: Session, rid: int, q: str) -> dict:

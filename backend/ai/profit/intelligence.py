@@ -32,10 +32,51 @@ RETURNING_GUEST_DAYS  = 14
 DELIVERY_COMMISSIONS  = {"uber_eats": 0.25, "glovo": 0.25, "bolt_food": 0.20}
 
 
+# A cost of zero is not a cost of zero. `cost_price` defaults to 0 in
+# models.py, so "nobody has entered this yet" and "this genuinely costs
+# nothing" are the same value in the database. Treating them alike is how an
+# un-costed dish became a 100% margin, sorted to the top of the contribution
+# table, and was excluded from leak detection — reported to the owner as the
+# best thing on their menu. Everything below distinguishes the two.
+MIN_COST_COVERAGE_PCT = 50.0   # below this, a margin describes too little to state
+
+
+def _has_cost(item) -> bool:
+    """True only when someone has actually entered a cost for this item."""
+    return bool(item is not None and item.cost_price)
+
+
 def _item_cost(item_map: dict, mid: int) -> int:
-    """BUG-10 FIX: safe item cost lookup — returns 0 if item deleted."""
+    """Cost in cents, or 0 when the item is deleted OR has no cost entered.
+
+    Kept for callers that only sum known costs. It cannot tell you whether the
+    zero is real — use _line_cost() when that distinction matters, which is
+    everywhere a margin or percentage is derived.
+    """
     item = item_map.get(mid)
     return (item.cost_price or 0) if item else 0
+
+
+def _line_cost(item_map: dict, mid: int, quantity: int) -> tuple[int, bool]:
+    """(cost_cents, cost_is_known) for one order line."""
+    item = item_map.get(mid)
+    if not _has_cost(item):
+        return 0, False
+    return quantity * item.cost_price, True
+
+
+def _coverage(costed_revenue: int, revenue: int) -> float:
+    """Share of revenue whose cost is actually known, 0-100."""
+    return round((costed_revenue / revenue) * 100, 1) if revenue else 0.0
+
+
+def _margin_over_costed(costed_revenue: int, cost: int) -> float | None:
+    """Margin across only the revenue whose cost is known, or None if there is
+    none. Reporting a margin over uncosted revenue overstates it by exactly the
+    uncosted portion, which is the failure this module had."""
+    if costed_revenue <= 0:
+        return None
+    return round(((costed_revenue - cost) / costed_revenue) * 100, 1)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -83,8 +124,15 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
         return _empty_response()
 
     # ── Single-pass item-level profit accumulation ────────────────────────────
-    item_profit: dict[int, dict] = defaultdict(lambda: {"qty": 0, "revenue": 0, "cost": 0, "profit": 0})
+    item_profit: dict[int, dict] = defaultdict(
+        lambda: {"qty": 0, "revenue": 0, "cost": 0, "profit": 0, "cost_known": False})
     total_revenue = total_food_cost = total_items_sold = 0
+    # Revenue split by whether we know what it cost to produce. Every headline
+    # percentage below is computed over the costed half only — a food-cost
+    # percentage that divides known costs by ALL revenue understates itself by
+    # exactly the uncosted share, which made the restaurant look more
+    # profitable the less data the owner had entered.
+    costed_revenue = uncosted_revenue = 0
 
     for order in orders_30d:
         for oi in order.items:
@@ -92,18 +140,26 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
             if not item:
                 continue
             line_revenue = oi.quantity * oi.unit_price
-            line_cost    = oi.quantity * (item.cost_price or 0)
-            item_profit[oi.menu_item_id]["qty"]     += oi.quantity
-            item_profit[oi.menu_item_id]["revenue"] += line_revenue
-            item_profit[oi.menu_item_id]["cost"]    += line_cost
-            item_profit[oi.menu_item_id]["profit"]  += line_revenue - line_cost
+            line_cost, cost_known = _line_cost(item_map, oi.menu_item_id, oi.quantity)
+            bucket = item_profit[oi.menu_item_id]
+            bucket["qty"]     += oi.quantity
+            bucket["revenue"] += line_revenue
+            bucket["cost_known"] = cost_known
+            if cost_known:
+                bucket["cost"]   += line_cost
+                bucket["profit"] += line_revenue - line_cost
+                total_food_cost  += line_cost
+                costed_revenue   += line_revenue
+            else:
+                # Profit stays 0 rather than becoming the full line revenue.
+                uncosted_revenue += line_revenue
             total_revenue    += line_revenue
-            total_food_cost  += line_cost
             total_items_sold += oi.quantity
 
-    total_gross_profit = total_revenue - total_food_cost
-    food_cost_pct      = (total_food_cost / max(total_revenue, 1)) * 100
-    gross_margin_pct   = (total_gross_profit / max(total_revenue, 1)) * 100
+    total_gross_profit = costed_revenue - total_food_cost
+    cost_coverage_pct  = _coverage(costed_revenue, total_revenue)
+    food_cost_pct      = (total_food_cost / costed_revenue) * 100 if costed_revenue else 0.0
+    gross_margin_pct   = _margin_over_costed(costed_revenue, total_food_cost) or 0.0
     prev_revenue       = sum(o.total or 0 for o in orders_prev)
     # Guard against a near-empty prior month: `/ max(prev_revenue, 1)` avoids a
     # ZeroDivisionError but, when prev_revenue is a few cents (e.g. a straggler
@@ -118,6 +174,7 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
 
     contribution_margins = _build_contribution_margins(items, item_profit)
     profit_leaks         = _detect_profit_leaks(contribution_margins)
+    uncosted_items       = [cm for cm in contribution_margins if cm["status"] == "UNKNOWN_COST"]
     portion_drift        = _detect_portion_drift(db, restaurant_id, item_map, now)
     daypart_analysis     = _daypart_profitability(orders_30d, item_map)
     channel_analysis     = _channel_profitability(orders_30d, item_map)
@@ -133,6 +190,9 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
         at_risk          = customer_intel["at_risk_customers"],
         portion_drift    = portion_drift,
         revenue_mom      = revenue_mom,
+        uncosted_items   = uncosted_items,
+        uncosted_revenue = uncosted_revenue,
+        cost_coverage_pct = cost_coverage_pct,
     )
 
     stars = [cm for cm in contribution_margins if cm["status"] == "STAR"]
@@ -145,7 +205,14 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
             "total_gross_profit_30d": total_gross_profit,
             "gross_margin_pct":       round(gross_margin_pct, 1),
             "food_cost_pct":          round(food_cost_pct, 1),
-            "food_cost_status":       _food_cost_status(food_cost_pct),
+            "food_cost_status":       _food_cost_status(food_cost_pct) if costed_revenue else "NO_COST_DATA",
+            # The margin and food-cost figures above describe this share of
+            # revenue and no more. At 100% they are the whole picture; below
+            # that they are a sample, and the owner is entitled to know which.
+            "cost_coverage_pct":      cost_coverage_pct,
+            "costed_revenue_30d":     costed_revenue,
+            "uncosted_revenue_30d":   uncosted_revenue,
+            "items_without_cost":     len(uncosted_items),
             "revenue_mom_pct":        revenue_mom,
             "total_orders_30d":       len(orders_30d),
             "avg_order_value":        int(total_revenue / max(len(orders_30d), 1)),
@@ -156,6 +223,7 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
             "dog_items":              len(dogs),
         },
         "contribution_margins":  contribution_margins[:20],
+        "uncosted_items":        uncosted_items[:20],
         "profit_leaks":          profit_leaks,
         "portion_drift":         portion_drift,
         "daypart_analysis":      daypart_analysis,
@@ -172,35 +240,71 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
 # ── Sub-analyses ──────────────────────────────────────────────────────────────
 
 def _build_contribution_margins(items, item_profit: dict) -> list[dict]:
-    result = []
+    """One row per item sold, with margins only where a cost is known.
+
+    An item with no cost entered gets margin_pct=None and status UNKNOWN_COST,
+    never 100% and never STAR. It also sorts BELOW every costed item: ranking
+    by profit put un-costed dishes at the top, because their profit was being
+    recorded as their entire revenue.
+    """
+    costed, unknown = [], []
     for item in items:
         data = item_profit.get(item.id, {})
         qty  = data.get("qty", 0)
         if qty == 0:
             continue
-        margin_pct    = ((item.price - (item.cost_price or 0)) / max(item.price, 1)) * 100
-        food_cost_pct = ((item.cost_price or 0) / max(item.price, 1)) * 100
-        result.append({
-            "item_id":          item.id,
-            "item_name":        item.name,
-            "category":         item.category,
-            "current_price":    item.price,
-            "cost_price":       item.cost_price or 0,
+        revenue = data.get("revenue", 0)
+        row = {
+            "item_id":           item.id,
+            "item_name":         item.name,
+            "category":          item.category,
+            "current_price":     item.price,
+            "qty_30d":           qty,
+            "total_revenue_30d": revenue,
+        }
+        if not _has_cost(item):
+            row.update({
+                "cost_price":       None,
+                "margin_pct":       None,
+                "food_cost_pct":    None,
+                "total_profit_30d": None,
+                "profit_per_unit":  None,
+                "status":           "UNKNOWN_COST",
+                "why":              "No cost price entered, so this item's profit cannot be measured.",
+            })
+            unknown.append(row)
+            continue
+        margin_pct    = ((item.price - item.cost_price) / max(item.price, 1)) * 100
+        food_cost_pct = (item.cost_price / max(item.price, 1)) * 100
+        row.update({
+            "cost_price":       item.cost_price,
             "margin_pct":       round(margin_pct, 1),
             "food_cost_pct":    round(food_cost_pct, 1),
-            "qty_30d":          qty,
             "total_profit_30d": data.get("profit", 0),
-            "total_revenue_30d": data.get("revenue", 0),
-            "profit_per_unit":  int(item.price - (item.cost_price or 0)),
+            "profit_per_unit":  int(item.price - item.cost_price),
             "status":           _margin_status(margin_pct),
         })
-    result.sort(key=lambda x: x["total_profit_30d"], reverse=True)
-    return result
+        costed.append(row)
+
+    costed.sort(key=lambda x: x["total_profit_30d"], reverse=True)
+    # Un-costed items sort by revenue: it is the only thing known about them,
+    # and it is what makes one worth costing before another.
+    unknown.sort(key=lambda x: x["total_revenue_30d"], reverse=True)
+    return costed + unknown
 
 
 def _detect_profit_leaks(contribution_margins: list[dict]) -> list[dict]:
+    """Items priced below the critical margin floor.
+
+    Un-costed items are skipped, as before — but they are no longer silently
+    skipped: _generate_recommendations raises them as a data gap, because an
+    item excluded from leak detection for want of a cost price is exactly the
+    item most likely to be leaking.
+    """
     leaks = []
     for cm in contribution_margins:
+        if cm["status"] == "UNKNOWN_COST":
+            continue
         if cm["margin_pct"] < CRITICAL_MARGIN_FLOOR and cm["cost_price"] > 0:
             target_price  = int(cm["cost_price"] / (1 - HEALTHY_MARGIN_MIN / 100))
             monthly_leak  = (target_price - cm["current_price"]) * cm["qty_30d"]
@@ -268,64 +372,93 @@ def _daypart_profitability(orders: list, item_map: dict) -> list[dict]:
     - EAT hour = (UTC hour + 3) % 24 for display bucketing only
     - _item_cost() for safe cost lookup
     """
-    daypart: dict[str, dict] = defaultdict(lambda: {"revenue": 0, "cost": 0, "orders": 0, "profit": 0})
+    daypart: dict[str, dict] = defaultdict(
+        lambda: {"revenue": 0, "costed_revenue": 0, "cost": 0, "orders": 0, "profit": 0})
 
     for order in orders:
         eat_hour = (order.created_at.hour + 3) % 24
         dp       = _hour_to_daypart(eat_hour)
-        order_cost = sum(
-            oi.quantity * _item_cost(item_map, oi.menu_item_id)   # BUG-10 FIX
-            for oi in order.items
-        )
+        order_cost = costed_line_revenue = 0
+        for oi in order.items:
+            line_cost, known = _line_cost(item_map, oi.menu_item_id, oi.quantity)
+            if known:
+                order_cost += line_cost
+                costed_line_revenue += oi.quantity * oi.unit_price
         revenue = order.total or 0
-        daypart[dp]["revenue"] += revenue
-        daypart[dp]["cost"]    += order_cost
-        daypart[dp]["orders"]  += 1
-        daypart[dp]["profit"]  += revenue - order_cost
+        daypart[dp]["revenue"]        += revenue
+        daypart[dp]["costed_revenue"] += costed_line_revenue
+        daypart[dp]["cost"]           += order_cost
+        daypart[dp]["orders"]         += 1
+        daypart[dp]["profit"]         += costed_line_revenue - order_cost
 
-    return [
-        {
-            "daypart":         dp,
-            "revenue":         d["revenue"],
-            "cost":            d["cost"],
-            "profit":          d["profit"],
-            "orders":          d["orders"],
-            "margin_pct":      round((d["profit"] / max(d["revenue"], 1)) * 100, 1),
-            "avg_order_profit": int(d["profit"] / max(d["orders"], 1)),
-        }
-        for dp, d in sorted(daypart.items(), key=lambda x: x[1]["profit"], reverse=True)
-    ]
+    rows = []
+    for dp, d in daypart.items():
+        coverage = _coverage(d["costed_revenue"], d["revenue"])
+        # A margin drawn from a third of the window's revenue is not the
+        # window's margin. Below the coverage floor it is withheld rather than
+        # stated, because a wrong number here sends the owner after the wrong
+        # service period.
+        margin = _margin_over_costed(d["costed_revenue"], d["cost"]) \
+            if coverage >= MIN_COST_COVERAGE_PCT else None
+        rows.append({
+            "daypart":           dp,
+            "revenue":           d["revenue"],
+            "cost":              d["cost"],
+            "profit":            d["profit"],
+            "orders":            d["orders"],
+            "margin_pct":        margin,
+            "cost_coverage_pct": coverage,
+            "avg_order_profit":  int(d["profit"] / max(d["orders"], 1)),
+        })
+    rows.sort(key=lambda r: r["profit"], reverse=True)
+    return rows
 
 
 def _channel_profitability(orders: list, item_map: dict) -> list[dict]:
     """BUG-10 FIX: uses _item_cost() instead of direct attribute access on possibly-None item."""
-    channel: dict[str, dict] = defaultdict(lambda: {"revenue": 0, "cost": 0, "orders": 0})
+    channel: dict[str, dict] = defaultdict(
+        lambda: {"revenue": 0, "costed_revenue": 0, "cost": 0, "commission": 0, "orders": 0})
 
     for order in orders:
-        ch         = order.delivery_channel.value if order.delivery_channel else "walk_in"
-        order_cost = sum(
-            oi.quantity * _item_cost(item_map, oi.menu_item_id)   # BUG-10 FIX
-            for oi in order.items
-        )
-        commission      = (order.total or 0) * DELIVERY_COMMISSIONS.get(ch, 0)
-        effective_cost  = order_cost + commission
-        channel[ch]["revenue"] += order.total or 0
-        channel[ch]["cost"]    += effective_cost
-        channel[ch]["orders"]  += 1
+        ch = order.delivery_channel.value if order.delivery_channel else "walk_in"
+        order_cost = costed_line_revenue = 0
+        for oi in order.items:
+            line_cost, known = _line_cost(item_map, oi.menu_item_id, oi.quantity)
+            if known:
+                order_cost += line_cost
+                costed_line_revenue += oi.quantity * oi.unit_price
+        revenue    = order.total or 0
+        commission = revenue * DELIVERY_COMMISSIONS.get(ch, 0)
+        channel[ch]["revenue"]        += revenue
+        channel[ch]["costed_revenue"] += costed_line_revenue
+        channel[ch]["cost"]           += order_cost
+        channel[ch]["commission"]     += commission
+        channel[ch]["orders"]         += 1
 
-    return [
-        {
+    rows = []
+    for ch, d in channel.items():
+        coverage = _coverage(d["costed_revenue"], d["revenue"])
+        # Commission is a known cost on all revenue; food cost is known only on
+        # the costed share. Scale the commission to that same share so the two
+        # halves of effective cost describe the same denominator.
+        share = (d["costed_revenue"] / d["revenue"]) if d["revenue"] else 0.0
+        effective_cost = d["cost"] + d["commission"] * share
+        margin = None
+        if coverage >= MIN_COST_COVERAGE_PCT and d["costed_revenue"] > 0:
+            margin = round(((d["costed_revenue"] - effective_cost) / d["costed_revenue"]) * 100, 1)
+        rows.append({
             "channel":             ch,
             "revenue":             d["revenue"],
-            "effective_cost":      d["cost"],
-            "profit":              d["revenue"] - d["cost"],
+            "effective_cost":      int(effective_cost),
+            "profit":              int(d["costed_revenue"] - effective_cost),
             "orders":              d["orders"],
-            "margin_pct":          round(((d["revenue"] - d["cost"]) / max(d["revenue"], 1)) * 100, 1),
+            "margin_pct":          margin,
+            "cost_coverage_pct":   coverage,
             "avg_order_value":     int(d["revenue"] / max(d["orders"], 1)),
             "commission_included": ch in DELIVERY_COMMISSIONS,
-        }
-        for ch, d in sorted(channel.items(), key=lambda x: x[1]["revenue"] - x[1]["cost"], reverse=True)
-    ]
+        })
+    rows.sort(key=lambda r: r["profit"], reverse=True)
+    return rows
 
 
 def _customer_intelligence(orders: list, total_revenue: int, now: datetime) -> dict:
@@ -470,9 +603,31 @@ def _profit_forecast(orders: list, total_cost: int, total_revenue: int) -> dict:
 
 def _generate_recommendations(
     food_cost_pct, profit_leaks, daypart_analysis,
-    channel_analysis, at_risk, portion_drift, revenue_mom
+    channel_analysis, at_risk, portion_drift, revenue_mom,
+    uncosted_items=None, uncosted_revenue=0, cost_coverage_pct=100.0,
 ) -> list[dict]:
     recs = []
+    # Missing cost prices lead, because they cap what every other number here
+    # can tell you. An item with no cost is invisible to leak detection, so the
+    # worst leak on the menu can be the one that never appears in the list.
+    uncosted_items = uncosted_items or []
+    if uncosted_items:
+        top = ", ".join(cm["item_name"] for cm in uncosted_items[:3])
+        more = f" and {len(uncosted_items) - 3} more" if len(uncosted_items) > 3 else ""
+        recs.append({
+            "type": "missing_cost_data",
+            "priority": "CRITICAL" if cost_coverage_pct < 80 else "HIGH",
+            "message": (
+                f"{len(uncosted_items)} item(s) have no cost price — "
+                f"KES {uncosted_revenue // 100:,} of sales this month cannot be "
+                f"checked for profit ({top}{more})"
+            ),
+            "action": "Enter a cost price for these items so their margin can be measured.",
+            "impact": (
+                f"Profit figures currently cover {cost_coverage_pct}% of revenue; "
+                "the rest is unmeasured, not profitable"
+            ),
+        })
     if food_cost_pct > HEALTHY_FOOD_COST_MAX:
         recs.append({"type": "food_cost", "priority": "CRITICAL",
             "message": f"Food cost at {food_cost_pct:.1f}% — above {HEALTHY_FOOD_COST_MAX}% threshold",
@@ -486,15 +641,16 @@ def _generate_recommendations(
         recs.append({"type": "portion_drift", "priority": "MEDIUM",
             "message": f"{drift['item_name']}: prices captured {drift['drift_pct']}% below menu price",
             "action": drift["action"], "impact": f"KES {drift['estimated_monthly_leak']//100:,}/month"})
-    if daypart_analysis:
-        worst = min(daypart_analysis, key=lambda x: x["margin_pct"])
+    measurable_dayparts = [d for d in daypart_analysis if d["margin_pct"] is not None]
+    if measurable_dayparts:
+        worst = min(measurable_dayparts, key=lambda x: x["margin_pct"])
         if worst["margin_pct"] < 45:
             recs.append({"type": "daypart", "priority": "MEDIUM",
                 "message": f"{worst['daypart'].replace('_',' ').title()} has lowest margin at {worst['margin_pct']}%",
                 "action": "Review high-cost items popular in this window",
                 "impact": "Improve profitable item mix during this period"})
     for ch in channel_analysis:
-        if ch["commission_included"] and ch["margin_pct"] < 30:
+        if ch["commission_included"] and ch["margin_pct"] is not None and ch["margin_pct"] < 30:
             recs.append({"type": "channel", "priority": "HIGH",
                 "message": f"{ch['channel'].replace('_',' ').title()}: margin only {ch['margin_pct']}% after commission",
                 "action": "Add 15-20% delivery premium or remove low-margin items from delivery menu",
@@ -538,8 +694,11 @@ def _empty_response() -> dict:
             "revenue_mom_pct": 0, "total_orders_30d": 0,
             "avg_order_value": 0, "total_items_sold": 0,
             "profit_leaks_found": 0, "total_leak_amount": 0,
-            "star_items": 0, "dog_items": 0},
-        "contribution_margins": [], "profit_leaks": [], "portion_drift": [],
+            "star_items": 0, "dog_items": 0,
+            "cost_coverage_pct": 0, "costed_revenue_30d": 0,
+            "uncosted_revenue_30d": 0, "items_without_cost": 0},
+        "contribution_margins": [], "uncosted_items": [],
+        "profit_leaks": [], "portion_drift": [],
         "daypart_analysis": [], "channel_analysis": [], "customer_intelligence": {},
         "upsell_uplift": [], "profit_forecast": {}, "stars": [], "dogs": [],
         "recommendations": [],

@@ -173,7 +173,16 @@ def _card_key(agent: str, action: str) -> str:
     outranked it. Agent + the advice itself is stable for as long as the advice
     is, and changes when the advice does, which is the behaviour we want.
     """
-    digest = hashlib.sha1(f"{agent}|{action}".encode("utf-8")).hexdigest()[:10]
+    # usedforsecurity=False: this digest is a STABLE UI KEY, not a security
+    # primitive. Nothing authenticates, signs or compares secrets with it — it
+    # only has to be short, deterministic and collision-unlikely across one
+    # restaurant's advice set. Without the flag Bandit rates it HIGH (CWE-327)
+    # and the blocking `sast` CI job fails, which is what it did for four
+    # consecutive merges. Declaring intent is the fix; the algorithm is fine
+    # for a non-security key.
+    digest = hashlib.sha1(
+        f"{agent}|{action}".encode("utf-8"), usedforsecurity=False
+    ).hexdigest()[:10]
     return f"d-{digest}"
 
 

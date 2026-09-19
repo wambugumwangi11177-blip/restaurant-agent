@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { homeFor } from "@/lib/tenantHome";
+import { homeForUser } from "@/lib/tenantHome";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Loader2, Eye, EyeOff, ShieldCheck, Lock, GitBranch } from "lucide-react";
@@ -42,7 +42,7 @@ export default function LoginPage() {
             const signedIn = isRegister
                 ? await register(email, password, tenantName)
                 : await login(email, password);
-            router.replace(homeFor(signedIn?.tenant_name));
+            router.replace(homeForUser(signedIn));
         } catch (err: unknown) {
             let message = "Authentication failed";
             if (err && typeof err === "object" && "response" in err) {

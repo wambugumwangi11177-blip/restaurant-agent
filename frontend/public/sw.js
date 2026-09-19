@@ -1,18 +1,36 @@
 // Chakula Service Worker — offline caching + PWA install support
-const CACHE_NAME = 'chakula-v1';
-const PRECACHE_URLS = [
-    '/dashboard',
-    '/dashboard/pos',
-    '/dashboard/kitchen',
-    '/dashboard/orders',
-];
+//
+// CACHE_NAME is versioned and MUST be bumped whenever the caching rules below
+// change: `activate` deletes every cache whose key differs, so the bump is what
+// evicts the previous version's entries. It stayed at 'chakula-v1' across every
+// deploy, which meant nothing was ever evicted.
+const CACHE_NAME = 'chakula-v2';
 
-// Install — cache shell
+// Deliberately empty — see below. Kept as a named constant so it's obvious this
+// is a decision, not an omission.
+const PRECACHE_URLS = [];
+
+// Install.
+//
+// v1 precached the HTML documents for /dashboard, /dashboard/pos,
+// /dashboard/kitchen and /dashboard/orders. Two problems, both of which the
+// owner saw as "it shows the old dashboard first, then the new one":
+//
+//   1. A Next.js HTML document hard-references that build's
+//      /_next/static/<buildId>/... chunks. After a redeploy the cached document
+//      is stale, so a network hiccup served the PREVIOUS release's dashboard —
+//      which then got replaced once the app hydrated and refetched.
+//   2. Nothing ever evicted it, because CACHE_NAME never changed (above).
+//
+// HTML documents are cheap to refetch and expensive to get wrong, so we no
+// longer precache any. Runtime caching in `fetch` below is already restricted
+// to build-hashed static assets, which are immutable per build and therefore
+// safe.
 self.addEventListener('install', (event) => {
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            return cache.addAll(PRECACHE_URLS);
-        })
+        PRECACHE_URLS.length
+            ? caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
+            : Promise.resolve()
     );
     self.skipWaiting();
 });

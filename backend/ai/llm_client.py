@@ -12,8 +12,16 @@ Provider selection (checked in this order):
      and no ANTHROPIC_API_KEY has ever been configured. Anthropic support is
      kept as a drop-in upgrade path (uncomment in requirements.txt "when
      client has paid" — see that file's comment), not the assumed default.
-  3. Neither set -> is_available() returns False; callers degrade gracefully
-     (see ai/whatsapp/orchestrator.py's fallback message).
+  3. OPENROUTER_API_KEY set -> OpenRouter, also via its OpenAI-compatible
+     endpoint (same code path as Groq, different base_url). This is the key
+     actually configured on the Railway production deployment.
+  4. None set -> is_available() returns False; callers degrade gracefully
+     (see ai/whatsapp/orchestrator.py's fallback message). NOTE: this is a
+     SILENT degradation — the app keeps working but every "AI" answer becomes
+     the deterministic fallback, which for /ai/strategy means the same ranked
+     plan regardless of the goal asked. The response's "mode" field says which
+     one ran ("llm" vs "deterministic") — check it before assuming an LLM
+     feature is live.
 
 Both providers are normalized to the same response shape in chat_with_tools()
 so callers never need to know which one is active: response.stop_reason
@@ -44,10 +52,12 @@ def _block_get(block, key):
 
 _ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 _GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+_OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 _HEADROOM_ENABLED = os.getenv("HEADROOM_ENABLED", "true").lower() == "true"
 _HEADROOM_PROXY_URL = os.getenv("HEADROOM_PROXY_URL", "")
 _ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
 _GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+_OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-sonnet-4.5")
 
 # Bound every LLM call: without a timeout a slow/hung provider ties up the
 # request (and, on a single gunicorn worker, starves all other traffic). Both
@@ -57,7 +67,12 @@ _GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 _LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT_SECONDS", "30"))
 _LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
 
-_PROVIDER = "anthropic" if _ANTHROPIC_API_KEY else ("groq" if _GROQ_API_KEY else None)
+_PROVIDER = (
+    "anthropic" if _ANTHROPIC_API_KEY
+    else "groq" if _GROQ_API_KEY
+    else "openrouter" if _OPENROUTER_API_KEY
+    else None
+)
 
 # ── Model tiers ──────────────────────────────────────────────────────────────
 # Callers pick a tier by task complexity; we resolve it to a concrete model for
@@ -87,7 +102,27 @@ _MODEL_TIERS = {
         TIER_MEDIUM: os.getenv("GROQ_MODEL_MEDIUM", _GROQ_MODEL),
         TIER_HIGH:   os.getenv("GROQ_MODEL_HIGH",   _GROQ_MODEL),
     },
+    "openrouter": {
+        # OpenRouter is a router in front of many providers, so model ids are
+        # "<vendor>/<model>". Every tier is env-overridable because OpenRouter
+        # retires ids on its own schedule — if narration starts failing with
+        # 404 model_not_found, check https://openrouter.ai/models and set these
+        # (this is exactly how GROQ_MODEL_LOW broke in 2026-08).
+        # Tool-use (chat_with_tools, used by the strategist) needs a model that
+        # supports function calling — the defaults below all do.
+        TIER_LOW:    os.getenv("OPENROUTER_MODEL_LOW",    "openai/gpt-4o-mini"),
+        TIER_MEDIUM: os.getenv("OPENROUTER_MODEL_MEDIUM", _OPENROUTER_MODEL),
+        TIER_HIGH:   os.getenv("OPENROUTER_MODEL_HIGH",   _OPENROUTER_MODEL),
+    },
 }
+
+
+def _default_model() -> str:
+    """The active provider's default model, for the OpenAI-compatible branches
+    when a caller passes neither an explicit `model` nor a `tier`. Provider-aware
+    because Groq and OpenRouter use different id namespaces — sending Groq's
+    default to OpenRouter is a 404."""
+    return _OPENROUTER_MODEL if _PROVIDER == "openrouter" else _GROQ_MODEL
 
 
 def model_for_tier(tier: str | None) -> str | None:
@@ -138,10 +173,20 @@ def _get_client():
             timeout=_LLM_TIMEOUT,
             max_retries=_LLM_MAX_RETRIES,
         )
+    elif _PROVIDER == "openrouter":
+        # OpenRouter is OpenAI-compatible too, so it reuses the same SDK and the
+        # same normalization path as Groq below — only the base_url differs.
+        from openai import OpenAI
+        _client = OpenAI(
+            api_key=_OPENROUTER_API_KEY,
+            base_url="https://openrouter.ai/api/v1",
+            timeout=_LLM_TIMEOUT,
+            max_retries=_LLM_MAX_RETRIES,
+        )
     else:
         raise RuntimeError(
-            "No LLM provider configured — set ANTHROPIC_API_KEY or GROQ_API_KEY "
-            "in backend/.env to enable LLM features."
+            "No LLM provider configured — set ANTHROPIC_API_KEY, GROQ_API_KEY or "
+            "OPENROUTER_API_KEY in backend/.env to enable LLM features."
         )
 
     return _client
@@ -207,7 +252,7 @@ def chat_with_usage(
     # Groq / OpenAI-compatible
     openai_messages = ([{"role": "system", "content": system}] if system else []) + messages
     kwargs = {
-        "model": resolved or _GROQ_MODEL,
+        "model": resolved or _default_model(),
         "max_tokens": max_tokens,
         "messages": openai_messages,
     }
@@ -344,7 +389,7 @@ def chat_with_tools(
     # so ai/whatsapp/orchestrator.py's loop logic stays provider-agnostic.
     openai_messages = ([{"role": "system", "content": system}] if system else []) + _canonical_messages_to_openai(messages)
     kwargs = {
-        "model": resolved or _GROQ_MODEL,
+        "model": resolved or _default_model(),
         "max_tokens": max_tokens,
         "messages": openai_messages,
     }

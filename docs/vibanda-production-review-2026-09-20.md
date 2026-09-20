@@ -90,3 +90,14 @@ Use risk-based gates, not a target number of tests. Financial totals, authorizat
 Security review references: [OWASP prompt injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/) and [OWASP excessive agency](https://genai.owasp.org/llmrisk/llm06-sensitive-information-disclosure/). Their practical implication here is to treat restaurant records and questions as untrusted input, limit model access, and enforce authorization outside the model.
 
 No exact `A10` identifier was found in the searched code/docs. AIOps, deterministic analytics, orchestration, evaluation and feature flags do exist. Clarify which A10 artifact was intended before claiming that specific component was reviewed.
+
+
+## Authenticated frontend verification — 20 September 2026
+
+User supplied `https://frontend-iota-navy-23.vercel.app/vibanda/os?q=How%20is%20my%20restaurant%20performing%3F`. Secure email/password sign-in succeeded. Sign-in landed on `/vibanda`, losing the requested OS question destination. Clicking OS and then Home correctly returned to `/vibanda` and displayed the Home heading; the reported Home-to-OS misrouting was not reproduced in this session.
+
+On OS, submitted “How is my restaurant performing?” from the top of the page. Browser DOM measurements recorded `scrollY=0` before submission and immediately afterward, then `scrollY=1102` when the answer had rendered (viewport height 936). This reproduces the delayed scroll jump on the live deployment; the local fix has not been published.
+
+The answer displayed health score 63/100, revenue trend -12.0% WoW and -36.1% day-over-day, and recommendations to recover approximately KES 50,079 from no-shows and overbook by 8.8%. The UI did not identify the answer's reporting period or link supporting records. Meanwhile today's sidebar showed zero orders/revenue and the page stated “Prototype data · Macsoft is not connected.” Historical or prototype records may explain the figures; this observation does not prove the calculations wrong. It does demonstrate inadequate provenance and period clarity for owner decisions. No operational decision buttons were submitted.
+
+Publishing remains blocked despite explicit user authorization: CLI push failed because GitHub credentials are unavailable in the workspace; the connected GitHub app rejected creation of the reviewed tree with HTTP 403 “Resource not accessible by integration.” No remote branch or PR was created, and no deployment was changed. The GitHub connection needs repository Contents write access before publication can proceed.

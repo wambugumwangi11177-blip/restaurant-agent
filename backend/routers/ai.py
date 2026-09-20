@@ -39,7 +39,7 @@ run up an unbounded bill. See ai/spend_cap.py.
 """
 
 import logging
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
@@ -640,27 +640,6 @@ async def ai_marketing(
     return data
 
 
-def _background_send(fn, *args) -> None:
-    """
-    Run a (slow, throttled) send loop on its own thread with its own DB session,
-    so the request returns immediately. The send functions are opt-out- and
-    consent-gated internally; this only handles the threading + session lifecycle.
-    """
-    import threading
-
-    def _run():
-        from database import SessionLocal
-        bg = SessionLocal()
-        try:
-            fn(bg, *args)
-        except Exception as exc:  # background thread — never surfaces to a caller
-            logger.warning(f"Background send failed: {exc}")
-        finally:
-            bg.close()
-
-    threading.Thread(target=_run, daemon=True).start()
-
-
 @router.post("/marketing/promo")
 @limiter.limit("30/minute")
 async def ai_marketing_promo(
@@ -675,23 +654,7 @@ async def ai_marketing_promo(
     `PROMO <offer>` command. Returns the audience it will reach; the send runs in
     the background.
     """
-    restaurant = get_or_create_restaurant(db, current_user)
-    offer_text = body.offer_text.strip()
-    if not offer_text:
-        return {"started": False, "audience": 0, "error": "Add an offer to send (e.g. '15% off all mains till 9pm')."}
-
-    from ai.whatsapp import brain
-    audience = brain.promo_audience_count(db, restaurant.id)
-    if audience == 0:
-        return {
-            "started": False,
-            "audience": 0,
-            "error": "No one to send to yet — a promo only reaches diners who gave consent at checkout and haven't opted out.",
-        }
-
-    _background_send(brain.broadcast_promo, restaurant.id, offer_text)
-    capped = min(audience, brain.PROMO_MAX_RECIPIENTS)
-    return {"started": True, "audience": capped, "message": f"Sending your promo to {capped} customer(s). Opted-out customers are skipped automatically."}
+    raise HTTPException(status_code=410, detail="External customer messaging has been removed. Marketing advice remains available in-app.")
 
 
 @router.post("/marketing/winback")
@@ -707,20 +670,7 @@ async def ai_marketing_winback(
     reachable audience; the send runs in the background and logs
     message_type="campaign_winback".
     """
-    restaurant = get_or_create_restaurant(db, current_user)
-
-    from ai.whatsapp import brain
-    reachable = brain.winback_reachable(db, restaurant.id)
-    if reachable == 0:
-        return {
-            "started": False,
-            "audience": 0,
-            "error": "No reachable lapsed regulars — a win-back only reaches customers who gave consent and haven't opted out.",
-        }
-
-    _background_send(brain.broadcast_winback, restaurant.id)
-    capped = min(reachable, brain.PROMO_MAX_RECIPIENTS)
-    return {"started": True, "audience": capped, "message": f"Sending win-back messages to {capped} lapsed regular(s). Opted-out customers are skipped automatically."}
+    raise HTTPException(status_code=410, detail="External customer messaging has been removed. Marketing advice remains available in-app.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

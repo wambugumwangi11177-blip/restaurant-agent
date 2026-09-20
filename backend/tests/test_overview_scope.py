@@ -92,7 +92,7 @@ def test_operational_cards_remain_today_when_sales_period_changes(
 def test_attention_decision_uses_tenant_key_not_restaurant_key(client, db_session, scoped_owner):
     user, headers = scoped_owner
     stock = db_session.query(models.InventoryItem).filter_by(restaurant_id=202).one()
-    key = f"stock-{stock.id}"
+    key = client.get("/api/v1/overview/today", headers=headers).json()["attention"][0]["id"]
     response = client.post(f"/api/v1/overview/attention/{key}/decision",
                            json={"decision": "approved"}, headers=headers)
     assert response.status_code == 200, response.text
@@ -221,3 +221,44 @@ def test_revenue_excludes_unpaid_cancelled_and_out_of_window_orders(db_session, 
     core = _summarize(db_session, 202, start, end)
     assert core == {"revenue": 123.45, "orders": 1}
     assert _orders_card(db_session, 202, start, end, core)["orders"] == 3
+
+
+def test_decisions_do_not_hide_sibling_cards_and_retries_are_idempotent(client, db_session, scoped_owner):
+    user, headers = scoped_owner
+    first = client.get('/api/v1/overview/today', headers=headers).json()
+    key = next(c['id'] for c in first['attention'] if c['domain'] == 'Purchasing')
+    for _ in range(2):
+        response = client.post(f'/api/v1/overview/attention/{key}/decision',
+                               json={'decision': 'later'}, headers=headers)
+        assert response.status_code == 200
+        assert response.json()['action_executed'] is False
+        assert response.json()['expires_at']
+    assert db_session.query(models.AttentionDecision).count() == 1
+    assert key not in [c['id'] for c in client.get('/api/v1/overview/today', headers=headers).json()['attention']]
+    user.active_restaurant_id = 203
+    db_session.commit()
+    assert key in [c['id'] for c in client.get('/api/v1/overview/today', headers=headers).json()['attention']]
+    user.active_restaurant_id = 202
+    row = db_session.query(models.AttentionDecision).one()
+    row.expires_at = utcnow() - timedelta(seconds=1)
+    db_session.commit()
+    assert key in [c['id'] for c in client.get('/api/v1/overview/today', headers=headers).json()['attention']]
+
+
+def test_unknown_and_legacy_unscoped_decisions_cannot_hide_advice(client, db_session, scoped_owner):
+    user, headers = scoped_owner
+    key = client.get('/api/v1/overview/today', headers=headers).json()['attention'][0]['id']
+    db_session.add(models.AttentionDecision(tenant_id=user.tenant_id, card_key=key, decision='approved'))
+    db_session.commit()
+    assert key in [c['id'] for c in client.get('/api/v1/overview/today', headers=headers).json()['attention']]
+    response = client.post('/api/v1/overview/attention/invented/decision', json={'decision': 'approved'}, headers=headers)
+    assert response.status_code == 404
+    assert db_session.query(models.AttentionDecision).count() == 1
+
+
+def test_waiter_cannot_dismiss_owner_attention(client, db_session, scoped_owner):
+    user, headers = scoped_owner
+    user.role = models.Role.STAFF
+    user.staff_role = models.StaffRole.WAITER
+    db_session.commit()
+    assert client.post('/api/v1/overview/attention/any/decision', json={'decision': 'approved'}, headers=headers).status_code == 403

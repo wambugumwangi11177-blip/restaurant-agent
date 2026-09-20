@@ -36,6 +36,8 @@ import re
 
 # +2547XXXXXXXX / 2547XXXXXXXX / 07XXXXXXXX and the 01x (Airtel/newer) ranges.
 # 10-12 digit shape with a 254/0 prefix — distinct from money figures.
+_EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.IGNORECASE)
+
 _PHONE_RE = re.compile(r"\b(?:\+?254|0)(?:7|1)\d{8}\b")
 
 # M-Pesa confirmation codes: 10 uppercase alphanumerics, e.g. "QGR7H2K9P1".
@@ -61,6 +63,7 @@ def scrub_for_llm(text: str, known_names: "list[str] | None" = None) -> str:
     behaviour (phone/M-Pesa/PIN/ID only, no name coverage)."""
     if not text or not isinstance(text, str):
         return text
+    text = _EMAIL_RE.sub("[email]", text)
     text = _PHONE_RE.sub("[phone]", text)
     text = _MPESA_RE.sub("[mpesa-code]", text)
     text = _PIN_RE.sub(lambda m: f"{m.group(1)}{m.group(2)}[redacted]", text)

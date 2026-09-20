@@ -15,7 +15,7 @@ STOP keywords follow the Twilio/industry-standard set; START/UNSTOP resume.
 
 from sqlalchemy.orm import Session
 import models
-from payments.mpesa_client import normalize_phone
+from phone_utils import normalize_phone
 
 # Standard opt-out / opt-in keywords (compared case-insensitively, trimmed).
 STOP_KEYWORDS = {"stop", "stopall", "unsubscribe", "cancel", "end", "quit", "optout", "opt out"}
@@ -28,7 +28,8 @@ def canonical(phone: str) -> str:
         return ""
     normalized = normalize_phone(phone)
     if normalized:
-        return normalized
+        # Historical suppression records use digits-only keys.
+        return normalized.lstrip("+")
     return "".join(ch for ch in phone if ch.isdigit())
 
 

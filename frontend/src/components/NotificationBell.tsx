@@ -57,7 +57,7 @@ function edgeClass(eventType: string): string {
     return EDGE_BY_EVENT_TYPE[eventType] || "border-l-[#2a2a2a]";
 }
 
-export default function NotificationBell() {
+export default function NotificationBell({ ownerHome }: { ownerHome?: string } = {}) {
     const {
         notifications, unreadCount, permission, subscribed, isIOSNotStandalone, stale,
         markRead, markAllRead, subscribeToPush,
@@ -90,7 +90,10 @@ export default function NotificationBell() {
     function handleClick(n: NotificationItem) {
         if (!n.is_read) markRead(n.id);
         setOpen(false);
-        if (n.url) router.push(n.url);
+        if (ownerHome) {
+            router.push(n.url?.includes("/support") ? `${ownerHome}/support` :
+                `${ownerHome}/os?q=${encodeURIComponent(n.title)}`);
+        } else if (n.url) router.push(n.url);
     }
 
     function renderGroup(label: string, items: NotificationItem[]) {

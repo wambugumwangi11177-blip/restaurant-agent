@@ -4,15 +4,17 @@
 // prototype-data badge, ask bar, searchable question groups, transcript
 // ("You asked" → Finding / Why this matters / Estimated impact / Recommended
 // next step card), "This period" aside with REAL numbers from /overview/today.
-// Backend wiring (tracer): POST /api/v1/ai/strategy (goal→grounded plan,
-// deterministic fallback when no LLM key).
+// Answers and suggested actions come from the same question-specific /ai/chat response.
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Search, Send, Sparkles, ShieldCheck, Info, ChevronRight } from "lucide-react";
 import api from "@/lib/api";
 import { fmtKes } from "@/lib/format";
 import { QUESTION_GROUPS } from "@/lib/osSuggestions";
-import { OsLoading } from "@/components/os/States";
+import { OsLoading, OsError } from "@/components/os/States";
+import SourceUnavailable from "@/components/vibanda/SourceUnavailable";
+
+const observerMode = process.env.NEXT_PUBLIC_OBSERVER_MODE === "true";
 
 type AiStep = { action: string; why?: string; expected_impact?: string };
 type AskCard = {
@@ -21,6 +23,7 @@ type AskCard = {
 };
 
 type Answer = {
+  evidenceNote?: string;
   finding: string;
   why: string;
   impact: string;
@@ -36,6 +39,7 @@ type Answer = {
 type Turn = { question: string; answer: Answer | null; error?: boolean };
 
 type Overview = {
+  data_provenance?: { notice: string };
   restaurant_name: string;
   revenue: { revenue: number; orders: number; avg_order: number; pace_projection: number };
   orders: { orders: number; active_now: number };
@@ -43,87 +47,6 @@ type Overview = {
   bookings: { covers_today: number };
   staff: { scheduled: number };
 };
-
-// Map a free-text question to a grounded answer built from REAL overview data
-// (deterministic — same contract as the backend's /ai/strategy fallback).
-function groundingAnswer(q: string, ov: Overview | null): Answer {
-  const s = q.toLowerCase();
-  if (!ov) {
-    return {
-      finding: "I couldn't load today's numbers just now.",
-      why: "The overview feed didn't respond — check your connection and try again.",
-      impact: "—",
-      action: "Retry the question in a moment.",
-    };
-  }
-  if (s.includes("sales") || s.includes("revenue") || s.includes("money today")) {
-    return {
-      finding: `Revenue today is ${fmtKes(ov.revenue.revenue)} across ${ov.orders.orders} orders.`,
-      why: "Counts every order recorded in your restaurant so far today (Nairobi calendar day).",
-      impact: ov.revenue.pace_projection ? `On pace for ~${fmtKes(ov.revenue.pace_projection)} today` : "—",
-      action: ov.revenue.pace_projection
-        ? "Keep the current service rhythm; compare the pace against last week's same day in Business performance."
-        : "Check back after the first orders of the day land.",
-      metric: `Average order · ${fmtKes(ov.revenue.avg_order)}`,
-    };
-  }
-  if (s.includes("run out") || s.includes("stock") || s.includes("waste") || s.includes("reorder") || s.includes("expire")) {
-    const names = ov.stock.low_stock.map((i) => i.name);
-    return {
-      finding: names.length
-        ? `${names.length} item${names.length === 1 ? "" : "s"} at or below reorder point: ${names.join(", ")}.`
-        : "Nothing is below its reorder point right now.",
-      why: names.length
-        ? "Current quantity has reached the level where a normal delivery cycle may not arrive in time."
-        : "Your stock levels are within their healthy ranges.",
-      impact: names.length ? "Avoids emergency buying at higher prices" : "—",
-      action: names.length ? `Raise today's order for ${names[0]} and confirm the next delivery slot.` : "No action needed today.",
-    };
-  }
-  if (s.includes("book") || s.includes("customer") || s.includes("no-show") || s.includes("covers")) {
-    return {
-      finding: `${ov.bookings.covers_today} covers are expected today.`,
-      why: "Counted from confirmed reservations on today's date.",
-      impact: "—",
-      action: ov.bookings.covers_today
-        ? "Staff the floor for the peak windows you already know; keep a waitlist during them."
-        : "Push a lunch offer to regulars to fill today's covers.",
-    };
-  }
-  if (s.includes("staff") || s.includes("labor") || s.includes("shift") || s.includes("understaff")) {
-    return {
-      finding: `${ov.staff.scheduled} shifts are scheduled in the current period; ${ov.orders.active_now} orders are active right now.`,
-      why: "Compare scheduled coverage against demand to spot over/understaffing.",
-      impact: "—",
-      action: "Match the shift plan to today's expected covers before the next service.",
-    };
-  }
-  if (s.includes("focus") || s.includes("worried") || s.includes("health") || s.includes("one thing") || s.includes("everything")) {
-    return ov.stock.low_stock.length
-      ? {
-          finding: `The most urgent thing today is stock: ${ov.stock.low_stock.map((i) => i.name).join(", ")} ${ov.stock.low_stock.length === 1 ? "is" : "are"} below reorder point.`,
-          why: "A stockout forces emergency buying and can take items off the menu mid-service.",
-          impact: "Protects today's menu availability",
-          action: `Reorder ${ov.stock.low_stock[0].name} today.`,
-          next: "Then review Business performance on Home for the 7-day trend.",
-        }
-      : {
-          finding: `Nothing urgent — ${ov.orders.orders} orders and ${fmtKes(ov.revenue.revenue)} revenue so far today.`,
-          why: "No items below reorder point and no stuck orders flagged.",
-          impact: "—",
-          action: "Use the quiet to review the 7-day performance trend on Home.",
-        };
-  }
-  // Default: grounded overview snapshot
-  return {
-    finding: `Today: ${fmtKes(ov.revenue.revenue)} revenue · ${ov.orders.orders} orders · ${ov.bookings.covers_today} covers expected · ${ov.stock.low_stock.length} stock item(s) to watch.`,
-    why: "Pulled live from your restaurant's data as of right now (Nairobi day).",
-    impact: "—",
-    action: ov.stock.low_stock.length
-      ? `Most useful next step: reorder ${ov.stock.low_stock[0].name}.`
-      : "Ask about sales, stock, bookings, staff, or the kitchen for specifics.",
-  };
-}
 
 function OsChatInner() {
   const params = useSearchParams();
@@ -135,85 +58,60 @@ function OsChatInner() {
   // Settled (success OR failure) — not merely "loaded". A ?q= question must
   // wait for this, see the prefill effect below.
   const [overviewReady, setOverviewReady] = useState(false);
+  const [overviewError, setOverviewError] = useState(false);
   const prefillAsked = useRef(false);
-  const latestTurnRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    api.get<Overview>("/api/v1/overview/today")
-      .then((r) => setOverview(r.data))
-      .catch(() => {})
-      .finally(() => setOverviewReady(true));
+    let active = true;
+    api.get<Overview>("/api/v1/overview/today", { timeout: 15000 })
+      .then((r) => { if (active) setOverview(r.data); })
+      .catch(() => { if (active) setOverviewError(true); })
+      .finally(() => { if (active) setOverviewReady(true); });
+    return () => { active = false; };
   }, []);
-
-  // Bring the NEW question to the top of the viewport so the answer fills in
-  // directly below it, in view.
-  //
-  // This used to scroll a marker placed AFTER the transcript to the top of the
-  // viewport, which pushed the answer above the fold — the owner had to scroll
-  // back up to read every reply. Keyed on turns.length, not `turns`, so the
-  // page holds still while the answer streams into the card the reader is
-  // already looking at.
-  useEffect(() => {
-    if (!turns.length) return;
-    latestTurnRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [turns.length]);
 
   const ask = async (question: string) => {
     const q = question.trim();
-    if (!q || busy) return;
+    if (q.length < 3 || q.length > 500 || busy) return;
     setInput("");
     setTurns((t) => [...t, { question: q, answer: null }]);
     setBusy(true);
     try {
-      // Tracer wiring: real backend. /ai/strategy takes a goal + timeframe and
-      // returns a grounded plan (LLM when GROQ_API_KEY is set, deterministic
-      // otherwise). We also compute a deterministic grounded answer from the
-      // overview feed so the card is always truthful even if the AI errors.
-      // Real-time LLM chat: POST /ai/chat grounds the question in the RIGHT
-      // ai/ module's real data, then OpenRouter writes the conversational
-      // reply from those numbers. Strategy steps + deterministic card remain
-      // as fallbacks so the chat never goes dark.
+      // Use only the question-specific grounded response. A failed request
+      // must not be replaced with unrelated overview advice.
       let card: AskCard | null = null;
       let llmReply: string | undefined;
-      let aiSteps: { action: string; why?: string; expected_impact?: string }[] = [];
-      let aiHeadline = "";
       try {
         const r = await api.post("/api/v1/ai/chat", {
           question: q,
-          history: turns.slice(-4).map((t) => ({ role: "user", content: t.question })),
-        });
+          history: turns.slice(-3).flatMap((t) => [
+            { role: "user", content: t.question },
+            ...(t.answer ? [{ role: "assistant", content: (t.answer.llmReply || t.answer.finding).slice(0, 4000) }] : []),
+          ]),
+        }, { timeout: 45000 });
         card = r.data?.grounded ?? null;
         llmReply = r.data?.llm_reply ?? undefined;
       } catch { card = null; }
-      try {
-        const r2 = await api.post("/api/v1/ai/strategy", { goal: q, timeframe: "today" });
-        const st = r2.data?.strategy;
-        if (st?.steps?.length) {
-          aiHeadline = st.headline ?? "";
-          aiSteps = st.steps.slice(0, 5).map((s: { action?: string; why?: string; expected_impact?: string }) => ({
-            action: s.action ?? "",
-            why: s.why,
-            expected_impact: s.expected_impact === "not quantified" ? undefined : s.expected_impact,
-          }));
-        }
-      } catch { aiSteps = []; }
-
       const answer: Answer = card
         ? {
+            evidenceNote: typeof card.data?.evidence_note === "string" ? card.data.evidence_note : undefined,
             finding: card.finding,
             why: card.why,
             impact: card.impact || "—",
             action: card.recommendation,
             module: card.module,
             llmReply,
-            aiHeadline: aiHeadline || undefined,
-            aiSteps: aiSteps.length ? aiSteps : (card.steps || []).map((s) => ({ action: s.action ?? "", why: s.why })),
+            aiSteps: (card.steps || []).map((s) => ({ action: s.action ?? "", why: s.why })),
           }
-        : (() => {
-            const g = groundingAnswer(q, overview);
-            return { ...g, llmReply, aiSteps: aiSteps.length ? aiSteps : undefined, aiHeadline: aiSteps.length ? aiHeadline : undefined };
-          })();
+        : {
+            finding: "I couldn't complete that question.",
+            why: "The answer service did not return a verified result.",
+            impact: "Not available",
+            action: "Please try your question again. No restaurant changes were made.",
+          };
       setTurns((t) => t.map((turn, i) => (i === t.length - 1 ? { question: q, answer } : turn)));
+    } catch {
+      setTurns((t) => t.map((turn, i) => (i === t.length - 1 ? { question: q, answer: null, error: true } : turn)));
     } finally {
       setBusy(false);
     }
@@ -261,7 +159,7 @@ function OsChatInner() {
           <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--v-accent)] text-[var(--v-accent-foreground)]">
             <Info size={10} />
           </span>
-          Prototype data · {overview?.restaurant_name ?? "Vibanda Village"}
+          {overview?.data_provenance?.notice ?? "Source synchronization and completeness have not been verified."}
         </div>
       </div>
 
@@ -273,11 +171,14 @@ function OsChatInner() {
         <Search size={17} className="ml-4 shrink-0 text-[var(--v-muted-foreground)]" />
         <input
           value={input}
+          maxLength={500}
           onChange={(e) => setInput(e.target.value)}
+          aria-label="Your restaurant question"
+          maxLength={500}
           placeholder="Ask anything about your restaurant..."
           className="min-w-0 flex-1 bg-transparent px-3 py-4 text-sm outline-none placeholder:text-[hsl(207_12%_46_/_0.7)]"
         />
-        <button type="submit" disabled={busy}
+        <button type="submit" aria-label="Send question" disabled={busy || input.trim().length < 3}
           className="mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--v-primary)] text-[var(--v-primary-foreground)] disabled:opacity-50">
           <Send size={15} />
         </button>
@@ -302,7 +203,6 @@ function OsChatInner() {
               {turns.map((t, i) => (
                 <div
                   key={i}
-                  ref={i === turns.length - 1 ? latestTurnRef : undefined}
                   className="scroll-mt-4 space-y-3"
                 >
                   {/* You asked */}
@@ -315,6 +215,7 @@ function OsChatInner() {
                     </div>
                   </div>
                   {/* Answer card */}
+                  {t.error && <OsError message="Couldn't verify an answer. Please retry." onRetry={() => ask(t.question)} />}
                   {t.answer && (
                     <div className="ml-11 overflow-hidden rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] shadow-[0_10px_35px_hsl(201_47%_29_/.05)]">
                       <div className="border-b border-[var(--v-border)] bg-[hsl(39_26%_93_/_0.45)] px-4 py-3">
@@ -322,6 +223,7 @@ function OsChatInner() {
                         <p className="mt-1 text-[13px] font-semibold">{t.question}</p>
                       </div>
                       <div className="space-y-5 p-4 sm:p-5">
+                        {t.answer.evidenceNote && <p className="text-xs text-[var(--v-muted-foreground)]">{t.answer.evidenceNote}</p>}
                         {t.answer.llmReply && (
                           <div className="rounded-xl bg-[hsl(42_71%_75_/_0.18)] p-3.5">
                             <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[hsl(208_29%_19_/_0.92)]">{t.answer.llmReply}</p>
@@ -426,7 +328,11 @@ function OsChatInner() {
             <div className="mb-3 flex items-center justify-between">
               <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--v-muted-foreground)]">This period</p>
             </div>
-            <div className="space-y-4">
+            {!overview ? (
+              <p role={overviewError ? "alert" : "status"} className="text-sm text-[var(--v-muted-foreground)]">
+                {overviewError ? "Today's figures are unavailable. Reload to retry." : "Loading today's figures…"}
+              </p>
+            ) : <div className="space-y-4">
               <div>
                 <p className="text-[10px] text-[var(--v-muted-foreground)]">Revenue</p>
                 <p className="font-display mt-1 text-xl font-semibold">{fmtKes(overview?.revenue.revenue ?? 0)}</p>
@@ -444,7 +350,7 @@ function OsChatInner() {
                   <p className="mt-1 text-sm font-semibold">{fmtKes(overview?.revenue.avg_order ?? 0)}</p>
                 </div>
               </div>
-            </div>
+            </div>}
           </div>
           <div className="rounded-xl border border-[var(--v-border)] bg-[var(--v-primary)] p-4 text-[var(--v-primary-foreground)]">
             <div className="flex items-center gap-2">
@@ -460,7 +366,7 @@ function OsChatInner() {
           </div>
           <div className="flex items-start gap-2.5 px-1 pt-1 text-[10px] leading-relaxed text-[var(--v-muted-foreground)]">
             <ShieldCheck size={14} className="mt-0.5 shrink-0" />
-            <span>Answers come from your restaurant&apos;s real data. Always confirm operational changes with your team.</span>
+            <span>Answers use recorded restaurant data; completeness and freshness may vary. Always confirm operational changes with your team.</span>
           </div>
         </aside>
       </div>
@@ -469,6 +375,10 @@ function OsChatInner() {
 }
 
 export default function VibandaOsPage() {
+  return observerMode ? <SourceUnavailable title="Ask" detail="Questions unlock when their answers can be grounded in validated Macsoft facts." /> : <VibandaOsContent />;
+}
+
+function VibandaOsContent() {
   return (
     <Suspense fallback={<div className="p-6 text-sm text-[var(--v-muted-foreground)]">Loading…</div>}>
       <OsChatInner />

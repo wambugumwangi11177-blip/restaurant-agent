@@ -19,6 +19,8 @@ import logging
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
+from pydantic import BaseModel
+from typing import Literal
 from sqlalchemy.orm import Session
 
 import models
@@ -104,13 +106,15 @@ def _stock_card(db: Session, rid: int) -> dict:
         models.Restaurant.id == rid,
         models.InventoryItem.quantity <= models.InventoryItem.low_stock_threshold,
     ).all()
-    return {"low_stock": [{"name": i.item_name, "qty": float(i.quantity)} for i in low],
+    total = db.query(func.count(models.InventoryItem.id)).filter(models.InventoryItem.restaurant_id == rid).scalar()
+    return {"recorded_items": total, "low_stock": [{"name": i.item_name, "qty": float(i.quantity)} for i in low],
             "expiring_48h": [], "waste_pct_week": 0.0}
 
 
 def _bookings_card(db: Session, rid: int, start, end) -> dict:
     covers = db.query(func.coalesce(func.sum(models.Reservation.party_size), 0)).filter(
         models.Reservation.restaurant_id == rid,
+        models.Reservation.status == models.ReservationStatus.CONFIRMED,
         models.Reservation.reservation_date >= (start + _EAT_OFFSET).date(),
         models.Reservation.reservation_date <= (end + _EAT_OFFSET).date(),
     ).scalar()
@@ -173,11 +177,13 @@ def _card_key(agent: str, action: str) -> str:
     outranked it. Agent + the advice itself is stable for as long as the advice
     is, and changes when the advice does, which is the behaviour we want.
     """
-    digest = hashlib.sha1(f"{agent}|{action}".encode("utf-8")).hexdigest()[:10]
+    # Stable display/dismissal key, never an authentication or integrity check.
+    # Preserve existing keys so previously reviewed cards do not reappear.
+    digest = hashlib.sha1(f"{agent}|{action}".encode("utf-8"), usedforsecurity=False).hexdigest()[:10]
     return f"d-{digest}"
 
 
-def _decision_cards(db: Session, rid: int) -> list:
+def _decision_cards(db: Session, rid: int, source_status: dict | None = None) -> list:
     """What needs attention, from the Decision Intelligence layer.
 
     This is the point of the Home page: the owner should not have to ask. Every
@@ -191,6 +197,8 @@ def _decision_cards(db: Session, rid: int) -> list:
     from ai.decisions import get_ranked_decisions
 
     data = get_ranked_decisions(db, rid)
+    if source_status is not None:
+        source_status.update(data.get("source_status", {}))
     cards = []
     for d in data.get("decisions", [])[:8]:
         action = (d.get("action") or "").strip()
@@ -254,7 +262,7 @@ def _operational_cards(db: Session, rid: int) -> list:
     return cards
 
 
-def _attention_cards(db: Session, rid: int, tenant_id: int) -> list:
+def _attention_cards(db: Session, rid: int, tenant_id: int, include_decided: bool = False, source_status: dict | None = None) -> list:
     """The Home page's "what needs your attention", operational first.
 
     Order is deliberate: what is happening now (a stockout, an unapproved
@@ -267,11 +275,20 @@ def _attention_cards(db: Session, rid: int, tenant_id: int) -> list:
     right trade here — Home must always render.
     """
     cards = _operational_cards(db, rid)
+    from ai.home_specialists import collect
+    specialist_cards, specialist_status = collect(db, rid)
+    if source_status is not None:
+        source_status.update(specialist_status)
+    for card in specialist_cards:
+        card["id"] = _card_key(card["domain"], card["title"] + "|" + card.pop("entity", ""))
+    cards.extend(specialist_cards)
     try:
-        ai_cards = _decision_cards(db, rid)
+        ai_cards = _decision_cards(db, rid, source_status) if source_status is not None else _decision_cards(db, rid)
     except Exception:  # noqa: BLE001 — Home must render even if an agent fails
         logger.exception("[overview] decision layer failed for restaurant %s", rid)
         ai_cards = []
+        if source_status is not None:
+            source_status["decision_analysis"] = {"state": "failed", "recommendations": None}
 
     # Drop AI advice that restates an operational card. "Beef is running low"
     # and "Reorder Beef soon" are one problem; showing both makes the page look
@@ -296,9 +313,21 @@ def _attention_cards(db: Session, rid: int, tenant_id: int) -> list:
         seen_titles.add(title_l)
         cards.append(c)
 
-    decided = {d.card_key for d in db.query(models.AttentionDecision).filter(
-        models.AttentionDecision.tenant_id == tenant_id).all()}
-    return [c for c in cards if c["id"] not in decided]
+    if include_decided:
+        return cards
+    # Legacy unscoped rows remain audit history, never hide another branch's work.
+    rows = db.query(models.AttentionDecision).filter(
+        models.AttentionDecision.tenant_id == tenant_id,
+        models.AttentionDecision.restaurant_id == rid,
+    ).order_by(models.AttentionDecision.id.desc()).all()
+    latest = {}
+    for row in rows:
+        latest.setdefault(row.card_key, row)
+    now = utcnow()
+    hidden = {key for key, row in latest.items()
+              if row.decision != "later" or (row.expires_at and row.expires_at > now)}
+    return [c for c in cards if c["id"] not in hidden]
+
 
 
 def _pulse(db: Session, rid: int, core: dict, stock: dict, bookings: dict) -> list:
@@ -353,7 +382,21 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
     stock = _stock_card(db, rid)
     operational_start, operational_end = _eat_range("today")
     bookings = _bookings_card(db, rid, operational_start, operational_end)
+    source_status = {}
+    attention = _attention_cards(db, rid, user.tenant_id, source_status=source_status)
+    for domain in ("integration",):
+        source_status[domain] = {"state": "not_evaluated", "recommendations": None}
+    latest_order = db.query(func.max(models.Order.created_at)).filter(models.Order.restaurant_id == rid).scalar()
     return {
+        "source_status": source_status,
+        "data_provenance": {
+            "source": "recorded_restaurant_data",
+            "integration_verified": False,
+            "latest_order_at": latest_order.isoformat() if latest_order else None,
+            "sales_window_start": start.isoformat(), "sales_window_end": end.isoformat(),
+            "timezone": "Africa/Nairobi",
+            "notice": "Recorded data only. Live source synchronization and completeness have not been verified.",
+        },
         "greeting_date": _eat_now().date().isoformat(),
         "restaurant_name": db.query(models.Restaurant.name).filter(
             models.Restaurant.id == rid).scalar() or "Vibanda Village",
@@ -367,22 +410,39 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
         "stock": stock,
         "bookings": bookings,
         "staff": _staff_card(db, rid, operational_start, operational_end),
-        "attention": _attention_cards(db, rid, user.tenant_id),
+        "attention": attention,
         "pulse": _pulse(db, rid, _summarize(db, rid, operational_start, operational_end), stock, bookings),
         "performance": _performance(db, rid),
     }
 
 
+class DecisionBody(BaseModel):
+    decision: Literal["approved", "later", "rejected"]
+
+
 @router.post("/attention/{card_key}/decision")
-def decide(card_key: str, body: dict, db: Session = Depends(get_db),
+def decide(card_key: str, body: DecisionBody, db: Session = Depends(get_db),
            user=Depends(require_staff_role())):
-    _restaurant_id(db, user)  # Apply the same ownership check as the feed.
-    if body.get("decision") not in ("approved", "later", "rejected"):
-        raise HTTPException(422, "decision must be approved|later|rejected")
-    row = models.AttentionDecision(
-        tenant_id=user.tenant_id, card_key=card_key, decision=body["decision"],
-        decided_by=user.id,
-    )
-    db.add(row)
+    rid = _restaurant_id(db, user)
+    if not rid:
+        raise HTTPException(404, "Restaurant not found")
+    # Serialize decisions per restaurant on PostgreSQL, including retries.
+    db.query(models.Restaurant).filter_by(id=rid, tenant_id=user.tenant_id).with_for_update().one()
+    latest = db.query(models.AttentionDecision).filter_by(
+        tenant_id=user.tenant_id, restaurant_id=rid, card_key=card_key,
+    ).order_by(models.AttentionDecision.id.desc()).first()
+    now = utcnow()
+    if not (latest and latest.decision == body.decision and
+            (latest.decision != "later" or (latest.expires_at and latest.expires_at > now))):
+        if card_key not in {c["id"] for c in _attention_cards(db, rid, user.tenant_id, include_decided=True)}:
+            raise HTTPException(404, "Attention card is no longer available for this restaurant")
+        latest = models.AttentionDecision(
+            tenant_id=user.tenant_id, restaurant_id=rid, card_key=card_key,
+            decision=body.decision, decided_by=user.id,
+            expires_at=now + timedelta(hours=24) if body.decision == "later" else None,
+        )
+        db.add(latest)
     db.commit()
-    return {"card_key": card_key, "status": body["decision"]}
+    return {"card_key": card_key, "status": body.decision,
+            "action_executed": False,
+            "expires_at": latest.expires_at.isoformat() if latest.expires_at else None}

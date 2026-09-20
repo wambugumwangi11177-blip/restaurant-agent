@@ -26,11 +26,12 @@ def latest_version(db: Session, source_system_id: int, entity: str, source_id: s
             MirrorEvent.source_system_id == source_system_id,
             MirrorEvent.entity == entity,
             MirrorEvent.source_id == source_id,
+            MirrorEvent.action.in_(("inserted", "superseded")),
         )
         .order_by(MirrorEvent.id.desc())
         .first()
     )
-    if row is None or row.action not in ("inserted", "superseded"):
+    if row is None:
         return None
     return row.source_version
 
@@ -57,7 +58,17 @@ def ingest(
     dedupe check and would insert twice.
     """
     current = latest_version(db, source_system_id, entity, source_id)
-    if current == source_version:
+    # Retry identity is the complete source key, not just the latest event.
+    # A skip is an audit event, never a replacement for the applied version.
+    # Replaying a previously applied older version must not roll it back.
+    already_applied = db.query(MirrorEvent.id).filter(
+        MirrorEvent.source_system_id == source_system_id,
+        MirrorEvent.entity == entity,
+        MirrorEvent.source_id == source_id,
+        MirrorEvent.source_version == source_version,
+        MirrorEvent.action.in_(("inserted", "superseded")),
+    ).first() is not None
+    if already_applied:
         action = "skipped"
         reason = "same source_version already applied"
     elif current is None:

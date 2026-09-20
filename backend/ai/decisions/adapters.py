@@ -235,7 +235,8 @@ _ADAPTERS = {
 
 
 def collect_decisions(
-    db: Session, restaurant_id: int, sources: list[str] | None = None
+    db: Session, restaurant_id: int, sources: list[str] | None = None,
+    source_status: dict | None = None,
 ) -> list[Decision]:
     """
     Gather Decisions from every (or a subset of) agent. Each source runs in
@@ -248,7 +249,13 @@ def collect_decisions(
         if adapter is None:
             continue
         try:
-            decisions.extend(adapter(db, restaurant_id))
+            with db.begin_nested():
+                result = adapter(db, restaurant_id)
+            decisions.extend(result)
+            if source_status is not None:
+                source_status[name] = {"state": "evaluated", "recommendations": len(result)}
         except Exception as exc:  # noqa: BLE001 — degrade per-source, never 500
+            if source_status is not None:
+                source_status[name] = {"state": "failed", "recommendations": None}
             logger.warning("decision adapter '%s' failed: %s", name, exc)
     return decisions

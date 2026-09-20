@@ -88,7 +88,7 @@ _REDACTION = "[unverified]"
 # hyphen doing other work is not: "2026-07-08" still reads 2026/07/08 and the
 # range "15-20%" still reads 15 and 20, not 15 and -20.
 _NUMBER_RE = re.compile(
-    r"(?P<cur>KES\s*|\$\s*|USD\s*)?"
+    r"(?P<cur>KES\s*|KSH\s*|\$\s*|USD\s*)?"
     r"(?P<num>(?<![\w.,])-?(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?))"
     r"(?P<pct>\s*%)?",
     re.IGNORECASE,

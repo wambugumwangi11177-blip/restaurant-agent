@@ -118,14 +118,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             router.push("/login");
             return;
         }
-        // Vibanda tenants live in their own 3-page shell — never in the
+        // Staff role first, tenant second. /vibanda is an owner surface —
+        // GET /overview/today is ADMIN-only — so sending a Vibanda waiter
+        // there drops them on a page where every call 403s, with
+        // app/staff/layout.tsx sending them back here and this sending them
+        // straight out again. The two guards used to point at each other.
+        if (isStaffAccount && staffRole) {
+            router.push(tierHome(staffRole));
+            return;
+        }
+        // Vibanda OWNERS live in their own 3-page shell — never in the
         // generic dashboard (plan 2026-09-12). Bounce any deep link.
         if (isVibanda(user.tenant_name)) {
             router.push("/vibanda");
             return;
-        }
-        if (isStaffAccount && staffRole) {
-            router.push(tierHome(staffRole));
         }
     }, [user, isLoading, isStaffAccount, staffRole, router]);
 

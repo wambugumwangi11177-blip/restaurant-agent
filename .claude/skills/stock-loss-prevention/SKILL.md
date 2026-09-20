@@ -19,12 +19,13 @@ and shouldn't be skipped even when the fix feels obvious.
 
 - `backend/models.py: StockMovement` (search `class StockMovement`) tracks
   `movement_type` (`IN/OUT/ADJUST`), `quantity`, freeform `reason` ("sale",
-  "waste", "purchase", "adjustment"), `created_at`. **It has no field
-  recording who performed the movement.** This is the actual gap: you
-  cannot answer "who moved this stock" today. Any loss-prevention work
-  starts here — add `performed_by_user_id` (or `staff_member_id`) before
-  building variance reports on top of it, or the reports will have no
-  accountability trail, which defeats the point.
+  "waste", "purchase", "adjustment"), `created_at`, **and
+  `performed_by_user_id`** (`models.py:469`, added by migration
+  `025_add_staff_rbac_and_stock_custody.py`). The accountability trail
+  exists — "who moved this stock" is answerable today. This paragraph used
+  to say the opposite and was still saying it in September 2026, long after
+  the column landed; if you are reading a skill file, check the model before
+  you trust it.
 - `Supplier` and `PurchaseOrder` (`models.py`, search `class Supplier`)
   **already model supplier→store**: `PurchaseOrder.quantity_ordered` vs
   `quantity_received`, `status` (`PENDING→SENT→DELIVERED/LATE/PARTIAL`).
@@ -73,27 +74,49 @@ why the numbers are what they are:
   detection without also making sure that role boundary actually holds in
   the routers, or the control is theater.
 
-## Implementation sequence
+## What is already built (verified 2026-09-19)
 
-1. Draft/update the directive (see above) if it doesn't already reflect
-   this plan.
-2. Migration: `performed_by_user_id` on `StockMovement` (nullable initially
-   for backward compat with existing rows, required going forward at the
-   API layer).
-3. New structured transfer concept for store→kitchen (a `reason="transfer"`
-   movement pair, or a dedicated model if the freeform `reason` proves too
-   loose to query reliably — check how `reason` is actually queried
-   elsewhere before deciding).
-4. Variance computation: theoretical (via `MenuIngredient` + sales) vs.
-   actual (via `StockMovement` OUT), surfaced as a report, gated to
-   Controller/Owner/Manager per the permission matrix.
-5. New event type (e.g. `STOCK_VARIANCE_FLAGGED`) through `events/bus.py`,
-   one handler, reusing the `last_alerted_at`-style per-subject cooldown —
-   do not let both an emitter and a handler send the WhatsApp/SMS
-   themselves (see the double-send bug reference above).
-6. Verify: unit test the variance math against known-good and known-bad
-   scenarios (zero variance, under-threshold, over-threshold), and confirm
-   the cooldown actually prevents re-alerting within the window before
+Steps 1-5 of the original sequence are **done**. Do not rebuild them:
+
+1. `directives/016_stock_custody_risk_and_staff_comms.md` covers this
+   workstream.
+2. `performed_by_user_id` is on `StockMovement` (migration 025).
+3. Store→kitchen transfers are modelled: `ai/stock_custody.py`'s
+   `request_transfer:260`, `fulfill_transfer:313`, `confirm_transfer:160`,
+   plus `submit_count:372` for blind counts.
+4. `compute_variance_report:91` computes theoretical (via `MenuIngredient` +
+   sales) against actual (`StockMovement` OUT) at a 3% threshold (`:33`),
+   exposed at `GET /stock/variance-report` and gated to
+   Owner/Manager/Controller.
+5. `STOCK_VARIANCE_FLAGGED` flows through `events/bus.py` to one handler,
+   and `main.py`'s `variance_check` job runs it nightly at 21:00 EAT.
+
+## What was actually missing, and is now fixed
+
+The gap was never the detection — it was that **nothing showed it to the
+owner**. `ai/decisions/adapters.py` registered six sources and none of them
+were loss prevention, so variance, theft, cash and cost-data findings were
+computed on schedule and reached no screen the owner opens. Fixed
+2026-09-19: `from_stock_custody`, `from_fraud`, `from_cash_reconciliation`
+and `from_data_quality` are registered in `_ADAPTERS` and surface on Home.
+
+If you are extending this, the lesson generalises: **a detector that is not
+registered in `_ADAPTERS` is invisible, however good its tests are.**
+`tests/test_loss_prevention_reaches_home.py` pins the registered list for
+that reason.
+
+## Remaining sequence for new work
+1. Register any new detector in `ai/decisions/adapters.py::_ADAPTERS` and
+   add it to the list `tests/test_loss_prevention_reaches_home.py` pins —
+   an unregistered detector is invisible.
+2. Quantify the loss where the module genuinely observed money, and leave it
+   unquantified where it did not. Ranking weights impact at 0.45, so an
+   unquantified finding can never outrank a priced one; inventing a figure
+   to game that is worse than the finding ranking low.
+3. Verify: unit test the variance math against known-good and known-bad
+   scenarios (zero variance, under-threshold, over-threshold), assert the
+   finding reaches `GET /overview/today`, and confirm the cooldown prevents
+   re-alerting within the window before
    calling this done.
 
 ## When you're done

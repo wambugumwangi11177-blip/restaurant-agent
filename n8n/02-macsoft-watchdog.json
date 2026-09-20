@@ -1,0 +1,215 @@
+{
+  "name": "LEVIII \u2014 MacSoft delivery watchdog",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 * * * *"
+            }
+          ]
+        }
+      },
+      "name": "Hourly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.LEVIII_API_BASE }}/webhooks/macsoft/status",
+        "options": {
+          "timeout": 60000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.LEVIII_MACSOFT_KEY }}"
+            }
+          ]
+        }
+      },
+      "name": "Read MacSoft status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.total_records }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ],
+          "boolean": [
+            {
+              "value1": "={{ $json.projection.projected === 0 }}",
+              "value2": true
+            }
+          ]
+        },
+        "combineOperation": "all"
+      },
+      "name": "Data arriving but not landing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        760,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_ALERT_WEBHOOK }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "*MacSoft data is landing and not reaching the dashboard*\n{{ $json.total_records }} record(s) mirrored, {{ $json.projection.projected }} projected. Top unmapped reasons: {{ JSON.stringify($json.projection.top_unmapped_reasons) }}. Widen the field lists in integration/projection.py and run reproject_all."
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Alert: stored but invisible",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.projection.unmapped }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "name": "New unmapped reasons?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_ALERT_WEBHOOK }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "*MacSoft is sending fields the mapping does not know*\n{{ $json.projection.unmapped }} record(s) unmapped. Reasons: {{ JSON.stringify($json.projection.top_unmapped_reasons) }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Alert: unmapped records",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Hourly": {
+      "main": [
+        [
+          {
+            "node": "Read MacSoft status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read MacSoft status": {
+      "main": [
+        [
+          {
+            "node": "Data arriving but not landing?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data arriving but not landing?": {
+      "main": [
+        [
+          {
+            "node": "Alert: stored but invisible",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "New unmapped reasons?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New unmapped reasons?": {
+      "main": [
+        [
+          {
+            "node": "Alert: unmapped records",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true
+  },
+  "meta": {
+    "leviiiNotes": [
+      "The failure this exists for: a push stores perfectly and changes nothing on screen.",
+      "total_records rising while projection.projected stays flat is exactly that signature,",
+      "and it went unnoticed until the September audit because the only check counted mirror rows.",
+      "top_unmapped_reasons naming a new field is fixable in minutes if you hear about it the same day."
+    ]
+  },
+  "active": false
+}

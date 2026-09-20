@@ -16,7 +16,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from logging_config import configure_logging
-from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support, tables, attendance, fraud, cash_reconciliation, restaurants, overview, reports, ai_ask
+from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support, tables, attendance, fraud, cash_reconciliation, restaurants, overview, reports, ai_ask, jobs
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
@@ -113,8 +113,30 @@ def on_startup():
     except Exception as e:
         logger.warning(f"[WARN] Push notification handler registration failed: {e}")
 
-    # 3. Schedule morning WhatsApp briefing (07:00 EAT = 04:00 UTC)
-    _start_scheduler()
+    # 3. Scheduled work.
+    #
+    # APScheduler runs these in THIS process, so they die with the container,
+    # restart silently on the next boot, and leave no record of whether last
+    # night's run happened. routers/jobs.py exposes the same thirteen jobs to
+    # an external scheduler (n8n) that keeps the execution history, the retry
+    # and the failure alert.
+    #
+    # Defaults to ON: a deploy that silently stopped running scheduled work
+    # because a variable was missing would be far worse than running it twice.
+    # Set ENABLE_INTERNAL_SCHEDULER=false once n8n is confirmed driving them.
+    if _internal_scheduler_enabled():
+        _start_scheduler()
+    else:
+        logger.info(
+            "[scheduler] in-process scheduler disabled by ENABLE_INTERNAL_SCHEDULER "
+            "— scheduled work must be driven via POST /internal/jobs/{name}"
+        )
+
+
+def _internal_scheduler_enabled() -> bool:
+    """Whether to run jobs in-process. On unless explicitly turned off."""
+    raw = (os.getenv("ENABLE_INTERNAL_SCHEDULER") or "true").strip().lower()
+    return raw not in ("0", "false", "no", "off")
 
 
 def _start_scheduler():
@@ -413,6 +435,74 @@ def _run_escalation_sweep_job():
         logger.error(f"[Escalation Sweep] Scheduler job failed: {exc}")
 
 
+def _run_mirror_reconcile_job():
+    """Prove every mirrored record became a domain row, or is accounted for.
+
+    NOT a source-vs-mirror reconciliation. MacSoft is push-only and exposes no
+    list endpoint — they refused database access, and integration/source_client.py
+    has no configured base URL — so we cannot ask them what they think they sent.
+    Claiming otherwise would be the kind of reassuring check that proves nothing.
+
+    What IS checkable, and matters now that integration/projection.py exists:
+    every record in the mirror should have a ProjectionLink saying what became
+    of it — a domain row, or a recorded reason it could not be mapped. A
+    mirrored record with no link at all was silently dropped between the two
+    layers, which is exactly the failure class that let MacSoft data land
+    perfectly and change nothing on screen for weeks.
+
+    Fail-closed, via integration/reconcile.py: a run that cannot prove equality
+    ends `mismatch`, never `clean`, and the result is written to ReconcileRun
+    so there is a record of last night's answer.
+    """
+    try:
+        from sqlalchemy import func
+        from database import SessionLocal
+        from integration.models import MirrorEvent, ProjectionLink, SourceSystem
+        from integration.reconcile import reconcile
+
+        db = SessionLocal()
+        try:
+            results = []
+            for source in db.query(SourceSystem).all():
+                # The latest kept action per record — a superseded version is
+                # history, and counting it would report false drift.
+                latest = (
+                    db.query(MirrorEvent.entity, MirrorEvent.source_id,
+                             func.max(MirrorEvent.id))
+                    .filter(MirrorEvent.source_system_id == source.id,
+                            MirrorEvent.action.in_(("inserted", "superseded")))
+                    .group_by(MirrorEvent.entity, MirrorEvent.source_id)
+                    .all()
+                )
+                mirrored = {f"{entity}:{sid}" for entity, sid, _ in latest}
+                linked = {
+                    f"{row.entity}:{row.source_id}"
+                    for row in db.query(ProjectionLink).filter(
+                        ProjectionLink.source_system_id == source.id).all()
+                }
+                result = reconcile(
+                    db, source_system_id=source.id, entity="__all__",
+                    source_ids=sorted(mirrored), mirror_ids=sorted(linked),
+                )
+                results.append({"source": source.slug, "status": result.status,
+                                "mirrored": result.source_count,
+                                "projected_or_recorded": result.mirror_count,
+                                "detail": result.detail})
+                if result.status != "clean":
+                    logger.warning("[reconcile] %s: %s", source.slug, result.detail)
+            overall = "clean" if all(r["status"] == "clean" for r in results) else "mismatch"
+            if not results:
+                overall = "clean"
+            return {"status": overall, "sources": results}
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.exception("[reconcile] job failed")
+        # Re-raised so POST /internal/jobs/mirror_reconcile returns 500 and the
+        # external scheduler's retry and alerting fire. Fail closed.
+        raise
+
+
 def _run_outbox_sweep_job():
     """Audit remediation, Tier 2 item 5: retry NotificationOutbox rows left
     behind by a failed events/bus.py handler call. events.bus.sweep_outbox()
@@ -610,6 +700,9 @@ _VERSIONED_ROUTERS = [
 app.include_router(auth.router)
 app.include_router(webhooks.router)
 app.include_router(health.router)
+# Unversioned, like the webhooks it sits beside: an external scheduler's URL
+# should not move when the public API version does.
+app.include_router(jobs.router)
 for _r in _VERSIONED_ROUTERS:
     app.include_router(_r, prefix="/api/v1")          # canonical, documented
     app.include_router(_r, include_in_schema=False)   # legacy path, still works

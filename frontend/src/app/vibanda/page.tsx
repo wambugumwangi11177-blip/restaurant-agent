@@ -31,6 +31,13 @@ type Feed = {
     // inference, so a trust % on it would be theatre.
     priority_score?: number;
     confidence_pct?: number;
+    // What the primary button will actually do. Approving used to record a
+    // click and nothing else, so "Approve" and "Reject" had identical effects
+    // on the business. The backend now says per card whether it can carry the
+    // decision out, and the button is labelled from that rather than assuming.
+    applies?: boolean;
+    action_label?: string;
+    apply_hint?: string;
   }[];
   pulse: { domain: string; headline: string; detail: string }[];
   performance: { revenue_trend: { date: string; revenue: number; orders: number }[] };
@@ -157,9 +164,16 @@ function AttentionCard({ card, onDecide, onAsk }: {
           <p className="mt-1 text-xs leading-relaxed text-[hsl(208_29%_19_/_0.72)]">{card.what_to_do}</p>
         </div>
       </div>
+      {card.apply_hint && (
+        <p className="ml-12 mt-3 text-[10px] leading-relaxed text-[var(--v-muted-foreground)]">
+          {card.apply_hint}
+        </p>
+      )}
       <div className="ml-12 mt-4 flex flex-wrap items-center gap-2">
         <button onClick={() => onDecide(card.id, "approved")}
-          className="min-h-9 rounded-lg bg-[var(--v-primary)] px-3 py-2 text-[10px] font-bold text-[var(--v-primary-foreground)] hover:brightness-105">Approve</button>
+          className="min-h-9 rounded-lg bg-[var(--v-primary)] px-3 py-2 text-[10px] font-bold text-[var(--v-primary-foreground)] hover:brightness-105">
+          {card.action_label ?? "Approve"}
+        </button>
         <button onClick={() => onDecide(card.id, "later")}
           className="min-h-10 rounded-lg border border-[var(--v-border)] px-2 py-2 text-[11px] font-bold hover:bg-[var(--v-muted)]">Later</button>
         <button onClick={() => onDecide(card.id, "rejected")}
@@ -182,6 +196,7 @@ export default function VibandaHomePage() {
   const [period, setPeriod] = useState("today");
   const [dailyReport, setDailyReport] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback((p: string) => {
     setErr(false);
@@ -196,7 +211,20 @@ export default function VibandaHomePage() {
   }, []);
 
   const decide = async (cardId: string, decision: "approved" | "later" | "rejected") => {
-    await api.post(`/api/v1/overview/attention/${encodeURIComponent(cardId)}/decision`, { decision });
+    try {
+      const r = await api.post(
+        `/api/v1/overview/attention/${encodeURIComponent(cardId)}/decision`,
+        { decision },
+      );
+      // Say what happened. A price that actually moved, or an order that
+      // actually went to a supplier, is worth confirming — and a card that
+      // could not be applied must not disappear as though it had been.
+      const msg: string = r.data?.message ?? "";
+      if (msg) setNotice(msg);
+    } catch {
+      setNotice("Could not record that. Please try again.");
+      return;
+    }
     setFeed((f) => f && { ...f, attention: f.attention.filter((c) => c.id !== cardId) });
   };
 
@@ -207,6 +235,24 @@ export default function VibandaHomePage() {
 
   return (
     <div className="animate-rise-in space-y-10">
+      {/* Confirmation of what a decision actually did. Dismissible, and never
+          blocks the page — the decision is already recorded by the time this
+          appears. */}
+      {notice && (
+        <div
+          role="status"
+          className="flex items-start justify-between gap-3 rounded-lg border border-[hsl(201_47%_29_/_0.35)] bg-[hsl(42_71%_75_/_0.28)] px-4 py-3 text-xs font-medium"
+        >
+          <span>{notice}</span>
+          <button
+            onClick={() => setNotice(null)}
+            aria-label="Dismiss"
+            className="shrink-0 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)] hover:text-[var(--v-primary)]"
+          >
+            Close
+          </button>
+        </div>
+      )}
       {/* Hero — sketch pattern: eyebrow date (in layout), big display heading
           with primary-colored period, context subtitle */}
       <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">

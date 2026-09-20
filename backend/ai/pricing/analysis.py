@@ -154,14 +154,29 @@ def fetch_item_velocities(
 def items_on_cooldown_for_restaurant(
     db: Session, restaurant_id: int
 ) -> set[int]:
-    """Correct version with restaurant_id filter."""
+    """Items whose price was CHANGED in the last COOLDOWN_DAYS.
+
+    APPROVED only, deliberately. Counting PENDING here made the analysis
+    suppress its own output: sync_pending_recommendations materializes a
+    recommendation into a PENDING row so it can be approved, the next read saw
+    that row as a cooldown and produced no recommendation, and sync then marked
+    the row EXPIRED for no longer being computed. Verified 2026-09-19 —
+    reads 1 and 3 returned the recommendation, reads 2 and 4 returned none, and
+    each cycle left another dead row behind, so the table grew by one row per
+    page refresh forever.
+
+    A PENDING recommendation is an open offer to the owner, not a past action.
+    It does not need cooldown protection against duplication either:
+    sync_pending_recommendations is keyed on (menu_item_id, recommendation_type)
+    and updates in place.
+    """
     cutoff = utcnow() - timedelta(days=COOLDOWN_DAYS)
     recs = (
         db.query(models.PricingRecommendation.menu_item_id)
         .filter(
             models.PricingRecommendation.restaurant_id == restaurant_id,
             models.PricingRecommendation.created_at >= cutoff,
-            models.PricingRecommendation.status.in_(["PENDING", "APPROVED"]),
+            models.PricingRecommendation.status == "APPROVED",
         )
         .all()
     )

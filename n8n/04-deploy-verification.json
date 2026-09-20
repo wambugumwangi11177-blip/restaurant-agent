@@ -1,0 +1,164 @@
+{
+  "name": "LEVIII \u2014 deploy verification",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "leviii-deploy",
+        "httpMethod": "POST"
+      },
+      "name": "Railway deploy webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.LEVIII_API_BASE }}/health/db",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "name": "Database reachable?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.LEVIII_API_BASE }}/webhooks/macsoft/status",
+        "options": {
+          "timeout": 60000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.LEVIII_MACSOFT_KEY }}"
+            }
+          ]
+        }
+      },
+      "name": "MacSoft pipeline alive?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "operation": "notEquals",
+              "value2": "error"
+            }
+          ]
+        }
+      },
+      "name": "All green?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LEVIII_ALERT_WEBHOOK }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "*A deploy finished and the smoke checks did not pass*\nCheck /health/db and /webhooks/macsoft/status on the new release."
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Alert: deploy looks broken",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Railway deploy webhook": {
+      "main": [
+        [
+          {
+            "node": "Database reachable?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Database reachable?": {
+      "main": [
+        [
+          {
+            "node": "MacSoft pipeline alive?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MacSoft pipeline alive?": {
+      "main": [
+        [
+          {
+            "node": "All green?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "All green?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Alert: deploy looks broken",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true
+  },
+  "meta": {
+    "leviiiNotes": [
+      "The tracer running as a deploy gate rather than something someone remembers to check.",
+      "Point Railway's deploy webhook at this workflow's URL."
+    ]
+  },
+  "active": false
+}

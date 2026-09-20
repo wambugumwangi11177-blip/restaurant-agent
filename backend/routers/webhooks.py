@@ -10,6 +10,7 @@ import os
 
 from database import get_db
 from integration.ingest import ingest
+from integration.projection import project_batch, projection_summary, money_unit
 from rate_limit import limiter
 import models
 from phone_utils import normalize_phone
@@ -353,6 +354,14 @@ def _verify_macsoft_key(supplied: str | None) -> None:
 
 MACSOFT_SOURCE_SLUG = "macsoft-prod"
 
+
+def projection_money_unit() -> str:
+    """The unit projection reads money in. Echoed by /macsoft/status so a
+    100x scaling error is caught against a real invoice, not a quarter later.
+    Read at call time, never cached — see integration/projection.py's note on
+    why import-time config forced module reloads that broke unrelated tests."""
+    return money_unit()
+
 # Keys we will accept as a record's stable identity, most explicit first. This
 # list exists so MacSoft does not have to rename anything; extend it once their
 # real field names are known.
@@ -474,11 +483,13 @@ async def receive_macsoft_data(
     # flushes each row, so dedupe inside a single batch works (SessionLocal is
     # autoflush=False, so the flush is what makes a repeated record visible to
     # the next lookup).
+    identified: list[tuple[str, str, dict]] = []
     try:
         for record in records:
             source_id, version, derived = _identity(record)
             if derived:
                 derived_identity += 1
+            identified.append((source_id, version, record))
             action = ingest(
                 db,
                 source_system_id=source_system_id,
@@ -498,14 +509,33 @@ async def receive_macsoft_data(
         logger.exception("[MacSoft] batch failed, rolled back (entity=%s, n=%d)", entity, len(records))
         raise HTTPException(status_code=500, detail="Could not store batch — please retry.")
 
+    # The mirror is now durable. Project it into the domain tables the product
+    # actually reads — without this step a push lands correctly and changes
+    # nothing on the owner's Home page, because every agent queries
+    # models.Order/MenuItem/InventoryItem and the mirror is a separate base.
+    # Deliberately AFTER the commit and in its own try/except: a projection
+    # bug must cost a projection, never a record. Whatever it misses,
+    # integration/projection.py::reproject_all replays from the mirror later.
+    try:
+        projected = project_batch(
+            db, source_system_id=source_system_id, entity=entity, records=identified,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("[MacSoft] projection failed (entity=%s) — mirror intact", entity)
+        projected = {"projected": 0, "updated": 0, "unmapped": len(records),
+                     "unchanged": 0, "by_table": {},
+                     "reasons": {"projection raised": len(records)}}
+
     # Counts and shape only — never the payload itself. The records are already
     # durably stored in mirror_events; repeating them in the application log
     # would put customer names and phone numbers in plaintext where log
     # retention and erasure requests do not reach (Kenya DPA 2019).
     logger.info(
-        "[MacSoft] entity=%s received=%d inserted=%d superseded=%d skipped=%d derived_identity=%d",
+        "[MacSoft] entity=%s received=%d inserted=%d superseded=%d skipped=%d "
+        "derived_identity=%d projected=%d updated=%d unmapped=%d",
         entity, len(records), counts["inserted"], counts["superseded"],
         counts["skipped"], derived_identity,
+        projected["projected"], projected["updated"], projected["unmapped"],
     )
 
     return {
@@ -518,6 +548,17 @@ async def receive_macsoft_data(
         # Surfaced so MacSoft can see we could not find an id/version on some
         # records and tell us the right field names.
         "records_without_id_or_version": derived_identity,
+        # What actually reached the owner's dashboard. "stored" and "visible"
+        # are different things, and the difference is the whole reason this
+        # block exists — see integration/projection.py.
+        "projected": {
+            "created": projected["projected"],
+            "updated": projected["updated"],
+            "unchanged": projected["unchanged"],
+            "unmapped": projected["unmapped"],
+            "into": projected["by_table"],
+            "unmapped_reasons": projected["reasons"],
+        },
     }
 
 
@@ -543,9 +584,21 @@ async def macsoft_status(
         GET  /webhooks/macsoft/status -> total_records goes up by 1
 
     That single round trip exercises DNS, TLS, the API key, JSON parsing,
-    identity extraction, the database write, and the read back. If the number
-    moves, the integration works. If it does not, it does not — regardless of
-    what any status code said.
+    identity extraction, the database write, and the read back.
+
+    STORED IS NOT VISIBLE. `total_records` counts mirror rows, and the mirror
+    is staging — for most of this integration's life nothing read it, so a push
+    could be perfectly stored and change nothing on the owner's dashboard. The
+    `projection` block below is the half that answers "did it reach the
+    product": `projected` counts records that became orders, menu items or
+    inventory, `unmapped` counts records the current field mapping could not
+    place, and `top_unmapped_reasons` says why so the mapping can be widened
+    (integration/projection.py, then reproject_all). Read both numbers. A rising
+    `total_records` with a flat `projected` means the data is safe and invisible.
+
+    `money_unit` is echoed because it cannot be inferred from the data and a
+    wrong value scales every figure by 100. Check it against one real invoice
+    on day one.
 
     Read-only, and deliberately returns NO payload contents: counts and
     timestamps only. Someone holding the push key should be able to confirm
@@ -571,6 +624,9 @@ async def macsoft_status(
                 "total_records": 0,
                 "by_entity": {},
                 "last_received_at": None,
+                "projection": {"projected": 0, "unmapped": 0, "by_table": {},
+                               "top_unmapped_reasons": {},
+                               "money_unit": projection_money_unit()},
             }
 
         total = db.query(_func.count(MirrorEvent.id)).filter(
@@ -599,10 +655,22 @@ async def macsoft_status(
             MirrorEvent.source_system_id == row.id
         ).order_by(MirrorEvent.id.desc()).first()
 
+        # What reached the domain tables the owner's pages actually query.
+        # Without this a caller cannot distinguish a working integration from
+        # one that stores perfectly into a table nothing reads.
+        try:
+            projection = projection_summary(db, row.id)
+        except Exception:  # noqa: BLE001 — never fail the tracer on this half
+            logger.exception("[MacSoft] projection summary failed")
+            projection = {"projected": 0, "unmapped": 0, "by_table": {},
+                          "top_unmapped_reasons": {"summary unavailable": 0},
+                          "money_unit": projection_money_unit()}
+
         return {
             "status": "ok",
             "connected": total > 0,
             "total_records": int(total),
+            "projection": projection,
             "by_entity": by_entity,
             "by_action": by_action,
             "last_received_at": latest.received_at.isoformat() + "Z" if latest else None,

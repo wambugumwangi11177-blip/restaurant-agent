@@ -152,6 +152,12 @@ def _staff_card(db: Session, rid: int, start, end) -> dict:
 # Category -> the word the owner sees. The AI layer names things after its own
 # agents ("supply_chain"); the Home page speaks the restaurant's language.
 _DOMAIN_LABEL = {
+    # Loss prevention gets its own label, and must NOT be "Stock". The dedupe
+    # below drops a Stock card that names an already-low item, which is right
+    # for "reorder beef" beside "beef is low" — and wrong for "beef usage does
+    # not match the recipes". Running low and being stolen are different
+    # problems about the same ingredient, and the owner needs both.
+    "loss_prevention": "Loss",
     "pricing": "Pricing",
     "inventory": "Stock",
     "menu": "Menu",
@@ -181,9 +187,11 @@ def _decision_cards(db: Session, rid: int) -> list:
     """What needs attention, from the Decision Intelligence layer.
 
     This is the point of the Home page: the owner should not have to ask. Every
-    specialist agent's recommendations (pricing, inventory, menu, labour, supply
-    chain, marketing) are collected, scored on impact/confidence/risk/effort and
-    returned best-first, so the thing most worth doing today is at the top.
+    specialist agent's findings are collected, scored on impact, confidence,
+    risk and effort, and returned best-first — loss prevention (theft, stock
+    variance, cash shortfalls, missing cost data) alongside optimisation
+    (pricing, inventory, menu, labour, supply chain, marketing), so the thing
+    most worth doing today is at the top whichever kind it is.
 
     Deterministic — no LLM. The agents computed these numbers; this only orders
     and relabels them.
@@ -192,14 +200,25 @@ def _decision_cards(db: Session, rid: int) -> list:
 
     data = get_ranked_decisions(db, rid)
     cards = []
-    for d in data.get("decisions", [])[:8]:
+    # Ten sources feed this now, four of them loss prevention. Eight cards was
+    # sized for six optimisation sources; keeping it would let a busy pricing
+    # day push a theft flag off the page entirely.
+    for d in data.get("decisions", [])[:12]:
         action = (d.get("action") or "").strip()
         if not action:
             continue
         impact_cents = d.get("impact_cents_month") if d.get("quantified") else None
         category = (d.get("category") or "").lower()
+        agent = d.get("agent") or "agent"
+        rec_id = d.get("recommendation_id")
+        # Only a pricing recommendation has something this system can apply on
+        # the owner's behalf. "Check Beef usage against the recipes" is done by
+        # a person in a store room; the button for it must say so rather than
+        # claiming an approval it cannot perform.
+        applies = agent == "pricing_intelligence" and rec_id is not None
+        meta = d.get("meta") or {}
         cards.append({
-            "id": _card_key(d.get("agent") or "agent", action),
+            "id": _card_key(agent, action),
             "domain": _DOMAIN_LABEL.get(category, category.replace("_", " ").title() or "Business"),
             "title": action,
             "why": (d.get("rationale") or "").strip(),
@@ -209,6 +228,23 @@ def _decision_cards(db: Session, rid: int) -> list:
             # Surfaced so the UI can show WHY this is first, not just that it is.
             "priority_score": d.get("priority_score"),
             "confidence_pct": d.get("confidence_pct"),
+            # What pressing the primary button will actually do.
+            "applies": applies,
+            "action_label": "Approve" if applies else "Mark as done",
+            "apply_hint": (
+                f"Sets {meta.get('item_name') or 'this item'} to "
+                f"KSh {(meta.get('suggested_price') or 0) // 100:,}"
+                if applies else "Records your decision — this one is yours to carry out"
+            ),
+            "agent": agent,
+            "recommendation_id": rec_id,
+            # Carried so a decision on this card can be measured later
+            # (ai/evaluation/outcomes.py). Stage five had no input at all
+            # before: AttentionDecision recorded the click and nothing read it
+            # except the filter that hides the card.
+            "entity_type": d.get("entity_type"),
+            "entity_id": d.get("entity_id"),
+            "impact_cents_month": impact_cents,
         })
     return cards
 
@@ -235,21 +271,34 @@ def _operational_cards(db: Session, rid: int) -> list:
             "what_to_do": f"Raise today's order to restock {item.item_name}.",
             "impact": "",
             "status": "open",
+            "applies": False,
+            "action_label": "Mark as done",
+            "apply_hint": "Records your decision — this one is yours to carry out",
+            "agent": "stock",
         })
-    pending_po = db.query(func.count(models.PurchaseOrder.id)).join(models.Restaurant).filter(
+    # Carry the ids, not just the count. The card used to say "review and
+    # approve the pending purchase orders" and lead nowhere — Vibanda has no
+    # purchasing screen, and the decision endpoint had nothing to act on. With
+    # the ids attached, Approve sends them to the suppliers from here.
+    pending_pos = db.query(models.PurchaseOrder).join(models.Restaurant).filter(
         models.Restaurant.id == rid,
         func.lower(models.PurchaseOrder.status) == "pending",
-    ).scalar()
-    if pending_po:
-        title = f"{pending_po} purchase order(s) awaiting approval"
+    ).all()
+    if pending_pos:
+        title = f"{len(pending_pos)} purchase order(s) awaiting approval"
         cards.append({
             "id": _card_key("purchasing", title),
             "domain": "Purchasing",
             "title": title,
-            "why": "Approving keeps deliveries on schedule.",
-            "what_to_do": "Review and approve the pending purchase orders.",
+            "why": "Nothing reaches a supplier until you approve it.",
+            "what_to_do": "Approve to send these orders to your suppliers.",
             "impact": "",
             "status": "open",
+            "applies": True,
+            "action_label": "Approve & send",
+            "apply_hint": f"Sends {len(pending_pos)} order(s) to your suppliers",
+            "agent": "reorder",
+            "purchase_order_ids": [po.id for po in pending_pos],
         })
     return cards
 
@@ -373,16 +422,179 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
     }
 
 
+# A Home card and an escalating notification are two views of one finding. The
+# escalation ladder (ai/escalation/engine.py) pages managers at 15 minutes and
+# phones the owner at 45 unless someone acknowledges — and until now nothing in
+# this product could acknowledge anything. POST /notifications/{id}/acknowledge
+# exists and has no caller, and /read sets is_read, which the sweep explicitly
+# ignores. So every critical event ran the whole ladder, every time, because the
+# owner had no button that stopped the clock.
+#
+# They do have a button: the one on the card. Deciding a card is the owner
+# saying "I have seen this and dealt with it", which is exactly what
+# acknowledged_at means. This maps the card back to the events it came from.
+_CARD_AGENT_EVENTS = {
+    "stock_custody": ("stock.variance_flagged",),
+    "fraud_detection": ("fraud.suspicious_transaction_flagged",),
+    "cash_reconciliation": ("cash.reconciliation_flagged",),
+    "stock": ("stock.critical", "stock.depleted"),
+}
+
+
+def _acknowledge_related(db: Session, tenant_id: int, card: dict) -> int:
+    """Stop the escalation clock for the finding this card represents.
+
+    Scoped to the deciding owner's own tenant and to the event types this card
+    came from — acknowledging a theft flag must not silence an unrelated
+    stock alert. Returns how many notifications were acknowledged.
+    """
+    events = _CARD_AGENT_EVENTS.get(card.get("agent") or "")
+    if not events:
+        return 0
+    user_ids = [row[0] for row in db.query(models.User.id).filter(
+        models.User.tenant_id == tenant_id).all()]
+    if not user_ids:
+        return 0
+    rows = db.query(models.Notification).filter(
+        models.Notification.user_id.in_(user_ids),
+        models.Notification.event_type.in_(events),
+        models.Notification.severity.isnot(None),
+        models.Notification.acknowledged_at.is_(None),
+    ).all()
+    now = utcnow()
+    for row in rows:
+        row.acknowledged_at = now
+        row.is_read = True
+    return len(rows)
+
+
+def _apply_decision(db: Session, rid: int, card: dict, decision: str, user) -> dict:
+    """Carry out what the owner just approved, where this system can.
+
+    For most of this page's life it could not: the endpoint wrote a row and
+    returned, so approving a KES 40,000/month price change and dismissing it
+    had identical effects on the business. A card now declares whether it is
+    applicable (`applies`), and this is the other half of that promise.
+
+    Returns {applied: bool, message: str}. Never raises: a failure to apply
+    must not lose the owner's decision, which is already the thing we are
+    recording.
+    """
+    if decision not in ("approved", "rejected"):
+        return {"applied": False, "message": ""}
+    agent = card.get("agent")
+
+    try:
+        if agent == "pricing_intelligence" and card.get("recommendation_id"):
+            from ai.pricing.recommendations import (
+                approve_recommendation, reject_recommendation,
+            )
+            rec_id = card["recommendation_id"]
+            if decision == "approved":
+                result = approve_recommendation(db, rec_id, rid, approved_by=user.email)
+            else:
+                result = reject_recommendation(db, rec_id, rid, reason="Rejected on Home")
+            if result.get("error"):
+                logger.warning("[overview] could not apply pricing rec %s: %s",
+                               rec_id, result["error"])
+                return {"applied": False, "message": result["error"]}
+            return {"applied": True, "message": result.get("message", "")}
+
+        if agent == "reorder" and card.get("purchase_order_ids"):
+            if decision != "approved":
+                # Rejecting the card is not cancelling the orders — that is a
+                # separate, heavier action with a supplier on the other end.
+                return {"applied": False,
+                        "message": "Orders left pending. Cancel them from Purchasing if that is what you meant."}
+            from ai.reorder import approve_and_send, PurchaseOrderError
+            sent, failed = 0, 0
+            for po_id in card["purchase_order_ids"]:
+                try:
+                    approve_and_send(db, po_id, rid, approved_by_email=user.email)
+                    sent += 1
+                except PurchaseOrderError as exc:
+                    failed += 1
+                    logger.info("[overview] PO %s not sent: %s", po_id, exc)
+                except Exception:  # noqa: BLE001 — one supplier failing never blocks the rest
+                    failed += 1
+                    logger.exception("[overview] PO %s failed to send", po_id)
+            if not sent:
+                return {"applied": False, "message": "No orders could be sent."}
+            msg = f"{sent} purchase order(s) sent to your suppliers."
+            if failed:
+                msg += f" {failed} could not be sent — check Purchasing."
+            return {"applied": True, "message": msg}
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        logger.exception("[overview] applying %s for card %s failed", decision, card.get("id"))
+        return {"applied": False, "message": "Recorded, but the change could not be applied."}
+
+    return {"applied": False, "message": ""}
+
+
 @router.post("/attention/{card_key}/decision")
 def decide(card_key: str, body: dict, db: Session = Depends(get_db),
            user=Depends(require_staff_role())):
-    _restaurant_id(db, user)  # Apply the same ownership check as the feed.
-    if body.get("decision") not in ("approved", "later", "rejected"):
+    rid = _restaurant_id(db, user)  # Apply the same ownership check as the feed.
+    decision = body.get("decision")
+    if decision not in ("approved", "later", "rejected"):
         raise HTTPException(422, "decision must be approved|later|rejected")
+
+    # Re-derive the feed and find the card by key, so what gets applied is
+    # exactly what was on screen. Keying on the card rather than trusting ids
+    # from the request body also means a caller cannot approve a price change
+    # the page never offered them.
+    card = None
+    try:
+        for c in _attention_cards(db, rid, user.tenant_id):
+            if c["id"] == card_key:
+                card = c
+                break
+    except Exception:  # noqa: BLE001 — recording the decision still matters
+        logger.exception("[overview] could not rebuild cards for %s", card_key)
+
+    outcome = _apply_decision(db, rid, card, decision, user) if card else {
+        # A card that is no longer in the feed has usually been overtaken —
+        # the recommendation expired, or someone else acted on it.
+        "applied": False, "message": "",
+    }
+
+    # Any decision stops the clock, including "Later": the owner has seen it,
+    # which is what the escalation ladder is checking for. Continuing to page
+    # managers about something already on the owner's screen is the alert
+    # fatigue this system is meant to prevent.
+    acknowledged = 0
+    if card:
+        try:
+            acknowledged = _acknowledge_related(db, user.tenant_id, card)
+        except Exception:  # noqa: BLE001 — never lose the decision over this
+            logger.exception("[overview] acknowledging alerts for %s failed", card_key)
+
+        # Record what was claimed so it can be checked in a fortnight. Only
+        # decisions with a countable outcome are scoreable; the rest are
+        # recorded as advice given and never scored, because marking an
+        # unscoreable decision a miss would punish an agent for the shape of
+        # its advice rather than its quality.
+        try:
+            from ai.evaluation.outcomes import record_decision_outcome
+            record_decision_outcome(db, rid, card, decision)
+        except Exception:  # noqa: BLE001
+            logger.exception("[overview] recording outcome for %s failed", card_key)
+
     row = models.AttentionDecision(
-        tenant_id=user.tenant_id, card_key=card_key, decision=body["decision"],
+        tenant_id=user.tenant_id, card_key=card_key, decision=decision,
         decided_by=user.id,
     )
     db.add(row)
     db.commit()
-    return {"card_key": card_key, "status": body["decision"]}
+    message = outcome["message"]
+    if acknowledged and not message:
+        message = (f"Noted. {acknowledged} alert(s) acknowledged — "
+                   f"managers will not be paged about this.")
+    return {
+        "card_key": card_key,
+        "status": decision,
+        "applied": outcome["applied"],
+        "message": message,
+        "alerts_acknowledged": acknowledged,
+    }

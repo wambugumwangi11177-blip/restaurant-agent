@@ -6,11 +6,17 @@ cycle so the forecasting agents get measured against reality and their accuracy
 becomes visible (AgentPrediction.error_pct / within_ci → get_agent_accuracy,
 get_quality_drift, the AI-Ops scorecards).
 
-Two halves, run daily by the scheduler (main.py):
+Three parts, run daily by the scheduler (main.py):
   1. record_revenue_forecast — snapshot tomorrow's revenue forecast as a
      prediction, BEFORE the fact, with its confidence interval.
   2. evaluate_due_predictions — for any matured daily_revenue prediction whose
      day has now passed, compute the ACTUAL revenue and fill it in.
+  3. evaluate_due_decision_outcomes (ai/evaluation/outcomes.py) — score matured
+     OWNER DECISIONS: did the advice they approved actually pay off? That half
+     had no input at all until 2026-09-19; AttentionDecision recorded the click
+     and the only thing that read it was the filter hiding the card. The system
+     learned whether its forecast was right and nothing about whether its
+     recommendations were worth taking.
 
 Deterministic. No LLM. Idempotent: recording twice for the same date is guarded,
 and evaluating an already-evaluated prediction is skipped.
@@ -123,14 +129,22 @@ def run_learning_cycle(db: Session) -> dict:
     any matured predictions. Called by the daily scheduler job. Degrades
     per-restaurant — one failure never stops the others.
     """
+    from .outcomes import evaluate_due_decision_outcomes
+
     restaurants = db.query(models.Restaurant.id).all()
-    recorded = evaluated = 0
+    recorded = evaluated = decisions_scored = 0
     for (rid,) in restaurants:
         try:
             if record_revenue_forecast(db, rid) is not None:
                 recorded += 1
             evaluated += evaluate_due_predictions(db, rid)
+            # The other half of the loop: not just "was the forecast right"
+            # but "was the advice worth taking". Both feed agent_reliability,
+            # which scales confidence in ai/decisions/__init__.py.
+            decisions_scored += evaluate_due_decision_outcomes(db, rid)
         except Exception as exc:  # noqa: BLE001
             logger.warning("learning cycle failed for restaurant %s: %s", rid, exc)
-    logger.info("learning cycle: recorded=%s evaluated=%s", recorded, evaluated)
-    return {"recorded": recorded, "evaluated": evaluated}
+    logger.info("learning cycle: recorded=%s evaluated=%s decisions_scored=%s",
+                recorded, evaluated, decisions_scored)
+    return {"recorded": recorded, "evaluated": evaluated,
+            "decisions_scored": decisions_scored}

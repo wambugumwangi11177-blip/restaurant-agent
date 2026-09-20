@@ -384,3 +384,73 @@ deliberate, already-visible action to whoever does it, lower urgency than
 "did the revocation I just did actually happen"); a "menu item back in
 stock" notification (same reasoning). Both are cheap to add later if this
 judgment call turns out wrong in practice — flagged, not silently dropped.
+
+---
+
+## 2026-09-19 — The detection was never the problem
+
+A full-repo audit found every piece of this directive implemented, tested,
+scheduled — and invisible. `compute_variance_report` ran nightly at 21:00 EAT
+and `compute_fraud_report` every two hours, both passing their tests, and
+neither reached any screen the Vibanda owner opens. The only UI that displayed
+them lives on the generic dashboard, which that tenant is actively redirected
+away from.
+
+The cause was one dictionary. `ai/decisions/adapters.py::_ADAPTERS` registered
+six sources — pricing, inventory, supply_chain, menu, labor, marketing — and a
+detector not in that dictionary produces findings for nobody.
+
+### What changed
+
+- `from_stock_custody`, `from_fraud`, `from_cash_reconciliation` and
+  `from_data_quality` adapters, registered in `_ADAPTERS`.
+- Loss prevention has its own domain label on Home. It must NOT reuse "Stock":
+  the card dedupe drops a Stock card naming an already-low item, which is right
+  for "reorder beef" beside "beef is low" and wrong for "beef usage does not
+  match the recipes". Running low and being stolen are different problems about
+  one ingredient and the owner needs both.
+- Home shows 12 cards, not 8. Eight was sized for six optimisation sources;
+  keeping it would let a busy pricing day push a theft flag off the page.
+
+### The variance threshold, as asked
+
+`VARIANCE_THRESHOLD = 0.03` (`ai/stock_custody.py:33`) — the 3% floor of the
+2–3% industry range, over a 24-hour window, reported once daily rather than per
+movement. Unchanged; it was already right.
+
+### Quantifying a loss — the decision that took the longest
+
+Ranking weights monetary impact at 0.45, so a finding with no figure can never
+outrank a priced one. An unquantified theft alert sat below a KES 8,000 price
+tweak, which is indefensible.
+
+Resolution: carry through money the module genuinely observed (a drawer
+shortfall, an unreceipted M-Pesa payment, a variance against a costed item) and
+leave the rest unquantified. An item with no cost price reports its variance in
+kilos and says plainly that the shilling value cannot be stated — a zero there
+would rank a real theft last.
+
+The 24-hour window is projected to a month so it is comparable with
+`impact_cents_month`. That projection is an inference — that today's loss
+repeats — and every rationale says so, with the observed figure first. A
+restaurant KES 3,000 short each night is losing KES 90,000 a month if nothing
+changes, and that is the number that makes it outrank a price change.
+
+### Acknowledgement now stops the ladder
+
+`ai/escalation/engine.py` paged managers at 15 minutes and phoned the owner at
+45 for any unacknowledged severity-tagged notification. The only endpoint that
+sets `acknowledged_at` had no caller, and `/read` sets `is_read`, which the
+sweep ignores — so the full ladder fired on every critical event, forever.
+
+Deciding a Home card now acknowledges the alerts it came from, scoped to that
+card's event types and the deciding owner's tenant. "Later" counts: the owner
+has seen it, which is what the ladder is checking for.
+
+### The lesson worth keeping
+
+A detector that is not registered in `_ADAPTERS` is invisible however good its
+tests are, and `test_fraud_detection.py`'s twelve green tests proved nothing
+about delivery. `tests/test_loss_prevention_reaches_home.py` asserts on
+`GET /overview/today` rather than on the detectors, and pins the registered
+source list so adding a detector without registering it fails.

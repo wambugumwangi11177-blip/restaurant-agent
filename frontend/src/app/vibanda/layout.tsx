@@ -1,10 +1,22 @@
 "use client";
-// Vibanda Village shell — 3-tab nav (Home/OS/Support). Bottom bar on mobile,
-// top tabs on desktop. Only Vibanda-tenant users ever see this tree.
+// Vibanda Village shell — 3-tab nav (Home/OS/Reports). Bottom bar on mobile,
+// top tabs on desktop.
+//
+// OWNER-ONLY, and it guards for it. Every page in this tree reads
+// GET /overview/today or GET /reports, both gated to ADMIN by the backend
+// (auth.py's require_staff_role with an empty allow-set). A staff member who
+// reached here got a 403 on every call and a generic error screen with no way
+// out — app/staff/layout.tsx sent them to /dashboard and
+// app/dashboard/layout.tsx sent them straight back. Sending them to their own
+// tier home is the fix; guarding here as well is the belt to that brace, so a
+// direct link cannot reproduce it.
+import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Home, MessageCircle, FileText } from "lucide-react";
 import { fmtDate } from "@/lib/format";
+import { useAuth } from "@/context/AuthContext";
+import { tierHome, type StaffTier } from "@/lib/permissions";
 
 // Three tabs, by the owner's decision (2026-09-19): Home is where the system
 // talks to you, OS is where you talk to the system, Reports is the record.
@@ -18,6 +30,31 @@ const TABS = [
 
 export default function VibandaLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, isLoading } = useAuth();
+  const isStaffAccount = (user?.role ?? "").toLowerCase() === "staff";
+  const staffRole = (user?.staff_role ?? null) as StaffTier | null;
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+    if (isStaffAccount) {
+      // Their own pages work. This one cannot, for them.
+      router.replace(staffRole ? tierHome(staffRole) : "/dashboard");
+    }
+  }, [user, isLoading, isStaffAccount, staffRole, router]);
+
+  if (isLoading || !user || isStaffAccount) {
+    return (
+      <div className="vibanda-theme flex min-h-screen items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--v-primary)] border-t-transparent" />
+      </div>
+    );
+  }
+
   return (
     <div className="vibanda-theme min-h-screen pb-20 md:pb-0">
       <header className="px-4 pt-6 pb-2 md:px-8">

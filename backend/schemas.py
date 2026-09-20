@@ -26,6 +26,38 @@ def _validate_email_if_present(v: Optional[str]) -> Optional[str]:
 OptionalEmailStr = Annotated[str, AfterValidator(_validate_email_if_present)]
 
 
+# ──────────────────────────────────────────────
+# BOUNDED FREE TEXT
+# ──────────────────────────────────────────────
+# Length ceilings for user-supplied free text on REQUEST schemas.
+#
+# Every one of these fields was an unbounded `str`. Nothing else capped them:
+# the backing columns are `String`/`Text` with no length (see models.py), so
+# Postgres accepts any size, and the only ceiling was
+# MAX_REQUEST_BODY_BYTES (1 MB, middleware/body_limit.py) applied to the whole
+# request. That left `POST /orders/public` — unauthenticated, rate limited at
+# 20/minute per IP — able to write a ~1 MB customer name straight to the DB,
+# 20 times a minute, for free. Bounded is not the same as validated.
+#
+# The limits are deliberately generous: they exist to stop absurd input, not
+# to second-guess a real Kenyan restaurant's data. Kept as named types rather
+# than inline `Field(max_length=...)` so the numbers are defined once and a new
+# schema can reuse the right one instead of inventing a number.
+#
+# REQUEST SCHEMAS ONLY — never apply these to a `*Out` response model. Rows
+# that predate this change can exceed any limit set here, and a response-model
+# constraint would turn one oversized legacy row into a 500 for the whole list
+# endpoint. (That exact failure already happened once here for a different
+# reason: see ReservationOut.reservation_time, made Optional after a single
+# null timestamp took down the entire bookings page.)
+
+ShortText = Annotated[str, Field(max_length=120)]      # names, labels, categories
+PhoneText = Annotated[str, Field(max_length=32)]       # E.164 + separators, generously
+TinyText = Annotated[str, Field(max_length=80)]        # units, enum-ish strings, statuses
+LongText = Annotated[str, Field(max_length=2000)]      # notes, descriptions, reasons
+UrlText = Annotated[str, Field(max_length=2048)]       # image URLs (max practical URL length)
+
+
 class StrictModel(BaseModel):
     """Base for all request/response schemas: rejects unrecognized fields with a
     422 instead of silently dropping them. Closes threat-model risk R6 — a client
@@ -63,24 +95,24 @@ class TokenData(StrictModel):
 # MENU
 # ──────────────────────────────────────────────
 class MenuItemBase(StrictModel):
-    name: str
+    name: ShortText
     price: int = Field(ge=0)  # In cents
-    category: str
-    description: str = ""
+    category: ShortText
+    description: LongText = ""
     is_available: bool = True
-    image_url: str = ""
+    image_url: UrlText = ""
     avg_prep_minutes: float = Field(default=10.0, ge=0)
 
 class MenuItemCreate(MenuItemBase):
     pass
 
 class MenuItemUpdate(StrictModel):
-    name: Optional[str] = None
+    name: Optional[ShortText] = None
     price: Optional[int] = Field(default=None, ge=0)
-    category: Optional[str] = None
-    description: Optional[str] = None
+    category: Optional[ShortText] = None
+    description: Optional[LongText] = None
     is_available: Optional[bool] = None
-    image_url: Optional[str] = None
+    image_url: Optional[UrlText] = None
     avg_prep_minutes: Optional[float] = Field(default=None, ge=0)
 
 class MenuItem(MenuItemBase):
@@ -98,13 +130,13 @@ class OrderItemCreate(StrictModel):
 
 class OrderCreate(StrictModel):
     items: List[OrderItemCreate]
-    order_type: str = "dine_in"          # dine_in, takeout, delivery
-    delivery_channel: str = "walk_in"    # walk_in, app, uber_eats, bolt_food, glovo
-    payment_method: str = "pending"      # cash, mpesa, card, pending
-    customer_name: str = ""
-    customer_phone: str = ""
+    order_type: TinyText = "dine_in"          # dine_in, takeout, delivery
+    delivery_channel: TinyText = "walk_in"    # walk_in, app, uber_eats, bolt_food, glovo
+    payment_method: TinyText = "pending"      # cash, mpesa, card, pending
+    customer_name: ShortText = ""
+    customer_phone: PhoneText = ""
     table_number: Optional[int] = None
-    notes: str = ""
+    notes: LongText = ""
     consent: bool = False   # required True on the public (customer-facing) endpoint only
 
 class OrderItemOut(StrictModel):
@@ -177,17 +209,17 @@ class KitchenIncidentOut(StrictModel):
 # INVENTORY
 # ──────────────────────────────────────────────
 class InventoryItemCreate(StrictModel):
-    item_name: str
+    item_name: ShortText
     quantity: float = Field(default=0, ge=0)
-    unit: str = "kg"
+    unit: TinyText = "kg"
     cost_per_unit: float = Field(default=0, ge=0)
     low_stock_threshold: int = Field(default=10, ge=0)
     expiry_days: int = Field(default=30, ge=0)
 
 class InventoryItemUpdate(StrictModel):
-    item_name: Optional[str] = None
+    item_name: Optional[ShortText] = None
     quantity: Optional[float] = Field(default=None, ge=0)
-    unit: Optional[str] = None
+    unit: Optional[TinyText] = None
     cost_per_unit: Optional[float] = Field(default=None, ge=0)
     low_stock_threshold: Optional[int] = Field(default=None, ge=0)
     expiry_days: Optional[int] = Field(default=None, ge=0)
@@ -208,11 +240,11 @@ class InventoryItemOut(StrictModel):
 class StockReceive(StrictModel):
     quantity: float = Field(gt=0)
     cost_per_unit: Optional[float] = Field(default=None, ge=0)
-    supplier: str = ""
+    supplier: ShortText = ""
 
 class StockAdjust(StrictModel):
     quantity: float     # Positive = add, negative = remove
-    reason: str = ""    # waste, breakage, correction
+    reason: LongText = ""    # waste, breakage, correction
 
 class StockQuantityChangeOut(StrictModel):
     """Response for /{item_id}/receive and /{item_id}/adjust — a short
@@ -224,8 +256,8 @@ class StockQuantityChangeOut(StrictModel):
 # RESERVATIONS
 # ──────────────────────────────────────────────
 class ReservationCreate(StrictModel):
-    customer_name: str
-    customer_phone: str = ""
+    customer_name: ShortText
+    customer_phone: PhoneText = ""
     customer_email: OptionalEmailStr = ""
     party_size: int = Field(default=2, gt=0)
     reservation_date: date
@@ -233,7 +265,7 @@ class ReservationCreate(StrictModel):
     duration_minutes: int = Field(default=90, gt=0)
     table_id: Optional[int] = None
     deposit_paid: bool = False
-    notes: str = ""
+    notes: LongText = ""
 
 class ReservationOut(StrictModel):
     id: int
@@ -257,7 +289,7 @@ class ReservationOut(StrictModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 class ReservationStatusUpdate(StrictModel):
-    status: str  # confirmed, cancelled, completed, no_show
+    status: TinyText  # confirmed, cancelled, completed, no_show
 
 class AvailableTableOut(StrictModel):
     """Best-fit-first suggestion — same ranking find_available_tables()
@@ -272,8 +304,8 @@ class ReservationUpdate(StrictModel):
     books (party size grew, customer called to move the time, assigning/
     moving which table it's seated at). Distinct from
     ReservationStatusUpdate, which only ever changes `status`."""
-    customer_name: Optional[str] = None
-    customer_phone: Optional[str] = None
+    customer_name: Optional[ShortText] = None
+    customer_phone: Optional[PhoneText] = None
     customer_email: Optional[OptionalEmailStr] = None
     party_size: Optional[int] = Field(default=None, gt=0)
     reservation_date: Optional[date] = None
@@ -281,7 +313,7 @@ class ReservationUpdate(StrictModel):
     duration_minutes: Optional[int] = Field(default=None, gt=0)
     table_id: Optional[int] = None
     deposit_paid: Optional[bool] = None
-    notes: Optional[str] = None
+    notes: Optional[LongText] = None
 
 
 # ──────────────────────────────────────────────

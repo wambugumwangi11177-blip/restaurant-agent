@@ -48,7 +48,33 @@ except Exception:
 from rate_limit import limiter, SLOWAPI_AVAILABLE
 from time_utils import utcnow
 
-app = FastAPI(title="Restaurant Agent API", version="2.0.0")
+# ── Interactive docs / OpenAPI schema ────────────────────────────────────────
+# Closed in production. FastAPI serves /docs, /redoc and /openapi.json to
+# anyone by default, which publishes a complete machine-readable inventory of
+# every route in this app — including privileged ones like
+# POST /api/v1/staff/{id}/impersonate and the export/erasure endpoints — plus
+# their exact request schemas, to an unauthenticated `curl`. RBAC still gates
+# every one of those routes (see each router's require_role/require_staff_role),
+# so this was reconnaissance exposure rather than access; there is still no
+# reason to hand an attacker the map.
+#
+# Reuses startup_checks.is_production() rather than reading APP_ENV directly, so
+# there is exactly one definition of "production" in the backend. Outside
+# production (local, CI, sandbox) the docs stay on — they are how you explore
+# the API while developing.
+from startup_checks import is_production
+
+_PROD = is_production()
+
+app = FastAPI(
+    title="Restaurant Agent API",
+    version="2.0.0",
+    docs_url=None if _PROD else "/docs",
+    redoc_url=None if _PROD else "/redoc",
+    openapi_url=None if _PROD else "/openapi.json",
+)
+if _PROD:
+    logger.info("[OpenAPI] /docs, /redoc and /openapi.json are disabled (production)")
 
 if SLOWAPI_AVAILABLE:
     from slowapi import _rate_limit_exceeded_handler

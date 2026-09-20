@@ -152,6 +152,21 @@ def _answer_revenue(db: Session, rid: int, q: str) -> dict:
         trend_txt = fc.get("trend") or fc.get("summary") or ""
     except Exception:
         forecast, trend_txt = {}, ""
+    if any(term in q.lower() for term in ("which days are slow", "slow days", "slowest day")):
+        weekly = forecast.get("weekly_pattern") if isinstance(forecast, dict) else None
+        observed = [row for row in (weekly or []) if row.get("days_sampled", 0) > 0]
+        if not observed:
+            return _unavailable_card("revenue")
+        slowest = min(observed, key=lambda row: (row.get("avg_revenue", 0), row.get("day", "")))
+        ranking = sorted(observed, key=lambda row: (row.get("avg_revenue", 0), row.get("day", "")))
+        steps = [{"action": f"{row['day']}: {_money(row.get('avg_revenue', 0))} average across {row.get('days_sampled', 0)} recorded day(s)",
+                  "why": f"{row.get('avg_orders', 0)} average paid orders"} for row in ranking[:4]]
+        return {"finding": f"{slowest['day']} is the slowest recorded day at {_money(slowest.get('avg_revenue', 0))} average revenue.",
+                "why": "Uses paid, non-cancelled orders in the 30-day data-anchored analysis window; days without recorded orders are not treated as evidence of low demand.",
+                "impact": "Plan staffing and purchasing around the observed weekly pattern.",
+                "recommendation": "Compare the recorded pattern with your operating hours before changing staffing or promotions.",
+                "module": "revenue", "steps": steps,
+                "data": {"narrative_allowed": False, "weekly_pattern": ranking}}
     finding = f"Revenue today is {_money(core['revenue'] * 100)} across {core['orders']} paid orders."
     why = "Paid, non-cancelled orders created during the Nairobi calendar day so far. This is not payment cash flow."
     # core["revenue"] is already KES (overview's _summarize converts cents→KES);

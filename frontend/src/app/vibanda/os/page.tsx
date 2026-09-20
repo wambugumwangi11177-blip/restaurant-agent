@@ -1,7 +1,7 @@
 "use client";
 // Vibanda OS — copy of the sketch's /ai page, wired to the real backend.
 // Anatomy from the sketch: hero (badge "Your operating partner" + "Ask AI."),
-// prototype-data badge, ask bar, searchable question groups, transcript
+// source-provenance notice, ask bar, searchable question groups, transcript
 // ("You asked" → Finding / Why this matters / Estimated impact / Recommended
 // next step card), "This period" aside with REAL numbers from /overview/today.
 // Answers and suggested actions come from the same question-specific /ai/chat response.

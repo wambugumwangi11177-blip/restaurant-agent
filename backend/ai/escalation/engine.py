@@ -140,34 +140,14 @@ def _page_managers(db: Session, notif: "models.Notification") -> None:
         )
         return
 
-    # WhatsApp/SMS to every manager with a phone on file. StaffMember.phone is
-    # the reachable-number field (models.py's own docstring); join via
-    # user_id since that's how a roster entry links to a dashboard login.
-    staff_rows = db.query(models.StaffMember).filter(
-        models.StaffMember.restaurant_id == restaurant.id,
-        models.StaffMember.user_id.in_(manager_ids),
-        models.StaffMember.phone.isnot(None),
-        models.StaffMember.is_active == True,  # noqa: E712
-    ).all()
-
-    from ai.whatsapp.brain import send_whatsapp_message
-    for staff in staff_rows:
-        send_whatsapp_message(
-            staff.phone, escalated_body, db=db, restaurant_id=restaurant.id,
-            message_type="escalation", channel="whatsapp", fallback_sms=True,
-        )
-
 
 def _call_owner(db: Session, notif: "models.Notification") -> None:
     restaurant = _restaurant_for_notification(db, notif)
     if not restaurant:
         return
 
-    from ai.whatsapp.brain import owner_phone_for
-    phone = owner_phone_for(restaurant)
-    if not phone:
-        logger.warning(f"[Escalation] No owner phone to call for restaurant {restaurant.id}")
-        return
-
-    from ai.whatsapp.twilio_client import call
-    call(phone, f"Urgent alert from Leviii. {notif.title}. Please check your dashboard immediately.")
+    owners = get_staff_users_for_restaurant(db, restaurant, [models.StaffRole.OWNER])
+    # The terminal escalation is an in-app reminder, not a new escalation
+    # chain. No severity is assigned, preventing recursive escalation.
+    notify_users(db, [owner.id for owner in owners], f"[URGENT] {notif.title}",
+                 notif.body, "owner_escalation", notif.url)

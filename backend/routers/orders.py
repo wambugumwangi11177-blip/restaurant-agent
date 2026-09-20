@@ -399,10 +399,8 @@ async def create_public_order(
     db: Session = Depends(get_db),
 ):
     """
-    Customer-facing order endpoint — no login required. Rate limited
-    (security pass 2026-07-07): unauthenticated, and a real M-Pesa STK push
-    can be triggered per request — unlimited requests here means both order-
-    spam/DB-bloat risk and a real cost/abuse vector once M-Pesa is live.
+    Customer-facing order endpoint — no login required. Rate limited to
+    mitigate order spam. Records an unpaid order; never initiates a payment.
     """
     restaurant = db.query(models.Restaurant).filter(
         models.Restaurant.id == restaurant_id
@@ -482,8 +480,6 @@ async def create_public_order(
         db.rollback()
         logger.error(f"Ingredient deduction failed for public order {db_order.id}: {exc}")
 
-    if payment_method == models.PaymentMethod.MPESA:
-        _trigger_mpesa_stk_push(db, db_order)
 
     # 2026-07-18 event-map pass: unlike a staff-rung dine-in order (the waiter
     # is right there, the KDS shows it), an online order arrives with *no staff
@@ -499,29 +495,6 @@ async def create_public_order(
     })
 
     return _order_to_dict(db_order)
-
-
-def _trigger_mpesa_stk_push(db: Session, order: models.Order) -> None:
-    """
-    Best-effort: a failed/unconfigured STK push should never break order
-    creation. The customer/staff can retry payment through other means
-    (cash, card, or a manual STK retry) — the order itself is already valid.
-    """
-    from payments import mpesa_client
-
-    phone = mpesa_client.normalize_phone(order.customer_phone or "")
-    if not phone:
-        return
-
-    result = mpesa_client.initiate_stk_push(
-        phone_number=phone,
-        amount_cents=order.total or 0,
-        account_reference=f"ORDER-{order.id}",
-        description=f"Order #{order.id}",
-    )
-    if result["status"] == "initiated":
-        order.mpesa_checkout_request_id = result["checkout_request_id"]
-        db.commit()
 
 
 def _order_to_dict(order: models.Order) -> dict:

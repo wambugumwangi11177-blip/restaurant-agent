@@ -26,11 +26,12 @@ def latest_version(db: Session, source_system_id: int, entity: str, source_id: s
             MirrorEvent.source_system_id == source_system_id,
             MirrorEvent.entity == entity,
             MirrorEvent.source_id == source_id,
+            MirrorEvent.action.in_(("inserted", "superseded")),
         )
         .order_by(MirrorEvent.id.desc())
         .first()
     )
-    if row is None or row.action not in ("inserted", "superseded"):
+    if row is None:
         return None
     return row.source_version
 

@@ -39,7 +39,9 @@ def reconcile(
     extra = sorted(set(mirror_ids) - set(source_ids))
     drift = abs(len(source_ids) - len(mirror_ids))
 
-    if drift > tolerance or missing or extra:
+    source_checksum = checksum_ids(source_ids)
+    mirror_checksum = checksum_ids(mirror_ids)
+    if drift > tolerance or missing or extra or source_checksum != mirror_checksum:
         detail = f"missing={len(missing)} extra={len(extra)} drift={drift}"
         status = "mismatch"
     else:
@@ -52,8 +54,8 @@ def reconcile(
             entity=entity,
             source_count=len(source_ids),
             mirror_count=len(mirror_ids),
-            source_checksum=checksum_ids(source_ids),
-            mirror_checksum=checksum_ids(mirror_ids),
+            source_checksum=source_checksum,
+            mirror_checksum=mirror_checksum,
             status=status,
             detail={"missing": missing[:50], "extra": extra[:50], "detail": detail},
         )

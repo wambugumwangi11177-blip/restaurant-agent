@@ -28,7 +28,7 @@ from database import get_db
 import models
 import auth
 from routers.deps import get_or_create_restaurant
-from payments.mpesa_client import normalize_phone
+from phone_utils import normalize_phone
 
 router = APIRouter(prefix="/data", tags=["data-rights"])
 

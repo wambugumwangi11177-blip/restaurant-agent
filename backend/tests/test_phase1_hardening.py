@@ -110,7 +110,7 @@ def test_client_ip_ignores_spoofed_leading_xff(monkeypatch):
 # ── webhook / middleware behaviours ──────────────────────────────────────────
 
 def test_stripe_webhook_disabled_501(client):
-    assert client.post("/webhooks/stripe", content=b"{}").status_code == 501
+    assert client.post("/webhooks/stripe", content=b"{}").status_code == 404
 
 
 def test_oversized_body_rejected_413(client, monkeypatch):

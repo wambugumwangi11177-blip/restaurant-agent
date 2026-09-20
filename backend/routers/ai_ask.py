@@ -188,7 +188,9 @@ def _answer_kitchen(db: Session, rid: int, q: str) -> dict:
     from ai.kds_intelligence import get_kds_intelligence
     kds = get_kds_intelligence(db, rid)
     bottlenecks = kds.get("bottlenecks") or []
-    stations = kds.get("stations") or []
+    stations = kds.get("station_performance") or []
+    if not stations and not bottlenecks:
+        return _unavailable_card("kitchen")
     if bottlenecks:
         b0 = bottlenecks[0]
         name = b0.get("station") or b0.get("name") or "a station"
@@ -198,7 +200,7 @@ def _answer_kitchen(db: Session, rid: int, q: str) -> dict:
         finding = f"Slowest station: {slowest.get('station') or slowest.get('name')} at {slowest.get('avg_minutes')} min average."
     else:
         finding = "No bottlenecks detected right now — the kitchen is on pace."
-    why = "From live kitchen display data: prep times per item and queue depth per station."
+    why = "From recorded kitchen preparation times over the analysis period; this does not establish the live queue."
     impact = "Protects ticket times during rush"
     recs = kds.get("recommendations") or []
     rec = (recs[0] if isinstance(recs[0], str) else recs[0].get("action", "")) if recs else "Keep the current line setup."
@@ -210,12 +212,15 @@ def _answer_kitchen(db: Session, rid: int, q: str) -> dict:
 def _answer_staff(db: Session, rid: int, q: str) -> dict:
     from ai.labor.intelligence import get_labor_intelligence
     labor = get_labor_intelligence(db, rid)
-    pct = labor.get("labor_cost_pct") or labor.get("cost_pct")
+    summary = labor.get("summary") or {}
+    if not summary.get("shifts_logged") or not summary.get("total_revenue_30d"):
+        return _unavailable_card("labor")
+    pct = summary.get("labor_pct")
     recs = labor.get("recommendations") or []
     finding = f"Labor cost is {pct}% of revenue." if pct is not None else "Labor intelligence loaded."
     if pct is not None:
         finding += " " + ("Within the 25-35% healthy range." if 25 <= float(pct) <= 35 else "Outside the 25-35% healthy band — review shift lengths.")
-    why = "From clocked shifts versus revenue over the current period."
+    why = "From recorded labor costs versus revenue over the past 30 days. Zero recorded cost does not establish free labor."
     impact = "Labor is typically your largest controllable cost"
     rec = (recs[0] if isinstance(recs[0], str) else recs[0].get("action", "")) if recs else "Align the biggest shifts with your peak windows."
     steps = [{"action": r if isinstance(r, str) else r.get("action", "")} for r in recs[:4]]
@@ -227,8 +232,11 @@ def _answer_menu(db: Session, rid: int, q: str) -> dict:
     from ai.menu_engineer import get_menu_engineering
     me = get_menu_engineering(db, rid)
     summary = me.get("summary") or {}
-    stars = me.get("stars") or summary.get("stars") or []
-    dogs = me.get("dogs") or summary.get("dogs") or []
+    matrix = me.get("matrix") or []
+    if not matrix or not any(item.get("qty_sold", 0) for item in matrix):
+        return _unavailable_card("menu")
+    stars = [item["name"] for item in matrix if item.get("classification") == "Star"]
+    dogs = [item["name"] for item in matrix if item.get("classification") == "Dog"]
     parts = []
     if stars:
         parts.append(f"{len(stars)} star item(s) driving profit")
@@ -264,15 +272,18 @@ def _answer_pricing(db: Session, rid: int, q: str) -> dict:
 def _answer_profit(db: Session, rid: int, q: str) -> dict:
     from ai.profit.intelligence import get_profit_intelligence
     pi = get_profit_intelligence(db, rid)
-    leaks = pi.get("leaks") or pi.get("issues") or []
-    total = pi.get("total_leak") or pi.get("monthly_impact")
+    summary = pi.get("summary") or {}
+    if not summary.get("total_orders_30d"):
+        return _unavailable_card("profit")
+    leaks = pi.get("profit_leaks") or []
+    total = summary.get("total_leak_amount")
     if leaks:
         l0 = leaks[0]
-        finding = f"Biggest leak: {l0.get('area') or l0.get('name', '?')} — {l0.get('detail', '')}"
+        finding = f"Biggest modelled margin opportunity: {l0['item_name']} — {l0['action']}"
     else:
         finding = "No significant profit leaks detected this period."
-    why = "Cross-references food cost, waste, discounts and labor against revenue."
-    impact = _money(total) if total else "—"
+    why = "Compares recorded menu cost and sales against the margin target; this is an estimate, not verified recoverable profit."
+    impact = f"Modelled monthly opportunity: {_money(total)}" if total else "—"
     recs = pi.get("recommendations") or []
     rec = (recs[0] if isinstance(recs[0], str) else recs[0].get("action", "")) if recs else "Maintain current cost controls."
     steps = [{"action": r if isinstance(r, str) else r.get("action", ""), "why": (r.get("why", "") if isinstance(r, dict) else "")} for r in leaks[:4] or recs[:4]]

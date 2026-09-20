@@ -102,6 +102,12 @@ def test_dispatch_push_sends_to_every_subscription_and_prunes_dead_ones(db_sessi
     monkeypatch.setattr(notify_mod, "VAPID_PRIVATE_KEY", "fake-priv")
     monkeypatch.setattr(notify_mod, "VAPID_CLAIM_EMAIL", "owner@example.com")
 
+    # Delivery is mocked below; DNS must also be deterministic. Keep the real
+    # public-IP guard active, but do not depend on external DNS availability.
+    monkeypatch.setattr(notify_mod.socket, "getaddrinfo", lambda *_: [
+        (notify_mod.socket.AF_INET, notify_mod.socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443)),
+    ])
+
     sent = []
 
     class FakeWebPushException(Exception):

@@ -173,7 +173,9 @@ def _card_key(agent: str, action: str) -> str:
     outranked it. Agent + the advice itself is stable for as long as the advice
     is, and changes when the advice does, which is the behaviour we want.
     """
-    digest = hashlib.sha1(f"{agent}|{action}".encode("utf-8")).hexdigest()[:10]
+    # Stable display/dismissal key, never an authentication or integrity check.
+    # Preserve existing keys so previously reviewed cards do not reappear.
+    digest = hashlib.sha1(f"{agent}|{action}".encode("utf-8"), usedforsecurity=False).hexdigest()[:10]
     return f"d-{digest}"
 
 

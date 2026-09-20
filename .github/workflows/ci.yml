@@ -136,6 +136,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Owner interaction regression tests
+        run: npm test
+
       - name: Typecheck
         run: npx tsc --noEmit
 

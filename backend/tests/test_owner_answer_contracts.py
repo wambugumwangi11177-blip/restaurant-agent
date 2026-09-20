@@ -1,6 +1,6 @@
 """Owner answers must preserve the actual analytics contracts, not just HTTP 200."""
 from tests.test_home_attention_intelligence import restaurant  # noqa: F401
-from routers.ai_ask import _answer_menu, _answer_kitchen, _answer_staff, _answer_profit
+from routers.ai_ask import _answer_menu, _answer_kitchen, _answer_staff, _answer_profit, _answer_revenue
 
 
 def test_menu_answer_uses_real_classified_items(db_session, restaurant):
@@ -86,3 +86,18 @@ def test_today_bookings_exclude_cancelled_and_foreign_rows(db_session, restauran
     assert answer['data']['covers'] == 3
     assert len(answer['steps']) == 1
     assert answer['data']['narrative_allowed'] is False
+
+
+def test_slow_days_answer_is_specific_and_grounded(monkeypatch, db_session, restaurant):
+    from ai import revenue_forecaster
+    _, r = restaurant
+    monkeypatch.setattr(revenue_forecaster, "get_revenue_forecast", lambda *_: {
+        "weekly_pattern": [
+            {"day": "Monday", "avg_revenue": 12000, "avg_orders": 2.0, "days_sampled": 2},
+            {"day": "Friday", "avg_revenue": 45000, "avg_orders": 6.0, "days_sampled": 2},
+        ]
+    })
+    answer = _answer_revenue(db_session, r.id, "Which days are slow?")
+    assert answer["finding"].startswith("Monday is the slowest recorded day")
+    assert answer["data"]["narrative_allowed"] is False
+    assert "Friday" in answer["steps"][1]["action"]

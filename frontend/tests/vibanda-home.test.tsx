@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import HomePage from "../src/app/vibanda/page";
 import api from "@/lib/api";
 
@@ -29,7 +29,8 @@ afterEach(cleanup);
 
 it("shows missing kitchen data honestly and only navigates through the explicit Ask button", async () => {
   render(<HomePage />);
-  await screen.findByText("Not available");
+  const kitchenAsk = await screen.findByRole("button", { name: "Ask about the kitchen" });
+  expect(within(kitchenAsk.closest("article")!).getByText("Not available")).toBeTruthy();
   expect(screen.queryByText("On pace")).toBeNull();
   expect(screen.queryByText("No delays reported")).toBeNull();
   expect(screen.queryByText("No sales in this period yet")).toBeNull();
@@ -43,7 +44,23 @@ it("keeps the attention card and shows an error when a decision fails", async ()
   vi.mocked(api.post).mockRejectedValue(new Error("offline"));
   render(<HomePage />);
   await screen.findByText("Review beef stock");
-  fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+  fireEvent.click(screen.getByRole("button", { name: "Acknowledge" }));
   expect((await screen.findByRole("alert")).textContent).toContain("could not be saved");
   expect(screen.getByText("Review beef stock")).toBeTruthy();
+});
+
+
+it("shows failed analysis and missing inventory instead of claiming good health", async () => {
+  vi.mocked(api.get).mockImplementation(async (url) => ({ data: url.includes("reports")
+    ? { report_text: "Daily report" }
+    : { ...feed, stock: { ...feed.stock, recorded_items: 0 }, source_status: {
+        pricing: { state: "failed", recommendations: null },
+        kitchen: { state: "insufficient_data", recommendations: null },
+      } } }));
+  render(<HomePage />);
+  expect(await screen.findByText("No inventory records available")).toBeTruthy();
+  expect(screen.getByText(/Analysis failed/)).toBeTruthy();
+  expect(screen.getByText(/Not enough recorded data/)).toBeTruthy();
+  expect(screen.queryByText("Healthy")).toBeNull();
+  expect(vi.mocked(api.get).mock.calls.filter(([url]) => url.includes("overview"))).toHaveLength(1);
 });

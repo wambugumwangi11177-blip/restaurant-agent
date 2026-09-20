@@ -6,6 +6,29 @@
 
 The review covers deployed `master` commit `82754b575f3e1135cb16982fa754eb5cbc2e2416`, its latest changes, owner-facing data paths, existing tests, and a separate inspection of candidate branch `claude/agent-different-work-ppl204` at `179ecc2`. It is not a penetration-test certification, a line-by-line verification of every module, or a claim that no other bugs exist.
 
+## Follow-up hardening and current release status
+
+The sections below retain the original audit evidence. This update supersedes the original publication blocker and records which findings have since been addressed on the review branch. It does **not** claim that the new branch is deployed.
+
+- Publishing the original reviewed commits succeeded through the user's explicitly authorized GitHub credential. The app connector itself still returns 403 for writes.
+- Attention decisions now include restaurant scope. Old unscoped rows remain audit history and no longer suppress any restaurant's cards. “Later” expires after 24 hours. Repeated identical active decisions reuse the existing record; PostgreSQL row locking serializes concurrent submissions. Unknown card IDs are rejected and owner authorization remains enforced. Migration `048_scope_attention_decisions` handles both existing tables and fresh `create_all` installations.
+- Home says **Acknowledge / Remind me in 24h / Dismiss**, with an explicit source-system handoff. It does not claim to execute purchases, prices or messages.
+- Home now includes read-only profit, kitchen, reservation, cash-variance and suspicious-transaction review findings in addition to the ranked adapters. Cash signals are explicitly not accusations or verified losses. Per-source evaluation/failure/insufficient-data states are visible. Source failures run inside savepoints so a SQL error cannot poison the whole feed transaction. Live integration completeness remains unverified, visibly so.
+- The per-area Home section uses the same response and selected sales period as the main cards. No duplicate overview fetch; empty inventory is not “Healthy.” Booking covers exclude cancelled/no-show records.
+- Booking and pricing adapters use their actual output fields and label modelled loss/opportunity. Today's confirmed arrivals and recorded started/scheduled staff shifts have direct, date-scoped answers. Historical analysis now carries an evidence note and the actual order-analysis anchor. This does not establish complete intent coverage for arbitrary questions or causal explanations.
+- Chat and narrated reports now use a shared boundary: rate limits, best-effort email/phone/known-name scrubbing of all provider-bound text, untrusted evidence outside the system message, tenant-wide estimated budget checks serialized for these two routes, and persisted provider token usage even if numeric grounding rejects the narrative. Scrubber/provider errors fall back to deterministic data. These controls do not certify semantic safety, complete PII detection, exact provider billing, or unify every other AI entry point.
+- Added a PostgreSQL CI release job for migration up/down/fresh-install paths, concurrent decision retry, and dump/restore into a separate synthetic database. This is separate from proving recovery of the real Railway backup and deployment.
+
+Follow-up verification: full local backend suite **780 passed, 1 skipped** (PostgreSQL test requires its disposable CI database). After final savepoint changes, **65 targeted tests passed**. Frontend **6 interaction tests passed**; clean production build passed. The initial cached build failed inside Turbopack's persisted cache; removing generated `.next` output and rebuilding succeeded. Bandit reports **0 medium/high**, 44 low findings. No live model credits were used for these regression tests.
+
+Still required before an unconditional production handover:
+
+1. Green checks on the published commit, including the new PostgreSQL job; actual deployment migration and rollback validation; authenticated desktop/mobile browser verification of that deployed version.
+2. Macsoft tenant/restaurant binding, field mapping, ordered correction/conflict semantics and domain-table projection, then a reconciled data-to-Home tracer using their sample. Receipt alone is not synchronization. This work cannot honestly be certified without the source contract.
+3. Real backup restore and observed operational alerts, shared rate-limit storage if running multiple workers, and CI enforcement in the Railway deployment configuration.
+4. Evaluation of every advertised question against expected answers, especially dates, rankings and causal questions. No blanket “every feature works” claim is justified by module routing or passing unit tests.
+5. Reconcile the separate unmerged candidate branch's overlapping AI/CI changes and migration numbering before merging it. Its reporting-cache freshness and metering issues remain as documented below.
+
 ## Deployment evidence
 
 - Railway `restaurant-agent-backend/backend-api` is running `82754b5`. Recent logs contain successful overview, reports, authentication and AI-chat requests. Those logs do not establish which tenant made each request or whether the rendered answers were correct.

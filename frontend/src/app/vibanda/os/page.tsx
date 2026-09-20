@@ -20,6 +20,7 @@ type AskCard = {
 };
 
 type Answer = {
+  evidenceNote?: string;
   finding: string;
   why: string;
   impact: string;
@@ -35,6 +36,7 @@ type Answer = {
 type Turn = { question: string; answer: Answer | null; error?: boolean };
 
 type Overview = {
+  data_provenance?: { notice: string };
   restaurant_name: string;
   revenue: { revenue: number; orders: number; avg_order: number; pace_projection: number };
   orders: { orders: number; active_now: number };
@@ -86,6 +88,7 @@ function OsChatInner() {
       } catch { card = null; }
       const answer: Answer = card
         ? {
+            evidenceNote: typeof card.data?.evidence_note === "string" ? card.data.evidence_note : undefined,
             finding: card.finding,
             why: card.why,
             impact: card.impact || "—",
@@ -148,7 +151,7 @@ function OsChatInner() {
           <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--v-accent)] text-[var(--v-accent-foreground)]">
             <Info size={10} />
           </span>
-          Prototype data · {overview?.restaurant_name ?? "Vibanda Village"}
+          {overview?.data_provenance?.notice ?? "Source synchronization and completeness have not been verified."}
         </div>
       </div>
 
@@ -210,6 +213,7 @@ function OsChatInner() {
                         <p className="mt-1 text-[13px] font-semibold">{t.question}</p>
                       </div>
                       <div className="space-y-5 p-4 sm:p-5">
+                        {t.answer.evidenceNote && <p className="text-xs text-[var(--v-muted-foreground)]">{t.answer.evidenceNote}</p>}
                         {t.answer.llmReply && (
                           <div className="rounded-xl bg-[hsl(42_71%_75_/_0.18)] p-3.5">
                             <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[hsl(208_29%_19_/_0.92)]">{t.answer.llmReply}</p>
@@ -348,7 +352,7 @@ function OsChatInner() {
           </div>
           <div className="flex items-start gap-2.5 px-1 pt-1 text-[10px] leading-relaxed text-[var(--v-muted-foreground)]">
             <ShieldCheck size={14} className="mt-0.5 shrink-0" />
-            <span>Answers come from your restaurant&apos;s real data. Always confirm operational changes with your team.</span>
+            <span>Answers use recorded restaurant data; completeness and freshness may vary. Always confirm operational changes with your team.</span>
           </div>
         </aside>
       </div>

@@ -1052,6 +1052,8 @@ class AttentionDecision(Base):
     __tablename__ = "attention_decisions"
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id"), index=True, nullable=False)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), index=True, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
     card_key = Column(String, nullable=False)   # e.g. "stock-12", "po-pending"
     decision = Column(String, nullable=False)   # approved | later | rejected
     decided_at = Column(DateTime, default=utcnow)

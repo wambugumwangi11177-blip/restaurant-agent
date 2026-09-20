@@ -14,6 +14,8 @@ import PartHealth from "@/components/vibanda/PartHealth";
 import { useAuth } from "@/context/AuthContext";
 
 type Feed = {
+  source_status?: Record<string, { state: string; recommendations: number | null }>;
+  data_provenance?: { notice: string; latest_order_at: string | null };
   greeting_date: string;
   restaurant_name: string;
   period: string;
@@ -21,7 +23,7 @@ type Feed = {
   revenue: { revenue: number; orders: number; avg_order: number; pace_projection: number };
   orders: { revenue: number; orders: number; delayed: number; active_now: number; split: Record<string, number> };
   kitchen: { avg_prep_min: number; delay_risk: number; bottleneck: string | null };
-  stock: { low_stock: { name: string; qty: number }[]; expiring_48h: string[]; waste_pct_week: number };
+  stock: { recorded_items?: number; low_stock: { name: string; qty: number }[]; expiring_48h: string[]; waste_pct_week: number };
   bookings: { covers_today: number; next_reservation_min: number | null; waitlist: number; no_show_pct: number };
   staff: { scheduled: number; on_shift: number; overtime_risk: number; labor_cost_pct: number };
   attention: {
@@ -41,12 +43,12 @@ const PERIODS = ["1h", "today", "7d", "30d"] as const;
 const PERIOD_LABEL: Record<string, string> = { "1h": "1H", today: "Today", "7d": "7D", "30d": "30D" };
 
 // Sketch pattern: eyebrow + font-display heading per section
-function SectionHead({ eyebrow, title, meta }: { eyebrow: string; title: string; meta?: string }) {
+function SectionHead({ eyebrow, title, meta, id }: { eyebrow: string; title: string; meta?: string; id?: string }) {
   return (
     <div className="mb-4 flex items-end justify-between">
       <div>
         <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">{eyebrow}</p>
-        <h2 className="font-display text-2xl font-semibold tracking-[-0.035em]">{title}</h2>
+        <h2 id={id} className="font-display text-2xl font-semibold tracking-[-0.035em]">{title}</h2>
       </div>
       {meta && <span className="hidden text-[10px] text-[var(--v-muted-foreground)] sm:block">{meta}</span>}
     </div>
@@ -174,11 +176,11 @@ function AttentionCard({ card, onDecide, onAsk }: {
       </div>
       <div className="ml-12 mt-4 flex flex-wrap items-center gap-2">
         <button disabled={saving} onClick={() => recordDecision("approved")}
-          className="min-h-9 rounded-lg bg-[var(--v-primary)] px-3 py-2 text-[10px] font-bold text-[var(--v-primary-foreground)] hover:brightness-105">Approve</button>
+          className="min-h-9 rounded-lg bg-[var(--v-primary)] px-3 py-2 text-[10px] font-bold text-[var(--v-primary-foreground)] hover:brightness-105">Acknowledge</button>
         <button disabled={saving} onClick={() => recordDecision("later")}
-          className="min-h-10 rounded-lg border border-[var(--v-border)] px-2 py-2 text-[11px] font-bold hover:bg-[var(--v-muted)]">Later</button>
+          className="min-h-10 rounded-lg border border-[var(--v-border)] px-2 py-2 text-[11px] font-bold hover:bg-[var(--v-muted)]">Remind me in 24h</button>
         <button disabled={saving} onClick={() => recordDecision("rejected")}
-          className="min-h-10 rounded-lg border border-[var(--v-border)] px-2 py-2 text-[11px] font-bold hover:bg-[var(--v-muted)]">Reject</button>
+          className="min-h-10 rounded-lg border border-[var(--v-border)] px-2 py-2 text-[11px] font-bold hover:bg-[var(--v-muted)]">Dismiss</button>
         <button
           onClick={() => onAsk(card.title)}
           className="min-h-10 rounded-lg border border-[hsl(201_47%_29_/_0.45)] px-2 py-2 text-[11px] font-bold text-[var(--v-primary)] hover:bg-[var(--v-muted)]">
@@ -259,7 +261,7 @@ export default function VibandaHomePage() {
       </div>
       <p className="flex items-center gap-2 rounded-lg border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.55)] px-3 py-2 text-[10px] text-[var(--v-muted-foreground)]">
         <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--v-accent)] text-[var(--v-accent-foreground)]">i</span>
-        Prototype data · live POS sync coming soon
+        {feed?.data_provenance?.notice ?? "Source synchronization and completeness have not been verified."}
       </p>
 
       {err && <OsError message="Couldn't reach the kitchen right now." onRetry={() => load(period)} />}
@@ -268,7 +270,7 @@ export default function VibandaHomePage() {
         <>
           {/* Today snapshot — 6 pillar cards */}
           <section aria-labelledby="snapshot-heading">
-            <SectionHead eyebrow="How are we doing?" title="Today at Vibanda Village"
+            <SectionHead id="snapshot-heading" eyebrow="How are we doing?" title="Today at Vibanda Village"
               meta="Operational cards stay current · period sets context" />
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <PillarCard label="Revenue" primaryLabel={`Revenue · ${PERIOD_LABEL[period]}`} primary={fmtKes(feed.revenue.revenue)}
@@ -302,7 +304,7 @@ export default function VibandaHomePage() {
 
           {/* What needs your attention */}
           <section aria-labelledby="attention-heading">
-            <SectionHead eyebrow="Decision support" title="What needs your attention"
+            <SectionHead id="attention-heading" eyebrow="Decision support" title="What needs your attention"
               meta={feed.attention.length ? `${feed.attention.length} high-priority ${feed.attention.length === 1 ? "item" : "items"}` : undefined} />
             <div className="space-y-3">
               {feed.attention.length === 0 && (
@@ -323,7 +325,7 @@ export default function VibandaHomePage() {
           {/* Operational pulse */}
           {feed.pulse.length > 0 && (
             <section aria-labelledby="pulse-heading">
-              <SectionHead eyebrow="What's happening right now?" title="Operational pulse"
+              <SectionHead id="pulse-heading" eyebrow="What's happening right now?" title="Operational pulse"
                 meta="Current context · refreshed just now" />
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {feed.pulse.map((p) => (
@@ -342,7 +344,7 @@ export default function VibandaHomePage() {
           )}
 
           {/* How each part is doing */}
-          <PartHealth />
+          <PartHealth feed={feed} />
 
           {/* Business performance */}
           <section aria-labelledby="performance-heading" className="mt-10 rounded-xl border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.55)] p-4 sm:p-5">

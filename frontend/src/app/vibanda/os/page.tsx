@@ -4,7 +4,7 @@
 // prototype-data badge, ask bar, searchable question groups, transcript
 // ("You asked" → Finding / Why this matters / Estimated impact / Recommended
 // next step card), "This period" aside with REAL numbers from /overview/today.
-// POST /api/v1/ai/chat, with GET /api/v1/ai/ask as the deterministic fallback.
+// Answers and suggested actions come from the same question-specific /ai/chat response.
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Search, Send, Sparkles, ShieldCheck, Info, ChevronRight } from "lucide-react";
@@ -23,6 +23,7 @@ type AskCard = {
 };
 
 type Answer = {
+  evidenceNote?: string;
   finding: string;
   why: string;
   impact: string;
@@ -38,6 +39,7 @@ type Answer = {
 type Turn = { question: string; answer: Answer | null; error?: boolean };
 
 type Overview = {
+  data_provenance?: { notice: string };
   restaurant_name: string;
   revenue: { revenue: number; orders: number; avg_order: number; pace_projection: number };
   orders: { orders: number; active_now: number };
@@ -58,39 +60,25 @@ function OsChatInner() {
   const [overviewReady, setOverviewReady] = useState(false);
   const [overviewError, setOverviewError] = useState(false);
   const prefillAsked = useRef(false);
-  const latestTurnRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let active = true;
-    api.get<Overview>("/api/v1/overview/today")
+    api.get<Overview>("/api/v1/overview/today", { timeout: 15000 })
       .then((r) => { if (active) setOverview(r.data); })
       .catch(() => { if (active) setOverviewError(true); })
       .finally(() => { if (active) setOverviewReady(true); });
     return () => { active = false; };
   }, []);
 
-  // Bring the NEW question to the top of the viewport so the answer fills in
-  // directly below it, in view.
-  //
-  // This used to scroll a marker placed AFTER the transcript to the top of the
-  // viewport, which pushed the answer above the fold — the owner had to scroll
-  // back up to read every reply. Keyed on turns.length, not `turns`, so the
-  // page holds still while the answer streams into the card the reader is
-  // already looking at.
-  useEffect(() => {
-    if (!turns.length) return;
-    latestTurnRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [turns.length]);
-
   const ask = async (question: string) => {
     const q = question.trim();
-    if (!q || busy) return;
+    if (q.length < 3 || q.length > 500 || busy) return;
     setInput("");
     setTurns((t) => [...t, { question: q, answer: null }]);
     setBusy(true);
     try {
-      // One grounded question path; an API failure is never replaced with
-      // unrelated strategy advice or a cached snapshot from another period.
+      // Use only the question-specific grounded response. A failed request
+      // must not be replaced with unrelated overview advice.
       let card: AskCard | null = null;
       let llmReply: string | undefined;
       try {
@@ -100,16 +88,13 @@ function OsChatInner() {
             { role: "user", content: t.question },
             ...(t.answer ? [{ role: "assistant", content: (t.answer.llmReply || t.answer.finding).slice(0, 4000) }] : []),
           ]),
-        });
+        }, { timeout: 45000 });
         card = r.data?.grounded ?? null;
         llmReply = r.data?.llm_reply ?? undefined;
-      } catch {
-        const r = await api.get<AskCard>("/api/v1/ai/ask", { params: { question: q } });
-        card = r.data;
-      }
-      if (!card?.finding) throw new Error("No verified answer returned");
-
-      const answer: Answer = {
+      } catch { card = null; }
+      const answer: Answer = card
+        ? {
+            evidenceNote: typeof card.data?.evidence_note === "string" ? card.data.evidence_note : undefined,
             finding: card.finding,
             why: card.why,
             impact: card.impact || "—",
@@ -117,6 +102,12 @@ function OsChatInner() {
             module: card.module,
             llmReply,
             aiSteps: (card.steps || []).map((s) => ({ action: s.action ?? "", why: s.why })),
+          }
+        : {
+            finding: "I couldn't complete that question.",
+            why: "The answer service did not return a verified result.",
+            impact: "Not available",
+            action: "Please try your question again. No restaurant changes were made.",
           };
       setTurns((t) => t.map((turn, i) => (i === t.length - 1 ? { question: q, answer } : turn)));
     } catch {
@@ -168,7 +159,7 @@ function OsChatInner() {
           <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--v-accent)] text-[var(--v-accent-foreground)]">
             <Info size={10} />
           </span>
-          Prototype data · Macsoft is not connected
+          {overview?.data_provenance?.notice ?? "Source synchronization and completeness have not been verified."}
         </div>
       </div>
 
@@ -182,10 +173,12 @@ function OsChatInner() {
           value={input}
           maxLength={500}
           onChange={(e) => setInput(e.target.value)}
+          aria-label="Your restaurant question"
+          maxLength={500}
           placeholder="Ask anything about your restaurant..."
           className="min-w-0 flex-1 bg-transparent px-3 py-4 text-sm outline-none placeholder:text-[hsl(207_12%_46_/_0.7)]"
         />
-        <button type="submit" disabled={busy || input.trim().length < 3} aria-label="Send question"
+        <button type="submit" aria-label="Send question" disabled={busy || input.trim().length < 3}
           className="mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--v-primary)] text-[var(--v-primary-foreground)] disabled:opacity-50">
           <Send size={15} />
         </button>
@@ -210,7 +203,6 @@ function OsChatInner() {
               {turns.map((t, i) => (
                 <div
                   key={i}
-                  ref={i === turns.length - 1 ? latestTurnRef : undefined}
                   className="scroll-mt-4 space-y-3"
                 >
                   {/* You asked */}
@@ -231,6 +223,7 @@ function OsChatInner() {
                         <p className="mt-1 text-[13px] font-semibold">{t.question}</p>
                       </div>
                       <div className="space-y-5 p-4 sm:p-5">
+                        {t.answer.evidenceNote && <p className="text-xs text-[var(--v-muted-foreground)]">{t.answer.evidenceNote}</p>}
                         {t.answer.llmReply && (
                           <div className="rounded-xl bg-[hsl(42_71%_75_/_0.18)] p-3.5">
                             <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[hsl(208_29%_19_/_0.92)]">{t.answer.llmReply}</p>
@@ -373,7 +366,7 @@ function OsChatInner() {
           </div>
           <div className="flex items-start gap-2.5 px-1 pt-1 text-[10px] leading-relaxed text-[var(--v-muted-foreground)]">
             <ShieldCheck size={14} className="mt-0.5 shrink-0" />
-            <span>Answers come from your restaurant&apos;s real data. Always confirm operational changes with your team.</span>
+            <span>Answers use recorded restaurant data; completeness and freshness may vary. Always confirm operational changes with your team.</span>
           </div>
         </aside>
       </div>

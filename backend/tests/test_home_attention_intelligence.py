@@ -138,7 +138,7 @@ def test_dismissed_cards_stay_dismissed(db_session, restaurant):
     cards = _attention_cards(db_session, r.id, tenant.id)
     target = cards[0]["id"]
     db_session.add(models.AttentionDecision(
-        tenant_id=tenant.id, card_key=target, decision="rejected"))
+        tenant_id=tenant.id, restaurant_id=r.id, card_key=target, decision="rejected"))
     db_session.commit()
 
     after = [c["id"] for c in _attention_cards(db_session, r.id, tenant.id)]
@@ -166,3 +166,30 @@ def test_a_new_restaurant_gets_an_empty_list_not_an_error(db_session):
     r = models.Restaurant(tenant_id=t.id, name="Brand New", address="x")
     db_session.add(r); db_session.commit()
     assert _attention_cards(db_session, r.id, t.id) == []
+
+
+def test_home_includes_profit_and_missing_payment_evidence(db_session, restaurant):
+    tenant, r = restaurant
+    order = models.Order(restaurant_id=r.id, total=40000, is_paid=True,
+                         payment_method=models.PaymentMethod.MPESA, mpesa_receipt=None)
+    db_session.add(order)
+    db_session.commit()
+    state = {}
+    cards = _attention_cards(db_session, r.id, tenant.id, source_status=state)
+    assert any(c['domain'] == 'Profit' and 'Modelled' in c['impact'] for c in cards)
+    assert any(c['domain'] == 'Payment review' and str(order.id) in c['title'] for c in cards)
+    assert state['profit']['state'] == 'evaluated'
+    assert state['kitchen']['state'] == 'insufficient_data'
+
+
+def test_home_does_not_silently_hide_adapter_failure(db_session, restaurant, monkeypatch):
+    from ai.decisions import adapters
+    def broken(*args):
+        raise ValueError('private details')
+    monkeypatch.setitem(adapters._ADAPTERS, 'pricing', broken)
+    state = {}
+    tenant, r = restaurant
+    cards = _attention_cards(db_session, r.id, tenant.id, source_status=state)
+    assert cards
+    assert state['pricing'] == {'state': 'failed', 'recommendations': None}
+    assert 'private details' not in str(state)

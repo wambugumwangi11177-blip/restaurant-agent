@@ -31,7 +31,8 @@ def get_ranked_decisions(
     with no track record keep full confidence — it is a no-op for a new
     restaurant, which is why it never disturbs the deterministic baseline.
     """
-    decisions = collect_decisions(db, restaurant_id, sources=sources)
+    source_status = {}
+    decisions = collect_decisions(db, restaurant_id, sources=sources, source_status=source_status)
     # Marketplace plugins (Phase 11) contribute to the same ranked stream. Empty
     # by default (no plugins registered) → no effect on the core baseline.
     try:
@@ -47,6 +48,7 @@ def get_ranked_decisions(
     total_impact = sum(d["impact_cents_month"] or 0 for d in quantified)
 
     return {
+        "source_status": source_status,
         "summary": {
             "total_decisions": len(ranked),
             "quantified_decisions": len(quantified),

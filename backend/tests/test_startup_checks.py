@@ -159,58 +159,24 @@ def test_unconfigured_smtp_outside_production_has_no_warning(monkeypatch):
     assert not any("SMTP" in s for s in soft)
 
 
-def test_production_without_any_mpesa_does_not_require_a_callback_token(monkeypatch):
-    """
-    A deployment that does not use M-Pesa at all must still boot.
+def test_retired_mpesa_gate_is_gone_entirely(monkeypatch):
+    """M-Pesa was retired (6aee044). The boot gate went with it.
 
-    The gate was unconditional, so a tenant taking no M-Pesa payments could not
-    start in production without inventing a token for a provider it never
-    calls. That is not a security property, it is a ritual — and the real
-    protection is elsewhere: _verify_mpesa_token() 403s every callback while
-    the token is unset, credentials or not (CYB-103).
-
-    The warning still appears; it just does not block the boot.
+    Three tests used to assert a soft MPESA_CALLBACK_TOKEN warning survived in
+    production. They came back during the consolidation merge alongside the
+    retirement that deleted the check they assert, and failed on master from
+    2026-09-20. The contract now is simply: startup says nothing about M-Pesa.
     """
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("SECRET_KEY", "x")
     monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@db.example.com/app")
     monkeypatch.setenv("CORS_ORIGINS", "https://app.example.com")
-    monkeypatch.delenv("MPESA_ENV", raising=False)
-    for k in _MPESA_CREDS:
-        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("MPESA_ENV", "production")          # even declared live
+    for k, v in _MPESA_CREDS.items():
+        monkeypatch.setenv(k, v)                           # even fully credentialed
     monkeypatch.delenv("MPESA_CALLBACK_TOKEN", raising=False)
 
     hard, soft = startup_checks.collect_problems()
-    assert not any("MPESA_CALLBACK_TOKEN" in h for h in hard)
-    assert any("MPESA_CALLBACK_TOKEN" in s for s in soft)
+    assert not any("MPESA" in problem for problem in hard + soft)
 
-    # The whole point: this boots.
-    startup_checks.enforce_startup_checks()
-
-
-def test_declaring_mpesa_env_restores_the_hard_requirement(monkeypatch):
-    """Setting MPESA_ENV says the integration is live, even before creds land."""
-    monkeypatch.setenv("APP_ENV", "production")
-    monkeypatch.setenv("SECRET_KEY", "x")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@db.example.com/app")
-    monkeypatch.setenv("MPESA_ENV", "sandbox")
-    for k in _MPESA_CREDS:
-        monkeypatch.delenv(k, raising=False)
-    monkeypatch.delenv("MPESA_CALLBACK_TOKEN", raising=False)
-
-    hard, _soft = startup_checks.collect_problems()
-    assert any("MPESA_CALLBACK_TOKEN" in h for h in hard)
-
-
-def test_credentials_alone_restore_the_hard_requirement(monkeypatch):
-    """Daraja creds present means money can move; the token is mandatory."""
-    monkeypatch.setenv("APP_ENV", "production")
-    monkeypatch.setenv("SECRET_KEY", "x")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@db.example.com/app")
-    monkeypatch.delenv("MPESA_ENV", raising=False)
-    for k, v in _MPESA_CREDS.items():
-        monkeypatch.setenv(k, v)
-    monkeypatch.delenv("MPESA_CALLBACK_TOKEN", raising=False)
-
-    hard, _soft = startup_checks.collect_problems()
-    assert any("MPESA_CALLBACK_TOKEN" in h for h in hard)
+    startup_checks.enforce_startup_checks()                # and it boots

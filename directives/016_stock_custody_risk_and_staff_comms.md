@@ -384,3 +384,52 @@ deliberate, already-visible action to whoever does it, lower urgency than
 "did the revocation I just did actually happen"); a "menu item back in
 stock" notification (same reasoning). Both are cheap to add later if this
 judgment call turns out wrong in practice — flagged, not silently dropped.
+
+## 2026-09-20: the custody model had a hole in the plainest endpoint of all
+
+An API security review swept all 154 endpoints against the usual checklist
+(authentication, ownership, mass assignment, data exposure, rate limiting,
+error handling). Every item passed. The worst finding passed too, which is
+the lesson worth keeping.
+
+**The hole:** `PUT /inventory/{item_id}` accepted `quantity`. It was
+authenticated, tenant-scoped, and field-whitelisted through a
+`StrictModel` with `extra="forbid"` — it satisfies every question a generic
+audit knows how to ask. But the handler applies the schema with a bare
+`setattr` loop, so a quantity supplied there changed stock on hand while
+writing **none** of what `POST /{item_id}/adjust` writes: no `StockMovement`
+row, no `performed_by_user_id`, no `INVENTORY_ADJUSTMENT_FLAGGED` event.
+
+That is precisely the trail this directive is built on.
+`ai/stock_custody.py::_actual_usage_by_item` computes actual usage by
+summing `StockMovement` OUT rows, so stock removed through the PUT was
+invisible to the nightly variance check — and a later physical count
+reconciles cleanly against the already-lowered number, so the second line
+of defence missed it too. Inventory's `_CAN_WRITE` is
+`(MANAGER, STOCKKEEPER)`: the Stockkeeper tier, which this directive's
+whole separation-of-duties argument exists to oversee, could zero an item
+and leave no trace.
+
+**The fix:** `quantity` is gone from `InventoryItemUpdate`, rejected by name
+with a message naming `/receive` and `/adjust` rather than the generic
+`extra="forbid"` 422 (which reads like a typo and sends people looking for
+another way through). Covered by `tests/test_api_security_review.py`.
+The frontend never called this route for quantity — it already used
+`/receive` and `/adjust` — so nothing downstream changed.
+
+**What to carry forward:** the rule this directive should have stated
+outright, and now does — *an endpoint that can change `InventoryItem.quantity`
+and does not write a `StockMovement` is a custody bug, regardless of how
+well it is authenticated.* Check that property directly when adding or
+editing any inventory-touching route; the generic checklist will not catch
+it, because from the outside an untracked write and a tracked one look
+identical. The `stock-loss-prevention` skill already says to check new
+adjustment endpoints for who-performed-the-action. Existing endpoints
+needed the same check, and had not had it.
+
+Two unrelated findings from the same review, fixed alongside: the slowapi
+rate limiter had no shared store and depended on a hardcoded `--workers 1`
+in the Dockerfile that nothing enforced (now `WEB_CONCURRENCY`, with a
+`startup_checks.py` gate that hard-fails a production boot if it is raised
+without Redis), and `/docs` / `/redoc` / `/openapi.json` were public in
+production (now off unless `ENABLE_DOCS=1`).

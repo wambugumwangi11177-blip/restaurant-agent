@@ -50,9 +50,56 @@ def _mpesa_in_use() -> bool:
     return _mpesa_configured() or bool(os.getenv("MPESA_ENV", "").strip())
 
 
+def docs_enabled() -> bool:
+    """Whether to serve /docs, /redoc and /openapi.json.
+
+    FastAPI serves all three unauthenticated by default. In production that
+    publishes the complete route map to anyone who asks — including the shape
+    of /webhooks/mpesa/{token}, whose ONLY authentication is that path token
+    (routers/webhooks.py::_verify_mpesa_token), and the full request schema of
+    every auth route. Not secret on its own, but a needless head start.
+
+    On everywhere that isn't production, where the schema is a working tool.
+    Off in production unless ENABLE_DOCS is set for a deliberate, temporary
+    debugging session — the same explicit-opt-in posture METRICS_TOKEN gives
+    /metrics.
+
+    Lives here rather than inline in main.py so it is a function a test can
+    call with a monkeypatched environment. The inline version could only be
+    exercised by reloading main, which swaps out the module-level `app` that
+    other tests captured at import time and silently breaks their
+    dependency_overrides.
+    """
+    if not is_production():
+        return True
+    return os.getenv("ENABLE_DOCS", "").strip().lower() in ("1", "true", "yes")
+
+
+def _rate_limit_store_is_shared() -> bool:
+    """True when slowapi has an external counter (see rate_limit.py)."""
+    return bool(
+        os.getenv("RATE_LIMIT_STORAGE_URI", "").strip()
+        or os.getenv("REDIS_URL", "").strip()
+    )
+
+
+def _worker_count() -> int:
+    """How many gunicorn workers this container will run.
+
+    The Dockerfile passes `--workers ${WEB_CONCURRENCY:-1}`, so this env var
+    is the single knob that decides it — which is what lets the check below
+    see the same number the process manager will use.
+    """
+    try:
+        return max(int(os.getenv("WEB_CONCURRENCY", "1").strip() or "1"), 1)
+    except ValueError:
+        return 1
+
+
 # Kept for backwards compatibility with imports/tests that reference the
 # helper's old name; the token check itself no longer conditions on it (CYB-103).
-__all__ = ["is_production", "_mpesa_configured", "collect_problems", "enforce_startup_checks"]
+__all__ = ["is_production", "docs_enabled", "_mpesa_configured", "collect_problems",
+           "enforce_startup_checks"]
 
 
 def collect_problems() -> tuple[list[str], list[str]]:
@@ -95,6 +142,41 @@ def collect_problems() -> tuple[list[str], list[str]]:
             hard.append(msg)
         else:
             soft.append(msg)
+
+    # Rate limiting is only correct across >1 worker when the counter lives
+    # outside the process. Without a shared store slowapi keeps an in-process
+    # dict per worker, so a client's requests round-robin across N
+    # independent counters and every configured limit is silently N times
+    # looser — including login (10/min) and register (5/hour), the two that
+    # brake credential brute-force.
+    #
+    # This already happened once in production (rate_limit.py's docstring has
+    # the full account: limits appeared configured and did nothing). The fix
+    # then was pinning the Dockerfile to one worker — a real fix, but an
+    # invariant that lived only in a comment, so the next person to scale out
+    # would silently undo it. This is the enforcement: raising WEB_CONCURRENCY
+    # without provisioning Redis first fails the deploy instead of quietly
+    # halving the brute-force protection.
+    workers = _worker_count()
+    shared_store = _rate_limit_store_is_shared()
+    if workers > 1 and not shared_store:
+        msg = (
+            f"WEB_CONCURRENCY={workers} with no shared rate-limit store — each "
+            f"worker keeps its own in-memory counter, so every rate limit "
+            f"(login, register, password reset) is roughly {workers}x looser "
+            "than configured. Set RATE_LIMIT_STORAGE_URI (or REDIS_URL) to a "
+            "Redis instance, or run a single worker."
+        )
+        if prod:
+            hard.append(msg)
+        else:
+            soft.append(msg)
+    elif prod and not shared_store:
+        soft.append(
+            "No shared rate-limit store (RATE_LIMIT_STORAGE_URI/REDIS_URL "
+            "unset) — rate limiting is correct only while this app runs a "
+            "single worker. Provision Redis before raising WEB_CONCURRENCY."
+        )
 
     # CORS must be set explicitly in production; the built-in fallback list is a
     # dev safety net, not a production ACL.

@@ -174,7 +174,6 @@ function OsChatInner() {
           maxLength={500}
           onChange={(e) => setInput(e.target.value)}
           aria-label="Your restaurant question"
-          maxLength={500}
           placeholder="Ask anything about your restaurant..."
           className="min-w-0 flex-1 bg-transparent px-3 py-4 text-sm outline-none placeholder:text-[hsl(207_12%_46_/_0.7)]"
         />

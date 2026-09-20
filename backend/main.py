@@ -48,7 +48,23 @@ except Exception:
 from rate_limit import limiter, SLOWAPI_AVAILABLE
 from time_utils import utcnow
 
-app = FastAPI(title="Restaurant Agent API", version="2.0.0")
+# ── OpenAPI / interactive docs exposure ──────────────────────────────────────
+# Off in production (the schema publishes the full route map unauthenticated),
+# on everywhere else. ENABLE_DOCS=1 re-opens it for a deliberate debugging
+# session — see startup_checks.docs_enabled() for the full reasoning.
+from startup_checks import docs_enabled
+
+_DOCS_ENABLED = docs_enabled()
+if not _DOCS_ENABLED:
+    logger.info("[Docs] /docs, /redoc and /openapi.json disabled in production")
+
+app = FastAPI(
+    title="Restaurant Agent API",
+    version="2.0.0",
+    docs_url="/docs" if _DOCS_ENABLED else None,
+    redoc_url="/redoc" if _DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if _DOCS_ENABLED else None,
+)
 
 if SLOWAPI_AVAILABLE:
     from slowapi import _rate_limit_exceeded_handler

@@ -29,16 +29,23 @@ EXPOSE 8000
 # on this deploy path (found 2026-07-07 — Procfile's release: line was dead
 # code for this specific Railway configuration).
 #
-# --workers 1 (was 2, found 2026-07-07): slowapi's rate limiter uses
-# in-process memory with no Redis backing it, so 2 worker processes meant 2
-# independent counters — a client's requests round-robin across both,
-# silently doubling every configured rate limit (login lockout protection
-# was ~50% as effective as intended). Single worker makes the counter
-# authoritative again; see rate_limit.py's docstring for the full tradeoff
-# and the real fix (Redis-backed storage) if traffic ever needs >1 worker.
+# --workers ${WEB_CONCURRENCY:-1}, default 1 (was 2 until 2026-07-07, then a
+# hardcoded 1 until 2026-09-20): slowapi's rate limiter uses in-process
+# memory with no Redis backing it, so 2 worker processes meant 2 independent
+# counters — a client's requests round-robin across both, silently doubling
+# every configured rate limit (login lockout protection was ~50% as effective
+# as intended). One worker makes the counter authoritative again; see
+# rate_limit.py's docstring for the full tradeoff and the real fix
+# (Redis-backed storage) if traffic ever needs >1.
+#
+# Read from WEB_CONCURRENCY rather than hardcoded, so the count is a value
+# startup_checks.py can also see: raising it without first setting
+# RATE_LIMIT_STORAGE_URI/REDIS_URL now fails the production boot instead of
+# quietly loosening every auth rate limit. The invariant used to live only
+# in this comment, where nothing enforced it.
 # --timeout 60: a worker whose request runs longer than this is killed and
 # restarted, so a single hung upstream (LLM/Twilio/M-Pesa) can't wedge the one
 # worker indefinitely. It sits above the app-level client timeouts (LLM 30s,
 # Twilio 10s) so those fire first and degrade gracefully; the gunicorn timeout
 # is the last-resort backstop. Tunable via GUNICORN_TIMEOUT.
-CMD ["sh", "-c", "python -c 'from database import init_db; init_db()' && alembic upgrade head && gunicorn main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --timeout ${GUNICORN_TIMEOUT:-60} --bind 0.0.0.0:$PORT"]
+CMD ["sh", "-c", "python -c 'from database import init_db; init_db()' && alembic upgrade head && gunicorn main:app --workers ${WEB_CONCURRENCY:-1} --worker-class uvicorn.workers.UvicornWorker --timeout ${GUNICORN_TIMEOUT:-60} --bind 0.0.0.0:$PORT"]

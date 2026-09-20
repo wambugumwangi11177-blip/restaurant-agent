@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, EmailStr, AfterValidator
+from pydantic import BaseModel, ConfigDict, Field, EmailStr, AfterValidator, model_validator
 from typing import Optional, List, Annotated
 from datetime import datetime, date, time
 import email_validator
@@ -186,11 +186,42 @@ class InventoryItemCreate(StrictModel):
 
 class InventoryItemUpdate(StrictModel):
     item_name: Optional[str] = None
-    quantity: Optional[float] = Field(default=None, ge=0)
     unit: Optional[str] = None
     cost_per_unit: Optional[float] = Field(default=None, ge=0)
     low_stock_threshold: Optional[int] = Field(default=None, ge=0)
     expiry_days: Optional[int] = Field(default=None, ge=0)
+
+    # `quantity` is deliberately absent, and rejected by name below rather
+    # than by the generic extra="forbid" message, because the reason matters
+    # to whoever hits it.
+    #
+    # PUT /inventory/{item_id} applies this schema with a bare setattr loop.
+    # While `quantity` lived here, a Manager or Stockkeeper could change
+    # stock on hand through it and leave behind none of the three things
+    # POST /{item_id}/adjust writes: a StockMovement row, a
+    # performed_by_user_id naming who did it, and an
+    # INVENTORY_ADJUSTMENT_FLAGGED event. Directive 016's custody model is
+    # built on exactly those rows — ai/stock_custody.py computes actual
+    # usage by summing StockMovement OUT — so an untracked write is
+    # invisible to the variance report whose entire job is catching it, and
+    # a later physical count reconciles cleanly against the already-lowered
+    # number. Stockkeeper is both the tier this endpoint grants write access
+    # to and the tier the variance report exists to oversee, which is what
+    # made this worth closing rather than documenting.
+    #
+    # Adding stock goes through /{item_id}/receive, correcting it through
+    # /{item_id}/adjust. Both record the audit trail.
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_untracked_quantity(cls, data):
+        if isinstance(data, dict) and "quantity" in data:
+            raise ValueError(
+                "quantity cannot be changed here — it would leave no audit "
+                "trail of who moved the stock. Use POST "
+                "/inventory/{item_id}/receive to add stock, or POST "
+                "/inventory/{item_id}/adjust to correct it."
+            )
+        return data
 
 class InventoryItemOut(StrictModel):
     id: int

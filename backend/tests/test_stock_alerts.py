@@ -51,8 +51,8 @@ def _run_check(db_session, monkeypatch):
     sent = []
     import ai.whatsapp as whatsapp_mod
     import ai.whatsapp.brain as brain_mod
-    monkeypatch.setattr(whatsapp_mod, "send_whatsapp_message",
-                        lambda to, msg, **kw: sent.append((to, msg)))
+    monkeypatch.setattr(brain_mod, "send_to_owner",
+                        lambda db, restaurant, msg, message_type: sent.append((restaurant.id, msg)))
     monkeypatch.setattr(brain_mod, "send_whatsapp_message",
                         lambda to, msg, **kw: sent.append((to, msg)))
 
@@ -83,7 +83,7 @@ def test_critical_item_alerts_owner_exactly_once(stocked, monkeypatch):
 
     assert len(sent) == 1, f"expected exactly one owner message, got {len(sent)}: {sent}"
     to, msg = sent[0]
-    assert to == "+254712345678"
+    assert to == 1
     assert "Chicken" in msg
     # ...and it is the *orchestrated* alert (cross-agent context), not the plain
     # one the direct send used. on_stock_critical resolved the owner from

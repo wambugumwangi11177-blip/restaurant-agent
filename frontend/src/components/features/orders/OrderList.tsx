@@ -207,7 +207,6 @@ export default function OrderList() {
                                                 className="mt-2 flex gap-1.5 items-center overflow-hidden">
                                                 {[
                                                     { v: "cash", label: "Cash", icon: Banknote },
-                                                    { v: "mpesa", label: "M-Pesa", icon: Smartphone },
                                                     { v: "card", label: "Card", icon: CreditCard },
                                                 ].map((p) => (
                                                     <button key={p.v} onClick={() => setPayMethod(p.v)}

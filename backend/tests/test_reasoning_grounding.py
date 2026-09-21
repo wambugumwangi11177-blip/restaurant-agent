@@ -17,6 +17,16 @@ PAYLOAD = {
 }
 
 
+def test_ksh_currency_marker_checks_small_invented_amounts():
+    result = grounding.verify({"headline": "Costs KSh 7."}, {"cost": 2})
+    assert result["verified"] is False
+
+
+def test_ksh_currency_marker_supports_integer_cents():
+    result = grounding.verify({"headline": "Costs KSh 9000."}, {"cost_cents": 900000})
+    assert result["verified"] is True
+
+
 def _verify(headline="", priorities=None, actions=None):
     return grounding.verify(
         {"headline": headline, "priorities": priorities or [], "actions": actions or []},

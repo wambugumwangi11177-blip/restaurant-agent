@@ -437,7 +437,6 @@ export default function POSWorkspace() {
                         <div className="flex gap-1.5">
                             {[
                                 { v: "cash", label: "Cash", icon: Banknote },
-                                { v: "mpesa", label: "M-Pesa", icon: Smartphone },
                                 { v: "card", label: "Card", icon: CreditCard },
                                 { v: "pending", label: "Later", icon: X },
                             ].map((p) => (

@@ -8,6 +8,35 @@ import models
 from routers.deps import get_or_create_restaurant, get_restaurant_or_none
 
 
+def test_owner_notifications_include_admin_without_staff_role_and_stay_tenant_scoped(db_session):
+    from routers.deps import get_staff_users_for_restaurant
+
+    db = db_session
+    tenant = models.Tenant(name="In-app owner")
+    other = models.Tenant(name="Other owner")
+    db.add_all([tenant, other])
+    db.flush()
+    restaurant = models.Restaurant(tenant_id=tenant.id, name="Owner restaurant")
+    owner = models.User(tenant_id=tenant.id, email="inapp-owner@example.com",
+                        hashed_password="unused", role=models.Role.ADMIN,
+                        staff_role=None, is_active=True)
+    foreign = models.User(tenant_id=other.id, email="foreign-owner@example.com",
+                          hashed_password="unused", role=models.Role.ADMIN, is_active=True)
+    inactive = models.User(tenant_id=tenant.id, email="inactive-owner@example.com",
+                           hashed_password="unused", role=models.Role.ADMIN, is_active=False)
+    db.add_all([restaurant, owner, foreign, inactive])
+    db.commit()
+    assert [user.id for user in get_staff_users_for_restaurant(
+        db, restaurant, [models.StaffRole.OWNER])] == [owner.id]
+    assert get_staff_users_for_restaurant(db, restaurant, [models.StaffRole.KITCHEN]) == []
+    from ai.whatsapp.brain import send_to_owner
+    send_to_owner(db, restaurant, "Recorded stock needs review", "stock_review")
+    notification = db.query(models.Notification).filter_by(user_id=owner.id).one()
+    assert notification.body == "Recorded stock needs review"
+    assert notification.event_type == "stock_review"
+    assert db.query(models.Notification).count() == 1
+
+
 def _make_tenant_and_user(db_session, name="Test Tenant"):
     tenant = models.Tenant(name=name)
     db_session.add(tenant)

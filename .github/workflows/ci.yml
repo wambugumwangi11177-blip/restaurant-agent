@@ -22,6 +22,9 @@ on:
       - "fix/**"
       - "chore/**"
       - "postmortem/**"
+      # review/** added on master while this branch was open — kept, since the
+      # whole point of this list is that a pushed branch gets verified.
+      - "review/**"
   pull_request:
   workflow_dispatch: {}
 
@@ -166,6 +169,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Owner interaction regression tests
+        run: npm test
+
       - name: Typecheck
         run: npx tsc --noEmit
 
@@ -211,3 +217,47 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: true
+
+  owner-postgres-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: test_owner_release
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: release-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      OWNER_POSTGRES_TEST_URL: postgresql://postgres:release-test-only@127.0.0.1:5432/test_owner_release
+      DATABASE_URL: postgresql://postgres:release-test-only@127.0.0.1:5432/test_owner_release
+      SECRET_KEY: ci-owner-release-test-only
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+      PGPASSWORD: release-test-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Verify migration paths and concurrent decisions on PostgreSQL
+        run: pytest -v tests/test_owner_postgres.py
+      - name: Restore synthetic backup into a separate database
+        run: |
+          pg_dump --format=custom --dbname=test_owner_release --file=/tmp/owner-release.dump
+          createdb test_owner_restore
+          pg_restore --exit-on-error --no-owner --dbname=test_owner_restore /tmp/owner-release.dump
+          test "$(psql -At --dbname=test_owner_restore -c 'SELECT count(*) FROM attention_decisions')" = "1"
+          test "$(psql -At --dbname=test_owner_restore -c 'SELECT sum(total) FROM orders WHERE is_paid')" = "12345"

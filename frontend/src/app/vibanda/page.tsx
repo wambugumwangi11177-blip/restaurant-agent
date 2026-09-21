@@ -4,23 +4,29 @@
 // headings, rounded-xl cards on translucent card surface, teal primary,
 // gold accents, sketch section order (6 cards → attention → pulse →
 // parts → performance).
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight, TrendingUp } from "lucide-react";
 import api from "@/lib/api";
 import { fmtKes, fmtPct, greetingFor } from "@/lib/format";
-import { OsLoading, OsEmpty, OsError } from "@/components/os/States";
+import { OsLoading, OsError } from "@/components/os/States";
 import PartHealth from "@/components/vibanda/PartHealth";
 import { useAuth } from "@/context/AuthContext";
+import SourceUnavailable from "@/components/vibanda/SourceUnavailable";
+
+const observerMode = process.env.NEXT_PUBLIC_OBSERVER_MODE === "true";
 
 type Feed = {
+  source_status?: Record<string, { state: string; recommendations: number | null }>;
+  data_provenance?: { notice: string; latest_order_at: string | null };
   greeting_date: string;
   restaurant_name: string;
   period: string;
+  unavailable_metrics: string[];
   revenue: { revenue: number; orders: number; avg_order: number; pace_projection: number };
   orders: { revenue: number; orders: number; delayed: number; active_now: number; split: Record<string, number> };
   kitchen: { avg_prep_min: number; delay_risk: number; bottleneck: string | null };
-  stock: { low_stock: { name: string; qty: number }[]; expiring_48h: string[]; waste_pct_week: number };
+  stock: { recorded_items?: number; low_stock: { name: string; qty: number }[]; expiring_48h: string[]; waste_pct_week: number };
   bookings: { covers_today: number; next_reservation_min: number | null; waitlist: number; no_show_pct: number };
   staff: { scheduled: number; on_shift: number; overtime_risk: number; labor_cost_pct: number };
   attention: {
@@ -40,12 +46,12 @@ const PERIODS = ["1h", "today", "7d", "30d"] as const;
 const PERIOD_LABEL: Record<string, string> = { "1h": "1H", today: "Today", "7d": "7D", "30d": "30D" };
 
 // Sketch pattern: eyebrow + font-display heading per section
-function SectionHead({ eyebrow, title, meta }: { eyebrow: string; title: string; meta?: string }) {
+function SectionHead({ eyebrow, title, meta, id }: { eyebrow: string; title: string; meta?: string; id?: string }) {
   return (
     <div className="mb-4 flex items-end justify-between">
       <div>
         <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">{eyebrow}</p>
-        <h2 className="font-display text-2xl font-semibold tracking-[-0.035em]">{title}</h2>
+        <h2 id={id} className="font-display text-2xl font-semibold tracking-[-0.035em]">{title}</h2>
       </div>
       {meta && <span className="hidden text-[10px] text-[var(--v-muted-foreground)] sm:block">{meta}</span>}
     </div>
@@ -123,9 +129,23 @@ function ConfidenceChip({ pct }: { pct: number }) {
 // grid under a top border, action buttons.
 function AttentionCard({ card, onDecide, onAsk }: {
   card: Feed["attention"][number];
-  onDecide: (id: string, d: "approved" | "later" | "rejected") => void;
+  onDecide: (id: string, d: "approved" | "later" | "rejected") => Promise<void>;
   onAsk: (question: string) => void;
 }) {
+  const [saving, setSaving] = useState(false);
+  const [decisionError, setDecisionError] = useState(false);
+  const recordDecision = async (decision: "approved" | "later" | "rejected") => {
+    if (saving) return;
+    setSaving(true);
+    setDecisionError(false);
+    try {
+      await onDecide(card.id, decision);
+    } catch {
+      setDecisionError(true);
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
     <article className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-4 transition-shadow hover:shadow-[0_10px_30px_hsl(201_47%_29_/.05)] sm:p-5">
       <div className="flex items-start gap-3">
@@ -158,23 +178,33 @@ function AttentionCard({ card, onDecide, onAsk }: {
         </div>
       </div>
       <div className="ml-12 mt-4 flex flex-wrap items-center gap-2">
-        <button onClick={() => onDecide(card.id, "approved")}
-          className="min-h-9 rounded-lg bg-[var(--v-primary)] px-3 py-2 text-[10px] font-bold text-[var(--v-primary-foreground)] hover:brightness-105">Approve</button>
-        <button onClick={() => onDecide(card.id, "later")}
-          className="min-h-10 rounded-lg border border-[var(--v-border)] px-2 py-2 text-[11px] font-bold hover:bg-[var(--v-muted)]">Later</button>
-        <button onClick={() => onDecide(card.id, "rejected")}
-          className="min-h-10 rounded-lg border border-[var(--v-border)] px-2 py-2 text-[11px] font-bold hover:bg-[var(--v-muted)]">Reject</button>
+        <button disabled={saving} onClick={() => recordDecision("approved")}
+          className="min-h-9 rounded-lg bg-[var(--v-primary)] px-3 py-2 text-[10px] font-bold text-[var(--v-primary-foreground)] hover:brightness-105">Acknowledge</button>
+        <button disabled={saving} onClick={() => recordDecision("later")}
+          className="min-h-10 rounded-lg border border-[var(--v-border)] px-2 py-2 text-[11px] font-bold hover:bg-[var(--v-muted)]">Remind me in 24h</button>
+        <button disabled={saving} onClick={() => recordDecision("rejected")}
+          className="min-h-10 rounded-lg border border-[var(--v-border)] px-2 py-2 text-[11px] font-bold hover:bg-[var(--v-muted)]">Dismiss</button>
         <button
           onClick={() => onAsk(card.title)}
           className="min-h-10 rounded-lg border border-[hsl(201_47%_29_/_0.45)] px-2 py-2 text-[11px] font-bold text-[var(--v-primary)] hover:bg-[var(--v-muted)]">
           Ask AI about this
         </button>
       </div>
+      <p className="ml-12 mt-2 text-xs text-[var(--v-muted-foreground)]">
+        Records your decision only. Apply operational changes in your source system.
+      </p>
+      {decisionError && <p role="alert" className="ml-12 mt-2 text-xs text-[var(--v-warn)]">
+        Your decision could not be saved. Please try again.
+      </p>}
     </article>
   );
 }
 
 export default function VibandaHomePage() {
+  return observerMode ? <SourceUnavailable title="Overview" detail="Verified restaurant facts will appear here once the approved read-only source is connected." /> : <VibandaOperationalHome />;
+}
+
+function VibandaOperationalHome() {
   const { user } = useAuth();
   const router = useRouter();
   const [feed, setFeed] = useState<Feed | null>(null);
@@ -182,17 +212,26 @@ export default function VibandaHomePage() {
   const [period, setPeriod] = useState("today");
   const [dailyReport, setDailyReport] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);
+  const requestId = useRef(0);
 
   const load = useCallback((p: string) => {
+    const id = ++requestId.current;
     setErr(false);
+    setFeed(null);
     api.get<Feed>(`/api/v1/overview/today?period=${p}`)
-      .then((r) => setFeed(r.data))
-      .catch(() => setErr(true));
+      .then((r) => { if (id === requestId.current) setFeed(r.data); })
+      .catch(() => { if (id === requestId.current) setErr(true); });
   }, []);
 
-  useEffect(() => { load(period); }, [period, load]);
   useEffect(() => {
-    api.get("/api/v1/reports/daily").then((r) => setDailyReport(r.data.report_text)).catch(() => {});
+    // The request itself is the external synchronization performed here.
+    // Loading/error state is deliberately reset by the request helper.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load(period);
+    return () => { requestId.current += 1; };
+  }, [period, load]);
+  useEffect(() => {
+    api.get("/api/v1/reports/daily?narrate=false").then((r) => setDailyReport(r.data.report_text)).catch(() => {});
   }, []);
 
   const decide = async (cardId: string, decision: "approved" | "later" | "rejected") => {
@@ -238,7 +277,7 @@ export default function VibandaHomePage() {
       </div>
       <p className="flex items-center gap-2 rounded-lg border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.55)] px-3 py-2 text-[10px] text-[var(--v-muted-foreground)]">
         <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--v-accent)] text-[var(--v-accent-foreground)]">i</span>
-        Prototype data · live POS sync coming soon
+        {feed?.data_provenance?.notice ?? "Source synchronization and completeness have not been verified."}
       </p>
 
       {err && <OsError message="Couldn't reach the kitchen right now." onRetry={() => load(period)} />}
@@ -247,30 +286,30 @@ export default function VibandaHomePage() {
         <>
           {/* Today snapshot — 6 pillar cards */}
           <section aria-labelledby="snapshot-heading">
-            <SectionHead eyebrow="How are we doing?" title="Today at Vibanda Village"
+            <SectionHead id="snapshot-heading" eyebrow="How are we doing?" title="Today at Vibanda Village"
               meta="Operational cards stay current · period sets context" />
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <PillarCard label="Revenue" primaryLabel="Revenue so far" primary={fmtKes(feed.revenue.revenue)}
+              <PillarCard label="Revenue" primaryLabel={`Revenue · ${PERIOD_LABEL[period]}`} primary={fmtKes(feed.revenue.revenue)}
                 comparison={feed.revenue.orders ? `Average order · ${fmtKes(feed.revenue.avg_order)}` : ""}
                 signals={[
-                  feed.revenue.pace_projection ? `On pace for ~${fmtKes(feed.revenue.pace_projection)} today` : "No sales in this period yet",
+                  feed.revenue.pace_projection ? `On pace for ~${fmtKes(feed.revenue.pace_projection)} today` : (feed.revenue.orders ? "Paid, non-cancelled orders · no forecast available" : "No paid sales recorded in this period"),
                 ]}
                 askLabel="Ask about sales" onAsk={() => ask("How are my sales today?")} />
-              <PillarCard label="Orders" primaryLabel="Orders today" primary={`${feed.orders.orders} orders`}
+              <PillarCard label="Orders" primaryLabel={`Orders · ${PERIOD_LABEL[period]}`} primary={`${feed.orders.orders} orders`}
                 comparison={feed.orders.active_now ? `${feed.orders.active_now} active now` : ""}
                 signals={[Object.entries(feed.orders.split).filter(([, v]) => v > 0).map(([k, v]) => `${v} ${k.replace("_", "-")}`).join(" · ") || "—"]}
                 askLabel="Ask about orders" onAsk={() => ask("Are there any delayed orders?")} />
-              <PillarCard label="Kitchen" primaryLabel="Kitchen" primary={feed.kitchen.avg_prep_min ? `${feed.kitchen.avg_prep_min} min prep` : "On pace"}
+              <PillarCard label="Kitchen" primaryLabel="Kitchen" primary={feed.unavailable_metrics.includes("kitchen") ? "Not available" : `${feed.kitchen.avg_prep_min} min prep`}
                 comparison={feed.kitchen.delay_risk ? `${feed.kitchen.delay_risk} orders approaching delay` : ""}
-                signals={[feed.kitchen.bottleneck ? `Bottleneck: ${feed.kitchen.bottleneck}` : "No delays reported"]}
+                signals={[feed.unavailable_metrics.includes("kitchen") ? "Prep times and delays have not been verified" : (feed.kitchen.bottleneck ? `Bottleneck: ${feed.kitchen.bottleneck}` : "No bottleneck recorded")]}
                 askLabel="Ask about the kitchen" onAsk={() => ask("Is the kitchen running behind?")} />
-              <PillarCard label="Stock" primaryLabel="Stock" primary={feed.stock.low_stock.length ? `${feed.stock.low_stock.length} to watch` : "Healthy"}
-                comparison={feed.stock.low_stock[0] ? `${feed.stock.low_stock[0].name} projected to run out` : ""}
+              <PillarCard label="Stock" primaryLabel="Stock" primary={feed.stock.low_stock.length ? `${feed.stock.low_stock.length} to watch` : "No low-stock alerts"}
+                comparison={feed.stock.low_stock[0] ? `${feed.stock.low_stock[0].name} at or below reorder point` : ""}
                 signals={feed.stock.low_stock.slice(0, 2).map((i) => `${i.name} · ${i.qty} left`)}
                 askLabel="Ask about stock" onAsk={() => ask("What am I about to run out of?")} />
               <PillarCard label="Bookings" primaryLabel="Covers expected" primary={`${feed.bookings.covers_today} covers`}
                 comparison={feed.bookings.next_reservation_min ? `Next reservation in ${feed.bookings.next_reservation_min} min` : ""}
-                signals={[feed.bookings.waitlist ? `${feed.bookings.waitlist} tables on the waitlist` : "No waitlist"]}
+                signals={[feed.unavailable_metrics.includes("waitlist") ? "Waitlist data not available" : `${feed.bookings.waitlist} tables on the waitlist`]}
                 askLabel="Ask about bookings" onAsk={() => ask("Who's booked tonight?")} />
               <PillarCard label="Staff" primaryLabel="Coverage" primary={`${feed.staff.scheduled} scheduled`}
                 comparison={feed.staff.overtime_risk ? `${feed.staff.overtime_risk} overtime risk` : ""}
@@ -281,15 +320,15 @@ export default function VibandaHomePage() {
 
           {/* What needs your attention */}
           <section aria-labelledby="attention-heading">
-            <SectionHead eyebrow="Decision support" title="What needs your attention"
+            <SectionHead id="attention-heading" eyebrow="Decision support" title="What needs your attention"
               meta={feed.attention.length ? `${feed.attention.length} high-priority ${feed.attention.length === 1 ? "item" : "items"}` : undefined} />
             <div className="space-y-3">
               {feed.attention.length === 0 && (
                 <div className="rounded-xl border border-[hsl(150_28%_41_/_0.24)] bg-[hsl(150_28%_41_/_0.06)] px-5 py-8 text-center sm:px-10">
                   <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[hsl(150_28%_41_/_0.12)] text-[var(--v-good)]">✓</div>
-                  <h3 className="font-display mt-3 text-xl font-semibold tracking-[-0.02em]">You&apos;re on track</h3>
+                  <h3 className="font-display mt-3 text-xl font-semibold tracking-[-0.02em]">No open attention cards</h3>
                   <p className="mx-auto mt-1.5 max-w-md text-xs text-[var(--v-muted-foreground)]">
-                    There are no high-priority issues requiring your attention right now.
+                    No open cards were returned. This does not confirm that every restaurant area has been checked.
                   </p>
                 </div>
               )}
@@ -302,7 +341,7 @@ export default function VibandaHomePage() {
           {/* Operational pulse */}
           {feed.pulse.length > 0 && (
             <section aria-labelledby="pulse-heading">
-              <SectionHead eyebrow="What's happening right now?" title="Operational pulse"
+              <SectionHead id="pulse-heading" eyebrow="What's happening right now?" title="Operational pulse"
                 meta="Current context · refreshed just now" />
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {feed.pulse.map((p) => (
@@ -321,7 +360,7 @@ export default function VibandaHomePage() {
           )}
 
           {/* How each part is doing */}
-          <PartHealth />
+          <PartHealth feed={feed} />
 
           {/* Business performance */}
           <section aria-labelledby="performance-heading" className="mt-10 rounded-xl border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.55)] p-4 sm:p-5">

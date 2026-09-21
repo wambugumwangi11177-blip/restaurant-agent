@@ -148,11 +148,6 @@ def test_critical_alert_escalates_to_call_after_second_timeout(db_session, monke
     db_session.commit()
     owner = _make_user(db_session, tenant, "esc6owner", role=models.Role.ADMIN, staff_role=models.StaffRole.OWNER)
 
-    calls = []
-    monkeypatch.setattr(
-        "ai.whatsapp.twilio_client.call",
-        lambda to_number, message: calls.append((to_number, message)) or {"status": "sent", "sid": "CA123"},
-    )
 
     timeout = LEVEL_2_TIMEOUT_MINUTES["critical"]
     notif = _backdated_notification(db_session, owner, "critical", minutes_ago=timeout + 1, escalation_level=1)
@@ -162,7 +157,10 @@ def test_critical_alert_escalates_to_call_after_second_timeout(db_session, monke
     assert result["escalated_to_call"] == 1
     db_session.refresh(notif)
     assert notif.escalation_level == 2
-    assert len(calls) == 1
+    reminders = db_session.query(models.Notification).filter_by(
+        user_id=owner.id, event_type="owner_escalation").all()
+    assert len(reminders) == 1
+    assert reminders[0].severity is None
 
 
 def test_high_severity_never_reaches_voice_call(db_session):

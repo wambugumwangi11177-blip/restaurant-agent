@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum as SqEnum, DateTime, Float, Text, Date, Time, Index, UniqueConstraint, CheckConstraint, text
+from sqlalchemy import Column, Integer, BigInteger, String, Boolean, ForeignKey, Enum as SqEnum, DateTime, Float, Text, Date, Time, Index, UniqueConstraint, CheckConstraint, text
 from sqlalchemy.orm import relationship, declarative_base
 import enum
 from time_utils import utcnow
@@ -353,6 +353,16 @@ class OrderItem(Base):
         # You cannot order a non-positive quantity; a line's unit price is money.
         CheckConstraint("quantity > 0", name="ck_order_items_qty_pos"),
         CheckConstraint("unit_price >= 0", name="ck_order_items_price_nonneg"),
+        # COVERING index for the reporting join (_top_items in routers/reports.py).
+        # That query joins order_items -> orders -> menu_items and then aggregates
+        # quantity and unit_price. With only the plain order_id index, every
+        # matched line item required a second lookup into the heap/row to fetch
+        # menu_item_id, quantity and unit_price. Carrying all four columns in the
+        # index lets the aggregate be answered from the index alone.
+        # Measured on 300k orders / 900k line items: yearly _top_items 1841 ms ->
+        # 1223 ms, monthly 142 ms -> 103 ms. See migration 048.
+        Index("ix_order_items_order_covering",
+              "order_id", "menu_item_id", "quantity", "unit_price"),
     )
 
 # ──────────────────────────────────────────────
@@ -1528,3 +1538,70 @@ class Region(Base):
     created_at      = Column(DateTime, default=utcnow)
 
     organization = relationship("Organization")
+
+
+# ──────────────────────────────────────────────
+# REPORTING FACTS (dimensional rollup)
+# ──────────────────────────────────────────────
+# Why these exist: routers/reports.py aggregates straight off the transactional
+# tables. Measured on 300k orders / 900k line items, the YEARLY report cost
+# ~2.5 s of database work (757 ms _summarize + 1841 ms _top_items) before the
+# single-pass and covering-index fixes, and ~1.6 s after. That is the point at
+# which scanning raw orders per request stops being reasonable.
+#
+# Grain matters and there are two of them, so there are two tables. Revenue and
+# ORDER COUNT live at (restaurant, day): an order has many line items, so
+# counting orders from an item-grain table would multiply-count. Item quantity
+# and item sales live at (restaurant, day, menu_item). Collapsing them into one
+# table would force one of the two measures to be wrong.
+#
+# `business_date` is the Africa/Nairobi calendar day, matching how every report
+# window in this codebase is built (routers/reports.py `_range` applies
+# _EAT_OFFSET). A fact keyed on the UTC date would disagree with the live query
+# by three hours of orders, which on a restaurant's revenue line is not a
+# rounding error — it is a wrong number shown to the owner.
+#
+# These are a CACHE of a query, never a source of truth. Orders mutate after
+# creation (is_paid flips, status becomes CANCELLED), so a fact row can go stale
+# after it is written. reporting/rollup.py re-aggregates a trailing window
+# rather than appending, and carries a drift check that compares facts against
+# the live query.
+class DailySalesFact(Base):
+    """Grain: one row per (restaurant, Nairobi calendar day)."""
+    __tablename__ = "daily_sales_facts"
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    business_date = Column(Date, nullable=False)
+    # Cents, like Order.total. Money never becomes a float in storage.
+    revenue_cents = Column(BigInteger, nullable=False, default=0)
+    order_count = Column(Integer, nullable=False, default=0)
+    # When this row was last recomputed — lets the refresh job and the drift
+    # check reason about staleness without a second table.
+    built_at = Column(DateTime, default=utcnow, nullable=False)
+    __table_args__ = (
+        UniqueConstraint("restaurant_id", "business_date", name="uq_daily_sales_fact_day"),
+        Index("ix_daily_sales_facts_restaurant_date", "restaurant_id", "business_date"),
+        CheckConstraint("revenue_cents >= 0", name="ck_daily_sales_fact_revenue_nonneg"),
+        CheckConstraint("order_count >= 0", name="ck_daily_sales_fact_count_nonneg"),
+    )
+
+
+class DailyItemSalesFact(Base):
+    """Grain: one row per (restaurant, Nairobi calendar day, menu item)."""
+    __tablename__ = "daily_item_sales_facts"
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    business_date = Column(Date, nullable=False)
+    # RESTRICT mirrors OrderItem.menu_item_id: a sold item's history outlives an
+    # edit to the menu.
+    menu_item_id = Column(Integer, ForeignKey("menu_items.id", ondelete="RESTRICT"), nullable=False)
+    qty = Column(Integer, nullable=False, default=0)
+    sales_cents = Column(BigInteger, nullable=False, default=0)
+    built_at = Column(DateTime, default=utcnow, nullable=False)
+    __table_args__ = (
+        UniqueConstraint("restaurant_id", "business_date", "menu_item_id",
+                         name="uq_daily_item_sales_fact_day_item"),
+        Index("ix_daily_item_sales_facts_restaurant_date", "restaurant_id", "business_date"),
+        CheckConstraint("qty >= 0", name="ck_daily_item_sales_fact_qty_nonneg"),
+        CheckConstraint("sales_cents >= 0", name="ck_daily_item_sales_fact_sales_nonneg"),
+    )

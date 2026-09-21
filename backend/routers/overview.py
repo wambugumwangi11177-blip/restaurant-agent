@@ -367,6 +367,62 @@ def _performance(db: Session, rid: int) -> dict:
     return {"revenue_trend": trend, "orders_trend": trend}
 
 
+def _source_connection(db: Session) -> dict:
+    """What the MacSoft source has actually delivered, read from the mirror.
+
+    Deliberately NOT called "verified". Mirror rows prove MacSoft delivered
+    something and that it was stored; they do not prove the delivery is
+    complete, and nothing here maps a mirror row onto an order. Completeness is
+    integration/reconcile.py's job, reported separately as `reconciled`.
+
+    The Reports page used to carry a hardcoded "Prototype data · Macsoft is not
+    connected" line. A sentence that can only be corrected by a deploy will be
+    wrong the day the integration goes live, so this reads the real state.
+    """
+    from integration.models import MirrorEvent, ReconcileRun, SourceSystem
+    from routers.webhooks import MACSOFT_SOURCE_SLUG
+
+    try:
+        # SAVEPOINT, not a bare try: on PostgreSQL a failed statement aborts the
+        # whole transaction, so swallowing the error here would poison every
+        # query /today runs after this one. The savepoint confines the damage
+        # without discarding work the caller has already done.
+        with db.begin_nested():
+            source = db.query(SourceSystem).filter(
+                SourceSystem.slug == MACSOFT_SOURCE_SLUG).first()
+            if source is None:
+                return {"source": "macsoft", "state": "awaiting_first_delivery",
+                        "records": 0, "last_received_at": None, "reconciled": False}
+
+            records = db.query(func.count(MirrorEvent.id)).filter(
+                MirrorEvent.source_system_id == source.id).scalar() or 0
+            latest = db.query(func.max(MirrorEvent.received_at)).filter(
+                MirrorEvent.source_system_id == source.id).scalar()
+            reconciled = db.query(ReconcileRun.id).filter(
+                ReconcileRun.source_system_id == source.id,
+                ReconcileRun.status == "clean").first() is not None
+
+        return {
+            "source": "macsoft",
+            "state": "receiving" if records else "awaiting_first_delivery",
+            "records": int(records),
+            "last_received_at": latest.isoformat() if latest else None,
+            "reconciled": reconciled,
+        }
+    except Exception:
+        # Mirror tables unreachable (migration 046 not applied, database down).
+        # "Unavailable" is not "not connected" — say which one it is.
+        return {"source": "macsoft", "state": "unavailable",
+                "records": None, "last_received_at": None, "reconciled": False}
+
+
+_SOURCE_NOTICE = {
+    "receiving": "Recorded data only. Macsoft has delivered records; delivery completeness is not reconciled.",
+    "awaiting_first_delivery": "Recorded data only. Macsoft has delivered nothing yet, so any figures here come from data recorded in this system.",
+    "unavailable": "Recorded data only. The Macsoft mirror could not be read, so its delivery state is unknown.",
+}
+
+
 @router.get("/today")
 def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
           db: Session = Depends(get_db), user=Depends(require_staff_role())):
@@ -384,18 +440,21 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
     bookings = _bookings_card(db, rid, operational_start, operational_end)
     source_status = {}
     attention = _attention_cards(db, rid, user.tenant_id, source_status=source_status)
-    for domain in ("integration",):
-        source_status[domain] = {"state": "not_evaluated", "recommendations": None}
+    connection = _source_connection(db)
+    source_status["integration"] = {"state": connection["state"], "recommendations": None}
     latest_order = db.query(func.max(models.Order.created_at)).filter(models.Order.restaurant_id == rid).scalar()
     return {
         "source_status": source_status,
         "data_provenance": {
             "source": "recorded_restaurant_data",
-            "integration_verified": False,
+            # True only once a reconcile run has come back clean — delivered is
+            # not the same as complete.
+            "integration_verified": connection["reconciled"],
+            "source_connection": connection,
             "latest_order_at": latest_order.isoformat() if latest_order else None,
             "sales_window_start": start.isoformat(), "sales_window_end": end.isoformat(),
             "timezone": "Africa/Nairobi",
-            "notice": "Recorded data only. Live source synchronization and completeness have not been verified.",
+            "notice": _SOURCE_NOTICE[connection["state"]],
         },
         "greeting_date": _eat_now().date().isoformat(),
         "restaurant_name": db.query(models.Restaurant.name).filter(

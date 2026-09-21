@@ -16,7 +16,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from logging_config import configure_logging
-from routers import orders, inventory, health, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support, tables, attendance, fraud, cash_reconciliation, restaurants, overview, reports, ai_ask, observer
+from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support, tables, attendance, fraud, cash_reconciliation, restaurants, overview, reports, ai_ask, observer
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
@@ -602,8 +602,8 @@ app.add_middleware(ObserverModeMiddleware)
 #
 # NOT versioned, deliberately:
 #   • auth.router already carries its own /api/v1/auth prefix.
-#   • webhooks — Safaricom/Twilio POST to fixed, externally-registered callback
-#     URLs; versioning them would break every registered CallBackURL.
+#   • webhooks — MacSoft POSTs to a fixed, externally-registered URL; versioning
+#     it would break the push endpoint they have already been given.
 #   • health — conventionally unversioned (probes/uptime checks hit /health).
 _VERSIONED_ROUTERS = [
     menu.router, orders.router, inventory.router, analytics.router,
@@ -616,6 +616,7 @@ _VERSIONED_ROUTERS = [
 
 app.include_router(auth.router)
 app.include_router(health.router)
+app.include_router(webhooks.router)
 for _r in _VERSIONED_ROUTERS:
     app.include_router(_r, prefix="/api/v1")          # canonical, documented
     app.include_router(_r, include_in_schema=False)   # legacy path, still works

@@ -151,7 +151,30 @@ def _answer_revenue(db: Session, rid: int, q: str) -> dict:
         forecast = fc.get("forecast") or fc.get("predictions") or {}
         trend_txt = fc.get("trend") or fc.get("summary") or ""
     except Exception:
-        forecast, trend_txt = {}, ""
+        fc, forecast, trend_txt = {}, {}, ""
+    if any(term in q.lower() for term in ("which days are slow", "slow days", "slowest day")):
+        # `weekly_pattern` is a TOP-LEVEL key of get_revenue_forecast's response
+        # (ai/revenue_forecaster.py:228). It is NOT inside "forecast", which is
+        # the 7-day forward list — reading it from there returned the
+        # unavailable card for every slow-day question (verified 2026-09-20).
+        weekly = fc.get("weekly_pattern") if isinstance(fc, dict) else None
+        # `days_sampled` is max(len(days_seen), 1), so it is 1 even for a weekday
+        # with no recorded orders at all. Filtering on it would have let an
+        # unobserved Tuesday be reported as "the slowest day at KSh 0".
+        # total_orders is the only field that distinguishes observed from absent.
+        observed = [row for row in (weekly or []) if row.get("total_orders", 0) > 0]
+        if not observed:
+            return _unavailable_card("revenue")
+        slowest = min(observed, key=lambda row: (row.get("avg_revenue", 0), row.get("day", "")))
+        ranking = sorted(observed, key=lambda row: (row.get("avg_revenue", 0), row.get("day", "")))
+        steps = [{"action": f"{row['day']}: {_money(row.get('avg_revenue', 0))} average across {row.get('days_sampled', 0)} recorded day(s)",
+                  "why": f"{row.get('avg_orders', 0)} average orders"} for row in ranking[:4]]
+        return {"finding": f"{slowest['day']} is the slowest recorded day at {_money(slowest.get('avg_revenue', 0))} average revenue.",
+                "why": "Uses non-cancelled orders in the 30-day data-anchored analysis window; weekdays with no recorded orders are left out rather than reported as slow.",
+                "impact": "Plan staffing and purchasing around the observed weekly pattern.",
+                "recommendation": "Compare the recorded pattern with your operating hours before changing staffing or promotions.",
+                "module": "revenue", "steps": steps,
+                "data": {"narrative_allowed": False, "weekly_pattern": ranking}}
     finding = f"Revenue today is {_money(core['revenue'] * 100)} across {core['orders']} paid orders."
     why = "Paid, non-cancelled orders created during the Nairobi calendar day so far. This is not payment cash flow."
     # core["revenue"] is already KES (overview's _summarize converts cents→KES);

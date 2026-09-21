@@ -31,11 +31,22 @@ def test_measured_stockout_prediction_can_be_narrated(monkeypatch):
     assert card["data"]["narrative_allowed"] is True
 
 
-def test_threshold_chat_skips_unverifiable_narrative(monkeypatch):
+def test_threshold_chat_skips_unverifiable_narrative(monkeypatch, db_session):
+    import models
     from routers import ai_ask
     from ai import llm_client
+    from rate_limit import limiter
 
-    monkeypatch.setattr(ai_ask, "_restaurant_id", lambda *args: 1)
+    restaurant = models.Restaurant(name="Threshold only")
+    db_session.add(restaurant)
+    db_session.commit()
+
+    # chat_llm is rate-limited, so slowapi rejects a direct call that carries no
+    # ASGI Request. The limit is not what this test is about; turn it off and
+    # pass request=None. _with_provenance does need a real session (it reads the
+    # restaurant's data freshness and analysis anchor), hence db_session.
+    monkeypatch.setattr(limiter, "enabled", False)
+    monkeypatch.setattr(ai_ask, "_restaurant_id", lambda *args: restaurant.id)
     monkeypatch.setattr(inventory_predictor, "get_inventory_predictions", lambda *args: {
         "predictions": [{"item_name": "Tomatoes", "status": "low"}]})
     monkeypatch.setattr(llm_client, "is_available", lambda: True)
@@ -47,8 +58,9 @@ def test_threshold_chat_skips_unverifiable_narrative(monkeypatch):
         raise AssertionError("Threshold-only evidence must not reach free-form narration")
 
     monkeypatch.setattr(llm_client, "chat", forbidden_chat)
-    # No DB methods are required when narration is suppressed.
-    result = ai_ask.chat_llm(ai_ask.ChatBody(question="What will run out soon?"), None, None)
+    monkeypatch.setattr(llm_client, "chat_with_usage", forbidden_chat)
+    result = ai_ask.chat_llm(None, ai_ask.ChatBody(question="What will run out soon?"),
+                             db_session, None)
     assert result["llm_used"] is False
     assert result["llm_reply"] is None
     assert calls == []

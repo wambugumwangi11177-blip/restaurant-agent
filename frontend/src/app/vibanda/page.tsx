@@ -6,19 +6,19 @@
 // parts → performance).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ChevronRight, TrendingUp } from "lucide-react";
 import api from "@/lib/api";
 import { fmtKes, fmtPct, greetingFor } from "@/lib/format";
 import { OsLoading, OsError } from "@/components/os/States";
 import PartHealth from "@/components/vibanda/PartHealth";
 import { useAuth } from "@/context/AuthContext";
-import SourceUnavailable from "@/components/vibanda/SourceUnavailable";
-
-const observerMode = process.env.NEXT_PUBLIC_OBSERVER_MODE === "true";
+import OwnerHomeEmpty from "@/components/vibanda/OwnerHomeEmpty";
+import { isVerifiedVibandaSource } from "@/lib/vibandaSource";
 
 type Feed = {
   source_status?: Record<string, { state: string; recommendations: number | null }>;
-  data_provenance?: { notice: string; latest_order_at: string | null };
+  data_provenance?: { notice: string; latest_order_at: string | null; source_connection?: { state?: string; reconciled?: boolean } };
   greeting_date: string;
   restaurant_name: string;
   period: string;
@@ -41,6 +41,23 @@ type Feed = {
   pulse: { domain: string; headline: string; detail: string }[];
   performance: { revenue_trend: { date: string; revenue: number; orders: number }[] };
 };
+
+const OWNER_HOME_LINKS = [
+  ["Menu & pricing", "Menu health, prices, and margin decisions", "menu"],
+  ["Finance", "Recorded money movement and reconciliation", "finance"],
+  ["Expenses", "Costs, when a real expense source is connected", "expenses"],
+  ["Suppliers", "Supplier reliability and purchasing risks", "suppliers"],
+  ["Purchasing", "Orders, commitments, and what needs a decision", "purchasing"],
+  ["Cash reconciliation", "Cash, M-Pesa, and card settlement", "cash-reconciliation"],
+  ["Point of sale", "Sales channels and till activity", "pos"],
+  ["Marketing", "Guest growth opportunities and campaigns", "marketing"],
+  ["Fraud and risk", "Unusual activity and control risks", "risk"],
+  ["Notifications", "Important changes and reminders", "notifications"],
+  ["Business intelligence", "Forward views, decisions, and risks", "intelligence"],
+  ["Data trust", "Source freshness, completeness, and reconciliation", "data-trust"],
+  ["Audit trail", "Changes, approvals, and decisions", "audit"],
+  ["Restaurant settings", "Profile, connections, and owner controls", "settings"],
+] as const;
 
 const PERIODS = ["1h", "today", "7d", "30d"] as const;
 const PERIOD_LABEL: Record<string, string> = { "1h": "1H", today: "Today", "7d": "7D", "30d": "30D" };
@@ -65,9 +82,9 @@ function SectionHead({ eyebrow, title, meta, id }: { eyebrow: string; title: str
 // page. Home is where the system reports to you; OS is where you question it.
 // The card now just reports, and carries one small, explicit "Ask" affordance
 // for the moment you actually want to go and ask.
-function PillarCard({ label, primaryLabel, primary, comparison, signals, askLabel, onAsk }: {
+function PillarCard({ label, primaryLabel, primary, comparison, signals, askLabel, onAsk, href }: {
   label: string; primaryLabel: string; primary: string; comparison: string;
-  signals: string[]; askLabel: string; onAsk: () => void;
+  signals: string[]; askLabel: string; onAsk: () => void; href: string;
 }) {
   return (
     <article className="group flex min-h-[190px] flex-col justify-between rounded-xl border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.72)] p-4 text-left transition-all hover:border-[hsl(201_47%_29_/_0.38)] hover:bg-[var(--v-card)]">
@@ -93,6 +110,10 @@ function PillarCard({ label, primaryLabel, primary, comparison, signals, askLabe
         >
           {askLabel} <ChevronRight size={11} />
         </button>
+        <Link href={href}
+          className="ml-2 inline-flex min-h-8 items-center gap-1 rounded-lg border border-[hsl(201_47%_29_/_0.45)] px-2 py-1 text-[10px] font-bold text-[var(--v-primary)] hover:bg-[var(--v-muted)]">
+          Open details <ChevronRight size={11} />
+        </Link>
       </div>
     </article>
   );
@@ -201,13 +222,36 @@ function AttentionCard({ card, onDecide, onAsk }: {
 }
 
 export default function VibandaHomePage() {
-  return observerMode ? <SourceUnavailable title="Overview" detail="Verified restaurant facts will appear here once the approved read-only source is connected." /> : <VibandaOperationalHome />;
+  return <VibandaHomeGate />;
 }
 
-function VibandaOperationalHome() {
+function VibandaHomeGate() {
+  const [state, setState] = useState<"checking" | "empty" | "live">("checking");
+  const [initialFeed, setInitialFeed] = useState<Feed | null>(null);
+  useEffect(() => {
+    let active = true;
+    const checkSource = () => api.get<Feed>("/api/v1/overview/today?period=today", { timeout: 15000 })
+      .then((r) => {
+        if (!active) return;
+        const connection = r.data?.data_provenance?.source_connection;
+        if (isVerifiedVibandaSource(connection)) { setInitialFeed(r.data); setState("live"); }
+        else setState("empty");
+      })
+      .catch(() => { if (active) setState("empty"); });
+    checkSource();
+    const refresh = window.setInterval(checkSource, 30000);
+    return () => { active = false; window.clearInterval(refresh); };
+  }, []);
+  if (state === "checking") return <p role="status" className="text-sm text-[var(--v-muted-foreground)]">Checking verified restaurant data…</p>;
+  return state === "live"
+    ? <VibandaOperationalHome initialFeed={initialFeed} />
+    : <OwnerHomeEmpty detail="Verified restaurant facts will appear here once the approved read-only source is connected and reconciled." />;
+}
+
+function VibandaOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null }) {
   const { user } = useAuth();
   const router = useRouter();
-  const [feed, setFeed] = useState<Feed | null>(null);
+  const [feed, setFeed] = useState<Feed | null>(() => initialFeed);
   const [err, setErr] = useState(false);
   const [period, setPeriod] = useState("today");
   const [dailyReport, setDailyReport] = useState<string | null>(null);
@@ -224,12 +268,15 @@ function VibandaOperationalHome() {
   }, []);
 
   useEffect(() => {
+    if (initialFeed && period === initialFeed.period) {
+      return;
+    }
     // The request itself is the external synchronization performed here.
     // Loading/error state is deliberately reset by the request helper.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load(period);
     return () => { requestId.current += 1; };
-  }, [period, load]);
+  }, [period, load, initialFeed]);
   useEffect(() => {
     api.get("/api/v1/reports/daily?narrate=false").then((r) => setDailyReport(r.data.report_text)).catch(() => {});
   }, []);
@@ -294,27 +341,27 @@ function VibandaOperationalHome() {
                 signals={[
                   feed.revenue.pace_projection ? `On pace for ~${fmtKes(feed.revenue.pace_projection)} today` : (feed.revenue.orders ? "Paid, non-cancelled orders · no forecast available" : "No paid sales recorded in this period"),
                 ]}
-                askLabel="Ask about sales" onAsk={() => ask("How are my sales today?")} />
+                askLabel="Ask about sales" onAsk={() => ask("How are my sales today?")} href="/vibanda/revenue" />
               <PillarCard label="Orders" primaryLabel={`Orders · ${PERIOD_LABEL[period]}`} primary={`${feed.orders.orders} orders`}
                 comparison={feed.orders.active_now ? `${feed.orders.active_now} active now` : ""}
                 signals={[Object.entries(feed.orders.split).filter(([, v]) => v > 0).map(([k, v]) => `${v} ${k.replace("_", "-")}`).join(" · ") || "—"]}
-                askLabel="Ask about orders" onAsk={() => ask("Are there any delayed orders?")} />
+                askLabel="Ask about orders" onAsk={() => ask("Are there any delayed orders?")} href="/vibanda/orders" />
               <PillarCard label="Kitchen" primaryLabel="Kitchen" primary={feed.unavailable_metrics.includes("kitchen") ? "Not available" : `${feed.kitchen.avg_prep_min} min prep`}
                 comparison={feed.kitchen.delay_risk ? `${feed.kitchen.delay_risk} orders approaching delay` : ""}
                 signals={[feed.unavailable_metrics.includes("kitchen") ? "Prep times and delays have not been verified" : (feed.kitchen.bottleneck ? `Bottleneck: ${feed.kitchen.bottleneck}` : "No bottleneck recorded")]}
-                askLabel="Ask about the kitchen" onAsk={() => ask("Is the kitchen running behind?")} />
+                askLabel="Ask about the kitchen" onAsk={() => ask("Is the kitchen running behind?")} href="/vibanda/kitchen" />
               <PillarCard label="Stock" primaryLabel="Stock" primary={feed.stock.low_stock.length ? `${feed.stock.low_stock.length} to watch` : "No low-stock alerts"}
                 comparison={feed.stock.low_stock[0] ? `${feed.stock.low_stock[0].name} at or below reorder point` : ""}
                 signals={feed.stock.low_stock.slice(0, 2).map((i) => `${i.name} · ${i.qty} left`)}
-                askLabel="Ask about stock" onAsk={() => ask("What am I about to run out of?")} />
+                askLabel="Ask about stock" onAsk={() => ask("What am I about to run out of?")} href="/vibanda/stock" />
               <PillarCard label="Bookings" primaryLabel="Covers expected" primary={`${feed.bookings.covers_today} covers`}
                 comparison={feed.bookings.next_reservation_min ? `Next reservation in ${feed.bookings.next_reservation_min} min` : ""}
                 signals={[feed.unavailable_metrics.includes("waitlist") ? "Waitlist data not available" : `${feed.bookings.waitlist} tables on the waitlist`]}
-                askLabel="Ask about bookings" onAsk={() => ask("Who's booked tonight?")} />
+                askLabel="Ask about bookings" onAsk={() => ask("Who's booked tonight?")} href="/vibanda/bookings" />
               <PillarCard label="Staff" primaryLabel="Coverage" primary={`${feed.staff.scheduled} scheduled`}
                 comparison={feed.staff.overtime_risk ? `${feed.staff.overtime_risk} overtime risk` : ""}
                 signals={[feed.staff.labor_cost_pct ? `Labor cost · ${fmtPct(feed.staff.labor_cost_pct)}` : "—"]}
-                askLabel="Ask about staff" onAsk={() => ask("Who worked the most shifts this week?")} />
+                askLabel="Ask about staff" onAsk={() => ask("Who worked the most shifts this week?")} href="/vibanda/team" />
             </div>
           </section>
 
@@ -361,6 +408,21 @@ function VibandaOperationalHome() {
 
           {/* How each part is doing */}
           <PartHealth feed={feed} />
+
+          <section aria-labelledby="owner-areas-heading">
+            <SectionHead id="owner-areas-heading" eyebrow="Owner controls" title="The rest of your restaurant"
+              meta="Open a page when you need the detail" />
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {OWNER_HOME_LINKS.map(([label, note, slug]) => (
+                <Link key={slug} href={`/vibanda/${slug}`}
+                  className="rounded-xl border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.72)] p-4 transition hover:-translate-y-0.5 hover:border-[var(--v-primary)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--v-primary)]/60">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">{label}</p>
+                  <p className="mt-2 text-xs leading-5 text-[var(--v-muted-foreground)]">{note}</p>
+                  <p className="mt-3 text-[11px] font-semibold text-[var(--v-primary)]">Open {label.toLowerCase()} <ChevronRight className="inline" size={12} /></p>
+                </Link>
+              ))}
+            </div>
+          </section>
 
           {/* Business performance */}
           <section aria-labelledby="performance-heading" className="mt-10 rounded-xl border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.55)] p-4 sm:p-5">

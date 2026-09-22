@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Check } from "lucide-react";
 import { useNotifications, NotificationItem } from "@/lib/useNotifications";
+import api from "@/lib/api";
+import { isVerifiedVibandaSource } from "@/lib/vibandaSource";
 
 function timeAgo(iso: string): string {
     const then = new Date(iso).getTime();
@@ -63,8 +65,22 @@ export default function NotificationBell({ ownerHome }: { ownerHome?: string } =
         markRead, markAllRead, subscribeToPush,
     } = useNotifications();
     const [open, setOpen] = useState(false);
+    const [sourceVerified, setSourceVerified] = useState(!ownerHome);
     const panelRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
+
+    useEffect(() => {
+        if (!ownerHome) return;
+        let active = true;
+        api.get<{ data_provenance?: { source_connection?: { state?: string; reconciled?: boolean } } }>("/api/v1/overview/today?period=today", { timeout: 15000 })
+            .then((r) => {
+                if (!active) return;
+                const source = r.data?.data_provenance?.source_connection;
+                setSourceVerified(isVerifiedVibandaSource(source));
+            })
+            .catch(() => { if (active) setSourceVerified(false); });
+        return () => { active = false; };
+    }, [ownerHome]);
 
     useEffect(() => {
         function onClickOutside(e: MouseEvent) {
@@ -128,6 +144,30 @@ export default function NotificationBell({ ownerHome }: { ownerHome?: string } =
                     ))}
                 </ul>
             </li>
+        );
+    }
+
+    // Observer-mode notifications may be generated from local/demo operational
+    // state. Do not show them alongside an unverified MacSoft source; that
+    // would make prototype facts look like current restaurant alerts.
+    if (ownerHome && !sourceVerified) {
+        return (
+            <div className="relative" ref={panelRef}>
+                <button
+                    onClick={() => setOpen((v) => !v)}
+                    aria-label="Notifications"
+                    aria-expanded={open}
+                    className="relative text-[#737373] hover:text-[#e5e5e5] transition-colors"
+                >
+                    <Bell className="w-5 h-5" />
+                </button>
+                {open && (
+                    <div className="absolute right-0 mt-2 w-80 bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg shadow-xl z-50">
+                        <div className="px-3 py-2 border-b border-[#1a1a1a] text-xs font-medium text-[#e5e5e5]">Notifications</div>
+                        <p className="px-3 py-6 text-center text-xs text-[#737373]">Notifications will appear after verified restaurant data arrives.</p>
+                    </div>
+                )}
+            </div>
         );
     }
 

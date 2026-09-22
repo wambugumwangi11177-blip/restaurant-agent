@@ -39,7 +39,7 @@ export default function VibandaLayout({ children }: { children: React.ReactNode 
   return (
     <div className="vibanda-theme min-h-screen pb-20 md:pb-0">
       <header className="px-4 pt-6 pb-2 md:px-8">
-        <div className="float-right"><NotificationBell ownerHome="/vibanda" /></div>
+      <div className="float-right"><NotificationBell ownerHome="/vibanda" /></div>
         {/* Sketch: tiny uppercase eyebrow date line */}
         <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">{fmtDate()} · Nairobi</p>
         {process.env.NEXT_PUBLIC_SYNTHETIC_DEMO === "true" && user?.tenant_name === VIBANDA_SYNTHETIC_TENANT && (

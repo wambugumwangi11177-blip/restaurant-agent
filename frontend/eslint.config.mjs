@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // ECC agent harness (286 skills + agents with embedded code examples):
+    ".claude/**",
+    ".clinerules/**",
+    ".ecc/**",
   ]),
 ]);
 

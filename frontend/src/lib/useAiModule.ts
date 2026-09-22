@@ -33,7 +33,7 @@ export function useAiModule<T>(endpoint: string) {
             setLoading(false);
         }
     };
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps — fetchData is stable for this render cycle; adding it causes infinite re-fetch
     useEffect(() => { fetchData(); }, [endpoint]);
 
     return { data, loading, error, retry: fetchData };

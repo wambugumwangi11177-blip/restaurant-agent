@@ -127,3 +127,40 @@ def add_member(client):
         return {"Authorization": f"Bearer {_login(client, email)}"}
 
     return _add
+
+
+class _ScriptedConversation:
+    def __init__(self, script, results):
+        self.model = "claude-opus-5"
+        self._script, self._results = script, results
+
+    def send(self):
+        return self._script.pop(0)
+
+    def add_tool_results(self, results):
+        self._results.extend(results)
+
+
+@pytest.fixture
+def scripted_llm(monkeypatch):
+    """Replace the LLM with a script of turns. Use `turn()` / `use()` helpers below."""
+    from app.kernel.agents import llm
+
+    state = {"script": [], "results": [], "prompts": []}
+    monkeypatch.setattr(llm, "provider", lambda: "anthropic")
+    monkeypatch.setattr(llm, "is_available", lambda: True)
+
+    def start(system, user_text, tools, tier="medium"):
+        state["prompts"].append({"system": system, "user": user_text, "tools": [t.name for t in tools]})
+        return _ScriptedConversation(state["script"], state["results"])
+
+    monkeypatch.setattr(llm, "start_conversation", start)
+    return state
+
+
+def llm_turn(text="", uses=()):
+    from app.kernel.agents import llm
+
+    uses = [llm.ToolUse(id=f"t{i}", name=n, input=a) for i, (n, a) in enumerate(uses)]
+    return llm.Turn(text=text, tool_uses=uses, stop_reason="tool_use" if uses else "end_turn",
+                    model="claude-opus-5", input_tokens=100, output_tokens=20)

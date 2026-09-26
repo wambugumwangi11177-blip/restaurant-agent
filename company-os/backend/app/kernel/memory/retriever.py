@@ -67,11 +67,26 @@ _SQL = text(
 
 
 class PostgresFTSRetriever:
+    """Ranked full-text search. Returns at most one passage per (document, section):
+    a long section split into several chunks would otherwise fill every slot with
+    the same citation and crowd out other relevant sources."""
+
     def search(self, db: Session, workspace_id: int, query: str, limit: int = 5) -> list[Citation]:
         query = (query or "").strip()[:1000]
         if not query:
             return []
-        rows = db.execute(_SQL, {"query": query, "workspace_id": workspace_id, "limit": max(1, min(limit, 20))})
+        limit = max(1, min(limit, 20))
+        rows = db.execute(_SQL, {"query": query, "workspace_id": workspace_id, "limit": limit * 5})
+        seen: set[tuple[int, str]] = set()
+        best = []
+        for r in rows:
+            key = (r.document_id, r.heading)
+            if key in seen:
+                continue
+            seen.add(key)
+            best.append(r)
+            if len(best) == limit:
+                break
         return [
             Citation(
                 document_id=r.document_id,
@@ -83,7 +98,7 @@ class PostgresFTSRetriever:
                 content=r.content,
                 score=round(float(r.score), 4),
             )
-            for r in rows
+            for r in best
         ]
 
 

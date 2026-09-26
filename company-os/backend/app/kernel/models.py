@@ -66,6 +66,14 @@ class Workspace(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, server_default="Africa/Nairobi")
     currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="KES")
+    # Productization (directive 000, phase 10). "internal" = the founder's own company.
+    plan: Mapped[str] = mapped_column(String(20), nullable=False, server_default="internal")
+    seat_limit: Mapped[int | None] = mapped_column(Integer)
+    monthly_agent_run_limit: Mapped[int | None] = mapped_column(Integer)
+    # None = every department enabled; otherwise the list of department keys enabled.
+    enabled_departments: Mapped[list | None] = mapped_column(JSONB)
+    # Workspace-level settings departments read (e.g. finance opening balance, iCal URL).
+    settings: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
     created_at: Mapped[datetime] = _ts()
 
 

@@ -14,7 +14,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import agents, approvals, auth, governance, memory, records, webhooks
+from app.api import agents, approvals, auth, departments, governance, memory, records, webhooks
 from app.config import check_startup, get_settings
 from app.kernel.agents.builtin_agents import register_builtin_agents
 from app.kernel.agents.builtin_tools import register_builtin_tools
@@ -36,6 +36,9 @@ def bootstrap() -> None:
     register_builtin_tools()
     register_builtin_agents()
     register_subscribers()
+    from app.departments import register_all
+
+    register_all()
     _bootstrapped = True
 
 
@@ -71,7 +74,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(governance.public_router)
-    for module in (auth, records, memory, agents, approvals, governance, webhooks):
+    for module in (auth, records, memory, agents, approvals, departments, governance, webhooks):
         app.include_router(module.router, prefix="/api/v1")
     return app
 

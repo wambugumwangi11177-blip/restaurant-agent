@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -205,7 +205,8 @@ class NoteOut(Out):
 
 # ── Links ────────────────────────────────────────────────────────────────────
 
-LinkableType = Literal["person", "organization", "task", "decision", "note", "document"]
+# Any registered record type or "document"; validated against the registry in records.create_link.
+LinkableType = Annotated[str, Field(min_length=1, max_length=40, pattern=r"^[a-z_]+$")]
 
 
 class LinkIn(In):

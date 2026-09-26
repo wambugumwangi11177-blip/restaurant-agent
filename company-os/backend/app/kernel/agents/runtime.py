@@ -65,6 +65,9 @@ def run_agent(
     if not role_has(principal.role, spec.permission):
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"Your role cannot run {name!r}")
     input_text = (input_text or "").strip()[:8000]
+    from app.kernel.workspaces import check_agent_run_allowed
+
+    check_agent_run_allowed(db, principal.workspace_id)
 
     run = AgentRun(
         workspace_id=principal.workspace_id, agent_name=name, input={"text": input_text},

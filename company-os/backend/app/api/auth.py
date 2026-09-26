@@ -230,6 +230,9 @@ def _founder_count(db: Session, workspace_id: int) -> int:
 @router.post("/members", status_code=201)
 def add_member(body: MemberIn, principal: Principal = Depends(require("members.manage")),
                db: Session = Depends(get_db)) -> dict:
+    from app.kernel.workspaces import check_seat_available
+
+    check_seat_available(db, principal.workspace_id)
     email = body.email.lower()
     user = db.execute(select(User).where(func.lower(User.email) == email)).scalar_one_or_none()
     if user is None:

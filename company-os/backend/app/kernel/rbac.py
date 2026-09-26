@@ -37,6 +37,8 @@ PERMISSIONS: dict[str, set[Role]] = {
     "privacy.manage": {F},
     "ops.read": {F},
     "feedback.write": {F, S},
+    "jobs.run": {F},
+    "workspace.settings": {F},
 }
 
 

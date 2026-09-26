@@ -9,7 +9,8 @@ writes directly.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
@@ -32,28 +33,82 @@ from app.kernel.models import (
     Person,
     Task,
 )
+from app.kernel.rbac import role_has
 from app.kernel.tenancy import Principal, get_or_404, get_scoped, scoped
+
+
+Hook = Callable[[Session, Principal, dict, Any], dict]
 
 
 @dataclass(frozen=True)
 class RecordType:
+    """A record type the generic records API serves. Departments register their
+    own with `register_record_type` (ADR 0001) and get CRUD, workspace scoping,
+    audit rows, events, reference checks and a schema-driven UI for free."""
     model: type
     create: type[BaseModel]
     patch: type[BaseModel]
     out: type[BaseModel]
     search_fields: tuple[str, ...]
+    label: str = ""
+    department: str = "kernel"
+    title_field: str = "title"
+    read_perm: str = "records.read"
+    write_perm: str = "records.write"
+    delete_perm: str = "records.delete"
+    # field -> record type it points at ("user" = a workspace member)
+    refs: dict[str, str] = field(default_factory=dict)
+    # (db, principal, values, existing_or_None) -> values; validates / computes fields
+    prepare: Hook | None = None
+    # (db, principal, obj, deleted) — runs after the write is flushed (e.g. recompute a parent's totals)
+    after: Callable[[Session, Principal, Any, bool], None] | None = None
+
+
+def _prepare_task(db: Session, principal: Principal, values: dict, obj: Any) -> dict:
+    if values.get("status") == "done" and (obj is None or obj.status != "done"):
+        values["completed_at"] = _now()
+    elif "status" in values and values["status"] != "done":
+        values["completed_at"] = None
+    return values
+
+
+def _prepare_decision(db: Session, principal: Principal, values: dict, obj: Any) -> dict:
+    if obj is None:
+        values["decided_by_user_id"] = principal.user_id
+    return values
+
+
+def _prepare_person(db: Session, principal: Principal, values: dict, obj: Any) -> dict:
+    if obj is not None and obj.erased_at is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This person was erased under a data-rights request")
+    return values
 
 
 RECORD_TYPES: dict[str, RecordType] = {
-    "person": RecordType(Person, sc.PersonIn, sc.PersonPatch, sc.PersonOut, ("full_name", "email", "title")),
-    "organization": RecordType(Organization, sc.OrganizationIn, sc.OrganizationPatch, sc.OrganizationOut, ("name", "industry")),
-    "task": RecordType(Task, sc.TaskIn, sc.TaskPatch, sc.TaskOut, ("title", "description")),
-    "decision": RecordType(Decision, sc.DecisionIn, sc.DecisionPatch, sc.DecisionOut, ("title", "decision")),
-    "note": RecordType(Note, sc.NoteIn, sc.NotePatch, sc.NoteOut, ("title", "body")),
+    "person": RecordType(Person, sc.PersonIn, sc.PersonPatch, sc.PersonOut, ("full_name", "email", "title"),
+                         label="People", title_field="full_name", prepare=_prepare_person),
+    "organization": RecordType(Organization, sc.OrganizationIn, sc.OrganizationPatch, sc.OrganizationOut,
+                               ("name", "industry"), label="Organizations", title_field="name"),
+    "task": RecordType(Task, sc.TaskIn, sc.TaskPatch, sc.TaskOut, ("title", "description"), label="Tasks",
+                       refs={"assignee_user_id": "user"}, prepare=_prepare_task),
+    "decision": RecordType(Decision, sc.DecisionIn, sc.DecisionPatch, sc.DecisionOut, ("title", "decision"),
+                           label="Decisions", prepare=_prepare_decision),
+    "note": RecordType(Note, sc.NoteIn, sc.NotePatch, sc.NoteOut, ("title", "body"), label="Notes"),
 }
 
-# Types that can be the endpoint of a link (documents are created by memory ingest).
-LINKABLE: dict[str, type] = {**{k: v.model for k, v in RECORD_TYPES.items()}, "document": Document}
+
+def register_record_type(name: str, rt: RecordType) -> None:
+    existing = RECORD_TYPES.get(name)
+    if existing is not None and existing is not rt:
+        raise ValueError(f"Record type {name!r} already registered")
+    RECORD_TYPES[name] = rt
+
+
+def linkable_model(name: str) -> type | None:
+    if name == "document":
+        return Document
+    rt = RECORD_TYPES.get(name)
+    return rt.model if rt else None
 
 
 def record_type(name: str) -> RecordType:
@@ -63,20 +118,38 @@ def record_type(name: str) -> RecordType:
     return rt
 
 
+def record_type_for(db: Session, principal: Principal, name: str, perm: str = "read") -> RecordType:
+    """Resolve a type for this caller: exists, department enabled for the
+    workspace, and the caller's role holds the needed permission."""
+    from app.kernel.workspaces import department_enabled  # local: workspaces imports nothing from here
+
+    rt = record_type(name)
+    if rt.department != "kernel" and not department_enabled(db, principal.workspace_id, rt.department):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Unknown record type {name!r}")
+    needed = {"read": rt.read_perm, "write": rt.write_perm, "delete": rt.delete_perm}[perm]
+    if not role_has(principal.role, needed):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, f"Your role ({principal.role}) lacks '{needed}'")
+    return rt
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _check_assignee(db: Session, principal: Principal, user_id: int | None) -> None:
-    if user_id is None:
-        return
-    member = db.execute(
-        select(Membership).where(
-            Membership.workspace_id == principal.workspace_id, Membership.user_id == user_id
-        )
-    ).scalar_one_or_none()
-    if member is None:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "assignee_user_id is not a member of this workspace")
+def _check_refs(db: Session, principal: Principal, rt: RecordType, values: dict) -> None:
+    for fld, target in rt.refs.items():
+        ref_id = values.get(fld)
+        if ref_id is None:
+            continue
+        if target == "user":
+            ok = db.execute(select(Membership).where(
+                Membership.workspace_id == principal.workspace_id, Membership.user_id == ref_id)).scalar_one_or_none()
+        else:
+            model = linkable_model(target)
+            ok = model is not None and get_scoped(db, model, ref_id, principal.workspace_id) is not None
+        if not ok:
+            what = "a member of this workspace" if target == "user" else f"an existing {target} in this workspace"
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"{fld} is not {what}")
 
 
 def list_records(
@@ -100,15 +173,14 @@ def create_record(
 ) -> Any:
     rt = record_type(type_name)
     values = data.model_dump()
-    if type_name == "task":
-        _check_assignee(db, principal, values.get("assignee_user_id"))
-        if values.get("status") == "done":
-            values["completed_at"] = _now()
-    if type_name == "decision":
-        values["decided_by_user_id"] = principal.user_id
+    _check_refs(db, principal, rt, values)
+    if rt.prepare:
+        values = rt.prepare(db, principal, values, None)
     obj = rt.model(workspace_id=principal.workspace_id, **values)
     db.add(obj)
     db.flush()
+    if rt.after:
+        rt.after(db, principal, obj, False)
     write_audit(
         db, action="record.create", workspace_id=principal.workspace_id, entity_type=type_name,
         entity_id=obj.id, changes=diff(type_name, None, snapshot(obj)),
@@ -125,21 +197,18 @@ def update_record(
 ) -> Any:
     rt = record_type(type_name)
     obj = get_or_404(db, rt.model, record_id, principal.workspace_id)
-    if type_name == "person" and obj.erased_at is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "This person was erased under a data-rights request")
     before = snapshot(obj)
     changes = patch.model_dump(exclude_unset=True)
-    if type_name == "task":
-        if "assignee_user_id" in changes:
-            _check_assignee(db, principal, changes["assignee_user_id"])
-        if changes.get("status") == "done" and obj.status != "done":
-            obj.completed_at = _now()
-        elif "status" in changes and changes["status"] != "done":
-            obj.completed_at = None
+    _check_refs(db, principal, rt, changes)
+    if rt.prepare:
+        changes = rt.prepare(db, principal, changes, obj)
     for key, value in changes.items():
         setattr(obj, key, value)
-    obj.updated_at = _now()
+    if hasattr(obj, "updated_at"):
+        obj.updated_at = _now()
     db.flush()
+    if rt.after:
+        rt.after(db, principal, obj, False)
     d = diff(type_name, before, snapshot(obj))
     if d:
         write_audit(
@@ -166,6 +235,8 @@ def delete_record(db: Session, principal: Principal, type_name: str, record_id: 
     )
     db.delete(obj)
     db.flush()
+    if rt.after:
+        rt.after(db, principal, obj, True)
     write_audit(
         db, action="record.delete", workspace_id=principal.workspace_id, entity_type=type_name,
         entity_id=record_id, changes=diff(type_name, before, None), actor_user_id=principal.user_id,
@@ -176,7 +247,10 @@ def delete_record(db: Session, principal: Principal, type_name: str, record_id: 
 
 def create_link(db: Session, principal: Principal, data: sc.LinkIn, agent_run_id: int | None = None) -> Link:
     for t, i in ((data.from_type, data.from_id), (data.to_type, data.to_id)):
-        if get_scoped(db, LINKABLE[t], i, principal.workspace_id) is None:
+        model = linkable_model(t)
+        if model is None:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"{t!r} is not a record type")
+        if get_scoped(db, model, i, principal.workspace_id) is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"{t} {i} not found")
     if (data.from_type, data.from_id) == (data.to_type, data.to_id):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "A record cannot link to itself")
@@ -197,7 +271,10 @@ def create_link(db: Session, principal: Principal, data: sc.LinkIn, agent_run_id
 
 
 def links_for(db: Session, principal: Principal, type_name: str, record_id: int) -> list[Link]:
-    get_or_404(db, LINKABLE[type_name], record_id, principal.workspace_id)
+    model = linkable_model(type_name)
+    if model is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Unknown record type {type_name!r}")
+    get_or_404(db, model, record_id, principal.workspace_id)
     stmt = scoped(Link, principal.workspace_id).where(
         or_(
             (Link.from_type == type_name) & (Link.from_id == record_id),

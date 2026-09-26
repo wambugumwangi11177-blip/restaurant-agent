@@ -8,6 +8,9 @@ from sqlalchemy import engine_from_config, pool
 from app.config import get_settings
 from app.db import Base
 from app.kernel import models  # noqa: F401 — registers every table on Base.metadata
+from app.departments import import_models
+
+import_models()
 
 config = context.config
 if config.config_file_name is not None:

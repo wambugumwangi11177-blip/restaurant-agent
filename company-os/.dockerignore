@@ -1,0 +1,9 @@
+# Build context is company-os/ (docker build -f backend/Dockerfile .)
+frontend/
+.tmp/
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/*.pyc
+backend/.env
+.git

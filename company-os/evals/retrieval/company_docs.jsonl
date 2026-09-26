@@ -1,0 +1,3 @@
+// YOUR company's eval set (Phase 0 memory gate: >= 16 of 20 correct). Add 20+ lines like:
+// {"id": "refund-policy", "question": "What is our refund policy for restaurant clients?", "expect": [{"title": "<exact document title>", "heading": "<optional section name>"}]}
+// Use questions you or your team actually ask. Titles are the document titles shown on the Memory page.

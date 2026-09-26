@@ -1,0 +1,6 @@
+{
+  "min_hit_rate": 0.875,
+  "measured": {"date": "2026-09-26", "cases": 24, "hits": 21, "k": 3, "retriever": "PostgresFTSRetriever"},
+  "known_misses": ["plan-pace", "plan-productize", "move-repo"],
+  "note": "Deterministic, so the floor equals the measured score. Misses are paraphrase/keyword-dilution cases (ADR 0003). Raise the floor when retrieval improves; lower it only with a written reason (e.g. a corpus rewrite) in the same commit."
+}

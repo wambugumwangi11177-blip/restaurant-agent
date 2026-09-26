@@ -1,0 +1,26 @@
+// Retrieval eval over the OS's own directives and ADRs. Questions are phrased the way a founder would ask,
+// written before measuring (not tuned to the retriever). Format: see backend/app/kernel/evals.py.
+{"id": "plan-order", "question": "Which department gets built right after the founder command center?", "expect": [{"title": "Company OS — Build Plan (one department at a time)", "heading": "Department build order"}]}
+{"id": "plan-money", "question": "Does the OS ever move money on its own?", "expect": [{"title": "Company OS — Build Plan (one department at a time)", "heading": "Finance"}]}
+{"id": "plan-lawyer", "question": "Who has to review contract templates before agents use them?", "expect": [{"title": "Company OS — Build Plan (one department at a time)", "heading": "Legal"}]}
+{"id": "plan-pace", "question": "How many weeks will the kernel take to build?", "expect": [{"title": "Company OS — Build Plan (one department at a time)", "heading": "Pace"}]}
+{"id": "plan-training", "question": "Why can't the AI be trained on our company data?", "expect": [{"title": "Company OS — Build Plan (one department at a time)", "heading": "Ground truths"}]}
+{"id": "plan-crm", "question": "Which records does the sales CRM keep?", "expect": [{"title": "Company OS — Build Plan (one department at a time)", "heading": "Customers & Sales"}]}
+{"id": "plan-productize", "question": "What has to happen before we sell the OS to other businesses?", "expect": [{"title": "Company OS — Build Plan (one department at a time)", "heading": "Productize"}]}
+{"id": "embeddings", "question": "What embedding provider does memory search use?", "expect": [{"title": "ADR 0003 — Postgres full-text search before vector search"}, {"title": "Company OS — Build Plan (one department at a time)", "heading": "Review"}]}
+{"id": "whatsapp-setup", "question": "How do I connect WhatsApp to the OS?", "expect": [{"title": "Directive 001 — Kernel (Phase 0)", "heading": "WhatsApp setup"}]}
+{"id": "deploy-frontend", "question": "Where should the frontend be deployed?", "expect": [{"title": "Directive 001 — Kernel (Phase 0)", "heading": "Deploy"}]}
+{"id": "restore", "question": "How do I check that a backup can actually be restored?", "expect": [{"title": "Directive 001 — Kernel (Phase 0)", "heading": "Backups"}]}
+{"id": "upload-types", "question": "What file types can I upload into memory?", "expect": [{"title": "Directive 001 — Kernel (Phase 0)", "heading": "Known limitations"}, {"title": "Directive 001 — Kernel (Phase 0)", "heading": "Operate it"}]}
+{"id": "first-account", "question": "How do I create the first founder account?", "expect": [{"title": "Directive 001 — Kernel (Phase 0)", "heading": "Run it locally"}]}
+{"id": "staff-approve", "question": "Can a staff member approve an outgoing email?", "expect": [{"title": "ADR 0002 — The approval gate lives in the tool runtime, not in prompts"}]}
+{"id": "injection", "question": "What happens if text inside a document tells the agent to send a message?", "expect": [{"title": "ADR 0002 — The approval gate lives in the tool runtime, not in prompts"}, {"title": "Company OS — Build Plan (one department at a time)", "heading": "Review"}]}
+{"id": "autonomy", "question": "When is a tool allowed to be approved automatically?", "expect": [{"title": "ADR 0002 — The approval gate lives in the tool runtime, not in prompts"}, {"title": "Directive 001 — Kernel (Phase 0)", "heading": "Operate it"}]}
+{"id": "sqlite", "question": "Why don't the tests use SQLite?", "expect": [{"title": "ADR 0004 — Tests run on real PostgreSQL, never SQLite"}]}
+{"id": "default-model", "question": "Which Claude model is the default for every tier?", "expect": [{"title": "ADR 0005 — Provider-neutral LLM layer; Anthropic via official SDK"}]}
+{"id": "spend-limit", "question": "What is the daily limit on LLM spending?", "expect": [{"title": "ADR 0005 — Provider-neutral LLM layer; Anthropic via official SDK"}, {"title": "Directive 001 — Kernel (Phase 0)", "heading": "Operate it"}]}
+{"id": "audit-edit", "question": "Can anyone edit or delete the audit history?", "expect": [{"title": "ADR 0006 — Audit log is append-only and never stores PII"}]}
+{"id": "erasure", "question": "What happens to someone's personal details when they ask to be erased?", "expect": [{"title": "ADR 0006 — Audit log is append-only and never stores PII"}, {"title": "Directive 001 — Kernel (Phase 0)", "heading": "Operate it"}, {"title": "Company OS — Build Plan (one department at a time)", "heading": "Review"}]}
+{"id": "move-repo", "question": "How will this folder be moved into its own GitHub repository?", "expect": [{"title": "ADR 0007 — Build inside restaurant-agent until the company-os repo exists"}]}
+{"id": "dept-imports", "question": "Can one department import code from another department?", "expect": [{"title": "ADR 0001 — Modular monolith: one Kernel, departments as isolated packages"}, {"title": "Company OS — Build Plan (one department at a time)", "heading": "Review"}]}
+{"id": "qa-unknown", "question": "What does the question-answering agent say when the documents don't have the answer?", "expect": [{"title": "Agent: memory_qa"}]}

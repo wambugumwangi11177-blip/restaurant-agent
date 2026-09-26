@@ -1,0 +1,31 @@
+# Company OS backend — runtime dependencies (pinned).
+# Same core stack as restaurant-agent so one person maintains one skill set.
+fastapi==0.141.1
+starlette==1.3.1
+uvicorn==0.40.0
+gunicorn==23.0.0
+
+sqlalchemy==2.0.46
+alembic==1.18.4
+psycopg2-binary==2.9.11
+
+# Auth: PyJWT (HS256) + argon2-cffi directly. Deliberately not python-jose/passlib:
+# python-jose drags in ecdsa (unfixed Minerva advisory) and passlib is unmaintained.
+pyjwt==2.15.0
+argon2-cffi==25.1.0
+
+pydantic==2.12.5
+email-validator==2.2.0
+python-multipart==0.0.31
+python-dotenv==1.2.2
+
+# All outbound HTTP (LLM providers, Twilio). No provider SDKs: each API is a
+# single POST, and SDK major-version churn is a maintenance cost we don't need.
+httpx==0.28.1
+
+# Anthropic path uses the official SDK (per the Claude API reference); OpenRouter/Groq
+# are OpenAI-compatible and called with httpx above.
+anthropic==1.8.0
+
+# IANA zones for zoneinfo on slim images without /usr/share/zoneinfo (Africa/Nairobi).
+tzdata==2026.4

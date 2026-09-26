@@ -179,3 +179,27 @@ def test_advisor_reads_legal_but_cannot_write(client, make_workspace, add_member
     adv = add_member(w["h"], "advisor", "a@acme.example.com")
     assert client.get("/api/v1/reports/legal.register", headers=adv).status_code == 200
     assert client.post("/api/v1/records/contract", headers=adv, json={"title": "x"}).status_code == 403
+
+
+def test_links_cannot_probe_records_the_caller_cannot_read(client, make_workspace, add_member):
+    w = make_workspace("acme")
+    con = add_member(w["h"], "contractor", "c@acme.example.com")
+    inv = _inv(client, w["h"])
+    note = client.post("/api/v1/records/note", headers=con, json={"title": "n"}).json()
+    body = {"from_type": "note", "from_id": note["id"], "to_type": "invoice", "to_id": inv["id"]}
+    assert client.post("/api/v1/links", headers=con, json=body).status_code == 403
+    assert client.post("/api/v1/links", headers=con, json={**body, "to_id": 99999}).status_code == 403  # same answer
+    assert client.post("/api/v1/links", headers=w["h"], json=body).status_code == 201
+
+
+def test_link_listing_hides_unreadable_ends(client, make_workspace, add_member):
+    w = make_workspace("acme")
+    con = add_member(w["h"], "contractor", "c@acme.example.com")
+    inv = _inv(client, w["h"])
+    person = client.post("/api/v1/records/person", headers=w["h"], json={"full_name": "Client contact"}).json()
+    note = client.post("/api/v1/records/note", headers=w["h"], json={"title": "n"}).json()
+    for to_type, to_id in (("invoice", inv["id"]), ("note", note["id"])):
+        client.post("/api/v1/links", headers=w["h"], json={"from_type": "person", "from_id": person["id"], "to_type": to_type, "to_id": to_id})
+    assert len(client.get(f"/api/v1/records/person/{person['id']}/links", headers=w["h"]).json()) == 2
+    seen = client.get(f"/api/v1/records/person/{person['id']}/links", headers=con).json()
+    assert [lk["to_type"] for lk in seen] == ["note"]

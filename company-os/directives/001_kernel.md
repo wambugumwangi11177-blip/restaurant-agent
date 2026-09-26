@@ -140,4 +140,6 @@ Unknown numbers are recorded and get no reply. Retried deliveries are ignored.
 
   Rule for future pages: `null` means not loaded yet, `[]` means actually empty.
 - 2026-09-26: The Docker image was **not** built in the build sandbox (Docker CLI present, no daemon). What was verified: the image's exact start command (gunicorn with 2 uvicorn workers) serves `/health`, and the `COPY` sources exist. A `.dockerignore` was added so `.venv`, caches and `node_modules` stay out of the image. First real build: Railway, at deploy.
+- 2026-09-26 (departments): links are permission-aware. Creating a link needs read access to both ends, and listing a record's links hides edges to types the caller can't read. Otherwise a contractor could probe for invoices by id.
+- 2026-09-26 (departments): the browser E2E caught a race in generated forms. Reference fields rendered as number inputs until their options loaded, so input could land in the wrong field. Reference fields now show "Loading…" and Create is disabled until the options arrive.
 - 2026-09-26: `pkill -f <pattern>` / `pgrep -f` also match the shell running the command whenever the pattern appears in that command line. Stop dev servers by process name (`next-server`) or by PID.

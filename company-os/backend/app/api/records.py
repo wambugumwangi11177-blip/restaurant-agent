@@ -136,12 +136,28 @@ def record_links(type_name: str, record_id: int, principal: Principal = Depends(
                  db: Session = Depends(get_db)) -> list[dict]:
     if type_name != "document":
         records.record_type_for(db, principal, type_name, "read")
-    return [LinkOut.model_validate(lk).model_dump(mode="json") for lk in records.links_for(db, principal, type_name, record_id)]
+
+    def readable(t: str) -> bool:
+        if t == "document":
+            return True
+        try:
+            records.record_type_for(db, principal, t, "read")
+            return True
+        except HTTPException:
+            return False
+
+    links = records.links_for(db, principal, type_name, record_id)
+    # Hide edges whose other end the caller may not read (no existence leaks).
+    return [LinkOut.model_validate(lk).model_dump(mode="json") for lk in links
+            if readable(lk.from_type) and readable(lk.to_type)]
 
 
 @router.post("/links", status_code=201)
 def create_link(body: LinkIn, principal: Principal = Depends(require("records.write")),
                 db: Session = Depends(get_db)) -> dict:
+    # Both ends must be readable by the caller: linking must not reveal records they can't see.
+    for t in {body.from_type, body.to_type} - {"document"}:
+        records.record_type_for(db, principal, t, "read")
     link = records.create_link(db, principal, body)
     db.commit()
     return LinkOut.model_validate(link).model_dump(mode="json")

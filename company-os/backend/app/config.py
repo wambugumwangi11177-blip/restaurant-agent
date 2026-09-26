@@ -53,6 +53,14 @@ class Settings:
     smtp_password: str = ""
     smtp_from: str = ""
 
+    # Productization (phase 10). Platform admins manage every workspace's plan;
+    # they must also have MFA enabled. Self-serve signup is OFF unless enabled.
+    platform_admin_emails: list[str] = field(default_factory=list)
+    allow_signup: bool = False
+    signup_seat_limit: int = 3
+    signup_monthly_agent_run_limit: int = 200
+    signup_departments: list[str] = field(default_factory=list)  # empty = all
+
     # Login lockout
     max_failed_logins: int = 5
     lockout_minutes: int = 15
@@ -104,6 +112,11 @@ def _load() -> Settings:
         smtp_user=e("SMTP_USER", ""),
         smtp_password=e("SMTP_PASSWORD", ""),
         smtp_from=e("SMTP_FROM", ""),
+        platform_admin_emails=[x.lower() for x in _csv(e("PLATFORM_ADMIN_EMAILS", ""))],
+        allow_signup=e("ALLOW_SIGNUP", "false").lower() == "true",
+        signup_seat_limit=int(e("SIGNUP_SEAT_LIMIT", "3")),
+        signup_monthly_agent_run_limit=int(e("SIGNUP_MONTHLY_AGENT_RUN_LIMIT", "200")),
+        signup_departments=_csv(e("SIGNUP_DEPARTMENTS", "")),
         max_failed_logins=int(e("MAX_FAILED_LOGINS", "5")),
         lockout_minutes=int(e("LOCKOUT_MINUTES", "15")),
     )

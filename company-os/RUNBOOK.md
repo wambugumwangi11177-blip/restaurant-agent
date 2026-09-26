@@ -11,6 +11,16 @@
 - **Stop all outbound messages now:** unset `TWILIO_*` and `SMTP_*` and restart. Approved proposals then fail visibly with `channel_not_configured` instead of sending.
 - **A member's device is lost:** Members → remove them, or have them use `POST /api/v1/auth/logout-all`. Either one bumps `token_version`, which ends every session at once.
 
+## Scheduled jobs (cron)
+Run `python execution/run_jobs.py --list` to see every job. Suggested schedule (Railway cron service or crontab; times are Africa/Nairobi):
+```
+*/15 * * * *  python execution/run_jobs.py sla_check
+0 7 * * *     python execution/run_jobs.py daily_brief
+0 8 * * *     python execution/run_jobs.py collections_check
+5 8 * * *     python execution/run_jobs.py obligations_check
+```
+Each workspace runs in its own transaction and is audited (`job.run`, `manual: false`). One workspace failing does not stop the others, and the exit code is 1 if any failed.
+
 ## Backups
 - Manual: `DATABASE_URL=... execution/backup_db.sh` writes a `pg_dump -Fc` file to `.tmp/backups/`.
 - **Production (needs the founder):** schedule the same command nightly. On Railway, use a cron service running `execution/backup_db.sh` with `BACKUP_DIR` on a mounted volume or bucket, as restaurant-agent does with its Railway bucket. Keep at least one copy off Railway (restaurant-agent's `backup.yml` pattern: S3, opt-in).

@@ -35,12 +35,14 @@ export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
+  const [depts, setDepts] = useState<{ key: string; label: string }[]>([]);
   const [failed, setFailed] = useState(false);
   const isLogin = pathname === "/login";
 
   useEffect(() => {
     if (isLogin) return;
     api<Me>("auth/me").then(setMe).catch(() => setFailed(true));
+    api<{ key: string; label: string }[]>("departments").then(setDepts).catch(() => setDepts([]));
   }, [isLogin]);
 
   if (isLogin) return <>{children}</>;
@@ -72,6 +74,23 @@ export function Shell({ children }: { children: ReactNode }) {
               );
             })}
           </nav>
+          {depts.length > 0 && (
+            <>
+              <div className="mb-1 mt-4 hidden text-xs font-semibold uppercase tracking-wide text-zinc-400 md:block">Departments</div>
+              <nav className="mt-1 flex gap-1 overflow-x-auto md:mt-0 md:flex-col">
+                {depts.map((d) => {
+                  const href = `/d/${d.key}`;
+                  const active = pathname.startsWith(href);
+                  return (
+                    <Link key={d.key} href={href}
+                      className={`whitespace-nowrap rounded-md px-2 py-1.5 text-sm ${active ? "bg-zinc-100 font-medium dark:bg-zinc-800" : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800"}`}>
+                      {d.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </>
+          )}
           <div className="mt-4 hidden text-xs text-zinc-500 md:block">
             {me.user.full_name} · {me.role}
             <button onClick={logout} className="mt-1 block underline">Sign out</button>

@@ -5,6 +5,60 @@ import { api } from "@/lib/api";
 import { can, useMe } from "@/components/shell";
 import { Badge, Button, Card, ErrorBox, Input, Label, PageHeader, Select } from "@/components/ui";
 
+type Setting = { key: string; department: string; description: string; secret: boolean; kind: string; is_set: boolean; value: unknown };
+type Usage = { plan: string; seats_used: number; seat_limit: number | null; agent_runs_this_month: number; monthly_agent_run_limit: number | null; llm_spend_this_month_usd: string };
+
+function WorkspaceSettings() {
+  const [items, setItems] = useState<Setting[] | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [usage, setUsage] = useState<Usage | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    try {
+      setItems(await api<Setting[]>("workspace/settings"));
+      setUsage(await api<Usage>("workspace/usage"));
+    } catch (e) { setError((e as Error).message); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  async function save(key: string, value: string | null) {
+    setError(null); setMsg(null);
+    try {
+      await api("workspace/settings", { method: "PUT", body: { [key]: value } });
+      setDraft({ ...draft, [key]: "" }); setMsg(`Saved ${key}`); load();
+    } catch (e) { setError((e as Error).message); }
+  }
+  return (
+    <>
+      <h2 className="mb-2 mt-8 text-sm font-semibold">Workspace</h2>
+      <Card>
+        {usage && (
+          <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
+            Plan <strong>{usage.plan}</strong> · seats {usage.seats_used}{usage.seat_limit ? ` / ${usage.seat_limit}` : ""} ·
+            agent runs this month {usage.agent_runs_this_month}{usage.monthly_agent_run_limit != null ? ` / ${usage.monthly_agent_run_limit}` : ""} ·
+            LLM spend this month ${Number(usage.llm_spend_this_month_usd).toFixed(4)}
+          </p>
+        )}
+        <ErrorBox error={error} />
+        {msg && <p className="mb-2 text-sm text-emerald-700 dark:text-emerald-400">{msg}</p>}
+        <div className="space-y-3">
+          {items?.map((it) => (
+            <div key={it.key} className="grid gap-2 md:grid-cols-3 md:items-center">
+              <div className="text-sm"><div className="font-mono text-xs">{it.key}</div><div className="text-xs text-zinc-500">{it.description}</div></div>
+              <Input placeholder={it.is_set ? (it.secret ? "•••••• (set — type to replace)" : String(it.value)) : "not set"}
+                type={it.secret ? "password" : "text"} value={draft[it.key] ?? ""} onChange={(e) => setDraft({ ...draft, [it.key]: e.target.value })} />
+              <div className="flex gap-2">
+                <Button variant="secondary" disabled={!draft[it.key]} onClick={() => save(it.key, draft[it.key])}>Save</Button>
+                {it.is_set && <Button variant="secondary" onClick={() => save(it.key, null)}>Clear</Button>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </>
+  );
+}
+
 type Member = { user_id: number; email: string; full_name: string; phone: string | null; role: string; mfa_enabled: boolean };
 const ROLES = ["founder", "staff", "contractor", "advisor"];
 
@@ -70,6 +124,8 @@ export default function SettingsPage() {
           </div>
         </Card>
       </div>
+
+      {can(me, "workspace.settings") && <WorkspaceSettings />}
 
       <h2 className="mb-2 mt-8 text-sm font-semibold">Members</h2>
       <Card>

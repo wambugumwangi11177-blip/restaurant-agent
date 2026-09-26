@@ -36,6 +36,7 @@ def create_workspace_with_founder(
     phone: str | None = None,
     timezone: str = "Africa/Nairobi",
     currency: str = "KES",
+    allow_existing_user: bool = True,
 ) -> tuple[Workspace, User]:
     if not _SLUG.match(slug):
         raise BootstrapError("slug must be 2-63 chars of lowercase letters, digits and hyphens")
@@ -44,6 +45,9 @@ def create_workspace_with_founder(
     require_strong_password(password)
     email = email.strip().lower()
     user = db.execute(select(User).where(func.lower(User.email) == email)).scalar_one_or_none()
+    if user is not None and not allow_existing_user:
+        # Public signup must never attach a new workspace to someone else's account.
+        raise BootstrapError("An account with this email already exists — sign in instead")
     if user is None:
         user = User(email=email, full_name=full_name, phone=normalize_phone(phone), password_hash=hash_password(password))
         db.add(user)

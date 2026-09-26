@@ -63,7 +63,8 @@ export default function AgentsPage() {
   const me = useMe();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [provider, setProvider] = useState<string | null>(null);
-  const [selected, setSelected] = useState("memory_qa");
+  const [selected, setSelected] = useState(() =>
+    typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("agent") ?? "memory_qa" : "memory_qa");
   const [input, setInput] = useState("");
   const [result, setResult] = useState<Run | null>(null);
   const [runs, setRuns] = useState<Run[] | null>(null);

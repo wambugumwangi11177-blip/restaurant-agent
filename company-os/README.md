@@ -6,6 +6,7 @@ The company's internal operating system: one **Kernel** (identity, records, memo
 - **Kernel SOP and done-gate status:** [`directives/001_kernel.md`](directives/001_kernel.md)
 - **Decisions:** [`docs/adr/`](docs/adr/README.md)
 - **Operations:** [`RUNBOOK.md`](RUNBOOK.md)
+- **Departments:** Command Center (101), Sales (102), Delivery (103), Support (104), Finance (105), Legal (106), Marketing (107), Product (108), People (109), Productize (110). The directives are in `directives/`.
 
 ## Principles
 - Agents propose, deterministic code executes, and the founder approves anything that leaves the company.
@@ -21,10 +22,10 @@ Then open http://localhost:3000. The full steps are in directive 001.
 
 ## Layout
 ```
-backend/     FastAPI + SQLAlchemy + Alembic (app/kernel = the Kernel, app/api = HTTP)
+backend/     FastAPI + SQLAlchemy + Alembic (app/kernel = the Kernel, app/departments = one module per department, app/api = HTTP)
 frontend/    Next.js web shell (approvals, records, memory, agents, audit)
 directives/  SOPs; directives/agents/*.md are agent system prompts
-execution/   deterministic scripts (bootstrap, ingest, evals, backup, restore drill)
+execution/   deterministic scripts (bootstrap, ingest, CSV import, scheduled jobs, evals, backup, restore drill)
 evals/       retrieval eval cases and baseline
 docs/adr/    architecture decisions
 ```

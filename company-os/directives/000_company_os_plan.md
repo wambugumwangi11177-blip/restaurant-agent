@@ -32,6 +32,25 @@ This plan sets out how to build it without hallucinated parts. We build one depa
   - `docs/adr/*` and `docs/engineering-standards.md` as the starting standards set.
 - **Multi-tenant from day one.** Every row carries a `workspace_id`, using the query-layer isolation pattern from ADR 0004. Your company is workspace #1. This is the one "future-ready" decision that is cheap now and very expensive to retrofit later. Nothing else gets built for hypothetical future customers.
 
+## Build status (updated 2026-09-26)
+Every phase's **software** is built, tested (real Postgres) and in the web UI. Every **done gate** below is about real use, and stays open until the founder uses it. Code cannot close those gates, and they are not reported as closed.
+
+| Phase | Directive | Software | Done gate |
+|---|---|---|---|
+| 0 Kernel | 001 | ✅ | partly: see 001 (needs your documents, Twilio, deployment) |
+| 1 Command Center | 101 | ✅ | ⏳ 10 working days of real briefs |
+| 2 Sales | 102 | ✅ | ⏳ real pipeline imported |
+| 3 Delivery | 103 | ✅ | ⏳ Vibanda status produced from the OS |
+| 4 Support | 104 | ✅ | ⏳ your SLA policy plus 30 days |
+| 5 Finance | 105 | ✅ (never moves money; no tax/FX rules built in) | ⏳ one month reconciled; accountant confirms tax |
+| 6 Legal | 106 | ✅ (no legal rules built in) | ⏳ contracts in; lawyer reviews templates and register |
+| 7 Marketing | 107 | ✅ | ⏳ Vibanda consent plus a published case study |
+| 8 Product | 108 | ✅ | ⏳ next release planned from OS data |
+| 9 People | 109 | ✅ | n/a until the first hire |
+| 10 Productize | 110 | ✅ limits, plans, gated signup, usage · ❌ **billing** (needs your payment-provider and pricing decision) | ⏳ after 60+ days of your own use |
+
+The founder authorized building all phases at once on 2026-09-26, overriding the plan's original "one gate before the next" pacing. The gates remain the definition of done.
+
 ---
 
 ## Review (2026-09-26): corrections and additions

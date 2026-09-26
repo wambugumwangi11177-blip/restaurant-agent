@@ -84,6 +84,8 @@ def ingest_files(db: Session, principal: Principal, files: list[Path]) -> int:
 def _matches(c: Citation, expect: dict) -> bool:
     if c.document_title != expect["title"]:
         return False
+    if "heading_exact" in expect:  # a specific section, e.g. a document's untitled top section
+        return c.heading == expect["heading_exact"]
     heading = expect.get("heading")
     return heading is None or heading.lower() in c.heading.lower()
 

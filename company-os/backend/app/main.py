@@ -14,7 +14,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import agents, approvals, auth, departments, governance, memory, records, webhooks
+from app.api import agents, approvals, auth, departments, governance, memory, platform, records, webhooks
 from app.config import check_startup, get_settings
 from app.kernel.agents.builtin_agents import register_builtin_agents
 from app.kernel.agents.builtin_tools import register_builtin_tools
@@ -74,7 +74,8 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(governance.public_router)
-    for module in (auth, records, memory, agents, approvals, departments, governance, webhooks):
+    app.include_router(platform.public_router)
+    for module in (auth, records, memory, agents, approvals, departments, platform, governance, webhooks):
         app.include_router(module.router, prefix="/api/v1")
     return app
 

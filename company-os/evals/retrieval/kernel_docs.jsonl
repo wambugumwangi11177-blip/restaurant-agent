@@ -1,12 +1,12 @@
 // Retrieval eval over the OS's own directives and ADRs. Questions are phrased the way a founder would ask,
 // written before measuring (not tuned to the retriever). Format: see backend/app/kernel/evals.py.
 {"id": "plan-order", "question": "Which department gets built right after the founder command center?", "expect": [{"title": "Company OS — Build Plan (one department at a time)", "heading": "Department build order"}]}
-{"id": "plan-money", "question": "Does the OS ever move money on its own?", "expect": [{"title": "Company OS — Build Plan (one department at a time)", "heading": "Finance"}]}
+{"id": "plan-money", "question": "Does the OS ever move money on its own?", "expect": [{"title": "Company OS — Build Plan (one department at a time)", "heading": "Finance"}, {"title": "Directive 105 — Finance (founder only)"}]}
 {"id": "plan-lawyer", "question": "Who has to review contract templates before agents use them?", "expect": [{"title": "Company OS — Build Plan (one department at a time)", "heading": "Legal"}]}
 {"id": "plan-pace", "question": "How many weeks will the kernel take to build?", "expect": [{"title": "Company OS — Build Plan (one department at a time)", "heading": "Pace"}]}
 {"id": "plan-training", "question": "Why can't the AI be trained on our company data?", "expect": [{"title": "Company OS — Build Plan (one department at a time)", "heading": "Ground truths"}]}
 {"id": "plan-crm", "question": "Which records does the sales CRM keep?", "expect": [{"title": "Company OS — Build Plan (one department at a time)", "heading": "Customers & Sales"}]}
-{"id": "plan-productize", "question": "What has to happen before we sell the OS to other businesses?", "expect": [{"title": "Company OS — Build Plan (one department at a time)", "heading": "Productize"}]}
+{"id": "plan-productize", "question": "What has to happen before we sell the OS to other businesses?", "expect": [{"title": "Company OS — Build Plan (one department at a time)", "heading": "Productize"}, {"title": "Directive 110 — Productize (selling the OS to other businesses)"}]}
 {"id": "embeddings", "question": "What embedding provider does memory search use?", "expect": [{"title": "ADR 0003 — Postgres full-text search before vector search"}, {"title": "Company OS — Build Plan (one department at a time)", "heading": "Review"}]}
 {"id": "whatsapp-setup", "question": "How do I connect WhatsApp to the OS?", "expect": [{"title": "Directive 001 — Kernel (Phase 0)", "heading": "WhatsApp setup"}]}
 {"id": "deploy-frontend", "question": "Where should the frontend be deployed?", "expect": [{"title": "Directive 001 — Kernel (Phase 0)", "heading": "Deploy"}]}
@@ -21,6 +21,18 @@
 {"id": "spend-limit", "question": "What is the daily limit on LLM spending?", "expect": [{"title": "ADR 0005 — Provider-neutral LLM layer; Anthropic via official SDK"}, {"title": "Directive 001 — Kernel (Phase 0)", "heading": "Operate it"}]}
 {"id": "audit-edit", "question": "Can anyone edit or delete the audit history?", "expect": [{"title": "ADR 0006 — Audit log is append-only and never stores PII"}]}
 {"id": "erasure", "question": "What happens to someone's personal details when they ask to be erased?", "expect": [{"title": "ADR 0006 — Audit log is append-only and never stores PII"}, {"title": "Directive 001 — Kernel (Phase 0)", "heading": "Operate it"}, {"title": "Company OS — Build Plan (one department at a time)", "heading": "Review"}]}
-{"id": "move-repo", "question": "How will this folder be moved into its own GitHub repository?", "expect": [{"title": "ADR 0007 — Build inside restaurant-agent until the company-os repo exists"}]}
+{"id": "move-repo", "question": "How will this folder be moved into its own GitHub repository?", "expect": [{"title": "ADR 0007 — Build inside restaurant-agent until the company-os repo exists"}, {"title": "Company OS — Build Plan (one department at a time)", "heading_exact": "Company OS — Build Plan (one department at a time)"}]}
 {"id": "dept-imports", "question": "Can one department import code from another department?", "expect": [{"title": "ADR 0001 — Modular monolith: one Kernel, departments as isolated packages"}, {"title": "Company OS — Build Plan (one department at a time)", "heading": "Review"}]}
 {"id": "qa-unknown", "question": "What does the question-answering agent say when the documents don't have the answer?", "expect": [{"title": "Agent: memory_qa"}]}
+{"id": "dept-calendar", "question": "How do I connect my Google calendar to the morning brief?", "expect": [{"title": "Directive 101 — Founder Command Center"}]}
+{"id": "dept-stale-deal", "question": "When does a deal get flagged as needing a follow-up?", "expect": [{"title": "Directive 102 — Customers & Sales"}]}
+{"id": "dept-github-private", "question": "Why does the project status say commits are unavailable for a private repo?", "expect": [{"title": "Directive 103 — Delivery / Projects"}]}
+{"id": "dept-sla-default", "question": "What SLA applies to tickets if we never configured one?", "expect": [{"title": "Directive 104 — Support & Incidents"}]}
+{"id": "dept-money", "question": "Can the finance agents pay a supplier?", "expect": [{"title": "Directive 105 — Finance (founder only)"}]}
+{"id": "dept-vat", "question": "Which VAT rate does the OS charge on invoices?", "expect": [{"title": "Directive 105 — Finance (founder only)"}]}
+{"id": "dept-mpesa-import", "question": "How do I import my M-Pesa statement?", "expect": [{"title": "Directive 105 — Finance (founder only)"}]}
+{"id": "dept-contract-quote", "question": "How does the contract reader avoid inventing obligations?", "expect": [{"title": "Directive 106 — Legal & Compliance (founder writes, advisors read)"}, {"title": "Agent: contract_reader"}]}
+{"id": "dept-case-study", "question": "Can we publish a case study about a client without asking them?", "expect": [{"title": "Directive 107 — Marketing & Content"}, {"title": "Agent: case_study_drafter"}]}
+{"id": "dept-roadmap-rank", "question": "How are feature requests ranked for the roadmap?", "expect": [{"title": "Directive 108 — Product & Roadmap"}]}
+{"id": "dept-offboarding", "question": "What happens to someone's system access when they leave?", "expect": [{"title": "Directive 109 — People & HR (founder only; used from the first hire)"}]}
+{"id": "dept-billing", "question": "Can customers pay for a subscription to the OS yet?", "expect": [{"title": "Directive 110 — Productize (selling the OS to other businesses)"}]}

@@ -1,6 +1,11 @@
 {
-  "min_hit_rate": 0.875,
-  "measured": {"date": "2026-09-26", "cases": 24, "hits": 21, "k": 3, "retriever": "PostgresFTSRetriever"},
-  "known_misses": ["plan-pace", "plan-productize", "move-repo"],
-  "note": "Deterministic, so the floor equals the measured score. Misses are paraphrase/keyword-dilution cases (ADR 0003). Raise the floor when retrieval improves; lower it only with a written reason (e.g. a corpus rewrite) in the same commit."
+  "min_hit_rate": 0.9166,
+  "measured": {"date": "2026-09-26", "cases": 36, "hits": 33, "k": 3, "retriever": "PostgresFTSRetriever (one passage per section)"},
+  "known_misses": ["first-account", "injection", "dept-billing"],
+  "history": [
+    "v1: 24 cases, 21/24 on the Phase 0 corpus (misses: plan-pace, plan-productize, move-repo).",
+    "v2: the corpus grew (all departments). Dedup to one passage per section fixed plan-pace. Adjudicated as correct sources that were previously unaccepted, after reading their text: Directive 105 for plan-money ('the OS never moves money'), Directive 110 for plan-productize ('only after departments 1-6 have run your own company for 60+ days'), and the plan's top section for move-repo (it contains the git subtree split instructions, so v1 mis-scored it). 12 department questions added before measuring; 11 hit.",
+    "Remaining misses are paraphrase or keyword dilution (ADR 0003). They are recorded, not tuned away."
+  ],
+  "note": "Deterministic, so the floor equals the measured score (rounded down). Raise it when retrieval improves; lower it only with a written reason in the same commit."
 }

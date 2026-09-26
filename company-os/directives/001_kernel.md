@@ -35,6 +35,12 @@ Departments are built on top of it, one at a time (directive 000). None of them 
 | Export and erasure | `backend/app/kernel/privacy.py` |
 | Web shell | `frontend/` |
 
+## Extension points (how departments plug in; ADR 0008)
+- `records.register_record_type(name, RecordType(...))`: generic CRUD, audit and events, `refs` checks, per-type permissions, `prepare`/`after` hooks.
+- `departments.register_report / register_job / register_setting / register_brief_section / register_department`
+- `rbac.register_permissions`, `events.register_event_types`, `tools.register_tool`, `registry.register_agent`
+- Workspace switches (`app/kernel/workspaces.py`): `enabled_departments`, `seat_limit`, `monthly_agent_run_limit`, `settings`.
+
 ## Run it locally
 1. Start Postgres 16. Create a database and role that match `DATABASE_URL`. The default is `postgresql+psycopg2://cos:cos@localhost:5432/cos_dev`.
 2. Set up the backend:

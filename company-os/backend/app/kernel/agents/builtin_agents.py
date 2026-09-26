@@ -69,7 +69,7 @@ def _memory_fallback(ctx: ToolContext, text: str) -> tuple[str, list[dict]]:
         return "No LLM is configured, and no document matched your question.", []
     lines = ["No LLM is configured, so here are the most relevant passages instead of an answer:"]
     for i, h in enumerate(hits, 1):
-        lines.append(f"[{i}] {h.heading}: {h.snippet}")
+        lines.append(f"[{i}] {h.heading}: {h.snippet.replace('«', '').replace('»', '')}")
     return "\n".join(lines), [h.as_dict() for h in hits]
 
 

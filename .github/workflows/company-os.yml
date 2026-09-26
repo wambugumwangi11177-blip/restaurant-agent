@@ -1,0 +1,61 @@
+name: company-os
+
+# Scoped to company-os/ only, so restaurant-agent's own CI and deploys are unaffected
+# (ADR 0007). Move this file into the company-os repo when it is extracted.
+on:
+  push:
+    paths: ["company-os/**", ".github/workflows/company-os.yml"]
+  pull_request:
+    paths: ["company-os/**", ".github/workflows/company-os.yml"]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cos
+          POSTGRES_PASSWORD: cos
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cos" --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: company-os/backend
+    env:
+      TEST_DATABASE_ADMIN_URL: postgresql+psycopg2://cos:cos@localhost:5432/postgres
+      DATABASE_URL: postgresql+psycopg2://cos:cos@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      # Includes the retrieval-eval gate (tests/test_evals.py) and the approval-gate tests.
+      - name: Tests (real Postgres)
+        run: python -m pytest -q
+      - name: Migrations match models
+        run: alembic upgrade head && alembic check
+      - name: SAST (bandit, medium+)
+        run: pip install bandit && bandit -r app -ll
+      - name: Dependency audit
+        run: pip install pip-audit && pip-audit -r requirements.txt
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: company-os/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: company-os/frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high

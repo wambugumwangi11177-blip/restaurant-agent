@@ -112,6 +112,8 @@ Unknown numbers are recorded and get no reply. Retried deliveries are ignored.
 | WhatsApp `status` returns a real answer | ✅ in tests with signed requests. ⏳ **Needs the founder:** a live check with a Twilio account |
 | Nightly backup and a restore drill | ✅ scripts, plus a local drill in RUNBOOK.md. ⏳ **Needs the founder:** production schedule and drill |
 | Spend dashboard | ✅ `/api/v1/ops/status` and the Home page |
+| Error alerting | ⚠️ Partial. A failed approved action notifies founders; logs are JSON with request ids. ⏳ **Needs the founder:** an uptime and exception monitor on `/health` (Railway healthcheck plus any uptime service) |
+| Web shell | ✅ Approvals, Records, Memory, Agents, Audit, Settings. Verified with a headless-browser end-to-end run (desktop and 375 px mobile, no horizontal overflow) |
 | Deployed | ⏳ **Needs the founder's** Railway and Vercel accounts |
 
 ## Known limitations (deliberate, Phase 0)
@@ -125,3 +127,10 @@ Unknown numbers are recorded and get no reply. Retried deliveries are ignored.
 - 2026-09-26: The GitHub integration can't create repositories (403), so this is built inside restaurant-agent (ADR 0007).
 - 2026-09-26: `email-validator` rejects reserved TLDs such as `.test`, so test fixtures use `example.com`.
 - 2026-09-26: Twilio's docs site is blocked from the build sandbox. The WhatsApp signature code was verified against the official `twilio-python` `RequestValidator` instead. A signature "example" recalled from memory was wrong, which shows why anything security-related gets checked against a primary source.
+- 2026-09-26: A browser end-to-end run (Playwright, headless Chromium) found three web-shell bugs that the unit tests could not see. All are fixed.
+  1. Overlapping list requests could land out of order and overwrite newer results (Approvals filter, Records search). Lists now drop superseded responses.
+  2. After approving, the outcome wasn't shown. There is now a result banner that says executed or failed, with the error.
+  3. Pages showed "nothing here" before their data had loaded; Home even contradicted its own status count. Every list now shows "Loading…" until its data arrives.
+
+  Rule for future pages: `null` means not loaded yet, `[]` means actually empty.
+- 2026-09-26: `pkill -f <pattern>` / `pgrep -f` also match the shell running the command whenever the pattern appears in that command line. Stop dev servers by process name (`next-server`) or by PID.

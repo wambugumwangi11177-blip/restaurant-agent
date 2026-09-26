@@ -73,6 +73,7 @@ def test_memory_qa_without_llm_falls_back_to_sources(client, make_workspace):
     r = client.post("/api/v1/agents/memory_qa/run", headers=w["h"], json={"input": "How are backups done?"}).json()
     assert r["status"] == "succeeded"
     assert r["output"].startswith("No LLM is configured")
+    assert "«" not in r["output"] and "»" not in r["output"]  # highlight markers are for the web UI only
     assert r["citations"] and r["citations"][0]["heading"] == "Operations › Backups"
 
 

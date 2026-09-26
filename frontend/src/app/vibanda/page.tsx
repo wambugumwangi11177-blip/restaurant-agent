@@ -15,6 +15,7 @@ import PartHealth from "@/components/vibanda/PartHealth";
 import { useAuth } from "@/context/AuthContext";
 import OwnerHomeEmpty from "@/components/vibanda/OwnerHomeEmpty";
 import { isVerifiedVibandaSource } from "@/lib/vibandaSource";
+import { VIBANDA_HOME_LINKS } from "@/lib/vibandaAreas";
 
 type Feed = {
   source_status?: Record<string, { state: string; recommendations: number | null }>;
@@ -41,23 +42,6 @@ type Feed = {
   pulse: { domain: string; headline: string; detail: string }[];
   performance: { revenue_trend: { date: string; revenue: number; orders: number }[] };
 };
-
-const OWNER_HOME_LINKS = [
-  ["Menu & pricing", "Menu health, prices, and margin decisions", "menu"],
-  ["Finance", "Recorded money movement and reconciliation", "finance"],
-  ["Expenses", "Costs, when a real expense source is connected", "expenses"],
-  ["Suppliers", "Supplier reliability and purchasing risks", "suppliers"],
-  ["Purchasing", "Orders, commitments, and what needs a decision", "purchasing"],
-  ["Cash reconciliation", "Cash, M-Pesa, and card settlement", "cash-reconciliation"],
-  ["Point of sale", "Sales channels and till activity", "pos"],
-  ["Marketing", "Guest growth opportunities and campaigns", "marketing"],
-  ["Fraud and risk", "Unusual activity and control risks", "risk"],
-  ["Notifications", "Important changes and reminders", "notifications"],
-  ["Business intelligence", "Forward views, decisions, and risks", "intelligence"],
-  ["Data trust", "Source freshness, completeness, and reconciliation", "data-trust"],
-  ["Audit trail", "Changes, approvals, and decisions", "audit"],
-  ["Restaurant settings", "Profile, connections, and owner controls", "settings"],
-] as const;
 
 const PERIODS = ["1h", "today", "7d", "30d"] as const;
 const PERIOD_LABEL: Record<string, string> = { "1h": "1H", today: "Today", "7d": "7D", "30d": "30D" };
@@ -413,7 +397,7 @@ function VibandaOperationalHome({ initialFeed = null }: { initialFeed?: Feed | n
             <SectionHead id="owner-areas-heading" eyebrow="Owner controls" title="The rest of your restaurant"
               meta="Open a page when you need the detail" />
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {OWNER_HOME_LINKS.map(([label, note, slug]) => (
+              {VIBANDA_HOME_LINKS.map(([label, note, slug]) => (
                 <Link key={slug} href={`/vibanda/${slug}`}
                   className="rounded-xl border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.72)] p-4 transition hover:-translate-y-0.5 hover:border-[var(--v-primary)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--v-primary)]/60">
                   <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">{label}</p>

@@ -625,6 +625,49 @@ class ConversationTurn(Base):
     )
 
 
+class OwnerOSConversation(Base):
+    """A private, owner-scoped OS conversation for one restaurant."""
+    __tablename__ = "owner_os_conversations"
+
+    id = Column(Integer, primary_key=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False, index=True)
+    owner_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(120), nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    messages = relationship("OwnerOSMessage", back_populates="conversation", cascade="all, delete-orphan", order_by="OwnerOSMessage.created_at")
+    __table_args__ = (Index("ix_owner_os_conversation_owner_updated", "owner_user_id", "updated_at"),)
+
+
+class OwnerOSMessage(Base):
+    __tablename__ = "owner_os_messages"
+
+    id = Column(Integer, primary_key=True)
+    conversation_id = Column(Integer, ForeignKey("owner_os_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String(16), nullable=False)
+    content = Column(Text, nullable=False)
+    answer_type = Column(String(32), nullable=True)
+    client_message_id = Column(String(64), nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    conversation = relationship("OwnerOSConversation", back_populates="messages")
+    __table_args__ = (UniqueConstraint("conversation_id", "client_message_id", name="uq_owner_os_client_message"),)
+
+
+class OwnerOSPreference(Base):
+    """Small, explicit set of per-owner OS display preferences."""
+    __tablename__ = "owner_os_preferences"
+
+    id = Column(Integer, primary_key=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    owner_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    default_area = Column(String(48), nullable=True)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    __table_args__ = (UniqueConstraint("restaurant_id", "owner_user_id", name="uq_owner_os_preference_scope"),)
+
+
 class ProductEvent(Base):
     """
     Product-analytics events for the APP's own users (owners/staff) — feature

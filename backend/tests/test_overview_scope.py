@@ -176,13 +176,16 @@ def test_failed_analysis_abstains_without_leaking_exception(client, scoped_owner
 
 def test_invented_chat_figures_fall_back_to_deterministic_card(client, scoped_owner, monkeypatch):
     from routers import ai_ask
+    from routers import overview
     from ai import llm_client
     card = {"finding": "Revenue is KSh 500.", "why": "Recorded sales.",
             "impact": "Not quantified", "recommendation": "Review sales.",
             "module": "revenue", "steps": [], "data": {"revenue": 500}}
     monkeypatch.setitem(ai_ask._HANDLERS, "revenue", lambda *args: card)
+    monkeypatch.setattr(ai_ask, "_module_has_records", lambda *args: True)
+    monkeypatch.setattr(overview, "_source_connection", lambda *args: {"state": "receiving", "reconciled": True})
     monkeypatch.setattr(llm_client, "is_available", lambda: True)
-    monkeypatch.setattr(llm_client, "chat", lambda *args, **kwargs: "Revenue is KSh 999,999.")
+    monkeypatch.setattr(ai_ask, "narrate_owner", lambda *args, **kwargs: "Revenue is KSh 999,999.")
     _, headers = scoped_owner
     response = client.post("/api/v1/ai/chat", json={"question": "How are sales?"}, headers=headers)
     assert response.status_code == 200, response.text

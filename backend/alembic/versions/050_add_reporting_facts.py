@@ -1,4 +1,4 @@
-"""048 reporting facts — daily sales rollups + a covering index for the report join.
+"""050 reporting facts — daily sales rollups + a covering index for the report join.
 
 Created 2026-09-19. routers/reports.py aggregated straight off `orders` and
 `order_items`. Measured on a seeded 300,000-order / 900,000-line-item dataset,
@@ -19,8 +19,8 @@ routers/reports.py. These tables are a CACHE of a query, never a source of
 truth — backend/reporting/rollup.py re-aggregates a trailing window and every
 read falls back to the live query when coverage is incomplete.
 """
-revision = "048_add_reporting_facts"
-down_revision = "047_attention_decisions"
+revision = "050_add_reporting_facts"
+down_revision = "049_owner_os_workspace"
 branch_labels = None
 depends_on = None
 

@@ -88,6 +88,34 @@ def test_planned_area_question_never_runs_an_unrelated_handler(client, db_sessio
     assert saved_design and "should-not-leak" not in saved_design.content
 
 
+def test_follow_up_uses_the_answer_the_owner_actually_saw(client, scoped_owner, monkeypatch):
+    from ai import llm_client
+    from routers import ai_ask
+
+    _, headers = scoped_owner
+    monkeypatch.setattr(llm_client, "is_available", lambda: False)
+    first = client.post("/api/v1/ai/chat", headers=headers, json={
+        "question": "Help me reduce food waste.", "answer_mode": "general",
+    })
+    assert first.status_code == 200, first.text
+    displayed_answer = first.json()["answer_text"]
+    assert displayed_answer != first.json()["grounded"]["finding"]
+    seen_messages = []
+
+    def capture_narration(db, user, rid, messages, *args):
+        seen_messages.extend(messages)
+        return "Based on what you shared, start by recording waste at the end of each shift."
+
+    monkeypatch.setattr(llm_client, "is_available", lambda: True)
+    monkeypatch.setattr(ai_ask, "narrate_owner", capture_narration)
+    follow_up = client.post("/api/v1/ai/chat", headers=headers, json={
+        "question": "Our team throws away unused prep after closing.",
+        "answer_mode": "general", "conversation_id": first.json()["conversation_id"],
+    })
+    assert follow_up.status_code == 200, follow_up.text
+    assert {"role": "assistant", "content": displayed_answer} in seen_messages
+
+
 def test_owner_os_migration_is_safe_after_model_create_all():
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)

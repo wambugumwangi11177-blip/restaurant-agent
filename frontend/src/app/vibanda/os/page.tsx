@@ -282,7 +282,11 @@ function OSChatInner() {
       </> : <>
         <div className="flex items-center justify-between gap-3"><p className="text-xs text-[var(--v-muted-foreground)]">Conversation saved privately to your Vibanda owner account.</p><button type="button" onClick={() => { setSearch(""); document.getElementById("browse-questions")?.scrollIntoView({ block: "nearest" }); }} className="text-xs font-semibold text-[var(--v-primary)]">Browse questions</button></div>
         {sourceStatus !== "verified" && <p className="flex items-center gap-2 rounded-lg bg-[hsl(42_40%_99_/_0.58)] px-3 py-2 text-[11px] text-[var(--v-muted-foreground)]"><Database size={13} />{sourceStatus === "needs_reconciliation" ? "Restaurant records need source reconciliation before the OS can treat findings as verified." : sourceStatus === "unknown" ? "The restaurant data status could not be verified; feature explanations and general guidance remain available." : "Restaurant data isn’t connected yet; feature explanations and general guidance remain available."}</p>}
-        <div ref={chatViewport} aria-live="polite" className="max-h-[62vh] space-y-4 overflow-y-auto rounded-xl border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.34)] p-3 sm:p-5">
+        <div ref={chatViewport} role="region" aria-label="Conversation messages" aria-live="polite" onScroll={(event) => {
+          const viewport = event.currentTarget;
+          followReply.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 96;
+          if (followReply.current) setNewResponse(false);
+        }} className="max-h-[62vh] space-y-4 overflow-y-auto rounded-xl border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.34)] p-3 sm:p-5">
           {turns.map((turn) => <article key={turn.id} className="space-y-3">
             <div className="ml-auto max-w-[92%] sm:max-w-[78%]"><p className="mb-1 text-right text-[10px] font-semibold text-[var(--v-muted-foreground)]">Your question</p><div className="rounded-2xl rounded-br-sm bg-[var(--v-primary)] px-4 py-3 text-sm leading-relaxed text-[var(--v-primary-foreground)]">{turn.question}</div></div>
             <div className="max-w-[96%] rounded-2xl rounded-bl-sm border border-[var(--v-border)] bg-[var(--v-card)] p-4 shadow-sm sm:max-w-[88%]">

@@ -643,7 +643,7 @@ def chat_llm(request: Request, body: ChatBody, db: Session = Depends(get_db),
                 if message.role == "assistant":
                     try:
                         parsed = json.loads(text)
-                        text = parsed.get("llm_reply") or parsed.get("grounded", {}).get("finding") or text
+                        text = parsed.get("answer_text") or parsed.get("llm_reply") or parsed.get("grounded", {}).get("finding") or text
                     except (ValueError, AttributeError):
                         pass
                 messages.append({"role": message.role, "content": text[:4000]})

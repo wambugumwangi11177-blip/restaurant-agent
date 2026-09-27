@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import OsPage from "../src/app/vibanda/os/page";
 import api from "@/lib/api";
 
@@ -37,6 +37,28 @@ function submit(question: string) {
 }
 
 describe("owner OS without restaurant data", () => {
+  it("preserves reading position when the owner scrolls while an answer is pending", async () => {
+    let finishReply!: (value: { data: typeof reply }) => void;
+    const pendingReply = new Promise<{ data: typeof reply }>((resolve) => { finishReply = resolve; });
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { id: 42 } } as never);
+    vi.mocked(api.post).mockImplementationOnce(() => pendingReply as never);
+    render(<OsPage />);
+    submit("Which ingredients are running low?");
+    const viewport = await screen.findByRole("region", { name: "Conversation messages" });
+    Object.defineProperties(viewport, {
+      scrollHeight: { configurable: true, value: 1200 },
+      clientHeight: { configurable: true, value: 400 },
+      scrollTop: { configurable: true, writable: true, value: 200 },
+    });
+    fireEvent.scroll(viewport);
+    await act(async () => { finishReply({ data: reply }); });
+    expect(await screen.findByRole("button", { name: /New response/ })).toBeTruthy();
+    expect(viewport.scrollTop).toBe(200);
+    viewport.scrollTop = 800;
+    fireEvent.scroll(viewport);
+    expect(screen.queryByRole("button", { name: /New response/ })).toBeNull();
+  });
+
   it("opens with the starting questions and all four shared Home areas", async () => {
     render(<OsPage />);
     expect(screen.getByRole("heading", { name: /what would you like to work on/i })).toBeTruthy();

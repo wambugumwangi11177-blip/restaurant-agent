@@ -52,6 +52,16 @@ def test_owner_conversations_preferences_retries_and_tenant_scope(client, db_ses
     hidden = client.get(f"/api/v1/ai/os/conversations/{conversation_id}", headers=sibling_headers)
     assert hidden.status_code == 404
     assert client.get("/api/v1/ai/os/preferences", headers=sibling_headers).json() == {"default_area": None}
+    foreign_owner = models.User(
+        tenant_id=202, active_restaurant_id=303,
+        email="foreign-os-owner@example.com", hashed_password="unused", role=models.Role.ADMIN,
+    )
+    db_session.add(foreign_owner)
+    db_session.commit()
+    foreign_headers = {"Authorization": f"Bearer {auth.create_access_token({'sub': foreign_owner.email})}"}
+    assert client.get(f"/api/v1/ai/os/conversations/{conversation_id}", headers=foreign_headers).status_code == 404
+    assert client.get("/api/v1/ai/os/conversations", headers=foreign_headers).json() == {"conversations": []}
+    assert client.post("/api/v1/ai/chat", headers=foreign_headers, json=payload).status_code == 404
     expired_headers = {"Authorization": f"Bearer {auth.create_access_token({'sub': owner.email}, expires_delta=timedelta(seconds=-1))}"}
     assert client.get("/api/v1/ai/os/preferences", headers=expired_headers).status_code == 401
 
@@ -114,6 +124,29 @@ def test_follow_up_uses_the_answer_the_owner_actually_saw(client, scoped_owner, 
     })
     assert follow_up.status_code == 200, follow_up.text
     assert {"role": "assistant", "content": displayed_answer} in seen_messages
+
+
+def test_model_timeout_keeps_general_guidance_and_saved_history(client, db_session, scoped_owner, monkeypatch):
+    from ai import llm_client
+    from routers import ai_ask
+
+    _, headers = scoped_owner
+    monkeypatch.setattr(llm_client, "is_available", lambda: True)
+
+    def timeout(*args):
+        raise TimeoutError("private provider error detail")
+
+    monkeypatch.setattr(ai_ask, "narrate_owner", timeout)
+    response = client.post("/api/v1/ai/chat", headers=headers, json={
+        "question": "Help me reduce food waste.", "answer_mode": "general",
+    })
+    assert response.status_code == 200, response.text
+    answer = response.json()
+    assert answer["answer_type"] == "general_guidance"
+    assert answer["llm_used"] is False
+    assert answer["answer_text"]
+    assert "private provider" not in response.text
+    assert db_session.query(models.OwnerOSMessage).filter_by(conversation_id=answer["conversation_id"]).count() == 2
 
 
 def test_owner_os_migration_is_safe_after_model_create_all():

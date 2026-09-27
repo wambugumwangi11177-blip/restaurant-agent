@@ -5,8 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { homeFor } from "@/lib/tenantHome";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Loader2, Eye, EyeOff, ShieldCheck, Lock, GitBranch } from "lucide-react";
-import api from "@/lib/api";
+import { Loader2, Eye, EyeOff, ArrowRight } from "lucide-react";
 
 export default function LoginPage() {
     const { login, loginWithRestaurant, register } = useAuth();
@@ -21,16 +20,9 @@ export default function LoginPage() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [showGeneralLoginOptions, setShowGeneralLoginOptions] = useState(false);
-    const [trustStats, setTrustStats] = useState<{ grounded_pct: number | null; narratives_generated: number } | null>(null);
 
     useEffect(() => {
         setShowGeneralLoginOptions(window.location.hostname !== "vibandavillage.vercel.app");
-    }, []);
-
-    useEffect(() => {
-        api.get("/ai/trust-stats")
-            .then((r) => setTrustStats(r.data))
-            .catch(() => { });
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -166,14 +158,14 @@ export default function LoginPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-2.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[#0a0a0a] font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full min-h-11 py-2.5 rounded-lg bg-[#e8bd68] hover:bg-[#f3cf84] text-[#17120a] font-semibold text-sm flex items-center justify-center gap-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8bd68] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {loading ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                             ) : isRegister ? (
                                 "Create Account"
                             ) : (
-                                "Sign In"
+                                <>Sign In <ArrowRight className="w-4 h-4" aria-hidden="true" /></>
                             )}
                         </button>
                     </form>
@@ -214,31 +206,10 @@ export default function LoginPage() {
                     </div>}
                 </div>
 
-                {/* Trust panel — why owners can rely on the numbers */}
-                <div className="mt-6 rounded-xl border border-[#262626] bg-[#141414]/60 p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                        <ShieldCheck className="w-4 h-4 text-[var(--accent)]" />
-                        <p className="text-xs font-semibold text-[#e5e5e5]">Built to be trusted, not just used</p>
-                    </div>
-                    <ul className="space-y-2">
-                        <li className="flex items-start gap-2 text-xs text-[#a3a3a3]">
-                            <GitBranch className="w-3.5 h-3.5 text-[#525252] mt-0.5 flex-shrink-0" />
-                            <span>Every number comes from deterministic math over your real data — AI only interprets it, never computes it.</span>
-                        </li>
-                        <li className="flex items-start gap-2 text-xs text-[#a3a3a3]">
-                            <ShieldCheck className="w-3.5 h-3.5 text-[#525252] mt-0.5 flex-shrink-0" />
-                            <span>
-                                Every figure the AI writes is checked against your data before you see it
-                                {trustStats?.grounded_pct != null && (
-                                    <> — <span className="text-[var(--accent)] font-medium">{trustStats.grounded_pct}% verified</span> across {trustStats.narratives_generated.toLocaleString()} insights so far</>
-                                )}.
-                            </span>
-                        </li>
-                        <li className="flex items-start gap-2 text-xs text-[#a3a3a3]">
-                            <Lock className="w-3.5 h-3.5 text-[#525252] mt-0.5 flex-shrink-0" />
-                            <span>Your restaurant&apos;s data is isolated per account — never mixed with, or trained on across, other tenants.</span>
-                        </li>
-                    </ul>
+                <div className="mt-6 rounded-xl border border-[#342b1e] bg-[#1a1712] p-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#e8bd68]">Owner workspace</p>
+                    <h3 className="mt-2 text-base font-semibold text-[#f2eee6]">A clearer view of your day.</h3>
+                    <p className="mt-2 text-sm leading-6 text-[#b7b0a5]">Sign in to review your restaurant, find what needs attention, and plan your next move.</p>
                 </div>
             </motion.div>
         </div>

@@ -368,6 +368,7 @@ async def login_by_restaurant(
     login_data: RestaurantLoginRequest,
     db: Session = Depends(get_db),
 ):
+    """Resolve one active Owner for the named restaurant before checking its password."""
     restaurant_name = login_data.restaurant_name.strip().lower()
     owners = (
         db.query(models.User)

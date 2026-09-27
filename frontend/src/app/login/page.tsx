@@ -20,7 +20,12 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [showGeneralLoginOptions, setShowGeneralLoginOptions] = useState(false);
     const [trustStats, setTrustStats] = useState<{ grounded_pct: number | null; narratives_generated: number } | null>(null);
+
+    useEffect(() => {
+        setShowGeneralLoginOptions(window.location.hostname !== "vibandavillage.vercel.app");
+    }, []);
 
     useEffect(() => {
         api.get("/ai/trust-stats")
@@ -173,7 +178,7 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    <div className="mt-5 text-center space-y-2">
+                    {showGeneralLoginOptions && <div className="mt-5 text-center space-y-2">
                         <button
                             onClick={() => {
                                 setIsRegister(!isRegister);
@@ -206,7 +211,7 @@ export default function LoginPage() {
                                 Forgot password?
                             </a>
                         )}
-                    </div>
+                    </div>}
                 </div>
 
                 {/* Trust panel — why owners can rely on the numbers */}

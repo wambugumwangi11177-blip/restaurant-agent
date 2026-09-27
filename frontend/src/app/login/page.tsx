@@ -9,12 +9,14 @@ import { Loader2, Eye, EyeOff, ShieldCheck, Lock, GitBranch } from "lucide-react
 import api from "@/lib/api";
 
 export default function LoginPage() {
-    const { login, register } = useAuth();
+    const { login, loginWithRestaurant, register } = useAuth();
     const router = useRouter();
     const [isRegister, setIsRegister] = useState(false);
+    const [useEmailLogin, setUseEmailLogin] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [tenantName, setTenantName] = useState("");
+    const [restaurantName, setRestaurantName] = useState("Vibanda Village");
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
@@ -41,7 +43,9 @@ export default function LoginPage() {
             // the "it shows the old dashboard first, then the new one".
             const signedIn = isRegister
                 ? await register(email, password, tenantName)
-                : await login(email, password);
+                : useEmailLogin
+                    ? await login(email, password)
+                    : await loginWithRestaurant(restaurantName, password);
             router.replace(homeFor(signedIn?.tenant_name));
         } catch (err: unknown) {
             let message = "Authentication failed";
@@ -88,8 +92,9 @@ export default function LoginPage() {
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {isRegister && (
                             <div>
-                                <label className="block text-sm text-[#737373] mb-1.5">Restaurant Name</label>
+                                <label htmlFor="signup-restaurant-name" className="block text-sm text-[#737373] mb-1.5">Restaurant Name</label>
                                 <input
+                                    id="signup-restaurant-name"
                                     type="text"
                                     value={tenantName}
                                     onChange={(e) => setTenantName(e.target.value)}
@@ -100,27 +105,46 @@ export default function LoginPage() {
                             </div>
                         )}
 
-                        <div>
-                            <label className="block text-sm text-[#737373] mb-1.5">Email</label>
-                            <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[var(--accent)] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm"
-                                placeholder="you@restaurant.com"
-                                required
-                            />
-                        </div>
+                        {isRegister || useEmailLogin ? (
+                            <div>
+                                <label htmlFor="email" className="block text-sm text-[#737373] mb-1.5">Email</label>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[var(--accent)] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm"
+                                    placeholder="you@restaurant.com"
+                                    required
+                                />
+                            </div>
+                        ) : (
+                            <div>
+                                <label htmlFor="restaurant-name" className="block text-sm text-[#737373] mb-1.5">Restaurant</label>
+                                <input
+                                    id="restaurant-name"
+                                    type="text"
+                                    value={restaurantName}
+                                    onChange={(e) => setRestaurantName(e.target.value)}
+                                    className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[var(--accent)] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm"
+                                    placeholder="Vibanda Village"
+                                    autoComplete="organization"
+                                    required
+                                />
+                            </div>
+                        )}
 
                         <div>
-                            <label className="block text-sm text-[#737373] mb-1.5">Password</label>
+                            <label htmlFor="password" className="block text-sm text-[#737373] mb-1.5">Password</label>
                             <div className="relative">
                                 <input
+                                    id="password"
                                     type={showPassword ? "text" : "password"}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[var(--accent)] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm pr-10"
                                     placeholder="••••••••"
+                                    autoComplete="current-password"
                                     required
                                 />
                                 <button
@@ -153,6 +177,7 @@ export default function LoginPage() {
                         <button
                             onClick={() => {
                                 setIsRegister(!isRegister);
+                                setUseEmailLogin(false);
                                 setError("");
                             }}
                             className="block w-full text-sm text-[#737373] hover:text-[var(--accent)]"
@@ -161,6 +186,18 @@ export default function LoginPage() {
                                 ? "Already have an account? Sign in"
                                 : "New restaurant? Create account"}
                         </button>
+                        {!isRegister && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setUseEmailLogin(!useEmailLogin);
+                                    setError("");
+                                }}
+                                className="block w-full text-sm text-[#737373] hover:text-[var(--accent)]"
+                            >
+                                {useEmailLogin ? "Use restaurant sign in" : "Sign in with email instead"}
+                            </button>
+                        )}
                         {!isRegister && (
                             <a
                                 href="/forgot-password"

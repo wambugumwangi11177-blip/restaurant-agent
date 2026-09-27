@@ -16,6 +16,7 @@ FIXES:
 import os
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from database import get_db
 import models, auth
@@ -101,6 +102,12 @@ class LoginRequest(StrictModel):
     email: str
     password: str
     mfa_code: str | None = None   # required only when the account has MFA enabled
+
+
+class RestaurantLoginRequest(StrictModel):
+    restaurant_name: str
+    password: str
+    mfa_code: str | None = None
 
 
 class MfaCode(StrictModel):
@@ -265,11 +272,13 @@ async def register(request: Request, user_data: UserCreate, db: Session = Depend
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@router.post("/login", response_model=Token)
-@limiter.limit("10/minute")
-async def login(request: Request, login_data: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == login_data.email).first()
-
+def _authenticate_password_user(
+    db: Session,
+    user: models.User | None,
+    password: str,
+    mfa_code: str | None,
+    failure_detail: str,
+):
     # Lockout check FIRST, before touching the password at all — rejects
     # locked accounts without a password-verification timing signal.
     if user and user.locked_until and user.locked_until > utcnow():
@@ -282,8 +291,8 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
     if not user:
         # Burn the same Argon2 work a real verification costs so response time
         # doesn't reveal whether the account exists (user-enumeration oracle).
-        auth.verify_password(login_data.password, auth.get_password_hash("timing-equalizer"))
-    if not user or not auth.verify_password(login_data.password, user.hashed_password):
+        auth.verify_password(password, auth.get_password_hash("timing-equalizer"))
+    if not user or not auth.verify_password(password, user.hashed_password):
         if user:
             user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
             just_locked = user.failed_login_attempts >= MAX_FAILED_ATTEMPTS
@@ -291,7 +300,7 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
                 user.locked_until = utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
             db.commit()
             # Fires exactly once, at the moment of transition into lockout —
-            # the early-return above (line ~213) short-circuits every
+            # the early return above short-circuits every
             # subsequent attempt while already locked, so this can't re-fire
             # per retry. A possible brute-force attempt is a risk signal the
             # Owner should see in real time, not just in the audit trail.
@@ -306,16 +315,16 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
                     })
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail=failure_detail,
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     # Second factor: only when the account has enrolled+enabled MFA. Checked
     # AFTER the password so a missing/invalid code on a correct password doesn't
     # count toward brute-force lockout differently — but a wrong code still fails
-    # the login. The client resubmits email+password+mfa_code together.
+    # the login. The client resubmits the account credentials with mfa_code.
     if user.mfa_enabled:
-        if not login_data.mfa_code or not auth.verify_totp(user.mfa_secret, login_data.mfa_code):
+        if not mfa_code or not auth.verify_totp(user.mfa_secret, mfa_code):
             # A wrong TOTP code must count toward brute-force lockout — with a
             # known/stolen password, unbounded code guessing would otherwise
             # defeat the second factor (only the 10/min IP limiter would brake
@@ -341,6 +350,41 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
         data={"sub": user.email, "ver": user.token_version or 0}
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/login", response_model=Token)
+@limiter.limit("10/minute")
+async def login(request: Request, login_data: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == login_data.email).first()
+    return _authenticate_password_user(
+        db, user, login_data.password, login_data.mfa_code, "Incorrect email or password"
+    )
+
+
+@router.post("/login/restaurant", response_model=Token)
+@limiter.limit("10/minute")
+async def login_by_restaurant(
+    request: Request,
+    login_data: RestaurantLoginRequest,
+    db: Session = Depends(get_db),
+):
+    restaurant_name = login_data.restaurant_name.strip().lower()
+    owners = (
+        db.query(models.User)
+        .join(models.Restaurant, models.Restaurant.tenant_id == models.User.tenant_id)
+        .filter(
+            func.lower(models.Restaurant.name) == restaurant_name,
+            models.User.role == models.Role.ADMIN,
+            models.User.staff_role == models.StaffRole.OWNER,
+            models.User.is_active.is_(True),
+        )
+        .distinct()
+        .all()
+    )
+    user = owners[0] if len(owners) == 1 else None
+    return _authenticate_password_user(
+        db, user, login_data.password, login_data.mfa_code, "Incorrect restaurant or password"
+    )
 
 
 @router.get("/me", response_model=MeOut)

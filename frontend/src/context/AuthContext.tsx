@@ -44,6 +44,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<User | null>;
+  loginWithRestaurant: (restaurantName: string, password: string) => Promise<User | null>;
   register: (email: string, password: string, tenantName: string) => Promise<User | null>;
   logout: () => void;
   isLoading: boolean;
@@ -105,6 +106,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // BUG 6 FIX: removed pointless URLSearchParams construction
   const login = async (email: string, password: string) => {
     const res = await api.post("/api/v1/auth/login", { email, password });
+    const accessToken = res.data.access_token;
+    setAccessToken(accessToken);
+    setToken(accessToken);
+    return await fetchUser(accessToken);
+  };
+
+  const loginWithRestaurant = async (restaurantName: string, password: string) => {
+    const res = await api.post("/api/v1/auth/login/restaurant", {
+      restaurant_name: restaurantName,
+      password,
+    });
     const accessToken = res.data.access_token;
     setAccessToken(accessToken);
     setToken(accessToken);
@@ -200,7 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, login, register, logout, isLoading, startImpersonation, endImpersonation, loginWithPin }}
+      value={{ user, token, login, loginWithRestaurant, register, logout, isLoading, startImpersonation, endImpersonation, loginWithPin }}
     >
       {children}
     </AuthContext.Provider>

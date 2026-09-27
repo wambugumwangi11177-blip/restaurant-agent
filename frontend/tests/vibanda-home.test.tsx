@@ -10,6 +10,7 @@ vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { restaurant_n
 
 const feed = {
   restaurant_name: "Vibanda Village", period: "today", unavailable_metrics: ["kitchen", "waitlist"],
+  data_provenance: { source_connection: { source: "macsoft", state: "receiving", records: 1, last_received_at: null, reconciled: true } },
   revenue: { revenue: 500, orders: 1, avg_order: 500, pace_projection: 0 },
   orders: { orders: 1, active_now: 0, delayed: 0, split: { dine_in: 1 } },
   kitchen: { avg_prep_min: 0, delay_risk: 0, bottleneck: null },

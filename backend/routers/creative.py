@@ -2,10 +2,11 @@
 
 Home either tells the owner about their day or, when the restaurant data cannot
 yet be trusted, about the system. Which of the two is decided HERE, from the same
-rule the OS chat and the Home page use (source receiving AND reconciled) — the
+rule the OS chat uses (`overview.source_is_trusted`: a MacSoft feed that is
+receiving AND reconciled, or a tenant that records directly in this app) — the
 creative layer inherits that evidence gate and never widens it:
 
-  verified source   -> `today_story`   evidence: the day's recorded figures
+  trusted source    -> `today_story`   evidence: the day's recorded figures
   anything else     -> `system_story`  evidence: what the software does; NO
                                        restaurant figures are ever sent
 
@@ -38,13 +39,18 @@ _CONNECTION_IN_WORDS = {
                   "reconciliation, so restaurant figures are not yet treated as verified."),
     "awaiting_first_delivery": "MacSoft has not delivered any records yet.",
     "unavailable": "The state of the MacSoft connection could not be read right now.",
+    "direct": "This restaurant records its data directly in this system; there is no external feed to wait for.",
 }
 
 
-def _source_verified(db: Session) -> tuple[bool, dict]:
-    connection = overview._source_connection(db)
-    verified = connection.get("state") == "receiving" and connection.get("reconciled") is True
-    return verified, connection
+def _source_verified(db: Session, tenant_id: int | None) -> tuple[bool, dict]:
+    """(trusted, connection) — the one rule the OS chat and Home already share.
+
+    Delegates to overview.source_is_trusted so a tenant that records directly in
+    this app (overview.DIRECT_SOURCE_TENANTS) counts as trusted exactly as it does
+    in the OS chat, instead of being held to a MacSoft reconciliation it never has."""
+    connection = overview._source_connection(db, tenant_id)
+    return overview.source_is_trusted(connection), connection
 
 
 def _today_evidence(db: Session, user, rid: int, period: str) -> dict:
@@ -128,7 +134,7 @@ def creative_home(
     rid = overview._restaurant_id(db, user)
     if not rid:
         raise HTTPException(404, "No restaurant found for this account")
-    verified, connection = _source_verified(db)
+    verified, connection = _source_verified(db, user.tenant_id)
     if verified:
         # A "today" story must never be served on a later calendar day.
         valid_since = overview._eat_range("today")[0] if period == "today" else None

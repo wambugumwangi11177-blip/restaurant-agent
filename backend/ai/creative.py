@@ -37,7 +37,7 @@ from fastapi import HTTPException
 import feature_flags
 import models
 from ai import llm_client
-from ai.owner_narrative import narrate, strip_reasoning_leak
+from ai.owner_narrative import narrate, strip_creative_leak
 from ai.reasoning.grounding import verify
 from time_utils import utcnow
 
@@ -139,7 +139,7 @@ _OS_VOICE = (
     "Voice: warm, vivid and human; lead with the most useful point. When the evidence has related modules, "
     "connect the findings across them instead of answering module by module. State as fact only what the "
     "evidence shows and phrase your own ideas as 'an idea to test'. Use only figures that appear exactly in "
-    "the evidence or in the owner's words; never calculate or estimate. Keep under 180 words."
+    "the evidence or in the owner's words; never calculate or estimate."
 )
 
 
@@ -209,9 +209,10 @@ def keep_grounded_sentences(text: str | None, grounding_source: str) -> tuple[st
 
 
 def finish_text(raw: str | None, grounding_source: str) -> tuple[str | None, int]:
-    """Model output -> owner-safe text: strip leaked reasoning, then drop every
-    sentence the grounding source cannot back. Shared by take() and the OS chat."""
-    return keep_grounded_sentences(strip_reasoning_leak(raw or ""), grounding_source)
+    """Model output -> owner-safe text: strip leaked reasoning (the narrow,
+    voice-preserving filter), then drop every sentence the grounding source
+    cannot back. Shared by take() and the OS chat."""
+    return keep_grounded_sentences(strip_creative_leak(raw or ""), grounding_source)
 
 
 # ── Cache, locking and failure state ─────────────────────────────────────────

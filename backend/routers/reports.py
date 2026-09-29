@@ -142,7 +142,7 @@ def report_creative(request: Request, period: str, refresh: bool = False,
         # Function-level import: ai_ask imports this module, so a top-level one would cycle.
         from routers import ai_ask
         from routers.creative import _source_verified
-        verified, _ = _source_verified(db)
+        verified, connection = _source_verified(db, user.tenant_id)
         top = _top_items(db, rid, start, end)
         return {
             "report": {
@@ -151,7 +151,9 @@ def report_creative(request: Request, period: str, refresh: bool = False,
                 "average_order_kes": round(core["revenue"] / core["orders"]),
                 "top_items": [{"name": t["name"], "sold": t["qty"], "sales_kes": round(t["sales_kes"])} for t in top],
             },
-            "data_status": ("source verified" if verified else
+            "data_status": ("recorded directly in this system; there is no external source"
+                            if connection.get("state") == "direct" else
+                            "source verified" if verified else
                             "recorded data only: the source has not passed a clean reconciliation"),
             "related": {
                 "basis": "30-day analysis window, not the report period",

@@ -60,6 +60,14 @@ _THINK_BLOCK = re.compile(r"<think>.*?</think>", re.IGNORECASE | re.DOTALL)
 _THINK_UNTERMINATED = re.compile(r"<think>.*\Z", re.IGNORECASE | re.DOTALL)
 
 
+def _strip_think_blocks(text: str) -> str:
+    text = text or ""
+    if "</think>" in text.lower() and "<think>" not in text.lower():
+        text = re.split(r"</think>", text, flags=re.IGNORECASE)[-1]
+    text = _THINK_BLOCK.sub("", text)
+    return _THINK_UNTERMINATED.sub("", text)
+
+
 def strip_reasoning_leak(text: str) -> str:
     """nemotron-style reasoning models sometimes prepend their planning
     ('We need to produce a daily report...'). Strip any leading lines that
@@ -72,11 +80,7 @@ def strip_reasoning_leak(text: str) -> str:
     Also removes <think>…</think> blocks: closed ones anywhere, an unterminated
     one (output cut off mid-thought) to the end, and a lone closing tag's
     preceding reasoning."""
-    text = text or ""
-    if "</think>" in text.lower() and "<think>" not in text.lower():
-        text = re.split(r"</think>", text, flags=re.IGNORECASE)[-1]
-    text = _THINK_BLOCK.sub("", text)
-    text = _THINK_UNTERMINATED.sub("", text)
+    text = _strip_think_blocks(text)
     lines = text.strip().splitlines()
     out: list[str] = []
     started = False
@@ -95,3 +99,35 @@ def strip_reasoning_leak(text: str) -> str:
             started = True
         out.append(line)
     return "\n".join(out).strip() or text.strip()
+
+
+# Creative prose (ai/creative.py) is warm and conversational, so the report
+# filter's broad rules above would eat real sentences: a first paragraph that
+# says "we'll" or "the report for this week", or opens with "First," / "Sure,",
+# or a short "My read:" header line, is exactly what that voice produces. Only
+# unmistakable planning openers are removed here.
+_CREATIVE_LEAK_STARTERS = re.compile(
+    r"^(we need to|i need to|let me (think|plan|draft|write|figure)\b|okay,? so\b|so the user\b"
+    r"|the user (wants|asked|is asking)\b|the task is\b|here's a plan\b"
+    r"|to (produce|draft|write) (the|a|this)\b|(thinking|plan|draft|note)\s*:)",
+    re.IGNORECASE,
+)
+
+
+def strip_creative_leak(text: str) -> str:
+    """Remove leaked reasoning from creative text without touching its voice.
+
+    Strips <think> blocks like strip_reasoning_leak, then only leading lines that
+    open with an explicit planning phrase. Unlike the report filter it never falls
+    back to the raw text: if nothing but planning is left, nothing is shown."""
+    lines = _strip_think_blocks(text).strip().splitlines()
+    out: list[str] = []
+    started = False
+    for line in lines:
+        stripped = line.strip()
+        if not started and stripped and _CREATIVE_LEAK_STARTERS.match(stripped):
+            continue
+        if stripped:
+            started = True
+        out.append(line)
+    return "\n".join(out).strip()

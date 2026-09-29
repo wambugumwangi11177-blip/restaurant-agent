@@ -557,7 +557,7 @@ def test_os_creative_fully_invented_reply_falls_back_to_the_deterministic_text(c
     body = client.post("/api/v1/ai/chat", headers=headers, json={
         "question": "Help me reduce food waste.", "answer_mode": "general"}).json()
     assert body["llm_used"] is False and body["creative"] is False
-    assert body["answer_text"].startswith("I can help work through this as general guidance")
+    assert body["answer_text"].startswith("I can help work through this")  # the deterministic fallback
 
 
 def test_os_creative_keeps_planned_features_deterministic(client, scoped_owner, provider):
@@ -635,3 +635,75 @@ def test_creative_takes_migration_creates_the_table_on_a_database_without_it():
             "prompt_version", "dropped_sentences", "created_at"}
         assert "ix_creative_takes_lookup" in {i["name"] for i in inspector.get_indexes("creative_takes")}
     engine.dispose()
+
+
+# ── Direct-source tenants (overview.DIRECT_SOURCE_TENANTS) ───────────────────
+
+def _records_directly(db):
+    """scoped_owner's tenant becomes one that records directly in this app."""
+    db.query(models.Tenant).filter_by(id=101).update({"name": "Demo Restaurant"})
+    db.commit()
+
+
+def test_direct_source_tenant_gets_todays_story_without_any_macsoft_delivery(
+        client, db_session, scoped_owner, provider):
+    """The OS chat trusts a direct-source tenant's records (overview.source_is_trusted);
+    Home's creative note must apply the same rule rather than wait for a MacSoft
+    reconcile that tenant will never have."""
+    _, headers = scoped_owner
+    _records_directly(db_session)
+    stub = provider("Revenue is KSh 500 today. Try a lunch special.")
+    add_paid_order(db_session, total_cents=50000)
+    body = client.get(f"{HOME}?period=today", headers=headers).json()
+    assert (body["mode"], body["period"]) == ("today_story", "today")
+    (messages, _), = stub.calls
+    assert '"revenue_kes": 500' in messages[0]["content"]
+
+
+def test_report_take_describes_a_direct_source_honestly(client, db_session, scoped_owner, provider):
+    _, headers = scoped_owner
+    _records_directly(db_session)
+    stub = provider("My read: lunch carries the day.\nTry this: a lunch combo.")
+    add_paid_order(db_session)
+    response = client.get("/api/v1/reports/daily/creative", headers=headers)
+    assert response.status_code == 200, response.text
+    (messages, _), = stub.calls
+    assert "recorded directly in this system" in messages[0]["content"]
+    assert "has not passed a clean reconciliation" not in messages[0]["content"]
+
+
+# ── The creative leak filter keeps the voice ─────────────────────────────────
+
+@pytest.mark.parametrize("text", [
+    "Tonight we'll see a busy grill.\nKeep the beef close.",
+    "The report for this week shows lunch carrying sales.\nTry this: a lunch combo.",
+    "First things first: beef is low.\nOrder before dinner.",
+    "Sure, the grill is busy.\nKeep the beef close.",
+    "My read:\nLunch carries the week.\nTry this:\nA lunch combo.",
+])
+def test_creative_leak_filter_keeps_warm_openings(text):
+    assert owner_narrative.strip_creative_leak(text) == text
+    # Why a separate filter exists: the report narrative's broad rules would
+    # silently drop each of these opening lines.
+    assert owner_narrative.strip_reasoning_leak(text) != text
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("We need to write a warm story about the day.\nThe grill was busy.", "The grill was busy."),
+    ("Okay, so the user wants a story.\nLet me draft it.\nA steady lunch.", "A steady lunch."),
+    ("<think>plan the answer</think>Warm day.", "Warm day."),
+    ("scratch work</think>The real text.", "The real text."),
+    ("We need to write something warm.", ""),
+])
+def test_creative_leak_filter_still_removes_planning(text, expected):
+    assert owner_narrative.strip_creative_leak(text) == expected
+
+
+def test_report_take_keeps_its_assertion_when_the_voice_says_well(client, db_session, scoped_owner, provider):
+    _, headers = scoped_owner
+    take = ("My read: lunch carries the week, and we'll know more by Friday.\n"
+            "Try this: a lunch combo on Wednesday.")
+    provider(take)
+    add_paid_order(db_session)
+    body = client.get("/api/v1/reports/daily/creative", headers=headers).json()
+    assert body["text"] == take

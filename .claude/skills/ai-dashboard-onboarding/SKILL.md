@@ -62,9 +62,12 @@ labor, marketing, profit, supply_chain, menu_engineer,
 reservation_optimizer, revenue_forecaster, ops_manager, kds_intelligence)
 is deterministic SQLAlchemy + threshold rules, not LLM-backed — this is
 called out as *correct design*, not a bug, but mislabeling it in
-user-facing copy was flagged as a real mistake previously. Only
-`StrategyAgent` (`ai/orchestrator/strategist.py`) is genuinely LLM-backed
-today. When writing new empty-state copy, don't upgrade a deterministic
+user-facing copy was flagged as a real mistake previously. The
+LLM-backed pieces are: `StrategyAgent` (`ai/orchestrator/strategist.py`), the
+grounded narrator (`ai/reasoning/narrator.py`), the WhatsApp free-text reply,
+and — when `FEATURE_CREATIVE_LAYER` is on — the creative layer on Home, OS and
+Reports (`ai/creative.py`, ADR 0007), whose text is always labelled "AI-written".
+Every engine under `backend/ai/*` remains deterministic. When writing new empty-state copy, don't upgrade a deterministic
 threshold check into "AI predicts..." language it doesn't earn — "predicts"
 is fine for the forecaster (it's doing real forecasting math), "AI" as a
 standalone label for a threshold rule is the thing to avoid.

@@ -91,3 +91,69 @@ Run `execution/seed_demo_data.py` to generate 30 days of realistic data:
 - [ ] Dynamic pricing engine
 - [ ] Automated purchase order generation
 - [ ] WhatsApp/Voice reservation integration
+
+---
+
+## Creative (stochastic) layer — Home, OS, Reports (added 2026-09-29, ADR 0007)
+
+A third bounded LLM role: warm, temperature-above-0 writing that may only cite figures already
+in its evidence (or, in OS, the owner's own words). **Default off.**
+
+**Turn it on:** set `FEATURE_CREATIVE_LAYER=true` (also needs `ai_narration`, which is on by
+default, and a provider key). Turn it off the same way; `FEATURE_AI_NARRATION=false` silences it
+too. The migration (`050_creative_takes`) runs on boot like every other.
+
+| Surface | Endpoint | Mode | Gate it inherits |
+|---|---|---|---|
+| Home | `GET /api/v1/ai/creative/home?period=today\|1h\|7d\|30d` | `today_story` when the source is *receiving and reconciled*; otherwise `system_story` (period `any`, **no restaurant figures sent**) | Same rule as the OS chat and `frontend/src/lib/vibandaSource.ts` |
+| Reports | `GET /api/v1/reports/{period}/creative` | `report_take` | No orders in the period → `reason: no_data`, no provider call |
+| OS | `POST /api/v1/ai/chat` (existing) | Answers become creative when the flag is on; adds `creative`, `consulted_modules`, `dropped_sentences` | `data_available` (existing). Planned-feature answers stay deterministic |
+
+All three accept `?refresh=1` (Home/Reports). Response: `{surface, mode, period, text, llm_used,
+generated_at, stale, reason, dropped_sentences}` plus `refresh_failed` when a rewrite failed and
+the previous text was kept. `reason` is one of `disabled`, `no_data`, `budget_reached`,
+`provider_error`, `ungrounded`, `evidence_unavailable`.
+
+**How it works (`backend/ai/creative.py`, no router imports):**
+- Text is cached in `creative_takes` (also the audit trail). Cache hit = one indexed query, no
+  evidence build, no provider call. TTL 30 min (`CREATIVE_CACHE_TTL_SECONDS`), 6 h for the system
+  story (`CREATIVE_SYSTEM_STORY_TTL_SECONDS`). A stale take is served and flagged; the client
+  refreshes it once in the background. "Try another take" is debounced for 60 s.
+- A "today" story / daily take written before the current Nairobi day began is **never served**
+  (`valid_since`): the cache key has no date.
+- A failed write keeps the last good text and starts a 120 s per-key cooldown, so a provider
+  outage or an empty quota is not hammered by page loads. Cooldown and the duplicate-call lock
+  are in-process — correct because gunicorn runs `--workers 1` (`backend/Dockerfile`); revisit
+  if that changes.
+- Grounding is sentence-level (`keep_grounded_sentences`): unbacked figure → sentence removed;
+  more removed than kept → whole text dropped (tokens are still metered).
+- OS orchestration is done by **code**, not by the model: `_orchestrate()` picks up to three
+  modules (primary, other keyword matches, companions from `_COMPANIONS`), `_gather_evidence()`
+  runs their handlers (each in its own SAVEPOINT), and one creative call connects the findings.
+
+**Env vars:** `FEATURE_CREATIVE_LAYER`, `CREATIVE_TEMPERATURE` (default 0.7, clamped 0–1.2),
+`CREATIVE_CACHE_TTL_SECONDS`, `CREATIVE_SYSTEM_STORY_TTL_SECONDS`, and the creative model tier
+`OPENROUTER_MODEL_CREATIVE` / `ANTHROPIC_MODEL_CREATIVE` / `GROQ_MODEL_CREATIVE` (each defaults to
+that provider's medium model). See `backend/.env.example`.
+
+**Quota warning.** Up to about two writes per hour per page and period, plus one per OS
+question, all sharing one provider quota. On the OpenRouter free tier this can run out on a busy
+day (the ~50/day figure is unverified here); pages then fall back to their last take or their
+deterministic text. Adding OpenRouter credit, or pointing `OPENROUTER_MODEL_CREATIVE` at a paid
+model, is the fix.
+
+**Verify after deploying (cannot be done from the build container — openrouter.ai egress is
+blocked there):** set the flag, open `/vibanda`, `/vibanda/os` and `/vibanda/reports`; check the
+"AI-written" labels and "Written HH:MM" stamps; check `token_usage.prompt_version` rows named
+`creative-*` and `owner-os-creative-v1`; check OpenRouter's daily usage. Ask the owner before
+spending live quota on a test.
+
+**Learnings:** the plan's cache key had no date, so a story written at 23:50 would have been
+served at 00:10 as "today's" — `valid_since` fixes it. Evidence is built lazily (only when a
+provider call will be made) because Home's evidence runs every specialist agent. The
+duplicate-call guard compares row identity ("was a take written while I waited for the lock?"),
+not an age window — running the layer against a real PostgreSQL showed the age-window version
+stopped deduplicating as soon as the refresh debounce was tuned to 0. The alembic chain cannot
+run end-to-end on SQLite (043 uses PostgreSQL-only `unnest(enum_range(...))`); to check a new
+migration locally, use a PostgreSQL cluster, or `alembic stamp <previous>` on a scratch SQLite
+DB and exercise just the new revision.

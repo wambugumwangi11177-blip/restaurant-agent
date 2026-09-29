@@ -3,6 +3,28 @@
 Notable changes to the Leviii AI platform and its documentation. Newest first. Derived from
 git history on `feat/phase1-production-hardening`.
 
+## Unreleased — Creative (stochastic) LLM layer on Home, OS and Reports (2026-09-29)
+
+### Added
+- **Creative layer** (ADR 0007), behind `FEATURE_CREATIVE_LAYER` (default off): warm,
+  temperature-above-0 text on Home (`GET /ai/creative/home`), Reports
+  (`GET /reports/{period}/creative`) and the OS chat. Every figure the model writes must already
+  be in its evidence or the owner's own words; a sentence with any other figure is removed, and
+  the whole text is dropped if more than half was removed. Each page's own evidence gate is
+  inherited, never widened: Home tells the *system story* (no restaurant figures sent) until the
+  source is receiving and reconciled; Reports make no call for a period with no orders.
+- **OS orchestrates deterministic modules from code**: up to three relevant modules run and one
+  creative call connects their findings; answers show "Drew on: …" and are labelled AI-written.
+- **`creative_takes` table** (migration `050_creative_takes`): the cache behind the text and an
+  audit trail of what the AI told the owner, and when.
+- `creative` model tier (`*_MODEL_CREATIVE`), `narrate(temperature=, tier=)`, and OpenRouter /
+  creative env vars documented in `backend/.env.example`.
+
+### Fixed
+- **`ai_narration` kill switch now also stops the report narrative and the OS chat** — both
+  ignored it (only provider availability was checked).
+- A story cached before the current Nairobi day began is never served as today's.
+
 ## Unreleased — Strategist agent reliability fixes (2026-07-21)
 
 ### Fixed

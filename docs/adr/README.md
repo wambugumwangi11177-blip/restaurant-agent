@@ -11,5 +11,6 @@ get the next number; superseded ADRs are marked, not deleted.
 | [0004](0004-query-layer-tenant-isolation.md) | Query-layer tenant isolation | Accepted |
 | [0005](0005-llm-only-on-free-text-path.md) | LLM confined to non-computing roles (free-text + grounded narration); math stays deterministic | Accepted |
 | [0006](0006-rbac-via-require-role-dependency.md) | RBAC via a `require_role` dependency | Accepted |
+| [0007](0007-creative-narration-layer.md) | Creative (stochastic) LLM layer on Home, OS and Reports — third bounded role, figures still never computed by the model | Accepted |
 
 _Owner: Engineering · Contact: leviiiaikenya@gmail.com_

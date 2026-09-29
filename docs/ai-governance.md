@@ -40,8 +40,9 @@ unchanged.
 
 | Purpose | Provider | Model(s) | Data sent |
 |---|---|---|---|
-| Free-text WhatsApp replies | Groq (OpenAI-compatible endpoint) | e.g. `llama-3.1-8b-instant`, `openai/gpt-oss-120b` (observed) | Prompt content only |
-| Grounded narration of analytics (pricing, profit, menu, roi, marketing, per-item explain) | Groq (current) | Task-tiered: routine narration on the fast model, pricing on the larger model | Deterministic analytics payload only (no raw customer text) |
+| Free-text WhatsApp replies | The active provider (see strategy below): OpenRouter in the current production deployment; Groq before OpenRouter was configured | e.g. `llama-3.1-8b-instant`, `openai/gpt-oss-120b` (observed on Groq) | Prompt content only |
+| Grounded narration of analytics (pricing, profit, menu, roi, marketing, per-item explain) | The active provider: OpenRouter in the current production deployment | Task-tiered: routine narration on the fast model, pricing on the larger model | Deterministic analytics payload only (no raw customer text) |
+| Vibanda OS chat answers and the Reports narrative (`ai/owner_narrative.py`) | The active provider: OpenRouter in the current production deployment | Medium tier (`OPENROUTER_MODEL`), temperature 0; the creative tier and `CREATIVE_TEMPERATURE` for OS answers when the creative layer is on | The owner's question and recent turns; the verified evidence card only when restaurant data is available; report figures for the narrative. PII-scrubbed first |
 | Creative (stochastic) text: Home story, OS chat answers, Reports take | OpenRouter when `OPENROUTER_API_KEY` is set (else Anthropic/Groq per the strategy above) | Its own `creative` tier: `OPENROUTER_MODEL_CREATIVE` / `ANTHROPIC_MODEL_CREATIVE` / `GROQ_MODEL_CREATIVE`, each defaulting to that provider's medium model. Temperature `CREATIVE_TEMPERATURE` (default 0.7) | Server-built evidence JSON (recorded figures, item and stock names, up to three attention titles) — **none at all while the data source is unverified** (Home sends only what the software does). OS chat also sends the owner's own message and recent turns. Everything is PII-scrubbed first |
 
 **Provider strategy (OpenRouter → Anthropic → Groq).** All LLM roles
@@ -50,11 +51,14 @@ run through a single client (`backend/ai/llm_client.py`) that selects OpenRouter
 OpenRouter (one key, many models; the `:free` models are the default) is documented in
 `llm_client.py` as the owner's chosen chat/report gateway. Task complexity tiers (LOW/MEDIUM/HIGH)
 already map to concrete models per provider — e.g. pricing is a money decision and
-runs on a MEDIUM-tier model. The reasoning layer is running and grounded on Groq
-now; enabling the frontier tier (Anthropic Claude — Haiku/Sonnet/Opus by tier) is a
-single-config upgrade rolled out for production/paying customers, with **no code
-change**. When that key is set, Anthropic becomes an active sub-processor (tracked in
-the [Compliance Matrix](compliance-matrix.md) sub-processor list).
+runs on a MEDIUM-tier model. The current production deployment calls OpenRouter
+(Railway logs show `openrouter.ai` chat-completion requests, observed 2026-09-27).
+Moving to the frontier tier (Anthropic Claude — Haiku/Sonnet/Opus by tier) is still a
+configuration change with **no code change**: either point the `OPENROUTER_MODEL*`
+tier variables at Claude models on OpenRouter, or set `ANTHROPIC_API_KEY` **and remove
+`OPENROUTER_API_KEY`** (OpenRouter takes precedence while its key is set). When Anthropic
+is called directly it becomes an active sub-processor (tracked in the
+[Compliance Matrix](compliance-matrix.md) sub-processor list).
 
 - Provider selection and client construction: `backend/ai/llm_client.py`; tier→model
   table and reasoning tasks: `backend/ai/reasoning/narrator.py`.
@@ -201,4 +205,4 @@ the key / switch provider — Groq↔Anthropic per §2), with **no code change**
 | 1.0 | 2026-07-11 | Engineering | Initial AI governance doc from `backend/ai/` |
 | 1.1 | 2026-07-11 | Engineering | Added the grounded reasoning/narration layer as the second (non-computing) LLM role; provider strategy (Groq→Anthropic Claude); grounding-guarantee subsection |
 | 1.2 | 2026-07-11 | Engineering | Prompt versioning (`PROMPT_VERSION` + `token_usage.prompt_version`); quality-drift alarm; written §8 availability & fallback policy |
-| 1.3 | 2026-09-29 | Engineering | Creative (stochastic) layer as the third bounded LLM role (ADR 0007): model inventory, §3 entry point (c), §5 sentence-level grounding, §8 fallback rows; provider order documented as OpenRouter → Anthropic → Groq |
+| 1.3 | 2026-09-29 | Engineering | Creative (stochastic) layer as the third bounded LLM role (ADR 0007): model inventory, §3 entry point (c), §5 sentence-level grounding, §8 fallback rows; provider order documented as OpenRouter → Anthropic → Groq; stale "Groq (current)" rows corrected and the OS chat / Reports narration row added |

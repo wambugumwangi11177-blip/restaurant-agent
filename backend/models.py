@@ -1453,9 +1453,11 @@ class TokenUsage(Base):
 class CreativeTake(Base):
     """One piece of creative (stochastic) LLM text shown to an owner (ADR 0007).
 
-    Serves two purposes: the cache that lets Home/OS/Reports show the last good
+    Serves two purposes: the cache that lets Home and Reports show the last good
     text instantly (and keep showing it when a refresh fails), and an audit trail
-    of exactly what the AI told the owner, and when. Rows are append-only from
+    of exactly what the AI wrote on those pages, and when. (Creative OS chat
+    answers are not cached here; they are stored with the conversation in
+    owner_os_messages.) Rows are append-only from
     the application's point of view; ai/creative.py prunes each key to its
     newest 50. `surface` is home | reports, `period` is the page period (or
     "any" for the system story), `mode` is today_story | system_story |

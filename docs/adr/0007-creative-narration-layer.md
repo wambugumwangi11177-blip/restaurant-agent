@@ -23,9 +23,10 @@ LLM never computes a figure**:
    more sentences were removed than kept. The model's own assertions are phrased as *ideas to
    test*, never as findings.
 3. **Each page's evidence gate is inherited and never widened.**
-   - Home: restaurant facts only when the source is *receiving and reconciled* (the same rule
-     as the OS chat and `vibandaSource.ts`); otherwise it tells the **system story** and no
-     restaurant figure is sent to the provider at all.
+   - Home: restaurant facts only when the source is *trusted* — `overview.source_is_trusted`,
+     the same rule as the OS chat: a MacSoft feed that is receiving **and** reconciled, or a
+     tenant that records directly in this app (`overview.DIRECT_SOURCE_TENANTS`). Otherwise it
+     tells the **system story** and no restaurant figure is sent to the provider at all.
    - Reports: no take and no provider call for a period with zero recorded orders.
    - OS: restaurant evidence only when the answer is `data_available` (existing rule); planned
      features stay deterministic with no LLM call.
@@ -66,6 +67,10 @@ LLM never computes a figure**:
 - **Grounding is numeric, not semantic.** Like the narrator, it stops invented figures; it does
   not prove a sentence true or stop every prompt injection. Evidence and the owner's words are
   passed as untrusted user-role data, never in the system message.
+- **Leaked reasoning is filtered narrowly.** Creative text uses `strip_creative_leak`
+  (`<think>` blocks and explicit planning openers only). The report narrative's broader filter
+  would silently drop warm opening lines ("we'll…", "The report for this week…", "First,…",
+  a "My read:" header), so the two are deliberately separate.
 
 ## References
 `backend/ai/creative.py`, `backend/routers/creative.py`, `backend/routers/reports.py`

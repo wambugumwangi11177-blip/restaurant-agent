@@ -1,5 +1,5 @@
-"""Persist creative LLM takes: the cache behind Home/OS/Reports text and an audit
-trail of exactly what the AI told the owner (ADR 0007)."""
+"""Persist creative LLM takes: the cache behind the Home and Reports creative text
+and an audit trail of exactly what the AI wrote there (ADR 0007)."""
 from alembic import op
 import sqlalchemy as sa
 

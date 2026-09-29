@@ -105,7 +105,7 @@ too. The migration (`050_creative_takes`) runs on boot like every other.
 
 | Surface | Endpoint | Mode | Gate it inherits |
 |---|---|---|---|
-| Home | `GET /api/v1/ai/creative/home?period=today\|1h\|7d\|30d` | `today_story` when the source is *receiving and reconciled*; otherwise `system_story` (period `any`, **no restaurant figures sent**) | Same rule as the OS chat and `frontend/src/lib/vibandaSource.ts` |
+| Home | `GET /api/v1/ai/creative/home?period=today\|1h\|7d\|30d` | `today_story` when the source is *trusted* (`overview.source_is_trusted`: MacSoft receiving **and** reconciled, or a direct-source tenant such as Demo Restaurant); otherwise `system_story` (period `any`, **no restaurant figures sent**) | Same rule as the OS chat |
 | Reports | `GET /api/v1/reports/{period}/creative` | `report_take` | No orders in the period → `reason: no_data`, no provider call |
 | OS | `POST /api/v1/ai/chat` (existing) | Answers become creative when the flag is on; adds `creative`, `consulted_modules`, `dropped_sentences` | `data_available` (existing). Planned-feature answers stay deterministic |
 
@@ -157,3 +157,19 @@ stopped deduplicating as soon as the refresh debounce was tuned to 0. The alembi
 run end-to-end on SQLite (043 uses PostgreSQL-only `unnest(enum_range(...))`); to check a new
 migration locally, use a PostgreSQL cluster, or `alembic stamp <previous>` on a scratch SQLite
 DB and exercise just the new revision.
+
+**Learnings (merge into master, 2026-09-29):**
+- **Migration order:** `050_creative_takes` owns 050. The unmerged branch
+  `claude/agent-different-work-ppl204` also carries a `050_add_reporting_facts` on top of 049;
+  before it lands it must become `051_…` with `down_revision = "050_creative_takes"`.
+  `tests/test_alembic_single_head.py` now fails CI on two heads — without it, the container's
+  `alembic upgrade head && gunicorn …` would fail and the backend would not start.
+- **Trust rule:** master added direct-source tenants (`overview.DIRECT_SOURCE_TENANTS`, trusted
+  via `source_is_trusted`). The creative Home/Reports gate calls that same function; a
+  hand-written "receiving and reconciled" check silently left Demo Restaurant on the system
+  story. Reuse the shared rule; don't restate it.
+- **Leak filter:** the report narrative's `strip_reasoning_leak` drops any leading line
+  containing "we'll"/"report for" or starting "first/sure/okay", which is exactly how the
+  creative voice talks. Creative text uses the narrow `strip_creative_leak` instead.
+- **Budget in chat:** master made the OS chat degrade softly when the daily budget is spent
+  (200 with the deterministic answer, no provider call) instead of returning 429.

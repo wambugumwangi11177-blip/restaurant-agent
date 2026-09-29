@@ -24,6 +24,14 @@ git history on `feat/phase1-production-hardening`.
 - **`ai_narration` kill switch now also stops the report narrative and the OS chat** — both
   ignored it (only provider availability was checked).
 - A story cached before the current Nairobi day began is never served as today's.
+- Creative Home/Reports use the shared `overview.source_is_trusted` rule, so a direct-source
+  tenant (Demo Restaurant) gets its day's story instead of only the system story.
+- Creative text uses a narrow leaked-reasoning filter (`strip_creative_leak`); the report filter
+  was silently removing warm opening lines such as "we'll…" or a "My read:" header.
+- `test_tenant_budget_includes_sibling_restaurants` updated to the OS chat's soft budget handling
+  on master (200 + deterministic answer, still no provider call); it was red on master.
+- New `tests/test_alembic_single_head.py`: two migration heads now fail CI instead of stopping
+  the backend at boot (`050_creative_takes` owns 050; the reporting-facts branch must become 051).
 
 ## Unreleased — Strategist agent reliability fixes (2026-07-21)
 

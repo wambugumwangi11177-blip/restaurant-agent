@@ -1450,6 +1450,39 @@ class TokenUsage(Base):
     )
 
 
+class CreativeTake(Base):
+    """One piece of creative (stochastic) LLM text shown to an owner (ADR 0007).
+
+    Serves two purposes: the cache that lets Home/OS/Reports show the last good
+    text instantly (and keep showing it when a refresh fails), and an audit trail
+    of exactly what the AI told the owner, and when. Rows are append-only from
+    the application's point of view; ai/creative.py prunes each key to its
+    newest 50. `surface` is home | reports, `period` is the page period (or
+    "any" for the system story), `mode` is today_story | system_story |
+    report_take.
+
+    No standalone restaurant_id index: the composite below leads with it, so it
+    already serves restaurant-scoped lookups and the ON DELETE CASCADE scan.
+    """
+    __tablename__ = "creative_takes"
+
+    id                = Column(Integer, primary_key=True, index=True)
+    restaurant_id     = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    surface           = Column(String(16), nullable=False)
+    period            = Column(String(16), nullable=False)
+    mode              = Column(String(24), nullable=False)
+    text              = Column(Text, nullable=False)
+    evidence_hash     = Column(String(64), nullable=False)   # sha256 of the evidence JSON sent to the model
+    llm_model         = Column(String(128), nullable=True)   # the model the tier resolved to when requested
+    prompt_version    = Column(String(48), nullable=True)
+    dropped_sentences = Column(Integer, nullable=False, default=0, server_default="0")
+    created_at        = Column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        Index("ix_creative_takes_lookup", "restaurant_id", "surface", "period", "mode", "created_at"),
+    )
+
+
 class CustomerFeedback(Base):
     """
     Lightweight customer rating captured over the messaging channel — a customer

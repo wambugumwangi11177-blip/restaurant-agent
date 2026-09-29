@@ -82,17 +82,23 @@ _PROVIDER = ("openrouter" if _OPENROUTER_API_KEY
 # code change. The whole table auto-upgrades from Groq to Claude the moment an
 # ANTHROPIC_API_KEY is set — no caller changes needed (see module docstring).
 TIER_LOW, TIER_MEDIUM, TIER_HIGH = "low", "medium", "high"
+# The creative (stochastic) layer's own tier (ADR 0007): defaults to the medium
+# model on every provider so nothing changes until an operator points
+# *_MODEL_CREATIVE at a model chosen for voice rather than for cost.
+TIER_CREATIVE = "creative"
 
 _MODEL_TIERS = {
     "openrouter": {
         TIER_LOW:    _OPENROUTER_MODEL_LOW,
         TIER_MEDIUM: _OPENROUTER_MODEL,
         TIER_HIGH:   os.getenv("OPENROUTER_MODEL_HIGH", _OPENROUTER_MODEL),
+        TIER_CREATIVE: os.getenv("OPENROUTER_MODEL_CREATIVE", _OPENROUTER_MODEL),
     },
     "anthropic": {
         TIER_LOW:    os.getenv("ANTHROPIC_MODEL_LOW",    "claude-haiku-4-5-20251001"),
         TIER_MEDIUM: os.getenv("ANTHROPIC_MODEL_MEDIUM", _ANTHROPIC_MODEL),
         TIER_HIGH:   os.getenv("ANTHROPIC_MODEL_HIGH",   "claude-opus-4-8"),
+        TIER_CREATIVE: os.getenv("ANTHROPIC_MODEL_CREATIVE", os.getenv("ANTHROPIC_MODEL_MEDIUM", _ANTHROPIC_MODEL)),
     },
     "groq": {
         # Groq has no equivalent to a big frontier model, so MEDIUM/HIGH both
@@ -105,6 +111,7 @@ _MODEL_TIERS = {
         TIER_LOW:    os.getenv("GROQ_MODEL_LOW",    "openai/gpt-oss-20b"),
         TIER_MEDIUM: os.getenv("GROQ_MODEL_MEDIUM", _GROQ_MODEL),
         TIER_HIGH:   os.getenv("GROQ_MODEL_HIGH",   _GROQ_MODEL),
+        TIER_CREATIVE: os.getenv("GROQ_MODEL_CREATIVE", os.getenv("GROQ_MODEL_MEDIUM", _GROQ_MODEL)),
     },
 }
 

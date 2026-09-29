@@ -44,6 +44,11 @@ _FLAGS: dict[str, tuple[bool, str]] = {
     # into unattended LLM spend is an explicit, distinct choice from just
     # enabling the on-demand endpoint. Narrate-only — never writes/approves.
     "autonomous_strategist": (False, "Weekly unattended strategist review, pushed via WhatsApp/in-app; spends LLM tokens."),
+    # Third bounded LLM role (ADR 0007): warm, temperature > 0 writing on Home, OS
+    # and Reports. It only ever renders figures already in the evidence it was
+    # given, but it spends tokens on page load, so it defaults OFF and is also
+    # gated by ai_narration + a configured provider.
+    "creative_layer": (False, "Creative (stochastic) LLM layer on Home, OS and Reports; spends LLM tokens."),
 }
 
 _TRUTHY = {"1", "true", "yes", "on"}

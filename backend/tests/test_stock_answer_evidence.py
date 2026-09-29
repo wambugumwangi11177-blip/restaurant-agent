@@ -37,8 +37,20 @@ def test_threshold_chat_skips_unverifiable_narrative(monkeypatch, db_session):
     from ai import llm_client
     from rate_limit import limiter
 
-    restaurant = models.Restaurant(name="Threshold only")
+    # The stock card only reaches the chat when there are stock records and a
+    # trusted source; a tenant that records directly in this app is trusted
+    # without a MacSoft reconcile (overview.source_is_trusted).
+    tenant = models.Tenant(name="Demo Restaurant")
+    db_session.add(tenant)
+    db_session.flush()
+    restaurant = models.Restaurant(name="Threshold only", tenant_id=tenant.id)
     db_session.add(restaurant)
+    db_session.flush()
+    db_session.add(models.InventoryItem(restaurant_id=restaurant.id, item_name="Tomatoes",
+                                        quantity=1, unit="kg", low_stock_threshold=5))
+    owner = models.User(tenant_id=tenant.id, email="threshold-owner@example.com",
+                        hashed_password="unused", role=models.Role.ADMIN)
+    db_session.add(owner)
     db_session.commit()
 
     # chat_llm is rate-limited, so slowapi rejects a direct call that carries no
@@ -60,7 +72,8 @@ def test_threshold_chat_skips_unverifiable_narrative(monkeypatch, db_session):
     monkeypatch.setattr(llm_client, "chat", forbidden_chat)
     monkeypatch.setattr(llm_client, "chat_with_usage", forbidden_chat)
     result = ai_ask.chat_llm(None, ai_ask.ChatBody(question="What will run out soon?"),
-                             db_session, None)
+                             db_session, owner)
+    assert result["data_availability"] == "available"  # the stock card really was used
     assert result["llm_used"] is False
     assert result["llm_reply"] is None
     assert calls == []

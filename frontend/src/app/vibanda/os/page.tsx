@@ -13,6 +13,10 @@ type ChatResponse = {
   llm_reply?: string | null;
   answer_text?: string | null;
   answer_type?: string;
+  llm_used?: boolean;
+  // Creative layer (ADR 0007). Present only when the layer is on.
+  creative?: boolean;
+  consulted_modules?: string[];
   data_availability?: string;
   follow_up_prompts?: string[];
   proposal?: {
@@ -33,6 +37,12 @@ const STARTERS: { text: string; purpose: OSQuestionPurpose }[] = [
   { text: "I want to change something in my app.", purpose: "general" },
   { text: "Help me prepare for connecting my restaurant data.", purpose: "general" },
 ];
+
+// Backend module ids -> the words the owner uses for those areas.
+const MODULE_LABEL: Record<string, string> = {
+  stock: "Stock", revenue: "Sales", bookings: "Bookings", kitchen: "Kitchen", staff: "Team",
+  menu: "Menu", pricing: "Pricing", profit: "Profit", ops: "Operations",
+};
 
 const AREA_BY_SLUG = new Map(OS_AREA_QUESTIONS.map((area) => [area.slug, area]));
 const PURPOSE_MODE: Record<ChatPurpose, "auto" | "capabilities" | "general" | "analysis"> = {
@@ -291,8 +301,9 @@ function OSChatInner() {
             <div className="ml-auto max-w-[92%] sm:max-w-[78%]"><p className="mb-1 text-right text-[10px] font-semibold text-[var(--v-muted-foreground)]">Your question</p><div className="rounded-2xl rounded-br-sm bg-[var(--v-primary)] px-4 py-3 text-sm leading-relaxed text-[var(--v-primary-foreground)]">{turn.question}</div></div>
             <div className="max-w-[96%] rounded-2xl rounded-bl-sm border border-[var(--v-border)] bg-[var(--v-card)] p-4 shadow-sm sm:max-w-[88%]">
                 {turn.error ? <div role="alert" className="space-y-2"><p className="text-sm">I couldn’t reach the answer service. Your message is still here so you can retry it.</p><button type="button" onClick={() => void send(turn.question, turn.purpose, turn.id, turn.topic)} className="rounded-lg border border-[var(--v-border)] px-3 py-1.5 text-xs font-semibold">Retry answer</button></div> : turn.answer ? <div className="space-y-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">{turn.answer.answer_type === "capability_explanation" ? "Software explanation" : turn.answer.answer_type === "planned_feature" ? "Planned feature" : turn.answer.answer_type === "general_guidance" ? "General guidance from your description" : turn.answer.data_availability === "available" ? "Verified restaurant analysis" : turn.answer.data_availability === "needs_source_verification" ? "Records need source verification" : "Data needed before analysis"}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">{turn.answer.creative ? "Creative · AI-written · " : turn.answer.llm_used ? "AI-written · " : ""}{turn.answer.answer_type === "capability_explanation" ? "Software explanation" : turn.answer.answer_type === "planned_feature" ? "Planned feature" : turn.answer.answer_type === "general_guidance" ? "General guidance from your description" : turn.answer.data_availability === "available" ? "Verified restaurant analysis" : turn.answer.data_availability === "needs_source_verification" ? "Records need source verification" : "Data needed before analysis"}</p>
                 <p className="whitespace-pre-wrap text-sm leading-relaxed">{turn.answer.answer_text || turn.answer.llm_reply || turn.answer.grounded?.finding || "I can help explain the software or plan a next step."}</p>
+                {turn.answer.consulted_modules?.length ? <p className="flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--v-muted-foreground)]"><span>Drew on:</span>{turn.answer.consulted_modules.map((id) => <span key={id} className="rounded-full border border-[var(--v-border)] px-2 py-0.5 font-semibold">{MODULE_LABEL[id] ?? id}</span>)}</p> : null}
                 {turn.answer.answer_type === "restaurant_analysis" && turn.answer.data_availability === "needs_connected_data" && <p className="rounded-lg bg-[hsl(42_40%_99_/_0.8)] px-3 py-2 text-xs text-[var(--v-muted-foreground)]">This question needs connected restaurant records. No restaurant result has been inferred.</p>}
                 {turn.answer.answer_type === "restaurant_analysis" && turn.answer.data_availability === "needs_source_verification" && <p className="rounded-lg bg-[hsl(42_40%_99_/_0.8)] px-3 py-2 text-xs text-[var(--v-muted-foreground)]">Records exist, but the source has not passed a clean reconciliation. No restaurant result is treated as verified.</p>}
                 {turn.answer.data_availability === "planned_feature" && <p className="rounded-lg bg-[hsl(42_40%_99_/_0.8)] px-3 py-2 text-xs text-[var(--v-muted-foreground)]">This owner area is planned. Connecting restaurant data alone will not enable this analysis.</p>}

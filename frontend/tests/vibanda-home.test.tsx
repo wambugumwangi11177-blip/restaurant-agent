@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import HomePage from "../src/app/vibanda/page";
 import api from "@/lib/api";
 
@@ -64,4 +64,32 @@ it("shows failed analysis and missing inventory instead of claiming good health"
   expect(screen.getByText(/Not enough recorded data/)).toBeTruthy();
   expect(screen.queryByText("Healthy")).toBeNull();
   expect(vi.mocked(api.get).mock.calls.filter(([url]) => url.includes("overview"))).toHaveLength(1);
+});
+
+it("shows the creative note under the source notice without a second overview call, and never refetches it on the source poll", async () => {
+  // Fake timers so the Home gate's 30-second source poll can actually be run.
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    const story = { surface: "home", mode: "today_story", period: "today", text: "A steady lunch so far.", stale: false,
+      generated_at: "2026-09-29T12:05:00", reason: null };
+    vi.mocked(api.get).mockImplementation(async (url) => ({ data: url.includes("/ai/creative/")
+      ? story : url.includes("reports") ? { report_text: "Daily report" } : feed }));
+    const urls = () => vi.mocked(api.get).mock.calls.map(([url]) => url as string);
+    render(<HomePage />);
+    expect(await screen.findByText("A steady lunch so far.")).toBeTruthy();
+    expect(screen.getByText("Today’s story · AI-written")).toBeTruthy();
+    expect(urls().filter((url) => url.includes("overview"))).toHaveLength(1);
+    expect(urls().filter((url) => url.includes("/ai/creative/home"))).toEqual(["/api/v1/ai/creative/home?period=today"]);
+
+    // The source poll really runs (a second overview call)…
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(urls().filter((url) => url.includes("overview")).length).toBeGreaterThan(1);
+    // …and the creative note is not fetched again.
+    expect(urls().filter((url) => url.includes("/ai/creative/home"))).toEqual(["/api/v1/ai/creative/home?period=today"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "7D" }));
+    await waitFor(() => expect(urls()).toContain("/api/v1/ai/creative/home?period=7d"));
+  } finally {
+    vi.useRealTimers();
+  }
 });

@@ -7,6 +7,7 @@ import api from "@/lib/api";
 import { fmtKes } from "@/lib/format";
 import { OsLoading, OsEmpty, OsError } from "@/components/os/States";
 import SourceUnavailable from "@/components/vibanda/SourceUnavailable";
+import CreativeNote from "@/components/vibanda/CreativeNote";
 
 const observerMode = process.env.NEXT_PUBLIC_OBSERVER_MODE === "true";
 
@@ -140,6 +141,10 @@ function VibandaReportsContent() {
               <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[hsl(208_29%_19_/_0.92)]">{report.llm_narrative}</p>
             </div>
           )}
+
+          {/* The layer's own assertion, loaded separately so the report never waits on it.
+              Not requested for an empty period: no records is not evidence of anything. */}
+          {report.orders > 0 && <CreativeNote className="mt-5" endpoint={`/api/v1/reports/${report.period}/creative`} />}
 
           {report.top_items.length > 0 && (
             <div className="mt-5 border-t border-[var(--v-border)] pt-4">

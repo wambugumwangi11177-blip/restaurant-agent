@@ -26,6 +26,13 @@ Narration is additive (disabled ⇒ raw numbers still served). The invariant is 
 restated precisely: **the LLM is confined to two roles — free-text replies and grounded
 narration — and computes nothing in either.**
 
+## Update (2026-09-29) — a third bounded role: creative writing → see [ADR 0007](0007-creative-narration-layer.md)
+Home, the OS chat and Reports also carry a **creative** LLM layer (temperature above 0, warm
+voice), behind `FEATURE_CREATIVE_LAYER`. The invariant is unchanged and now enforced per
+sentence: the model still computes nothing, and any sentence carrying a figure that is not in
+its evidence or the owner's own words is removed. The LLM is therefore confined to **three**
+roles — free-text replies, grounded narration, and grounded creative writing.
+
 ## Consequences
 - Bounded token cost and a minimized attack/error surface on the WhatsApp command path.
 - Deterministic, testable behavior for all figures; the LLM handles only genuine free-form

@@ -48,7 +48,11 @@ def test_tenant_budget_includes_sibling_restaurants(client, db_session, scoped_o
     db_session.add(models.TokenUsage(restaurant_id=203, llm_model='test-model', input_tokens=1000000, output_tokens=0))
     db_session.commit()
     response = client.post('/api/v1/ai/chat', headers=headers, json={'question': 'How are sales?'})
-    assert response.status_code == 429
+    # The OS chat degrades to its deterministic answer when the budget is spent
+    # (routers/ai_ask.py handles the 429 softly); what matters is that the
+    # sibling restaurant's spend counted and nothing was sent to the provider.
+    assert response.status_code == 200
+    assert response.json()['llm_used'] is False
     assert not captured
 
 

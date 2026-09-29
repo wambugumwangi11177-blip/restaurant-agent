@@ -13,10 +13,6 @@ type ChatResponse = {
   llm_reply?: string | null;
   answer_text?: string | null;
   answer_type?: string;
-  llm_used?: boolean;
-  // Creative layer (ADR 0007). Present only when the layer is on.
-  creative?: boolean;
-  consulted_modules?: string[];
   data_availability?: string;
   follow_up_prompts?: string[];
   proposal?: {
@@ -29,20 +25,15 @@ type ChatPurpose = OSQuestionPurpose | "auto";
 type Turn = { id: string; question: string; purpose: ChatPurpose; topic?: string; answer?: ChatResponse; error?: boolean };
 type SavedConversation = { id: number; title: string; updated_at: string };
 type HandoffDraft = { title: string; text: string };
-type SourceStatus = "checking" | "verified" | "awaiting" | "needs_reconciliation" | "unknown";
+// "direct": Demo Restaurant records its data here — nothing to wait for.
+type SourceStatus = "checking" | "direct" | "verified" | "awaiting" | "needs_reconciliation" | "unknown";
 
 const STARTERS: { text: string; purpose: OSQuestionPurpose }[] = [
   { text: "Show me how this software can help my restaurant.", purpose: "capability" },
   { text: "Help me solve a problem.", purpose: "general" },
   { text: "I want to change something in my app.", purpose: "general" },
-  { text: "Help me prepare for connecting my restaurant data.", purpose: "general" },
+  { text: "Help me plan what to record for my restaurant.", purpose: "general" },
 ];
-
-// Backend module ids -> the words the owner uses for those areas.
-const MODULE_LABEL: Record<string, string> = {
-  stock: "Stock", revenue: "Sales", bookings: "Bookings", kitchen: "Kitchen", staff: "Team",
-  menu: "Menu", pricing: "Pricing", profit: "Profit", ops: "Operations",
-};
 
 const AREA_BY_SLUG = new Map(OS_AREA_QUESTIONS.map((area) => [area.slug, area]));
 const PURPOSE_MODE: Record<ChatPurpose, "auto" | "capabilities" | "general" | "analysis"> = {
@@ -109,7 +100,7 @@ function OSChatInner() {
     api.get<{ data_provenance?: { source_connection?: { state?: string; reconciled?: boolean } } }>("/api/v1/overview/today", { timeout: 12000 })
       .then((response) => {
         const state = response.data?.data_provenance?.source_connection;
-        if (active) setSourceStatus(state?.state === "receiving" ? state.reconciled === true ? "verified" : "needs_reconciliation" : state?.state === "awaiting_first_delivery" ? "awaiting" : "unknown");
+        if (active) setSourceStatus(state?.state === "direct" ? "direct" : state?.state === "receiving" ? state.reconciled === true ? "verified" : "needs_reconciliation" : state?.state === "awaiting_first_delivery" ? "awaiting" : "unknown");
       })
       .catch(() => { if (active) setSourceStatus("unknown"); });
     api.get<{ default_area: string | null }>("/api/v1/ai/os/preferences")
@@ -218,10 +209,10 @@ function OSChatInner() {
   const prepareHandoff = (turn: Turn) => {
     const transcript = turns.slice(-8).map((item) => `Owner: ${item.question}\nOS: ${item.answer?.answer_text ?? item.answer?.llm_reply ?? item.answer?.grounded?.finding ?? "No verified answer returned."}`).join("\n\n");
     const text = cleanHandoffText([
-      "Vibanda Restaurant OS — technical help request",
+      "Demo Restaurant OS — technical help request",
       `Owner goal: ${turn.question}`,
-      `Page: ${window.location.origin}/vibanda/os`,
-      `Restaurant: Vibanda Village`,
+      `Page: ${window.location.origin}/demo/os`,
+      `Restaurant: Demo Restaurant`,
       "Conversation context (recent messages):",
       transcript,
       "Requested next step: review this request with the owner by WhatsApp or phone.",
@@ -264,7 +255,7 @@ function OSChatInner() {
       {canBrowse ? <>
         <div className="flex items-start gap-2 rounded-lg bg-[hsl(42_40%_99_/_0.58)] px-3 py-2.5 text-xs text-[var(--v-muted-foreground)]">
           <Database size={14} className="mt-0.5 shrink-0 text-[var(--v-primary)]" />
-          <span>{sourceStatus === "verified" ? "Verified restaurant data is connected. Ask the OS about the records it can verify." : sourceStatus === "checking" ? "Checking restaurant data status. You can still explore features and discuss ideas." : sourceStatus === "needs_reconciliation" ? "Restaurant data has arrived but isn’t reconciled yet. You can explore features and plan changes while findings wait for verification." : sourceStatus === "unknown" ? "Restaurant data status can’t be verified right now. You can still explore features, discuss ideas, and plan changes." : "Restaurant data isn’t connected yet. You can still explore features, discuss ideas, and prepare changes."}</span>
+          <span>{sourceStatus === "direct" ? "Your restaurant records live here directly — nothing waits on an external data feed. Ask about anything you have recorded." : sourceStatus === "verified" ? "Verified restaurant data is connected. Ask the OS about the records it can verify." : sourceStatus === "checking" ? "Checking restaurant data status. You can still explore features and discuss ideas." : sourceStatus === "needs_reconciliation" ? "Restaurant data has arrived but isn’t reconciled yet. You can explore features and plan changes while findings wait for verification." : sourceStatus === "unknown" ? "Restaurant data status can’t be verified right now. You can still explore features, discuss ideas, and plan changes." : "Restaurant data isn’t connected yet. You can still explore features, discuss ideas, and prepare changes."}</span>
         </div>
         <section aria-label="Start a conversation" className="grid gap-2 sm:grid-cols-2">
           {STARTERS.map((starter) => <button type="button" key={starter.text} onClick={() => void send(starter.text, starter.purpose)} className="group flex min-h-16 items-center justify-between gap-3 rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-4 text-left text-sm font-medium transition hover:-translate-y-0.5 hover:border-[var(--v-primary)]/50 hover:shadow-sm">
@@ -282,16 +273,16 @@ function OSChatInner() {
               {section.areas.map((area) => <div key={area.slug} className="rounded-lg bg-[hsl(42_40%_99_/_0.56)] p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-sm font-semibold">{area.label}</h3><p className="mt-0.5 text-xs text-[var(--v-muted-foreground)]">{area.note}</p></div><button type="button" onClick={() => { setPreferencePreview({ before: defaultArea, after: section.id }); setPreferenceSaved(false); }} className="rounded-md px-2 py-1 text-[10px] font-semibold text-[var(--v-primary)] hover:bg-[var(--v-muted)]">{defaultArea === section.id ? "Your default area" : "Make my default"}</button></div>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {area.questions.filter((question) => question.purpose !== "analysis" || search).slice(0, search ? area.questions.length : 2).map((question) => <button type="button" key={`${area.slug}-${question.text}`} onClick={() => void send(question.text, question.purpose, undefined, area.slug)} className="rounded-lg border border-[var(--v-border)] bg-white/70 px-3 py-2 text-left text-xs transition hover:border-[var(--v-primary)]/50"><span>{question.text}</span>{question.needsConnectedData && <span className="ml-2 text-[10px] text-[var(--v-muted-foreground)]">Needs connected data</span>}{question.availability === "planned" && <span className="ml-2 text-[10px] text-[var(--v-muted-foreground)]">Planned feature</span>}</button>)}
+                  {area.questions.filter((question) => question.purpose !== "analysis" || search).slice(0, search ? area.questions.length : 2).map((question) => <button type="button" key={`${area.slug}-${question.text}`} onClick={() => void send(question.text, question.purpose, undefined, area.slug)} className="rounded-lg border border-[var(--v-border)] bg-white/70 px-3 py-2 text-left text-xs transition hover:border-[var(--v-primary)]/50"><span>{question.text}</span>{question.needsConnectedData && <span className="ml-2 text-[10px] text-[var(--v-muted-foreground)]">Needs recorded data</span>}{question.availability === "planned" && <span className="ml-2 text-[10px] text-[var(--v-muted-foreground)]">Planned feature</span>}</button>)}
                 </div>
-                {!search && area.questions.some((question) => question.purpose === "analysis") && <details className="mt-2 rounded-lg border border-dashed border-[var(--v-border)]"><summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold text-[var(--v-muted-foreground)]">Questions that need connected data <span className="font-normal">({area.questions.filter((question) => question.purpose === "analysis").length})</span></summary><div className="flex flex-wrap gap-2 px-3 pb-3">{area.questions.filter((question) => question.purpose === "analysis").map((question) => <button type="button" key={`${area.slug}-${question.text}`} onClick={() => void send(question.text, question.purpose, undefined, area.slug)} className="rounded-lg border border-[var(--v-border)] bg-white/70 px-3 py-2 text-left text-xs hover:border-[var(--v-primary)]/50"><span>{question.text}</span><span className="mt-1 block text-[10px] text-[var(--v-muted-foreground)]">Needs connected data{question.availability === "planned" ? " · Planned feature" : ""}</span></button>)}</div></details>}
+                {!search && area.questions.some((question) => question.purpose === "analysis") && <details className="mt-2 rounded-lg border border-dashed border-[var(--v-border)]"><summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold text-[var(--v-muted-foreground)]">Questions that need recorded data <span className="font-normal">({area.questions.filter((question) => question.purpose === "analysis").length})</span></summary><div className="flex flex-wrap gap-2 px-3 pb-3">{area.questions.filter((question) => question.purpose === "analysis").map((question) => <button type="button" key={`${area.slug}-${question.text}`} onClick={() => void send(question.text, question.purpose, undefined, area.slug)} className="rounded-lg border border-[var(--v-border)] bg-white/70 px-3 py-2 text-left text-xs hover:border-[var(--v-primary)]/50"><span>{question.text}</span><span className="mt-1 block text-[10px] text-[var(--v-muted-foreground)]">Needs recorded data{question.availability === "planned" ? " · Planned feature" : ""}</span></button>)}</div></details>}
               </div>)}
             </div>
           </details>)}
         </section>
       </> : <>
-        <div className="flex items-center justify-between gap-3"><p className="text-xs text-[var(--v-muted-foreground)]">Conversation saved privately to your Vibanda owner account.</p><button type="button" onClick={() => { setSearch(""); document.getElementById("browse-questions")?.scrollIntoView({ block: "nearest" }); }} className="text-xs font-semibold text-[var(--v-primary)]">Browse questions</button></div>
-        {sourceStatus !== "verified" && <p className="flex items-center gap-2 rounded-lg bg-[hsl(42_40%_99_/_0.58)] px-3 py-2 text-[11px] text-[var(--v-muted-foreground)]"><Database size={13} />{sourceStatus === "needs_reconciliation" ? "Restaurant records need source reconciliation before the OS can treat findings as verified." : sourceStatus === "unknown" ? "The restaurant data status could not be verified; feature explanations and general guidance remain available." : "Restaurant data isn’t connected yet; feature explanations and general guidance remain available."}</p>}
+        <div className="flex items-center justify-between gap-3"><p className="text-xs text-[var(--v-muted-foreground)]">Conversation saved privately to your Demo Restaurant owner account.</p><button type="button" onClick={() => { setSearch(""); document.getElementById("browse-questions")?.scrollIntoView({ block: "nearest" }); }} className="text-xs font-semibold text-[var(--v-primary)]">Browse questions</button></div>
+        {sourceStatus !== "verified" && sourceStatus !== "direct" && <p className="flex items-center gap-2 rounded-lg bg-[hsl(42_40%_99_/_0.58)] px-3 py-2 text-[11px] text-[var(--v-muted-foreground)]"><Database size={13} />{sourceStatus === "needs_reconciliation" ? "Restaurant records need source reconciliation before the OS can treat findings as verified." : sourceStatus === "unknown" ? "The restaurant data status could not be verified; feature explanations and general guidance remain available." : "Restaurant data isn’t connected yet; feature explanations and general guidance remain available."}</p>}
         <div ref={chatViewport} role="region" aria-label="Conversation messages" aria-live="polite" onScroll={(event) => {
           const viewport = event.currentTarget;
           followReply.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 96;
@@ -301,10 +292,9 @@ function OSChatInner() {
             <div className="ml-auto max-w-[92%] sm:max-w-[78%]"><p className="mb-1 text-right text-[10px] font-semibold text-[var(--v-muted-foreground)]">Your question</p><div className="rounded-2xl rounded-br-sm bg-[var(--v-primary)] px-4 py-3 text-sm leading-relaxed text-[var(--v-primary-foreground)]">{turn.question}</div></div>
             <div className="max-w-[96%] rounded-2xl rounded-bl-sm border border-[var(--v-border)] bg-[var(--v-card)] p-4 shadow-sm sm:max-w-[88%]">
                 {turn.error ? <div role="alert" className="space-y-2"><p className="text-sm">I couldn’t reach the answer service. Your message is still here so you can retry it.</p><button type="button" onClick={() => void send(turn.question, turn.purpose, turn.id, turn.topic)} className="rounded-lg border border-[var(--v-border)] px-3 py-1.5 text-xs font-semibold">Retry answer</button></div> : turn.answer ? <div className="space-y-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">{turn.answer.creative ? "Creative · AI-written · " : turn.answer.llm_used ? "AI-written · " : ""}{turn.answer.answer_type === "capability_explanation" ? "Software explanation" : turn.answer.answer_type === "planned_feature" ? "Planned feature" : turn.answer.answer_type === "general_guidance" ? "General guidance from your description" : turn.answer.data_availability === "available" ? "Verified restaurant analysis" : turn.answer.data_availability === "needs_source_verification" ? "Records need source verification" : "Data needed before analysis"}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">{turn.answer.answer_type === "capability_explanation" ? "Software explanation" : turn.answer.answer_type === "planned_feature" ? "Planned feature" : turn.answer.answer_type === "general_guidance" ? "General guidance from your description" : turn.answer.data_availability === "available" ? "Verified restaurant analysis" : turn.answer.data_availability === "needs_source_verification" ? "Records need source verification" : "Data needed before analysis"}</p>
                 <p className="whitespace-pre-wrap text-sm leading-relaxed">{turn.answer.answer_text || turn.answer.llm_reply || turn.answer.grounded?.finding || "I can help explain the software or plan a next step."}</p>
-                {turn.answer.consulted_modules?.length ? <p className="flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--v-muted-foreground)]"><span>Drew on:</span>{turn.answer.consulted_modules.map((id) => <span key={id} className="rounded-full border border-[var(--v-border)] px-2 py-0.5 font-semibold">{MODULE_LABEL[id] ?? id}</span>)}</p> : null}
-                {turn.answer.answer_type === "restaurant_analysis" && turn.answer.data_availability === "needs_connected_data" && <p className="rounded-lg bg-[hsl(42_40%_99_/_0.8)] px-3 py-2 text-xs text-[var(--v-muted-foreground)]">This question needs connected restaurant records. No restaurant result has been inferred.</p>}
+                {turn.answer.answer_type === "restaurant_analysis" && turn.answer.data_availability === "needs_connected_data" && <p className="rounded-lg bg-[hsl(42_40%_99_/_0.8)] px-3 py-2 text-xs text-[var(--v-muted-foreground)]">This question needs recorded restaurant data. No restaurant result has been inferred.</p>}
                 {turn.answer.answer_type === "restaurant_analysis" && turn.answer.data_availability === "needs_source_verification" && <p className="rounded-lg bg-[hsl(42_40%_99_/_0.8)] px-3 py-2 text-xs text-[var(--v-muted-foreground)]">Records exist, but the source has not passed a clean reconciliation. No restaurant result is treated as verified.</p>}
                 {turn.answer.data_availability === "planned_feature" && <p className="rounded-lg bg-[hsl(42_40%_99_/_0.8)] px-3 py-2 text-xs text-[var(--v-muted-foreground)]">This owner area is planned. Connecting restaurant data alone will not enable this analysis.</p>}
                 {turn.answer.answer_type === "restaurant_analysis" && turn.answer.grounded?.why && <details className="text-xs text-[var(--v-muted-foreground)]"><summary className="cursor-pointer font-semibold">Evidence and limits</summary><p className="mt-2">{turn.answer.grounded.why}</p>{turn.answer.grounded.data?.evidence_note && <p className="mt-1">{turn.answer.grounded.data.evidence_note}</p>}</details>}
@@ -320,7 +310,7 @@ function OSChatInner() {
         {newResponse && <button type="button" onClick={() => { chatViewport.current?.scrollTo({ top: chatViewport.current.scrollHeight, behavior: "smooth" }); setNewResponse(false); }} className="mx-auto block rounded-full border border-[var(--v-border)] bg-[var(--v-card)] px-4 py-2 text-xs font-semibold shadow-sm">New response ↓</button>}
         <div id="browse-questions" className="space-y-3">
           <div className="flex items-center justify-between gap-3"><h2 className="font-display text-lg font-semibold">Browse questions</h2><label className="flex items-center gap-2 rounded-lg border border-[var(--v-border)] bg-[var(--v-card)] px-3 py-2"><Search size={14} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search all OS questions" placeholder="Search questions" className="w-36 bg-transparent text-xs outline-none" /></label></div>
-          {filteredAreas.map((section) => <details key={section.id} open={!!search} className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)]"><summary className="cursor-pointer px-4 py-3 text-sm font-semibold">{section.title}</summary><div className="space-y-3 border-t border-[var(--v-border)] p-3">{section.areas.map((area) => <div key={area.slug}><p className="mb-1 text-xs font-semibold">{area.label}</p><div className="flex flex-wrap gap-2">{area.questions.map((question) => <button type="button" key={`${area.slug}-${question.text}`} onClick={() => void send(question.text, question.purpose, undefined, area.slug)} className="rounded-lg border border-[var(--v-border)] px-3 py-2 text-left text-xs hover:border-[var(--v-primary)]"><span>{question.text}</span>{question.needsConnectedData && <span className="ml-2 text-[10px] text-[var(--v-muted-foreground)]">Needs connected data</span>}{question.availability === "planned" && <span className="ml-2 text-[10px] text-[var(--v-muted-foreground)]">Planned feature</span>}</button>)}</div></div>)}</div></details>)}
+          {filteredAreas.map((section) => <details key={section.id} open={!!search} className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)]"><summary className="cursor-pointer px-4 py-3 text-sm font-semibold">{section.title}</summary><div className="space-y-3 border-t border-[var(--v-border)] p-3">{section.areas.map((area) => <div key={area.slug}><p className="mb-1 text-xs font-semibold">{area.label}</p><div className="flex flex-wrap gap-2">{area.questions.map((question) => <button type="button" key={`${area.slug}-${question.text}`} onClick={() => void send(question.text, question.purpose, undefined, area.slug)} className="rounded-lg border border-[var(--v-border)] px-3 py-2 text-left text-xs hover:border-[var(--v-primary)]"><span>{question.text}</span>{question.needsConnectedData && <span className="ml-2 text-[10px] text-[var(--v-muted-foreground)]">Needs recorded data</span>}{question.availability === "planned" && <span className="ml-2 text-[10px] text-[var(--v-muted-foreground)]">Planned feature</span>}</button>)}</div></div>)}</div></details>)}
         </div>
       </>}
 
@@ -332,6 +322,6 @@ function OSChatInner() {
   );
 }
 
-export default function VibandaOsPage() {
-  return <Suspense fallback={<div role="status" className="p-6 text-sm text-[var(--v-muted-foreground)]">Loading the Vibanda OS…</div>}><OSChatInner /></Suspense>;
+export default function DemoOsPage() {
+  return <Suspense fallback={<div role="status" className="p-6 text-sm text-[var(--v-muted-foreground)]">Loading the Demo Restaurant OS…</div>}><OSChatInner /></Suspense>;
 }

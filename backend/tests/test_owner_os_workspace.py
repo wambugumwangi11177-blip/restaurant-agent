@@ -2,6 +2,8 @@
 from datetime import timedelta
 import importlib.util
 from pathlib import Path
+import pytest
+from fastapi import HTTPException
 
 import auth
 import models
@@ -9,6 +11,51 @@ from tests.test_overview_scope import scoped_owner  # noqa: F401
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import create_engine, inspect
+
+
+@pytest.mark.parametrize("question", [
+    "hi can you help with creative genius?",
+    "Can you help me brainstorm a creative welcome for new guests?",
+    "Give me ideas for reducing food waste.",
+    "Hello, what would be a good way to welcome guests?",
+])
+def test_open_ended_questions_do_not_require_restaurant_data(client, scoped_owner, monkeypatch, question):
+    from ai import llm_client
+    from routers import ai_ask
+
+    _, headers = scoped_owner
+    monkeypatch.setattr(llm_client, "is_available", lambda: False)
+    for module in ai_ask._HANDLERS:
+        monkeypatch.setitem(ai_ask._HANDLERS, module, lambda *_: (_ for _ in ()).throw(
+            AssertionError("general question ran a restaurant handler")
+        ))
+    response = client.post("/api/v1/ai/chat", headers=headers, json={"question": question})
+    assert response.status_code == 200, response.text
+    answer = response.json()
+    assert answer["answer_type"] == "general_guidance"
+    assert answer["data_availability"] == "not_required"
+    assert "restaurant records" not in answer["answer_text"].lower()
+    assert all("data" not in prompt.lower() and "connect" not in prompt.lower()
+               for prompt in answer["follow_up_prompts"])
+
+
+@pytest.mark.parametrize("question", [
+    "Which ingredients are running low?",
+    "Can you help me see which ingredients are running low?",
+    "Can you tell me how many orders we have?",
+])
+def test_record_question_still_requires_verified_data(client, scoped_owner, monkeypatch, question):
+    from ai import llm_client
+
+    _, headers = scoped_owner
+    monkeypatch.setattr(llm_client, "is_available", lambda: False)
+    response = client.post("/api/v1/ai/chat", headers=headers, json={
+        "question": question,
+    })
+    assert response.status_code == 200, response.text
+    answer = response.json()
+    assert answer["answer_type"] == "restaurant_analysis"
+    assert answer["data_availability"] != "not_required"
 
 
 def test_owner_conversations_preferences_retries_and_tenant_scope(client, db_session, scoped_owner, monkeypatch):
@@ -147,6 +194,24 @@ def test_model_timeout_keeps_general_guidance_and_saved_history(client, db_sessi
     assert answer["answer_text"]
     assert "private provider" not in response.text
     assert db_session.query(models.OwnerOSMessage).filter_by(conversation_id=answer["conversation_id"]).count() == 2
+
+
+def test_ai_budget_limit_keeps_general_guidance(client, scoped_owner, monkeypatch):
+    from ai import llm_client
+    from routers import ai_ask
+
+    _, headers = scoped_owner
+    monkeypatch.setattr(llm_client, "is_available", lambda: True)
+    monkeypatch.setattr(ai_ask, "narrate_owner", lambda *_: (_ for _ in ()).throw(
+        HTTPException(429, "Daily estimated AI budget reached")
+    ))
+    response = client.post("/api/v1/ai/chat", headers=headers, json={
+        "question": "Can you help with a creative idea?",
+    })
+    assert response.status_code == 200, response.text
+    assert response.json()["answer_type"] == "general_guidance"
+    assert response.json()["answer_text"]
+    assert response.json()["llm_used"] is False
 
 
 def test_owner_os_migration_is_safe_after_model_create_all():

@@ -6,6 +6,7 @@ import { Bell, Check } from "lucide-react";
 import { useNotifications, NotificationItem } from "@/lib/useNotifications";
 import api from "@/lib/api";
 import { isVerifiedVibandaSource } from "@/lib/vibandaSource";
+import { isDirectSource } from "@/lib/directSource";
 
 function timeAgo(iso: string): string {
     const then = new Date(iso).getTime();
@@ -76,7 +77,7 @@ export default function NotificationBell({ ownerHome }: { ownerHome?: string } =
             .then((r) => {
                 if (!active) return;
                 const source = r.data?.data_provenance?.source_connection;
-                setSourceVerified(isVerifiedVibandaSource(source));
+                setSourceVerified(isVerifiedVibandaSource(source) || isDirectSource(source));
             })
             .catch(() => { if (active) setSourceVerified(false); });
         return () => { active = false; };

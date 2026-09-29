@@ -4,7 +4,6 @@ period: daily | weekly | monthly | yearly. 422 for anything else.
 "Drafted" = markdown template + real numbers interpolated. No LLM.
 Shares _summarize() with the overview router (DRY).
 """
-import re
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func
@@ -18,6 +17,8 @@ from time_utils import utcnow
 
 from rate_limit import limiter
 from ai.owner_narrative import narrate as narrate_owner
+from ai.owner_narrative import strip_reasoning_leak as _strip_reasoning_leak  # shared with ai/creative.py
+from ai import creative
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -81,6 +82,18 @@ def _draft(period: str, range_label: str, core: dict, top: list) -> str:
     return "\n".join(lines)
 
 
+def _label(period: str) -> str:
+    """Owner-facing date range for a report period, in Nairobi time."""
+    now_eat = utcnow() + _EAT_OFFSET
+    if period == "daily":
+        return now_eat.strftime("%d %b %Y")
+    if period == "weekly":
+        return f"{(now_eat - timedelta(days=7)).strftime('%d %b')} – {now_eat.strftime('%d %b %Y')}"
+    if period == "monthly":
+        return f"{(now_eat - timedelta(days=30)).strftime('%d %b')} – {now_eat.strftime('%d %b %Y')}"
+    return f"{(now_eat - timedelta(days=365)).strftime('%d %b %Y')} – {now_eat.strftime('%d %b %Y')}"
+
+
 @router.get("/{period}")
 @limiter.limit("20/minute")
 def report(request: Request, period: str, narrate: bool = True, db: Session = Depends(get_db), user=Depends(require_staff_role())):
@@ -90,15 +103,7 @@ def report(request: Request, period: str, narrate: bool = True, db: Session = De
     start, end = _range(period)
     core = _summarize(db, rid, start, end)
     top = _top_items(db, rid, start, end)
-    now_eat = utcnow() + _EAT_OFFSET
-    if period == "daily":
-        label = now_eat.strftime("%d %b %Y")
-    elif period == "weekly":
-        label = f"{(now_eat - timedelta(days=7)).strftime('%d %b')} – {now_eat.strftime('%d %b %Y')}"
-    elif period == "monthly":
-        label = f"{(now_eat - timedelta(days=30)).strftime('%d %b')} – {now_eat.strftime('%d %b %Y')}"
-    else:
-        label = f"{(now_eat - timedelta(days=365)).strftime('%d %b %Y')} – {now_eat.strftime('%d %b %Y')}"
+    label = _label(period)
     llm_text = _llm_narrative(period, label, core, top, db, user, rid) if narrate else None
     return {
         "period": period,
@@ -113,6 +118,54 @@ def report(request: Request, period: str, narrate: bool = True, db: Session = De
     }
 
 
+# ─── Creative take (ADR 0007) ────────────────────────────────────────────────
+
+@router.get("/{period}/creative")
+@limiter.limit("20/minute")
+def report_creative(request: Request, period: str, refresh: bool = False,
+                    db: Session = Depends(get_db), user=Depends(require_staff_role())):
+    """A creative assertion of the model's own, alongside the report.
+
+    Loaded separately from GET /{period} so the report never waits on the model.
+    Inherits the report's evidence gate: a period with no recorded orders gets no
+    take and no provider call (absence of records is not evidence of a quiet day).
+    """
+    if period not in _PERIOD_SPANS:
+        raise HTTPException(422, f"period must be one of {list(_PERIOD_SPANS)}")
+    rid = _restaurant_id(db, user)
+    start, end = _range(period)
+    core = _summarize(db, rid, start, end)
+    if not core["orders"]:
+        return creative.no_text(creative.SURFACE_REPORTS, creative.MODE_REPORT_TAKE, period, creative.REASON_NO_DATA)
+
+    def evidence() -> dict:
+        # Function-level import: ai_ask imports this module, so a top-level one would cycle.
+        from routers import ai_ask
+        from routers.creative import _source_verified
+        verified, _ = _source_verified(db)
+        top = _top_items(db, rid, start, end)
+        return {
+            "report": {
+                "period": period, "range": _label(period),
+                "revenue_kes": round(core["revenue"]), "paid_orders": core["orders"],
+                "average_order_kes": round(core["revenue"] / core["orders"]),
+                "top_items": [{"name": t["name"], "sold": t["qty"], "sales_kes": round(t["sales_kes"])} for t in top],
+            },
+            "data_status": ("source verified" if verified else
+                            "recorded data only: the source has not passed a clean reconciliation"),
+            "related": {
+                "basis": "30-day analysis window, not the report period",
+                "findings": ai_ask._gather_evidence(db, rid, ["menu", "profit"], ""),
+            },
+        }
+
+    # A daily report describes today; never serve yesterday's take as today's.
+    valid_since = _range("daily")[0] if period == "daily" else None
+    return creative.take(db, user, rid, surface=creative.SURFACE_REPORTS, period=period,
+                         mode=creative.MODE_REPORT_TAKE, evidence=evidence, refresh=refresh,
+                         valid_since=valid_since)
+
+
 # ─── LLM narrative (OpenRouter) ──────────────────────────────────────────────
 
 def _llm_narrative(period: str, label: str, core: dict, top: list, db, owner, rid: int) -> str | None:
@@ -124,8 +177,11 @@ def _llm_narrative(period: str, label: str, core: dict, top: list, db, owner, ri
     # Keep the deterministic empty state rather than soliciting speculation.
     if not core["orders"]:
         return None
+    import feature_flags
     from ai import llm_client
-    if not llm_client.is_available():
+    # ai_narration is the documented "stop every LLM call" valve; this path used
+    # to ignore it (only provider availability was checked).
+    if not feature_flags.is_enabled("ai_narration") or not llm_client.is_available():
         return None
     tops = "\n".join(f"- {t['name']}: {t['qty']} sold, {t['sales_kes']:.0f} KSh" for t in top) or "- none recorded"
     system = (
@@ -162,37 +218,3 @@ def _grounded_reply(text: str, evidence: str) -> str | None:
     cleaned = _strip_reasoning_leak(text)
     checked = verify({"headline": cleaned}, evidence)
     return cleaned if cleaned and checked["verified"] else None
-
-
-_LEAK_STARTERS = re.compile(
-    r"^(we need|let me|i need|i'll|i will|to (produce|draft|write)|first|okay|sure|here's a plan|thinking|must have|should i|note:)",
-    re.IGNORECASE,
-)
-
-
-def _strip_reasoning_leak(text: str) -> str:
-    """nemotron-style reasoning models sometimes prepend their planning
-    ('We need to produce a daily report...'). Strip any leading lines that
-    are meta-commentary so the owner only sees the finished report. A line is
-    meta if it starts with a leak-starter AND the following content restarts
-    with a proper report line — simplest robust rule: drop leading lines that
-    match leak starters or mention 'report for'/'numbers exactly' style task
-    echo, until the first line that reads like report prose."""
-    lines = (text or "").strip().splitlines()
-    out: list[str] = []
-    started = False
-    for line in lines:
-        stripped = line.strip()
-        if not started and stripped and (
-            _LEAK_STARTERS.match(stripped)
-            or "report for" in stripped.lower()
-            or "numbers exactly" in stripped.lower()
-            or "we'll" in stripped.lower()
-            or "we need to" in stripped.lower()
-            or (stripped.endswith(":") and len(stripped) < 80)
-        ):
-            continue
-        if stripped:
-            started = True
-        out.append(line)
-    return "\n".join(out).strip() or text

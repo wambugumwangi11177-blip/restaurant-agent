@@ -734,10 +734,18 @@ def chat_llm(request: Request, body: ChatBody, db: Session = Depends(get_db),
     use_creative = creative.enabled()
     consulted_modules: list[str] = []
     dropped_sentences = 0
+    # A card marked narrative_allowed=False is already the precise answer (a
+    # reorder threshold, a ranked weekly pattern, a date-scoped list or count);
+    # narrating over it invites speculation such as a stockout "forecast" from a
+    # threshold (fixed in 01af838). The gate was lost in d977d1b; restored for
+    # restaurant analysis only, so general guidance and the connect-your-data
+    # answers still get the model's help — and the creative layer cannot widen it.
+    narration_allowed = not (answer_type == "restaurant_analysis"
+                             and card.get("data", {}).get("narrative_allowed") is False)
     # ai_narration is the documented "stop every LLM call" valve; it used to be
     # ignored here (only provider availability was checked).
     if (llm_client.is_available() and feature_flags.is_enabled("ai_narration")
-            and not (planned_analysis or planned_capability)):
+            and not (planned_analysis or planned_capability) and narration_allowed):
         context = json.dumps({k: card[k] for k in ("finding", "why", "impact", "recommendation", "steps", "data")}, ensure_ascii=False)
         source_sentences = (
             "Verified capabilities: owner Home briefing and area pages, OS questions/chat, and Reports. "

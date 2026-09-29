@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import HomePage from "../src/app/vibanda/page";
 import api from "@/lib/api";
 
@@ -64,4 +64,19 @@ it("shows failed analysis and missing inventory instead of claiming good health"
   expect(screen.getByText(/Not enough recorded data/)).toBeTruthy();
   expect(screen.queryByText("Healthy")).toBeNull();
   expect(vi.mocked(api.get).mock.calls.filter(([url]) => url.includes("overview"))).toHaveLength(1);
+});
+
+it("shows the creative note under the source notice without a second overview call, and never refetches it on the source poll", async () => {
+  const story = { surface: "home", mode: "today_story", period: "today", text: "A steady lunch so far.", stale: false,
+    generated_at: "2026-09-29T12:05:00", reason: null };
+  vi.mocked(api.get).mockImplementation(async (url) => ({ data: url.includes("/ai/creative/")
+    ? story : url.includes("reports") ? { report_text: "Daily report" } : feed }));
+  render(<HomePage />);
+  expect(await screen.findByText("A steady lunch so far.")).toBeTruthy();
+  expect(screen.getByText("Today’s story · AI-written")).toBeTruthy();
+  const urls = vi.mocked(api.get).mock.calls.map(([url]) => url as string);
+  expect(urls.filter((url) => url.includes("overview"))).toHaveLength(1);
+  expect(urls.filter((url) => url.includes("/ai/creative/home"))).toEqual(["/api/v1/ai/creative/home?period=today"]);
+  fireEvent.click(screen.getByRole("button", { name: "7D" }));
+  await waitFor(() => expect(vi.mocked(api.get).mock.calls.map(([url]) => url as string)).toContain("/api/v1/ai/creative/home?period=7d"));
 });

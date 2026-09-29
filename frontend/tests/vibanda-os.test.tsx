@@ -150,4 +150,38 @@ describe("owner OS without restaurant data", () => {
     await screen.findByText("Your default area is saved.");
     expect(api.put).toHaveBeenCalledWith("/api/v1/ai/os/preferences", { default_area: "money" });
   });
+
+  it("labels a creative answer as AI-written and names the modules it drew on", async () => {
+    const creative = { ...reply, answer_type: "restaurant_analysis", data_availability: "available", llm_used: true,
+      creative: true, consulted_modules: ["revenue", "menu", "staff"], llm_reply: "A warm, connected answer.",
+      answer_text: "A warm, connected answer." };
+    vi.mocked(api.post).mockImplementation(async (url: string) =>
+      (url.endsWith("/ai/os/conversations") ? { data: { id: 42 } } : { data: creative }) as never);
+    render(<OsPage />);
+    submit("How are my sales today and which dishes sell best?");
+    await screen.findByText("A warm, connected answer.");
+    expect(screen.getByText("Creative · AI-written · Verified restaurant analysis")).toBeTruthy();
+    const drewOn = screen.getByText("Drew on:").closest("p")!;
+    expect(drewOn.textContent).toBe("Drew on:SalesMenuTeam");
+  });
+
+  it("says only AI-written when the layer is off, and adds no AI label when no model answered", async () => {
+    const plain = { ...reply, answer_type: "general_guidance", llm_used: true, llm_reply: "Plain guidance.", answer_text: "Plain guidance." };
+    vi.mocked(api.post).mockImplementation(async (url: string) =>
+      (url.endsWith("/ai/os/conversations") ? { data: { id: 42 } } : { data: plain }) as never);
+    const first = render(<OsPage />);
+    submit("Help me reduce food waste.");
+    await screen.findByText("Plain guidance.");
+    expect(screen.getByText("AI-written · General guidance from your description")).toBeTruthy();
+    expect(screen.queryByText("Drew on:")).toBeNull();
+    first.unmount();
+
+    vi.mocked(api.post).mockImplementation(async (url: string) =>
+      (url.endsWith("/ai/os/conversations") ? { data: { id: 42 } } : { data: { ...plain, llm_used: false, llm_reply: null, answer_text: "Deterministic fallback text." } }) as never);
+    render(<OsPage />);
+    submit("Help me reduce food waste.");
+    await screen.findByText("Deterministic fallback text.");
+    expect(screen.getByText("General guidance from your description")).toBeTruthy();
+    expect(screen.queryByText(/AI-written/)).toBeNull();
+  });
 });

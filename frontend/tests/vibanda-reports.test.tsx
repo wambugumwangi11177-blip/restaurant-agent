@@ -55,4 +55,25 @@ describe("the Reports page states the real source position", () => {
     await screen.findByText(report.report_text);
     await waitFor(() => expect(screen.queryByText(/Macsoft/)).toBeNull());
   });
+
+  it("shows the creative take for a period with orders, loaded separately from the report", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => Promise.resolve(
+      url.includes("/creative")
+        ? { data: { surface: "reports", mode: "report_take", period: "daily", text: "My read: lunch carries the day.", stale: false, generated_at: "2026-09-29T12:05:00" } }
+        : url.includes("/overview/today") ? { data: {} } : { data: report }) as never);
+    render(<ReportsPage />);
+    await screen.findByText(report.report_text);
+    expect(await screen.findByText("My read: lunch carries the day.")).toBeTruthy();
+    expect(screen.getByText("Creative take · AI-written")).toBeTruthy();
+    const urls = vi.mocked(api.get).mock.calls.map(([url]) => url as string);
+    expect(urls).toContain("/api/v1/reports/daily/creative");
+  });
+
+  it("asks for no creative take when the period has no orders", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => Promise.resolve(
+      url.includes("/overview/today") ? { data: {} } : { data: { ...report, orders: 0, revenue: 0 } }) as never);
+    render(<ReportsPage />);
+    await screen.findByText(/No paid, non-cancelled orders are recorded/);
+    expect(vi.mocked(api.get).mock.calls.map(([url]) => url as string).some((url) => url.includes("/creative"))).toBe(false);
+  });
 });

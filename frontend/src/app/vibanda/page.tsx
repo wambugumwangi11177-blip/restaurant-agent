@@ -14,6 +14,7 @@ import { OsLoading, OsError } from "@/components/os/States";
 import PartHealth from "@/components/vibanda/PartHealth";
 import { useAuth } from "@/context/AuthContext";
 import OwnerHomeEmpty from "@/components/vibanda/OwnerHomeEmpty";
+import CreativeNote from "@/components/vibanda/CreativeNote";
 import { isVerifiedVibandaSource } from "@/lib/vibandaSource";
 import { VIBANDA_HOME_LINKS } from "@/lib/vibandaAreas";
 
@@ -310,6 +311,10 @@ function VibandaOperationalHome({ initialFeed = null }: { initialFeed?: Feed | n
         <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--v-accent)] text-[var(--v-accent-foreground)]">i</span>
         {feed?.data_provenance?.notice ?? "Source synchronization and completeness have not been verified."}
       </p>
+      {/* Written by the creative layer from the same verified figures; loads on its
+          own, so Home never waits on it. Keyed on the period only, so the 30s
+          source poll above never refetches it. */}
+      <CreativeNote endpoint={`/api/v1/ai/creative/home?period=${period}`} />
 
       {err && <OsError message="Couldn't reach the kitchen right now." onRetry={() => load(period)} />}
       {!err && !feed && <OsLoading />}

@@ -49,6 +49,33 @@ def test_demo_overview_is_live_without_any_macsoft_delivery(client):
     assert body["revenue"]["orders"] == 0
 
 
+def test_startup_hook_provisions_demo_once_and_never_resets_the_password(client, db_session, monkeypatch):
+    import auth
+    import tenant_provisioning
+
+    monkeypatch.delenv("DEMO_RESTAURANT_OWNER_EMAIL", raising=False)
+    tenant_provisioning.provision_demo_from_env()
+    assert db_session.query(models.Tenant).filter_by(name="Demo Restaurant").count() == 0
+
+    monkeypatch.setenv("DEMO_RESTAURANT_OWNER_EMAIL", "owner@demo-restaurant.example")
+    monkeypatch.setenv("DEMO_RESTAURANT_OWNER_PASSWORD", "FirstPassword123")
+    tenant_provisioning.provision_demo_from_env()
+    monkeypatch.setenv("DEMO_RESTAURANT_OWNER_PASSWORD", "SecondPassword456")
+    tenant_provisioning.provision_demo_from_env()
+
+    db_session.expire_all()
+    assert db_session.query(models.Tenant).filter_by(name="Demo Restaurant").count() == 1
+    owner = db_session.query(models.User).filter_by(email="owner@demo-restaurant.example").one()
+    assert owner.role == models.Role.ADMIN and owner.staff_role == models.StaffRole.OWNER
+    assert auth.verify_password("FirstPassword123", owner.hashed_password)
+
+    login = client.post("/api/v1/auth/login/restaurant",
+                        json={"restaurant_name": "Demo Restaurant", "password": "FirstPassword123"})
+    assert login.status_code == 200, login.text
+    me = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {login.json()['access_token']}"}).json()
+    assert me["tenant_name"] == "Demo Restaurant" and me["restaurant_name"] == "Demo Restaurant"
+
+
 def test_demo_owner_os_analyses_recorded_data_without_reconciliation(client, db_session, scoped_owner, monkeypatch):
     from ai import llm_client
 

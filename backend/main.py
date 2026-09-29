@@ -92,6 +92,12 @@ def on_startup():
     except Exception as e:
         logger.warning(f"[WARN] DB init deferred: {e}")
 
+    # 1b. Env-gated, idempotent Demo Restaurant tenant. The live Postgres is
+    #     private to Railway, so the tenant is created from inside the service
+    #     when DEMO_RESTAURANT_OWNER_EMAIL/_PASSWORD are set. No-op otherwise.
+    from tenant_provisioning import provision_demo_from_env
+    provision_demo_from_env()
+
     from observer_mode import observer_mode_enabled
     if observer_mode_enabled():
         logger.warning("Observer mode enabled: operational subscribers and scheduler are disabled")

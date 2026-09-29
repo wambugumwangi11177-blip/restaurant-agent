@@ -3,8 +3,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import OsPage from "../src/app/vibanda/os/page";
 import api from "@/lib/api";
 
+const navigationState = vi.hoisted(() => ({ query: "" }));
 vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn() } }));
-vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
+vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(navigationState.query) }));
 
 const reply = {
   module: "stock", grounded: { finding: "I can’t verify stock levels yet.", why: "No source records.", recommendation: "Connect stock records.", data: { available: false } },
@@ -15,6 +16,7 @@ const reply = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  navigationState.query = "";
   vi.mocked(api.get).mockImplementation(async (url: string) => {
     if (url.endsWith("/ai/os/preferences")) return { data: { default_area: null } } as never;
     if (url.endsWith("/ai/os/conversations")) return { data: { conversations: [] } } as never;
@@ -37,6 +39,16 @@ function submit(question: string) {
 }
 
 describe("owner OS without restaurant data", () => {
+  it("lets linked questions use the same intent routing as typed questions", async () => {
+    navigationState.query = "q=Can%20you%20help%20with%20a%20creative%20idea%3F";
+    render(<OsPage />);
+    await screen.findByText(reply.answer_text);
+    const chatCall = vi.mocked(api.post).mock.calls.find(([url]) => url.endsWith("/ai/chat"));
+    expect(chatCall?.[1]).toMatchObject({
+      question: "Can you help with a creative idea?", answer_mode: "auto",
+    });
+  });
+
   it("preserves reading position when the owner scrolls while an answer is pending", async () => {
     let finishReply!: (value: { data: typeof reply }) => void;
     const pendingReply = new Promise<{ data: typeof reply }>((resolve) => { finishReply = resolve; });

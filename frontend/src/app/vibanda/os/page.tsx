@@ -157,7 +157,7 @@ function OSChatInner() {
     const question = params.get("q");
     if (!question || autoAsked.current) return;
     autoAsked.current = true;
-    void send(question, "analysis");
+    void send(question, "auto");
   }, [params, send]);
 
   const filteredAreas = useMemo(() => {

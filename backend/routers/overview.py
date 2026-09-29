@@ -367,8 +367,31 @@ def _performance(db: Session, rid: int) -> dict:
     return {"revenue_trend": trend, "orders_trend": trend}
 
 
-def _source_connection(db: Session) -> dict:
+# Tenants whose system of record is this application. They never wait on a
+# MacSoft delivery or any other API push: what is recorded here IS the data, so
+# there is no external source to reconcile against. Keyed on tenant name, the
+# same way the frontend forks its owner shells (frontend/src/lib/tenantHome.ts).
+DIRECT_SOURCE_TENANTS = frozenset({"demo restaurant"})
+
+
+def records_directly(db: Session, tenant_id: int | None) -> bool:
+    if tenant_id is None:
+        return False
+    name = db.query(models.Tenant.name).filter(models.Tenant.id == tenant_id).scalar()
+    return (name or "").strip().lower() in DIRECT_SOURCE_TENANTS
+
+
+def source_is_trusted(connection: dict) -> bool:
+    """Direct-entry data is trusted as recorded; a MacSoft mirror only after a clean reconcile."""
+    return connection.get("state") == "direct" or (
+        connection.get("state") == "receiving" and connection.get("reconciled") is True)
+
+
+def _source_connection(db: Session, tenant_id: int | None = None) -> dict:
     """What the MacSoft source has actually delivered, read from the mirror.
+
+    A direct-source tenant (DIRECT_SOURCE_TENANTS) short-circuits to state
+    "direct": it has no external feed to wait for.
 
     Deliberately NOT called "verified". Mirror rows prove MacSoft delivered
     something and that it was stored; they do not prove the delivery is
@@ -379,6 +402,10 @@ def _source_connection(db: Session) -> dict:
     connected" line. A sentence that can only be corrected by a deploy will be
     wrong the day the integration goes live, so this reads the real state.
     """
+    if records_directly(db, tenant_id):
+        return {"source": "direct", "state": "direct", "records": None,
+                "last_received_at": None, "reconciled": True}
+
     from integration.models import MirrorEvent, ReconcileRun, SourceSystem
     from routers.webhooks import MACSOFT_SOURCE_SLUG
 
@@ -420,6 +447,7 @@ _SOURCE_NOTICE = {
     "receiving": "Recorded data only. Macsoft has delivered records; delivery completeness is not reconciled.",
     "awaiting_first_delivery": "Recorded data only. Macsoft has delivered nothing yet, so any figures here come from data recorded in this system.",
     "unavailable": "Recorded data only. The Macsoft mirror could not be read, so its delivery state is unknown.",
+    "direct": "Recorded directly in this system. Nothing waits on Macsoft or any external data push.",
 }
 
 
@@ -440,7 +468,7 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
     bookings = _bookings_card(db, rid, operational_start, operational_end)
     source_status = {}
     attention = _attention_cards(db, rid, user.tenant_id, source_status=source_status)
-    connection = _source_connection(db)
+    connection = _source_connection(db, user.tenant_id)
     source_status["integration"] = {"state": connection["state"], "recommendations": None}
     latest_order = db.query(func.max(models.Order.created_at)).filter(models.Order.restaurant_id == rid).scalar()
     return {

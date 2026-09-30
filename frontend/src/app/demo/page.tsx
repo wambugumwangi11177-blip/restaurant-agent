@@ -299,7 +299,7 @@ function DemoOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null
       </p>
 
       {err && <OsError message="We couldn't load your restaurant just now. Please try again." onRetry={() => load(period)} />}
-      {stale && feed && <p role="status" className="flex flex-wrap items-center gap-2 rounded-lg border border-[hsl(43_76%_57%_/_0.6)] bg-[hsl(42_71%_75%_/_0.18)] px-3 py-2 text-xs">We could not reach the service just now, so you are seeing the last view that loaded. <button type="button" onClick={() => load(period)} className="font-semibold text-[var(--v-primary)] underline">Try again</button></p>
+      {stale && feed && <p role="status" className="flex flex-wrap items-center gap-2 rounded-lg border border-[hsl(43_76%_57%_/_0.6)] bg-[hsl(42_71%_75%_/_0.18)] px-3 py-2 text-xs">We could not reach the service just now, so you are seeing the last view that loaded. <button type="button" onClick={() => load(period)} className="font-semibold text-[var(--v-primary)] underline">Try again</button></p>}
       {!err && !feed && reconnecting && <p role="status" className="text-xs text-[var(--v-muted-foreground)]">Reconnecting… this can take a few seconds.</p>}
       {!err && !feed && <OsLoading />}
       {!err && feed && (

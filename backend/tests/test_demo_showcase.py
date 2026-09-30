@@ -34,6 +34,24 @@ def test_creative_prose_drops_truncated_tail():
     assert complete_prose('An unfinished thought') is None
     assert complete_prose('Use the 3.2 percent estimate. Review the result.') == 'Use the 3.2 percent estimate. Review the result.'
 
+def test_creative_never_shows_model_planning_notes():
+    from routers.demo import creative_final
+    leaked = (
+        "Constraints:\n\n- Use only supplied evidence, never calculate.\n- Two complete plain-text sentences, at most 60 words.\n\n"
+        "We need to produce two sentences.\n\n"
+        'Sentence 1: "The data shows three opportunities worth KES 2,910 a day."\n\n'
+        'Sentence 2: "A practical test would pilot the vegetable bowl on one shift."\n\nNow count words.'
+    )
+    assert creative_final(leaked) == (
+        "The data shows three opportunities worth KES 2,910 a day. "
+        "A practical test would pilot the vegetable bowl on one shift.")
+    # Planning with no drafted answer is refused rather than displayed.
+    assert creative_final("Constraints:\n- Use only supplied evidence.\n- Never claim an action happened.") is None
+    assert creative_final("We need to answer with two sentences about KES 720.") is None
+    assert creative_final("") is None
+    clean = "Vegetables expiring soon are worth KES 1,440 a day. Try a small vegetable-bowl special this week."
+    assert creative_final(clean) == clean
+
 def test_all_areas_are_populated():
     for key in demo.AREAS:
         result = demo.area(key)

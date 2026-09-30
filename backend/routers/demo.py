@@ -75,6 +75,28 @@ def complete_prose(text):
         return None
     return text[:endings[-1].end()].strip()
 
+_LEAK_MARKERS = re.compile(
+    r"constraints?\s*:|sentence\s*\d|word count|\bwe (?:need|must|can|should|have)\b|must not"
+    r"|plain[- ]text|\bthe user\b|\bat most \d+ words\b", re.IGNORECASE)
+_QUOTED_SENTENCE = re.compile(r"sentence\s*\d\s*[:.)\-]\s*[\"“](.+?)[\"”]\s*(?=\n|$)", re.IGNORECASE | re.DOTALL)
+
+def creative_final(raw):
+    """Reasoning models sometimes print their planning notes before the answer.
+    Keep only the answer they drafted, and refuse anything that still reads as planning."""
+    raw = raw or ""
+    quoted = [q.strip() for q in _QUOTED_SENTENCE.findall(raw)]
+    if quoted:
+        text = " ".join(quoted)
+    else:
+        lines = [l for l in raw.strip().splitlines() if l.strip()]
+        if len(lines) > 3 or any(l.lstrip().startswith(("-", "*", "•")) for l in lines):
+            return None
+        text = raw
+    text = " ".join(text.split())
+    if not text or _LEAK_MARKERS.search(text) or len(text.split()) > 70:
+        return None
+    return text
+
 def answer_topic(question, topic):
     if topic in demo.AREAS:
         return topic
@@ -128,7 +150,7 @@ def chat(request: Request, body: Question, db: Session = Depends(get_db), owner=
                 "Write two complete plain-text sentences, at most 60 words, no headings or markdown. "
                 "Distinguish ideas to test from findings. Never claim an action happened. No tools or external actions.",
                 400, "demo-creative-v2", creative.TEMPERATURE, creative.TIER)
-            grounded, _ = creative.finish_text(raw, source)
+            grounded, _ = creative.finish_text(creative_final(raw), source)
             grounded = complete_prose(grounded)
             if grounded:
                 result.update(answer_text=grounded, creative=True)

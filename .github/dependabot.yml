@@ -1,0 +1,45 @@
+# Dependency update automation.
+#
+# Why this exists: CI already FAILS the build on a newly-disclosed CVE
+# (pip-audit and `npm audit --audit-level=high` are both blocking). That is the
+# alarm. Nothing was raising the PR that silences it, so the only path from
+# "advisory published" to "fixed" was a human noticing red CI and hand-bumping a
+# pin. Dependabot closes that loop: the bump PR is open before, or alongside,
+# the failure.
+#
+# Weekly, not daily — this is a two-person repo and a daily cadence turns into
+# noise that gets ignored, which is the failure mode the blocking audit jobs
+# were introduced to avoid in the first place.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "backend"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "frontend"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # The workflows themselves pin third-party actions (checkout, setup-python,
+  # trivy, gitleaks). An unmaintained or compromised action runs with repo
+  # credentials, so it is a supply-chain surface like any other dependency.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels: ["dependencies", "ci"]
+    commit-message:
+      prefix: "chore(ci)"

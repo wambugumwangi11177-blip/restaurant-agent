@@ -49,3 +49,11 @@ backend/.storage/
 
 .vercel
 backend/local_dev.db
+
+# Coverage artifacts — the pytest job writes these on every run and they were
+# not ignored, so a local `pytest --cov` left .coverage/coverage.xml sitting in
+# `git status` waiting to be committed by accident.
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/

@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ChevronDown, Database, Lightbulb, Search, Send, Sparkles } from "lucide-react";
 import api from "@/lib/api";
+import { withRetry } from "@/lib/retry";
 import { DEMO_QUESTION_SECTIONS, DEMO_STARTERS } from "@/lib/demoQuestions";
 
 type Answer = {
@@ -59,7 +60,7 @@ function Workspace() {
     busyRef.current = true;
     setBusy(true);
     try {
-      const r = await api.post<Answer>("/api/v1/demo/chat", { question: text, topic: topic ?? null, creative: false }, { timeout: 30000 });
+      const r = await withRetry(() => api.post<Answer>("/api/v1/demo/chat", { question: text, topic: topic ?? null, creative: false }, { timeout: 30000 }), { tries: 4 });
       patch(id, { answer: r.data, idea: "loading" });
       setInput("");
       // The AI idea arrives on its own; the owner can keep asking in the meantime.

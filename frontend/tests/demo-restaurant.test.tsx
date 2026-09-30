@@ -6,6 +6,7 @@ import DemoOS from "../src/app/demo/os/page";
 import DemoAreaClient from "../src/components/demo/DemoAreaClient";
 import { homeFor } from "@/lib/tenantHome";
 import api from "@/lib/api";
+import { RETRY } from "@/lib/retry";
 
 const { push } = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn() } }));
@@ -118,6 +119,8 @@ const revenueArea = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  RETRY.delays = [1, 1, 1, 1]; // real waits are seconds long; the behaviour is the same
+  window.sessionStorage.clear();
   vi.mocked(api.get).mockImplementation(async (url: string) => ({
     data: url.includes("/pdf")
       ? new Blob(["%PDF-1.4"], { type: "application/pdf" })
@@ -259,4 +262,78 @@ it("OS has prompted questions, no focus-area picker and no creative toggle", asy
     { timeout: 90000 },
   ]);
   expect(screen.getByRole("link", { name: /See the numbers: Stock/ }).getAttribute("href")).toBe("/demo/stock");
+});
+
+const homeCalls = () => vi.mocked(api.get).mock.calls.filter((c) => String(c[0]).includes("/demo/home")).length;
+
+it("rides out a short backend restart instead of showing an error", async () => {
+  const outage = Object.assign(new Error("Network Error"), { isAxiosError: true });
+  let calls = 0;
+  vi.mocked(api.get).mockImplementation(async (url: string) => {
+    if (url.includes("/demo/home")) {
+      calls += 1;
+      if (calls <= 2) throw outage;
+      return { data: emptyFeed };
+    }
+    return { data: sampleReport };
+  });
+  render(<DemoHomePage />);
+  expect(await screen.findByText("Today at Demo Restaurant")).toBeTruthy();
+  expect(calls).toBe(3);
+  expect(screen.queryByText(/couldn't load your restaurant/i)).toBeNull();
+});
+
+it("shows a plain message and a retry button only when the outage lasts", async () => {
+  const down = Object.assign(new Error("Bad Gateway"), { isAxiosError: true, response: { status: 502 } });
+  vi.mocked(api.get).mockImplementation(async (url: string) => {
+    if (url.includes("/demo/home")) throw down;
+    return { data: sampleReport };
+  });
+  render(<DemoHomePage />);
+  expect(await screen.findByText(/We couldn't load your restaurant just now/)).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+  expect(screen.queryByText(/kitchen/i)).toBeNull();
+  expect(homeCalls()).toBe(5);
+});
+
+it("does not keep retrying a real answer such as an expired login", async () => {
+  const expired = Object.assign(new Error("Unauthorized"), { isAxiosError: true, response: { status: 401 } });
+  vi.mocked(api.get).mockImplementation(async (url: string) => {
+    if (url.includes("/demo/home")) throw expired;
+    return { data: sampleReport };
+  });
+  render(<DemoHomePage />);
+  expect(await screen.findByText(/We couldn't load your restaurant just now/)).toBeTruthy();
+  expect(homeCalls()).toBe(1);
+});
+
+it("area pages and reports also recover from a short outage", async () => {
+  const outage = Object.assign(new Error("Network Error"), { isAxiosError: true });
+  let areaCalls = 0;
+  vi.mocked(api.get).mockImplementation(async (url: string) => {
+    if (url.includes("/areas/")) {
+      areaCalls += 1;
+      if (areaCalls === 1) throw outage;
+      return { data: stockArea };
+    }
+    return { data: sampleReport };
+  });
+  render(<DemoAreaClient areaKey="stock" view={{ title: "Stock", description: "Ingredients." }} />);
+  expect(await screen.findByText("You track 13 ingredients, all used by the dishes on your menu.")).toBeTruthy();
+  expect(areaCalls).toBe(2);
+});
+
+it("keeps showing the last loaded view, marked as such, if the service stays down", async () => {
+  const first = render(<DemoHomePage />);
+  expect(await screen.findByText("Today at Demo Restaurant")).toBeTruthy();
+  first.unmount();
+  const down = Object.assign(new Error("Bad Gateway"), { isAxiosError: true, response: { status: 502 } });
+  vi.mocked(api.get).mockImplementation(async (url: string) => {
+    if (url.includes("/demo/home")) throw down;
+    return { data: sampleReport };
+  });
+  render(<DemoHomePage />);
+  expect(await screen.findByText(/seeing the last view that loaded/)).toBeTruthy();
+  expect(screen.getByText("Today at Demo Restaurant")).toBeTruthy();
+  expect(screen.queryByText(/We couldn't load your restaurant/)).toBeNull();
 });

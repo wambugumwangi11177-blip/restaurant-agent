@@ -5,6 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronRight, Lightbulb, Sparkles } from "lucide-react";
 import api from "@/lib/api";
+import { withRetry } from "@/lib/retry";
 
 type FromNumbers = { area: string; href: string; idea: string; why: string; next_step: string; expected: string | null };
 type Result = { checked: number; from_numbers: FromNumbers[]; creative: string[] };
@@ -23,7 +24,7 @@ export default function DemoIdeas() {
     setMore("idle");
     setIdeas([]);
     try {
-      const first = await api.post<Result>("/api/v1/demo/ideas", { creative: false });
+      const first = await withRetry(() => api.post<Result>("/api/v1/demo/ideas", { creative: false }), { tries: 4 });
       setNumbers(first.data);
     } catch {
       setError(true);

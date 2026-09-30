@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import api from "@/lib/api";
+import { withRetry } from "@/lib/retry";
 import { fmtKes } from "@/lib/format";
 type Result = {
   before: number;
@@ -20,10 +21,10 @@ export default function DemoSimulation() {
     setBusy(true);
     setError(false);
     try {
-      const r = await api.post<Result>("/api/v1/demo/simulate", {
-        price_change_pct: price,
-        demand_change_pct: demand,
-      });
+      const r = await withRetry(
+        () => api.post<Result>("/api/v1/demo/simulate", { price_change_pct: price, demand_change_pct: demand }),
+        { tries: 3 },
+      );
       setResult(r.data);
     } catch {
       setError(true);

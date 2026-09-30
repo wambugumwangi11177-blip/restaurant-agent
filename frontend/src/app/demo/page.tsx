@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, TrendingUp } from "lucide-react";
 import api from "@/lib/api";
+import { getWithFallback } from "@/lib/retry";
 import { fmtKes, fmtPct, greetingFor } from "@/lib/format";
 import { OsLoading, OsError } from "@/components/os/States";
 import { useAuth } from "@/context/AuthContext";
@@ -218,6 +219,8 @@ function DemoOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null
   const router = useRouter();
   const [feed, setFeed] = useState<Feed | null>(() => initialFeed);
   const [err, setErr] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [stale, setStale] = useState(false);
   const [period, setPeriod] = useState("today");
   const [dailyReport, setDailyReport] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);
@@ -227,9 +230,12 @@ function DemoOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null
     const id = ++requestId.current;
     setErr(false);
     setFeed(null);
-    api.get<Feed>(`/api/v1/demo/home?period=${p}`)
-      .then((r) => { if (id === requestId.current) setFeed(r.data); })
-      .catch(() => { if (id === requestId.current) setErr(true); });
+    setReconnecting(false);
+    setStale(false);
+    // A restart or a dropped connection passes in seconds: retry quietly, and fall back to the last good view.
+    getWithFallback(`home:${p}`, () => api.get<Feed>(`/api/v1/demo/home?period=${p}`), { onRetry: () => { if (id === requestId.current) setReconnecting(true); } })
+      .then((r) => { if (id === requestId.current) { setFeed(r.data); setStale(r.stale); setReconnecting(false); } })
+      .catch(() => { if (id === requestId.current) { setErr(true); setReconnecting(false); } });
   }, []);
 
   useEffect(() => {
@@ -292,7 +298,9 @@ function DemoOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null
         {feed?.data_provenance?.notice ?? "Recorded directly in this system."}
       </p>
 
-      {err && <OsError message="Couldn't reach the kitchen right now." onRetry={() => load(period)} />}
+      {err && <OsError message="We couldn't load your restaurant just now. Please try again." onRetry={() => load(period)} />}
+      {stale && feed && <p role="status" className="flex flex-wrap items-center gap-2 rounded-lg border border-[hsl(43_76%_57%_/_0.6)] bg-[hsl(42_71%_75%_/_0.18)] px-3 py-2 text-xs">We could not reach the service just now, so you are seeing the last view that loaded. <button type="button" onClick={() => load(period)} className="font-semibold text-[var(--v-primary)] underline">Try again</button></p>
+      {!err && !feed && reconnecting && <p role="status" className="text-xs text-[var(--v-muted-foreground)]">Reconnecting… this can take a few seconds.</p>}
       {!err && !feed && <OsLoading />}
       {!err && feed && (
         <>

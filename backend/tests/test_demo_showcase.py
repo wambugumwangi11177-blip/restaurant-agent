@@ -15,6 +15,13 @@ def demo_headers(db_session, scoped_owner, monkeypatch):
     db_session.commit()
     return {'Authorization': f'Bearer {auth.create_access_token({"sub":user.email})}'}
 
+@pytest.fixture(autouse=True)
+def _reset_ai_guard():
+    from routers import demo as router
+    router._ai_paused_until[0] = 0.0
+    yield
+    router._ai_paused_until[0] = 0.0
+
 def test_financial_reconciliation_and_calendar():
     day = date(2026, 9, 29)
     s = demo.scenario(day)
@@ -232,6 +239,29 @@ def test_a_model_that_cannot_switch_thinking_off_is_asked_again_without_it(clien
     assert narrate.call_args_list[0].kwargs['extra_body'] == router.REASONING_OFF
     assert 'extra_body' not in narrate.call_args_list[1].kwargs
     assert len(body['creative']) == 2
+
+def test_a_failing_provider_pauses_ai_for_everyone_and_the_site_keeps_working(client, demo_headers):
+    from routers import demo as router
+    router._cache.clear()
+    with patch('ai.owner_narrative.narrate', side_effect=RuntimeError('provider down')) as narrate, patch('ai.creative.enabled', return_value=True):
+        first = client.post('/api/v1/demo/chat', headers=demo_headers, json={'question': 'What should I do about stock?', 'creative': True})
+        second = client.post('/api/v1/demo/chat', headers=demo_headers, json={'question': 'Is my staff overtime too high?', 'creative': True})
+        home = client.get('/api/v1/demo/home', headers=demo_headers)
+    for r in (first, second):
+        assert r.status_code == 200 and not r.json()['creative'] and r.json()['answer_text']   # the calculated answer is still there
+    assert narrate.call_count == 1                 # the second question did not call the provider again
+    assert home.status_code == 200
+
+def test_a_second_ai_request_skips_instead_of_queueing_behind_the_first(client, demo_headers):
+    from routers import demo as router
+    router._cache.clear()
+    assert router._ai_slot.acquire(timeout=1)
+    try:
+        with patch('ai.owner_narrative.narrate') as narrate, patch('ai.creative.enabled', return_value=True):
+            r = client.post('/api/v1/demo/chat', headers=demo_headers, json={'question': 'What should I do about stock?', 'creative': True})
+        assert r.status_code == 200 and not r.json()['creative'] and narrate.call_count == 0
+    finally:
+        router._ai_slot.release()
 
 def test_creative_final_contract_and_ideas_parser():
     from routers.demo import creative_final, creative_ideas

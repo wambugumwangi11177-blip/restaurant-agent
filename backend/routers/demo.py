@@ -70,6 +70,9 @@ class IdeasRequest(BaseModel):
 _cache = OrderedDict()
 _lock = threading.Lock()
 _key_locks: dict = {}
+_ai_slot = threading.Semaphore(1)        # at most one provider call in flight
+_ai_paused_until = [0.0]                 # monotonic time before which AI is skipped after a provider failure
+AI_PAUSE_SECONDS = 45
 
 def complete_prose(text):
     """Do not display markdown decoration or a token-truncated final sentence."""
@@ -203,6 +206,14 @@ def _creative_call(db, user, restaurant, kind, request_key, source, system, max_
             if hit and time.monotonic() < hit[0]:
                 return hit[1], True
         value = empty
+        # AI is a bonus, never a dependency. A provider call holds a database connection and a row lock while
+        # it waits, so only one runs at a time; anyone else skips it instead of queueing behind it, and after
+        # a provider failure every caller skips it for a short while. Neither case is cached.
+        if time.monotonic() < _ai_paused_until[0] or not _ai_slot.acquire(timeout=2):
+            with _lock:
+                _key_locks.pop(cache_key, None)
+            return empty, False
+        failed = False
         try:
             from ai.owner_narrative import narrate
             def ask(options):
@@ -226,7 +237,13 @@ def _creative_call(db, user, restaurant, kind, request_key, source, system, max_
                 value = complete_prose(grounded) or None
         except Exception:
             db.rollback()
-            value = empty
+            value, failed = empty, True
+        finally:
+            _ai_slot.release()
+        if failed:
+            _ai_paused_until[0] = time.monotonic() + AI_PAUSE_SECONDS
+        elif value:
+            _ai_paused_until[0] = 0.0
         with _lock:
             _cache[cache_key] = (time.monotonic() + (1800 if value else 120), value)
             while len(_cache) > 128:

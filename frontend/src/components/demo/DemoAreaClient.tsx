@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ChevronRight, Info, Lightbulb } from "lucide-react";
 import api from "@/lib/api";
+import { getWithFallback } from "@/lib/retry";
 import { fmtKes } from "@/lib/format";
 import DemoSimulation from "./DemoSimulation";
 import { RenderChart, type DemoChart } from "./DemoCharts";
@@ -45,17 +46,16 @@ export default function DemoAreaClient({
   areaKey: string;
   view: { title: string; description: string };
 }) {
-  const [loaded, setLoaded] = useState<{ key: string; data?: Area; error?: boolean } | null>(null);
+  const [loaded, setLoaded] = useState<{ key: string; data?: Area; error?: boolean; stale?: boolean } | null>(null);
   const [retry, setRetry] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
   const [done, setDone] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     let active = true;
-    api
-      .get<Area>(`/api/v1/demo/areas/${areaKey}`)
+    getWithFallback(`area:${areaKey}`, () => api.get<Area>(`/api/v1/demo/areas/${areaKey}`))
       .then((r) => {
-        if (active) setLoaded({ key: areaKey, data: r.data });
+        if (active) setLoaded({ key: areaKey, data: r.data, stale: r.stale });
       })
       .catch(() => {
         if (active) setLoaded({ key: areaKey, error: true });
@@ -103,6 +103,7 @@ export default function DemoAreaClient({
         <p role="status">Loading the sample analysis…</p>
       ) : (
         <>
+          {loaded?.stale && <p role="status" className="flex flex-wrap items-center gap-2 rounded-lg border border-[hsl(43_76%_57%_/_0.6)] bg-[hsl(42_71%_75%_/_0.18)] px-3 py-2 text-xs">We could not reach the service just now, so you are seeing the last view that loaded. <button type="button" onClick={() => { setLoaded(null); setRetry((v) => v + 1); }} className="font-semibold text-[var(--v-primary)] underline">Try again</button></p>}
           <section className="rounded-xl border border-[hsl(201_47%_29%_/_0.25)] bg-[hsl(201_47%_29%_/_0.05)] p-5">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">In plain words</p>
             <p className="font-display mt-2 text-xl leading-snug">{data.headline}</p>

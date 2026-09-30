@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Download, Printer } from "lucide-react";
 import api from "@/lib/api";
+import { getWithFallback, withRetry } from "@/lib/retry";
 import { fmtKes } from "@/lib/format";
 import { Donut, LineSeries, WeekdayBars } from "@/components/demo/DemoCharts";
 
@@ -46,17 +47,16 @@ function Block({ title, note, children }: { title: string; note?: string; childr
 
 export default function DemoReports() {
   const [period, setPeriod] = useState<(typeof PERIODS)[number][0]>("daily");
-  const [loaded, setLoaded] = useState<{ period: string; data?: Report; error?: boolean } | null>(null);
+  const [loaded, setLoaded] = useState<{ period: string; data?: Report; error?: boolean; stale?: boolean } | null>(null);
   const [retry, setRetry] = useState(0);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState(false);
 
   useEffect(() => {
     let active = true;
-    api
-      .get<Report>(`/api/v1/demo/reports/${period}`)
+    getWithFallback(`report:${period}`, () => api.get<Report>(`/api/v1/demo/reports/${period}`))
       .then((r) => {
-        if (active) setLoaded({ period, data: r.data });
+        if (active) setLoaded({ period, data: r.data, stale: r.stale });
       })
       .catch(() => {
         if (active) setLoaded({ period, error: true });
@@ -72,7 +72,7 @@ export default function DemoReports() {
     setDownloading(true);
     setDownloadError(false);
     try {
-      const r = await api.get<Blob>(`/api/v1/demo/reports/${period}/pdf`, { responseType: "blob", timeout: 60000 });
+      const r = await withRetry(() => api.get<Blob>(`/api/v1/demo/reports/${period}/pdf`, { responseType: "blob", timeout: 60000 }), { tries: 3 });
       const url = URL.createObjectURL(r.data);
       const link = document.createElement("a");
       link.href = url;
@@ -145,6 +145,8 @@ export default function DemoReports() {
       ) : !report ? (
         <p role="status">Preparing report…</p>
       ) : (
+        <>
+        {loaded?.stale && <p role="status" className="flex flex-wrap items-center gap-2 rounded-lg border border-[hsl(43_76%_57%_/_0.6)] bg-[hsl(42_71%_75%_/_0.18)] px-3 py-2 text-xs">We could not reach the service just now, so you are seeing the last view that loaded. <button type="button" onClick={() => { setLoaded(null); setRetry((v) => v + 1); }} className="font-semibold text-[var(--v-primary)] underline">Try again</button></p>}
         <article className="space-y-8 rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-6 print:border-0 print:p-0">
           <header>
             <p className="text-xs text-[var(--v-muted-foreground)]">
@@ -261,6 +263,7 @@ export default function DemoReports() {
             </Link>
           </p>
         </article>
+        </>
       )}
     </div>
   );

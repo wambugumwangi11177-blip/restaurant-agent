@@ -30,7 +30,7 @@ type Feed = {
   revenue: { revenue: number; orders: number; avg_order: number; pace_projection: number };
   orders: { revenue: number; orders: number; delayed: number; active_now: number; split: Record<string, number> };
   kitchen: { avg_prep_min: number; delay_risk: number; bottleneck: string | null };
-  stock: { recorded_items?: number; low_stock: { name: string; qty: number; unit?: string }[]; expiring_48h: string[]; waste_pct_week: number };
+  stock: { recorded_items?: number; low_stock: { name: string; qty: number; unit?: string; runs_out_day?: string | null }[]; expiring_48h: string[]; waste_pct_week: number };
   bookings: { covers_today: number; next_reservation_min: number | null; waitlist: number; no_show_pct: number };
   staff: { scheduled: number; on_shift: number; overtime_risk: number; labor_cost_pct: number };
   attention: {
@@ -317,7 +317,7 @@ function DemoOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null
                 askLabel="Ask about the kitchen" onAsk={() => ask("Is the kitchen running behind?")} href="/demo/kitchen" />
               <PillarCard label="Stock" primaryLabel="Stock" primary={feed.stock.low_stock.length ? `${feed.stock.low_stock.length} to watch` : "No low-stock alerts"}
                 comparison={feed.stock.low_stock[0] ? `${feed.stock.low_stock[0].name} is running low: order soon` : ""}
-                signals={[...feed.stock.low_stock.slice(0, 2).map((i) => `${i.name} · ${i.qty}${i.unit ? ` ${i.unit}` : ""} left`), ...feed.stock.expiring_48h.slice(0, 1).map((e) => `${e.replace(" · ", ": ")} to use soon`)]}
+                signals={[...feed.stock.low_stock.slice(0, 2).map((i) => `${i.name} · ${i.qty}${i.unit ? ` ${i.unit}` : ""} left${i.runs_out_day ? ` · runs out ${i.runs_out_day}` : ""}`), ...feed.stock.expiring_48h.slice(0, 1).map((e) => `${e.replace(" · ", ": ")} to use soon`)]}
                 askLabel="Ask about stock" onAsk={() => ask("What am I about to run out of?")} href="/demo/stock" />
               <PillarCard label="Bookings" primaryLabel="Covers expected" primary={`${feed.bookings.covers_today} covers`}
                 comparison={feed.bookings.next_reservation_min ? `Next reservation in ${feed.bookings.next_reservation_min} min` : ""}

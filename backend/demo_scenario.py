@@ -5,6 +5,7 @@ this same scenario; projections and opportunities are never realised savings.
 Every figure shown to the owner is derived from the values below, never typed
 into copy by hand, so the pages, the OS answers and the PDF report always agree.
 """
+import math
 from datetime import date, datetime, timedelta
 from functools import lru_cache
 from zoneinfo import ZoneInfo
@@ -46,6 +47,9 @@ SUPPLIER_OF = {"Beef": "Meat & fish partner", "Chicken": "Meat & fish partner", 
                "Milk": "Dry goods & dairy partner"}
 NEAR_EXPIRY = {"Mixed vegetables": 8}   # kg that must be used within 48 hours
 LOW_COVER_DAYS = 2.0                     # order when stock covers two days or less
+SCHEDULED_TODAY = 8                      # people scheduled today
+COVERS_TODAY = 42                        # guests expected tonight
+SOON_DAYS = 3.0                          # "running out soon" means within this many days of expected sales
 LABOR_KES = 10500
 OTHER_COSTS_KES = 6500
 UNMATCHED_KES = 1200
@@ -119,13 +123,39 @@ def scenario(day: date):
         for ing, per in RECIPES[dish].items():
             usage[ing] = usage.get(ing, 0) + per * portions
             used_in.setdefault(ing, []).append(dish)
+    # What each coming day asks of the restaurant. The system learns how sales differ by weekday, and
+    # assumes each day sells the same mix of dishes as today, scaled to that day's expected sales.
+    ratios = [r["revenue"] / base for r in forecast]
+    plates_today = sum(n for *_, n in menu)
+    for row, ratio in zip(forecast, ratios):
+        row["plates"] = round(plates_today * ratio)
+        row["people"] = math.ceil(SCHEDULED_TODAY * ratio)
+        row["covers"] = round(COVERS_TODAY * ratio)
     stock = []
     for ing, unit in UNITS.items():
         daily = round(usage[ing], 2)
         cover = round(ON_HAND[ing] / daily, 1)
+        uses = [usage[ing] * x for x in ratios]
+        remaining, runway, out_index = ON_HAND[ing], None, None
+        for i, use in enumerate(uses):
+            if remaining >= use:
+                remaining -= use
+            else:
+                runway, out_index = round(i + remaining / use, 1), i
+                break
+        if runway is None:
+            runway = round(len(uses) + remaining / (sum(uses) / len(uses)), 1)
+        need = sum(uses)
+        # Suppliers need about a day, so order the day before it would be needed.
+        order_by = None
+        if out_index is not None:
+            order_by = "Today" if out_index < 2 else forecast[out_index - 2]["day"]
         stock.append({"name": ing, "unit": unit, "on_hand": ON_HAND[ing], "daily_use": daily, "cover_days": cover,
                       "used_in": used_in[ing], "supplier": SUPPLIER_OF[ing], "low": cover <= LOW_COVER_DAYS,
-                      "near_expiry": NEAR_EXPIRY.get(ing, 0)})
+                      "near_expiry": NEAR_EXPIRY.get(ing, 0), "runway_days": runway,
+                      "runs_out_day": forecast[out_index]["day"] if out_index is not None else None,
+                      "order_by": order_by, "need_7d": round(need, 1),
+                      "order_qty": max(0, math.ceil(need - ON_HAND[ing]))})
     return {"history": history, "menu": menu, "forecast": forecast, "opportunities": opportunities,
             "food_cost": sum(cost * n for _, _, cost, n in menu), "stock": stock, "overall": round(overall)}
 
@@ -240,7 +270,7 @@ def report(period, day=None):
     if comparison:
         word = "up" if comparison["change_pct"] >= 0 else "down"
         headline += f" That is {word} {abs(comparison['change_pct'])}% on {comparison['label']}."
-    beef_cover = next(x["cover_days"] for x in s["stock"] if x["name"] == "Beef")
+    beef_out = next(x["runs_out_day"] for x in s["stock"] if x["name"] == "Beef")
     story = [
         {"title": "Sales", "text": f"Your best day {scope} was {DAY_NAMES[date.fromisoformat(best['date']).weekday()]} "
                                    f"{best['date'][5:]} at {money(best['revenue'])}; the quietest was "
@@ -251,7 +281,7 @@ def report(period, day=None):
                                             f"leaving {money(margin)} to pay for staff and running costs. "
                                             f"{max(dishes, key=lambda d: d['contribution'])['name']} earns the most for the business "
                                             f"({money(max(d['contribution'] for d in dishes))} today)."},
-        {"title": "Stock and waste", "text": f"Beef is down to {beef_cover:g} days of cover and the meat delivery is a day late, so order today. "
+        {"title": "Stock and waste", "text": f"With the sales we expect, beef runs out on {beef_out} and the meat delivery is a day late, so order today. "
                                              f"{NEAR_EXPIRY['Mixed vegetables']} kg of vegetables need to be used within 2 days so they are not thrown away."},
         {"title": "Team", "text": f"Labour is about {round(LABOR_KES / today_row['revenue'] * 100, 1)}% of today's sales. "
                                    "3 overtime hours could be moved into the dinner rush instead of paid on top."},
@@ -291,7 +321,7 @@ def home(period="today", day=None):
       "revenue": {"revenue": revenue, "orders": orders, "avg_order": revenue/orders, "pace_projection": 0},
       "orders": {"revenue": revenue, "orders": orders, "delayed": 2, "active_now": 6, "split": {"dine_in": orders*45//70, "takeaway": orders*18//70, "delivery": orders-orders*45//70-orders*18//70}},
       "kitchen": {"avg_prep_min": 14, "delay_risk": 2, "bottleneck": "Grill station"},
-      "stock": {"recorded_items": len(s["stock"]), "low_stock": [{"name": x["name"], "qty": x["on_hand"], "unit": x["unit"]} for x in low],
+      "stock": {"recorded_items": len(s["stock"]), "low_stock": [{"name": x["name"], "qty": x["on_hand"], "unit": x["unit"], "runs_out_day": x["runs_out_day"]} for x in low],
                 "expiring_48h": [f"{k} · {v} kg" for k, v in NEAR_EXPIRY.items()], "waste_pct_week": 3.2},
       "bookings": {"covers_today": 42, "next_reservation_min": 45, "waitlist": 4, "no_show_pct": 6},
       "staff": {"scheduled": 8, "on_shift": 6, "overtime_risk": 3, "labor_cost_pct": round(LABOR_KES/s['history'][-1]['revenue']*100,1)},
@@ -306,15 +336,24 @@ def home(period="today", day=None):
 def _stock_area(s):
     rows = []
     for x in s["stock"]:
-        if x["low"]:
-            todo = "Order today"
-        elif x["near_expiry"]:
-            todo = f"Use the {x['near_expiry']} kg near its date first"
-        else:
-            todo = "Fine for now"
+        lasts = f"{x['runway_days']:g} days (runs out {x['runs_out_day']})" if x["runs_out_day"] else "More than 7 days"
+        order = f"{qty(x['order_qty'])} {x['unit']}" if x["order_qty"] > 0 else "Nothing needed"
         rows.append([x["name"], f"{qty(x['on_hand'])} {x['unit']}", f"{qty(x['daily_use'])} {x['unit']}",
-                     f"{x['cover_days']:g} days", ", ".join(x["used_in"]), todo])
+                     lasts, order, ", ".join(x["used_in"])])
     return rows
+
+
+def _order_list(s):
+    """Ingredients to order, grouped by supplier, with the day each order is needed by."""
+    days = [r["day"] for r in s["forecast"]]
+    groups = {}
+    for x in sorted((x for x in s["stock"] if x["order_qty"] > 0), key=lambda z: z["runway_days"]):
+        rank = -1 if x["order_by"] == "Today" else days.index(x["order_by"])
+        g = groups.setdefault(x["supplier"], {"items": [], "rank": rank, "by": x["order_by"]})
+        g["items"].append(f"{x['name']} {qty(x['order_qty'])} {x['unit']}")
+        if rank < g["rank"]:
+            g["rank"], g["by"] = rank, x["order_by"]
+    return [[sup, ", ".join(g["items"]), g["by"]] for sup, g in sorted(groups.items(), key=lambda kv: kv[1]["rank"])]
 
 
 def area(key, day=None):
@@ -338,6 +377,20 @@ def area(key, day=None):
     labor_pct = round(LABOR_KES / revenue * 100, 1)
     food_pct = round(s['food_cost'] / revenue * 100, 1)
     opps = {o["id"]: o for o in s["opportunities"]}
+    # What the coming days ask of stock, kitchen and team, learned from expected sales and recipes.
+    order_days = [r["day"] for r in forecast]
+    busy_i = order_days.index(busy["day"])
+    soon = sorted((x for x in s["stock"] if x["runway_days"] <= SOON_DAYS), key=lambda z: z["runway_days"])
+    others_soon = [x for x in soon if x["name"] != "Beef"]
+    plates_today = sum(d["units"] for d in dishes)
+    order_list = _order_list(s)
+    to_order_n = sum(1 for x in s['stock'] if x['order_qty'] > 0)
+    busy_row = forecast[busy_i]
+    before_rush = (f", before {busy['day']}, your busiest day"
+                   if beef["runs_out_day"] and order_days.index(beef["runs_out_day"]) < busy_i else "")
+
+    def day_table(title, note, columns, make_row):
+        return dict(title=title, note=note, columns=columns, rows=[make_row(r) for r in forecast])
 
     # Each spec: subtitle, headline, how_to_read, metrics, columns, rows, table_title, table_note, action,
     # attention (what needs attention here), decisions (ideas and why), charts.
@@ -372,21 +425,25 @@ def area(key, day=None):
         table_title="Stations right now", table_note="Slowest first. The idea is to move a helper to the slowest station.",
         action="Move plating support to the grill before the dinner rush.",
         attention=[_alert("grill", "The grill is the bottleneck", "Grill dishes (grilled fish, beef) take 22 minutes while the cold station finishes in 8.", "Move plating support to the grill before the dinner rush.", "urgent")],
-        decisions=[_decision("Share the load before dinner", "Two orders are already late and dinner is your busiest time.", "Ask the cold station to help plate grill orders.", "Fewer late orders")]),
+        decisions=[_decision("Share the load before dinner", "Two orders are already late and dinner is your busiest time.", "Ask the cold station to help plate grill orders.", "Fewer late orders"),
+                   _decision(f"Plan extra hands for {busy['day']}", f"We expect about {busy_row['plates']} plates on {busy['day']}, {round((busy_row['plates'] / plates_today - 1) * 100)}% more than today, and the grill already takes 22 minutes.", "Put one extra person on the grill and pre-prepare the sauces the day before.", "Fewer late orders on your busiest day")],
+        extra_tables=[day_table("Plates we expect to prepare", "Worked out from the sales we expect each day. We assume the same mix of dishes as today.", ['Day', 'Expected sales', 'Plates', 'Compared with today'], lambda r: [r['day'], money(r['revenue']), r['plates'], f"{round((r['plates'] / plates_today - 1) * 100):+d}%"])]),
       "stock": dict(
         subtitle="What is on the shelf, how long it will last, and what to order.",
-        headline=f"You track {len(s['stock'])} ingredients, all used by the dishes on your menu. Beef covers only {beef['cover_days']:g} days and {NEAR_EXPIRY['Mixed vegetables']} kg of vegetables must be used within 2 days.",
-        how_to_read="'Days of cover' is how long the stock lasts at today's selling rate. Each ingredient shows which dishes use it, so you can see which dish is affected if it runs out.",
-        metrics=[('Ingredients tracked', len(s['stock'])), ('Need ordering', len(low)), ('Near expiry', money(opps['waste']['value']))],
-        columns=['Ingredient', 'On hand', 'Used per day', 'Days of cover', 'Used in', 'What to do'], rows=_stock_area(s),
-        table_title="Everything on the shelf", table_note="Used per day is worked out from the recipes and today's sales.",
-        action="Use expiry stock first and review beef replenishment.",
-        attention=[_alert("beef-low", "Beef is running low", f"{qty(beef['on_hand'])} kg left and Beef pilau uses {qty(beef['daily_use'])} kg a day. That is {beef['cover_days']:g} days of cover, and the meat delivery is a day late.", "Order beef today, or confirm the late delivery.", "urgent", "Protects Beef pilau sales"),
+        headline=f"You track {len(s['stock'])} ingredients, all used by the dishes on your menu. With the sales we expect, beef runs out on {beef['runs_out_day']}, and {len(others_soon)} more ingredients run out within {SOON_DAYS:g} days unless you restock.",
+        how_to_read="We work this out from your recipes and how much you expect to sell each day: a busy Saturday uses more than a quiet Monday. 'Lasts' is how long the stock will last with those expected sales if nothing new arrives. As your sales change, these estimates change too. We assume each day sells the same mix of dishes as today.",
+        metrics=[('Ingredients tracked', len(s['stock'])), ('Order today', len(low)), (f'Run out within {SOON_DAYS:g} days', len(soon))],
+        columns=['Ingredient', 'On hand', 'Used per day (today)', 'Lasts (with expected sales)', 'Order about', 'Used in'], rows=_stock_area(s),
+        table_title="Everything on the shelf", table_note="'Order about' is what would cover the next 7 days of expected sales.",
+        action="Use expiry stock first and order the ingredients that run out first.",
+        attention=[_alert("beef-low", f"Beef runs out on {beef['runs_out_day']}", f"You have {qty(beef['on_hand'])} kg. With the sales we expect it lasts about {beef['runway_days']:g} days{before_rush}, and the meat delivery is a day late.", f"Order about {qty(beef['order_qty'])} kg today, or confirm the late delivery.", "urgent", "Protects Beef pilau sales"),
+                   *([_alert("soon-out", f"{len(others_soon)} more ingredients run out within {SOON_DAYS:g} days", f"{', '.join(x['name'] for x in others_soon)}. They run out {('on ' + others_soon[0]['runs_out_day']) if others_soon[0]['runs_out_day'] == others_soon[-1]['runs_out_day'] else ('between ' + others_soon[0]['runs_out_day'] + ' and ' + others_soon[-1]['runs_out_day'])}, and {busy['day']} is expected to be your busiest day.", "Order them together with the beef so one delivery covers the week.", "watch")] if others_soon else []),
                    _alert("veg-expiry", "8 kg of vegetables need using", f"You use about {qty(veg['daily_use'])} kg of vegetables a day (about {veg_two_days:g} kg in two days), so the 8 kg near its date can be used in time.", "Put the older vegetables at the front and feature the vegetable bowl.", "watch", money(opps['waste']['value']) + " at risk")],
-        decisions=[_decision("Use the older vegetables first", f"8 kg is close to its date but the kitchen normally uses {veg_two_days:g} kg in two days.", "Cook from the oldest batch first and run a vegetable bowl special.", money(opps['waste']['value']) + " potential saving"),
-                   _decision("Order beef today", f"Beef pilau sells {pilau['units']} plates a day and uses all the beef in two days.", "Place the beef order now and ask for the earliest slot.", "Avoids running out of your best-loved dish")],
-        charts=[dict(type="meters", title="How many days each ingredient will last", unit="days", target=LOW_COVER_DAYS,
-                     items=[dict(label=x["name"], value=x["cover_days"], note=f"{qty(x['on_hand'])} {x['unit']} on hand", status="low" if x["low"] else ("watch" if x["near_expiry"] else "ok")) for x in sorted(s["stock"], key=lambda z: z["cover_days"])])]),
+        decisions=[_decision("Order beef today", f"With the sales we expect, beef runs out on {beef['runs_out_day']}{before_rush}. Beef pilau sells {pilau['units']} plates a day.", f"Place an order for about {qty(beef['order_qty'])} kg and ask for the earliest slot.", "Avoids running out of your best-loved dish"),
+                   _decision("Send one combined order for what runs out this week", f"{to_order_n} ingredients will run out within the week. Ordering them together per supplier saves calls and delivery trips.", "Use the suggested order list on the Purchasing page.", "Avoids running out during your busy days"),
+                   _decision("Use the older vegetables first", f"8 kg is close to its date but the kitchen normally uses {veg_two_days:g} kg in two days.", "Cook from the oldest batch first and run a vegetable bowl special.", money(opps['waste']['value']) + " potential saving")],
+        charts=[dict(type="meters", title="How long each ingredient will last with the sales we expect", unit="days", target=LOW_COVER_DAYS,
+                     items=[dict(label=x["name"], value=min(x["runway_days"], 7), note=f"{qty(x['on_hand'])} {x['unit']} on hand" + (f" · runs out {x['runs_out_day']}" if x["runs_out_day"] else " · more than 7 days"), status="low" if x["runway_days"] <= LOW_COVER_DAYS else ("watch" if x["runway_days"] <= SOON_DAYS or x["near_expiry"] else "ok")) for x in sorted(s["stock"], key=lambda z: z["runway_days"])])]),
       "bookings": dict(
         subtitle="Who is booked, and how busy the evening will be.",
         headline="42 guests are expected tonight. One booking is still waiting for confirmation and 4 tables are on the waitlist.",
@@ -396,7 +453,9 @@ def area(key, day=None):
         table_title="Tonight's bookings", table_note="Confirmed bookings are safe to plan for; the last one still needs a reply.",
         action="Confirm the late booking and preserve capacity for walk-ins.",
         attention=[_alert("late-booking", "The 20:00 booking is not confirmed", "12 guests are waiting for a reply, and 4 tables are on the waitlist.", "Confirm the booking, or give the table to the waitlist.", "watch")],
-        decisions=[_decision("Confirm the 20:00 table today", "An unconfirmed table of 12 blocks seats another party could use.", "Call or message the guest now.", "Fills up to 12 seats")]),
+        decisions=[_decision("Confirm the 20:00 table today", "An unconfirmed table of 12 blocks seats another party could use.", "Call or message the guest now.", "Fills up to 12 seats"),
+                   _decision(f"Open more bookings for {busy['day']}", f"We expect about {busy_row['covers']} guests on {busy['day']}, compared with {COVERS_TODAY} tonight.", "Let regulars know, and keep a few tables free for walk-ins.", "Fills your busiest day")],
+        extra_tables=[day_table("Guests we expect", "Worked out from the sales we expect, assuming the same number of guests per shilling as today.", ['Day', 'Expected sales', 'Guests (covers)'], lambda r: [r['day'], money(r['revenue']), r['covers']])]),
       "team": dict(
         subtitle="Who is working, and whether the shifts match how busy you are.",
         headline=f"8 people are scheduled and 6 are on shift. About 3 hours of overtime could be avoided (about {money(opps['labor']['value'])}).",
@@ -406,7 +465,9 @@ def area(key, day=None):
         table_title="Coverage through the day", table_note="Lunch has enough people; dinner, your busiest time, is thin.",
         action="Preview the roster adjustment; preserve service coverage.",
         attention=[_alert("dinner", "Dinner is under-staffed", "Only 4 people cover dinner while lunch has 6.", "Move 3 hours from the quiet period into dinner.", "watch", money(opps['labor']['value']) + " potential / day")],
-        decisions=[_decision("Move hours into the dinner rush", "Overtime is being paid while a quiet period is fully staffed.", "Shift 3 hours from the quiet period to dinner.", money(opps['labor']['value']) + " potential / day")]),
+        decisions=[_decision("Move hours into the dinner rush", "Overtime is being paid while a quiet period is fully staffed.", "Shift 3 hours from the quiet period to dinner.", money(opps['labor']['value']) + " potential / day"),
+                   _decision(f"Plan {busy_row['people']} people for {busy['day']}", f"We expect about {money(busy_row['revenue'])} on {busy['day']}. At today's pace of {money(revenue // SCHEDULED_TODAY)} of sales per person, that needs about {busy_row['people']} people, and you have {SCHEDULED_TODAY} scheduled today.", "Ask for extra shifts early, and let the quietest day run lean.", "Covers your busiest day without overtime")],
+        extra_tables=[day_table("How many people we suggest", f"Assumes the same sales per person as today ({money(revenue // SCHEDULED_TODAY)}).", ['Day', 'Expected sales', 'People needed', f'Compared with {SCHEDULED_TODAY} today'], lambda r: [r['day'], money(r['revenue']), r['people'], f"{r['people'] - SCHEDULED_TODAY:+d}"])]),
       "menu": dict(
         subtitle="What you sell, what it costs to make, and where the money is.",
         headline=f"{top['name']} earns the most for the business today ({money(top['contribution'])}). After ingredients, the menu leaves {money(margin)} of today's {money(revenue)}.",
@@ -463,7 +524,9 @@ def area(key, day=None):
         action="Review stock cover before making a purchasing commitment.",
         attention=[_alert("po-overdue", "PO-D2 is overdue", "The meat and fish order (KES 6,000) should already be here.", "Chase the supplier; beef is running low.", "urgent"),
                    _alert("po-approve", "PO-D1 needs your approval", "KES 12,000 of dry goods is waiting on you.", "Check what rice and oil you actually need, then approve.", "watch")],
-        decisions=[_decision("Check stock before approving PO-D1", f"Rice covers about {rice['cover_days']:g} days and cooking oil far longer.", "Approve a smaller order if you already have plenty.", "Avoids over-buying")]),
+        decisions=[_decision("Check stock before approving PO-D1", f"Rice lasts about {rice['runway_days']:g} days with the sales we expect and cooking oil far longer.", "Approve a smaller order if you already have plenty.", "Avoids over-buying"),
+                   _decision("Send the suggested orders", f"{to_order_n} ingredients run out within the week. The list below groups them by supplier and shows when each order is needed.", "Approve the list, starting with the meat and fish order.", "Avoids running out during your busy days")],
+        extra_tables=[dict(title="Suggested order list", note="Worked out from your recipes and the sales we expect. Assumes a supplier needs about a day to deliver.", columns=['Supplier', 'What to order', 'Order by'], rows=order_list)]),
       "cash-reconciliation": dict(
         subtitle="Checking that the money in the till, M-Pesa and cards matches the sales.",
         headline=f"{money(revenue - UNMATCHED_KES)} of {money(revenue)} has been matched. {money(UNMATCHED_KES)} is still unmatched.",
@@ -561,7 +624,7 @@ def area(key, day=None):
             "how_to_read": spec["how_to_read"], "metrics": [{"label": k, "value": v} for k, v in metrics],
             "columns": spec["columns"], "rows": spec["rows"], "table_title": spec["table_title"], "table_note": spec["table_note"],
             "action": spec["action"], "opportunities": opportunities, "attention": spec["attention"], "decisions": spec["decisions"],
-            "charts": charts,
+            "charts": charts, "extra_tables": spec.get("extra_tables", []),
             "forecast": forecast if key in ('revenue', 'orders', 'pos', 'intelligence') else [],
             "forecast_method": "We look at how each weekday has done over the last 8 weeks and expect a similar day. The band shows how far a normal day can move from that.",
             "trend": s['history'][-7:] if key in ('revenue', 'finance', 'pos', 'intelligence') else []}

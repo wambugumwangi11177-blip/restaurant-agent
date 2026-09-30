@@ -109,6 +109,29 @@ def test_stock_is_built_from_the_menu_recipes():
     stock_rows = demo.area('stock', date(2026, 9, 30))['rows']
     assert len(stock_rows) == len(s['stock'])
 
+def test_stock_learns_from_expected_sales_and_feeds_the_other_modules():
+    day = date(2026, 9, 30)
+    s = demo.scenario(day)
+    beef = next(x for x in s['stock'] if x['name'] == 'Beef')
+    # Cover at today's rate is 2.0 days, but Friday and Saturday sell more, so beef runs out sooner.
+    assert beef['cover_days'] == 2.0 and beef['runway_days'] == 1.9
+    assert beef['runs_out_day'] == 'Friday' and beef['order_by'] == 'Today' and beef['order_qty'] == 16
+    f = s['forecast']
+    assert f[2]['plates'] > f[0]['plates'] and f[2]['people'] > f[0]['people'] and f[2]['covers'] > f[0]['covers']
+    assert all(x['order_qty'] > 0 for x in s['stock'] if x['runs_out_day'])
+    assert all(x['order_qty'] == 0 for x in s['stock'] if not x['runs_out_day'])
+    assert 'beef runs out on Friday' in demo.area('stock', day)['headline']
+    assert demo.home(day=day)['stock']['low_stock'][0]['runs_out_day'] == 'Friday'
+    for key in ('kitchen', 'team', 'bookings', 'purchasing'):
+        tables = demo.area(key, day)['extra_tables']
+        assert tables, key
+        for t in tables:
+            assert t['rows'] and all(len(r) == len(t['columns']) for r in t['rows'])
+    orders = demo.area('purchasing', day)['extra_tables'][0]['rows']
+    assert orders[0][0] == 'Meat & fish partner' and 'Beef 16 kg' in orders[0][1] and orders[0][2] == 'Today'
+    team = demo.area('team', day)['extra_tables'][0]['rows']
+    assert next(r for r in team if r[0] == 'Saturday')[2] > next(r for r in team if r[0] == 'Thursday')[2]
+
 def test_every_area_explains_itself_in_plain_words():
     for key in demo.AREAS:
         a = demo.area(key)

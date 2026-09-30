@@ -27,6 +27,7 @@ type Area = {
   attention: Attention[];
   decisions: Decision[];
   charts: DemoChart[];
+  extra_tables?: { title: string; note: string; columns: string[]; rows: (string | number)[][] }[];
   forecast: ForecastDay[];
   forecast_method: string;
 };
@@ -235,6 +236,35 @@ export default function DemoAreaClient({
           )}
 
           {["menu", "intelligence", "finance"].includes(areaKey) && <DemoSimulation />}
+
+          {(data.extra_tables ?? []).map((t) => (
+            <section key={t.title} className="overflow-x-auto rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-5">
+              <h2 className="font-display text-xl">{t.title}</h2>
+              <p className="mb-4 mt-1 text-xs text-[var(--v-muted-foreground)]">{t.note}</p>
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr>
+                    {t.columns.map((c) => (
+                      <th scope="col" className="border-b border-[var(--v-border)] p-3 text-xs font-semibold text-[var(--v-muted-foreground)]" key={c}>
+                        {c}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {t.rows.map((row, i) => (
+                    <tr key={i}>
+                      {row.map((v, j) => (
+                        <td className="border-b border-[var(--v-border)] p-3 align-top" key={j}>
+                          {v}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          ))}
 
           <section className="overflow-x-auto rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-5">
             <h2 className="font-display text-xl">{data.table_title}</h2>

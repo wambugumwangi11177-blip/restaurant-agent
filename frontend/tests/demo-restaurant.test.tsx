@@ -86,6 +86,7 @@ const stockArea = {
   attention: [{ id: "beef-low", title: "Beef is running low", why: "It covers 2 days.", what_to_do: "Order beef today.", level: "urgent", impact: "Protects Beef pilau sales" }],
   decisions: [{ idea: "Order beef today", why: "Beef pilau uses it all.", next_step: "Place the order now.", expected: "Avoids running out" }],
   charts: [{ type: "meters", title: "How many days each ingredient will last", unit: "days", target: 2, items: [{ label: "Beef", value: 2, note: "6 kg on hand", status: "low" }] }],
+  extra_tables: [{ title: "Suggested order list", note: "Worked out from your recipes and expected sales.", columns: ["Supplier", "What to order"], rows: [["Meat & fish partner", "Beef 16 kg"]] }],
   forecast: [],
   forecast_method: "",
 };
@@ -204,6 +205,8 @@ it("area pages explain, flag what needs attention, and suggest with reasons", as
   expect(screen.getByText("What we suggest, and why")).toBeTruthy();
   expect(screen.getByText("Order beef today")).toBeTruthy();
   expect(screen.getByText("Everything on the shelf")).toBeTruthy();
+  expect(screen.getByText("Suggested order list")).toBeTruthy();
+  expect(screen.getByText("Beef 16 kg")).toBeTruthy();
   expect(screen.getByRole("link", { name: /Back to Home/ }).getAttribute("href")).toBe("/demo");
   fireEvent.click(screen.getByRole("button", { name: "Got it" }));
   expect(screen.queryByText("Beef is running low")).toBeNull();

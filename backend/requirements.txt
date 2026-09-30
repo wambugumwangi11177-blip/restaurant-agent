@@ -57,3 +57,7 @@ py-vapid==1.9.0
 # Testing
 pytest==9.0.3              # PYSEC-2026-1845
 httpx==0.28.1
+
+# Owner reports as downloadable PDFs (demo_report_pdf.py). Pure Python; pillow is its imaging dependency.
+reportlab==4.4.10
+pillow==12.3.0

@@ -81,7 +81,8 @@ def complete_prose(text):
 
 _LEAK_MARKERS = re.compile(
     r"constraints?\s*:|sentence\s*\d|word count|\bwe (?:need|must|can|should|have)\b|must not"
-    r"|plain[- ]text|\bthe user\b|\bat most \d+ words\b|\bidea\s*\d\s*:", re.IGNORECASE)
+    r"|plain[- ]text|\bthe user\b|\bat most \d+ words\b|\bidea\s*\d\s*:"
+    r"|own line|per line|\bone sentence\b|\b(?:three|four|two) (?:ideas|sentences)\b", re.IGNORECASE)
 _QUOTED_SENTENCE = re.compile(r"sentence\s*\d\s*[:.)\-]\s*[\"“](.+?)[\"”]\s*(?=\n|$)", re.IGNORECASE | re.DOTALL)
 _FINAL = re.compile(r"^\s*final\s*(?:answer)?\s*:\s*", re.IGNORECASE | re.MULTILINE)
 _LIST_PREFIX = re.compile(r"^\s*(?:[-*•]|\d{1,2}[.)]|idea\s*\d*\s*[:.)-])\s*", re.IGNORECASE)
@@ -125,7 +126,8 @@ def creative_ideas(raw):
         words = len(text.split())
         if 4 <= words <= 45 and not _LEAK_MARKERS.search(text):
             ideas.append(text)
-    return ideas[:5]
+    # One stray line is almost always the model echoing its instructions, not a real answer.
+    return ideas[:5] if len(ideas) >= 2 else []
 
 _TOPIC_WORDS = {
     "stock": ("stock", "waste", "expir", "run out", "ingredient", "inventory", "beef", "chicken", "tilapia", "fish", "rice", "vegetable", "shelf"),
@@ -203,9 +205,19 @@ def _creative_call(db, user, restaurant, kind, request_key, source, system, max_
         value = empty
         try:
             from ai.owner_narrative import narrate
-            extra = {"extra_body": WEB_PLUGIN} if web else {}
-            raw = narrate(db, user, restaurant.id, [{"role": "user", "content": source}], system,
-                          max_tokens, version, creative.TEMPERATURE, creative.TIER, **extra)
+            def ask(options):
+                extra = {"extra_body": options} if options else {}
+                return narrate(db, user, restaurant.id, [{"role": "user", "content": source}], system,
+                               max_tokens, version, creative.TEMPERATURE, creative.TIER, **extra)
+            options = _provider_options(web)
+            try:
+                raw = ask(options)
+            except Exception:
+                db.rollback()
+                if "reasoning" not in options:
+                    raise
+                # Some models cannot switch thinking off and reject the field: ask again without it.
+                raw = ask({k: v for k, v in options.items() if k != "reasoning"})
             if many:
                 grounded = [creative.finish_text(i, source)[0] for i in creative_ideas(raw)]
                 value = [v for v in (complete_prose(g) for g in grounded if g) if v]
@@ -254,6 +266,15 @@ def chat(request: Request, body: Question, db: Session = Depends(get_db), owner=
 # Optional web research for the ideas box. Off unless DEMO_IDEAS_WEB=true, because each search is billed by
 # the provider. Only meaningful on OpenRouter, which runs the search itself and hands the model the results.
 WEB_PLUGIN = {"plugins": [{"id": "web", "max_results": 3}]}
+
+# Reasoning models otherwise spend their whole budget thinking out loud. Only OpenRouter understands this field.
+REASONING_OFF = {"reasoning": {"effort": "none"}}
+
+def _provider_options(web):
+    from ai import llm_client
+    if getattr(llm_client, "_PROVIDER", "") != "openrouter":
+        return {}
+    return {**REASONING_OFF, **(WEB_PLUGIN if web else {})}
 
 def web_research_on():
     if os.getenv("DEMO_IDEAS_WEB", "").strip().lower() not in ("1", "true", "yes"):

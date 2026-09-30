@@ -416,7 +416,7 @@ def area(key, day=None):
         table_title="Your menu today", table_note="Kept per plate is the price minus the cost of ingredients; the % is that as a share of the price.",
         action="Test a pilau price change before committing; demand may change.",
         attention=[_alert("pilau-price", "Beef pilau may be underpriced", f"It is your best seller ({pilau['units']} plates) and keeps {money(pilau['price'] - pilau['cost'])} a plate.", "Compare the result of a small price rise below before you change anything.", "watch", money(opps['margin']['value']) + " potential / day")],
-        decisions=[_decision("Try a small pilau price rise", f"A KES 30 rise on {pilau['units']} plates is worth {money(opps['margin']['value'])} a day if customers still order the same.", "Use the calculator below to see what happens if a few customers leave.", money(opps['margin']['value']) + " potential / day"),
+        decisions=[_decision("Try a small pilau price rise", f"A KES 30 rise on {pilau['units']} plates is worth {money(opps['margin']['value'])} a day if customers still order the same.", "Try it in the price calculator on the Menu page to see what happens if a few customers leave.", money(opps['margin']['value']) + " potential / day"),
                    _decision("Promote the vegetable bowl", f"It keeps {dishes[3]['margin_pct']}% of its price, more than the main dishes.", "Suggest it as a side or a lunch special.", "Higher share kept per sale")],
         charts=[dict(type="meters", title="What each dish keeps per plate (KES)", unit="KES", items=[dict(label=d["name"], value=d["price"] - d["cost"], note=f"{d['margin_pct']}% of the price", status="ok") for d in sorted(dishes, key=lambda z: -(z['price'] - z['cost']))])]),
       "finance": dict(

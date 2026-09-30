@@ -184,12 +184,31 @@ def test_web_research_is_off_unless_enabled_on_openrouter(client, demo_headers, 
     raw = "FINAL:\n1. Offer a lunch combo of vegetable bowl and fresh juice.\n"
     with patch('ai.owner_narrative.narrate', return_value=raw) as narrate, patch('ai.creative.enabled', return_value=True):
         client.post('/api/v1/demo/ideas', headers=demo_headers, json={'creative': True})
-    assert narrate.call_args.kwargs['extra_body'] == router.WEB_PLUGIN
+    assert narrate.call_args.kwargs['extra_body'] == {**router.REASONING_OFF, **router.WEB_PLUGIN}
     router._cache.clear()
     monkeypatch.delenv('DEMO_IDEAS_WEB')
     with patch('ai.owner_narrative.narrate', return_value=raw) as narrate, patch('ai.creative.enabled', return_value=True):
         client.post('/api/v1/demo/ideas', headers=demo_headers, json={'creative': True})
+    assert narrate.call_args.kwargs['extra_body'] == router.REASONING_OFF      # thinking off, no web search
+    router._cache.clear()
+    monkeypatch.setattr(llm_client, '_PROVIDER', 'groq')                        # other providers get neither field
+    with patch('ai.owner_narrative.narrate', return_value=raw) as narrate, patch('ai.creative.enabled', return_value=True):
+        client.post('/api/v1/demo/ideas', headers=demo_headers, json={'creative': True})
     assert 'extra_body' not in narrate.call_args.kwargs
+
+def test_a_model_that_cannot_switch_thinking_off_is_asked_again_without_it(client, demo_headers, monkeypatch):
+    from routers import demo as router
+    from ai import llm_client
+    router._cache.clear()
+    monkeypatch.setattr(llm_client, '_PROVIDER', 'openrouter')
+    monkeypatch.delenv('DEMO_IDEAS_WEB', raising=False)
+    good = "FINAL:\n1. Offer a lunch combo of vegetable bowl and fresh juice.\n2. Run a chai special on quiet afternoons.\n"
+    with patch('ai.owner_narrative.narrate', side_effect=[RuntimeError('400 reasoning cannot be disabled'), good]) as narrate, patch('ai.creative.enabled', return_value=True):
+        body = client.post('/api/v1/demo/ideas', headers=demo_headers, json={'creative': True}).json()
+    assert narrate.call_count == 2
+    assert narrate.call_args_list[0].kwargs['extra_body'] == router.REASONING_OFF
+    assert 'extra_body' not in narrate.call_args_list[1].kwargs
+    assert len(body['creative']) == 2
 
 def test_creative_final_contract_and_ideas_parser():
     from routers.demo import creative_final, creative_ideas
@@ -198,6 +217,8 @@ def test_creative_final_contract_and_ideas_parser():
     assert creative_final("Constraints:\n- two sentences\nWe need to be brief.") is None     # truncated before FINAL
     assert creative_final("FINAL: We need to compute the word count.") is None
     assert creative_ideas("no final block here\n1. Something useful to try this week.") == []
+    assert creative_ideas("FINAL:\nEach on its own line.") == []                  # an echoed instruction is not an idea
+    assert creative_ideas("FINAL:\n1. Offer a lunch combo this week.") == []       # a single stray line is not a list
     assert creative_ideas("FINAL:\n- Try a lunch combo this week.\n- ok\n- Sell chai to takeaway guests on quiet days.") == [
         "Try a lunch combo this week.", "Sell chai to takeaway guests on quiet days."]
 

@@ -15,11 +15,15 @@ import NotificationBell from "@/components/NotificationBell";
 
 const TABS = [
   { href: "/demo", label: "Home", icon: Home },
-  { href: "/demo/os", label: "OS", icon: MessageCircle },
+  { href: "/demo/os", label: "Ask AI", icon: MessageCircle },
   { href: "/demo/reports", label: "Reports", icon: FileText },
 ];
 
-export default function DemoLayout({ children }: { children: React.ReactNode }) {
+export default function DemoLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isLoading } = useAuth();
@@ -28,18 +32,27 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (isLoading) return;
     if (!user) router.replace("/login");
-    else if (!owner) router.replace(tierHome(user.staff_role as StaffTier | null));
+    else if (!owner)
+      router.replace(tierHome(user.staff_role as StaffTier | null));
     else if (!allowed) router.replace("/dashboard");
   }, [user, isLoading, owner, allowed, router]);
   if (isLoading || !allowed) {
-    return <p role="status" className="p-6">Checking account access…</p>;
+    return (
+      <p role="status" className="p-6">
+        Checking account access…
+      </p>
+    );
   }
   return (
     <div className="vibanda-theme min-h-screen pb-20 md:pb-0">
       <header className="px-4 pt-6 pb-2 md:px-8">
-      <div className="float-right"><NotificationBell ownerHome="/demo" /></div>
+        <div className="float-right">
+          <NotificationBell ownerHome="/demo" />
+        </div>
         {/* Sketch: tiny uppercase eyebrow date line */}
-        <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">{fmtDate()} · Nairobi</p>
+        <p className="mb-2 text-sm font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">
+          {fmtDate()} · Nairobi
+        </p>
         <nav className="hidden md:flex gap-1 mt-3">
           {TABS.map(({ href, label, icon: Icon }) => {
             const active = pathname === href;
@@ -47,7 +60,7 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-[12px] font-medium ${
+                className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium ${
                   active
                     ? "bg-[var(--v-primary)] text-[var(--v-primary-foreground)]"
                     : "text-[var(--v-muted-foreground)] hover:bg-[var(--v-muted)] hover:text-[var(--v-foreground)]"
@@ -59,7 +72,9 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
           })}
         </nav>
       </header>
-      <main className="mx-auto max-w-[1180px] px-4 pb-16 pt-4 sm:px-7 lg:px-10">{children}</main>
+      <main className="mx-auto max-w-[1180px] px-4 pb-16 pt-4 sm:px-7 lg:px-10">
+        {children}
+      </main>
       <nav className="fixed bottom-0 inset-x-0 md:hidden bg-[var(--v-card)] border-t border-[var(--v-border)] grid grid-cols-3">
         {TABS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
@@ -68,7 +83,9 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
               key={href}
               href={href}
               className={`flex flex-col items-center gap-1 py-3 text-xs ${
-                active ? "text-[var(--v-primary)]" : "text-[var(--v-muted-foreground)]"
+                active
+                  ? "text-[var(--v-primary)]"
+                  : "text-[var(--v-muted-foreground)]"
               }`}
             >
               <Icon size={20} /> {label}

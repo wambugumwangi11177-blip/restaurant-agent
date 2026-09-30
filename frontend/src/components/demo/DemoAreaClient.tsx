@@ -1,25 +1,202 @@
 "use client";
-// Demo Restaurant area page — cloned from VibandaAreaClient. Vibanda keeps these
-// pages in a "Waiting for verified MacSoft records" state until the source is
-// delivered and reconciled; Demo Restaurant records its data here directly, so
-// there is nothing to wait for and the page is always in its live layout.
-
-import { ArrowLeft, Database, LineChart, Table2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import DemoForecast from "@/components/demo/DemoForecast";
+import { ArrowLeft } from "lucide-react";
+import api from "@/lib/api";
+import { DEMO_MODULES, field, recordRows, cell } from "@/lib/demo-modules";
+import { RecordsTable, ValueChart } from "./DemoDataViews";
+import DemoForecast from "./DemoForecast";
 
-type View = { title: string; description: string; source: string; metrics: string[]; mode: "trend" | "timeline" | "status" | "exceptions"; visual: string; table: string; note: string };
-
-function EmptyMetric({ label }: { label: string }) { return <div className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-4"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)]">{label}</p><p className="font-display mt-3 text-2xl font-semibold">—</p><p className="mt-2 text-xs text-[var(--v-muted-foreground)]">No records yet</p></div>; }
-
-export default function DemoAreaClient({ areaKey, view }: { areaKey: string; view: View }) {
-  const primaryIcon = view.mode === "trend" ? <LineChart size={16} className="text-[var(--v-primary)]"/> : <Table2 size={16} className="text-[var(--v-primary)]"/>;
-  const primaryMessage = view.mode === "status" ? "Status details will appear as soon as records are entered. No state is being guessed." : view.mode === "timeline" ? "Recent activity will appear as soon as records are entered. No events are being invented." : view.mode === "exceptions" ? "Important exceptions will appear as soon as records are entered. A quiet state will remain simple and confirmed." : "The trend will appear as soon as records are entered. No shape or direction is being guessed.";
-
-  return <div className="animate-rise-in max-w-5xl space-y-7"><Link href="/demo" className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--v-primary)]"><ArrowLeft size={14}/> Back to overview</Link><div><p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">Demo Restaurant · owner view</p><h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-semibold tracking-[-0.045em]">{view.title}<span className="text-[var(--v-primary)]">.</span></h1><p className="mt-3 text-sm text-[var(--v-muted-foreground)]">{view.description}</p></div>
-    <div className="flex gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5"><Database className="mt-0.5 shrink-0 text-emerald-400" size={22}/><div><p className="font-semibold">Recorded directly in this system</p><p className="mt-1 text-sm text-[var(--v-muted-foreground)]">This page reads the records entered here. Nothing waits on MacSoft or an external data push. Forecasts appear only when the recorded history is sufficient.</p><p className="mt-3 text-xs text-[var(--v-muted-foreground)]">Information used: {view.source}</p></div></div>
-    <section><p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">At a glance</p><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{view.metrics.map((metric) => <EmptyMetric key={metric} label={metric}/>)}</div></section>
-    <section className="grid gap-4 lg:grid-cols-2"><div className="rounded-xl border border-dashed border-[var(--v-border)] bg-[var(--v-card)] p-5"><div className="flex items-center gap-2">{primaryIcon}<h2 className="font-display text-xl font-semibold">{view.visual}</h2></div><div className="mt-5 flex h-44 items-center justify-center rounded-lg border border-dashed border-[var(--v-border)] text-center"><p className="max-w-xs text-xs text-[var(--v-muted-foreground)]">{primaryMessage}</p></div></div><div className="rounded-xl border border-dashed border-[var(--v-border)] bg-[var(--v-card)] p-5"><div className="flex items-center gap-2"><Table2 size={16} className="text-[var(--v-primary)]"/><h2 className="font-display text-xl font-semibold">{view.table}</h2></div><div className="mt-5 flex h-44 items-center justify-center rounded-lg border border-dashed border-[var(--v-border)] text-center"><p className="max-w-xs text-xs text-[var(--v-muted-foreground)]">No records to list yet. The supporting detail appears here as soon as it is recorded.</p></div></div></section>
-    <DemoForecast area={areaKey} />
-    <div className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-5"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)]">What this page will help the owner know</p><p className="mt-3 text-sm leading-6 text-[var(--v-muted-foreground)]">{view.note}</p></div><div className="rounded-xl border border-dashed border-[var(--v-border)] px-5 py-7 text-center"><p className="text-sm font-semibold">No mock or sample data is being displayed.</p><p className="mt-2 text-xs text-[var(--v-muted-foreground)]">This system is the restaurant’s record.</p></div></div>;
+type View = {
+  title: string;
+  description: string;
+  source: string;
+  metrics: string[];
+  mode: "trend" | "timeline" | "status" | "exceptions";
+  visual: string;
+  table: string;
+  note: string;
+};
+export default function DemoAreaClient({
+  areaKey,
+  view,
+}: {
+  areaKey: string;
+  view: View;
+}) {
+  const config = DEMO_MODULES[areaKey];
+  const [data, setData] = useState<unknown>(null);
+  const [state, setState] = useState<"loading" | "ready" | "error">(
+    config?.endpoint ? "loading" : "ready",
+  );
+  const [reload, setReload] = useState(0);
+  useEffect(() => {
+    if (!config?.endpoint) return;
+    let active = true;
+    api
+      .get(config.endpoint, { timeout: 20000 })
+      .then((result) => {
+        if (!active) return;
+        if (result.data?.error || result.data?.available === false) {
+          setState("error");
+          return;
+        }
+        setData(result.data);
+        setState("ready");
+      })
+      .catch(() => {
+        if (active) setState("error");
+      });
+    return () => {
+      active = false;
+    };
+  }, [config, reload]);
+  const rows = recordRows(data, config?.rows).map((row) =>
+    areaKey === "menu"
+      ? {
+          ...row,
+          margin_pct:
+            typeof row.cost_price === "number" && row.cost_price > 0
+              ? row.margin_pct
+              : "Verify item cost",
+          classification:
+            Number(row.qty_sold) > 0 ? row.classification : "No recorded sales",
+        }
+      : row,
+  );
+  const metrics: Record<string, unknown> =
+    areaKey === "risk"
+      ? {
+          "Void spike flags": recordRows(data, ["void_spikes"]).length,
+          "Refund velocity flags": recordRows(data, ["refund_velocity"]).length,
+          "Payment mismatches": recordRows(data, ["payment_mismatches"]).length,
+          "Off-hours events": recordRows(data, ["off_hours"]).length,
+        }
+      : areaKey === "data-trust"
+        ? {
+            "Items checked": field(data, "summary.total_items"),
+            "Items with issues": field(data, "summary.items_with_issues"),
+            "Missing costs": field(data, "summary.missing_cost_count"),
+            "Cost coverage (%)": field(data, "summary.coverage_pct"),
+          }
+        : {};
+  const chartKey =
+    areaKey === "revenue" ? "revenue" : areaKey === "finance" ? "profit" : null;
+  const chartLabel = areaKey === "revenue" ? "date" : "channel";
+  return (
+    <div className="animate-rise-in space-y-7">
+      <Link
+        href="/demo"
+        className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[var(--v-primary)]"
+      >
+        <ArrowLeft size={16} /> Back to overview
+      </Link>
+      <header>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">
+          {view.title}
+        </h1>
+        <p className="mt-2 text-base text-[var(--v-muted-foreground)]">
+          {view.description}
+        </p>
+      </header>
+      <p className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-4 text-sm text-[var(--v-muted-foreground)]">
+        <strong className="block text-[var(--v-foreground)]">
+          Recorded directly in this system
+        </strong>
+        <span className="mt-1 block">{config?.scope ?? view.source}</span>
+      </p>
+      {state === "loading" && (
+        <p role="status">Loading recorded {view.title.toLowerCase()}…</p>
+      )}
+      {state === "error" && (
+        <div
+          role="alert"
+          className="rounded-xl border border-[var(--v-border)] p-5"
+        >
+          <p>
+            Could not load {view.title.toLowerCase()}. This does not mean there
+            are no records.
+          </p>
+          <button
+            type="button"
+            className="mt-3 min-h-10 rounded-lg border border-[var(--v-border)] px-4 font-semibold"
+            onClick={() => {
+              setState("loading");
+              setReload((n) => n + 1);
+            }}
+          >
+            Try again
+          </button>
+        </div>
+      )}
+      {state === "ready" && (
+        <>
+          {Object.keys(metrics).length > 0 && data != null && (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {Object.entries(metrics).map(([label, value]) => (
+                <div
+                  key={label}
+                  className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-4"
+                >
+                  <p className="text-sm text-[var(--v-muted-foreground)]">
+                    {label}
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold">{cell(value)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          {chartKey && rows.length > 0 && (
+            <section className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-5">
+              <h2 className="mb-4 text-xl font-semibold">{view.visual}</h2>
+              <ValueChart
+                rows={rows}
+                labelKey={chartLabel}
+                valueKey={chartKey}
+                title={view.visual}
+                format={areaKey === "finance" ? "cents" : "money"}
+              />
+            </section>
+          )}
+          <section>
+            <h2 className="mb-4 text-xl font-semibold">{view.table}</h2>
+            <RecordsTable
+              rows={rows}
+              columns={config?.columns ?? []}
+              caption={config?.scope ?? view.source}
+              empty={config?.empty ?? "No records are available for this view."}
+            />
+          </section>
+          {areaKey === "cash-reconciliation" && (
+            <section>
+              <h2 className="mb-4 text-xl font-semibold">
+                M-Pesa settlement exceptions
+              </h2>
+              <RecordsTable
+                rows={recordRows(data, ["mpesa_mismatches"])}
+                columns={[
+                  { key: "order_id", label: "Order" },
+                  {
+                    key: "total_cents",
+                    label: "Recorded total",
+                    format: "cents",
+                  },
+                  { key: "reason", label: "Reason" },
+                ]}
+                caption="Last 24 hours · recorded M-Pesa mismatches"
+                empty="No M-Pesa mismatches were returned. This alone does not confirm that all payments have been reconciled."
+              />
+            </section>
+          )}
+        </>
+      )}
+      <DemoForecast area={areaKey} />
+      <Link
+        href={`/demo/os?q=${encodeURIComponent(`What should I review in ${view.title.toLowerCase()} and why?`)}`}
+        className="inline-flex min-h-11 items-center rounded-lg bg-[var(--v-primary)] px-4 text-sm font-semibold text-[var(--v-primary-foreground)]"
+      >
+        Ask AI about {view.title.toLowerCase()}
+      </Link>
+    </div>
+  );
 }

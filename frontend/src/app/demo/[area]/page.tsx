@@ -3,33 +3,252 @@
 import DemoAreaClient from "@/components/demo/DemoAreaClient";
 
 type AreaMode = "trend" | "timeline" | "status" | "exceptions";
-type AreaView = { title: string; description: string; source: string; metrics: string[]; mode: AreaMode; visual: string; table: string; note: string };
+type AreaView = {
+  title: string;
+  description: string;
+  source: string;
+  metrics: string[];
+  mode: AreaMode;
+  visual: string;
+  table: string;
+  note: string;
+};
 const views: Record<string, AreaView> = {
-  revenue: { title: "Revenue", description: "Understand what the restaurant has earned.", source: "Recorded sales and payments", metrics: ["Revenue today", "Orders", "Average order", "Unpaid"], mode: "trend", visual: "Revenue over time", table: "Payment and sales breakdown", note: "The owner will see money first, then the pattern behind it: when sales happened, what channel they came through, and what remains unpaid." },
-  orders: { title: "Orders", description: "See the orders coming into the restaurant.", source: "Recorded restaurant orders", metrics: ["Orders today", "Open now", "Completed", "Cancelled"], mode: "trend", visual: "Orders by hour", table: "Recent orders", note: "This page will answer whether service is moving normally and where orders are getting stuck." },
-  kitchen: { title: "Kitchen", description: "Follow what needs to be prepared and what is waiting.", source: "Active kitchen orders", metrics: ["Open tickets", "Average prep time", "Delayed", "At risk"], mode: "exceptions", visual: "Preparation time by hour", table: "Live kitchen queue", note: "The owner needs the exception view: delays, bottlenecks, and dishes affecting service—not kitchen system terminology." },
-  stock: { title: "Stock", description: "Keep an eye on ingredients and supplies.", source: "Recorded inventory and stock movements", metrics: ["Items tracked", "Low stock", "Expiring soon", "Waste"], mode: "exceptions", visual: "Stock risk", table: "Items needing attention", note: "This will connect ingredients to the dishes they affect, so a stock issue becomes a business impact the owner can understand." },
-  bookings: { title: "Bookings", description: "See reservations and expected guests.", source: "Recorded reservations", metrics: ["Covers today", "Next booking", "Waitlist", "No-show rate"], mode: "trend", visual: "Expected guests by time", table: "Today’s bookings", note: "The owner needs a forward view of demand, seating pressure, and no-show risk." },
-  team: { title: "Team", description: "View the people working in the restaurant.", source: "Recorded schedules and attendance", metrics: ["Scheduled", "On shift", "Coverage gap", "Overtime risk"], mode: "status", visual: "Coverage across the day", table: "Team overview", note: "This is an owner summary of coverage and labor risk, not a staff administration screen." },
-  menu: { title: "Menu & pricing", description: "Understand what you sell, at what price, and where margin may be at risk.", source: "Recorded menu, prices, and item performance", metrics: ["Items on menu", "Best sellers", "Margin at risk", "Price changes"], mode: "trend", visual: "Popularity versus profitability", table: "Menu items needing review", note: "The owner should see which dishes attract guests, which make money, and which prices or costs need attention." },
-  finance: { title: "Finance", description: "Review cash movement and reconciliation signals.", source: "Recorded sales and settlement information", metrics: ["Revenue", "Collected", "Unpaid", "Difference"], mode: "trend", visual: "Money in versus money recorded", table: "Settlement breakdown", note: "Finance should show confidence in the numbers and clearly separate recorded sales from money actually reconciled." },
-  expenses: { title: "Expenses", description: "Track the cost of running the restaurant when an expense source is connected.", source: "A connected expense source", metrics: ["Expenses", "Food cost", "Labor cost", "Other costs"], mode: "trend", visual: "Costs over time", table: "Expense categories", note: "An expense page will only become active when a real expense source is connected. No costs are invented here." },
-  suppliers: { title: "Suppliers", description: "See who supplies the restaurant and how purchasing is performing.", source: "Recorded suppliers and purchasing", metrics: ["Active suppliers", "Open orders", "Late deliveries", "Price changes"], mode: "exceptions", visual: "Supplier reliability", table: "Supplier commitments", note: "The owner needs supplier reliability, price movement, and what a delay could affect in the menu." },
-  purchasing: { title: "Purchasing", description: "Review purchase orders and supplier commitments.", source: "Recorded purchase orders", metrics: ["Open orders", "Awaiting approval", "In transit", "Overdue"], mode: "exceptions", visual: "Purchasing commitments", table: "Open purchase orders", note: "Purchasing is a cash commitment view: what has been ordered, what is due, and what needs a decision." },
-  "cash-reconciliation": { title: "Cash reconciliation", description: "Compare recorded payments with cash, M-Pesa, and card settlement.", source: "Recorded payments and settlement records", metrics: ["Recorded sales", "Cash", "M-Pesa", "Unmatched"], mode: "exceptions", visual: "Recorded versus settled", table: "Reconciliation exceptions", note: "Only exceptions should demand the owner’s attention. A clean day should look simple and confirmed." },
-  pos: { title: "Point of sale", description: "Understand sales channels and till activity.", source: "Recorded point-of-sale transactions", metrics: ["Transactions", "Dine-in", "Takeaway", "Delivery"], mode: "trend", visual: "Sales by channel", table: "Channel performance", note: "This shows how business enters the restaurant and which channels are growing or creating issues." },
-  marketing: { title: "Marketing", description: "Review campaigns and guest growth opportunities.", source: "Recorded guest and campaign activity", metrics: ["Returning guests", "New guests", "Campaigns", "Response"], mode: "trend", visual: "Guest growth", table: "Opportunities", note: "Marketing should stay practical: which offer or guest segment deserves attention and why." },
-  risk: { title: "Fraud and risk", description: "Review unusual activity and control risks.", source: "Recorded order and control events", metrics: ["Open risks", "Unusual refunds", "Voids", "Review status"], mode: "exceptions", visual: "Risk events", table: "Items needing review", note: "This page should be quiet when controls are healthy and precise when something needs investigation." },
-  notifications: { title: "Notifications", description: "Review important changes, alerts, and reminders.", source: "Verified owner alerts", metrics: ["Unread", "Urgent", "Acknowledged", "Last alert"], mode: "timeline", visual: "Recent alerts", table: "Actions requiring attention", note: "Notifications are a delivery mechanism; the owner should see clear action and context, not system noise." },
-  intelligence: { title: "Business intelligence", description: "See the few decisions and risks that matter most to the owner today.", source: "Verified business signals", metrics: ["Open decisions", "High priority", "Confidence", "Impact"], mode: "exceptions", visual: "Business signals", table: "Decisions and recommendations", note: "Every recommendation will explain what changed, why it matters, what data supports it, and what the owner can do." },
-  "data-trust": { title: "Data trust", description: "See how complete and up to date the records entered in this system are.", source: "Records entered directly in this system", metrics: ["Data source", "Records entered", "Last entry", "Data quality"], mode: "status", visual: "Recording status", table: "Record checks", note: "This is the owner’s confidence layer: freshness, completeness, duplicates, and timestamps of what has been recorded here." },
-  audit: { title: "Audit trail", description: "Review important changes, approvals, and decisions.", source: "Verified business changes and approvals", metrics: ["Changes today", "Approvals", "Price edits", "Stock edits"], mode: "timeline", visual: "Recent activity", table: "Changes requiring context", note: "The audit trail protects the business by showing what changed, when, and which decision or user caused it." },
-  settings: { title: "Restaurant settings", description: "Manage the restaurant profile and connected services.", source: "Restaurant profile and connections", metrics: ["Profile", "Data source", "Last sync", "Alerts"], mode: "status", visual: "Connection status", table: "Configured services", note: "Settings should be simple owner controls for the restaurant identity, connections, and alert preferences." },
+  support: {
+    title: "Support",
+    description: "Review help requests for your restaurant.",
+    source: "Recorded support tickets",
+    metrics: [],
+    mode: "timeline",
+    visual: "Support activity",
+    table: "Your support tickets",
+    note: "Track the status of help requests.",
+  },
+  revenue: {
+    title: "Revenue",
+    description: "Understand what the restaurant has earned.",
+    source: "Recorded sales and payments",
+    metrics: ["Revenue today", "Orders", "Average order", "Unpaid"],
+    mode: "trend",
+    visual: "Revenue over time",
+    table: "Payment and sales breakdown",
+    note: "The owner will see money first, then the pattern behind it: when sales happened, what channel they came through, and what remains unpaid.",
+  },
+  orders: {
+    title: "Orders",
+    description: "See the orders coming into the restaurant.",
+    source: "Recorded restaurant orders",
+    metrics: ["Orders today", "Open now", "Completed", "Cancelled"],
+    mode: "trend",
+    visual: "Orders by hour",
+    table: "Recent orders",
+    note: "This page will answer whether service is moving normally and where orders are getting stuck.",
+  },
+  kitchen: {
+    title: "Kitchen",
+    description: "Follow what needs to be prepared and what is waiting.",
+    source: "Active kitchen orders",
+    metrics: ["Open tickets", "Average prep time", "Delayed", "At risk"],
+    mode: "exceptions",
+    visual: "Preparation time by hour",
+    table: "Live kitchen queue",
+    note: "The owner needs the exception view: delays, bottlenecks, and dishes affecting service—not kitchen system terminology.",
+  },
+  stock: {
+    title: "Stock",
+    description: "Keep an eye on ingredients and supplies.",
+    source: "Recorded inventory and stock movements",
+    metrics: ["Items tracked", "Low stock", "Expiring soon", "Waste"],
+    mode: "exceptions",
+    visual: "Stock risk",
+    table: "Items needing attention",
+    note: "This will connect ingredients to the dishes they affect, so a stock issue becomes a business impact the owner can understand.",
+  },
+  bookings: {
+    title: "Bookings",
+    description: "See reservations and expected guests.",
+    source: "Recorded reservations",
+    metrics: ["Covers today", "Next booking", "Waitlist", "No-show rate"],
+    mode: "trend",
+    visual: "Expected guests by time",
+    table: "Today’s bookings",
+    note: "The owner needs a forward view of demand, seating pressure, and no-show risk.",
+  },
+  team: {
+    title: "Team",
+    description: "View the people working in the restaurant.",
+    source: "Recorded schedules and attendance",
+    metrics: ["Scheduled", "On shift", "Coverage gap", "Overtime risk"],
+    mode: "status",
+    visual: "Coverage across the day",
+    table: "Team overview",
+    note: "This is an owner summary of coverage and labor risk, not a staff administration screen.",
+  },
+  menu: {
+    title: "Menu & pricing",
+    description:
+      "Understand what you sell, at what price, and where margin may be at risk.",
+    source: "Recorded menu, prices, and item performance",
+    metrics: [
+      "Items on menu",
+      "Best sellers",
+      "Margin at risk",
+      "Price changes",
+    ],
+    mode: "trend",
+    visual: "Popularity versus profitability",
+    table: "Menu items needing review",
+    note: "The owner should see which dishes attract guests, which make money, and which prices or costs need attention.",
+  },
+  finance: {
+    title: "Finance",
+    description: "Review cash movement and reconciliation signals.",
+    source: "Recorded sales and settlement information",
+    metrics: ["Revenue", "Collected", "Unpaid", "Difference"],
+    mode: "trend",
+    visual: "Money in versus money recorded",
+    table: "Settlement breakdown",
+    note: "Finance should show confidence in the numbers and clearly separate recorded sales from money actually reconciled.",
+  },
+  expenses: {
+    title: "Expenses",
+    description:
+      "Track the cost of running the restaurant when an expense source is connected.",
+    source: "A connected expense source",
+    metrics: ["Expenses", "Food cost", "Labor cost", "Other costs"],
+    mode: "trend",
+    visual: "Costs over time",
+    table: "Expense categories",
+    note: "An expense page will only become active when a real expense source is connected. No costs are invented here.",
+  },
+  suppliers: {
+    title: "Suppliers",
+    description:
+      "See who supplies the restaurant and how purchasing is performing.",
+    source: "Recorded suppliers and purchasing",
+    metrics: [
+      "Active suppliers",
+      "Open orders",
+      "Late deliveries",
+      "Price changes",
+    ],
+    mode: "exceptions",
+    visual: "Supplier reliability",
+    table: "Supplier commitments",
+    note: "The owner needs supplier reliability, price movement, and what a delay could affect in the menu.",
+  },
+  purchasing: {
+    title: "Purchasing",
+    description: "Review purchase orders and supplier commitments.",
+    source: "Recorded purchase orders",
+    metrics: ["Open orders", "Awaiting approval", "In transit", "Overdue"],
+    mode: "exceptions",
+    visual: "Purchasing commitments",
+    table: "Open purchase orders",
+    note: "Purchasing is a cash commitment view: what has been ordered, what is due, and what needs a decision.",
+  },
+  "cash-reconciliation": {
+    title: "Cash reconciliation",
+    description:
+      "Compare recorded payments with cash, M-Pesa, and card settlement.",
+    source: "Recorded payments and settlement records",
+    metrics: ["Recorded sales", "Cash", "M-Pesa", "Unmatched"],
+    mode: "exceptions",
+    visual: "Recorded versus settled",
+    table: "Reconciliation exceptions",
+    note: "Only exceptions should demand the owner’s attention. A clean day should look simple and confirmed.",
+  },
+  pos: {
+    title: "Point of sale",
+    description: "Understand sales channels and till activity.",
+    source: "Recorded point-of-sale transactions",
+    metrics: ["Transactions", "Dine-in", "Takeaway", "Delivery"],
+    mode: "trend",
+    visual: "Sales by channel",
+    table: "Channel performance",
+    note: "This shows how business enters the restaurant and which channels are growing or creating issues.",
+  },
+  marketing: {
+    title: "Marketing",
+    description: "Review campaigns and guest growth opportunities.",
+    source: "Recorded guest and campaign activity",
+    metrics: ["Returning guests", "New guests", "Campaigns", "Response"],
+    mode: "trend",
+    visual: "Guest growth",
+    table: "Opportunities",
+    note: "Marketing should stay practical: which offer or guest segment deserves attention and why.",
+  },
+  risk: {
+    title: "Fraud and risk",
+    description: "Review unusual activity and control risks.",
+    source: "Recorded order and control events",
+    metrics: ["Open risks", "Unusual refunds", "Voids", "Review status"],
+    mode: "exceptions",
+    visual: "Risk events",
+    table: "Items needing review",
+    note: "This page should be quiet when controls are healthy and precise when something needs investigation.",
+  },
+  notifications: {
+    title: "Notifications",
+    description: "Review important changes, alerts, and reminders.",
+    source: "Verified owner alerts",
+    metrics: ["Unread", "Urgent", "Acknowledged", "Last alert"],
+    mode: "timeline",
+    visual: "Recent alerts",
+    table: "Actions requiring attention",
+    note: "Notifications are a delivery mechanism; the owner should see clear action and context, not system noise.",
+  },
+  intelligence: {
+    title: "Business intelligence",
+    description:
+      "See the few decisions and risks that matter most to the owner today.",
+    source: "Verified business signals",
+    metrics: ["Open decisions", "High priority", "Confidence", "Impact"],
+    mode: "exceptions",
+    visual: "Business signals",
+    table: "Decisions and recommendations",
+    note: "Every recommendation will explain what changed, why it matters, what data supports it, and what the owner can do.",
+  },
+  "data-trust": {
+    title: "Data trust",
+    description:
+      "See how complete and up to date the records entered in this system are.",
+    source: "Records entered directly in this system",
+    metrics: ["Data source", "Records entered", "Last entry", "Data quality"],
+    mode: "status",
+    visual: "Recording status",
+    table: "Record checks",
+    note: "This is the owner’s confidence layer: freshness, completeness, duplicates, and timestamps of what has been recorded here.",
+  },
+  audit: {
+    title: "Audit trail",
+    description: "Review important changes, approvals, and decisions.",
+    source: "Verified business changes and approvals",
+    metrics: ["Changes today", "Approvals", "Price edits", "Stock edits"],
+    mode: "timeline",
+    visual: "Recent activity",
+    table: "Changes requiring context",
+    note: "The audit trail protects the business by showing what changed, when, and which decision or user caused it.",
+  },
+  settings: {
+    title: "Restaurant settings",
+    description: "Manage the restaurant profile and connected services.",
+    source: "Restaurant profile and connections",
+    metrics: ["Profile", "Data source", "Last sync", "Alerts"],
+    mode: "status",
+    visual: "Connection status",
+    table: "Configured services",
+    note: "Settings should be simple owner controls for the restaurant identity, connections, and alert preferences.",
+  },
 };
 
-export default async function DemoAreaPage({ params }: { params: Promise<{ area: string }> }) {
+export default async function DemoAreaPage({
+  params,
+}: {
+  params: Promise<{ area: string }>;
+}) {
   const { area: areaKey } = await params;
   const view = views[areaKey];
   if (!view) return <p className="text-sm">This area could not be found.</p>;
-  return <DemoAreaClient areaKey={areaKey} view={view} />;
+  return <DemoAreaClient key={areaKey} areaKey={areaKey} view={view} />;
 }

@@ -14,7 +14,7 @@ from ai.cost_model import cost_usd
 
 
 def narrate(db, user, restaurant_id, messages, system, max_tokens, prompt_version,
-            temperature=0.0, tier="medium"):
+            temperature=0.0, tier="medium", extra_body=None):
     """One scrubbed, budget-checked, metered provider call.
 
     `temperature`/`tier` default to the deterministic-narration settings every
@@ -35,10 +35,13 @@ def narrate(db, user, restaurant_id, messages, system, max_tokens, prompt_versio
     # UTF-8 bytes overestimate ordinary text tokens. Include a framing margin.
     input_bound = len(clean_system.encode()) + sum(len(m['content'].encode()) for m in clean_messages) + 1024
     estimate = cost_usd(llm_client.model_for_tier(tier), input_bound, max_tokens)
+    if extra_body:
+        estimate += 0.01  # a provider-side web search is billed per request, on top of tokens
     if spent + estimate >= spend_cap.DAILY_LLM_SPEND_CAP_USD:
         raise HTTPException(429, "Daily estimated AI budget reached. Deterministic reports remain available.")
+    extra = {"extra_body": extra_body} if extra_body else {}
     result = llm_client.chat_with_usage(clean_messages, system=clean_system,
-                                        max_tokens=max_tokens, tier=tier, temperature=temperature)
+                                        max_tokens=max_tokens, tier=tier, temperature=temperature, **extra)
     # Meter paid output even if a later grounding check rejects its content.
     db.add(models.TokenUsage(restaurant_id=restaurant_id, llm_model=result.model,
                             input_tokens=result.usage.input_tokens,

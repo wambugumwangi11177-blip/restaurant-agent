@@ -218,6 +218,7 @@ def chat_with_usage(
     model: str | None = None,
     tier: str | None = None,
     temperature: float | None = None,
+    extra_body: dict | None = None,
 ):
     """
     Send a chat completion and return BOTH the reply text and token usage,
@@ -263,6 +264,9 @@ def chat_with_usage(
     }
     if temperature is not None:
         kwargs["temperature"] = temperature
+    if extra_body:
+        # Provider-specific request fields, e.g. OpenRouter's web-search plugin. Only sent when asked for.
+        kwargs["extra_body"] = extra_body
     response = client.chat.completions.create(**kwargs)
     return SimpleNamespace(
         text=response.choices[0].message.content or "",

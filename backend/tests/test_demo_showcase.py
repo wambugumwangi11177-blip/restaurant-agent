@@ -170,6 +170,27 @@ def test_creative_ideas_use_only_the_final_block_and_are_cached(client, demo_hea
         'Ask regular guests to order takeaway by M-Pesa message.']
     assert not a['cached'] and b['cached'] and narrate.call_count == 1
 
+def test_web_research_is_off_unless_enabled_on_openrouter(client, demo_headers, monkeypatch):
+    from routers import demo as router
+    from ai import llm_client
+    router._cache.clear()
+    monkeypatch.delenv('DEMO_IDEAS_WEB', raising=False)
+    assert router.web_research_on() is False
+    monkeypatch.setenv('DEMO_IDEAS_WEB', 'true')
+    monkeypatch.setattr(llm_client, '_PROVIDER', 'groq')
+    assert router.web_research_on() is False
+    monkeypatch.setattr(llm_client, '_PROVIDER', 'openrouter')
+    assert router.web_research_on() is True
+    raw = "FINAL:\n1. Offer a lunch combo of vegetable bowl and fresh juice.\n"
+    with patch('ai.owner_narrative.narrate', return_value=raw) as narrate, patch('ai.creative.enabled', return_value=True):
+        client.post('/api/v1/demo/ideas', headers=demo_headers, json={'creative': True})
+    assert narrate.call_args.kwargs['extra_body'] == router.WEB_PLUGIN
+    router._cache.clear()
+    monkeypatch.delenv('DEMO_IDEAS_WEB')
+    with patch('ai.owner_narrative.narrate', return_value=raw) as narrate, patch('ai.creative.enabled', return_value=True):
+        client.post('/api/v1/demo/ideas', headers=demo_headers, json={'creative': True})
+    assert 'extra_body' not in narrate.call_args.kwargs
+
 def test_creative_final_contract_and_ideas_parser():
     from routers.demo import creative_final, creative_ideas
     leaked = "Constraints:\n- two sentences\nWe need to be brief.\nFINAL: Use the vegetables first. Sell a vegetable bowl special."

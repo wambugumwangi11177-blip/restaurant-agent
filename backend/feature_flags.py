@@ -23,6 +23,7 @@ import os
 
 # name -> (default, description)
 _FLAGS: dict[str, tuple[bool, str]] = {
+    "demo_creative": (False, "On-demand, cached creative writing for the authenticated Demo owner only."),
     "observer_mode": (False, "Read-only external-source deployment; blocks operational writes, webhooks and automations."),
     # Master kill-switch for all LLM narration. Default ON. Set
     # FEATURE_AI_NARRATION=false to instantly stop every LLM call (dashboard

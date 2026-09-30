@@ -1,202 +1,194 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import api from "@/lib/api";
-import { DEMO_MODULES, field, recordRows, cell } from "@/lib/demo-modules";
-import { RecordsTable, ValueChart } from "./DemoDataViews";
-import DemoForecast from "./DemoForecast";
-
-type View = {
-  title: string;
-  description: string;
-  source: string;
-  metrics: string[];
-  mode: "trend" | "timeline" | "status" | "exceptions";
-  visual: string;
-  table: string;
-  note: string;
+import { fmtKes } from "@/lib/format";
+import DemoSimulation from "./DemoSimulation";
+type Area = {
+  metrics: { label: string; value: string | number }[];
+  columns: string[];
+  rows: (string | number)[][];
+  action: string;
+  forecast: { date: string; revenue: number; low: number; high: number }[];
+  forecast_method: string;
+  trend: { date: string; revenue: number }[];
 };
 export default function DemoAreaClient({
   areaKey,
   view,
 }: {
   areaKey: string;
-  view: View;
+  view: { title: string; description: string };
 }) {
-  const config = DEMO_MODULES[areaKey];
-  const [data, setData] = useState<unknown>(null);
-  const [state, setState] = useState<"loading" | "ready" | "error">(
-    config?.endpoint ? "loading" : "ready",
-  );
-  const [reload, setReload] = useState(0);
+  const [loaded, setLoaded] = useState<{
+    key: string;
+    data?: Area;
+    error?: boolean;
+  } | null>(null);
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
-    if (!config?.endpoint) return;
     let active = true;
     api
-      .get(config.endpoint, { timeout: 20000 })
-      .then((result) => {
-        if (!active) return;
-        if (result.data?.error || result.data?.available === false) {
-          setState("error");
-          return;
-        }
-        setData(result.data);
-        setState("ready");
+      .get<Area>(`/api/v1/demo/areas/${areaKey}`)
+      .then((r) => {
+        if (active) setLoaded({ key: areaKey, data: r.data });
       })
       .catch(() => {
-        if (active) setState("error");
+        if (active) setLoaded({ key: areaKey, error: true });
       });
     return () => {
       active = false;
     };
-  }, [config, reload]);
-  const rows = recordRows(data, config?.rows).map((row) =>
-    areaKey === "menu"
-      ? {
-          ...row,
-          margin_pct:
-            typeof row.cost_price === "number" && row.cost_price > 0
-              ? row.margin_pct
-              : "Verify item cost",
-          classification:
-            Number(row.qty_sold) > 0 ? row.classification : "No recorded sales",
-        }
-      : row,
-  );
-  const metrics: Record<string, unknown> =
-    areaKey === "risk"
-      ? {
-          "Void spike flags": recordRows(data, ["void_spikes"]).length,
-          "Refund velocity flags": recordRows(data, ["refund_velocity"]).length,
-          "Payment mismatches": recordRows(data, ["payment_mismatches"]).length,
-          "Off-hours events": recordRows(data, ["off_hours"]).length,
-        }
-      : areaKey === "data-trust"
-        ? {
-            "Items checked": field(data, "summary.total_items"),
-            "Items with issues": field(data, "summary.items_with_issues"),
-            "Missing costs": field(data, "summary.missing_cost_count"),
-            "Cost coverage (%)": field(data, "summary.coverage_pct"),
-          }
-        : {};
-  const chartKey =
-    areaKey === "revenue" ? "revenue" : areaKey === "finance" ? "profit" : null;
-  const chartLabel = areaKey === "revenue" ? "date" : "channel";
+  }, [areaKey, retry]);
+  const data = loaded?.key === areaKey ? loaded.data : undefined;
   return (
-    <div className="animate-rise-in space-y-7">
-      <Link
-        href="/demo"
-        className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[var(--v-primary)]"
-      >
-        <ArrowLeft size={16} /> Back to overview
+    <div className="space-y-7 animate-rise-in">
+      <Link href="/demo" className="text-sm text-[var(--v-primary)]">
+        ← Back to Home
       </Link>
-      <header>
-        <h1 className="font-display text-3xl font-semibold tracking-tight">
-          {view.title}
-        </h1>
-        <p className="mt-2 text-base text-[var(--v-muted-foreground)]">
-          {view.description}
+      <div>
+        <p className="text-xs uppercase tracking-widest text-[var(--v-muted-foreground)]">
+          Demo Restaurant
         </p>
-      </header>
-      <p className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-4 text-sm text-[var(--v-muted-foreground)]">
-        <strong className="block text-[var(--v-foreground)]">
-          Recorded directly in this system
-        </strong>
-        <span className="mt-1 block">{config?.scope ?? view.source}</span>
-      </p>
-      {state === "loading" && (
-        <p role="status">Loading recorded {view.title.toLowerCase()}…</p>
-      )}
-      {state === "error" && (
-        <div
-          role="alert"
-          className="rounded-xl border border-[var(--v-border)] p-5"
-        >
-          <p>
-            Could not load {view.title.toLowerCase()}. This does not mean there
-            are no records.
-          </p>
+        <h1 className="font-display mt-2 text-4xl">{view.title}.</h1>
+        <p className="mt-3 text-sm">{view.description}</p>
+      </div>
+      {loaded?.error ? (
+        <div role="alert">
+          This area could not load.{" "}
           <button
-            type="button"
-            className="mt-3 min-h-10 rounded-lg border border-[var(--v-border)] px-4 font-semibold"
+            className="underline"
             onClick={() => {
-              setState("loading");
-              setReload((n) => n + 1);
+              setLoaded(null);
+              setRetry((v) => v + 1);
             }}
           >
             Try again
           </button>
         </div>
-      )}
-      {state === "ready" && (
+      ) : !data ? (
+        <p role="status">Loading the sample analysis…</p>
+      ) : (
         <>
-          {Object.keys(metrics).length > 0 && data != null && (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {Object.entries(metrics).map(([label, value]) => (
-                <div
-                  key={label}
-                  className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-4"
-                >
-                  <p className="text-sm text-[var(--v-muted-foreground)]">
-                    {label}
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold">{cell(value)}</p>
-                </div>
-              ))}
-            </div>
-          )}
-          {chartKey && rows.length > 0 && (
-            <section className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-5">
-              <h2 className="mb-4 text-xl font-semibold">{view.visual}</h2>
-              <ValueChart
-                rows={rows}
-                labelKey={chartLabel}
-                valueKey={chartKey}
-                title={view.visual}
-                format={areaKey === "finance" ? "cents" : "money"}
-              />
-            </section>
-          )}
-          <section>
-            <h2 className="mb-4 text-xl font-semibold">{view.table}</h2>
-            <RecordsTable
-              rows={rows}
-              columns={config?.columns ?? []}
-              caption={config?.scope ?? view.source}
-              empty={config?.empty ?? "No records are available for this view."}
-            />
-          </section>
-          {areaKey === "cash-reconciliation" && (
-            <section>
-              <h2 className="mb-4 text-xl font-semibold">
-                M-Pesa settlement exceptions
+          <div className="grid gap-3 sm:grid-cols-3">
+            {data.metrics.map((m) => (
+              <article
+                key={m.label}
+                className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-5"
+              >
+                <p className="text-xs text-[var(--v-muted-foreground)]">
+                  {m.label}
+                </p>
+                <p className="font-display mt-3 text-2xl">{m.value}</p>
+              </article>
+            ))}
+          </div>
+          {data.trend.length > 0 && (
+            <section className="rounded-xl border border-[var(--v-border)] p-5">
+              <h2 className="font-display text-xl">
+                Sales context · last 7 sample days
               </h2>
-              <RecordsTable
-                rows={recordRows(data, ["mpesa_mismatches"])}
-                columns={[
-                  { key: "order_id", label: "Order" },
-                  {
-                    key: "total_cents",
-                    label: "Recorded total",
-                    format: "cents",
-                  },
-                  { key: "reason", label: "Reason" },
-                ]}
-                caption="Last 24 hours · recorded M-Pesa mismatches"
-                empty="No M-Pesa mismatches were returned. This alone does not confirm that all payments have been reconciled."
-              />
+              <div
+                className="mt-5 flex h-36 items-end gap-3"
+                role="img"
+                aria-label="Sample daily revenue; exact values below each bar"
+              >
+                {data.trend.map((r) => (
+                  <div
+                    key={r.date}
+                    className="flex flex-1 flex-col items-center gap-2 text-[10px]"
+                  >
+                    <div
+                      className="w-full rounded-t bg-[var(--v-primary)]"
+                      style={{
+                        height: Math.max(
+                          4,
+                          (r.revenue /
+                            Math.max(...data.trend.map((x) => x.revenue))) *
+                            85,
+                        ),
+                      }}
+                    />
+                    <span>{fmtKes(r.revenue)}</span>
+                    <span>{r.date.slice(5)}</span>
+                  </div>
+                ))}
+              </div>
             </section>
+          )}
+          <section className="overflow-x-auto rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-5">
+            <h2 className="font-display mb-4 text-xl">Supporting evidence</h2>
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr>
+                  {data.columns.map((c) => (
+                    <th
+                      scope="col"
+                      className="border-b border-[var(--v-border)] p-3"
+                      key={c}
+                    >
+                      {c}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map((row, i) => (
+                  <tr key={i}>
+                    {row.map((v, j) => (
+                      <td
+                        className="border-b border-[var(--v-border)] p-3"
+                        key={j}
+                      >
+                        {v}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+          {data.forecast.length > 0 && (
+            <section>
+              <h2 className="font-display text-2xl">
+                Looking ahead · next 7 days
+              </h2>
+              <p className="my-3 text-xs text-[var(--v-muted-foreground)]">
+                {data.forecast_method}
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {data.forecast.map((r) => (
+                  <article
+                    className="rounded-xl border border-[var(--v-border)] p-4"
+                    key={r.date}
+                  >
+                    <p className="text-xs">{r.date}</p>
+                    <p className="font-display my-2 text-xl">
+                      {fmtKes(r.revenue)}
+                    </p>
+                    <p className="text-xs">
+                      Range {fmtKes(r.low)}–{fmtKes(r.high)}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+          <section className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-5">
+            <h2 className="font-display text-xl">Recommended next step</h2>
+            <p className="my-3 text-sm leading-6">{data.action}</p>
+            <Link
+              className="text-sm font-semibold text-[var(--v-primary)]"
+              href={`/demo/os?topic=${areaKey}&q=${encodeURIComponent(`Explain the ${view.title.toLowerCase()} evidence and what I should do next.`)}`}
+            >
+              Discuss this with OS →
+            </Link>
+          </section>
+          {["menu", "intelligence", "finance"].includes(areaKey) && (
+            <DemoSimulation />
           )}
         </>
       )}
-      <DemoForecast area={areaKey} />
-      <Link
-        href={`/demo/os?q=${encodeURIComponent(`What should I review in ${view.title.toLowerCase()} and why?`)}`}
-        className="inline-flex min-h-11 items-center rounded-lg bg-[var(--v-primary)] px-4 text-sm font-semibold text-[var(--v-primary-foreground)]"
-      >
-        Ask AI about {view.title.toLowerCase()}
-      </Link>
     </div>
   );
 }

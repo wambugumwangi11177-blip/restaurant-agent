@@ -1,0 +1,59 @@
+# Demo Restaurant showcase
+
+Demo is a separate tenant with a Home / OS / Reports shell under `/demo`.
+The new `/api/v1/demo/*` routes require both the configured Demo owner email
+(`DEMO_RESTAURANT_OWNER_EMAIL`, default `owner@demo-restaurant.example`) and the
+Demo tenant and selected restaurant. Naming another tenant Demo does not grant access.
+
+`backend/demo_scenario.py` holds one deterministic scenario: 56 daily summaries,
+six dishes and three opportunities. These are process-memory Python values,
+never inserted as orders, menu items, inventory or payments. Every screen labels
+them as illustrative. Existing operational APIs and Vibanda's source gates remain
+separate. No schema migration is needed; the existing Alembic head remains 050.
+
+## What works
+
+- Home totals, all 20 area evidence views, period reports and OS explanations.
+- Seven-day weekday-mean revenue projections; the range describes sample
+  variation, not a calibrated probability or guaranteed outcome.
+- A price/demand simulator recalculates food contribution without changing prices.
+- Potential savings show quantities, rates and assumptions. They are not realised
+  savings, and no subscription ROI ratio is claimed without a subscription cost.
+- Attention acknowledgement is local to the page. External messaging, purchasing,
+  roster changes and other business actions are not executed by the demo.
+- Reports state how many sample days are available; yearly does not invent a year.
+
+## Creative layer and cost
+
+`FEATURE_DEMO_CREATIVE=true` enables optional Demo writing only. It still respects
+`FEATURE_AI_NARRATION`; it does not enable automatic creative calls for Vibanda.
+The existing narrator handles provider selection (OpenRouter when configured),
+PII scrubbing, spend limits and token metering. Numeric grounding filters the
+response. Normal browsing and normal OS explanations do not call a model.
+
+Creative results are cached for 30 minutes, scoped by tenant, restaurant, day,
+scenario version and request. The process cache is bounded to 128 entries;
+failures cool down for two minutes. It resets on deployment. Normal token-usage
+audit rows still exist; there is no synthetic business-data growth. The current
+single-worker deployment makes single-flight caching effective. Multiple replicas
+would require a shared cache to avoid repeated provider calls.
+
+## Validation
+
+Run backend `tests/test_demo_showcase.py` plus tenant, creative and Demo source
+regressions, frontend `tests/demo-restaurant.test.tsx`, TypeScript, lint and build.
+Verify the live `/demo` route after publishing: a successful build alone does not
+prove that the domain points to it. The previous frontend alias target was
+`frontend-32mhjc4zz-mbuguss-projects.vercel.app`.
+
+## Deployment identity (verified 2026-09-30)
+
+The active Railway workspace is **Wambugu's Projects**, project
+`123c19bf-5b77-4e1f-833d-511ad9bdd733`, production environment
+`cbac60cf-c680-45bd-aa25-ec7d6b3f64ed`, service
+`69a12624-1820-4c4e-9305-9cdf57f088b4` (`restaurant-agent`). API:
+`https://restaurant-agent-production-653f.up.railway.app`.
+The older Mbuguss project `3080e9f0-01dc-42c0-b6bb-8280b746f5e0` is not this
+deployment. Verify account and project identity before changing configuration.
+Frontend remains the Vercel `frontend` project with the
+`https://vibandavillage.vercel.app` alias; Demo signs in to its separate tenant.

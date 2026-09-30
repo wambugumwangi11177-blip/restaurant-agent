@@ -49,7 +49,7 @@ export default function DemoLayout({
         <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">
           {fmtDate()} · Nairobi
         </p>
-        <nav className="hidden md:flex gap-1 mt-3">
+        <nav className="hidden md:flex gap-1 mt-3 print:hidden">
           {TABS.map(({ href, label, icon: Icon }) => {
             const active = pathname === href;
             return (
@@ -76,7 +76,7 @@ export default function DemoLayout({
         </p>
         {children}
       </main>
-      <nav className="fixed bottom-0 inset-x-0 md:hidden bg-[var(--v-card)] border-t border-[var(--v-border)] grid grid-cols-3">
+      <nav className="fixed bottom-0 inset-x-0 md:hidden print:hidden bg-[var(--v-card)] border-t border-[var(--v-border)] grid grid-cols-3">
         {TABS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (

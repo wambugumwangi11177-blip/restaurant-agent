@@ -1,14 +1,18 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import DemoHomePage from "../src/app/demo/page";
 import DemoReportsPage from "../src/app/demo/reports/page";
+import DemoOS from "../src/app/demo/os/page";
 import DemoAreaClient from "../src/components/demo/DemoAreaClient";
 import { homeFor } from "@/lib/tenantHome";
 import api from "@/lib/api";
 
 const { push } = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn() } }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push }),
+  useSearchParams: () => new URLSearchParams(),
+}));
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => ({ user: { restaurant_name: "Demo Restaurant" } }),
 }));
@@ -18,16 +22,9 @@ const emptyFeed = {
   period: "today",
   unavailable_metrics: ["kitchen", "waitlist"],
   data_provenance: {
-    notice:
-      "Recorded directly in this system. Nothing waits on Macsoft or any external data push.",
+    notice: "Recorded directly in this system. Nothing waits on Macsoft or any external data push.",
     latest_order_at: null,
-    source_connection: {
-      source: "direct",
-      state: "direct",
-      records: null,
-      last_received_at: null,
-      reconciled: true,
-    },
+    source_connection: { source: "direct", state: "direct", records: null, last_received_at: null, reconciled: true },
   },
   revenue: { revenue: 0, orders: 0, avg_order: 0, pace_projection: 0 },
   orders: { orders: 0, active_now: 0, delayed: 0, split: {} },
@@ -38,38 +35,98 @@ const emptyFeed = {
   attention: [],
   pulse: [],
   performance: { revenue_trend: [] },
-  roi: {
-    potential_daily: 2910,
-    assumption: "Illustrative, not realised savings.",
-    opportunities: [],
-  },
+};
+
+const sampleReport = {
+  period: "daily",
+  range: "2026-09-30 – 2026-09-30",
+  revenue: 61200,
+  orders: 70,
+  coverage_days: 1,
+  headline: "Today (Wednesday) the restaurant took KES 61,200 from 70 orders.",
+  kpis: [
+    { label: "Sales", value: "KES 61,200" },
+    { label: "Orders", value: "70" },
+    { label: "Average order", value: "KES 874" },
+    { label: "Kept after ingredients", value: "KES 37,760" },
+  ],
+  comparison: { label: "last Wednesday", previous_revenue: 57528, change_pct: 6.4 },
+  series: [
+    { date: "2026-09-29", day: "Tue", revenue: 54394, orders: 60 },
+    { date: "2026-09-30", day: "Wed", revenue: 61200, orders: 70 },
+  ],
+  weekday_pattern: [
+    { day: "Mon", revenue: 50000 },
+    { day: "Sat", revenue: 80000 },
+  ],
+  channels: [
+    { label: "Dine-in", value: 45 },
+    { label: "Takeaway", value: 18 },
+    { label: "Delivery", value: 7 },
+  ],
+  dishes: [{ name: "Beef pilau", price: 650, cost: 270, units: 24, sales: 15600, contribution: 9120, margin_pct: 58 }],
+  story: [{ title: "Stock and waste", text: "Beef is down to 2 days of cover, so order today." }],
+  decisions: [{ idea: "Use vegetables before expiry", why: "8 kg can be used before expiry.", next_step: "Feature the vegetable bowl.", expected: "KES 1,440 potential / day" }],
+  money_today: { sales: 61200, food_cost: 23440, contribution: 37760, labor: 10500, other: 6500, surplus: 20760 },
+  note: "",
+};
+
+const stockArea = {
+  key: "stock",
+  title: "Stock",
+  subtitle: "What is on the shelf, and what to order.",
+  headline: "You track 13 ingredients, all used by the dishes on your menu.",
+  how_to_read: "Days of cover is how long the stock lasts at today's selling rate.",
+  metrics: [{ label: "Need ordering", value: 1 }],
+  columns: ["Ingredient", "On hand"],
+  rows: [["Beef", "6 kg"]],
+  table_title: "Everything on the shelf",
+  table_note: "Used per day is worked out from the recipes.",
+  action: "Order beef.",
+  attention: [{ id: "beef-low", title: "Beef is running low", why: "It covers 2 days.", what_to_do: "Order beef today.", level: "urgent", impact: "Protects Beef pilau sales" }],
+  decisions: [{ idea: "Order beef today", why: "Beef pilau uses it all.", next_step: "Place the order now.", expected: "Avoids running out" }],
+  charts: [{ type: "meters", title: "How many days each ingredient will last", unit: "days", target: 2, items: [{ label: "Beef", value: 2, note: "6 kg on hand", status: "low" }] }],
+  forecast: [],
+  forecast_method: "",
+};
+
+const revenueArea = {
+  ...stockArea,
+  key: "revenue",
+  title: "Revenue",
+  headline: "You took KES 61,200 today.",
+  attention: [],
+  decisions: [],
+  charts: [
+    {
+      type: "line_band",
+      title: "Sales: last 14 days and the next 7",
+      actual: [{ date: "2026-09-30", day: "Wed", revenue: 61200 }],
+      forecast: [
+        { date: "2026-10-01", day: "Thu", revenue: 59670, low: 49420, high: 69920 },
+        { date: "2026-10-05", day: "Mon", revenue: 50685, low: 40000, high: 60000 },
+      ],
+    },
+  ],
+  forecast: [
+    { date: "2026-10-01", day: "Thursday", revenue: 59670, low: 49420, high: 69920, why: "Thursdays are close to a typical day." },
+    { date: "2026-10-05", day: "Monday", revenue: 50685, low: 40000, high: 60000, why: "Mondays are one of your quieter days." },
+  ],
+  forecast_method: "We look at how each weekday has done over the last 8 weeks.",
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.get).mockImplementation(async (url: string) => ({
-    data: url.includes("/reports/daily?")
-      ? { report_text: "Daily report" }
+    data: url.includes("/pdf")
+      ? new Blob(["%PDF-1.4"], { type: "application/pdf" })
       : url.includes("/reports/")
-        ? {
-            period: "daily",
-            range: "today",
-            revenue: 61200,
-            orders: 70,
-            top_items: [],
-            report_text: "Illustrative daily report",
-            coverage_days: 1,
-          }
-        : url.includes("/areas/")
-          ? {
-              metrics: [{ label: "Business writes", value: 0 }],
-              columns: ["Event", "State"],
-              rows: [["Price proposal", "Preview only"]],
-              action: "Review evidence.",
-              forecast: [],
-              trend: [],
-            }
-          : emptyFeed,
+        ? sampleReport
+        : url.includes("/areas/revenue")
+          ? revenueArea
+          : url.includes("/areas/")
+            ? stockArea
+            : emptyFeed,
   }));
 });
 afterEach(cleanup);
@@ -81,46 +138,122 @@ it("routes the Demo Restaurant owner to /demo and leaves Vibanda on /vibanda", (
   expect(homeFor("Someone Else")).toBe("/dashboard");
 });
 
-it("renders the demo owner home and keeps links inside its own shell", async () => {
+it("renders the demo owner home without the value block or a creative button", async () => {
   render(<DemoHomePage />);
   expect(await screen.findByText("Today at Demo Restaurant")).toBeTruthy();
-  expect(
-    screen.getAllByText(/Nothing waits on Macsoft/).length,
-  ).toBeGreaterThan(0);
-  expect(screen.getByText("No open attention cards")).toBeTruthy();
-  expect(screen.queryByText("Waiting for verified restaurant data")).toBeNull();
+  expect(screen.getAllByText(/Nothing waits on Macsoft/).length).toBeGreaterThan(0);
+  expect(screen.getByText("Nothing needs your attention right now")).toBeTruthy();
+  expect(screen.queryByText(/See the value/i)).toBeNull();
+  expect(screen.queryByText(/Write a creative take/i)).toBeNull();
+  expect(screen.queryByText(/A fresh perspective/i)).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Ask about sales" }));
-  expect(push).toHaveBeenCalledWith(
-    "/demo/os?q=How%20are%20my%20sales%20today%3F",
-  );
-  const detailLinks = screen
-    .getAllByRole("link", { name: /Open details/ })
-    .map((a) => a.getAttribute("href"));
+  expect(push).toHaveBeenCalledWith("/demo/os?q=How%20are%20my%20sales%20today%3F");
+  const detailLinks = screen.getAllByRole("link", { name: /Open details/ }).map((a) => a.getAttribute("href"));
   expect(detailLinks).toContain("/demo/revenue");
   expect(detailLinks.every((href) => href?.startsWith("/demo/"))).toBe(true);
 });
 
-it("shows bounded sample report coverage", async () => {
-  render(<DemoReportsPage />);
-  expect(await screen.findByText(/1 sample days available/)).toBeTruthy();
-  expect(await screen.findByText("Illustrative daily report")).toBeTruthy();
-  expect(screen.queryByText(/Macsoft is not connected/)).toBeNull();
+it("home ends with an ideas box: numbers first, then AI ideas, with no choice to make", async () => {
+  vi.mocked(api.post).mockImplementation(async (_url: string, body?: unknown) => ({
+    data: (body as { creative: boolean }).creative
+      ? { checked: 20, from_numbers: [], creative: ["Try a lunch combo of vegetable bowl and fresh juice."] }
+      : {
+          checked: 20,
+          creative: [],
+          from_numbers: [{ area: "Stock", href: "/demo/stock", idea: "Use the older vegetables first", why: "8 kg is close to its date.", next_step: "Cook from the oldest batch.", expected: "KES 1,440 potential saving" }],
+        },
+  }));
+  render(<DemoHomePage />);
+  await screen.findByText("Today at Demo Restaurant");
+  expect(screen.getByText("Fresh ideas to try this week")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /Get ideas/ }));
+  expect(await screen.findByText("Use the older vegetables first")).toBeTruthy();
+  expect(screen.getByText(/We looked at 20 parts of your restaurant/)).toBeTruthy();
+  expect(await screen.findByText(/Try a lunch combo/)).toBeTruthy();
+  expect(screen.getByText(/Written by AI/)).toBeTruthy();
+  expect(vi.mocked(api.post).mock.calls.map((c) => (c[1] as { creative: boolean }).creative)).toEqual([false, true]);
+  expect(screen.getByRole("link", { name: /See the numbers/ }).getAttribute("href")).toBe("/demo/stock");
 });
 
-it("area pages load evidence from the demo API", async () => {
-  render(
-    <DemoAreaClient
-      areaKey="audit"
-      view={{
-        title: "Audit trail",
-        description: "Review changes.",
-      }}
-    />,
-  );
-  expect(await screen.findByText("Preview only")).toBeTruthy();
-  expect(api.get).toHaveBeenCalledWith("/api/v1/demo/areas/audit");
-  expect(screen.queryByText("Waiting for verified MacSoft records")).toBeNull();
-  expect(
-    screen.getByRole("link", { name: /Back to Home/ }).getAttribute("href"),
-  ).toBe("/demo");
+it("reports explain themselves in plain words and can be downloaded as a PDF", async () => {
+  const createUrl = vi.fn(() => "blob:report");
+  Object.defineProperty(URL, "createObjectURL", { value: createUrl, configurable: true });
+  Object.defineProperty(URL, "revokeObjectURL", { value: vi.fn(), configurable: true });
+  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  render(<DemoReportsPage />);
+  expect(await screen.findByText(/1 sample day available/)).toBeTruthy();
+  expect(screen.getByText(/the restaurant took KES 61,200 from 70 orders/)).toBeTruthy();
+  expect(screen.getByText("The story in plain words")).toBeTruthy();
+  expect(screen.getByText("Where the money went")).toBeTruthy();
+  expect(screen.getByText(/Sales are up 6.4% compared with last Wednesday/)).toBeTruthy();
+  expect(screen.queryByText(/Macsoft is not connected/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: /Download PDF/ }));
+  await waitFor(() => expect(click).toHaveBeenCalled());
+  expect(api.get).toHaveBeenCalledWith("/api/v1/demo/reports/daily/pdf", { responseType: "blob", timeout: 60000 });
+  expect(createUrl).toHaveBeenCalled();
+  click.mockRestore();
+});
+
+it("area pages explain, flag what needs attention, and suggest with reasons", async () => {
+  render(<DemoAreaClient areaKey="stock" view={{ title: "Stock", description: "Keep an eye on ingredients." }} />);
+  expect(await screen.findByText("You track 13 ingredients, all used by the dishes on your menu.")).toBeTruthy();
+  expect(api.get).toHaveBeenCalledWith("/api/v1/demo/areas/stock");
+  expect(screen.getByText("In plain words")).toBeTruthy();
+  expect(screen.getByText("What needs your attention here")).toBeTruthy();
+  expect(screen.getByText("Beef is running low")).toBeTruthy();
+  expect(screen.getByText("What we suggest, and why")).toBeTruthy();
+  expect(screen.getByText("Order beef today")).toBeTruthy();
+  expect(screen.getByText("Everything on the shelf")).toBeTruthy();
+  expect(screen.getByRole("link", { name: /Back to Home/ }).getAttribute("href")).toBe("/demo");
+  fireEvent.click(screen.getByRole("button", { name: "Got it" }));
+  expect(screen.queryByText("Beef is running low")).toBeNull();
+  expect(screen.getByText("You have looked at everything on this page.")).toBeTruthy();
+});
+
+it("each coming day can explain itself on the page, starting with the quietest", async () => {
+  render(<DemoAreaClient areaKey="revenue" view={{ title: "Revenue", description: "Understand sales." }} />);
+  expect(await screen.findByText("You took KES 61,200 today.")).toBeTruthy();
+  expect(screen.getByText(/Mondays are one of your quieter days/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /Thursday/ }));
+  expect(screen.getByText(/Thursdays are close to a typical day/)).toBeTruthy();
+  expect(screen.queryByText(/Mondays are one of your quieter days/)).toBeNull();
+  expect(push).not.toHaveBeenCalled();
+});
+
+it("OS has prompted questions, no focus-area picker and no creative toggle", async () => {
+  vi.mocked(api.post).mockImplementation(async (_url: string, body?: unknown) => ({
+    data: (body as { creative: boolean }).creative
+      ? { answer_text: "Try a vegetable bowl special.", module: "stock", title: "Stock", href: "/demo/stock", creative: true, cached: false, reason: null }
+      : {
+          answer_text: "Beef covers 2 days.\n\nNeeds attention: order beef.",
+          module: "stock",
+          title: "Stock",
+          href: "/demo/stock",
+          creative: false,
+          cached: false,
+          reason: null,
+          follow_ups: ["What should I do about stock?"],
+        },
+  }));
+  render(<DemoOS />);
+  expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("What would you like to know");
+  expect(screen.queryByText(/Focus area/)).toBeNull();
+  expect(screen.queryByText(/Creative adviser/)).toBeNull();
+  expect(screen.queryByRole("checkbox")).toBeNull();
+  expect(screen.queryByRole("combobox")).toBeNull();
+  fireEvent.click(screen.getAllByRole("button", { name: "What am I about to run out of?" })[0]);
+  expect(await screen.findByText(/Beef covers 2 days/)).toBeTruthy();
+  expect(await screen.findByText("Try a vegetable bowl special.")).toBeTruthy();
+  expect(screen.getByText(/An idea to try/)).toBeTruthy();
+  expect(vi.mocked(api.post).mock.calls[0]).toEqual([
+    "/api/v1/demo/chat",
+    { question: "What am I about to run out of?", topic: "stock", creative: false },
+    { timeout: 30000 },
+  ]);
+  expect(vi.mocked(api.post).mock.calls[1]).toEqual([
+    "/api/v1/demo/chat",
+    { question: "What am I about to run out of?", topic: "stock", creative: true },
+    { timeout: 90000 },
+  ]);
+  expect(screen.getByRole("link", { name: /See the numbers: Stock/ }).getAttribute("href")).toBe("/demo/stock");
 });

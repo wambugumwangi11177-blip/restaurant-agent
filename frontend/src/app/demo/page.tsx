@@ -18,11 +18,9 @@ import { fmtKes, fmtPct, greetingFor } from "@/lib/format";
 import { OsLoading, OsError } from "@/components/os/States";
 import { useAuth } from "@/context/AuthContext";
 import { VIBANDA_HOME_LINKS } from "@/lib/vibandaAreas";
-import DemoValue, { type DemoRoi } from "@/components/demo/DemoValue";
-import DemoCreative from "@/components/demo/DemoCreative";
+import DemoIdeas from "@/components/demo/DemoIdeas";
 
 type Feed = {
-  roi: DemoRoi;
   source_status?: Record<string, { state: string; recommendations: number | null }>;
   data_provenance?: { notice: string; latest_order_at: string | null; source_connection?: { state?: string; reconciled?: boolean } };
   greeting_date: string;
@@ -32,7 +30,7 @@ type Feed = {
   revenue: { revenue: number; orders: number; avg_order: number; pace_projection: number };
   orders: { revenue: number; orders: number; delayed: number; active_now: number; split: Record<string, number> };
   kitchen: { avg_prep_min: number; delay_risk: number; bottleneck: string | null };
-  stock: { recorded_items?: number; low_stock: { name: string; qty: number }[]; expiring_48h: string[]; waste_pct_week: number };
+  stock: { recorded_items?: number; low_stock: { name: string; qty: number; unit?: string }[]; expiring_48h: string[]; waste_pct_week: number };
   bookings: { covers_today: number; next_reservation_min: number | null; waitlist: number; no_show_pct: number };
   staff: { scheduled: number; on_shift: number; overtime_risk: number; labor_cost_pct: number };
   attention: {
@@ -191,13 +189,13 @@ function AttentionCard({ card, onDecide, onAsk }: {
         <button disabled={saving} onClick={() => recordDecision("approved")}
           className="min-h-9 rounded-lg bg-[var(--v-primary)] px-3 py-2 text-[10px] font-bold text-[var(--v-primary-foreground)] hover:brightness-105">Acknowledge</button>
         <button disabled={saving} onClick={() => recordDecision("later")}
-          className="min-h-10 rounded-lg border border-[var(--v-border)] px-2 py-2 text-[11px] font-bold hover:bg-[var(--v-muted)]">Set aside for this demo</button>
+          className="min-h-10 rounded-lg border border-[var(--v-border)] px-2 py-2 text-[11px] font-bold hover:bg-[var(--v-muted)]">Not now</button>
         <button disabled={saving} onClick={() => recordDecision("rejected")}
           className="min-h-10 rounded-lg border border-[var(--v-border)] px-2 py-2 text-[11px] font-bold hover:bg-[var(--v-muted)]">Dismiss</button>
         <button
           onClick={() => onAsk(card.title)}
           className="min-h-10 rounded-lg border border-[hsl(201_47%_29_/_0.45)] px-2 py-2 text-[11px] font-bold text-[var(--v-primary)] hover:bg-[var(--v-muted)]">
-          Ask AI about this
+          Ask OS about this
         </button>
       </div>
       <p className="ml-12 mt-2 text-xs text-[var(--v-muted-foreground)]">
@@ -245,7 +243,7 @@ function DemoOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null
     return () => { requestId.current += 1; };
   }, [period, load, initialFeed]);
   useEffect(() => {
-    api.get("/api/v1/demo/reports/daily").then((r) => setDailyReport(r.data.report_text)).catch(() => {});
+    api.get("/api/v1/demo/reports/daily").then((r) => setDailyReport(r.data.headline ?? r.data.report_text)).catch(() => {});
   }, []);
 
   const decide = async (cardId: string, decision: "approved" | "later" | "rejected") => {
@@ -271,7 +269,7 @@ function DemoOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null
           </h1>
           <p className="mt-3 max-w-xl text-sm text-[var(--v-muted-foreground)]">
             {feed
-              ? <>Here&apos;s what deserves your attention at <b>{feed.restaurant_name}</b> — the full picture lives in Overview Today below.</>
+              ? <>Here&apos;s what deserves your attention at <b>{feed.restaurant_name}</b> today.</>
               : "Loading your restaurant…"}
           </p>
         </div>
@@ -298,8 +296,6 @@ function DemoOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null
       {!err && !feed && <OsLoading />}
       {!err && feed && (
         <>
-          <DemoValue roi={feed.roi} />
-          <DemoCreative />
           {/* Today snapshot — 6 pillar cards */}
           <section aria-labelledby="snapshot-heading">
             <SectionHead id="snapshot-heading" eyebrow="How are we doing?" title={`Today at ${feed.restaurant_name}`}
@@ -308,7 +304,7 @@ function DemoOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null
               <PillarCard label="Revenue" primaryLabel={`Revenue · ${PERIOD_LABEL[period]}`} primary={fmtKes(feed.revenue.revenue)}
                 comparison={feed.revenue.orders ? `Average order · ${fmtKes(feed.revenue.avg_order)}` : ""}
                 signals={[
-                  "Open details for the 7-day forecast and its assumptions",
+                  "Open details to see the next 7 days and why",
                 ]}
                 askLabel="Ask about sales" onAsk={() => ask("How are my sales today?")} href="/demo/revenue" />
               <PillarCard label="Orders" primaryLabel={`Orders · ${PERIOD_LABEL[period]}`} primary={`${feed.orders.orders} orders`}
@@ -320,8 +316,8 @@ function DemoOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null
                 signals={[feed.unavailable_metrics.includes("kitchen") ? "Prep times and delays have not been verified" : (feed.kitchen.bottleneck ? `Bottleneck: ${feed.kitchen.bottleneck}` : "No bottleneck recorded")]}
                 askLabel="Ask about the kitchen" onAsk={() => ask("Is the kitchen running behind?")} href="/demo/kitchen" />
               <PillarCard label="Stock" primaryLabel="Stock" primary={feed.stock.low_stock.length ? `${feed.stock.low_stock.length} to watch` : "No low-stock alerts"}
-                comparison={feed.stock.low_stock[0] ? `${feed.stock.low_stock[0].name} at or below reorder point` : ""}
-                signals={feed.stock.low_stock.slice(0, 2).map((i) => `${i.name} · ${i.qty} left`)}
+                comparison={feed.stock.low_stock[0] ? `${feed.stock.low_stock[0].name} is running low: order soon` : ""}
+                signals={[...feed.stock.low_stock.slice(0, 2).map((i) => `${i.name} · ${i.qty}${i.unit ? ` ${i.unit}` : ""} left`), ...feed.stock.expiring_48h.slice(0, 1).map((e) => `${e.replace(" · ", ": ")} to use soon`)]}
                 askLabel="Ask about stock" onAsk={() => ask("What am I about to run out of?")} href="/demo/stock" />
               <PillarCard label="Bookings" primaryLabel="Covers expected" primary={`${feed.bookings.covers_today} covers`}
                 comparison={feed.bookings.next_reservation_min ? `Next reservation in ${feed.bookings.next_reservation_min} min` : ""}
@@ -336,15 +332,15 @@ function DemoOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null
 
           {/* What needs your attention */}
           <section aria-labelledby="attention-heading">
-            <SectionHead id="attention-heading" eyebrow="Decision support" title="What needs your attention"
+            <SectionHead id="attention-heading" eyebrow="For you to decide" title="What needs your attention"
               meta={feed.attention.length ? `${feed.attention.length} high-priority ${feed.attention.length === 1 ? "item" : "items"}` : undefined} />
             <div className="space-y-3">
               {feed.attention.length === 0 && (
                 <div className="rounded-xl border border-[hsl(150_28%_41_/_0.24)] bg-[hsl(150_28%_41_/_0.06)] px-5 py-8 text-center sm:px-10">
                   <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[hsl(150_28%_41_/_0.12)] text-[var(--v-good)]">✓</div>
-                  <h3 className="font-display mt-3 text-xl font-semibold tracking-[-0.02em]">No open attention cards</h3>
+                  <h3 className="font-display mt-3 text-xl font-semibold tracking-[-0.02em]">Nothing needs your attention right now</h3>
                   <p className="mx-auto mt-1.5 max-w-md text-xs text-[var(--v-muted-foreground)]">
-                    No open cards were returned. This does not confirm that every restaurant area has been checked.
+                    You have dealt with everything on this list. Reload the page to see it again.
                   </p>
                 </div>
               )}
@@ -357,7 +353,7 @@ function DemoOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null
           {/* Operational pulse */}
           {feed.pulse.length > 0 && (
             <section aria-labelledby="pulse-heading">
-              <SectionHead id="pulse-heading" eyebrow="What's happening right now?" title="Operational pulse"
+              <SectionHead id="pulse-heading" eyebrow="What's happening right now?" title="Right now"
                 meta="Illustrative operating context" />
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {feed.pulse.map((p) => (
@@ -398,11 +394,11 @@ function DemoOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null
               <div>
                 <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">Deeper context</p>
                 <h2 id="performance-heading" className="font-display text-2xl font-semibold tracking-[-0.035em]">Business performance</h2>
-                <p className="mt-1.5 text-xs text-[var(--v-muted-foreground)]">Enough context to know if the business is okay. Open a module when you need the why.</p>
+                <p className="mt-1.5 text-xs text-[var(--v-muted-foreground)]">Enough to know if the business is doing okay. Open a page when you want the reason.</p>
               </div>
               <button onClick={() => ask("How is my restaurant performing?")}
                 className="inline-flex min-h-9 items-center gap-1.5 self-start rounded-lg border border-[var(--v-border)] px-3 py-2 text-[10px] font-bold text-[var(--v-primary)] hover:border-[hsl(201_47%_29_/_0.45)] hover:bg-[var(--v-muted)]">
-                Ask AI about performance <ChevronRight size={13} />
+                Ask OS about performance <ChevronRight size={13} />
               </button>
             </div>
             {/* Sketch: 7-day bars */}
@@ -426,13 +422,23 @@ function DemoOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null
               <div className="mt-4 border-t border-[var(--v-border)] pt-4">
                 <button onClick={() => setShowReport((s) => !s)}
                   className="flex w-full items-center justify-between text-left text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)]">
-                  <span>Daily report · drafted from your data</span>
+                  <span>Today in a few words</span>
                   <span>{showReport ? "Hide" : "Show"}</span>
                 </button>
-                {showReport && <pre className="mt-3 whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-[hsl(208_29%_19_/_0.82)]">{dailyReport}</pre>}
+                {showReport && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-[13px] leading-relaxed text-[hsl(208_29%_19_/_0.82)]">{dailyReport}</p>
+                    <Link href="/demo/reports" className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--v-primary)]">
+                      Open the full report and download it <ChevronRight size={12} />
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
           </section>
+
+          {/* Ideas: numbers first, then a few creative ones. */}
+          <DemoIdeas />
         </>
       )}
     </div>

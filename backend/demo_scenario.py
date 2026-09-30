@@ -291,7 +291,7 @@ def home(period="today", day=None):
       "revenue": {"revenue": revenue, "orders": orders, "avg_order": revenue/orders, "pace_projection": 0},
       "orders": {"revenue": revenue, "orders": orders, "delayed": 2, "active_now": 6, "split": {"dine_in": orders*45//70, "takeaway": orders*18//70, "delivery": orders-orders*45//70-orders*18//70}},
       "kitchen": {"avg_prep_min": 14, "delay_risk": 2, "bottleneck": "Grill station"},
-      "stock": {"recorded_items": len(s["stock"]), "low_stock": [{"name": x["name"], "qty": x["on_hand"]} for x in low],
+      "stock": {"recorded_items": len(s["stock"]), "low_stock": [{"name": x["name"], "qty": x["on_hand"], "unit": x["unit"]} for x in low],
                 "expiring_48h": [f"{k} · {v} kg" for k, v in NEAR_EXPIRY.items()], "waste_pct_week": 3.2},
       "bookings": {"covers_today": 42, "next_reservation_min": 45, "waitlist": 4, "no_show_pct": 6},
       "staff": {"scheduled": 8, "on_shift": 6, "overtime_risk": 3, "labor_cost_pct": round(LABOR_KES/s['history'][-1]['revenue']*100,1)},

@@ -57,3 +57,33 @@ The older Mbuguss project `3080e9f0-01dc-42c0-b6bb-8280b746f5e0` is not this
 deployment. Verify account and project identity before changing configuration.
 Frontend remains the Vercel `frontend` project with the
 `https://vibandavillage.vercel.app` alias; Demo signs in to its separate tenant.
+
+## Owner experience (2026-09-30)
+
+- Every area page explains itself in plain words first: "In plain words", what needs attention, what
+  we suggest and why, then the evidence table. All text is built from the scenario values, never typed.
+- **Stock is built from recipes** (`RECIPES` in `demo_scenario.py`): each ingredient traces to a menu
+  dish. Usage per day comes from the recipes and today's sales.
+- **Modules learn from expected sales.** Each coming day is scaled from the weekday sales forecast
+  (same dish mix as today). That gives per-ingredient run-out day and order quantity, plus kitchen plates,
+  suggested headcount, expected guests, and a supplier-grouped order list on Purchasing.
+- Forecast days each carry a plain-language reason (tap a day; no OS trip needed).
+- Home ends with an ideas box: data-checked ideas first, then AI ideas. No creative toggle anywhere.
+- OS: prompted questions grouped by part of the restaurant; the deterministic answer appears at once and
+  an AI idea is added underneath when ready (hidden if unavailable).
+- Reports: charts, plain sections, PDF download (`GET /api/v1/demo/reports/{period}/pdf`, ReportLab) and print.
+
+### AI reliability
+
+Reasoning models (the default free Nemotron) burn a small token budget "thinking" and can print their planning.
+Creative calls therefore send `reasoning: {effort: none}` on OpenRouter (retried without it if a model rejects
+the field), get a larger token budget, and must finish with a `FINAL:` line; `creative_final`/`creative_ideas`
+refuse anything else. Web research for the ideas box is off; set `DEMO_IDEAS_WEB=true` (OpenRouter only,
+about $0.007 per uncached search) to enable it.
+
+### Deploying the frontend
+
+Pushing to `master` deploys the backend (Railway). The frontend is **not** deployed by Git for the live domain:
+Git pushes only create Previews in a different Vercel project. From `frontend/` run `vercel deploy --prod --yes`
+(built in Vercel's cloud), then `vercel alias set <new-deployment-url> vibandavillage.vercel.app`. Test in CI first
+by pushing a `review/**` branch.

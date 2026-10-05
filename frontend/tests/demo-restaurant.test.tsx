@@ -4,6 +4,7 @@ import DemoHomePage from "../src/app/demo/page";
 import DemoReportsPage from "../src/app/demo/reports/page";
 import DemoOS from "../src/app/demo/os/page";
 import DemoAreaClient from "../src/components/demo/DemoAreaClient";
+import { WeekdayBars } from "../src/components/demo/DemoCharts";
 import { homeFor } from "@/lib/tenantHome";
 import api from "@/lib/api";
 import { RETRY } from "@/lib/retry";
@@ -160,9 +161,9 @@ it("renders the demo owner home without the value block or a creative button", a
 it("home ends with an ideas box: numbers first, then AI ideas, with no choice to make", async () => {
   vi.mocked(api.post).mockImplementation(async (_url: string, body?: unknown) => ({
     data: (body as { creative: boolean }).creative
-      ? { checked: 20, from_numbers: [], creative: ["Try a lunch combo of vegetable bowl and fresh juice."] }
+      ? { checked: 9, from_numbers: [], creative: ["Try a lunch combo of vegetable bowl and fresh juice."] }
       : {
-          checked: 20,
+          checked: 9,
           creative: [],
           from_numbers: [{ area: "Stock", href: "/demo/stock", idea: "Use the older vegetables first", why: "8 kg is close to its date.", next_step: "Cook from the oldest batch.", expected: "KES 1,440 potential saving" }],
         },
@@ -172,7 +173,7 @@ it("home ends with an ideas box: numbers first, then AI ideas, with no choice to
   expect(screen.getByText("Fresh ideas to try this week")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: /Get ideas/ }));
   expect(await screen.findByText("Use the older vegetables first")).toBeTruthy();
-  expect(screen.getByText(/We looked at 20 parts of your restaurant/)).toBeTruthy();
+  expect(screen.getByText(/We looked at 9 parts of your restaurant/)).toBeTruthy();
   expect(await screen.findByText(/Try a lunch combo/)).toBeTruthy();
   expect(screen.getByText(/Written by AI/)).toBeTruthy();
   expect(vi.mocked(api.post).mock.calls.map((c) => (c[1] as { creative: boolean }).creative)).toEqual([false, true]);
@@ -264,9 +265,10 @@ it("OS has prompted questions, no focus-area picker and no creative toggle", asy
   expect(screen.getByRole("link", { name: /See the numbers: Stock/ }).getAttribute("href")).toBe("/demo/stock");
 });
 
-it("home lists urgent items first, keeps lower ones compact, and lets decisions be undone", async () => {
+// A Home feed with one urgent item, one idea and one lower-priority item, as the backend now sends it.
+const attentionFeed = () => {
   const card = (id: string, level: string, title: string) => ({ id, domain: "Stock", title, why: "Because.", what_to_do: "Do it.", impact: "", status: "open", level, link: "stock" });
-  const feed = {
+  return {
     ...emptyFeed,
     period_label: "Today",
     period_note: "Revenue and orders follow the period. Kitchen, stock, bookings and staff always show right now.",
@@ -277,6 +279,10 @@ it("home lists urgent items first, keeps lower ones compact, and lets decisions 
     week_ahead: [{ date: "2026-10-01", day: "Thursday", revenue: 59670, low: 49420, high: 69920, plates: 100, people: 8, covers: 41 }],
     roi: { potential_daily: 2910, realised: 0, label: "Illustrative daily opportunity", assumption: "Not guaranteed.", opportunities: [{}, {}, {}] },
   };
+};
+
+it("home lists urgent items first, keeps lower ones compact, and lets decisions be undone", async () => {
+  const feed = attentionFeed();
   vi.mocked(api.get).mockImplementation(async (url: string) => ({ data: url.includes("/reports/") ? sampleReport : feed }));
   render(<DemoHomePage />);
   expect(await screen.findByText("2 items · 1 urgent")).toBeTruthy();
@@ -295,6 +301,45 @@ it("home lists urgent items first, keeps lower ones compact, and lets decisions 
   expect(screen.getByText(/Acknowledged:/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Undo" }));
   expect(screen.queryByText(/Acknowledged:/)).toBeNull();
+});
+
+it("home keeps acknowledged items for the browser session, so leaving and coming back does not undo them", async () => {
+  vi.mocked(api.get).mockImplementation(async (url: string) => ({ data: url.includes("/reports/") ? sampleReport : attentionFeed() }));
+  const first = render(<DemoHomePage />);
+  expect(await screen.findByText("2 items · 1 urgent")).toBeTruthy();
+  fireEvent.click(screen.getAllByRole("button", { name: "Acknowledge" })[0]);
+  expect(screen.getByText(/Acknowledged:/)).toBeTruthy();
+  first.unmount();
+  render(<DemoHomePage />);
+  expect(await screen.findByText(/Acknowledged:/)).toBeTruthy();
+  expect(screen.getByText("1 item")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  expect(screen.queryByText(/Acknowledged:/)).toBeNull();
+  cleanup();
+  render(<DemoHomePage />);
+  expect(await screen.findByText("2 items · 1 urgent")).toBeTruthy();         // the undo was remembered too
+  expect(screen.queryByText(/Acknowledged:/)).toBeNull();
+});
+
+it("weekday bars are percentages of a fixed-height track, with the tallest at 100%", () => {
+  const { container } = render(<WeekdayBars pattern={[{ day: "Mon", revenue: 50 }, { day: "Sat", revenue: 100 }]} />);
+  const heights = Array.from(container.querySelectorAll<HTMLElement>("div.absolute")).map((bar) => bar.style.height);
+  expect(heights).toEqual(["50%", "100%"]);
+});
+
+it("home still works when the browser blocks session storage", async () => {
+  vi.mocked(api.get).mockImplementation(async (url: string) => ({ data: url.includes("/reports/") ? sampleReport : attentionFeed() }));
+  const read = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked"); });
+  const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
+  try {
+    render(<DemoHomePage />);
+    expect(await screen.findByText("2 items · 1 urgent")).toBeTruthy();
+    fireEvent.click(screen.getAllByRole("button", { name: "Acknowledge" })[0]);
+    expect(screen.getByText(/Acknowledged:/)).toBeTruthy();                   // the choice still works on this page view
+  } finally {
+    read.mockRestore();
+    write.mockRestore();
+  }
 });
 
 const homeCalls = () => vi.mocked(api.get).mock.calls.filter((c) => String(c[0]).includes("/demo/home")).length;

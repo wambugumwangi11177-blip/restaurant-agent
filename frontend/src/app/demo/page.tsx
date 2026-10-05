@@ -64,6 +64,29 @@ type Feed = {
 
 type Decision = "approved" | "later" | "rejected";
 
+// Demo choices stay in the browser, for this session only: a reload or a trip to another page must not undo them,
+// and nothing is ever written to the server. Storage can be blocked or full, so every access is guarded.
+const DECISIONS_KEY = "demo-home-decisions-v1";
+const DECISION_VALUES: string[] = ["approved", "later", "rejected"];
+
+function readDecisions(): Record<string, Decision> {
+  try {
+    const parsed: unknown = JSON.parse(window.sessionStorage.getItem(DECISIONS_KEY) ?? "{}");
+    if (!parsed || typeof parsed !== "object") return {};
+    return Object.fromEntries(Object.entries(parsed).filter(([, value]) => DECISION_VALUES.includes(String(value)))) as Record<string, Decision>;
+  } catch {
+    return {};
+  }
+}
+
+function writeDecisions(next: Record<string, Decision>) {
+  try {
+    window.sessionStorage.setItem(DECISIONS_KEY, JSON.stringify(next));
+  } catch {
+    /* blocked or full: the choices then last only until the page is reloaded */
+  }
+}
+
 const PERIODS = ["1h", "today", "7d", "30d"] as const;
 const PERIOD_LABEL: Record<string, string> = { "1h": "1H", today: "Today", "7d": "7D", "30d": "30D" };
 
@@ -277,16 +300,25 @@ function DemoOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null
     api.get("/api/v1/demo/reports/daily").then((r) => setDailyReport(r.data.headline ?? r.data.report_text)).catch(() => {});
   }, []);
 
-  // Demo decisions are local to this page view; nothing is written anywhere.
+  // Demo decisions stay in this browser session; nothing is written to the server.
   const [decided, setDecided] = useState<Record<string, Decision>>({});
-  const decide = async (cardId: string, decision: Decision) => {
-    setDecided((d) => ({ ...d, [cardId]: decision }));
+  useEffect(() => {
+    // Read after mount so the server render and the first client render agree.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDecided(readDecisions());
+  }, []);
+  const save = (next: Record<string, Decision>) => {
+    setDecided(next);
+    writeDecisions(next);
   };
-  const undo = (cardId: string) => setDecided((d) => {
-    const next = { ...d };
+  const decide = async (cardId: string, decision: Decision) => {
+    save({ ...decided, [cardId]: decision });
+  };
+  const undo = (cardId: string) => {
+    const next = { ...decided };
     delete next[cardId];
-    return next;
-  });
+    save(next);
+  };
   const open = (feed?.attention ?? []).filter((c) => !decided[c.id]);
   const acknowledged = (feed?.attention ?? []).filter((c) => decided[c.id] === "approved");
   const setAside = (feed?.attention ?? []).filter((c) => decided[c.id] === "later");

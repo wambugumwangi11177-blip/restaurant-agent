@@ -163,17 +163,25 @@ export function WeekdayBars({ pattern }: { pattern: { day: string; revenue: numb
   const peak = pattern.reduce((best, p) => (p.revenue > best.revenue ? p : best), pattern[0]);
   return (
     <div role="img" aria-label={`Average sales by weekday. ${pattern.map((p) => `${p.day} ${fmtKes(p.revenue)}`).join(", ")}. Busiest: ${peak.day}.`}>
-      <div className="flex h-36 items-end gap-2">
-        {pattern.map((p) => (
-          <div key={p.day} className="flex flex-1 flex-col items-center justify-end gap-1.5">
-            <span className="text-[9px] text-[var(--v-muted-foreground)]">{k(p.revenue)}</span>
-            <div
-              className="w-full rounded-t-md"
-              style={{ height: `${Math.max((p.revenue / max) * 100, 4)}%`, background: p === peak ? "hsl(43 76% 57%)" : "hsl(201 47% 29% / 0.8)" }}
-            />
-            <span className="text-[10px] font-semibold">{p.day}</span>
-          </div>
-        ))}
+      {/* Each bar is a percentage of a track with a fixed height (a percentage of an auto-height parent collapses). */}
+      <div className="flex items-end gap-2 pt-4">
+        {pattern.map((p) => {
+          const share = Math.max((p.revenue / max) * 100, 4);
+          return (
+            <div key={p.day} className="flex flex-1 flex-col items-center gap-1.5">
+              <div className="relative h-32 w-full">
+                <span className="absolute inset-x-0 text-center text-[9px] text-[var(--v-muted-foreground)]" style={{ bottom: `calc(${share}% + 4px)` }}>
+                  {k(p.revenue)}
+                </span>
+                <div
+                  className="absolute bottom-0 w-full rounded-t-md"
+                  style={{ height: `${share}%`, background: p === peak ? "hsl(43 76% 57%)" : "hsl(201 47% 29% / 0.8)" }}
+                />
+              </div>
+              <span className="text-[10px] font-semibold">{p.day}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

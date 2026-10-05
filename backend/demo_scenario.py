@@ -53,6 +53,18 @@ SOON_DAYS = 3.0                          # "running out soon" means within this 
 LABOR_KES = 10500
 OTHER_COSTS_KES = 6500
 UNMATCHED_KES = 1200
+# Today's service snapshot. Home, the area pages and the OS answers all read these.
+ORDERS_TODAY = 70
+OPEN_ORDERS = 6                          # tickets still being prepared
+DELAYED_ORDERS = 2
+AVG_PREP_MIN = 14
+BOTTLENECK = "Grill station"
+GRILL_MIN, COLD_MIN = 22, 8              # slowest and fastest station prep time
+WAITLIST = 4
+NO_SHOW_PCT = 6
+ON_SHIFT = 6
+OVERTIME_HOURS = 3                       # avoidable overtime hours today
+NEXT_RESERVATION_MIN = 45
 
 
 def today():
@@ -82,7 +94,7 @@ def scenario(day: date):
         revenue = base * pattern[d.weekday()] * (94 + i // 7) // 10000
         history.append({"date": d.isoformat(), "revenue": revenue, "orders": max(1, revenue // 900)})
     # Today's menu is the exact source for today's sales and cost totals.
-    history[-1] = {"date": day.isoformat(), "revenue": base, "orders": 70}
+    history[-1] = {"date": day.isoformat(), "revenue": base, "orders": ORDERS_TODAY}
     spread = round(pstdev([r["revenue"] for r in history]))
     overall = mean(r["revenue"] for r in history)
     forecast = []
@@ -112,8 +124,8 @@ def scenario(day: date):
          "why": "8 kg can be used before expiry instead of discarded.", "action": "Prioritise the vegetable bowl and check the next delivery."},
         {"id": "margin", "area": "menu", "title": "Test the pilau price", "quantity": 24, "unit_value": 30,
          "why": "24 daily portions × KES 30 price change; assumes unchanged demand.", "action": "Compare contribution before approving a price change."},
-        {"id": "labor", "area": "team", "title": "Shift coverage into the dinner rush", "quantity": 3, "unit_value": 250,
-         "why": "3 avoidable overtime hours × KES 250 per hour.", "action": "Move existing coverage into the busy service window."},
+        {"id": "labor", "area": "team", "title": "Shift coverage into the dinner rush", "quantity": OVERTIME_HOURS, "unit_value": 250,
+         "why": f"{OVERTIME_HOURS} avoidable overtime hours × KES 250 per hour.", "action": "Move existing coverage into the busy service window."},
     ]
     for item in opportunities:
         item["value"] = item["quantity"] * item["unit_value"]
@@ -306,6 +318,36 @@ def report(period, day=None):
                     + (" Only 56 sample days exist, so 'this year' shows those days rather than a full year." if period == "yearly" else "")}
 
 
+# Alerts that another area or an opportunity card already says better; Home shows those once.
+_REPEATS = {"veg-expiry", "pilau-price", "dinner",       # same facts as the three opportunity cards
+            "unmatched-pay"}                              # same payment as Finance's "unmatched"
+PERIOD_LABELS = {"1h": "The last hour", "today": "Today", "7d": "The last 7 days", "30d": "The last 30 days"}
+
+
+@lru_cache(maxsize=2)
+def attention_items(day: date):
+    """Everything that needs the owner, read from the area pages so Home cannot disagree with them.
+
+    `attention`: urgent alerts first, then the opportunity cards (each carries its KES sum).
+    `watching`: the lower-priority alerts, kept visible but compact."""
+    s = scenario(day)
+    alerts = []
+    for key in AREAS:
+        if key == "notifications":      # built from this list, so it is not a source
+            continue
+        for a in area(key, day)["attention"]:
+            if a["id"] in _REPEATS:
+                continue
+            alerts.append({"id": a["id"], "domain": AREAS[key], "title": a["title"], "why": a["why"],
+                           "what_to_do": a["what_to_do"], "impact": a["impact"] or "", "status": "open",
+                           "level": a["level"], "link": key})
+    urgent = [a for a in alerts if a["level"] == "urgent"]
+    opportunities = [{"id": x["id"], "domain": AREAS[x["area"]], "title": x["title"], "why": x["why"],
+                      "what_to_do": x["action"], "impact": f"KES {x['value']:,} potential / day", "status": "open",
+                      "level": "opportunity", "link": x["area"]} for x in s["opportunities"]]
+    return {"attention": urgent + opportunities, "watching": [a for a in alerts if a["level"] != "urgent"]}
+
+
 def home(period="today", day=None):
     day = day or today()
     s = scenario(day)
@@ -315,20 +357,46 @@ def home(period="today", day=None):
     revenue, orders = sum(r["revenue"] for r in rows), sum(r["orders"] for r in rows)
     if period == "1h":
         revenue, orders = revenue // 8, max(1, orders // 8)
+    note = ("One eighth of today's sample sales, not a live hour." if period == "1h"
+            else "Revenue and orders follow the period. Kitchen, stock, bookings and staff always show right now.")
     low = [x for x in s["stock"] if x["low"]]
+    soon = sorted((x for x in s["stock"] if x["runway_days"] <= SOON_DAYS), key=lambda z: z["runway_days"])
+    first_low = low[0] if low else None
+    items = attention_items(day)
+    forecast = s["forecast"]
+    busy = max(forecast, key=lambda r: r["revenue"])
+    quiet = min(forecast, key=lambda r: r["revenue"])
+    today_row = s["history"][-1]
+    money_today = report("daily", day)["money_today"]
+    to_order = [x for x in s["stock"] if x["order_qty"] > 0]
+    pulse = [
+        {"domain": "Forecast", "headline": f"KES {sum(r['revenue'] for r in forecast):,} next 7 days", "detail": "Calculated from 56 sample daily summaries; inspect the range in Revenue.", "link": "revenue"},
+        {"domain": "Coming days", "headline": f"{busy['day']} looks busiest, {quiet['day']} quietest",
+         "detail": f"About {money(busy['revenue'])} expected on {busy['day']} and {money(quiet['revenue'])} on {quiet['day']}.", "link": "revenue"},
+        {"domain": "Stock", "headline": f"{len(soon)} ingredients run out within {SOON_DAYS:g} days",
+         "detail": f"{len(to_order)} ingredients are on the suggested order list for the week.", "link": "purchasing"},
+        {"domain": "Costs today", "headline": f"Ingredients {round(s['food_cost'] / today_row['revenue'] * 100, 1)}% and staff {round(LABOR_KES / today_row['revenue'] * 100, 1)}% of sales",
+         "detail": f"{money(money_today['surplus'])} is left after ingredients, staff and running costs.", "link": "finance"},
+        {"domain": "Cash control", "headline": f"KES {UNMATCHED_KES:,} settlement exception", "detail": "Investigate an unmatched payment; this is not proven loss or theft.", "link": "cash-reconciliation"},
+    ]
     return {"restaurant_name": "Demo Restaurant", "greeting_date": day.isoformat(), "period": period,
+      "period_label": PERIOD_LABELS[period], "period_note": note,
       "unavailable_metrics": [], "data_provenance": {"notice": NOTICE, "latest_order_at": None},
       "revenue": {"revenue": revenue, "orders": orders, "avg_order": revenue/orders, "pace_projection": 0},
-      "orders": {"revenue": revenue, "orders": orders, "delayed": 2, "active_now": 6, "split": {"dine_in": orders*45//70, "takeaway": orders*18//70, "delivery": orders-orders*45//70-orders*18//70}},
-      "kitchen": {"avg_prep_min": 14, "delay_risk": 2, "bottleneck": "Grill station"},
+      "orders": {"revenue": revenue, "orders": orders, "delayed": DELAYED_ORDERS, "active_now": OPEN_ORDERS, "split": {"dine_in": orders*45//70, "takeaway": orders*18//70, "delivery": orders-orders*45//70-orders*18//70}},
+      "kitchen": {"avg_prep_min": AVG_PREP_MIN, "delay_risk": DELAYED_ORDERS, "bottleneck": BOTTLENECK},
       "stock": {"recorded_items": len(s["stock"]), "low_stock": [{"name": x["name"], "qty": x["on_hand"], "unit": x["unit"], "runs_out_day": x["runs_out_day"]} for x in low],
-                "expiring_48h": [f"{k} · {v} kg" for k, v in NEAR_EXPIRY.items()], "waste_pct_week": 3.2},
-      "bookings": {"covers_today": 42, "next_reservation_min": 45, "waitlist": 4, "no_show_pct": 6},
-      "staff": {"scheduled": 8, "on_shift": 6, "overtime_risk": 3, "labor_cost_pct": round(LABOR_KES/s['history'][-1]['revenue']*100,1)},
-      "attention": [{"id": x['id'], "domain": AREAS[x['area']], "title": x['title'], "why": x['why'], "what_to_do": x['action'],
-                     "impact": f"KES {x['value']:,} potential / day", "status": "open"} for x in s['opportunities']],
-      "pulse": [{"domain": "Forecast", "headline": f"KES {sum(r['revenue'] for r in s['forecast']):,} next 7 days", "detail": "Calculated from 56 sample daily summaries; inspect the range in Revenue."},
-                {"domain": "Cash control", "headline": f"KES {UNMATCHED_KES:,} settlement exception", "detail": "Investigate an unmatched payment; this is not proven loss or theft."}],
+                "expiring_48h": [f"{k} · {v} kg" for k, v in NEAR_EXPIRY.items()],
+                "soon_count": len(soon),
+                "first_low_order": ({"name": first_low["name"], "order_by": first_low["order_by"], "order_qty": first_low["order_qty"], "unit": first_low["unit"]} if first_low else None)},
+      "bookings": {"covers_today": COVERS_TODAY, "next_reservation_min": NEXT_RESERVATION_MIN, "waitlist": WAITLIST, "no_show_pct": NO_SHOW_PCT},
+      "staff": {"scheduled": SCHEDULED_TODAY, "on_shift": ON_SHIFT, "overtime_risk": OVERTIME_HOURS, "labor_cost_pct": round(LABOR_KES/today_row['revenue']*100,1)},
+      "attention": [dict(x) for x in items["attention"]],
+      "watching": [dict(x) for x in items["watching"]],
+      "pulse": pulse,
+      "money_today": money_today,
+      "week_ahead": [{"date": r["date"], "day": r["day"], "revenue": r["revenue"], "low": r["low"], "high": r["high"],
+                      "plates": r["plates"], "people": r["people"], "covers": r["covers"]} for r in forecast],
       "source_status": {k: {"state": "available", "recommendations": 1} for k in AREAS},
       "performance": {"revenue_trend": s['history'][-7:]}, "roi": roi(day)}
 
@@ -408,25 +476,25 @@ def area(key, day=None):
                    _decision(f"Keep {quiet['day']} lean", f"{quiet['day']}s average {money(quiet['revenue'])}, well below a typical day.", "Cut prep for slow sellers and avoid overtime that day.", "Less waste and lower labour cost")]),
       "orders": dict(
         subtitle="The orders coming in, and whether service is keeping up.",
-        headline="70 orders are complete, 6 are being prepared and 2 are running late.",
+        headline=f"{ORDERS_TODAY} orders are complete, {OPEN_ORDERS} are being prepared and {DELAYED_ORDERS} are running late.",
         how_to_read="Open orders are still moving through the kitchen. A late order is one that has taken longer than it should; those are the ones to look at first.",
-        metrics=[('Completed', 70), ('Open', 6), ('Delayed', 2)], columns=['Ticket', 'Channel', 'State'],
+        metrics=[('Completed', ORDERS_TODAY), ('Open', OPEN_ORDERS), ('Delayed', DELAYED_ORDERS)], columns=['Ticket', 'Channel', 'State'],
         rows=[['D-101', 'Dine-in', 'Preparing'], ['D-102', 'Takeaway', 'Ready'], ['D-103', 'Delivery', 'Delayed']],
         table_title="Orders that need a look", table_note="A short list of orders in progress right now.",
         action="Prioritise delayed tickets and review service time.",
-        attention=[_alert("late-orders", "2 orders are running late", "One delivery order (D-103) has waited longer than usual.", "Check the grill queue and let the customer know.", "urgent")],
+        attention=[_alert("late-orders", f"{DELAYED_ORDERS} orders are running late", "One delivery order (D-103) has waited longer than usual.", "Check the grill queue and let the customer know.", "urgent")],
         decisions=[_decision("Clear the late delivery first", "Delivery customers cannot see the kitchen, so delays turn into complaints quickly.", "Send the late delivery next and call the customer.", "Protects the customer relationship")]),
       "kitchen": dict(
         subtitle="What is being prepared, and where the kitchen is slowing down.",
-        headline="Average preparation is 14 minutes. The grill is the slowest station at 22 minutes while the cold station is waiting at 8.",
+        headline=f"Average preparation is {AVG_PREP_MIN} minutes. The grill is the slowest station at {GRILL_MIN} minutes while the cold station is waiting at {COLD_MIN}.",
         how_to_read="Prep time is how long a dish takes from order to plate. When one station is far slower than the others, orders queue behind it.",
-        metrics=[('Average prep', '14 min'), ('Open tickets', 6), ('Delayed', 2)], columns=['Station', 'Prep time', 'What to do'],
-        rows=[['Grill', '22 min', 'Rebalance queue'], ['Cold station', '8 min', 'Support plating']],
+        metrics=[('Average prep', f'{AVG_PREP_MIN} min'), ('Open tickets', OPEN_ORDERS), ('Delayed', DELAYED_ORDERS)], columns=['Station', 'Prep time', 'What to do'],
+        rows=[['Grill', f'{GRILL_MIN} min', 'Rebalance queue'], ['Cold station', f'{COLD_MIN} min', 'Support plating']],
         table_title="Stations right now", table_note="Slowest first. The idea is to move a helper to the slowest station.",
         action="Move plating support to the grill before the dinner rush.",
-        attention=[_alert("grill", "The grill is the bottleneck", "Grill dishes (grilled fish, beef) take 22 minutes while the cold station finishes in 8.", "Move plating support to the grill before the dinner rush.", "urgent")],
-        decisions=[_decision("Share the load before dinner", "Two orders are already late and dinner is your busiest time.", "Ask the cold station to help plate grill orders.", "Fewer late orders"),
-                   _decision(f"Plan extra hands for {busy['day']}", f"We expect about {busy_row['plates']} plates on {busy['day']}, {round((busy_row['plates'] / plates_today - 1) * 100)}% more than today, and the grill already takes 22 minutes.", "Put one extra person on the grill and pre-prepare the sauces the day before.", "Fewer late orders on your busiest day")],
+        attention=[_alert("grill", "The grill is the bottleneck", f"Grill dishes (grilled fish, beef) take {GRILL_MIN} minutes while the cold station finishes in {COLD_MIN}.", "Move plating support to the grill before the dinner rush.", "urgent")],
+        decisions=[_decision("Share the load before dinner", f"{DELAYED_ORDERS} orders are already late and dinner is your busiest time.", "Ask the cold station to help plate grill orders.", "Fewer late orders"),
+                   _decision(f"Plan extra hands for {busy['day']}", f"We expect about {busy_row['plates']} plates on {busy['day']}, {round((busy_row['plates'] / plates_today - 1) * 100)}% more than today, and the grill already takes {GRILL_MIN} minutes.", "Put one extra person on the grill and pre-prepare the sauces the day before.", "Fewer late orders on your busiest day")],
         extra_tables=[day_table("Plates we expect to prepare", "Worked out from the sales we expect each day. We assume the same mix of dishes as today.", ['Day', 'Expected sales', 'Plates', 'Compared with today'], lambda r: [r['day'], money(r['revenue']), r['plates'], f"{round((r['plates'] / plates_today - 1) * 100):+d}%"])]),
       "stock": dict(
         subtitle="What is on the shelf, how long it will last, and what to order.",
@@ -446,22 +514,22 @@ def area(key, day=None):
                      items=[dict(label=x["name"], value=min(x["runway_days"], 7), note=f"{qty(x['on_hand'])} {x['unit']} on hand" + (f" · runs out {x['runs_out_day']}" if x["runs_out_day"] else " · more than 7 days"), status="low" if x["runway_days"] <= LOW_COVER_DAYS else ("watch" if x["runway_days"] <= SOON_DAYS or x["near_expiry"] else "ok")) for x in sorted(s["stock"], key=lambda z: z["runway_days"])])]),
       "bookings": dict(
         subtitle="Who is booked, and how busy the evening will be.",
-        headline="42 guests are expected tonight. One booking is still waiting for confirmation and 4 tables are on the waitlist.",
+        headline=f"{COVERS_TODAY} guests are expected tonight. One booking is still waiting for confirmation and {WAITLIST} tables are on the waitlist.",
         how_to_read="Covers means guests, not tables. The no-show rate is how often booked guests do not turn up, based on the sample history.",
-        metrics=[('Expected covers', 42), ('Waitlist', 4), ('No-show assumption', '6%')], columns=['Time', 'Covers', 'Status'],
+        metrics=[('Expected covers', COVERS_TODAY), ('Waitlist', WAITLIST), ('No-show assumption', f'{NO_SHOW_PCT}%')], columns=['Time', 'Covers', 'Status'],
         rows=[['18:00', 12, 'Confirmed'], ['19:00', 18, 'Confirmed'], ['20:00', 12, 'Awaiting confirmation']],
         table_title="Tonight's bookings", table_note="Confirmed bookings are safe to plan for; the last one still needs a reply.",
         action="Confirm the late booking and preserve capacity for walk-ins.",
-        attention=[_alert("late-booking", "The 20:00 booking is not confirmed", "12 guests are waiting for a reply, and 4 tables are on the waitlist.", "Confirm the booking, or give the table to the waitlist.", "watch")],
+        attention=[_alert("late-booking", "The 20:00 booking is not confirmed", f"12 guests are waiting for a reply, and {WAITLIST} tables are on the waitlist.", "Confirm the booking, or give the table to the waitlist.", "watch")],
         decisions=[_decision("Confirm the 20:00 table today", "An unconfirmed table of 12 blocks seats another party could use.", "Call or message the guest now.", "Fills up to 12 seats"),
                    _decision(f"Open more bookings for {busy['day']}", f"We expect about {busy_row['covers']} guests on {busy['day']}, compared with {COVERS_TODAY} tonight.", "Let regulars know, and keep a few tables free for walk-ins.", "Fills your busiest day")],
         extra_tables=[day_table("Guests we expect", "Worked out from the sales we expect, assuming the same number of guests per shilling as today.", ['Day', 'Expected sales', 'Guests (covers)'], lambda r: [r['day'], money(r['revenue']), r['covers']])]),
       "team": dict(
         subtitle="Who is working, and whether the shifts match how busy you are.",
-        headline=f"8 people are scheduled and 6 are on shift. About 3 hours of overtime could be avoided (about {money(opps['labor']['value'])}).",
+        headline=f"{SCHEDULED_TODAY} people are scheduled and {ON_SHIFT} are on shift. About {OVERTIME_HOURS} hours of overtime could be avoided (about {money(opps['labor']['value'])}).",
         how_to_read="Coverage is how many people are working in each part of the day. Overtime is extra paid time; moving a shift is usually cheaper than paying it.",
-        metrics=[('Scheduled', 8), ('On shift', 6), ('Avoidable overtime', money(opps['labor']['value']))], columns=['Period', 'People working', 'What to do'],
-        rows=[['Lunch', 6, 'Enough people'], ['Dinner', 4, 'Move 3 hours from a quiet period']],
+        metrics=[('Scheduled', SCHEDULED_TODAY), ('On shift', ON_SHIFT), ('Avoidable overtime', money(opps['labor']['value']))], columns=['Period', 'People working', 'What to do'],
+        rows=[['Lunch', 6, 'Enough people'], ['Dinner', 4, f'Move {OVERTIME_HOURS} hours from a quiet period']],
         table_title="Coverage through the day", table_note="Lunch has enough people; dinner, your busiest time, is thin.",
         action="Preview the roster adjustment; preserve service coverage.",
         attention=[_alert("dinner", "Dinner is under-staffed", "Only 4 people cover dinner while lunch has 6.", "Move 3 hours from the quiet period into dinner.", "watch", money(opps['labor']['value']) + " potential / day")],
@@ -566,15 +634,6 @@ def area(key, day=None):
         action="A signal needs review; it is not an accusation.",
         attention=[_alert("void", "An order was voided after it was cooked", "That food was made but not paid for.", "Ask the staff member for the reason.", "watch")],
         decisions=[_decision("Ask before assuming", "Most voids are honest mistakes.", "Talk to the person on shift and record the reason.", "Keeps trust with the team")]),
-      "notifications": dict(
-        subtitle="Everything asking for your attention, in one place.",
-        headline="3 things need your attention: vegetables near expiry, the pilau price and dinner coverage. One is urgent.",
-        how_to_read="These are the same items as on the Home page. Acknowledging one here only marks it for this demo.",
-        metrics=[('Need attention', 3), ('Urgent', 1), ('Messages sent', 0)], columns=['Alert', 'What to do'],
-        rows=[[x['title'], x['action']] for x in s['opportunities']],
-        table_title="Open alerts", table_note="Nothing is sent to anyone from the demo.",
-        action="Open the evidence and acknowledge the sample alert.",
-        attention=[_alert("beef-notify", "Beef is running low", f"It covers {beef['cover_days']:g} days and the meat delivery is late.", "Order beef today.", "urgent")], decisions=[]),
       "intelligence": dict(
         subtitle="The few decisions that matter most to you today.",
         headline=f"3 ideas are worth {money(roi(day)['potential_daily'])} a day if they all work. None of it has been earned yet; these are chances, not results.",
@@ -612,6 +671,23 @@ def area(key, day=None):
         action="The demo is isolated from Vibanda and other restaurants.",
         attention=[], decisions=[]),
     }
+    if key == "notifications":
+        # The same list Home shows, so the two can never disagree. Built here (not in `specs`)
+        # because attention_items() itself reads every other area.
+        items = attention_items(day)
+        everything = items["attention"] + items["watching"]
+        urgent = [x for x in everything if x["level"] == "urgent"]
+        specs["notifications"] = dict(
+            subtitle="Everything asking for your attention, in one place.",
+            headline=f"{len(everything)} things need your attention, {len(urgent)} of them urgent.",
+            how_to_read="These are the same items as on the Home page. Acknowledging one here only marks it for this demo.",
+            metrics=[('Need attention', len(everything)), ('Urgent', len(urgent)), ('Messages sent', 0)],
+            columns=['Alert', 'Where', 'What to do'],
+            rows=[[x['title'], x['domain'], x['what_to_do']] for x in everything],
+            table_title="Open alerts", table_note="Nothing is sent to anyone from the demo.",
+            action="Open the evidence and acknowledge the sample alert.",
+            attention=[{k: x[k] for k in ("id", "title", "why", "what_to_do", "level", "impact")} for x in urgent[:3]],
+            decisions=[])
     spec = specs[key]
     metrics = spec["metrics"]
     charts = list(spec.get("charts", []))

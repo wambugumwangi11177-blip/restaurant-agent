@@ -288,6 +288,73 @@ def test_prompted_questions_route_to_the_right_area_without_a_provider(client, d
         assert 'next 7 days' in r.json()['answer_text']
         assert narrate.call_count == 0
 
+def test_home_service_figures_match_the_area_pages():
+    day = date(2026, 9, 30)
+    h = demo.home(day=day)
+    assert h['orders']['delayed'] == h['kitchen']['delay_risk'] == demo.DELAYED_ORDERS
+    assert h['orders']['active_now'] == demo.OPEN_ORDERS
+    orders = {m['label']: m['value'] for m in demo.area('orders', day)['metrics']}
+    assert (orders['Open'], orders['Delayed']) == (h['orders']['active_now'], h['orders']['delayed'])
+    kitchen = demo.area('kitchen', day)
+    assert f"{h['kitchen']['avg_prep_min']} min" in {m['label']: m['value'] for m in kitchen['metrics']}.values()
+    assert h['kitchen']['bottleneck'] == demo.BOTTLENECK
+    bookings = {m['label']: m['value'] for m in demo.area('bookings', day)['metrics']}
+    assert bookings['Waitlist'] == h['bookings']['waitlist'] and bookings['Expected covers'] == h['bookings']['covers_today']
+    team = {m['label']: m['value'] for m in demo.area('team', day)['metrics']}
+    assert (team['Scheduled'], team['On shift']) == (h['staff']['scheduled'], h['staff']['on_shift'])
+    assert h['staff']['overtime_risk'] == demo.scenario(day)['opportunities'][2]['quantity']
+
+def test_home_attention_is_urgent_first_unique_and_traceable():
+    day = date(2026, 9, 30)
+    h = demo.home(day=day)
+    ids = [c['id'] for c in h['attention'] + h['watching']]
+    assert len(ids) == len(set(ids))
+    levels = [c['level'] for c in h['attention']]
+    assert levels == sorted(levels, key=lambda l: l != 'urgent')       # urgent first
+    assert {'late-orders', 'grill', 'beef-low', 'waste', 'margin', 'labor'} <= set(ids)
+    assert not {'veg-expiry', 'pilau-price', 'dinner', 'unmatched-pay', 'beef-notify'} & set(ids)
+    from_areas = {a['id'] for k in demo.AREAS if k != 'notifications' for a in demo.area(k, day)['attention']}
+    from_ideas = {o['id'] for o in demo.scenario(day)['opportunities']}
+    assert set(ids) <= from_areas | from_ideas                           # nothing is made up for Home
+    for c in h['attention'] + h['watching']:
+        assert c['title'] and c['why'] and c['what_to_do'] and c['link'] in demo.AREAS
+    for c in h['attention']:
+        if c['level'] == 'opportunity':
+            assert c['impact'].startswith('KES ') and 'potential' in c['impact']
+
+def test_notifications_page_is_the_home_list():
+    day = date(2026, 9, 30)
+    h = demo.home(day=day)
+    n = demo.area('notifications', day)
+    total = len(h['attention']) + len(h['watching'])
+    assert len(n['rows']) == total
+    assert {m['label']: m['value'] for m in n['metrics']}['Need attention'] == total
+    urgent = sum(1 for c in h['attention'] + h['watching'] if c['level'] == 'urgent')
+    assert {m['label']: m['value'] for m in n['metrics']}['Urgent'] == urgent
+
+def test_home_stock_and_extra_blocks_come_from_the_scenario():
+    day = date(2026, 9, 30)
+    s = demo.scenario(day)
+    h = demo.home(day=day)
+    soon = [x for x in s['stock'] if x['runway_days'] <= demo.SOON_DAYS]
+    stock_metrics = {m['label']: m['value'] for m in demo.area('stock', day)['metrics']}
+    assert h['stock']['soon_count'] == len(soon) == stock_metrics[f'Run out within {demo.SOON_DAYS:g} days']
+    assert h['stock']['first_low_order'] == {'name': 'Beef', 'order_by': 'Today', 'order_qty': 16, 'unit': 'kg'}
+    assert h['money_today'] == demo.report('daily', day)['money_today']
+    assert [r['revenue'] for r in h['week_ahead']] == [r['revenue'] for r in s['forecast']]
+    assert [(r['plates'], r['people'], r['covers']) for r in h['week_ahead']] == [(r['plates'], r['people'], r['covers']) for r in s['forecast']]
+    assert h['roi']['potential_daily'] == 2910 and h['roi']['realised'] == 0
+    assert all(p['link'] in demo.AREAS for p in h['pulse'])
+
+def test_home_periods_are_labelled_and_summed_correctly():
+    day = date(2026, 9, 30)
+    s = demo.scenario(day)
+    for period, n in (('today', 1), ('7d', 7), ('30d', 30)):
+        h = demo.home(period, day)
+        assert h['revenue']['revenue'] == sum(r['revenue'] for r in s['history'][-n:])
+        assert h['period_label'] and h['period_note']
+    assert 'not a live hour' in demo.home('1h', day)['period_note']
+
 def test_sibling_restaurant_rejected(client, db_session, scoped_owner,demo_headers):
     user,_=scoped_owner
     user.active_restaurant_id=203

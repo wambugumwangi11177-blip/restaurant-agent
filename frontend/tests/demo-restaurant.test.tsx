@@ -264,6 +264,39 @@ it("OS has prompted questions, no focus-area picker and no creative toggle", asy
   expect(screen.getByRole("link", { name: /See the numbers: Stock/ }).getAttribute("href")).toBe("/demo/stock");
 });
 
+it("home lists urgent items first, keeps lower ones compact, and lets decisions be undone", async () => {
+  const card = (id: string, level: string, title: string) => ({ id, domain: "Stock", title, why: "Because.", what_to_do: "Do it.", impact: "", status: "open", level, link: "stock" });
+  const feed = {
+    ...emptyFeed,
+    period_label: "Today",
+    period_note: "Revenue and orders follow the period. Kitchen, stock, bookings and staff always show right now.",
+    attention: [card("beef-low", "urgent", "Beef runs out on Friday"), card("waste", "opportunity", "Use vegetables before expiry")],
+    watching: [card("soon-out", "watch", "3 more ingredients run out soon")],
+    pulse: [{ domain: "Stock", headline: "3 ingredients run out soon", detail: "On the order list.", link: "purchasing" }],
+    money_today: { sales: 61200, food_cost: 23440, contribution: 37760, labor: 10500, other: 6500, surplus: 20760 },
+    week_ahead: [{ date: "2026-10-01", day: "Thursday", revenue: 59670, low: 49420, high: 69920, plates: 100, people: 8, covers: 41 }],
+    roi: { potential_daily: 2910, realised: 0, label: "Illustrative daily opportunity", assumption: "Not guaranteed.", opportunities: [{}, {}, {}] },
+  };
+  vi.mocked(api.get).mockImplementation(async (url: string) => ({ data: url.includes("/reports/") ? sampleReport : feed }));
+  render(<DemoHomePage />);
+  expect(await screen.findByText("2 items · 1 urgent")).toBeTruthy();
+  expect(screen.getByText("Urgent")).toBeTruthy();
+  expect(screen.getByText("Also worth watching")).toBeTruthy();
+  expect(screen.getByText("3 more ingredients run out soon")).toBeTruthy();
+  expect(screen.getByText("The week ahead")).toBeTruthy();
+  expect(screen.getByText(/2,910 a day, if all 3 ideas work/)).toBeTruthy();
+  expect(screen.getAllByRole("link", { name: /See the numbers/ })[0].getAttribute("href")).toBe("/demo/stock");
+  fireEvent.click(screen.getAllByRole("button", { name: "Not now" })[0]);
+  expect(screen.getByText("Set aside for now")).toBeTruthy();
+  expect(screen.getByText("1 item")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Bring back" }));
+  expect(screen.getByText("2 items · 1 urgent")).toBeTruthy();
+  fireEvent.click(screen.getAllByRole("button", { name: "Acknowledge" })[0]);
+  expect(screen.getByText(/Acknowledged:/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  expect(screen.queryByText(/Acknowledged:/)).toBeNull();
+});
+
 const homeCalls = () => vi.mocked(api.get).mock.calls.filter((c) => String(c[0]).includes("/demo/home")).length;
 
 it("rides out a short backend restart instead of showing an error", async () => {

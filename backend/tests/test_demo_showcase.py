@@ -175,11 +175,15 @@ def test_report_pdf_endpoint(client, demo_headers):
     assert client.get('/api/v1/demo/reports/nope/pdf', headers=demo_headers).status_code == 422
 
 def test_ideas_check_the_numbers_first_and_call_no_provider(client, demo_headers):
+    from routers.demo import IDEA_AREAS
     with patch('ai.owner_narrative.narrate') as narrate:
         r = client.post('/api/v1/demo/ideas', headers=demo_headers, json={})
         assert r.status_code == 200
         body = r.json()
-        assert body['checked'] == len(demo.AREAS) and body['creative'] == []
+        # "Checked" is the number of areas whose ideas were actually read, not every area in the demo.
+        assert body['checked'] == len(IDEA_AREAS) and body['creative'] == []
+        # One idea per area before any area's second, so the short list is not all stock and suppliers.
+        assert len({i['area'] for i in body['from_numbers']}) == len(body['from_numbers'])
         assert body['from_numbers'] and all(i['idea'] and i['why'] and i['next_step'] for i in body['from_numbers'])
         assert narrate.call_count == 0
     assert client.post('/api/v1/demo/ideas', json={}).status_code == 401
@@ -302,7 +306,8 @@ def test_home_service_figures_match_the_area_pages():
     assert bookings['Waitlist'] == h['bookings']['waitlist'] and bookings['Expected covers'] == h['bookings']['covers_today']
     team = {m['label']: m['value'] for m in demo.area('team', day)['metrics']}
     assert (team['Scheduled'], team['On shift']) == (h['staff']['scheduled'], h['staff']['on_shift'])
-    assert h['staff']['overtime_risk'] == demo.scenario(day)['opportunities'][2]['quantity']
+    labor = next(o for o in demo.scenario(day)['opportunities'] if o['id'] == 'labor')
+    assert h['staff']['overtime_risk'] == labor['quantity'] == demo.OVERTIME_HOURS
 
 def test_home_attention_is_urgent_first_unique_and_traceable():
     day = date(2026, 9, 30)
@@ -339,11 +344,13 @@ def test_home_stock_and_extra_blocks_come_from_the_scenario():
     soon = [x for x in s['stock'] if x['runway_days'] <= demo.SOON_DAYS]
     stock_metrics = {m['label']: m['value'] for m in demo.area('stock', day)['metrics']}
     assert h['stock']['soon_count'] == len(soon) == stock_metrics[f'Run out within {demo.SOON_DAYS:g} days']
-    assert h['stock']['first_low_order'] == {'name': 'Beef', 'order_by': 'Today', 'order_qty': 16, 'unit': 'kg'}
+    first_low = next(x for x in s['stock'] if x['low'])
+    assert h['stock']['first_low_order'] == {k: first_low[k] for k in ('name', 'order_by', 'order_qty', 'unit')}
+    assert first_low['name'] == 'Beef'                                   # the demo's story: beef is the urgent one
     assert h['money_today'] == demo.report('daily', day)['money_today']
     assert [r['revenue'] for r in h['week_ahead']] == [r['revenue'] for r in s['forecast']]
     assert [(r['plates'], r['people'], r['covers']) for r in h['week_ahead']] == [(r['plates'], r['people'], r['covers']) for r in s['forecast']]
-    assert h['roi']['potential_daily'] == 2910 and h['roi']['realised'] == 0
+    assert h['roi']['potential_daily'] == sum(o['value'] for o in s['opportunities']) and h['roi']['realised'] == 0
     assert all(p['link'] in demo.AREAS for p in h['pulse'])
 
 def test_home_periods_are_labelled_and_summed_correctly():
@@ -354,6 +361,57 @@ def test_home_periods_are_labelled_and_summed_correctly():
         assert h['revenue']['revenue'] == sum(r['revenue'] for r in s['history'][-n:])
         assert h['period_label'] and h['period_note']
     assert 'not a live hour' in demo.home('1h', day)['period_note']
+
+@pytest.fixture
+def fresh_caches():
+    """The scenario and its derived lists are cached per day; clear them around a test that changes a figure."""
+    from routers import demo as router
+    def clear():
+        demo.scenario.cache_clear()
+        demo.attention_items.cache_clear()
+        router._ideas_by_area.cache_clear()
+    clear()
+    yield
+    clear()
+
+def test_changing_a_scenario_figure_changes_every_place_that_shows_it(monkeypatch, fresh_caches):
+    day = date(2026, 9, 30)
+    monkeypatch.setattr(demo, 'ORDERS_TODAY', 80)
+    monkeypatch.setattr(demo, 'OVERTIME_HOURS', 5)
+    h = demo.home(day=day)
+    assert h['orders']['orders'] == 80 and sum(h['orders']['split'].values()) == 80
+    pos = demo.area('pos', day)
+    assert pos['headline'].startswith('80 orders')
+    assert {m['label']: m['value'] for m in pos['metrics']}['Completed orders'] == 80
+    assert sum(r[1] for r in pos['rows']) == 80
+    assert 'from 80 orders' in demo.area('revenue', day)['headline']
+    assert sum(c['value'] for c in demo.report('daily', day)['channels']) == 80
+    assert h['staff']['overtime_risk'] == 5
+    team = demo.area('team', day)
+    assert 'Move 5 hours' in team['attention'][0]['what_to_do'] and 'Shift 5 hours' in team['decisions'][0]['next_step']
+
+def test_bookings_purchase_orders_and_channels_add_up():
+    day = date(2026, 9, 30)
+    assert sum(covers for _, covers, _ in demo.BOOKING_SLOTS) == demo.COVERS_TODAY
+    assert sum(r[1] for r in demo.area('bookings', day)['rows']) == demo.COVERS_TODAY
+    total = sum(p[2] for p in demo.PURCHASE_ORDERS)
+    purchasing = demo.area('purchasing', day)
+    assert {m['label']: m['value'] for m in purchasing['metrics']}['Commitments'] == demo.money(total)
+    assert demo.money(total) in purchasing['headline']
+    assert [r[0] for r in purchasing['rows']] == [p[0] for p in demo.PURCHASE_ORDERS]
+    pos = demo.area('pos', day)
+    assert sum(r[1] for r in pos['rows']) == demo.ORDERS_TODAY == demo.home(day=day)['orders']['orders']
+    marketing = {m['label']: m['value'] for m in demo.area('marketing', day)['metrics']}
+    assert marketing['Returning guests'] + marketing['New guests'] == demo.ORDERS_TODAY
+
+def test_repeated_alerts_point_at_a_card_home_shows():
+    day = date(2026, 9, 30)
+    h = demo.home(day=day)
+    shown = {c['id'] for c in h['attention'] + h['watching']}
+    tagged = [a for k in demo.AREAS if k != 'notifications' for a in demo.area(k, day)['attention'] if a.get('repeat_of')]
+    assert tagged
+    assert all(a['repeat_of'] in shown for a in tagged)       # the card that says it instead is on Home
+    assert not {a['id'] for a in tagged} & shown               # and the repeat itself is not
 
 def test_sibling_restaurant_rejected(client, db_session, scoped_owner,demo_headers):
     user,_=scoped_owner

@@ -19,7 +19,9 @@ separate. No schema migration is needed; the existing Alembic head remains 050.
 - A price/demand simulator recalculates food contribution without changing prices.
 - Potential savings show quantities, rates and assumptions. They are not realised
   savings, and no subscription ROI ratio is claimed without a subscription cost.
-- Attention acknowledgement is local to the page. External messaging, purchasing,
+- Attention acknowledgement and "set aside" stay in the browser for the session
+  (`sessionStorage`, key `demo-home-decisions-v1`), so a reload or a trip to another page does not
+  undo them; nothing is written to the server. External messaging, purchasing,
   roster changes and other business actions are not executed by the demo.
 - Reports state how many sample days are available; yearly does not invent a year.
 
@@ -72,6 +74,25 @@ Frontend remains the Vercel `frontend` project with the
 - OS: prompted questions grouped by part of the restaurant; the deterministic answer appears at once and
   an AI idea is added underneath when ready (hidden if unavailable).
 - Reports: charts, plain sections, PDF download (`GET /api/v1/demo/reports/{period}/pdf`, ReportLab) and print.
+
+### One source for each figure
+
+Figures that appear in more than one place are constants at the top of `demo_scenario.py`
+(`ORDERS_TODAY`, the channel mix, `OVERTIME_HOURS`, `LUNCH_PEOPLE`, `BOOKING_SLOTS`,
+`PURCHASE_ORDERS`, ...) and everything reads them, so Home, the area pages and the OS cannot disagree.
+Tests change a constant and check every place follows. An alert that another card already says better
+is tagged `repeat_of=<id>` where it is defined, and Home shows the other card once. `/ideas` reports
+`checked` as the number of areas it actually read, and shows one idea per area before any area's second.
+
+### Answers to the prompted questions
+
+Each of the prompted OS questions has its own answer in `backend/demo_answers.py`, written as plain
+sentences whose every figure is computed from the scenario (never typed). A question is matched by its
+exact wording, not by keywords, so an answer cannot be about the wrong ingredient, dish or day; typing a
+prompted question in full still reaches its own area. Any other typed question keeps the general answer
+for its area. A test reads `frontend/src/lib/demoQuestions.ts` and fails if a question has no answer, an
+answer has no question, or two questions in one area get the same text. When the AI is on, it is given the
+calculated answer (`calculated_answer` in its evidence) and asked to keep its figures.
 
 ### AI reliability
 

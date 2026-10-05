@@ -94,6 +94,15 @@ for its area. A test reads `frontend/src/lib/demoQuestions.ts` and fails if a qu
 answer has no question, or two questions in one area get the same text. When the AI is on, it is given the
 calculated answer (`calculated_answer` in its evidence) and asked to keep its figures.
 
+### AI budget and database locks
+
+`ai/owner_narrative.py::narrate()` checks the daily budget and reserves the call's estimated cost as a
+usage row under a short tenant lock, commits (releasing the lock), then calls the provider with no lock or
+connection held. On success the row is rewritten with the real usage; on failure it is removed. Two
+simultaneous calls still cannot spend the same remaining budget, because the second sees the first's
+reservation. Trade-off: a crash in the middle of a call leaves its estimate counted until midnight UTC (spend
+is over-counted, never lost). The demo still runs one provider call at a time to bound cost and load.
+
 ### AI reliability
 
 Reasoning models (the default free Nemotron) burn a small token budget "thinking" and can print their planning.

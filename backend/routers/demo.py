@@ -217,9 +217,10 @@ def _creative_call(db, user, restaurant, kind, request_key, source, system, max_
             if hit and time.monotonic() < hit[0]:
                 return hit[1], True
         value = empty
-        # AI is a bonus, never a dependency. A provider call holds a database connection and a row lock while
-        # it waits, so only one runs at a time; anyone else skips it instead of queueing behind it, and after
-        # a provider failure every caller skips it for a short while. Neither case is cached.
+        # AI is a bonus, never a dependency. narrate() no longer holds a database lock while the model answers
+        # (it reserves its budget and commits first), but only one provider call runs at a time anyway: it
+        # bounds cost and load on a free model. Anyone else skips the AI instead of queueing behind it, and
+        # after a provider failure every caller skips it for a short while. Neither case is cached.
         if time.monotonic() < _ai_paused_until[0] or not _ai_slot.acquire(timeout=2):
             with _lock:
                 _key_locks.pop(cache_key, None)

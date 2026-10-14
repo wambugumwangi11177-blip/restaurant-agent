@@ -1606,3 +1606,36 @@ class Region(Base):
     created_at      = Column(DateTime, default=utcnow)
 
     organization = relationship("Organization")
+
+
+class CompanyProposal(Base):
+    """Company OS Kernel: one action an agent wants to take. Every non-READ action
+    is recorded here first, so the table is also the audit trail."""
+    __tablename__ = "company_proposals"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    agent         = Column(String, nullable=False)
+    tool          = Column(String, nullable=False, index=True)
+    tier          = Column(String, nullable=False)
+    summary       = Column(String, nullable=False)
+    payload       = Column(Text, nullable=False, default="{}")   # JSON
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="SET NULL"), nullable=True, index=True)
+    # pending | executed | rejected | failed
+    status        = Column(String, nullable=False, default="pending", index=True)
+    auto_executed = Column(Boolean, nullable=False, default=False)
+    edited        = Column(Boolean, nullable=False, default=False)
+    decided_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    result        = Column(Text, nullable=True)
+    error         = Column(Text, nullable=True)
+    created_at    = Column(DateTime, default=utcnow)
+    decided_at    = Column(DateTime, nullable=True)
+
+
+class CompanyToolAutonomy(Base):
+    """Per-tool earned autonomy: N consecutive unedited approvals unlock auto-run."""
+    __tablename__ = "company_tool_autonomy"
+
+    tool       = Column(String, primary_key=True)
+    streak     = Column(Integer, nullable=False, default=0)
+    autonomous = Column(Boolean, nullable=False, default=False)
+    updated_at = Column(DateTime, default=utcnow)

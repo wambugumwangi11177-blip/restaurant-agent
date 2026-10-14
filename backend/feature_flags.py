@@ -50,6 +50,12 @@ _FLAGS: dict[str, tuple[bool, str]] = {
     # given, but it spends tokens on page load, so it defaults OFF and is also
     # gated by ai_narration + a configured provider.
     "creative_layer": (False, "Creative (stochastic) LLM layer on Home, OS and Reports; spends LLM tokens."),
+    # Company OS Kernel (ai/company_os). Fail-safe: the whole agent loop is OFF
+    # until switched on. company_os_autonomy is the kill switch for earned
+    # autonomy: set FEATURE_COMPANY_OS_AUTONOMY=false and every agent action,
+    # whatever its earned streak, waits for a human (draft-only mode).
+    "company_os": (False, "Company OS agents propose and run company operations (daily cycle)."),
+    "company_os_autonomy": (True, "Allow tools with earned autonomy to run without approval; off = draft-only."),
 }
 
 _TRUTHY = {"1", "true", "yes", "on"}

@@ -144,6 +144,14 @@ def _start_scheduler():
             misfire_grace_time=3600,
         )
 
+        scheduler.add_job(
+            _run_company_os_cycle,
+            CronTrigger(hour=5, minute=30),  # 08:30 EAT, after the briefings
+            id="company_os_cycle",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+
         # Also check for late purchase orders every 2 hours
         scheduler.add_job(
             _check_late_purchase_orders,
@@ -273,6 +281,20 @@ def _start_scheduler():
         logger.warning("[WARN] APScheduler not installed — scheduled jobs disabled. Run: pip install apscheduler")
     except Exception as e:
         logger.warning(f"[WARN] Scheduler failed to start: {e}")
+
+
+def _run_company_os_cycle():
+    """Daily Company OS cycle (flag-gated inside run_company_cycle)."""
+    try:
+        from database import SessionLocal
+        from ai.company_os.agents import run_company_cycle
+        db = SessionLocal()
+        try:
+            run_company_cycle(db)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[CompanyOS] Scheduler job failed: {exc}")
 
 
 def _send_all_morning_briefings():
@@ -611,7 +633,7 @@ app.add_middleware(ObserverModeMiddleware)
 #   • webhooks — MacSoft POSTs to a fixed, externally-registered URL; versioning
 #     it would break the push endpoint they have already been given.
 #   • health — conventionally unversioned (probes/uptime checks hit /health).
-from routers import demo, continuity
+from routers import demo, continuity, company_os
 
 _VERSIONED_ROUTERS = [
     menu.router, orders.router, inventory.router, analytics.router,
@@ -619,7 +641,7 @@ _VERSIONED_ROUTERS = [
     billing.router, enterprise.router, staff.router, stock_custody.router,
     suppliers.router, purchase_orders.router, notifications.router, support.router,
     tables.router, attendance.router, fraud.router, cash_reconciliation.router,
-    restaurants.router, overview.router, reports.router, ai_ask.router, creative.router, observer.router, demo.router, continuity.router,
+    restaurants.router, overview.router, reports.router, ai_ask.router, creative.router, observer.router, demo.router, continuity.router, company_os.router,
     ]
 
 app.include_router(auth.router)

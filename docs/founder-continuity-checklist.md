@@ -34,3 +34,7 @@ restore the database without the founder.
 
 Also check the Railway env vars `ANTHROPIC_MODEL_LOW/MEDIUM/HIGH`: they override
 the code defaults, so a pinned retiring id there will still fail.
+- [x] **[code]** Weekly scorecard + per-restaurant health score (usage, freshness, support load, unacknowledged alerts) with the report's ">20% red => call" rule: `GET /continuity/scorecard` (SUPERADMIN only), `backend/ai/continuity/scorecard.py`
+
+## Not applicable as written
+The report's diner-facing controls (AI disclosure, allergen handover) target a customer-facing bot. This repo's WhatsApp agent is owner-facing (`ai/whatsapp/orchestrator.py`), and M-Pesa/Twilio transports are retired, so the STK-callback sweep and diner handover have no code here yet.

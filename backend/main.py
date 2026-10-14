@@ -611,7 +611,7 @@ app.add_middleware(ObserverModeMiddleware)
 #   • webhooks — MacSoft POSTs to a fixed, externally-registered URL; versioning
 #     it would break the push endpoint they have already been given.
 #   • health — conventionally unversioned (probes/uptime checks hit /health).
-from routers import demo
+from routers import demo, continuity
 
 _VERSIONED_ROUTERS = [
     menu.router, orders.router, inventory.router, analytics.router,
@@ -619,7 +619,7 @@ _VERSIONED_ROUTERS = [
     billing.router, enterprise.router, staff.router, stock_custody.router,
     suppliers.router, purchase_orders.router, notifications.router, support.router,
     tables.router, attendance.router, fraud.router, cash_reconciliation.router,
-    restaurants.router, overview.router, reports.router, ai_ask.router, creative.router, observer.router, demo.router,
+    restaurants.router, overview.router, reports.router, ai_ask.router, creative.router, observer.router, demo.router, continuity.router,
     ]
 
 app.include_router(auth.router)

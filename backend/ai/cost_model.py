@@ -24,6 +24,8 @@ import os
 # id, longest match wins. Approximate public list prices.
 _PRICE_PER_MTOK: dict[str, tuple[float, float]] = {
     # Anthropic
+    "claude-haiku-5":  (0.10, 0.50),   # Haiku 5.5 list price (Anthropic pricing page)
+    "claude-sonnet-5": (2.0, 10.0),    # Sonnet 5.5 list price
     "claude-opus":   (15.0, 75.0),
     "claude-sonnet": (3.0, 15.0),
     "claude-haiku":  (1.0, 5.0),

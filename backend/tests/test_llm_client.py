@@ -209,3 +209,17 @@ def test_temperature_dropped_for_claude_4_7_and_later():
     assert ok("claude-sonnet-5") is False
     assert ok("claude-haiku-5-5") is False
     assert ok("some-other-model") is True
+
+
+def test_default_anthropic_models_are_not_retired_ids():
+    from ai import llm_client
+    retired = ("claude-haiku-4-5", "claude-sonnet-4-5", "claude-3")
+    for tier, model in llm_client._MODEL_TIERS["anthropic"].items():
+        assert not model.startswith(retired), (tier, model)
+    assert llm_client._MODEL_TIERS["anthropic"][llm_client.TIER_LOW] == "claude-haiku-5-5"
+
+
+def test_haiku_5_5_priced_below_legacy_haiku():
+    from ai import cost_model
+    src = open(cost_model.__file__).read()
+    assert '"claude-haiku-5"' in src and '"claude-sonnet-5"' in src

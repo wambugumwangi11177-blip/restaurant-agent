@@ -9,7 +9,7 @@ Prices are public list prices per 1,000,000 tokens, USD, and are DELIBERATELY a
 static table here (not a live billing API) — they change rarely and an owner
 wants a stable estimate, not a to-the-cent invoice. Every entry is documented and
 env-overridable. Model ids are matched by substring so a provider-returned id
-("openai/gpt-oss-120b", "claude-haiku-4-5-20251001", "llama-3.1-8b-instant")
+("openai/gpt-oss-120b", "claude-haiku-5-5", "llama-3.1-8b-instant")
 resolves without an exact-string table.
 
 Honest about scope: this is an ESTIMATE. Unknown models fall back to a

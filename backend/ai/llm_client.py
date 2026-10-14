@@ -30,6 +30,7 @@ requirements.txt — "uncomment when client has paid").
 import json
 import logging
 import os
+import re
 from types import SimpleNamespace
 
 logger = logging.getLogger("ai.llm_client")
@@ -95,7 +96,7 @@ _MODEL_TIERS = {
         TIER_CREATIVE: os.getenv("OPENROUTER_MODEL_CREATIVE", _OPENROUTER_MODEL),
     },
     "anthropic": {
-        TIER_LOW:    os.getenv("ANTHROPIC_MODEL_LOW",    "claude-haiku-4-5-20251001"),
+        TIER_LOW:    os.getenv("ANTHROPIC_MODEL_LOW",    "claude-haiku-5-5"),
         TIER_MEDIUM: os.getenv("ANTHROPIC_MODEL_MEDIUM", _ANTHROPIC_MODEL),
         TIER_HIGH:   os.getenv("ANTHROPIC_MODEL_HIGH",   "claude-opus-4-8"),
         TIER_CREATIVE: os.getenv("ANTHROPIC_MODEL_CREATIVE", os.getenv("ANTHROPIC_MODEL_MEDIUM", _ANTHROPIC_MODEL)),
@@ -114,6 +115,20 @@ _MODEL_TIERS = {
         TIER_CREATIVE: os.getenv("GROQ_MODEL_CREATIVE", os.getenv("GROQ_MODEL_MEDIUM", _GROQ_MODEL)),
     },
 }
+
+
+
+_NO_TEMPERATURE_FROM = (4, 7)
+
+
+def _anthropic_accepts_temperature(model: str | None) -> bool:
+    """Claude 4.7 and later return HTTP 400 when `temperature` is sent
+    (Anthropic model-deprecations page). Parse "claude-<family>-<major>[-<minor>]"
+    and drop the parameter for those models; unparseable ids keep it."""
+    m = re.match(r"claude-(?:opus|sonnet|haiku)-(\d+)(?:-(\d{1,2}))?(?:-|$)", model or "")
+    if not m:
+        return True
+    return (int(m.group(1)), int(m.group(2) or 0)) < _NO_TEMPERATURE_FROM
 
 
 def _default_model() -> str:
@@ -242,7 +257,7 @@ def chat_with_usage(
             "system": system,
             "messages": messages,
         }
-        if temperature is not None:
+        if temperature is not None and _anthropic_accepts_temperature(kwargs["model"]):
             kwargs["temperature"] = temperature
         response = client.messages.create(**kwargs)
         text = "".join(block.text for block in response.content if block.type == "text")

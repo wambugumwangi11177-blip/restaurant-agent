@@ -142,3 +142,43 @@ Optional AI, SMTP, monitoring and off-site backup credentials must match the
 configured providers. Verify delivery, monitoring and backup operation separately;
 their presence alone is not evidence that recovery or alerting works.
 See `backend/.env.example` for the full annotated list.
+
+## 6. Operator runbook (rollback, key rotation, who to call)
+
+Written so a second person can act without the founder.
+
+**Roll back a bad deploy.** Railway → backend service → Deployments → pick the
+last green deployment → Redeploy. Images are retained 72h (Hobby) / 120h (Pro),
+so roll back inside that window. Health-check failures keep the previous
+version serving. Never roll back past a migration without §3b.
+
+**Rotate keys** (after any suspected leak, or a person leaving):
+1. `SECRET_KEY` (invalidates all sessions), `DATABASE_URL` password, LLM keys
+   (`OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` / `GROQ_API_KEY`), backup keys.
+2. Set the new value in Railway env vars, redeploy, verify `/health/db`.
+3. Revoke the old value at the provider. Record the date in the vault.
+
+**Token hygiene (PocketOS lesson).** No agent or CI environment may hold a
+Railway *account* token. Use a project-scoped token for CI; give teammates the
+Editor role (cannot delete services/volumes); seal production secrets.
+
+**Backups must leave the blast radius.** `wiping a volume deletes all
+backups` on Railway, and `backend/scripts/backup/run_backup.sh` uploads to a
+Railway bucket in the same project. Treat that as convenience only: the
+GitHub Actions dump (§1, `backup.yml`) to a *different provider and account*
+is the real off-platform copy. Enable Postgres PITR (about 4-week window).
+
+**Billing.** Railway stops workloads if credit hits zero and deletes volumes
+60-90 days after cancellation. Company card plus a backup card; a second
+person with billing access.
+
+**Who to call** (fill in; keep in the vault too):
+- Second director / signatory: ________
+- Retained engineer: ________  (P1 response target: 30 min in service hours)
+- Accountant / tax agent: ________  Company secretary / advocate: ________
+
+**Model retirement.** Anthropic gives 60 days' notice. Check
+https://platform.claude.com/docs/en/about-claude/model-deprecations monthly
+and grep for model ids (`ai/llm_client.py`, `.env.example`, Railway env
+`ANTHROPIC_MODEL*`). Claude 4.7+ models reject `temperature`; the client
+already omits it (`_anthropic_accepts_temperature`).

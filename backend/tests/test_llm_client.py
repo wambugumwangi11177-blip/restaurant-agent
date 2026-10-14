@@ -198,3 +198,14 @@ def test_canonical_messages_preserve_tool_call_arguments(monkeypatch):
     translated = llm_client._canonical_messages_to_openai(canonical)
     args = _json.loads(translated[1]["tool_calls"][0]["function"]["arguments"])
     assert args == {"party_size": 4, "time": "19:00"}
+
+
+def test_temperature_dropped_for_claude_4_7_and_later():
+    from ai.llm_client import _anthropic_accepts_temperature as ok
+    assert ok("claude-haiku-4-5-20251001") is True
+    assert ok("claude-sonnet-4-6") is True
+    assert ok("claude-opus-4-7") is False
+    assert ok("claude-opus-4-8") is False
+    assert ok("claude-sonnet-5") is False
+    assert ok("claude-haiku-5-5") is False
+    assert ok("some-other-model") is True

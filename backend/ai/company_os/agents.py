@@ -1,55 +1,37 @@
 """
-Company agents. They only ever call kernel.propose(); they never execute.
-Deterministic planners: drafts are templated from recorded facts, so there is
-nothing for a model (or a customer message) to invent or inject.
+Company OS entry point. Departments (ai/company_os/departments) own the work; this
+runs them in order, isolating failures so one broken department never stops the rest.
+Agents only ever call kernel.propose(); nothing here executes a tool directly.
 """
-from datetime import timedelta
+import logging
 
-import models
-from time_utils import utcnow
-from ai.continuity.scorecard import platform_scorecard
+import feature_flags
 from . import kernel, tools  # noqa: F401 - importing tools registers them
+from .departments import DEPARTMENTS, customer_success
 
-CHECKIN_COOLDOWN_DAYS = 7
+logger = logging.getLogger("company_os")
 
-
-def _recent_checkin(db, restaurant_id: int) -> bool:
-    since = utcnow() - timedelta(days=CHECKIN_COOLDOWN_DAYS)
-    return db.query(models.CompanyProposal).filter(
-        models.CompanyProposal.tool == "client_checkin",
-        models.CompanyProposal.restaurant_id == restaurant_id,
-        models.CompanyProposal.status.in_(["pending", "executed"]),
-        models.CompanyProposal.created_at >= since,
-    ).first() is not None
+# Kept for callers/tests that used the first two agents directly.
+client_success_agent = customer_success.health_agent
 
 
 def digest_agent(db) -> list:
-    return [kernel.propose(db, "digest_agent", "scorecard_digest", {}, "Daily company scorecard digest")]
+    return [kernel.propose(db, "executive.digest_agent", "scorecard_digest", {}, "Daily company scorecard digest")]
 
 
-def client_success_agent(db) -> list:
-    """Draft a check-in for each red restaurant (once per cooldown window)."""
-    out = []
-    for r in platform_scorecard(db)["restaurants"]:
-        if r["status"] != "red" or _recent_checkin(db, r["restaurant_id"]):
-            continue
-        reasons = "; ".join(r["reasons"]) or "activity looks low"
-        message = (f"Hi, we noticed {reasons} at {r['name']}. "
-                   "Is anything blocking you? Reply here and we'll help get you back on track.")
-        out.append(kernel.propose(
-            db, "client_success_agent", "client_checkin",
-            {"restaurant_id": r["restaurant_id"], "message": message},
-            f"Check in with {r['name']} (health {r['score']})",
-            restaurant_id=r["restaurant_id"]))
-    return out
-
-
-def run_company_cycle(db) -> dict:
+def run_company_cycle(db, today=None) -> dict:
     """The daily loop. No-op unless FEATURE_COMPANY_OS is on."""
-    import feature_flags
     if not feature_flags.is_enabled("company_os"):
         return {"ran": False, "reason": "company_os flag off"}
-    made = digest_agent(db) + client_success_agent(db)
+    made, errors = [], {}
+    for dept in DEPARTMENTS:
+        try:
+            made += dept.run(db, today)
+        except Exception as exc:  # noqa: BLE001
+            db.rollback()
+            errors[dept.NAME] = str(exc)[:200]
+            logger.error("[company_os] department %s failed: %s", dept.NAME, exc, exc_info=True)
     return {"ran": True, "proposals": len(made),
             "executed": sum(1 for p in made if p.status == "executed"),
-            "pending": sum(1 for p in made if p.status == "pending")}
+            "pending": sum(1 for p in made if p.status == "pending"),
+            "department_errors": errors}

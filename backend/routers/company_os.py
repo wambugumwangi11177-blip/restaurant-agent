@@ -20,7 +20,7 @@ class Decision(BaseModel):
 
 
 def _out(p: models.CompanyProposal) -> dict:
-    return {"id": p.id, "agent": p.agent, "tool": p.tool, "tier": p.tier, "summary": p.summary,
+    return {"id": p.id, "department": p.agent.split(".")[0], "agent": p.agent, "tool": p.tool, "tier": p.tier, "summary": p.summary,
             "payload": json.loads(p.payload or "{}"), "restaurant_id": p.restaurant_id,
             "status": p.status, "auto_executed": p.auto_executed, "edited": p.edited,
             "result": p.result, "error": p.error, "created_at": p.created_at, "decided_at": p.decided_at}
@@ -68,6 +68,13 @@ async def revoke(name: str, db: Session = Depends(get_db), _u: models.User = _op
         raise HTTPException(404, "Unknown tool")
     kernel.revoke_autonomy(db, name)
     return kernel.status(db)
+
+
+@router.get("/departments")
+async def departments(db: Session = Depends(get_db), _u: models.User = _op):
+    from ai.company_os.departments import DEPARTMENTS
+    from ai.company_os.departments.executive import founder_load
+    return {"departments": [d.NAME for d in DEPARTMENTS], "founder_load": founder_load(db)}
 
 
 @router.post("/run")

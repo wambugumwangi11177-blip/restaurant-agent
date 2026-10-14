@@ -172,6 +172,19 @@ def decide(
     return proposal
 
 
+def already_proposed(db: Session, tool: str, summary: str, days: int) -> bool:
+    """True if a live proposal with this exact summary exists inside the window.
+    Departments use it to stay idempotent across daily cycles."""
+    from datetime import timedelta
+    since = utcnow() - timedelta(days=days)
+    return db.query(models.CompanyProposal).filter(
+        models.CompanyProposal.tool == tool,
+        models.CompanyProposal.summary == summary[:250],
+        models.CompanyProposal.status.in_(["pending", "executed"]),
+        models.CompanyProposal.created_at >= since,
+    ).first() is not None
+
+
 def revoke_autonomy(db: Session, tool_name: str) -> None:
     row = _autonomy_row(db, tool_name)
     row.streak, row.autonomous, row.updated_at = 0, False, utcnow()

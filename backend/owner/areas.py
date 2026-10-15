@@ -98,13 +98,14 @@ def _money_cost_dials(ctx: OwnerContext) -> dict:
             "assumption": assume("food_cost_target_pct", s.food_cost_target_pct, label="Ingredient cost target")}
 
 
-def month_pnl(ctx: OwnerContext) -> dict:
-    """The Profit & Loss for the calendar month so far — Home's money.pnl block and the monthly report's P&L section."""
+def month_pnl(ctx: OwnerContext, month_start=None) -> dict:
+    """The Profit & Loss for the calendar month so far — Home's money.pnl block and the monthly report's P&L section — or, with
+    `month_start` (the first day of a month), for that whole month (the monthly report's `month` and the accountant export)."""
     from owner.money.pnl import compute_pnl, period_range
     from owner.money.view import owner_pnl
     from time_utils import eat_date
     today = eat_date(ctx.now)
-    start, end = period_range("month", today)
+    start, end = period_range("month", month_start or today)
     p = compute_pnl(ctx.db, ctx.rid, start, end, ctx.settings, today=today)
     return owner_pnl(p, "month", ctx.settings, as_of=ctx.now, sales_state=ctx.order_state()["state"])
 

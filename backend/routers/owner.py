@@ -22,6 +22,7 @@ from owner import ask as owner_ask
 from owner import home as owner_home
 from owner import reports as owner_reports
 from owner import settings as owner_settings
+from owner.money.ledger import parse_month
 from owner.states import OwnerContext
 from routers.deps import get_restaurant_or_none
 
@@ -98,11 +99,21 @@ def area(key: str, db: Session = Depends(get_db), user: models.User = Depends(_o
 
 
 @router.get("/report/{period}")
-def report(period: str, db: Session = Depends(get_db), user: models.User = Depends(_owner_only)):
-    """daily · weekly · monthly · yearly. Sections that are not built yet say so (`planned`)."""
+def report(period: str, month: Optional[str] = Query(None, description="monthly only: a past or current month, as 2026-09"),
+           db: Session = Depends(get_db), user: models.User = Depends(_owner_only)):
+    """daily · weekly · monthly · yearly. Sections that are not built yet say so (`planned`). `month` (monthly report only) makes
+    every section cover that whole calendar month."""
     if period not in owner_reports.PERIODS:
         raise HTTPException(404, "Unknown report")
-    return owner_reports.compose_report(_context(db, user), period)
+    first = None
+    if month is not None:
+        if period != "monthly":
+            raise HTTPException(422, "A month can only be chosen for the monthly report")
+        try:
+            first = parse_month(month)
+        except ValueError as e:
+            raise HTTPException(422, str(e)) from None
+    return owner_reports.compose_report(_context(db, user), period, first)
 
 
 class AskBody(BaseModel):

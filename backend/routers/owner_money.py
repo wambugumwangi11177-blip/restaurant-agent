@@ -12,7 +12,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints, field_validator, model_validator
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -23,13 +23,15 @@ from database import get_db
 from owner import settings as owner_settings
 from owner.money import bills as bill_rules
 from owner.money import categories as cats
-from owner.money.ledger import (LICENCE_MAX_DATE, LICENCE_MIN_DATE, MAX_KES, check_entry_date, nairobi_today, parse_money, to_cents,
-                                to_kes)
+from owner.money import export as pnl_export
+from owner.money.ledger import (LICENCE_MAX_DATE, LICENCE_MIN_DATE, MAX_KES, check_entry_date, nairobi_today, parse_money, parse_month,
+                                to_cents, to_kes)
 from owner.money.licences import licence_status
 from owner.money.pnl import KINDS as PNL_KINDS
 from owner.money.pnl import compute_pnl, period_range
 from owner.money.view import owner_pnl
 from owner.states import OwnerContext
+from rate_limit import limiter
 from routers.deps import get_restaurant_or_none
 from time_utils import utcnow
 
@@ -540,3 +542,28 @@ def profit_and_loss(period: Literal["day", "week", "month", "year"] = "month", o
     start, end = period_range(period, on or today)
     result = compute_pnl(db, restaurant.id, start, end, ctx.settings, today=today)
     return owner_pnl(result, period, ctx.settings, as_of=ctx.now, sales_state=ctx.order_state()["state"])
+
+
+EXPORT_TYPES = {"xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "pdf": "application/pdf"}
+
+
+@router.get("/pnl/export")
+@limiter.limit("20/minute")
+def export_profit_and_loss(request: Request, month: Optional[str] = Query(None, description="2026-09; default the current month"),
+                           fmt: Literal["xlsx", "pdf"] = Query("xlsx", alias="format"),
+                           db: Session = Depends(get_db), user: models.User = Depends(_roles)):
+    """The accountant's file: one month's Profit & Loss — the same figures as `GET /owner/report/monthly?month=…` — as a workbook
+    (P&L, Entries, About) or a PDF. A month that has not started yet is a 422."""
+    restaurant = _restaurant(db, user)
+    try:
+        first = parse_month(month) if month is not None else nairobi_today().replace(day=1)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    ctx = OwnerContext(db, user, restaurant)
+    block, entries = pnl_export.month_block(ctx, first)
+    if fmt == "pdf":
+        body = pnl_export.build_pdf(block, entries, restaurant.name, ctx.now)
+    else:
+        body = pnl_export.build_xlsx(block, entries, restaurant.name, ctx.now)
+    name = pnl_export.export_filename(restaurant.name, first.strftime("%Y-%m"), fmt)
+    return Response(body, media_type=EXPORT_TYPES[fmt], headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})

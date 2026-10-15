@@ -8,6 +8,7 @@ backend/owner/money/ledger.py — the rules every ledger entry shares: money, da
 """
 from __future__ import annotations
 
+import re
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
@@ -17,6 +18,8 @@ MAX_KES = Decimal("100000000")            # KES 100 million: a typo guard, not a
 MAX_PAST_DAYS = 365 * 5
 LICENCE_MIN_DATE = date(2000, 1, 1)
 LICENCE_MAX_DATE = date(2100, 1, 1)
+MONTH_MIN = date(2000, 1, 1)
+_MONTH = re.compile(r"(\d{4})-(0[1-9]|1[0-2])")
 
 
 def to_cents(kes: Decimal) -> int:
@@ -56,3 +59,16 @@ def check_entry_date(day: date, *, today: date | None = None) -> date:
     if (today - day).days > MAX_PAST_DAYS:
         raise ValueError("a payment cannot be dated more than five years back")
     return day
+
+
+def parse_month(value: str, *, today: date | None = None) -> date:
+    """"2026-09" → the first day of that month. A month that has not started yet, or before 2000, is refused."""
+    m = _MONTH.fullmatch(value or "")
+    if m is None:
+        raise ValueError("a month looks like 2026-09")
+    first = date(int(m.group(1)), int(m.group(2)), 1)
+    if first < MONTH_MIN:
+        raise ValueError("that month is too far back")
+    if first > (today or nairobi_today()).replace(day=1):
+        raise ValueError("that month has not started yet")
+    return first

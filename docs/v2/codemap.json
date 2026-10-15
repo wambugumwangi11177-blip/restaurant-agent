@@ -2587,6 +2587,36 @@
     "to": "models"
    },
    {
+    "from": "owner.money.export",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.money.export",
+    "lazy": true,
+    "to": "owner.areas"
+   },
+   {
+    "from": "owner.money.export",
+    "lazy": false,
+    "to": "owner.money.categories"
+   },
+   {
+    "from": "owner.money.export",
+    "lazy": false,
+    "to": "owner.money.pnl"
+   },
+   {
+    "from": "owner.money.export",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "owner.money.export",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
     "from": "owner.money.ledger",
     "lazy": false,
     "to": "time_utils"
@@ -2688,6 +2718,16 @@
    },
    {
     "from": "owner.reports",
+    "lazy": true,
+    "to": "owner.money.pnl"
+   },
+   {
+    "from": "owner.reports",
+    "lazy": true,
+    "to": "owner.money.view"
+   },
+   {
+    "from": "owner.reports",
     "lazy": false,
     "to": "owner.states"
    },
@@ -2700,6 +2740,11 @@
     "from": "owner.reports",
     "lazy": true,
     "to": "routers.reports"
+   },
+   {
+    "from": "owner.reports",
+    "lazy": true,
+    "to": "time_utils"
    },
    {
     "from": "owner.settings",
@@ -3664,6 +3709,11 @@
    {
     "from": "routers.owner",
     "lazy": false,
+    "to": "owner.money.ledger"
+   },
+   {
+    "from": "routers.owner",
+    "lazy": false,
     "to": "owner.reports"
    },
    {
@@ -3709,6 +3759,11 @@
    {
     "from": "routers.owner_money",
     "lazy": false,
+    "to": "owner.money.export"
+   },
+   {
+    "from": "routers.owner_money",
+    "lazy": false,
     "to": "owner.money.ledger"
    },
    {
@@ -3735,6 +3790,11 @@
     "from": "routers.owner_money",
     "lazy": false,
     "to": "owner.states"
+   },
+   {
+    "from": "routers.owner_money",
+    "lazy": false,
+    "to": "rate_limit"
    },
    {
     "from": "routers.owner_money",
@@ -4925,7 +4985,7 @@
     "group": "other",
     "id": "owner.areas",
     "kind": "py",
-    "loc": 684,
+    "loc": 685,
     "path": "backend/owner/areas.py"
    },
    {
@@ -4972,9 +5032,16 @@
    },
    {
     "group": "other",
+    "id": "owner.money.export",
+    "kind": "py",
+    "loc": 368,
+    "path": "backend/owner/money/export.py"
+   },
+   {
+    "group": "other",
     "id": "owner.money.ledger",
     "kind": "py",
-    "loc": 59,
+    "loc": 75,
     "path": "backend/owner/money/ledger.py"
    },
    {
@@ -5023,7 +5090,7 @@
     "group": "other",
     "id": "owner.reports",
     "kind": "py",
-    "loc": 94,
+    "loc": 115,
     "path": "backend/owner/reports.py"
    },
    {
@@ -5233,14 +5300,14 @@
     "group": "router",
     "id": "routers.owner",
     "kind": "py",
-    "loc": 117,
+    "loc": 128,
     "path": "backend/routers/owner.py"
    },
    {
     "group": "router",
     "id": "routers.owner_money",
     "kind": "py",
-    "loc": 543,
+    "loc": 570,
     "path": "backend/routers/owner_money.py"
    },
    {
@@ -6177,6 +6244,12 @@
    "verb": "POST"
   },
   {
+   "func": "export_profit_and_loss",
+   "module": "routers.owner_money",
+   "path": "/owner/money/pnl/export",
+   "verb": "GET"
+  },
+  {
    "func": "list_bills",
    "module": "routers.owner_money",
    "path": "/owner/money/bills",
@@ -6514,10 +6587,10 @@
   }
  ],
  "stats": {
-  "py_edges": 682,
-  "py_lazy_edges": 204,
-  "py_modules": 173,
-  "routes": 190,
+  "py_edges": 694,
+  "py_lazy_edges": 208,
+  "py_modules": 174,
+  "routes": 191,
   "ts_edges": 485,
   "ts_files": 231
  },

@@ -14,6 +14,23 @@ Newest sprint first. Spec: [`SPEC.md`](SPEC.md). Gate: `make -C docs/v2 gate`.
 
 ## Sprint log (newest first)
 
+### S1.1 Settings — done
+
+**Plan.** Goal: one settings service every engine will read (S1.2), editable by the owner, audited. Files: `models.py` (+`RestaurantSettings`, `RestaurantSettingsAudit`), `alembic/versions/051_add_restaurant_settings.py`, `owner/settings.py`, `routers/owner.py`, `main.py` (mount), `observer_mode.py`, `tests/test_owner_settings.py` (77 tests). Design decisions:
+- **Defaults and ranges live once** (`owner/settings.py`: `DEFAULTS`, `FIELDS`); the PUT body model is generated from `FIELDS`, so FastAPI's 422 and the service's check cannot disagree. 22 settings, exactly the SPEC fig 3.2 table (defaults and ranges transcribed from it).
+- **A complete row is always written** (no NULL-means-default), so a later change of a default never silently moves an owner's number; "no row" is the "owner has not chosen yet" state onboarding needs (`chosen: false`).
+- **Money is cents inside, KES at the edge** (`cash_tolerance_cents` ↔ `cash_tolerance_kes`, `price_step_cents` ↔ `price_step_kes`).
+- **Cross-field rule:** margin floor ≤ margin target (422 naming both). The spec lists the two ranges separately; a floor above the target would make every dish "priced too low", so I added the rule.
+- **Owner-only** for read *and* write (`require_staff_role(OWNER)`; ADMIN/SUPERADMIN pass; every other role 403; a staff user with no role gets the existing `staff_role_unassigned`). Spec says owner-only; managers will read thresholds through the owner API payloads (`assumption`) in later sprints, not this endpoint.
+- **No `restaurant_id` in the API at all** — the restaurant is the caller's own (`routers/deps.get_restaurant_or_none`, tenant-checked), so there is no id to forge. Tested, including a forged `active_restaurant_id`.
+- **Not included as settings:** the analytic tuning constants (SURGE 1.30 / SLOW 0.60 thresholds, 5-order and 14-day minimums, 7-day cooldown, 2.5σ void spike, ...). SPEC fig 3.2 does not list them as owner choices; they stay module constants (named, commented) and are not "business rules" in the D11 sense.
+
+**Found while building (a real hole, fixed).** `observer_mode.py` fails closed for `/overview`, `/reports`, `/ai` in the read-only Macsoft deployment because those figures come from local tables. A new `/owner/*` prefix is not in that list, so it would have **bypassed that boundary**. `/owner` is now in `_LOCAL_FACT_ENDPOINTS` (blocked for every method), with a test. Consequence to be aware of: while `observer_mode` is on, the owner API is unavailable by design; the MacSoft mirror must write rows (door 1) before it can feed the spine.
+
+**Gate.** backend **963 passed, 1 skipped** (886 + 77 new in `test_owner_settings.py`; 320 s) · evals 28 passed / 10 xfailed (unchanged) · vitest 55 · tsc clean · lint ratchet OK · `next build` OK · E6 not yet. Tests cover: defaults pinned to today's constants; 40 out-of-range payloads → 422 and nothing written; inclusive bounds; unknown/mistyped fields; floor ≤ target; audit rows (and none for a no-op); history; owner/admin/superadmin allowed, six other staff roles + unassigned + anonymous refused; two-tenant isolation incl. a forged `active_restaurant_id`; per-restaurant rows for a chain; observer-mode boundary; migration up/down/up and offline PostgreSQL DDL.
+
+**Migration 051** — additive (2 tables, no existing table touched). Guarded for the Dockerfile's `create_all()`-first deploy; idempotent; reversible. **I read the offline PostgreSQL DDL** (`alembic upgrade 050_creative_takes:051_restaurant_settings --sql`): correct types, `UNIQUE(restaurant_id)`, `ON DELETE CASCADE` to restaurants, `ON DELETE SET NULL` to users, lookup index. Reading the downgrade DDL exposed a bug (offline downgrade emitted nothing because the existence guard assumed "absent"); fixed (`_exists(..., offline=...)`) and now asserted. Nothing was run against any real database.
+
 ### S0.3 Golden fixtures + E2 characterisation — done
 
 **Plan.** Goal: pin what today's engines say for the §7 worked examples *before* anything changes, so later sprints change numbers only on purpose. Files: `backend/tests/fixtures/golden_restaurant.py`, `backend/tests/evals/test_e2_money_goldens.py`. Design decisions (the spec's "one week, 8 dishes" fixture cannot be literal — §7's numbers cannot coexist in one week: 400 chips at KES 270 alone is KES 108,000, more than the KES 100,000 weekly sales of example #1):

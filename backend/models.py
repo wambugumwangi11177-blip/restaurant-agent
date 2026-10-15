@@ -1485,6 +1485,78 @@ class CreativeTake(Base):
     )
 
 
+class RestaurantSettings(Base):
+    """The owner's own thresholds, one row per restaurant (docs/v2/SPEC.md §3.2, migration 051).
+
+    Every business rule the engines used to hard-code (food-cost ceiling, margin floor, cash
+    tolerance, delivery commissions, ...) lives here so it is one number, chosen by the owner,
+    shown on screen as "Based on: your floor 40%" and changeable. Typed columns, not JSON, so a
+    bad value cannot be stored and engines read plain attributes.
+
+    The DEFAULTS and the allowed ranges live in exactly one place — owner/settings.py — and the
+    service is the only write path: it always writes a complete row (so there is no NULL-means-
+    default ambiguity) and records every change in restaurant_settings_audit. No row = the owner
+    has not chosen yet; get_settings() then returns the defaults and never writes.
+
+    Money is integer cents (cash_tolerance_cents, price_step_cents) like every other money column;
+    the API converts to KES at its edge. Percentages are stored as plain percent numbers (35.0).
+    """
+    __tablename__ = "restaurant_settings"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False, unique=True)
+
+    food_cost_target_pct     = Column(Float, nullable=False)
+    prime_cost_target_pct    = Column(Float, nullable=False)
+    margin_floor_pct         = Column(Float, nullable=False)
+    margin_target_pct        = Column(Float, nullable=False)
+    popular_cutoff           = Column(Float, nullable=False)    # × the average dish's units sold
+    missing_stock_flag_pct   = Column(Float, nullable=False)
+    cash_tolerance_cents     = Column(Integer, nullable=False)
+    cash_tolerance_pct       = Column(Float, nullable=False)
+    commission_uber_eats_pct = Column(Float, nullable=False)
+    commission_glovo_pct     = Column(Float, nullable=False)
+    commission_bolt_food_pct = Column(Float, nullable=False)
+    offer_size_pct           = Column(Float, nullable=False)
+    offer_lift_pct           = Column(Float, nullable=False)
+    max_raise_pct            = Column(Float, nullable=False)
+    price_step_cents         = Column(Integer, nullable=False)
+    price_sensitivity        = Column(Float, nullable=False)
+    labour_target_pct        = Column(Float, nullable=False)
+    overtime_after_hours     = Column(Float, nullable=False)
+    urgent_alerts_per_day    = Column(Integer, nullable=False)
+    quiet_hours_start        = Column(Integer, nullable=False)  # hour of day, Nairobi time (0-23)
+    quiet_hours_end          = Column(Integer, nullable=False)
+    licence_warning_days     = Column(Integer, nullable=False)
+
+    # SET NULL: a deleted user must not take the settings row (or its history) with them.
+    updated_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at         = Column(DateTime, default=utcnow, nullable=False)
+    updated_at         = Column(DateTime, default=utcnow, nullable=False)
+
+
+class RestaurantSettingsAudit(Base):
+    """One row per setting changed by one save: who changed what, from what, to what, when.
+
+    Append-only from the application's point of view (owner/settings.py::update_settings).
+    old_value / new_value are the stored values as text (e.g. "35.0", "20000"); old_value is the
+    previous effective value, so the first change to a setting shows the default it replaced.
+    """
+    __tablename__ = "restaurant_settings_audit"
+
+    id                 = Column(Integer, primary_key=True, index=True)
+    restaurant_id      = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    field              = Column(String(48), nullable=False)   # the column name, e.g. margin_floor_pct
+    old_value          = Column(String(32), nullable=True)
+    new_value          = Column(String(32), nullable=False)
+    changed_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    changed_at         = Column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        Index("ix_restaurant_settings_audit_lookup", "restaurant_id", "changed_at"),
+    )
+
+
 class CustomerFeedback(Base):
     """
     Lightweight customer rating captured over the messaging channel — a customer

@@ -12,7 +12,7 @@ _OPERATIONAL = (
     "/billing", "/events", "/notifications", "/support", "/webhooks", "/ai",
     "/fraud", "/enterprise", "/data", "/overview",
 )
-_LOCAL_FACT_ENDPOINTS = ("/overview", "/reports", "/ai", "/data")
+_LOCAL_FACT_ENDPOINTS = ("/overview", "/reports", "/ai", "/data", "/owner")
 
 
 def observer_mode_enabled() -> bool:

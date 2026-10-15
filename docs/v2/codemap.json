@@ -656,12 +656,12 @@
    "reports": "not_built"
   },
   "owner_settings": {
-   "area": "not_built",
-   "demo": "not_built",
-   "home": "not_built",
-   "old_dash": "not_built",
-   "os": "not_built",
-   "reports": "not_built"
+   "area": "not_shown",
+   "demo": "not_shown",
+   "home": "not_shown",
+   "old_dash": "not_shown",
+   "os": "not_shown",
+   "reports": "not_shown"
   },
   "pricing": {
    "area": "not_shown",
@@ -2174,6 +2174,11 @@
    {
     "from": "main",
     "lazy": false,
+    "to": "routers.owner"
+   },
+   {
+    "from": "main",
+    "lazy": false,
     "to": "routers.purchase_orders"
    },
    {
@@ -2255,6 +2260,16 @@
     "from": "observer_mode",
     "lazy": false,
     "to": "feature_flags"
+   },
+   {
+    "from": "owner.settings",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.settings",
+    "lazy": false,
+    "to": "time_utils"
    },
    {
     "from": "populate_production",
@@ -3155,6 +3170,31 @@
     "from": "routers.overview",
     "lazy": false,
     "to": "time_utils"
+   },
+   {
+    "from": "routers.owner",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.owner",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.owner",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.owner",
+    "lazy": false,
+    "to": "owner.settings"
+   },
+   {
+    "from": "routers.owner",
+    "lazy": false,
+    "to": "routers.deps"
    },
    {
     "from": "routers.purchase_orders",
@@ -4274,7 +4314,7 @@
     "group": "core",
     "id": "models",
     "kind": "py",
-    "loc": 1609,
+    "loc": 1681,
     "path": "backend/models.py"
    },
    {
@@ -4283,6 +4323,20 @@
     "kind": "py",
     "loc": 50,
     "path": "backend/observer_mode.py"
+   },
+   {
+    "group": "other",
+    "id": "owner",
+    "kind": "py",
+    "loc": 7,
+    "path": "backend/owner/__init__.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.settings",
+    "kind": "py",
+    "loc": 286,
+    "path": "backend/owner/settings.py"
    },
    {
     "group": "other",
@@ -4472,6 +4526,13 @@
     "kind": "py",
     "loc": 536,
     "path": "backend/routers/overview.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.owner",
+    "kind": "py",
+    "loc": 74,
+    "path": "backend/routers/owner.py"
    },
    {
     "group": "router",
@@ -5341,6 +5402,24 @@
    "verb": "GET"
   },
   {
+   "func": "read_settings",
+   "module": "routers.owner",
+   "path": "/owner/settings",
+   "verb": "GET"
+  },
+  {
+   "func": "settings_history",
+   "module": "routers.owner",
+   "path": "/owner/settings/history",
+   "verb": "GET"
+  },
+  {
+   "func": "write_settings",
+   "module": "routers.owner",
+   "path": "/owner/settings",
+   "verb": "PUT"
+  },
+  {
    "func": "approve_purchase_order",
    "module": "routers.purchase_orders",
    "path": "/purchase-orders/{po_id}/approve",
@@ -5606,10 +5685,10 @@
   }
  ],
  "stats": {
-  "py_edges": 563,
+  "py_edges": 571,
   "py_lazy_edges": 167,
-  "py_modules": 148,
-  "routes": 167,
+  "py_modules": 151,
+  "routes": 170,
   "ts_edges": 485,
   "ts_files": 231
  },

@@ -1,0 +1,66 @@
+{
+  "src/app/dashboard/ai/_components/GraphImpactSection.tsx": [
+    1,
+    0
+  ],
+  "src/app/dashboard/ai/_full/FraudFull.tsx": [
+    0,
+    1
+  ],
+  "src/app/dashboard/ai/_full/shared.tsx": [
+    1,
+    0
+  ],
+  "src/app/dashboard/staff/page.tsx": [
+    1,
+    0
+  ],
+  "src/app/verify-email/page.tsx": [
+    1,
+    0
+  ],
+  "src/components/demo/DemoCharts.tsx": [
+    1,
+    0
+  ],
+  "src/components/features/inventory/KitchenStockPanel.tsx": [
+    1,
+    0
+  ],
+  "src/components/features/inventory/useInventoryWorkspace.ts": [
+    1,
+    0
+  ],
+  "src/components/features/kitchen/KDSBoard.tsx": [
+    1,
+    0
+  ],
+  "src/components/features/orders/OrderList.tsx": [
+    0,
+    1
+  ],
+  "src/components/features/purchasing/PurchasingWorkspace.tsx": [
+    1,
+    0
+  ],
+  "src/components/features/reservations/ReservationsWorkspace.tsx": [
+    3,
+    0
+  ],
+  "src/components/features/support/SupportView.tsx": [
+    1,
+    0
+  ],
+  "src/components/staff/AttendanceWidget.tsx": [
+    1,
+    0
+  ],
+  "src/lib/tokenStore.ts": [
+    0,
+    2
+  ],
+  "src/lib/useNotifications.ts": [
+    1,
+    0
+  ]
+}

@@ -1,0 +1,56 @@
+# LEVIII v2 gate (SPEC §0.2 step 4, §5).   Run from anywhere:  make -C docs/v2 gate
+#
+#   test   E1 backend  — the whole existing suite (tests/evals is run by `evals`, not twice)
+#   fe     E1 frontend — tsc --noEmit, vitest, eslint ratchet, next build
+#   evals  E2–E5       — backend/tests/evals (strict-xfail entries are the not-yet-built sprints)
+#   e6     E6          — Playwright owner tasks (skipped, loudly, until the spec file exists)
+#   gate   evals + test + fe + e6
+#
+# Override the interpreter / skip the slow build when iterating:
+#   PY=/path/to/venv/bin/python make -C docs/v2 gate
+#   SKIP_BUILD=1 make -C docs/v2 fe        (never skip it for a sprint-closing gate)
+#
+# Nothing here touches DATABASE_URL: tests/_db_guard.py refuses any remote database.
+
+SHELL      := /bin/bash
+.SHELLFLAGS := -eo pipefail -c
+ROOT       := $(abspath $(CURDIR)/../..)
+PY         ?= python3
+LOGDIR     := $(ROOT)/.tmp/gate
+E6_SPEC    := $(ROOT)/frontend/tests/e2e/owner-tasks.spec.ts
+
+.PHONY: test fe evals e6 gate
+
+test:
+	@mkdir -p $(LOGDIR)
+	@echo "== E1 backend: pytest (excluding tests/evals)"
+	cd $(ROOT)/backend && $(PY) -m pytest -q -p no:cacheprovider --ignore=tests/evals 2>&1 | tee $(LOGDIR)/backend.log | tail -n 1
+
+evals:
+	@mkdir -p $(LOGDIR)
+	@echo "== E2-E5 evals: pytest tests/evals"
+	@if [ -d $(ROOT)/backend/tests/evals ]; then \
+	  cd $(ROOT)/backend && $(PY) -m pytest -q -p no:cacheprovider tests/evals -rxX 2>&1 | tee $(LOGDIR)/evals.log | tail -n 40; \
+	else echo "no tests/evals yet"; fi
+
+fe:
+	@mkdir -p $(LOGDIR)
+	@echo "== E1 frontend: tsc --noEmit"
+	cd $(ROOT)/frontend && npx tsc --noEmit 2>&1 | tee $(LOGDIR)/tsc.log
+	@echo "== E1 frontend: vitest"
+	cd $(ROOT)/frontend && npx vitest run 2>&1 | tee $(LOGDIR)/vitest.log | tail -n 8
+	@echo "== E1 frontend: eslint ratchet (baseline docs/v2/eslint-baseline.json)"
+	cd $(ROOT) && $(PY) execution/lint_ratchet.py 2>&1 | tee $(LOGDIR)/eslint.log
+	@if [ -z "$(SKIP_BUILD)" ]; then \
+	  echo "== E1 frontend: next build"; \
+	  cd $(ROOT)/frontend && npx next build 2>&1 | tee $(LOGDIR)/build.log | tail -n 6; \
+	else echo "== next build SKIPPED (SKIP_BUILD set)"; fi
+
+e6:
+	@if [ -f $(E6_SPEC) ]; then \
+	  echo "== E6 owner tasks (Playwright, 390px + 1440px)"; \
+	  cd $(ROOT)/frontend && npx playwright test tests/e2e/owner-tasks.spec.ts 2>&1 | tee $(LOGDIR)/e6.log | tail -n 20; \
+	else echo "== E6 NOT RUN: frontend/tests/e2e/owner-tasks.spec.ts does not exist yet (due by P4)"; fi
+
+gate: evals test fe e6
+	@echo "== GATE PASSED (logs in .tmp/gate/)"

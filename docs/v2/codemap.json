@@ -1967,6 +1967,56 @@
     "to": "models"
    },
    {
+    "from": "demo.generator",
+    "lazy": true,
+    "to": "ai.cash_reconciliation.intelligence"
+   },
+   {
+    "from": "demo.generator",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "demo.generator",
+    "lazy": false,
+    "to": "demo.catalog"
+   },
+   {
+    "from": "demo.generator",
+    "lazy": false,
+    "to": "demo.wipe"
+   },
+   {
+    "from": "demo.generator",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "demo.generator",
+    "lazy": true,
+    "to": "owner.settings"
+   },
+   {
+    "from": "demo.generator",
+    "lazy": false,
+    "to": "tenant_provisioning"
+   },
+   {
+    "from": "demo.generator",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "demo.wipe",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "demo.wipe",
+    "lazy": false,
+    "to": "tenant_provisioning"
+   },
+   {
     "from": "dev_snapshot",
     "lazy": true,
     "to": "models"
@@ -2425,6 +2475,11 @@
     "from": "owner.ask",
     "lazy": true,
     "to": "routers.ai_ask"
+   },
+   {
+    "from": "owner.home",
+    "lazy": false,
+    "to": "ai.analysis_clock"
    },
    {
     "from": "owner.home",
@@ -4404,6 +4459,41 @@
    },
    {
     "group": "demo",
+    "id": "demo",
+    "kind": "py",
+    "loc": 2,
+    "path": "backend/demo/__init__.py"
+   },
+   {
+    "group": "demo",
+    "id": "demo.catalog",
+    "kind": "py",
+    "loc": 208,
+    "path": "backend/demo/catalog.py"
+   },
+   {
+    "group": "demo",
+    "id": "demo.generator",
+    "kind": "py",
+    "loc": 631,
+    "path": "backend/demo/generator.py"
+   },
+   {
+    "group": "demo",
+    "id": "demo.safety",
+    "kind": "py",
+    "loc": 75,
+    "path": "backend/demo/safety.py"
+   },
+   {
+    "group": "demo",
+    "id": "demo.wipe",
+    "kind": "py",
+    "loc": 104,
+    "path": "backend/demo/wipe.py"
+   },
+   {
+    "group": "demo",
     "id": "demo_report_pdf",
     "kind": "py",
     "loc": 229,
@@ -4595,7 +4685,7 @@
     "group": "other",
     "id": "owner.areas",
     "kind": "py",
-    "loc": 546,
+    "loc": 550,
     "path": "backend/owner/areas.py"
    },
    {
@@ -4609,7 +4699,7 @@
     "group": "other",
     "id": "owner.home",
     "kind": "py",
-    "loc": 124,
+    "loc": 125,
     "path": "backend/owner/home.py"
    },
    {
@@ -6011,9 +6101,9 @@
   }
  ],
  "stats": {
-  "py_edges": 623,
-  "py_lazy_edges": 190,
-  "py_modules": 157,
+  "py_edges": 634,
+  "py_lazy_edges": 192,
+  "py_modules": 162,
   "routes": 174,
   "ts_edges": 485,
   "ts_files": 231

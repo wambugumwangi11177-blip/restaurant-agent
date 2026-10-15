@@ -310,8 +310,12 @@ def _reorder(ctx: OwnerContext) -> dict:
     latest = ctx.db.query(models.StockMovement.created_at).join(models.InventoryItem).filter(
         models.InventoryItem.restaurant_id == ctx.rid).order_by(models.StockMovement.created_at.desc()).first()
     return {**ctx.entered_state(latest[0] if latest else None, empty="Stock levels recorded, no movements yet."),
+            "tracked": len(preds["predictions"]),
+            "least_cover": [{"item": p["name"], "unit": p["unit"], "left": p["current_stock"], "days_left": p.get("days_until_depletion")}
+                            for p in sorted((p for p in preds["predictions"] if p.get("days_until_depletion") is not None),
+                                            key=lambda p: p["days_until_depletion"])[:5]],
             "time_to_reorder": [{"item": p["name"], "unit": p["unit"], "left": p["current_stock"], "status": p["status"],
-                                 "days_left": p.get("days_until_stockout")} for p in items[:10]],
+                                 "days_left": p.get("days_until_depletion")} for p in items[:10]],
             "drafts": [{"item": c.item_name, "unit": c.unit, "order": c.adjusted_quantity, "supplier": c.supplier_name} for c in drafts[:10]]}
 
 

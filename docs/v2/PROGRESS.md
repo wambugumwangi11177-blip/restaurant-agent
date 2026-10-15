@@ -6,7 +6,31 @@ Newest sprint first. Spec: [`SPEC.md`](SPEC.md). Gate: `make -C docs/v2 gate`.
 
 ---
 
+## Open for the owner (decisions the build cannot make for you)
+
+1. **Beef variance percentage (§7 #7).** Engine: gap ÷ expected = 33.3%. Client guide: gap ÷ used = 25%. Same 10 kg, same flag. Pick the denominator before the guide and the screen disagree; until you do, owner screens will say "10 kg missing" with no percentage.
+2. **Four worked examples have no engine and no sprint** (§7 #4 target-margin price, #10 combo, #11 prep with cooked yield, #12 market list). They are strict-xfail goldens. Proposal: a small pure-function module `owner/kitchen.py` + `owner/menu_math.py` after P6 (no UI), or drop them from the client guide. Also #4 is internally inconsistent: rounded to whole KES (578 → 53,400) while #3 rounds to the KES 5 step (580 → 54,000).
+3. **§7 #15 decision score.** The risk term 0.8 cannot occur (risk is 1–5 → 1.0/.75/.5/.25/0). A real decision scores 81.75 → priority 82, not 82.5.
+
 ## Sprint log (newest first)
+
+### S0.3 Golden fixtures + E2 characterisation — done
+
+**Plan.** Goal: pin what today's engines say for the §7 worked examples *before* anything changes, so later sprints change numbers only on purpose. Files: `backend/tests/fixtures/golden_restaurant.py`, `backend/tests/evals/test_e2_money_goldens.py`. Design decisions (the spec's "one week, 8 dishes" fixture cannot be literal — §7's numbers cannot coexist in one week: 400 chips at KES 270 alone is KES 108,000, more than the KES 100,000 weekly sales of example #1):
+- One shared **skeleton** (tenant, restaurant, 4 staff roles, supplier, 8 dishes with recipes and costs) plus **one seeder per worked example**. Each test gets a fresh DB (existing `db_session`), so scenarios never contaminate each other. Everything is seeded relative to `utcnow()` (42 modules import `utcnow` by value, so a global clock patch is not possible; relative offsets make results time-independent).
+- Examples today's engines can answer are asserted **live**, with today's exact numbers (incl. today's wrong D16 answer, KES 433.50). Examples owned by later sprints are **strict xfail** with the owning sprint in the reason, so they fail loudly the moment the feature lands without the eval being flipped. Examples no sprint owns (#4, #10, #11, #12) are strict xfail with reason "unowned" and are escalated in the final report.
+- A pure-arithmetic class re-derives all 16 spec results independently (exact integer / `Fraction` maths) so a typo in the spec cannot hide.
+
+**Changed.** `backend/tests/fixtures/golden_restaurant.py` (skeleton + 8 seeders: chicken reprice, chips below menu, burger delivery, beef variance, handover, cash drawers, P&L week ± price rise); `backend/tests/evals/test_e2_money_goldens.py`.
+
+**E2 result: 28 passed, 10 xfailed (strict), 0 failed.** Live characterisation of today's engines: #1 (sales 100,000 · ingredients 32,000 · gross 68,000 · wages 25,000), #2 (food 30.5% · wages 23.8%), #3 (**today KES 433.50 / 10,050 — the D16 answer**), #5 (25,714), #6 (170 vs 320 + Glovo delivery gap needs KES 800), #7 (10 kg; **engine says 33.3%, spec says 25%**), #8 (520 short flagged, 150 short not; one alert), handover (40 declared vs 38 → disputed), #15, #16. Pending, strict xfail with owning sprint: #1b/#2b/#13 → S3.2, #9/#14 → S3.3, #3-after-fix → S1.3. **Unowned (no sprint builds them): #4 target-margin price, #10 combo, #11 prep yield, #12 market list** — decision needed (see "Open for the owner" below).
+
+**Evidence the evals bite.** Mutation check: applying the D16 fix (`ceil … / 500`) turns `test_ex03_…today…` red (`43500 != 43350`) *and* flips the strict xfail to XPASS(strict) = red. Reverted.
+
+**Gate.** backend **886 passed, 1 skipped** (298 s) · evals **28 passed, 10 xfailed** · vitest 55 · tsc clean · lint ratchet OK (15E/4W) · `next build` OK · E6 not yet.
+
+**Surprising.** 42 modules import `utcnow` by value, so the pre-flight idea of one global clock seam is not possible without touching all of them; fixtures use fixed offsets from a single `now` instead (numbers do not depend on the date the test runs).
+
 
 ### S0.2 Code map script — done
 

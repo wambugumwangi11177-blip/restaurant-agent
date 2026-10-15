@@ -53,3 +53,17 @@ def check_rule(frequency: str, due_day: int, due_month: int | None) -> None:
             raise ValueError("a yearly bill falls due on a day from 1 to 31")
     elif due_month is not None:
         raise ValueError("a month only makes sense for a yearly bill")
+
+
+def due_dates(bill, start: date, end: date) -> list[date]:
+    """Every date from `start` to `end` (inclusive) on which `bill` falls due."""
+    out: list[date] = []
+    d = next_due(bill, start)
+    while d is not None and d <= end:
+        out.append(d)
+        d = next_due(bill, d + timedelta(days=1))
+    return out
+
+
+# An occurrence counts as paid when a linked expense was recorded within this many days before it (or 3 after): half a period.
+PAID_WINDOW_DAYS = {"weekly": 3, "monthly": 15, "yearly": 90}

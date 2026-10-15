@@ -61,6 +61,9 @@ class Settings:
     quiet_hours_start: int = 22
     quiet_hours_end: int = 7
     licence_warning_days: int = 14
+    # Money (S3.3)
+    expense_spike_pct: float = 25.0          # a cost this far above its usual (3-month average) is flagged
+    bill_reserve_cents: int = 0              # cash the owner keeps aside for bills: the bill radar's opening position
 
     def commission_rate(self, channel: str) -> float:
         """Delivery commission as a fraction (0.25) for a DeliveryChannel value; 0 for channels without one."""
@@ -160,6 +163,13 @@ FIELDS: list[FieldSpec] = [
        "Until what hour of the morning should we stay quiet?", "o'clock", 0, 23, 1, kind="int"),
     _f("licence_warning_days", "Alerts and permits", "Licence warning",
        "How many days before a licence expires should we warn you?", "days", 7, 60, 1, kind="int"),
+    _f("expense_spike_pct", "Money", "Cost increase we flag",
+       "How far above your usual should a cost be, before we tell you it is going up?", "%", 10, 100, 5,
+       hint="Your usual is what that cost averaged over the last three months."),
+    _f("bill_reserve_kes", "Money", "Cash you keep aside for bills",
+       "How much cash do you keep aside for bills?", "KES", 0, 10_000_000, 1000,
+       attr="bill_reserve_cents", kind="int", scale=100,
+       hint="We count it when we check whether your sales will cover the bills that fall due."),
 ]
 BY_KEY = {f.key: f for f in FIELDS}
 BY_ATTR = {f.attr: f for f in FIELDS}

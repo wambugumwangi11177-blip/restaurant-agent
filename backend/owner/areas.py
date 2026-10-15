@@ -20,6 +20,7 @@ from sqlalchemy import func
 
 import models
 from owner import states
+from time_utils import EAT_OFFSET, eat_date
 from owner.states import OwnerContext, assume, block, kes, no_data, unavailable
 
 AREAS = ("money", "sales_dishes", "store", "cash", "staff", "permits")
@@ -108,6 +109,115 @@ def month_pnl(ctx: OwnerContext) -> dict:
     return owner_pnl(p, "month", ctx.settings, as_of=ctx.now, sales_state=ctx.order_state()["state"])
 
 
+def _hhmm(utc_naive) -> str:
+    """A naive-UTC timestamp as Nairobi wall-clock "3:40 pm"."""
+    local = utc_naive + EAT_OFFSET
+    return f"{local.hour % 12 or 12}:{local.minute:02d} {'am' if local.hour < 12 else 'pm'}"
+
+
+def breakeven_summary(ctx: OwnerContext) -> dict:
+    """"Costs covered": today's break-even sales and where today's sales are against it (Home's pulse chip and money.breakeven)."""
+    from owner.money.breakeven import break_even, todays_progress
+    today = eat_date(ctx.now)
+    be = ctx.cached("break_even", lambda: break_even(ctx.db, ctx.rid, today, ctx.settings))
+    if be is None:
+        return no_data("Costs covered needs your costs and some sales: enter your costs to see when today's sales cover them.")
+    progress = todays_progress(ctx.db, ctx.rid, be["break_even_cents"], today)
+    base = ctx.order_state()
+    basis = be["basis"]
+    return {**(base if base["state"] != "no_data" else block("live", as_of=ctx.now)),
+            "break_even_kes": kes(be["break_even_cents"]), "sales_today_kes": kes(progress["sales_so_far_cents"]),
+            "to_go_kes": kes(progress["to_go_cents"]), "covered": progress["crossed_at"] is not None,
+            "crossed_at": _hhmm(progress["crossed_at"]) if progress["crossed_at"] else None,
+            "fixed_per_day_kes": kes(be["fixed_per_day_cents"]), "food_cost_pct": be["food_cost_pct"],
+            "built_from": {"label": basis["label"], "period": basis["kind"], "days": basis["days"], "fixed_costs_kes": kes(basis["fixed_costs_cents"]),
+                           "wages_kes": kes(basis["labour_fixed_cents"]), "lines": [{"name": l["name"], "kes": kes(l["amount_cents"])} for l in basis["fixed_lines"]]},
+            "note": "Gas, packaging and other costs that move with sales are not counted, so the real figure is a little higher.",
+            "assumption": assume("food_cost_target_pct", ctx.settings.food_cost_target_pct, label="Ingredient cost target")}
+
+
+def _bill_radar(ctx: OwnerContext) -> dict:
+    from owner.money.radar import bill_radar
+    return ctx.cached("bill_radar", lambda: bill_radar(ctx.db, ctx.rid, eat_date(ctx.now), ctx.settings))
+
+
+def bills_block(ctx: OwnerContext) -> dict:
+    """The bill radar: forecast sales left after ingredients and wages, minus bills falling due, for 30 days (figure R4)."""
+    r = _bill_radar(ctx)
+    if not r["available"]:
+        if r["reason"] == "no_bills":
+            return no_data("No bills entered yet.")
+        return no_data("Needs about two weeks of sales before we can forecast whether they will cover your bills.")
+    s = ctx.settings
+    return block("as_entered", as_of=ctx.now,
+                 upcoming=[{"name": u["name"], "due_on": u["due_on"], "days_away": u["days_away"], "amount_kes": kes(u["amount_cents"]),
+                            "short": u["balance_after_cents"] < 0} for u in r["upcoming"]],
+                 shortfalls=[{"date": x["date"], "short_by_kes": kes(x["short_by_cents"]), "bills": x["bills"], "bills_kes": kes(x["bills_cents"])} for x in r["shortfalls"]],
+                 lowest={"date": r["lowest"]["date"], "balance_kes": kes(r["lowest"]["balance_cents"])},
+                 days=[{"date": d["date"], "expected_sales_kes": kes(d["expected_sales_cents"]), "left_kes": kes(d["left_after_costs_cents"]),
+                        "bills_kes": kes(d["bills_cents"]), "balance_kes": kes(d["balance_cents"])} for d in r["days"]],
+                 opening_kes=kes(r["opening_cents"]),
+                 notes=["Sales are counted after ingredients and wages, starting from the cash you keep aside for bills."]
+                       + (["Ingredient cost is your target, because there is no month of sales to measure it from yet."] if r["food_cost_assumed"] else []),
+                 assumption=assume("bill_reserve_kes", s.bill_reserve_cents // 100, label="Cash you keep aside for bills"))
+
+
+def spikes_block(ctx: OwnerContext) -> dict:
+    """Costs going up: a cost line already this far above its three-month usual (owner/money/spikes.py)."""
+    from owner.money.spikes import LEARNING_DAYS, expense_spikes
+    out = expense_spikes(ctx.db, ctx.rid, eat_date(ctx.now), ctx.settings)
+    s = ctx.settings
+    rule = assume("expense_spike_pct", s.expense_spike_pct, label="Cost increase we flag")
+    if out["history_days"] is None:
+        return no_data("Needs three months of entered costs.")
+    if out["history_days"] < LEARNING_DAYS and not out["spikes"]:
+        return block("learning", as_of=ctx.now, day=out["history_days"], of=LEARNING_DAYS, reason="Needs three months of entered costs to know what is usual.", assumption=rule)
+    return block("as_entered", as_of=ctx.now,
+                 spikes=[{"name": x["name"], "this_month_kes": kes(x["this_month_cents"]), "usual_kes": kes(x["usual_cents"]), "up_pct": x["pct"],
+                          "extra_kes": kes(x["extra_cents"])} for x in out["spikes"]],
+                 reason=None if out["spikes"] else "Nothing is costing more than usual.", assumption=rule)
+
+
+def _licences(ctx: OwnerContext) -> list[dict]:
+    from owner.money.licences import licence_status
+    today, warn = eat_date(ctx.now), ctx.settings.licence_warning_days
+    rows = ctx.db.query(models.Licence).filter(models.Licence.restaurant_id == ctx.rid, models.Licence.is_active.is_(True)).order_by(models.Licence.expires_on).all()
+    out = []
+    for l in rows:
+        days_left, status = licence_status(l.expires_on, today, warn)
+        out.append({"name": l.name, "issuer": l.issuer, "expires_on": l.expires_on.isoformat(), "days_left": days_left, "status": status,
+                    "word": {"expired": "Expired", "expiring": "Expires soon", "ok": "Fine"}[status]})
+    return out
+
+
+def licences_block(ctx: OwnerContext) -> dict:
+    items = _licences(ctx)
+    if not items:
+        return no_data("No licences entered yet.")
+    return block("as_entered", as_of=ctx.now, items=items, assumption=assume("licence_warning_days", ctx.settings.licence_warning_days, label="Licence warning (days)"))
+
+
+def licences_due_block(ctx: OwnerContext) -> dict:
+    """Licences to renew soon (Home's coming-up list): expired or inside the owner's warning window."""
+    items = [i for i in _licences(ctx) if i["status"] != "ok"]
+    entered = ctx.db.query(models.Licence.id).filter(models.Licence.restaurant_id == ctx.rid, models.Licence.is_active.is_(True)).first()
+    if entered is None:
+        return no_data("No licences entered yet.")
+    return block("as_entered", as_of=ctx.now, items=items, reason=None if items else f"Nothing expires in the next {ctx.settings.licence_warning_days} days.",
+                 assumption=assume("licence_warning_days", ctx.settings.licence_warning_days, label="Licence warning (days)"))
+
+
+def bills_due_block(ctx: OwnerContext, days: int = 14) -> dict:
+    """Bills falling due in the next two weeks (Home's coming-up list)."""
+    r = _bill_radar(ctx)
+    if not r["available"]:
+        return no_data("No bills entered yet." if r["reason"] == "no_bills" else "Bills are entered; the forecast needs about two weeks of sales.")
+    items = [u for u in r["upcoming"] if u["days_away"] < days]
+    return block("as_entered", as_of=ctx.now, reason=None if items else f"No bills fall due in the next {days} days.",
+                 items=[{"name": u["name"], "due_on": u["due_on"], "days_away": u["days_away"], "amount_kes": kes(u["amount_cents"]), "short": u["balance_after_cents"] < 0}
+                        for u in items])
+
+
 def _money_savings(ctx: OwnerContext) -> dict:
     from ai.roi.savings import get_roi_savings
     roi = ctx.cached("roi", lambda: get_roi_savings(ctx.db, ctx.rid))
@@ -124,9 +234,9 @@ def money_area(ctx: OwnerContext) -> tuple[dict, dict]:
     blocks = {
         "pnl": ctx.safe("money.pnl", lambda: month_pnl(ctx)),
         "cost_dials": dials,
-        "breakeven": unavailable("Costs covered needs your fixed costs; enter them to see when today's sales cover them."),
-        "bills": unavailable("No bills entered yet."),
-        "spikes": unavailable("Needs three months of entered costs."),
+        "breakeven": ctx.safe("money.breakeven", lambda: breakeven_summary(ctx)),
+        "bills": ctx.safe("money.bills", lambda: bills_block(ctx)),
+        "spikes": ctx.safe("money.spikes", lambda: spikes_block(ctx)),
         "savings": ctx.safe("money.savings", lambda: _money_savings(ctx)),
     }
     if dials["state"] in ("live", "stale", "learning"):
@@ -535,7 +645,7 @@ def _data_trust(ctx: OwnerContext) -> dict:
 def permits_area(ctx: OwnerContext) -> tuple[dict, dict]:
     settings_block = ctx.safe("permits.settings", lambda: _settings_summary(ctx))
     trust = ctx.safe("permits.data_trust", lambda: _data_trust(ctx))
-    blocks = {"licences": unavailable("No licences entered yet."), "settings": settings_block,
+    blocks = {"licences": ctx.safe("permits.licences", lambda: licences_block(ctx)), "settings": settings_block,
               "till_connection": ctx.safe("permits.till", lambda: _till_connection(ctx)), "data_trust": trust}
     if trust["state"] == "live":
         pct = trust["costs_known_pct"]

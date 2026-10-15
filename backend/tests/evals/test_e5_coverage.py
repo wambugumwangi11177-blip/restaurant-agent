@@ -64,6 +64,7 @@ ALLOWED_GAPS: dict[tuple[str, str], str] = {
     ("strategist", "os"): _OS,
     ("decisions", "reports"): _REPORT,
     ("owner_settings", "reports"): _REPORT,
+    ("money", "os"): _OS,
 }
 
 

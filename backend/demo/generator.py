@@ -50,7 +50,7 @@ SHIFT_HOURS = 7.0
 # menu kinds) and P16 (till-rung M-Pesa sales without a receipt) hold by construction of the catalog and the baseline.
 # P8 (M-Pesa statement), P9 (gas) and P10 (rent) wait for their phases. Planted on the owner's default branch (Westlands)
 # unless the scenario is about the comparison of the two (P14).
-PLANTS = ("P2", "P3", "P4", "P5", "P6", "P7", "P12", "P13", "P14", "P15")
+PLANTS = ("P2", "P3", "P4", "P5", "P6", "P7", "P9", "P10", "P12", "P13", "P14", "P15")
 P2_DAYS = 21                    # Chips charged KES 270 on the till (menu 300) for three weeks (the engine looks at 14 days from its own anchor)
 P3_GLOVO_BURGER_BOOST = 8.0     # Glovo guests order burgers far more than the average guest does
 P4_AFTERNOON_MIX = {"Quarter chicken": 8.0, "Burger": 4.0, "Beef stew": 3.0, "Beef fry": 3.0, "Chicken burger": 3.0, "Chicken wings": 3.0,
@@ -64,6 +64,8 @@ P12_OPEN_HOUR_OUT = 19          # chips are out from 19:00 Nairobi time
 P12_SALES_FACTOR = 0.5
 P13_RATIO = 56 / 60             # Kenchic delivers 56 of every 60 (ratio kept; the quantities are the demo's own)
 P15_SUPPLIER = "Ngong Charcoal Traders"
+P9_GAS_CENTS = (1_460_000, 1_410_000, 1_430_000, 1_860_000)    # KES 14,600 · 14,100 · 14,300 in the three months before, 18,600 this month so far (+29.8%)
+P10_DAYS_AHEAD = 3                                            # the rent falls due this many days from today (the 4th, on the day figure 6.1 draws)
 APPROVED_PRICE_CHANGES = {"Ugali sukuma": (25_000, 20), "Chicken wings": (55_000, 41)}   # (old price, days ago approved); the menu holds the new price
 
 
@@ -181,6 +183,7 @@ class DemoBuilder:
         for b in self.branches:
             self._simulate(b)
             self._future(b)
+            self._ledger(b)
         self._plant_after(owner)
         self._ideas_and_activity(owner)
         self._owner_settings(owner)
@@ -479,6 +482,75 @@ class DemoBuilder:
         self._count("orders", len(written))
         self._count("order_items", sum(len(o.items) for o, _p in written))
         self._count("prep_times", sum(len(o.items) for o, _p in written if o.status != models.OrderStatus.CANCELLED))
+
+    # ── the money ledger: what the restaurant pays for (S3.1–S3.3) ───────────
+    # key, monthly cents, day of month paid, is it a recurring bill, spread of the amount month to month
+    LEDGER = (("premises", 7_000_000, None, True, 0.0), ("kplc", 1_800_000, 20, True, 0.12), ("water", 320_000, 12, True, 0.08),
+              ("garbage", 250_000, 5, True, 0.0), ("pos_internet", 450_000, 10, True, 0.0), ("security", 800_000, 1, True, 0.0),
+              ("cleaning", 350_000, 8, False, 0.20), ("packaging", 480_000, 14, False, 0.20), ("marketing", 600_000, 16, False, 0.30),
+              ("mpesa_charges", 180_000, 28, False, 0.10), ("staff_meals", 600_000, 27, False, 0.10), ("gas", 1_400_000, 3, False, 0.04))
+
+    def _ledger(self, b: BranchState) -> None:
+        """Four months of costs the owner entered, the bills that recur, and the licences — so the P&L, costs covered, bill radar
+        and cost spikes have something to say. Plants P9 (gas +29.8%) and P10 (rent falls due in three days) on the default branch."""
+        from owner.money.categories import ensure_categories
+        db, rid = self.db, b.restaurant.id
+        ensure_categories(db, rid)
+        cats = {c.key: c for c in db.query(models.ExpenseCategory).filter(models.ExpenseCategory.restaurant_id == rid)}
+        rng = self.rng(b.spec["key"], "ledger")
+        rent_day = (self.today + timedelta(days=P10_DAYS_AHEAD + b.index * 7)).day if "P10" in self.plant else 4
+        scale = b.spec["scale"]
+        first_of_month = self.today.replace(day=1)
+        months = []
+        month = first_of_month
+        for _ in range(4):
+            months.append(month)
+            month = (month - timedelta(days=1)).replace(day=1)
+        months.reverse()                                                    # three complete months and this one
+        bills: dict[str, models.RecurringBill] = {}
+        for key, cents, day, recurring, spread in self.LEDGER:
+            amount = round(cents * (0.78 if (key == "premises" and b.index) else scale if key not in ("premises", "security", "garbage", "pos_internet") else 1.0))
+            due = rent_day if key == "premises" else day
+            if recurring:
+                bill = models.RecurringBill(restaurant_id=rid, category_id=cats[key].id, name={"premises": "Rent", "kplc": "Electricity (KPLC)", "water": "Water",
+                                                                                                "garbage": "Garbage collection", "pos_internet": "POS & internet",
+                                                                                                "security": "Security"}[key],
+                                            amount_cents=amount, frequency="monthly", due_day=due, start_on=months[0], supplier="", note="", is_active=True)
+                db.add(bill)
+                bills[key] = bill
+        db.flush()
+        for i, month in enumerate(months):
+            last_day = (month.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+            for key, cents, day, recurring, spread in self.LEDGER:
+                if key == "gas" and self.planting("P9", b):
+                    amounts = [P9_GAS_CENTS[i]] if i < 3 else [P9_GAS_CENTS[3] // 2] * 2                  # this month: two refills so far
+                    days = [day] if i < 3 else [1, 6]
+                else:
+                    base = round(cents * (0.78 if (key == "premises" and b.index) else scale if key not in ("premises", "security", "garbage", "pos_internet") else 1.0))
+                    amounts = [round(base * (1 + rng.uniform(-spread, spread)))] if spread else [base]
+                    days = [rent_day if key == "premises" else day]
+                for amount, d in zip(amounts, days):
+                    paid_on = month.replace(day=min(d, last_day.day))
+                    if i == len(months) - 1 and key == "gas":
+                        paid_on = min(paid_on, self.today)                                     # nothing dated after today
+                    if paid_on > self.today:
+                        continue
+                    db.add(models.Expense(restaurant_id=rid, category_id=cats[key].id, amount_cents=amount, paid_on=paid_on,
+                                          method="bank" if key in ("premises", "kplc") else "mpesa" if key in ("water", "mpesa_charges", "pos_internet") else "cash",
+                                          supplier="", note="", bill_id=bills[key].id if key in bills else None,
+                                          paid_by_user_id=self.users["manager"].id, created_at=local_utc(paid_on, 12), updated_at=local_utc(paid_on, 12)))
+                    self._count("expenses")
+        self._count("recurring_bills", len(bills))
+        for name, issuer, days, cost in (("Single business permit", "Nairobi County", 190, 1_250_000), ("Health certificate", "Public Health Office", 11, 300_000),
+                                         ("Fire safety certificate", "County Fire Service", 330, 450_000), ("Liquor licence", "County Liquor Board", 60, 3_000_000)):
+            db.add(models.Licence(restaurant_id=rid, name=name, issuer=issuer, expires_on=self.today + timedelta(days=days), cost_cents=cost,
+                                  document_ref=None, note="", is_active=True))
+            self._count("licences")
+        if b.index == 0:
+            if "P9" in self.plant:
+                self.planted["P9"] = f"gas KES {P9_GAS_CENTS[3] // 100:,} this month against a usual {round(sum(P9_GAS_CENTS[:3]) / 3 / 100):,}"
+            if "P10" in self.plant:
+                self.planted["P10"] = f"rent KES 70,000 falls due on the {rent_day}{'th' if 11 <= rent_day % 100 <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(rent_day % 10, 'th')}, {P10_DAYS_AHEAD} days from today"
 
     # ── planted scenarios (figure 6.1) ───────────────────────────────────────
     def _p12_potatoes(self, b: BranchState, day: date, plans: list[dict]) -> None:

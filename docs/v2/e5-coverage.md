@@ -4,7 +4,7 @@ Source of truth: `backend/owner/registry.py`, checked against the composed `/own
 topics (`routers/ai_ask.py`) and the report plan (`owner/reports.py`). ✔ present · ◌ planned (placeholder or
 named in the report plan, not built) · — exempt (written reason in the registry) · ✖ missing.
 
-**23 registered engines · 21 built · 1 complete on all three surfaces · 26 open gaps** (P4 exit: 0).
+**23 registered engines · 22 built · 1 complete on all three surfaces · 27 open gaps** (P4 exit: 0).
 
 | engine | owner name | status | Home | OS | Reports |
 |---|---|---|---|---|---|
@@ -28,18 +28,17 @@ named in the report plan, not built) · — exempt (written reason in the regist
 | data_quality | How complete your costs are | built | ✔ | ✖ missing | ◌ planned |
 | strategist | Goal mode | built | — exempt | ✖ missing | — exempt |
 | decisions | What is costing you money | built | ✔ | ✔ | ◌ planned |
-| money | Profit & Loss, costs covered, bills | planned | ◌ S3.3 | ◌ S3.3 | ✔ |
+| money | Profit & Loss, costs covered, bills | built | ✔ | ✖ missing | ✔ |
 | mpesa_match | M-Pesa statement check | planned | ◌ S6.1–S6.2 | ◌ S6.1–S6.2 | ◌ S6.1–S6.2 |
 | owner_settings | Your targets | built | ✔ | — exempt | ◌ planned |
 
 ## Open gaps (the allow-list; may only shrink)
 
-- **os** (8): cash, data_quality, fraud, marketing, roi, simulator, strategist, supply_chain — S5.1 (Ask LEVIII answers every area in five forms)
+- **os** (9): cash, data_quality, fraud, marketing, money, roi, simulator, strategist, supply_chain — S5.1 (Ask LEVIII answers every area in five forms)
 - **reports** (18): cash, custody, data_quality, decisions, fraud, inventory, kds, labor, marketing, menu, owner_settings, pricing, profit, reservations, revenue_forecast, roi, supply_chain, twin — S5.2 (report sections built)
 
 ## Not yet built engines (their surfaces are placeholders until their sprint)
 
-- **money** — Profit & Loss, costs covered, bills: S3.3
 - **mpesa_match** — M-Pesa statement check: S6.1–S6.2
 
 ## Exemptions (written reasons)

@@ -536,7 +536,7 @@ OUTPUT = {
     "cash": ("cash.shifts", lambda b: _has(b, "shifts")),
     "fraud": ("cash.cancelled_sales", lambda b: b["state"] == "live" and b["cancelled_last_7_days"] >= 0 and "to_check" in b),
     "kds": ("staff.kitchen", lambda b: _has(b, "stations")),
-    "reservations": ("coming_up.bookings", lambda b: b["state"] == "live" and b["covers_today"] > 0),
+    "reservations": ("coming_up.bookings", lambda b: b["state"] == "live" and (b["covers_today"] > 0 or len(b["next_days"]) >= 3)),
     "labor": ("staff.wages", lambda b: _has(b, "by_person") and b["wages_pct"] > 0),
     "supply_chain": ("store.suppliers", lambda b: _has(b, "suppliers") and any(s["on_time_pct"] is not None for s in b["suppliers"])),
     "marketing": ("sales_dishes.win_back", lambda b: b["state"] == "live" and b["lapsed_guests"] > 0 and b["reachable"] > 0),
@@ -545,6 +545,8 @@ OUTPUT = {
     "data_quality": ("permits.data_trust", lambda b: b["state"] == "live" and b["dishes"] == len(cat.MENU)),
     "decisions": ("costing_you_money", lambda b: b["state"] == "live" and len(b["cards"]) >= 3),
     "owner_settings": ("permits.settings", lambda b: b["state"] == "as_entered" and b["changed"] == 2),
+    "money": ("money.pnl", lambda b: b["state"] == "as_entered" and b["complete"] in (True, False) and b["lines"][-1]["kes"] != 0
+              and any(s["key"] == "premises" for s in b["sections"])),
 }
 
 

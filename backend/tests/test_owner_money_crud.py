@@ -496,7 +496,8 @@ def test_migration_052_follows_051_and_alembic_has_one_head():
     from alembic.script import ScriptDirectory
     config = Config(str(BACKEND / "alembic.ini"))
     config.set_main_option("script_location", str(BACKEND / "alembic"))
-    assert ScriptDirectory.from_config(config).get_heads() == [module.revision]
+    script = ScriptDirectory.from_config(config)
+    assert len(script.get_heads()) == 1 and module.revision in {r.revision for r in script.walk_revisions()}
 
 
 def test_migration_052_creates_exactly_the_model_columns_and_is_reversible_and_idempotent(tmp_path):

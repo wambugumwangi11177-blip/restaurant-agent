@@ -142,10 +142,12 @@ def compute_pnl(db: Session, restaurant_id: int, start: date, end: date, setting
         models.LaborShift.restaurant_id == restaurant_id, models.LaborShift.shift_date >= start, models.LaborShift.shift_date <= end).scalar() or 0)
     if any(c.pnl_line == "staff" for c, *_ in by_category.values()):
         labour, labour_basis = staff_entered, "entered"
+        labour_fixed = sum(t for c, t, _n, _l in by_category.values() if c.pnl_line == "staff" and c.is_fixed)
     elif shifts_cost:
         labour, labour_basis = shifts_cost, "shifts"
+        labour_fixed = shifts_cost                   # the people on the rota are there whatever the sales
     else:
-        labour, labour_basis = 0, "none"
+        labour, labour_basis, labour_fixed = 0, "none", 0
 
     # delivery commissions: the real ones if entered, else the owner's rates on the platform orders
     estimated_commission = sum(_commission(total, settings.commission_rate(ch.value)) for ch, (total, _n) in by_channel.items() if ch in PLATFORM_CHANNELS)
@@ -177,6 +179,7 @@ def compute_pnl(db: Session, restaurant_id: int, start: date, end: date, setting
             sec["lines"].sort(key=lambda l: l["amount_cents"], reverse=True)
             ordered_sections.append({"key": key, "name": cats.PNL_LINE_NAMES[key], **sec})
     other_costs = sum(s["total_cents"] for s in ordered_sections)
+    fixed_costs = labour_fixed + sum(l["amount_cents"] for sec in ordered_sections for l in sec["lines"] if l["is_fixed"])
 
     gross = sales - ingredients
     kept = gross - labour - other_costs
@@ -203,6 +206,7 @@ def compute_pnl(db: Session, restaurant_id: int, start: date, end: date, setting
         "gross_profit_cents": gross,
         "labour_cents": labour, "labour_basis": labour_basis, "shifts_cost_cents": shifts_cost,
         "other_costs_cents": other_costs, "sections": ordered_sections,
+        "labour_fixed_cents": labour_fixed, "fixed_costs_cents": fixed_costs,         # the costs that do not move with sales: break-even's numerator
         "delivery_commission_cents": commission, "delivery_commission_basis": commission_basis,
         "sales_after_commission_cents": sales - commission,
         "operating_profit_cents": kept, "net_before_tax_cents": kept,

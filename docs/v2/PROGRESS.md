@@ -14,6 +14,29 @@ Newest sprint first. Spec: [`SPEC.md`](SPEC.md). Gate: `make -C docs/v2 gate`.
 
 ## Sprint log (newest first)
 
+### S3.3 Costs covered, bill radar, cost spikes — done
+
+**Plan.** Goal: three questions a restaurant owner asks about money, answered from the ledger and the till: *have today's sales covered my costs yet?* · *will my sales cover the bills as they fall due?* · *is any cost running away?* Test first: E2 #9 and #14 (strict xfail → exact), then `tests/test_breakeven_radar_spikes.py` (35) and `tests/test_owner_money_blocks.py` (14), `tests/test_s33_money_settings.py` (9), E4 P9 and P10 flipped from xfail. Files: `owner/money/{breakeven,radar,spikes}.py`, `owner/money/bills.py` (+`due_dates`), `owner/areas.py` + `owner/home.py` (the blocks), settings `expense_spike_pct` and `bill_reserve_kes` (migration **053**), the demo generator's ledger.
+
+| | Rule | Worked example | Block |
+|---|---|---|---|
+| **Costs covered** | fixed costs per day ÷ (1 − ingredient share of sales), from the last complete month (else the month so far, said on screen); today's paid orders walked in time order → "Costs covered 3:40 pm" or "KES x to go" | E2 #9: 8,000 ÷ 0.68 = **KES 11,765** (11,764.71) | `money.breakeven`, pulse chip |
+| **Bill radar** | per day for 30 days: forecast sales after ingredients and wages, minus bills due, from the cash the owner keeps aside; a dip below zero is "you'll be KES x short on the 4th" | figure R4 | `money.bills`, `coming_up.bills` |
+| **Costs going up** | a cost line already ≥ the owner's % (default 25) above its three-month average, month to date | E2 #14: 18,600 vs 14,333 = **+29.8 %** | `money.spikes` |
+
+**Gate.** backend **1314 passed, 1 skipped** (1253 + 61; 567 s) · evals **59 passed / 7 xfailed** (E2 **33/4** — the four left are the UNOWNED §7 examples #4, #10, #11, #12 · E5 8 · E4 **18/3** — P2 and P5 in Zone 2 → S4.3, P8 → S6) · vitest 55 · tsc clean · lint ratchet OK (15E/4W) · `next build` OK · E6 not run (due by P4).
+
+**Decisions you should know about.**
+1. **The radar counts sales *after ingredients and wages*, not gross sales.** The spec says "forecast sales − bills due"; gross sales is not money you can pay rent with. It also starts from a number the system cannot know — the cash set aside — so that is a setting (`bill_reserve_kes`, KES 0 until the owner says), shown as the rule used, with a what-if parameter on the engine. With KES 0 set aside every large bill early in a month will look like a shortfall; that is the honest reading of "nothing set aside", not a prediction that the rent will bounce.
+2. **P10 is "rent falls due *three days from today*", not "the 4th".** Dates in the demo are relative (§6); a fixed 4th would be a shortfall only on a few days a year. The planted note says which day it landed on. P9 uses figure 6.1's literal numbers (14,600 · 14,100 · 14,300 then 18,600).
+3. **Fixed costs** = the lines the owner marked fixed (rent, KPLC, water, security, licences, salaries …) + the shifts' wages when no payroll was entered (the people on the rota are there whatever the sales). Costs that move with sales (gas, packaging, commissions) are **not** in break-even, so the true figure is a little higher — the block says so.
+4. **Cost spikes compare the month so far with a whole-month average.** Deliberately early and one-sided: a partial month already over the usual can only end higher; a partial month under the usual is simply unfinished. A cost line needs entries in each of the three previous months to have a usual at all; until the ledger is 90 days old the block says "learning, day n of 90".
+5. **Two new settings** (the spike % and the cash set aside) joined the other 22 in the one settings service, with migration 053 (idempotent; a row written before it reads as the defaults). The "Cost increase we flag" range is 10–100 %; the reserve 0–KES 10,000,000.
+
+**A time-of-day bug the demo test found (fixed here).** `coming_up.bookings` showed "No bookings tonight" whenever every booking tonight was already over — at 21:44 in Nairobi the demo's "every engine has output" test failed, at 16:30 it passed. The block now also lists the days ahead that have bookings (`next_days`: bookings and covers for the next 7 days), so a quiet evening still shows what is coming; with none at all it says "No bookings in the next 7 days".
+
+**The demo now has a ledger.** Four months of costs on both branches (rent, KPLC, water, garbage, POS & internet, security, cleaning, packaging, marketing, M-Pesa charges, staff meals, gas — wages come from the shifts, commissions are estimated), six recurring bills with their payments linked, four licences (one expiring in 11 days). Westlands plants P9 and P10. The registry now has `money` as **built** (all four blocks real; `built_blocks` was removed again — it was a bridge for S3.2); E5's only new open gap is `money` in OS (S5.1).
+
 ### S3.2 P&L engine — done
 
 **Plan.** Goal: one Profit & Loss — what you sold, what it cost, what you kept — computed once and shown identically on Home, in the monthly report and at `GET /owner/money/pnl`. Test first: the three worked examples (§7 #1, #2, #13) were strict-xfail stubs in E2; they are now live assertions (E2 **31 passed / 6 xfailed**, from 28 / 9), written against `owner/money/pnl.py::compute_pnl` before it existed. Files: `owner/money/pnl.py` (the engine, integer cents), `owner/money/view.py` (the owner-words shaper), `owner/areas.py` (`month_pnl` — Home's `money.pnl`), `owner/reports.py` (the monthly P&L section), `routers/owner_money.py` (`/pnl`), `tests/test_pnl.py` (26), `tests/test_owner_pnl_api.py` (22), golden seeders `seed_pnl_week_with_costs` / `seed_pnl_month`.

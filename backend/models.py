@@ -1528,6 +1528,9 @@ class RestaurantSettings(Base):
     quiet_hours_start        = Column(Integer, nullable=False)  # hour of day, Nairobi time (0-23)
     quiet_hours_end          = Column(Integer, nullable=False)
     licence_warning_days     = Column(Integer, nullable=False)
+    # added by migration 053 (S3.3): server defaults so rows written before it read as the defaults
+    expense_spike_pct        = Column(Float, nullable=False, default=25.0, server_default="25")
+    bill_reserve_cents       = Column(Integer, nullable=False, default=0, server_default="0")
 
     # SET NULL: a deleted user must not take the settings row (or its history) with them.
     updated_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

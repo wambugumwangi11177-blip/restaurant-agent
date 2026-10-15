@@ -13,8 +13,8 @@ finds it and that it shows up in the block the owner will look at. Each test say
   P6  Handover: store 4.0 / kitchen 3.8 doesn't match                  asserted (scaled)
   P7  Tuesday night drawer short ×4    recurring pattern              asserted (new engine function)
   P8  3 'M-Pesa' sales, no statement   M-Pesa gap                     strict xfail — P6 phase (S6.x)
-  P9  Gas +30% vs 3-month average      costs going up                 strict xfail — money layer (S3.x)
-  P10 Rent 70k due on the 4th          bill radar shortfall           strict xfail — money layer (S3.x)
+  P9  Gas +30% vs 3-month average      costs going up                 asserted (S3.3)
+  P10 Rent 70k due on the 4th          bill radar shortfall           asserted (S3.3; the date is relative)
   P11 Star · Puzzle · Plowhorse · Dog                                 asserted
   P12 Holiday Tuesday + chips out 19:00  why was Tuesday bad          data asserted; the OS "why" form is S5.1
   P13 Kenchic delivers 56 of 60        short delivery                 asserted (scaled; new engine field)
@@ -180,21 +180,38 @@ def test_p07_tuesday_night_is_short_four_weeks_running(demo):
     assert sum(1 for s in shifts["shifts"] if s["check"]) >= 1               # the latest Tuesday is in the 14-day shift list
 
 
-# ── P8 · P9 · P10 (later phases) ─────────────────────────────────────────────
+# ── P8 (the M-Pesa phase) ─────────────────────────────────────────────
 
 @pytest.mark.xfail(strict=True, reason="P6 phase (S6.x): the M-Pesa statement parser and matcher do not exist yet")
 def test_p08_three_mpesa_sales_have_no_statement_line(demo):
     assert block(demo["A"], "cash", "mpesa")["state"] == "live"
 
 
-@pytest.mark.xfail(strict=True, reason="Money layer (S3.x): expenses and the cost-spike detector do not exist yet")
 def test_p09_gas_is_30_percent_above_its_three_month_average(demo):
-    assert block(demo["A"], "money", "spikes")["state"] == "live"
+    """Engine: owner/money/spikes (the owner's 25% setting). Block: money.spikes. §7 #14: 18,600 against (14,600 + 14,100 + 14,300) ÷ 3."""
+    spikes = block(demo["A"], "money", "spikes")
+    assert spikes["state"] == "as_entered" and spikes["assumption"] == {"setting": "expense_spike_pct", "value": 25.0, "label": "Cost increase we flag"}
+    assert len(spikes["spikes"]) == 1                                         # and nothing else is flagged
+    gas = spikes["spikes"][0]
+    assert (gas["name"], gas["this_month_kes"], gas["usual_kes"], gas["up_pct"]) == ("Cooking gas", 18_600.0, 14_333.33, 29.8)
+    assert gas["extra_kes"] == pytest.approx(4_266.67, abs=0.01)
+    assert block(demo["B"], "money", "spikes")["spikes"] == []                  # the other branch's gas is as usual
 
 
-@pytest.mark.xfail(strict=True, reason="Money layer (S3.x): recurring bills and the bill radar do not exist yet")
-def test_p10_rent_of_70k_is_due_on_the_4th(demo):
-    assert demo["A"]["coming_up"]["bills"]["state"] == "live"
+def test_p10_rent_of_70k_falls_due_before_the_sales_can_cover_it(demo):
+    """Engine: owner/money/radar. Blocks: money.bills (the radar) and coming_up.bills (Zone 4). Dates are relative, so the rent
+    falls due three days from today; the radar starts from the KES 0 the owner keeps aside."""
+    bills = block(demo["A"], "money", "bills")
+    assert bills["state"] == "as_entered" and bills["opening_kes"] == 0.0
+    assert bills["assumption"] == {"setting": "bill_reserve_kes", "value": 0, "label": "Cash you keep aside for bills"}
+    rent = next(u for u in bills["upcoming"] if u["name"] == "Rent")
+    assert (rent["amount_kes"], rent["days_away"], rent["short"]) == (70_000.0, 3, True)
+    short = next(x for x in bills["shortfalls"] if x["bills"] == ["Rent"])
+    assert short["bills_kes"] == 70_000.0 and 0 < short["short_by_kes"] < 70_000        # three or four days of sales cannot pay it all
+    assert len(bills["days"]) == 30 and bills["lowest"]["balance_kes"] < 0
+    coming = demo["A"]["coming_up"]["bills"]
+    assert coming["state"] == "as_entered" and coming["items"][0]["name"] == "Rent" and coming["items"][0]["short"] is True
+    assert {i["name"] for i in coming["items"]} >= {"Rent"} and all(i["days_away"] < 14 for i in coming["items"])
 
 
 # ── P11 ──────────────────────────────────────────────────────────────────────

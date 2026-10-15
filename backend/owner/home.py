@@ -53,7 +53,7 @@ def _pulse(ctx: OwnerContext, period: str) -> dict:
             "vs_same_weekday_state": "live" if vs is not None else "learning",
             "sales_in_period": window["revenue"], "orders_in_period": window["orders"],
             "trend_7d": [{"date": d["date"], "sales": d["revenue"], "orders": d["orders"]} for d in overview._performance(ctx.db, ctx.rid)["revenue_trend"]],
-            "breakeven_at": unavailable("Costs covered needs your fixed costs; enter them to see when today's sales cover them."),
+            "breakeven_at": ctx.safe("home.breakeven", lambda: areas.breakeven_summary(ctx)),
             "money_match": {"cash": cash, "mpesa": unavailable("Upload your M-Pesa statement to check it against your sales.")},
             "freshness": {"latest_sale_at": freshness["latest_order_at"], "data_age_days": freshness["data_age_days"],
                           "is_stale": freshness["is_stale"], "source": conn["source"], "source_state": conn["state"]}}
@@ -89,14 +89,35 @@ def _coming_up(ctx: OwnerContext) -> dict:
     start, end = overview._eat_range("today")
     bookings = overview._bookings_card(ctx.db, ctx.rid, start, end)
     return {
-        "bills": unavailable("No bills entered yet."),
-        "licences": unavailable("No licences entered yet."),
+        "bills": ctx.safe("coming_up.bills", lambda: areas.bills_due_block(ctx)),
+        "licences": ctx.safe("coming_up.licences", lambda: areas.licences_due_block(ctx)),
         "deliveries": block("as_entered" if deliveries else "no_data", as_of=ctx.now, reason=None if deliveries else "No deliveries expected.",
                             items=[{"item": d.inventory_item.item_name if d.inventory_item else "", "supplier": d.supplier.name if d.supplier else "",
                                     "expected_at": iso(d.expected_at), "status": d.status} for d in deliveries]),
-        "bookings": block("live" if bookings["covers_today"] else "no_data", as_of=ctx.now, covers_today=bookings["covers_today"],
-                          reason=None if bookings["covers_today"] else "No bookings tonight."),
+        "bookings": _bookings(ctx, bookings["covers_today"]),
     }
+
+
+def _bookings(ctx: OwnerContext, covers_today: int, days: int = 7) -> dict:
+    """Tonight's covers, and the days ahead that have bookings (so a quiet evening still shows what is coming)."""
+    from collections import defaultdict
+    from datetime import datetime as _dt
+    from time_utils import EAT_OFFSET, eat_date
+    local_now = ctx.now + EAT_OFFSET
+    today = eat_date(ctx.now)
+    rows = ctx.db.query(models.Reservation.reservation_date, models.Reservation.reservation_time, models.Reservation.party_size).filter(
+        models.Reservation.restaurant_id == ctx.rid, models.Reservation.status == models.ReservationStatus.CONFIRMED,
+        models.Reservation.reservation_date >= today, models.Reservation.reservation_date < today + timedelta(days=days)).all()
+    per_day: dict = defaultdict(lambda: [0, 0])
+    for d, t, size in rows:
+        if _dt.combine(d, t) >= local_now:
+            per_day[d][0] += 1
+            per_day[d][1] += int(size or 0)
+    ahead = [{"date": d.isoformat(), "bookings": n, "covers": c} for d, (n, c) in sorted(per_day.items())]
+    if not covers_today and not ahead:
+        return no_data(f"No bookings in the next {days} days.", covers_today=0, next_days=[])
+    return block("live", as_of=ctx.now, covers_today=covers_today, next_days=ahead,
+                 reason=None if covers_today else "No bookings tonight." if ahead else None)
 
 
 def _read(ctx: OwnerContext) -> dict:

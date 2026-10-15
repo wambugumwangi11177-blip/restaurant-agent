@@ -255,10 +255,11 @@ def test_ex04_same_dish_to_55_percent_target(db_session):
     raise AssertionError("flip to: 260 / 0.45 → 578 → (578 − 400) × 300 = KES 53,400 / month")
 
 
-@pytest.mark.xfail(strict=True, reason="S3.3 break-even: fixed costs per day ÷ (1 − food cost %)")
 def test_ex09_break_even_sales(db_session):
-    from owner.money.breakeven import break_even_sales_cents                    # noqa: F401
-    raise AssertionError("flip to: 8,000 ÷ (1 − 0.32) = KES 11,765")
+    """§7 #9: fixed costs KES 8,000 a day ÷ (1 − 0.32) = KES 11,765 of sales (11,764.71 to the cent)."""
+    from owner.money.breakeven import break_even_sales_cents
+    assert break_even_sales_cents(800_000, 32.0) == 1_176_471
+    assert round(1_176_471 / 100) == 11_765
 
 
 @pytest.mark.xfail(strict=True, reason="UNOWNED: no combo pricing engine exists and no sprint builds one")
@@ -295,10 +296,11 @@ def test_ex13_monthly_pnl(db_session):
     assert (p["kept_pct"], p["food_cost_pct"], p["prime_cost_pct"]) == (15.8, 32.0, 57.0)
 
 
-@pytest.mark.xfail(strict=True, reason="S3.3 expense spike: month vs 3-month average ≥ 25% (setting)")
 def test_ex14_expense_spike(db_session):
-    from owner.money.spikes import expense_spike_pct                            # noqa: F401
-    raise AssertionError("flip to: (14,600 + 14,100 + 14,300)/3 = 14,333; 18,600 / 14,333 → +29.8%")
+    """§7 #14: (14,600 + 14,100 + 14,300) ÷ 3 = 14,333; 18,600 ÷ 14,333 → +29.8%."""
+    from owner.money.spikes import expense_spike_pct
+    assert sum([1_460_000, 1_410_000, 1_430_000]) / 3 == pytest.approx(1_433_333.33, abs=0.01)
+    assert expense_spike_pct(1_860_000, [1_460_000, 1_410_000, 1_430_000]) == 29.8
 
 
 # ═════════════════════════════════════════════════════════════════════════════

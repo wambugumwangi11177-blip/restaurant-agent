@@ -1999,6 +1999,11 @@
    {
     "from": "demo.generator",
     "lazy": true,
+    "to": "owner.money.categories"
+   },
+   {
+    "from": "demo.generator",
+    "lazy": true,
     "to": "owner.settings"
    },
    {
@@ -2464,7 +2469,27 @@
    {
     "from": "owner.areas",
     "lazy": true,
+    "to": "owner.money.breakeven"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "owner.money.licences"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
     "to": "owner.money.pnl"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "owner.money.radar"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "owner.money.spikes"
    },
    {
     "from": "owner.areas",
@@ -2488,7 +2513,7 @@
    },
    {
     "from": "owner.areas",
-    "lazy": true,
+    "lazy": false,
     "to": "time_utils"
    },
    {
@@ -2532,6 +2557,31 @@
     "to": "routers.overview"
    },
    {
+    "from": "owner.home",
+    "lazy": true,
+    "to": "time_utils"
+   },
+   {
+    "from": "owner.money.breakeven",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.money.breakeven",
+    "lazy": false,
+    "to": "owner.money.pnl"
+   },
+   {
+    "from": "owner.money.breakeven",
+    "lazy": false,
+    "to": "owner.money.view"
+   },
+   {
+    "from": "owner.money.breakeven",
+    "lazy": false,
+    "to": "owner.settings"
+   },
+   {
     "from": "owner.money.categories",
     "lazy": false,
     "to": "models"
@@ -2560,6 +2610,56 @@
     "from": "owner.money.pnl",
     "lazy": false,
     "to": "time_utils"
+   },
+   {
+    "from": "owner.money.radar",
+    "lazy": true,
+    "to": "ai.revenue_forecaster"
+   },
+   {
+    "from": "owner.money.radar",
+    "lazy": true,
+    "to": "ai.simulation.twin"
+   },
+   {
+    "from": "owner.money.radar",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.money.radar",
+    "lazy": false,
+    "to": "owner.money.bills"
+   },
+   {
+    "from": "owner.money.radar",
+    "lazy": false,
+    "to": "owner.money.breakeven"
+   },
+   {
+    "from": "owner.money.radar",
+    "lazy": false,
+    "to": "owner.money.pnl"
+   },
+   {
+    "from": "owner.money.radar",
+    "lazy": false,
+    "to": "owner.settings"
+   },
+   {
+    "from": "owner.money.spikes",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.money.spikes",
+    "lazy": false,
+    "to": "owner.money.pnl"
+   },
+   {
+    "from": "owner.money.spikes",
+    "lazy": false,
+    "to": "owner.settings"
    },
    {
     "from": "owner.money.view",
@@ -4615,7 +4715,7 @@
     "group": "demo",
     "id": "demo.generator",
     "kind": "py",
-    "loc": 820,
+    "loc": 892,
     "path": "backend/demo/generator.py"
    },
    {
@@ -4804,7 +4904,7 @@
     "group": "core",
     "id": "models",
     "kind": "py",
-    "loc": 1797,
+    "loc": 1800,
     "path": "backend/models.py"
    },
    {
@@ -4825,7 +4925,7 @@
     "group": "other",
     "id": "owner.areas",
     "kind": "py",
-    "loc": 574,
+    "loc": 684,
     "path": "backend/owner/areas.py"
    },
    {
@@ -4839,7 +4939,7 @@
     "group": "other",
     "id": "owner.home",
     "kind": "py",
-    "loc": 125,
+    "loc": 146,
     "path": "backend/owner/home.py"
    },
    {
@@ -4853,8 +4953,15 @@
     "group": "other",
     "id": "owner.money.bills",
     "kind": "py",
-    "loc": 56,
+    "loc": 70,
     "path": "backend/owner/money/bills.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.money.breakeven",
+    "kind": "py",
+    "loc": 90,
+    "path": "backend/owner/money/breakeven.py"
    },
    {
     "group": "other",
@@ -4881,8 +4988,22 @@
     "group": "other",
     "id": "owner.money.pnl",
     "kind": "py",
-    "loc": 213,
+    "loc": 217,
     "path": "backend/owner/money/pnl.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.money.radar",
+    "kind": "py",
+    "loc": 118,
+    "path": "backend/owner/money/radar.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.money.spikes",
+    "kind": "py",
+    "loc": 79,
+    "path": "backend/owner/money/spikes.py"
    },
    {
     "group": "other",
@@ -4895,7 +5016,7 @@
     "group": "other",
     "id": "owner.registry",
     "kind": "py",
-    "loc": 175,
+    "loc": 177,
     "path": "backend/owner/registry.py"
    },
    {
@@ -4909,7 +5030,7 @@
     "group": "other",
     "id": "owner.settings",
     "kind": "py",
-    "loc": 309,
+    "loc": 319,
     "path": "backend/owner/settings.py"
    },
    {
@@ -6393,9 +6514,9 @@
   }
  ],
  "stats": {
-  "py_edges": 662,
-  "py_lazy_edges": 197,
-  "py_modules": 170,
+  "py_edges": 682,
+  "py_lazy_edges": 204,
+  "py_modules": 173,
   "routes": 190,
   "ts_edges": 485,
   "ts_files": 231

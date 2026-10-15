@@ -66,7 +66,7 @@ def test_defaults_are_the_spec_table_and_todays_numbers():
 
 def test_every_field_has_owner_words_and_defaults_inside_bounds():
     from owner.settings import FIELDS, DEFAULTS
-    assert len(FIELDS) >= 22
+    assert len(FIELDS) >= 24
     for spec in FIELDS:
         assert spec.label and spec.question.endswith("?"), spec.key
         assert spec.minimum <= spec.default <= spec.maximum, spec.key
@@ -337,7 +337,8 @@ def test_migration_051_creates_exactly_the_model_columns_and_is_reversible_and_i
         assert {"restaurant_settings", "restaurant_settings_audit"} <= set(inspector.get_table_names())
         for model in (models.RestaurantSettings, models.RestaurantSettingsAudit):
             built = {c["name"] for c in inspector.get_columns(model.__tablename__)}
-            assert built == {c.name for c in model.__table__.columns}, model.__tablename__
+            later = {"expense_spike_pct", "bill_reserve_cents"}                # added to this table by migration 053 (S3.3)
+            assert built == {c.name for c in model.__table__.columns} - (later if model is models.RestaurantSettings else set()), model.__tablename__
         unique = [u["column_names"] for u in inspector.get_unique_constraints("restaurant_settings")]
         indexes = inspector.get_indexes("restaurant_settings")
         assert ["restaurant_id"] in unique or any(i["unique"] and i["column_names"] == ["restaurant_id"] for i in indexes)

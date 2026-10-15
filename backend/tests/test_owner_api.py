@@ -137,15 +137,15 @@ def test_not_yet_built_parts_say_so_instead_of_inventing_a_number(client, db_ses
     _r, user = _fresh(db_session)
     body = client.get(f"{API}/home", headers=_headers(user)).json()
     money = body["areas"]["money"]["blocks"]
-    for name in ("breakeven", "bills", "spikes"):
-        assert money[name]["state"] == "unavailable" and money[name]["reason"], name
-    assert money["pnl"]["state"] == "no_data" and money["pnl"]["reason"]            # S3.2: built, and honest when nothing is recorded
+    for name in ("pnl", "breakeven", "bills", "spikes"):                              # S3.2/S3.3: built, and honest when nothing is recorded
+        assert money[name]["state"] == "no_data" and money[name]["reason"], name
     assert money["pnl"]["lines"][0]["key"] == "sales" and money["pnl"]["lines"][-1]["key"] == "kept"
     assert body["areas"]["cash"]["blocks"]["mpesa"]["state"] == "unavailable"
-    assert body["pulse"]["breakeven_at"]["state"] == "unavailable"
+    assert body["pulse"]["breakeven_at"]["state"] == "no_data"
     assert body["read"]["state"] == "unavailable" and body["read"]["text"] is None
     for bill in ("bills", "licences"):
-        assert body["coming_up"][bill]["state"] == "unavailable"
+        assert body["coming_up"][bill]["state"] == "no_data" and body["coming_up"][bill]["reason"]
+    assert body["areas"]["permits"]["blocks"]["licences"]["state"] == "no_data"
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -555,7 +555,7 @@ def test_every_setting_an_engine_reads_is_listed_by_at_least_one_engine_or_surfa
     from owner.registry import ENGINES
     from owner.settings import FIELDS
     read = {s for e in ENGINES for s in e.settings}
-    # alert/licence settings are read by the alert levels (S5.3) and the licence list (S3.1), not by an engine row yet
-    awaiting = {"prime_cost_target_pct", "quiet_hours_start", "quiet_hours_end", "licence_warning_days"}
+    # the quiet hours are read by the alert levels (S5.3), which are not an engine row yet
+    awaiting = {"quiet_hours_start", "quiet_hours_end"}
     dead = {f.key for f in FIELDS} - read - awaiting
     assert dead == set(), f"settings no engine reads: {sorted(dead)}"

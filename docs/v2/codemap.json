@@ -570,7 +570,7 @@
   "custody": {
    "area": "not_shown",
    "demo": "not_shown",
-   "home": "not_shown",
+   "home": "wired",
    "old_dash": "wired",
    "os": "not_shown",
    "reports": "not_shown"
@@ -853,6 +853,11 @@
    },
    {
     "from": "ai.decisions.adapters",
+    "lazy": true,
+    "to": "ai.cash_reconciliation.intelligence"
+   },
+   {
+    "from": "ai.decisions.adapters",
     "lazy": false,
     "to": "ai.decisions.model"
    },
@@ -884,12 +889,32 @@
    {
     "from": "ai.decisions.adapters",
     "lazy": true,
+    "to": "ai.profit.intelligence"
+   },
+   {
+    "from": "ai.decisions.adapters",
+    "lazy": true,
+    "to": "ai.stock_custody"
+   },
+   {
+    "from": "ai.decisions.adapters",
+    "lazy": true,
     "to": "ai.supply_chain.intelligence"
    },
    {
     "from": "ai.decisions.adapters",
     "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.decisions.adapters",
+    "lazy": false,
     "to": "owner.settings"
+   },
+   {
+    "from": "ai.decisions.adapters",
+    "lazy": true,
+    "to": "time_utils"
    },
    {
     "from": "ai.decisions.ranking",
@@ -4278,7 +4303,7 @@
     "group": "ai",
     "id": "ai.decisions.adapters",
     "kind": "py",
-    "loc": 265,
+    "loc": 429,
     "path": "backend/ai/decisions/adapters.py"
    },
    {
@@ -4390,7 +4415,7 @@
     "group": "ai",
     "id": "ai.home_specialists",
     "kind": "py",
-    "loc": 86,
+    "loc": 87,
     "path": "backend/ai/home_specialists.py"
    },
    {
@@ -4558,7 +4583,7 @@
     "group": "ai",
     "id": "ai.profit.intelligence",
     "kind": "py",
-    "loc": 564,
+    "loc": 572,
     "path": "backend/ai/profit/intelligence.py"
    },
    {
@@ -4999,7 +5024,7 @@
     "group": "other",
     "id": "owner.home",
     "kind": "py",
-    "loc": 149,
+    "loc": 175,
     "path": "backend/owner/home.py"
    },
    {
@@ -5293,7 +5318,7 @@
     "group": "router",
     "id": "routers.overview",
     "kind": "py",
-    "loc": 538,
+    "loc": 551,
     "path": "backend/routers/overview.py"
    },
    {
@@ -6587,8 +6612,8 @@
   }
  ],
  "stats": {
-  "py_edges": 694,
-  "py_lazy_edges": 208,
+  "py_edges": 699,
+  "py_lazy_edges": 212,
   "py_modules": 174,
   "routes": 191,
   "ts_edges": 536,

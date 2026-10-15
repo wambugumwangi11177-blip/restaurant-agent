@@ -179,7 +179,10 @@ def test_home_includes_profit_and_missing_payment_evidence(db_session, restauran
     db_session.commit()
     state = {}
     cards = _attention_cards(db_session, r.id, tenant.id, source_status=state)
-    assert any(c['domain'] == 'Profit' and 'Modelled' in c['impact'] for c in cards)
+    # S4.2: a dish under the owner's floor is one card, with a KES figure — the pricing engine's idea when it has one for the
+    # dish (the margin review of the same dish is dropped as the same problem), else the margin review measured to the floor.
+    margin = [c for c in cards if 'Grilled Chicken' in c['title'] and c['domain'] in ('Profit', 'Pricing')]
+    assert len(margin) == 1 and margin[0]['impact_cents_month'] > 0 and margin[0]['kind'] == 'loss'
     payment_cards = [c for c in cards if c['domain'] == 'Payment review']
     assert len(payment_cards) == 1 and '1 order' in payment_cards[0]['title']      # one summary card, only the STK order
     assert state['profit']['state'] == 'evaluated'

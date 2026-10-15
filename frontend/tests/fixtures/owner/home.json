@@ -5,7 +5,7 @@
  },
  "period": "today",
  "timezone": "Africa/Nairobi",
- "generated_at": "2026-10-15T19:24:54.648735+00:00",
+ "generated_at": "2026-10-15T19:57:49.573262+00:00",
  "pulse": {
   "state": "live",
   "as_of": "2026-10-15T18:07:00+00:00",
@@ -121,7 +121,12 @@
    "data_age_days": 0,
    "is_stale": false,
    "source": "direct",
-   "source_state": "direct"
+   "source_state": "direct",
+   "source_reconciled": true,
+   "source_trusted": true,
+   "source_notice": "Recorded directly in this system. Nothing waits on Macsoft or any external data push.",
+   "source_records": null,
+   "source_last_received_at": null
   }
  },
  "costing_you_money": {
@@ -129,44 +134,25 @@
   "as_of": "2026-10-15T18:07:00+00:00",
   "cards": [
    {
-    "id": "d-d0894ddbe4",
-    "domain": "Profit",
-    "sentence": "Review margin on Quarter chicken",
-    "kes_month": null,
-    "action": "Increase price from KES 400 to KES 577",
-    "why": "Recorded sales and recipe costs indicate a modelled margin opportunity; this is not verified recoverable profit.",
-    "assumption": null,
-    "decision": null
-   },
-   {
-    "id": "d-c3ce41ca61",
-    "domain": "Kitchen",
-    "sentence": "Review preparation at grill",
-    "kes_month": null,
-    "action": "Check recorded tickets and station staffing before changing the kitchen setup.",
-    "why": "A bottleneck was detected in recorded preparation times; this does not establish the live queue.",
-    "assumption": null,
-    "decision": null
-   },
-   {
-    "id": "d-1b188a8b7e",
-    "domain": "Kitchen",
-    "sentence": "Review preparation at main",
-    "kes_month": null,
-    "action": "Check recorded tickets and station staffing before changing the kitchen setup.",
-    "why": "A bottleneck was detected in recorded preparation times; this does not establish the live queue.",
-    "assumption": null,
-    "decision": null
-   },
-   {
-    "id": "d-1560e6f1b5",
-    "domain": "Bookings",
-    "sentence": "Review 50 recorded no-shows",
-    "kes_month": null,
-    "action": "Review booking confirmations and cancellation records before changing deposit policies.",
-    "why": "6.1% of 822 recorded reservations. Historical records, not today's arrivals.",
-    "assumption": null,
-    "decision": null
+    "id": "d-87b0a0da9c",
+    "domain": "Stock",
+    "sentence": "Check where the Beef went: 2.5 kg more was used than your sales explain",
+    "kes_month": 8660.57,
+    "action": "Check where the Beef went: 2.5 kg more was used than your sales explain",
+    "why": "In the last 7 days the kitchen used 9.9 kg of Beef; the dishes sold explain 7.4 kg. That is 34% more. A reason to check the store and the portions, not a finding about anyone.",
+    "assumption": {
+     "setting": "missing_stock_flag_pct",
+     "value": 3.0,
+     "label": "Missing stock we flag"
+    },
+    "decision": {
+     "options": [
+      "approved",
+      "later",
+      "rejected"
+     ]
+    },
+    "tier": "loss"
    },
    {
     "id": "d-86dd8ccd58",
@@ -175,17 +161,292 @@
     "kes_month": 2310.0,
     "action": "Reprice: set Quarter chicken to KES 435 (from KES 400)",
     "why": "Margin at 35.0% — below 40% floor",
+    "assumption": {
+     "setting": "margin_floor_pct",
+     "value": 40.0,
+     "label": "Lowest share you keep"
+    },
+    "decision": {
+     "options": [
+      "approved",
+      "later",
+      "rejected"
+     ]
+    },
+    "tier": "loss"
+   },
+   {
+    "id": "d-d61782032c",
+    "domain": "Cash",
+    "sentence": "Look at Tuesday evening: the cash has been short 4 of the last 4 times",
+    "kes_month": 2104.9,
+    "action": "Look at Tuesday evening: the cash has been short 4 of the last 4 times",
+    "why": "Tuesday evening came up short 4 of the last 4 times, by about KES 491 each time. A repeating gap is a reason to look at how that shift is counted and run, not a finding about anyone.",
+    "assumption": {
+     "setting": "cash_tolerance_kes",
+     "value": 200,
+     "label": "Cash count difference we accept"
+    },
+    "decision": {
+     "options": [
+      "approved",
+      "later",
+      "rejected"
+     ]
+    },
+    "tier": "loss"
+   },
+   {
+    "id": "d-dff0e9c9d5",
+    "domain": "Pricing",
+    "sentence": "Raise Burger on Glovo to KES 800 (from KES 600)",
+    "kes_month": 2100.0,
+    "action": "Raise Burger on Glovo to KES 800 (from KES 600)",
+    "why": "Glovo takes 25%, so a Burger sold there keeps KES 170 instead of KES 320 in the restaurant; 14 sold through Glovo in the last 30 days.",
+    "assumption": {
+     "setting": "commission_glovo_pct",
+     "value": 25.0,
+     "label": "Glovo commission"
+    },
+    "decision": {
+     "options": [
+      "approved",
+      "later",
+      "rejected"
+     ]
+    },
+    "tier": "loss"
+   },
+   {
+    "id": "d-c3d5cd5101",
+    "domain": "Profit",
+    "sentence": "Check the till price for Chips: it was charged KES 270 against KES 300 on the menu",
+    "kes_month": 2057.14,
+    "action": "Check the till price for Chips: it was charged KES 270 against KES 300 on the menu",
+    "why": "32 orders in the last 14 days charged 10% less than the menu price. Look at discounts, price changes and open-price items. A reason to check the till, not a finding about anyone.",
     "assumption": null,
-    "decision": null
+    "decision": {
+     "options": [
+      "approved",
+      "later",
+      "rejected"
+     ]
+    },
+    "tier": "loss"
    }
   ],
-  "more": 7,
+  "ranked": [
+   {
+    "id": "d-87b0a0da9c",
+    "domain": "Stock",
+    "sentence": "Check where the Beef went: 2.5 kg more was used than your sales explain",
+    "kes_month": 8660.57,
+    "tier": "loss"
+   },
+   {
+    "id": "d-86dd8ccd58",
+    "domain": "Pricing",
+    "sentence": "Reprice: set Quarter chicken to KES 435 (from KES 400)",
+    "kes_month": 2310.0,
+    "tier": "loss"
+   },
+   {
+    "id": "d-d61782032c",
+    "domain": "Cash",
+    "sentence": "Look at Tuesday evening: the cash has been short 4 of the last 4 times",
+    "kes_month": 2104.9,
+    "tier": "loss"
+   },
+   {
+    "id": "d-dff0e9c9d5",
+    "domain": "Pricing",
+    "sentence": "Raise Burger on Glovo to KES 800 (from KES 600)",
+    "kes_month": 2100.0,
+    "tier": "loss"
+   },
+   {
+    "id": "d-c3d5cd5101",
+    "domain": "Profit",
+    "sentence": "Check the till price for Chips: it was charged KES 270 against KES 300 on the menu",
+    "kes_month": 2057.14,
+    "tier": "loss"
+   },
+   {
+    "id": "d-0de7aeffbf",
+    "domain": "Pricing",
+    "sentence": "Raise Quarter chicken on Uber Eats to KES 745 (from KES 400)",
+    "kes_month": 1035.0,
+    "tier": "loss"
+   },
+   {
+    "id": "d-7e72619e73",
+    "domain": "Pricing",
+    "sentence": "Raise Quarter chicken on Glovo to KES 745 (from KES 400)",
+    "kes_month": 517.5,
+    "tier": "loss"
+   },
+   {
+    "id": "d-0e41d4e0ea",
+    "domain": "Pricing",
+    "sentence": "Raise Quarter chicken on Bolt Food to KES 650 (from KES 400)",
+    "kes_month": 400.0,
+    "tier": "loss"
+   },
+   {
+    "id": "d-ab8717023c",
+    "domain": "Pricing",
+    "sentence": "Raise Burger on Uber Eats to KES 800 (from KES 600)",
+    "kes_month": 300.0,
+    "tier": "loss"
+   },
+   {
+    "id": "d-0db8b2511b",
+    "domain": "Pricing",
+    "sentence": "Raise Fish fillet on Glovo to KES 745 (from KES 650)",
+    "kes_month": 142.5,
+    "tier": "loss"
+   },
+   {
+    "id": "d-875c7f99fc",
+    "domain": "Pricing",
+    "sentence": "Raise Fish fillet on Uber Eats to KES 745 (from KES 650)",
+    "kes_month": 71.25,
+    "tier": "loss"
+   },
+   {
+    "id": "d-4c220c5ba4",
+    "domain": "Pricing",
+    "sentence": "Surge: set Nyama choma (goat) to KES 1,500 (from KES 1,400)",
+    "kes_month": 5899.99,
+    "tier": "idea"
+   },
+   {
+    "id": "d-510b754f02",
+    "domain": "Pricing",
+    "sentence": "Stimulate: set Chicken burger to KES 675 (from KES 750)",
+    "kes_month": 3825.0,
+    "tier": "idea"
+   },
+   {
+    "id": "d-559454a579",
+    "domain": "Pricing",
+    "sentence": "Surge: set Beer to KES 485 (from KES 450)",
+    "kes_month": 1575.0,
+    "tier": "idea"
+   },
+   {
+    "id": "d-6377e69387",
+    "domain": "Pricing",
+    "sentence": "Surge: set Ugali sukuma to KES 325 (from KES 300)",
+    "kes_month": 1250.0,
+    "tier": "idea"
+   },
+   {
+    "id": "d-ee65884a58",
+    "domain": "Pricing",
+    "sentence": "Stimulate: set Passion juice to KES 270 (from KES 300)",
+    "kes_month": 969.0,
+    "tier": "idea"
+   },
+   {
+    "id": "d-c3ce41ca61",
+    "domain": "Kitchen",
+    "sentence": "Review preparation at grill",
+    "kes_month": null,
+    "tier": "idea"
+   },
+   {
+    "id": "d-1b188a8b7e",
+    "domain": "Kitchen",
+    "sentence": "Review preparation at main",
+    "kes_month": null,
+    "tier": "idea"
+   },
+   {
+    "id": "d-1560e6f1b5",
+    "domain": "Bookings",
+    "sentence": "Review 50 recorded no-shows",
+    "kes_month": null,
+    "tier": "idea"
+   },
+   {
+    "id": "d-e965678a8d",
+    "domain": "Growth",
+    "sentence": "Send win-back offer to 31 lapsed regular(s)",
+    "kes_month": null,
+    "tier": "idea"
+   },
+   {
+    "id": "d-1bbf5cc14a",
+    "domain": "Menu",
+    "sentence": "Reduce food cost",
+    "kes_month": null,
+    "tier": "idea"
+   },
+   {
+    "id": "d-1ab966e0d9",
+    "domain": "Menu",
+    "sentence": "Promote prominently",
+    "kes_month": null,
+    "tier": "idea"
+   },
+   {
+    "id": "d-eb354c04c5",
+    "domain": "Menu",
+    "sentence": "Remove from menu",
+    "kes_month": null,
+    "tier": "idea"
+   },
+   {
+    "id": "d-e9e9df5ce0",
+    "domain": "Purchasing",
+    "sentence": "Find alternative supplier for critical items. Maintain minimum safety stock.",
+    "kes_month": null,
+    "tier": "idea"
+   },
+   {
+    "id": "d-570ccf8b3e",
+    "domain": "Menu",
+    "sentence": "Optimize cost or increase price",
+    "kes_month": null,
+    "tier": "idea"
+   },
+   {
+    "id": "d-cadf21d986",
+    "domain": "Menu",
+    "sentence": "Capitalize on momentum",
+    "kes_month": null,
+    "tier": "idea"
+   },
+   {
+    "id": "d-cb3385bd1d",
+    "domain": "Menu",
+    "sentence": "Reinvent or rebrand",
+    "kes_month": null,
+    "tier": "idea"
+   },
+   {
+    "id": "d-1c0dc9df77",
+    "domain": "Purchasing",
+    "sentence": "Negotiate new pricing or get quotes from alternative suppliers.",
+    "kes_month": null,
+    "tier": "idea"
+   },
+   {
+    "id": "d-ccf442865d",
+    "domain": "Staff",
+    "sentence": "Review staffing levels on these days — revenue may not justify it",
+    "kes_month": null,
+    "tier": "idea"
+   }
+  ],
+  "more": 24,
   "ranking": "What is happening now first, then ideas by what they are worth in KES; an idea we cannot put a number on comes after those we can.",
   "reason": null
  },
  "health": {
   "state": "live",
-  "as_of": "2026-10-15T19:24:54.648735+00:00",
+  "as_of": "2026-10-15T19:57:49.573262+00:00",
   "tiles": [
    {
     "area": "money",
@@ -249,7 +510,7 @@
    "key": "money",
    "title": "My Money",
    "state": "live",
-   "as_of": "2026-10-15T19:24:54.648735+00:00",
+   "as_of": "2026-10-15T19:57:49.573262+00:00",
    "summary": {
     "number": 29.3,
     "unit": "%",
@@ -260,7 +521,7 @@
    "blocks": {
     "pnl": {
      "state": "as_entered",
-     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "as_of": "2026-10-15T19:57:49.573262+00:00",
      "assumptions": [
       {
        "setting": "food_cost_target_pct",
@@ -540,7 +801,7 @@
     },
     "bills": {
      "state": "as_entered",
-     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "as_of": "2026-10-15T19:57:49.573262+00:00",
      "assumption": {
       "setting": "bill_reserve_kes",
       "value": 0,
@@ -831,7 +1092,7 @@
     },
     "spikes": {
      "state": "as_entered",
-     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "as_of": "2026-10-15T19:57:49.573262+00:00",
      "assumption": {
       "setting": "expense_spike_pct",
       "value": 25.0,
@@ -850,7 +1111,7 @@
     },
     "savings": {
      "state": "live",
-     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "as_of": "2026-10-15T19:57:49.573262+00:00",
      "captured_kes_month": 2507.73,
      "hours_saved_30d": 66.7,
      "approved_ideas": 1,
@@ -1393,7 +1654,7 @@
       {
        "dish": "Quarter chicken",
        "keeps_pct": 35.0,
-       "month_gain": 11732.82
+       "month_gain": 2310.0
       }
      ],
      "assumptions": [
@@ -1589,7 +1850,7 @@
     },
     "win_back": {
      "state": "live",
-     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "as_of": "2026-10-15T19:57:49.573262+00:00",
      "lapsed_guests": 50,
      "reachable": 31,
      "offers": 3,
@@ -1597,7 +1858,7 @@
     },
     "simulator": {
      "state": "live",
-     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "as_of": "2026-10-15T19:57:49.573262+00:00",
      "info": true,
      "how": "Ask “what if I raise the price of <dish>?” in Ask LEVIII."
     }
@@ -2355,7 +2616,7 @@
     },
     "patterns": {
      "state": "live",
-     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "as_of": "2026-10-15T19:57:49.573262+00:00",
      "assumption": {
       "setting": "cash_tolerance_kes",
       "value": 200,
@@ -2460,7 +2721,7 @@
     },
     "on_shift": {
      "state": "live",
-     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "as_of": "2026-10-15T19:57:49.573262+00:00",
      "scheduled": 5,
      "on_shift": 2
     },
@@ -2506,7 +2767,7 @@
    "key": "permits",
    "title": "Permits & Settings",
    "state": "live",
-   "as_of": "2026-10-15T19:24:54.648735+00:00",
+   "as_of": "2026-10-15T19:57:49.573262+00:00",
    "summary": {
     "number": 100.0,
     "unit": "%",
@@ -2517,7 +2778,7 @@
    "blocks": {
     "licences": {
      "state": "as_entered",
-     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "as_of": "2026-10-15T19:57:49.573262+00:00",
      "assumption": {
       "setting": "licence_warning_days",
       "value": 14,
@@ -2569,7 +2830,7 @@
     },
     "till_connection": {
      "state": "live",
-     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "as_of": "2026-10-15T19:57:49.573262+00:00",
      "info": true,
      "source": "direct",
      "word": "Recorded here",
@@ -2578,7 +2839,7 @@
     },
     "data_trust": {
      "state": "live",
-     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "as_of": "2026-10-15T19:57:49.573262+00:00",
      "dishes": 29,
      "costs_known_pct": 100.0,
      "missing_costs": 0,
@@ -2590,7 +2851,7 @@
  "coming_up": {
   "bills": {
    "state": "as_entered",
-   "as_of": "2026-10-15T19:24:54.648735+00:00",
+   "as_of": "2026-10-15T19:57:49.573262+00:00",
    "reason": null,
    "items": [
     {
@@ -2611,7 +2872,7 @@
   },
   "licences": {
    "state": "as_entered",
-   "as_of": "2026-10-15T19:24:54.648735+00:00",
+   "as_of": "2026-10-15T19:57:49.573262+00:00",
    "assumption": {
     "setting": "licence_warning_days",
     "value": 14,
@@ -2631,7 +2892,7 @@
   },
   "deliveries": {
    "state": "as_entered",
-   "as_of": "2026-10-15T19:24:54.648735+00:00",
+   "as_of": "2026-10-15T19:57:49.573262+00:00",
    "reason": null,
    "items": [
     {
@@ -2656,7 +2917,7 @@
   },
   "bookings": {
    "state": "live",
-   "as_of": "2026-10-15T19:24:54.648735+00:00",
+   "as_of": "2026-10-15T19:57:49.573262+00:00",
    "covers_today": 0,
    "next_days": [
     {

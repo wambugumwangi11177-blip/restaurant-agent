@@ -61,18 +61,25 @@ export type Pulse = Block & {
   freshness: Freshness;
 };
 
+/** now: happening now (a stockout) · loss: money already going out · idea: money you could make. The screen words them. */
+export type CardTier = "now" | "loss" | "idea";
+
 export type DecisionCard = {
   id: string;
   domain: string;
   sentence: string;
+  /** What it is worth in a month, in KES; null when we cannot put an honest figure on it. */
   kes_month: number | null;
   action: string;
   why: string;
   assumption: Assumption | null;
   decision: { options: string[] } | null;
+  tier: CardTier;
 };
 
-export type CostingYouMoney = Block & { cards: DecisionCard[]; more: number; ranking: string };
+export type RankedCard = Pick<DecisionCard, "id" | "domain" | "sentence" | "kes_month" | "tier">;
+
+export type CostingYouMoney = Block & { cards: DecisionCard[]; ranked: RankedCard[]; more: number; ranking: string };
 
 export type HealthStatus = "good" | "watch" | "bad" | "unknown";
 export type HealthTile = { area: AreaKey; title: string; number: number | null; unit: string; word: string; status: HealthStatus; label: string };

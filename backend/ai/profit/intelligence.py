@@ -206,20 +206,28 @@ def _build_contribution_margins(items, item_profit: dict, settings: Settings) ->
 
 
 def _detect_profit_leaks(contribution_margins: list[dict], settings: Settings) -> list[dict]:
+    """A dish that keeps less than the owner's floor. The leak is what the shortfall costs in a month: the price that would
+    keep the floor (rounded up to the owner's price step), less today's price, times what was sold in 30 days. It is measured to
+    the FLOOR — the least the owner said they accept — not to the target margin they would like: a target is a wish, a floor
+    is a rule, and only a broken rule is "costing you money". `suggested_price` is still the target, as the price to aim for."""
     leaks = []
+    step = max(settings.price_step_cents, 1)
     for cm in contribution_margins:
         if cm["margin_pct"] < settings.margin_floor_pct and cm["cost_price"] > 0:
             target_price  = int(cm["cost_price"] / (1 - settings.margin_target_pct / 100))
-            monthly_leak  = (target_price - cm["current_price"]) * cm["qty_30d"]
+            floor_price   = -(-int(cm["cost_price"] / (1 - settings.margin_floor_pct / 100)) // step) * step
+            floor_price   = max(floor_price, cm["current_price"])
+            monthly_leak  = (floor_price - cm["current_price"]) * cm["qty_30d"]
             leaks.append({
                 "item_name":          cm["item_name"],
                 "category":           cm["category"],
                 "current_margin_pct": cm["margin_pct"],
                 "food_cost_pct":      cm["food_cost_pct"],
                 "monthly_leak_cents": monthly_leak,
+                "floor_price":        floor_price,
                 "suggested_price":    target_price,
                 "severity":           "CRITICAL" if cm["margin_pct"] < 30 else "HIGH",
-                "action":             f"Increase price from KES {cm['current_price']//100:,} to KES {target_price//100:,}",
+                "action":             f"Increase price from KES {cm['current_price']//100:,} to at least KES {floor_price//100:,}",
             })
     leaks.sort(key=lambda x: x["monthly_leak_cents"], reverse=True)
     return leaks

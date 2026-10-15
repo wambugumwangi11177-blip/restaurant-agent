@@ -43,14 +43,40 @@ it("every number carries its state in words", async () => {
   expect(screen.getByText("Not available")).toBeTruthy();                // the M-Pesa check, until a statement is uploaded
 });
 
-it("Zone 2 lists what is costing money; an idea with no KES figure says so instead of inventing one", async () => {
+it("Zone 2 lists the money going out, the biggest first, each in KES a month", async () => {
   render(<HomePage />);
   const region = (await screen.findByRole("heading", { name: "What's costing you money" })).closest("section")!;
   const cards = within(region).getAllByRole("article");
   expect(cards).toHaveLength(5);
-  expect(within(region).getAllByText("we can't put a number on this yet").length).toBeGreaterThan(0);
-  expect(within(region).getByText(/7 more ideas/)).toBeTruthy();
+  expect(within(cards[0]).getByText("costing about KES 8,661 a month")).toBeTruthy();
+  expect(within(cards[0]).getByText(/Check where the Beef went/)).toBeTruthy();
+  expect(within(cards[4]).getByText(/Chips/)).toBeTruthy();
   expect(within(cards[0]).getByRole("link", { name: "Ask LEVIII about this" }).getAttribute("href")).toMatch(/^\/os\?q=/);
+});
+
+it("an idea we cannot put a figure on says so, and one that could earn money says that, not 'costing'", async () => {
+  const data = home();
+  data.costing_you_money.cards[1].kes_month = null;
+  data.costing_you_money.cards[2].tier = "idea";
+  data.costing_you_money.cards[3].tier = "now";
+  serve(data);
+  render(<HomePage />);
+  const region = (await screen.findByRole("heading", { name: "What's costing you money" })).closest("section")!;
+  expect(within(region).getByText("we can't put a number on this yet")).toBeTruthy();
+  expect(within(region).getByText("could earn about KES 2,105 a month")).toBeTruthy();
+  expect(within(region).getByText("happening now")).toBeTruthy();
+});
+
+it("the rest of the ranking is one tap away, in the same order, with what each is worth", async () => {
+  render(<HomePage />);
+  const fold = await screen.findByRole("button", { name: /24 more ideas/ });
+  expect(fold.getAttribute("aria-expanded")).toBe("false");
+  fireEvent.click(fold);
+  const rows = within(fold.parentElement!).getAllByRole("listitem");
+  expect(rows).toHaveLength(24);
+  expect(within(rows[0]).getByText(/could earn about KES 5,900 a month|costing about/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Show fewer" }));
+  expect(screen.queryAllByRole("listitem").filter((li) => li.textContent?.includes("Ask LEVIII"))).toHaveLength(0);
 });
 
 it("a KES figure is written the way an owner says it", async () => {
@@ -58,24 +84,24 @@ it("a KES figure is written the way an owner says it", async () => {
   data.costing_you_money.cards[0].kes_month = 18600.4;
   serve(data);
   render(<HomePage />);
-  expect(await screen.findByText("about KES 18,600 a month")).toBeTruthy();
+  expect(await screen.findByText("costing about KES 18,600 a month")).toBeTruthy();
 });
 
-it("a card the decision layer made can be acknowledged; a failed save keeps the card and says so", async () => {
+it("any card can be acknowledged; a failed save keeps the card and says so, a good one takes it away", async () => {
   const data = home();
-  data.costing_you_money.cards[0].decision = { options: ["approved", "later", "rejected"] };
   serve(data);
   vi.mocked(api.post).mockRejectedValueOnce(new Error("offline"));
   render(<HomePage />);
-  const sentence = data.costing_you_money.cards[0].sentence;
-  await screen.findByText(sentence);
-  fireEvent.click(screen.getByRole("button", { name: "Acknowledge" }));
+  const first = data.costing_you_money.cards[0];
+  const card = () => screen.getByText(first.sentence).closest("article")!;
+  await screen.findByText(first.sentence);
+  fireEvent.click(within(card()).getByRole("button", { name: "Acknowledge" }));
   expect((await screen.findByRole("alert")).textContent).toMatch(/could not be saved/);
-  expect(screen.getByText(sentence)).toBeTruthy();
+  expect(screen.getByText(first.sentence)).toBeTruthy();
   vi.mocked(api.post).mockResolvedValueOnce({ data: {} } as never);
-  fireEvent.click(screen.getByRole("button", { name: "Acknowledge" }));
-  await waitFor(() => expect(screen.queryByText(sentence)).toBeNull());
-  expect(api.post).toHaveBeenLastCalledWith(`/api/v1/overview/attention/${encodeURIComponent(data.costing_you_money.cards[0].id)}/decision`, { decision: "approved" });
+  fireEvent.click(within(card()).getByRole("button", { name: "Acknowledge" }));
+  await waitFor(() => expect(screen.queryByText(first.sentence)).toBeNull());
+  expect(api.post).toHaveBeenLastCalledWith(`/api/v1/overview/attention/${encodeURIComponent(first.id)}/decision`, { decision: "approved" });
 });
 
 it("the health strip has one tile per area, each a link to its panel", async () => {

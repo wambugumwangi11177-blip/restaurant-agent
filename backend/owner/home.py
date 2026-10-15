@@ -62,16 +62,42 @@ def _pulse(ctx: OwnerContext, period: str) -> dict:
                           "source_records": conn.get("records"), "source_last_received_at": conn.get("last_received_at")}}
 
 
+CARDS_SHOWN = 5
+DECISION_OPTIONS = ["approved", "later", "rejected"]          # acknowledge · remind me in 24h · dismiss (routers/overview.py)
+
+
+def _rank(cards: list[dict]) -> list[dict]:
+    """What is happening now first (as it always was); then money that is already going out, most first; then money you could
+    make, most first; then what we cannot put an honest figure on, in the order it came. "Costing you money" is about the
+    second group, so a price rise worth KES 6,000 does not sit above a gap that has already cost KES 2,000; and a card without
+    a figure never outranks one with a figure."""
+    now = [c for c in cards if c.get("now")]
+    rest = [c for c in cards if not c.get("now")]
+    priced = [c for c in rest if (c.get("impact_cents_month") or 0) > 0]
+    by_kes = lambda group: sorted(group, key=lambda c: c["impact_cents_month"], reverse=True)   # noqa: E731
+    losses = by_kes(c for c in priced if c.get("kind") == "loss")
+    ideas = by_kes(c for c in priced if c.get("kind") != "loss")
+    unpriced = [c for c in rest if not (c.get("impact_cents_month") or 0) > 0]
+    return now + losses + ideas + unpriced
+
+
+def _card(c: dict) -> dict:
+    return {"id": c["id"], "domain": c["domain"], "sentence": c["title"], "kes_month": kes(c.get("impact_cents_month") or None),
+            "action": c.get("what_to_do", ""), "why": c.get("why", ""), "assumption": c.get("assumption"),
+            "decision": {"options": DECISION_OPTIONS}, "tier": "now" if c.get("now") else ("loss" if c.get("kind") == "loss" else "idea")}
+
+
 def _costing_you_money(ctx: OwnerContext) -> dict:
     overview = _overview()
     base = ctx.order_state()
-    cards = overview._attention_cards(ctx.db, ctx.rid, ctx.tenant_id)
+    cards = _rank(overview._attention_cards(ctx.db, ctx.rid, ctx.tenant_id, decision_limit=40))
     if base["state"] == "no_data" and not cards:
         return no_data("Nothing to rank until sales are recorded.", cards=[])
-    top = cards[:5]
+    top = cards[:CARDS_SHOWN]
     return {**(base if base["state"] != "no_data" else block("live", as_of=ctx.now)),
-            "cards": [{"id": c["id"], "domain": c["domain"], "sentence": c["title"], "kes_month": kes(c.get("impact_cents_month")),
-                       "action": c.get("what_to_do", ""), "why": c.get("why", ""), "assumption": None, "decision": None} for c in top],
+            "cards": [_card(c) for c in top],
+            # Every card, ranked — what Home folds under "more" and what Ask LEVIII's "what should I do" starts from.
+            "ranked": [{k: _card(c)[k] for k in ("id", "domain", "sentence", "kes_month", "tier")} for c in cards],
             "more": max(len(cards) - len(top), 0),
             "ranking": "What is happening now first, then ideas by what they are worth in KES; an idea we cannot put a number on comes after those we can.",
             "reason": None if top else "Nothing is costing you money that we can see right now."}

@@ -12,18 +12,19 @@ logger = logging.getLogger(__name__)
 def collect(db, rid):
     cards, states = [], {}
 
-    def add(domain, title, why, action, impact='', entity=''):
+    def add(domain, title, why, action, impact='', entity='', impact_cents_month=None, kind=None):
         cards.append(dict(domain=domain, title=title, why=why, what_to_do=action,
-                          impact=impact, status='open', entity=str(entity)))
+                          impact=impact, status='open', entity=str(entity), impact_cents_month=impact_cents_month, kind=kind))
 
     def profit():
         from ai.profit.intelligence import get_profit_intelligence
         data = get_profit_intelligence(db, rid)
         for leak in data.get('profit_leaks', [])[:4]:
             add('Profit', f"Review margin on {leak['item_name']}",
-                'Recorded sales and recipe costs indicate a modelled margin opportunity; this is not verified recoverable profit.',
-                leak['action'], f"Modelled KSh {leak['monthly_leak_cents'] / 100:,.0f} per month",
-                leak.get('item_id', leak['item_name']))
+                f"It keeps {leak['current_margin_pct']:g}% of its price, under the lowest share you said you accept. "
+                'The figure is what the gap to your floor costs in a month at the prices and sales recorded; it is not verified recoverable profit.',
+                leak['action'], f"About KSh {leak['monthly_leak_cents'] / 100:,.0f} a month to your floor",
+                leak.get('item_id', leak['item_name']), impact_cents_month=leak['monthly_leak_cents'] or None, kind='loss')
         return bool(data.get('summary', {}).get('total_orders_30d'))
 
     def kitchen():

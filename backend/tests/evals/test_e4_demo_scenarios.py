@@ -104,9 +104,10 @@ def test_p02_chips_are_charged_below_the_menu_price(demo):
     assert chips["month_loss"] > 1000
 
 
-@pytest.mark.xfail(strict=True, reason="S4.3 ranks Home cards by KES; today the till-price gap is not among the first five (operational and kitchen cards come first)")
 def test_p02_is_one_of_the_things_costing_you_money(demo):
-    assert any("Chips" in c["sentence"] or "Chips" in c["why"] for c in cards(demo["A"]))
+    """Ranked by KES with the other losses: Home shows the five largest, the rest sit under "more" (`ranked` lists them all)."""
+    chips = next(c for c in demo["A"]["costing_you_money"]["ranked"] if "Chips" in c["sentence"])
+    assert chips["kes_month"] and chips["kes_month"] > 1000 and chips["tier"] == "loss"
 
 
 # ── P3 ───────────────────────────────────────────────────────────────────────
@@ -151,7 +152,6 @@ def test_p05_the_kitchen_uses_more_beef_than_the_sales_explain(demo):
     assert head["status"] == "bad" and head["number"] == 1
 
 
-@pytest.mark.xfail(strict=True, reason="S4.3 extends the decision adapters so a stock gap is a ranked, KES-valued card on Home")
 def test_p05_is_one_of_the_things_costing_you_money(demo):
     assert any("Beef" in c["sentence"] and c["kes_month"] for c in cards(demo["A"]))
 

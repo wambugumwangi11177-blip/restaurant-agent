@@ -26,7 +26,8 @@ import pytest
 import models
 from time_utils import utcnow
 from ai import menu_engineer
-from ai.menu_engineer import _menu_optimization_score, POPULARITY_INDEX
+from ai.menu_engineer import _menu_optimization_score
+from owner.settings import DEFAULTS
 
 
 # ── 1. Popularity cutoff ──────────────────────────────────────────────────────
@@ -78,7 +79,7 @@ def test_the_fixture_really_is_skewed():
     """The test only proves anything if the mid-list item straddles the two cutoffs."""
     total = BESTSELLER_QTY + 4 * MIDLIST_QTY
     raw_mean = total / 5
-    indexed = POPULARITY_INDEX * raw_mean
+    indexed = DEFAULTS.popular_cutoff * raw_mean
     assert indexed <= MIDLIST_QTY < raw_mean, "fixture no longer distinguishes the two cutoffs"
 
 

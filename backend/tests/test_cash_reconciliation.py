@@ -15,8 +15,12 @@ import models
 from time_utils import utcnow
 from ai.cash_reconciliation.intelligence import (
     record_drawer_count, compute_reconciliation_report, expected_cash_amount_cents,
-    DrawerCountError, DRAWER_TOLERANCE_CENTS,
+    DrawerCountError,
 )
+from owner.settings import DEFAULTS
+
+DRAWER_TOLERANCE_CENTS = DEFAULTS.cash_tolerance_cents     # KES 200 by default
+
 
 
 def _make_restaurant_and_staff(db_session, suffix):

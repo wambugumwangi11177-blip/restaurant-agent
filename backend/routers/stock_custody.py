@@ -27,6 +27,7 @@ import schemas
 import auth
 from routers.deps import get_or_create_restaurant
 from ai import stock_custody as variance_engine
+from owner.settings import get_settings
 
 router = APIRouter(prefix="/stock", tags=["stock-custody"])
 
@@ -208,7 +209,7 @@ async def variance_report(
     return {
         "restaurant_id": restaurant.id,
         "window_hours": hours,
-        "threshold": variance_engine.VARIANCE_THRESHOLD,
+        "threshold": get_settings(db, restaurant.id).missing_stock_flag_pct / 100.0,
         "items": [
             {
                 "inventory_item_id": r.inventory_item_id,

@@ -17,15 +17,18 @@ FieldSpec.scale (stored = api × scale).
 """
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass, replace, fields as dataclass_fields
 from typing import Any
 
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 import models
 from time_utils import utcnow
+
+logger = logging.getLogger("owner.settings")
 
 
 @dataclass(frozen=True)
@@ -183,9 +186,29 @@ def _from_row(row) -> Settings:
 
 
 def get_settings(db: Session, restaurant_id: int) -> Settings:
-    """The restaurant's settings; DEFAULTS when the owner has chosen nothing. Never writes."""
-    row = _row(db, restaurant_id)
+    """The restaurant's settings; DEFAULTS when the owner has chosen nothing. Never writes.
+
+    Fails safe: if the table cannot be read (code deployed before migration 051, a database blip) the
+    defaults are returned and the problem is logged — every engine calls this, so it must never be the
+    reason Home or the AI pages go down. The read runs in a SAVEPOINT so that on PostgreSQL a failed
+    statement does not poison the caller's transaction (same pattern as overview._source_connection).
+    """
+    try:
+        with db.begin_nested():
+            row = _row(db, restaurant_id)
+    except SQLAlchemyError:
+        logger.warning("restaurant_settings unreadable for restaurant %s; using defaults", restaurant_id, exc_info=True)
+        return DEFAULTS
     return _from_row(row) if row else DEFAULTS
+
+
+def resolve(db: Session, restaurant_id: int, settings: Settings | None = None) -> Settings:
+    """What an engine calls first: the settings it was handed, else the restaurant's saved ones (else defaults).
+
+    Passing `settings` explicitly is for the owner API and previews; passing nothing means every existing
+    caller (Home, OS, reports, WhatsApp, the old dashboard) honours the owner's saved choices untouched.
+    """
+    return settings if settings is not None else get_settings(db, restaurant_id)
 
 
 def describe(db: Session, restaurant_id: int) -> dict:

@@ -10,7 +10,7 @@ reconciliation isn't buildable yet. What's buildable today, and still a real
      at shift end; expected_amount is computed from Order rows
      (payment_method=CASH, is_paid=True) for the same window. A gap beyond
      tolerance is flagged — same "threshold, not zero-tolerance" posture as
-     ai/stock_custody.py's VARIANCE_THRESHOLD (spoilage/float errors are
+     the missing-stock flag in ai/stock_custody.py (spoilage/float errors are
      real and not theft, which is why there's a tolerance).
   2. M-Pesa settlement gaps: reuses ai.fraud.detection.payment_mismatches
      directly rather than reimplementing it — an M-Pesa order marked paid
@@ -31,12 +31,15 @@ from sqlalchemy import func
 import models
 from time_utils import utcnow
 from ai.fraud.detection import payment_mismatches as mpesa_payment_mismatches
+from owner.settings import Settings, resolve
 
-# KES 200 (in cents) or 1% of expected, whichever is larger — a small,
-# consistent till float discrepancy (change-making errors, rounding) is
-# normal and shouldn't page anyone; a real gap should.
-DRAWER_TOLERANCE_CENTS = 20000
-DRAWER_TOLERANCE_PCT = 0.01
+# The drawer tolerance — a shilling amount or a share of takings, whichever is larger — is the owner's
+# setting (settings.cash_tolerance_cents / cash_tolerance_pct; defaults KES 200 / 1%): a small, consistent till
+# float discrepancy (change-making errors, rounding) is normal and shouldn't page anyone; a real gap should.
+
+
+def drawer_tolerance_cents(expected_cents: int, settings: Settings) -> int:
+    return max(settings.cash_tolerance_cents, int(expected_cents * settings.cash_tolerance_pct / 100))
 
 
 class DrawerCountError(Exception):
@@ -86,6 +89,7 @@ def record_drawer_count(
     window_end,
     labor_shift_id: int | None = None,
     notes: str = "",
+    settings: Settings | None = None,
 ) -> models.CashDrawerCount:
     """
     Record a physical drawer count and compute variance against expected
@@ -93,6 +97,7 @@ def record_drawer_count(
     ai/stock_custody.py::submit_count's shape (compute expected, snapshot it,
     persist, flag if beyond tolerance).
     """
+    settings = resolve(db, restaurant_id, settings)
     if counted_amount_cents < 0:
         raise DrawerCountError("counted_amount_cents cannot be negative")
     if window_end <= window_start:
@@ -124,8 +129,7 @@ def record_drawer_count(
     )
 
     variance = counted_amount_cents - expected
-    tolerance = max(DRAWER_TOLERANCE_CENTS, int(expected * DRAWER_TOLERANCE_PCT))
-    if abs(variance) > tolerance:
+    if abs(variance) > drawer_tolerance_cents(expected, settings):
         from events.bus import emit_async, EventType
         emit_async(EventType.CASH_RECONCILIATION_FLAGGED, {
             "restaurant_id": restaurant_id,
@@ -139,13 +143,14 @@ def record_drawer_count(
 
 
 def compute_reconciliation_report(
-    db: Session, restaurant_id: int, window_hours: int = 24
+    db: Session, restaurant_id: int, window_hours: int = 24, settings: Settings | None = None
 ) -> CashReconciliationReport:
     """On-demand combined view: recent drawer-count variances + M-Pesa
     settlement gaps. Callers: routers/cash_reconciliation.py (dashboard) and
     the SHIFT_ENDED handler (ai/orchestrator/executive.py or push_notifier.py)
     which triggers a fresh drawer expectation, not this report directly —
     this function is read-only over whatever counts already exist."""
+    settings = resolve(db, restaurant_id, settings)
     since = utcnow() - timedelta(hours=window_hours)
 
     counts = db.query(models.CashDrawerCount).filter(
@@ -156,7 +161,7 @@ def compute_reconciliation_report(
     drawer_variances = []
     for c in counts:
         variance = c.counted_amount_cents - c.expected_amount_cents
-        tolerance = max(DRAWER_TOLERANCE_CENTS, int(c.expected_amount_cents * DRAWER_TOLERANCE_PCT))
+        tolerance = drawer_tolerance_cents(c.expected_amount_cents, settings)
         drawer_variances.append(DrawerVarianceResult(
             count_id=c.id,
             expected_amount_cents=c.expected_amount_cents,

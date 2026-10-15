@@ -282,3 +282,73 @@ def seed_pnl_week(db, g: Golden, *, price_rise: bool = False) -> models.MenuItem
             ))
     db.commit()
     return meal
+
+
+# ─── seeders for the settings-driven behaviour tests (S1.2) ──────────────────
+
+def pin_anchor(db, g: Golden, n: int = 30) -> None:
+    """Make the analysis anchor ≈ `now`: the 30th most recent order sits within the last hour.
+
+    `ai.analysis_clock.analysis_anchor` is the date of the 30th most recent order, so a scenario that
+    wants its windows aligned to `now` needs 30 recent orders. These are cheap Spaghetti orders (margin
+    46.7%, one day of history) — no pricing recommendation and no velocity signal of their own.
+    """
+    spaghetti = g.items["Spaghetti"]
+    for k in range(n):
+        add_order(db, g, [(spaghetti, 1, spaghetti.price)], g.now - timedelta(minutes=2 * k))
+    db.commit()
+
+
+def seed_chips_surge(db, g: Golden) -> None:
+    """Chips (margin 70%) that suddenly sell hot: 1/day for days 7–29, then 5/day for the last 7 days."""
+    chips = g.items["Chips"]
+    for day in range(7, 30):
+        add_order(db, g, [(chips, 1, chips.price)], g.now - timedelta(days=day, hours=1))
+    for day in range(0, 7):
+        for k in range(5):
+            add_order(db, g, [(chips, 1, chips.price)], g.now - timedelta(days=day, hours=2 + k))
+    db.commit()
+    pin_anchor(db, g)
+
+
+def seed_slow_pilau(db, g: Golden) -> None:
+    """Pilau (margin 68.6%) that went quiet: 5/day for days 7–29, one plate in the last week."""
+    pilau = g.items["Pilau"]
+    for day in range(7, 30):
+        for k in range(5):
+            add_order(db, g, [(pilau, 1, pilau.price)], g.now - timedelta(days=day, hours=1 + k))
+    add_order(db, g, [(pilau, 1, pilau.price)], g.now - timedelta(days=3))
+    db.commit()
+    pin_anchor(db, g)
+
+
+def seed_menu_mix(db, g: Golden) -> None:
+    """Units sold over the last 20 days chosen so the popular cut-off (0.7 × the average) matters.
+
+    Eight dishes, 400 units: average 50 units/dish → cut-off 35 at 0.7 and 50 at 1.0. Dishes selling 40
+    units are popular at 0.7 and not at 1.0.
+    """
+    plan = {"Quarter chicken": 100, "Chips": 90, "Burger": 40, "Nyama choma": 40, "Fish fillet": 40,
+            "Spaghetti": 30, "Pilau": 40, "Beef stew": 20}
+    k = 0
+    for name, units in plan.items():
+        item = g.items[name]
+        for i in range(units):
+            add_order(db, g, [(item, 1, item.price)], g.now - timedelta(hours=1 + (k % 400)))
+            k += 1
+    db.commit()
+
+
+def seed_overtime_shift(db, g: Golden, hours: float = 8.5) -> None:
+    """One 8.5-hour shift (KES 125/h) and some sales, so labour % and overtime have something to read."""
+    pilau = g.items["Pilau"]
+    for k in range(40):
+        add_order(db, g, [(pilau, 1, pilau.price)], g.now - timedelta(minutes=20 * k))
+    member = models.StaffMember(restaurant_id=g.rid, name="Closer", role_title="Waiter", hourly_rate=12_500)
+    db.add(member)
+    db.flush()
+    db.add(models.LaborShift(
+        restaurant_id=g.rid, staff_member_id=member.id, shift_date=g.now.date(),
+        scheduled_hours=8.0, actual_hours=hours, labor_cost=int(hours * 12_500),
+        actual_start=g.now.replace(hour=6), actual_end=g.now.replace(hour=14, minute=30)))
+    db.commit()

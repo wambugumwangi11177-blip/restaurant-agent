@@ -6,7 +6,10 @@ that still violates the floor it is restoring. Ceiling to 50 guarantees the
 result is at/above the floor. SURGE/STIMULATE already gate post-round; this pins
 REPRICE to the same guarantee.
 """
-from ai.pricing.analysis import _round_price_up, MIN_MARGIN_PCT
+from ai.pricing.analysis import _round_price_up
+from owner.settings import DEFAULTS
+
+MIN_MARGIN_PCT = DEFAULTS.margin_floor_pct     # the owner's margin floor (default 40)
 
 
 def _margin_pct(price: int, cost: int) -> float:

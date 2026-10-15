@@ -658,8 +658,8 @@
   "owner_settings": {
    "area": "not_shown",
    "demo": "not_shown",
-   "home": "not_shown",
-   "old_dash": "not_shown",
+   "home": "wired",
+   "old_dash": "wired",
    "os": "not_shown",
    "reports": "not_shown"
   },
@@ -779,6 +779,11 @@
    {
     "from": "ai.cash_reconciliation.intelligence",
     "lazy": false,
+    "to": "owner.settings"
+   },
+   {
+    "from": "ai.cash_reconciliation.intelligence",
+    "lazy": false,
     "to": "time_utils"
    },
    {
@@ -880,6 +885,11 @@
     "from": "ai.decisions.adapters",
     "lazy": true,
     "to": "ai.supply_chain.intelligence"
+   },
+   {
+    "from": "ai.decisions.adapters",
+    "lazy": false,
+    "to": "owner.settings"
    },
    {
     "from": "ai.decisions.ranking",
@@ -1102,6 +1112,11 @@
     "to": "models"
    },
    {
+    "from": "ai.labor.intelligence",
+    "lazy": false,
+    "to": "owner.settings"
+   },
+   {
     "from": "ai.marketing",
     "lazy": false,
     "to": "ai.marketing.insights"
@@ -1150,6 +1165,11 @@
     "from": "ai.menu_engineer",
     "lazy": false,
     "to": "models"
+   },
+   {
+    "from": "ai.menu_engineer",
+    "lazy": false,
+    "to": "owner.settings"
    },
    {
     "from": "ai.notify",
@@ -1209,11 +1229,6 @@
    {
     "from": "ai.orchestrator.executive",
     "lazy": true,
-    "to": "ai.stock_custody"
-   },
-   {
-    "from": "ai.orchestrator.executive",
-    "lazy": true,
     "to": "ai.whatsapp.brain"
    },
    {
@@ -1230,6 +1245,11 @@
     "from": "ai.orchestrator.executive",
     "lazy": false,
     "to": "models"
+   },
+   {
+    "from": "ai.orchestrator.executive",
+    "lazy": true,
+    "to": "owner.settings"
    },
    {
     "from": "ai.orchestrator.executive",
@@ -1429,6 +1449,11 @@
    {
     "from": "ai.pricing.analysis",
     "lazy": false,
+    "to": "owner.settings"
+   },
+   {
+    "from": "ai.pricing.analysis",
+    "lazy": false,
     "to": "time_utils"
    },
    {
@@ -1449,6 +1474,11 @@
    {
     "from": "ai.pricing.recommendations",
     "lazy": false,
+    "to": "owner.settings"
+   },
+   {
+    "from": "ai.pricing.recommendations",
+    "lazy": false,
     "to": "time_utils"
    },
    {
@@ -1465,6 +1495,11 @@
     "from": "ai.profit.intelligence",
     "lazy": false,
     "to": "models"
+   },
+   {
+    "from": "ai.profit.intelligence",
+    "lazy": false,
+    "to": "owner.settings"
    },
    {
     "from": "ai.profit.intelligence",
@@ -1649,6 +1684,11 @@
    {
     "from": "ai.simulation.engine",
     "lazy": false,
+    "to": "owner.settings"
+   },
+   {
+    "from": "ai.simulation.engine",
+    "lazy": false,
     "to": "time_utils"
    },
    {
@@ -1700,6 +1740,11 @@
     "from": "ai.stock_custody",
     "lazy": false,
     "to": "models"
+   },
+   {
+    "from": "ai.stock_custody",
+    "lazy": false,
+    "to": "owner.settings"
    },
    {
     "from": "ai.stock_custody",
@@ -3419,6 +3464,11 @@
    {
     "from": "routers.stock_custody",
     "lazy": false,
+    "to": "owner.settings"
+   },
+   {
+    "from": "routers.stock_custody",
+    "lazy": false,
     "to": "routers.deps"
    },
    {
@@ -3628,7 +3678,7 @@
     "group": "ai",
     "id": "ai.cash_reconciliation.intelligence",
     "kind": "py",
-    "loc": 172,
+    "loc": 177,
     "path": "backend/ai/cash_reconciliation/intelligence.py"
    },
    {
@@ -3663,7 +3713,7 @@
     "group": "ai",
     "id": "ai.decisions.adapters",
     "kind": "py",
-    "loc": 262,
+    "loc": 265,
     "path": "backend/ai/decisions/adapters.py"
    },
    {
@@ -3796,7 +3846,7 @@
     "group": "ai",
     "id": "ai.labor.intelligence",
     "kind": "py",
-    "loc": 207,
+    "loc": 209,
     "path": "backend/ai/labor/intelligence.py"
    },
    {
@@ -3831,7 +3881,7 @@
     "group": "ai",
     "id": "ai.menu_engineer",
     "kind": "py",
-    "loc": 552,
+    "loc": 554,
     "path": "backend/ai/menu_engineer.py"
    },
    {
@@ -3852,7 +3902,7 @@
     "group": "ai",
     "id": "ai.orchestrator.executive",
     "kind": "py",
-    "loc": 786,
+    "loc": 787,
     "path": "backend/ai/orchestrator/executive.py"
    },
    {
@@ -3922,14 +3972,14 @@
     "group": "ai",
     "id": "ai.pricing.analysis",
     "kind": "py",
-    "loc": 375,
+    "loc": 383,
     "path": "backend/ai/pricing/analysis.py"
    },
    {
     "group": "ai",
     "id": "ai.pricing.recommendations",
     "kind": "py",
-    "loc": 353,
+    "loc": 355,
     "path": "backend/ai/pricing/recommendations.py"
    },
    {
@@ -3943,7 +3993,7 @@
     "group": "ai",
     "id": "ai.profit.intelligence",
     "kind": "py",
-    "loc": 547,
+    "loc": 554,
     "path": "backend/ai/profit/intelligence.py"
    },
    {
@@ -4027,7 +4077,7 @@
     "group": "ai",
     "id": "ai.simulation.engine",
     "kind": "py",
-    "loc": 309,
+    "loc": 317,
     "path": "backend/ai/simulation/engine.py"
    },
    {
@@ -4055,7 +4105,7 @@
     "group": "ai",
     "id": "ai.stock_custody",
     "kind": "py",
-    "loc": 448,
+    "loc": 451,
     "path": "backend/ai/stock_custody.py"
    },
    {
@@ -4335,7 +4385,7 @@
     "group": "other",
     "id": "owner.settings",
     "kind": "py",
-    "loc": 286,
+    "loc": 309,
     "path": "backend/owner/settings.py"
    },
    {
@@ -4573,7 +4623,7 @@
     "group": "router",
     "id": "routers.stock_custody",
     "kind": "py",
-    "loc": 225,
+    "loc": 226,
     "path": "backend/routers/stock_custody.py"
    },
    {
@@ -5685,7 +5735,7 @@
   }
  ],
  "stats": {
-  "py_edges": 571,
+  "py_edges": 581,
   "py_lazy_edges": 167,
   "py_modules": 151,
   "routes": 170,

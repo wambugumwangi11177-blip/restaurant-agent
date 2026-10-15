@@ -19,7 +19,7 @@ from .adapters import collect_decisions  # noqa: F401
 
 def get_ranked_decisions(
     db: Session, restaurant_id: int, sources: list[str] | None = None,
-    apply_reliability: bool = True,
+    apply_reliability: bool = True, settings=None,
 ) -> dict:
     """
     The full Decision Intelligence payload for one restaurant: every agent's
@@ -32,7 +32,7 @@ def get_ranked_decisions(
     restaurant, which is why it never disturbs the deterministic baseline.
     """
     source_status = {}
-    decisions = collect_decisions(db, restaurant_id, sources=sources, source_status=source_status)
+    decisions = collect_decisions(db, restaurant_id, sources=sources, source_status=source_status, settings=settings)
     # Marketplace plugins (Phase 11) contribute to the same ranked stream. Empty
     # by default (no plugins registered) → no effect on the core baseline.
     try:

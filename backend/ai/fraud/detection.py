@@ -11,7 +11,7 @@ added in Sprint 1 (previously nowhere recorded who voided/cancelled what).
 Four independent patterns, each adaptive per-restaurant/per-staff rather than
 a fixed global number — a restaurant with naturally high turnover shouldn't
 get flagged for behaving like itself (same "threshold, not zero-tolerance"
-philosophy as stock_custody.VARIANCE_THRESHOLD):
+philosophy as the owner's missing-stock setting, owner/settings.py):
 
   1. void_spikes      — a staff member's cancel/refund count this window blows
                          past their OWN historical baseline (mean + N stddev).

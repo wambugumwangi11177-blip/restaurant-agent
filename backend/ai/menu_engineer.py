@@ -23,13 +23,14 @@ from collections import Counter, defaultdict
 from datetime import timedelta
 import models
 from ai.analysis_clock import analysis_anchor
+from owner.settings import DEFAULTS, Settings, resolve
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CLASSIFICATION CONSTANTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-# An item counts as "popular" at 70% of the mean units sold, not at the mean
+# An item counts as "popular" at a share of the mean units sold (default 70%), not at the mean
 # itself. This is the standard Kasavana & Smith popularity index, and the reason
 # for it is that unit sales are strongly right-skewed: a couple of bestsellers
 # drag the arithmetic mean above what a perfectly healthy mid-list item sells.
@@ -40,7 +41,7 @@ from ai.analysis_clock import analysis_anchor
 # 66.5 and they still are, correctly, because they genuinely are unpopular
 # relative to the star. The index earns its keep on realistic spreads, where it
 # stops a solid seller a shade under the mean from being written off.
-POPULARITY_INDEX = 0.7
+# (The 0.7 itself is the owner's setting `popular_cutoff` — owner/settings.py — default 0.70.)
 
 # Weights for the 0-100 menu optimization score. Each component below is
 # normalised to [0, 1] first, and the weights sum to 1, so the score is bounded
@@ -63,16 +64,16 @@ W_MOMENTUM    = 0.15   # which way it's trending; noisiest signal, least weight
 # Plowhorse edges out Puzzle because volume is harder to create than margin.
 QUADRANT_CREDIT = {"Star": 1.0, "Plowhorse": 0.6, "Puzzle": 0.5, "Dog": 0.0}
 
-# Food-cost band for the cost component: <=25% scores full marks, >=40% zero.
-# Matches the 40% margin floor / 35% food-cost ceiling the pricing engine
-# enforces in ai/pricing/analysis.py.
-FOOD_COST_FLOOR_PCT   = 25.0
-FOOD_COST_CEILING_PCT = 40.0
+# Food-cost band for the cost component: a food cost at or under (ceiling − 10 points) scores full marks,
+# at or over the ceiling zero. The ceiling is the owner's single food-cost target (settings.food_cost_target_pct,
+# default 35) — the same number profit and pricing use. (Until S1.2 this engine used its own 40, a conflict
+# SPEC D11 recorded.) The 10-point band keeps the default scale 25%..35%.
+FOOD_COST_BAND_PTS = 10.0
 
 
 def _menu_optimization_score(classifications: Counter, avg_food_cost: float,
                              rising_count: int, falling_count: int,
-                             item_count: int) -> int:
+                             item_count: int, settings: Settings | None = None) -> int:
     """
     Menu health as a bounded 0-100 index. Every component is a ratio in [0, 1]
     and the weights sum to 1, so the result cannot exceed its range.
@@ -84,8 +85,8 @@ def _menu_optimization_score(classifications: Counter, avg_food_cost: float,
         QUADRANT_CREDIT.get(name, 0.0) * count for name, count in classifications.items()
     ) / item_count
 
-    span = FOOD_COST_CEILING_PCT - FOOD_COST_FLOOR_PCT
-    cost = (FOOD_COST_CEILING_PCT - avg_food_cost) / span
+    ceiling = (settings or DEFAULTS).food_cost_target_pct
+    cost = (ceiling - avg_food_cost) / FOOD_COST_BAND_PTS
     cost = max(0.0, min(1.0, cost))
 
     # Net momentum in [-1, 1] (every item rising vs every item falling),
@@ -100,8 +101,9 @@ def _menu_optimization_score(classifications: Counter, avg_food_cost: float,
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
-def get_menu_engineering(db: Session, restaurant_id: int) -> dict:
-    """Exhaustive menu engineering analysis."""
+def get_menu_engineering(db: Session, restaurant_id: int, settings: Settings | None = None) -> dict:
+    """Exhaustive menu engineering analysis. `settings` defaults to the restaurant's saved thresholds."""
+    settings = resolve(db, restaurant_id, settings)
     items = db.query(models.MenuItem).filter(
         models.MenuItem.restaurant_id == restaurant_id
     ).all()
@@ -202,7 +204,7 @@ def get_menu_engineering(db: Session, restaurant_id: int) -> dict:
     # ── Calculate Averages ──
     total_qty_sold = sum(order_counts.values()) if order_counts else 1
     avg_popularity = total_qty_sold / max(len(items), 1)
-    popularity_cutoff = POPULARITY_INDEX * avg_popularity
+    popularity_cutoff = settings.popular_cutoff * avg_popularity
     all_margins = [(i.price - (i.cost_price or 0)) for i in items]
     avg_margin = sum(all_margins) / max(len(all_margins), 1)
 
@@ -223,8 +225,8 @@ def get_menu_engineering(db: Session, restaurant_id: int) -> dict:
         popularity_pct = round((qty_sold / max(total_qty_sold, 1)) * 100, 1)
         sell_through_per_day = round(qty_sold / total_days, 2)
 
-        # Classification. `popularity_cutoff` is 0.7 x mean, not the raw mean —
-        # see POPULARITY_INDEX.
+        # Classification. `popularity_cutoff` is the owner's popular cut-off (default 0.7) x mean,
+        # not the raw mean — see the note above and settings.popular_cutoff.
         is_popular = qty_sold >= popularity_cutoff
         is_profitable = margin >= avg_margin
         if is_popular and is_profitable:
@@ -287,7 +289,7 @@ def get_menu_engineering(db: Session, restaurant_id: int) -> dict:
     pareto = _revenue_pareto(matrix)
 
     # ── Recommendations ──
-    recommendations = _generate_recommendations(matrix, avg_margin, category_perf)
+    recommendations = _generate_recommendations(matrix, avg_margin, category_perf, settings)
 
     # ── Summary Stats ──
     classifications = Counter(m["classification"] for m in matrix)
@@ -299,7 +301,7 @@ def get_menu_engineering(db: Session, restaurant_id: int) -> dict:
 
     # Menu optimization score (0-100) — see _menu_optimization_score.
     menu_opt_score = _menu_optimization_score(
-        classifications, avg_food_cost, rising_count, falling_count, len(matrix)
+        classifications, avg_food_cost, rising_count, falling_count, len(matrix), settings
     )
 
     return {
@@ -462,7 +464,7 @@ def _revenue_pareto(matrix):
 # ─────────────────────────────────────────────────────────────────────────────
 # RECOMMENDATIONS ENGINE
 # ─────────────────────────────────────────────────────────────────────────────
-def _generate_recommendations(matrix, avg_margin, category_perf):
+def _generate_recommendations(matrix, avg_margin, category_perf, settings: Settings):
     """Actionable intelligence with priority and estimated impact."""
     recs = []
 
@@ -503,12 +505,12 @@ def _generate_recommendations(matrix, avg_margin, category_perf):
                 "impact": f"10% price increase adds ~{int(item['revenue'] * 0.1 / 100)} KES revenue",
             })
 
-        if item["food_cost_pct"] > 35:
+        if item["food_cost_pct"] > settings.food_cost_target_pct:
             recs.append({
                 "item": item["name"],
                 "action": "Reduce food cost",
-                "reason": f"Food cost at {item['food_cost_pct']}% exceeds 35% target. Review suppliers, portion sizes, or ingredient substitutions.",
-                "priority": "high" if item["food_cost_pct"] > 45 else "medium",
+                "reason": f"Food cost at {item['food_cost_pct']}% exceeds {settings.food_cost_target_pct:g}% target. Review suppliers, portion sizes, or ingredient substitutions.",
+                "priority": "high" if item["food_cost_pct"] > settings.food_cost_target_pct + 10 else "medium",
                 "impact": "Reducing to 30% adds significant profit margin",
             })
 
@@ -523,7 +525,7 @@ def _generate_recommendations(matrix, avg_margin, category_perf):
 
     # Category-level recommendations
     for cat in category_perf:
-        if cat["avg_food_cost_pct"] > 40:
+        if cat["avg_food_cost_pct"] > settings.food_cost_target_pct + 5:
             recs.append({
                 "item": f"Category: {cat['category']}",
                 "action": "Audit category food costs",

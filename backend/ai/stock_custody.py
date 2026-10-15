@@ -24,13 +24,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 import models
+from owner.settings import Settings, resolve
 from time_utils import utcnow
 
-# 3%, the conservative end of the 2-3% industry-standard range for
-# theoretical-vs-actual usage variance (cited in the stock-loss-prevention
-# skill / directive 016) — below this, it's noise (spoilage, portion
-# variance), not a signal worth a manager's attention.
-VARIANCE_THRESHOLD = 0.03
+# The flag line is the owner's setting `missing_stock_flag_pct` (owner/settings.py). Its 3% default is the
+# conservative end of the 2-3% industry-standard range for theoretical-vs-actual usage variance (cited in the
+# stock-loss-prevention skill / directive 016) — below this it is noise (spoilage, portion variance), not a
+# signal worth a manager's attention.
 
 
 @dataclass
@@ -89,7 +89,7 @@ def _actual_usage_by_item(db: Session, restaurant_id: int, since) -> dict[int, f
 
 
 def compute_variance_report(
-    db: Session, restaurant_id: int, hours: int = 24
+    db: Session, restaurant_id: int, hours: int = 24, settings: Settings | None = None
 ) -> list[ItemVariance]:
     """
     Theoretical vs. actual usage per inventory item over the trailing `hours`
@@ -99,6 +99,8 @@ def compute_variance_report(
     an item nobody's recipe uses but that still moved stock isn't a variance
     question, it's a data-quality one (untracked recipe, or wrong item).
     """
+    settings = resolve(db, restaurant_id, settings)
+    threshold = settings.missing_stock_flag_pct / 100.0
     since = utcnow() - timedelta(hours=hours)
 
     theoretical = _theoretical_usage_by_item(db, restaurant_id, since)
@@ -132,7 +134,7 @@ def compute_variance_report(
             flagged = False
         else:
             variance_pct = abs(act - theo) / theo
-            flagged = variance_pct > VARIANCE_THRESHOLD
+            flagged = variance_pct > threshold
 
         results.append(ItemVariance(
             inventory_item_id=item_id,
@@ -147,8 +149,9 @@ def compute_variance_report(
     return results
 
 
-def flagged_items(db: Session, restaurant_id: int, hours: int = 24) -> list[ItemVariance]:
-    return [r for r in compute_variance_report(db, restaurant_id, hours) if r.flagged]
+def flagged_items(db: Session, restaurant_id: int, hours: int = 24,
+                  settings: Settings | None = None) -> list[ItemVariance]:
+    return [r for r in compute_variance_report(db, restaurant_id, hours, settings) if r.flagged]
 
 
 class TransferConfirmError(Exception):
@@ -431,9 +434,9 @@ def submit_count(
 
     # Only a real gap is worth a message — not every count (most will match
     # closely), matching the "alert on the exception" philosophy used
-    # throughout this workstream. Threshold reuses VARIANCE_THRESHOLD rather
+    # throughout this workstream. Threshold reuses the owner's missing-stock setting rather
     # than inventing a second number to keep in sync.
-    if expected > 0 and abs(delta) / expected > VARIANCE_THRESHOLD:
+    if expected > 0 and abs(delta) / expected > resolve(db, restaurant_id).missing_stock_flag_pct / 100.0:
         from events.bus import emit_async, EventType
         emit_async(EventType.STOCK_COUNT_DISCREPANCY, {
             "restaurant_id": restaurant_id,

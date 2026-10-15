@@ -25,6 +25,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from .model import Decision
+from owner.settings import Settings, resolve
 
 logger = logging.getLogger("ai.decisions")
 
@@ -50,10 +51,10 @@ def _priority(rec: dict) -> str:
 _PRICING_RISK = {"REPRICE": 2, "SURGE": 3, "STIMULATE": 3}
 
 
-def from_pricing(db: Session, restaurant_id: int) -> list[Decision]:
+def from_pricing(db: Session, restaurant_id: int, settings: Settings | None = None) -> list[Decision]:
     from ai.pricing.recommendations import get_pricing_intelligence
 
-    data = get_pricing_intelligence(db, restaurant_id)
+    data = get_pricing_intelligence(db, restaurant_id, settings=settings)
     out: list[Decision] = []
     for rec in data.get("recommendations", []):
         rtype = rec.get("type")
@@ -117,7 +118,7 @@ def _from_generic_recs(
     return out
 
 
-def from_supply_chain(db: Session, restaurant_id: int) -> list[Decision]:
+def from_supply_chain(db: Session, restaurant_id: int, settings: Settings | None = None) -> list[Decision]:
     from ai.supply_chain.intelligence import get_supply_chain_intelligence
     data = get_supply_chain_intelligence(db, restaurant_id)
     return _from_generic_recs(
@@ -127,9 +128,9 @@ def from_supply_chain(db: Session, restaurant_id: int) -> list[Decision]:
     )
 
 
-def from_labor(db: Session, restaurant_id: int) -> list[Decision]:
+def from_labor(db: Session, restaurant_id: int, settings: Settings | None = None) -> list[Decision]:
     from ai.labor.intelligence import get_labor_intelligence
-    data = get_labor_intelligence(db, restaurant_id)
+    data = get_labor_intelligence(db, restaurant_id, settings=settings)
     return _from_generic_recs(
         data.get("recommendations", []), "labor_intelligence", "labor",
         default_risk=3, default_difficulty=3,
@@ -137,9 +138,9 @@ def from_labor(db: Session, restaurant_id: int) -> list[Decision]:
     )
 
 
-def from_menu(db: Session, restaurant_id: int) -> list[Decision]:
+def from_menu(db: Session, restaurant_id: int, settings: Settings | None = None) -> list[Decision]:
     from ai.menu_engineer import get_menu_engineering
-    data = get_menu_engineering(db, restaurant_id)
+    data = get_menu_engineering(db, restaurant_id, settings=settings)
     return _from_generic_recs(
         data.get("recommendations", []), "menu_engineer", "menu",
         default_risk=2, default_difficulty=2,
@@ -151,7 +152,7 @@ def from_menu(db: Session, restaurant_id: int) -> list[Decision]:
 # Inventory — reorder / critical stock items become decisions
 # ─────────────────────────────────────────────────────────────────────────────
 
-def from_inventory(db: Session, restaurant_id: int) -> list[Decision]:
+def from_inventory(db: Session, restaurant_id: int, settings: Settings | None = None) -> list[Decision]:
     from ai.inventory_predictor import get_inventory_predictions
     data = get_inventory_predictions(db, restaurant_id)
 
@@ -188,7 +189,7 @@ def from_inventory(db: Session, restaurant_id: int) -> list[Decision]:
 # Marketing — a win-back opportunity when lapsed regulars are reachable
 # ─────────────────────────────────────────────────────────────────────────────
 
-def from_marketing(db: Session, restaurant_id: int) -> list[Decision]:
+def from_marketing(db: Session, restaurant_id: int, settings: Settings | None = None) -> list[Decision]:
     from ai.marketing import get_marketing_insights
     data = get_marketing_insights(db, restaurant_id)
 
@@ -236,12 +237,14 @@ _ADAPTERS = {
 
 def collect_decisions(
     db: Session, restaurant_id: int, sources: list[str] | None = None,
-    source_status: dict | None = None,
+    source_status: dict | None = None, settings: Settings | None = None,
 ) -> list[Decision]:
     """
     Gather Decisions from every (or a subset of) agent. Each source runs in
-    isolation: one failing adapter never sinks the rest.
+    isolation: one failing adapter never sinks the rest. The owner's settings are read once and handed to
+    every adapter, so all of them judge the restaurant by the same thresholds.
     """
+    settings = resolve(db, restaurant_id, settings)
     chosen = sources or list(_ADAPTERS.keys())
     decisions: list[Decision] = []
     for name in chosen:
@@ -250,7 +253,7 @@ def collect_decisions(
             continue
         try:
             with db.begin_nested():
-                result = adapter(db, restaurant_id)
+                result = adapter(db, restaurant_id, settings)
             decisions.extend(result)
             if source_status is not None:
                 source_status[name] = {"state": "evaluated", "recommendations": len(result)}

@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError
 import models
 from time_utils import utcnow
+from owner.settings import Settings, resolve
 from .analysis import (
     fetch_item_velocities,
     items_on_cooldown_for_restaurant,
@@ -25,8 +26,9 @@ from .analysis import (
 )
 
 
-def get_pricing_intelligence(db: Session, restaurant_id: int) -> dict:
-    """Full pricing analysis — read-only."""
+def get_pricing_intelligence(db: Session, restaurant_id: int, settings: Settings | None = None) -> dict:
+    """Full pricing analysis — read-only. `settings` defaults to the restaurant's saved thresholds."""
+    settings = resolve(db, restaurant_id, settings)
     items = (
         db.query(models.MenuItem)
         .filter(
@@ -49,13 +51,13 @@ def get_pricing_intelligence(db: Session, restaurant_id: int) -> dict:
         vel = velocities.get(item.id)
         if vel is None:
             continue
-        result = analyse_item(item, vel, on_cooldown=item.id in on_cooldown)
+        result = analyse_item(item, vel, on_cooldown=item.id in on_cooldown, settings=settings)
         item_analyses.append(result)
         if result.get("type"):
             recommendations.append(result)
 
     recommendations.sort(key=lambda x: x["monthly_impact_cents"], reverse=True)
-    delivery_gaps     = check_delivery_margins(items, velocities)
+    delivery_gaps     = check_delivery_margins(items, velocities, settings)
     total_opportunity = sum(r["monthly_impact_cents"] for r in recommendations)
 
     return {
@@ -65,7 +67,7 @@ def get_pricing_intelligence(db: Session, restaurant_id: int) -> dict:
             "surge_opportunities":             sum(1 for r in recommendations if r["type"] == "SURGE"),
             "reprice_needed":                  sum(1 for r in recommendations if r["type"] == "REPRICE"),
             "stimulate_candidates":            sum(1 for r in recommendations if r["type"] == "STIMULATE"),
-            "items_below_margin_floor":        sum(1 for a in item_analyses if a["margin_pct"] < 40 and a["cost_price"] > 0),
+            "items_below_margin_floor":        sum(1 for a in item_analyses if a["margin_pct"] < settings.margin_floor_pct and a["cost_price"] > 0),
             "items_analysed":                  len(item_analyses),
             "analysis_window_days":            30,
         },

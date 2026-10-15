@@ -266,7 +266,8 @@ def on_stock_variance_flagged(payload: dict) -> None:
 
         owner_recipient = _owner_recipient(restaurant)
         if owner_recipient:
-            from ai.stock_custody import VARIANCE_THRESHOLD
+            from owner.settings import get_settings
+            variance_threshold = get_settings(db, restaurant_id).missing_stock_flag_pct / 100.0
             lines = [
                 f"• {i['item_name']}: {i['variance_pct']*100:.1f}% variance "
                 f"(expected ~{i['theoretical']:.1f}, actual {i['actual']:.1f})"
@@ -276,7 +277,7 @@ def on_stock_variance_flagged(payload: dict) -> None:
 
             msg = (
                 f"📊 *Stock Variance Report*\n\n"
-                f"{len(items)} item(s) over the {VARIANCE_THRESHOLD*100:.0f}% variance threshold "
+                f"{len(items)} item(s) over the {variance_threshold*100:.0f}% variance threshold "
                 f"in the last 24h:\n\n" + "\n".join(lines) + more +
                 f"\n\nWorth a physical count if this keeps recurring on the same item."
             )

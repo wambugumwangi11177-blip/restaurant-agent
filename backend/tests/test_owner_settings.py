@@ -47,34 +47,21 @@ def _tenant(db, suffix, *, role=models.Role.STAFF, staff_role=models.StaffRole.O
 
 # ── defaults are today's constants ───────────────────────────────────────────
 
-def test_defaults_equal_the_constants_the_engines_use_today(db_session):
-    """S1.1-only guard. S1.2 deletes these constants and replaces this with per-engine behaviour tests."""
+def test_defaults_are_the_spec_table_and_todays_numbers():
+    """SPEC fig 3.2 defaults. They are also the values the engines hard-coded before S1.2 (menu's 40% food-cost
+    ceiling aside, unified at 35), so moving an engine to settings changes no number — E2 proves that."""
     from owner.settings import DEFAULTS
-    from ai import menu_engineer, stock_custody
-    from ai.profit import intelligence as profit
-    from ai.pricing import analysis as pricing
-    from ai.cash_reconciliation import intelligence as cash
-    from ai.labor import intelligence as labor
-    from ai.simulation import engine as sim
-
-    assert DEFAULTS.food_cost_target_pct == profit.HEALTHY_FOOD_COST_MAX == pricing.MAX_FOOD_COST_PCT == 35.0
-    assert DEFAULTS.margin_floor_pct == profit.CRITICAL_MARGIN_FLOOR == pricing.MIN_MARGIN_PCT == 40.0
-    assert DEFAULTS.margin_target_pct == profit.HEALTHY_MARGIN_MIN == 55.0
-    assert DEFAULTS.popular_cutoff == menu_engineer.POPULARITY_INDEX == 0.7
-    assert DEFAULTS.missing_stock_flag_pct == stock_custody.VARIANCE_THRESHOLD * 100 == 3.0
-    assert DEFAULTS.cash_tolerance_cents == cash.DRAWER_TOLERANCE_CENTS == 20_000
-    assert DEFAULTS.cash_tolerance_pct == cash.DRAWER_TOLERANCE_PCT * 100 == 1.0
-    assert (DEFAULTS.commission_uber_eats_pct, DEFAULTS.commission_glovo_pct, DEFAULTS.commission_bolt_food_pct) \
-        == (profit.DELIVERY_COMMISSIONS["uber_eats"] * 100, profit.DELIVERY_COMMISSIONS["glovo"] * 100,
-            profit.DELIVERY_COMMISSIONS["bolt_food"] * 100) == (25.0, 25.0, 20.0)
-    assert DEFAULTS.price_sensitivity == sim.BASE_ELASTICITY == -0.7
-    assert DEFAULTS.labour_target_pct == labor.HEALTHY_LABOR_PCT_MAX == 30.0
-    assert DEFAULTS.overtime_after_hours == labor.OVERTIME_HOURS_DAILY == 8.0
-    # Values the spec fixes that no module defines yet (inline literals today):
-    assert (DEFAULTS.prime_cost_target_pct, DEFAULTS.offer_size_pct, DEFAULTS.offer_lift_pct,
-            DEFAULTS.max_raise_pct, DEFAULTS.price_step_cents, DEFAULTS.urgent_alerts_per_day,
-            DEFAULTS.quiet_hours_start, DEFAULTS.quiet_hours_end, DEFAULTS.licence_warning_days) \
-        == (62.0, 10.0, 30.0, 15.0, 500, 5, 22, 7, 14)
+    assert DEFAULTS.food_cost_target_pct == 35.0 and DEFAULTS.prime_cost_target_pct == 62.0
+    assert DEFAULTS.margin_floor_pct == 40.0 and DEFAULTS.margin_target_pct == 55.0
+    assert DEFAULTS.popular_cutoff == 0.70 and DEFAULTS.missing_stock_flag_pct == 3.0
+    assert DEFAULTS.cash_tolerance_cents == 20_000 and DEFAULTS.cash_tolerance_pct == 1.0
+    assert (DEFAULTS.commission_uber_eats_pct, DEFAULTS.commission_glovo_pct, DEFAULTS.commission_bolt_food_pct) == (25.0, 25.0, 20.0)
+    assert (DEFAULTS.offer_size_pct, DEFAULTS.offer_lift_pct, DEFAULTS.max_raise_pct) == (10.0, 30.0, 15.0)
+    assert DEFAULTS.price_step_cents == 500 and DEFAULTS.price_sensitivity == -0.7
+    assert DEFAULTS.labour_target_pct == 30.0 and DEFAULTS.overtime_after_hours == 8.0
+    assert (DEFAULTS.urgent_alerts_per_day, DEFAULTS.quiet_hours_start, DEFAULTS.quiet_hours_end, DEFAULTS.licence_warning_days) == (5, 22, 7, 14)
+    assert DEFAULTS.commissions == {"uber_eats": 0.25, "glovo": 0.25, "bolt_food": 0.2}
+    assert DEFAULTS.commission_rate("walk_in") == 0.0
 
 
 def test_every_field_has_owner_words_and_defaults_inside_bounds():

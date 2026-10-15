@@ -1,0 +1,189 @@
+{
+ "source": "docs/v2/SPEC.md figure 1.3 (PDF page 6), transcribed by hand from the rendered figure",
+ "columns": [
+  "home",
+  "area",
+  "os",
+  "reports",
+  "demo",
+  "old_dash"
+ ],
+ "rows": {
+  "sales_summary": [
+   "wired",
+   "not_shown",
+   "wired",
+   "wired",
+   "reimplemented",
+   "wired"
+  ],
+  "revenue_forecast": [
+   "not_shown",
+   "partial",
+   "wired",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "profit": [
+   "wired",
+   "partial",
+   "wired",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "pricing": [
+   "wired",
+   "not_shown",
+   "wired",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "menu": [
+   "wired",
+   "partial",
+   "wired",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "simulator": [
+   "not_shown",
+   "not_shown",
+   "not_shown",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "inventory": [
+   "wired",
+   "partial",
+   "wired",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "custody": [
+   "not_shown",
+   "not_shown",
+   "not_shown",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "cash": [
+   "wired",
+   "not_shown",
+   "not_shown",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "fraud": [
+   "wired",
+   "not_shown",
+   "not_shown",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "kds": [
+   "wired",
+   "partial",
+   "wired",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "reservations": [
+   "wired",
+   "partial",
+   "wired",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "labor": [
+   "wired",
+   "partial",
+   "wired",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "supply_chain": [
+   "wired",
+   "partial",
+   "not_shown",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "marketing": [
+   "wired",
+   "not_shown",
+   "not_shown",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "roi": [
+   "not_shown",
+   "not_shown",
+   "not_shown",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "twin": [
+   "not_shown",
+   "partial",
+   "not_shown",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "data_quality": [
+   "partial",
+   "not_shown",
+   "not_shown",
+   "not_shown",
+   "reimplemented",
+   "wired"
+  ],
+  "strategist": [
+   "not_shown",
+   "not_shown",
+   "not_shown",
+   "not_shown",
+   "not_shown",
+   "partial"
+  ],
+  "money": [
+   "not_built",
+   "not_built",
+   "not_built",
+   "not_built",
+   "reimplemented",
+   "not_built"
+  ],
+  "mpesa_match": [
+   "not_built",
+   "not_built",
+   "not_built",
+   "not_built",
+   "reimplemented",
+   "not_built"
+  ],
+  "owner_settings": [
+   "not_built",
+   "not_built",
+   "not_built",
+   "not_built",
+   "not_built",
+   "not_built"
+  ]
+ }
+}

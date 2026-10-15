@@ -1,0 +1,7771 @@
+{
+ "conditional_files": {
+  "components/vibanda/VibandaForecast.tsx": "forecast panel renders only when the source is verified"
+ },
+ "engines": [
+  {
+   "key": "sales_summary",
+   "kind": "symbol",
+   "label": "Sales summary",
+   "targets": [
+    "routers.overview:_summarize"
+   ]
+  },
+  {
+   "key": "revenue_forecast",
+   "kind": "module",
+   "label": "Revenue forecast",
+   "targets": [
+    "ai.revenue_forecaster"
+   ]
+  },
+  {
+   "key": "profit",
+   "kind": "module",
+   "label": "Profit intelligence (leaks, till gap, channels)",
+   "targets": [
+    "ai.profit"
+   ]
+  },
+  {
+   "key": "pricing",
+   "kind": "module",
+   "label": "Pricing suggestions",
+   "targets": [
+    "ai.pricing"
+   ]
+  },
+  {
+   "key": "menu",
+   "kind": "module",
+   "label": "Menu engineering",
+   "targets": [
+    "ai.menu_engineer"
+   ]
+  },
+  {
+   "key": "simulator",
+   "kind": "module",
+   "label": "Price simulator",
+   "targets": [
+    "ai.simulation.engine"
+   ]
+  },
+  {
+   "key": "inventory",
+   "kind": "module",
+   "label": "Stock prediction & reorder",
+   "targets": [
+    "ai.inventory_predictor",
+    "ai.reorder"
+   ]
+  },
+  {
+   "key": "custody",
+   "kind": "module",
+   "label": "Stock custody & variance",
+   "targets": [
+    "ai.stock_custody"
+   ]
+  },
+  {
+   "key": "cash",
+   "kind": "module",
+   "label": "Cash drawer check",
+   "targets": [
+    "ai.cash_reconciliation"
+   ]
+  },
+  {
+   "key": "fraud",
+   "kind": "module",
+   "label": "Fraud signals",
+   "targets": [
+    "ai.fraud"
+   ]
+  },
+  {
+   "key": "kds",
+   "kind": "module",
+   "label": "Kitchen (KDS)",
+   "targets": [
+    "ai.kds_intelligence"
+   ]
+  },
+  {
+   "key": "reservations",
+   "kind": "module",
+   "label": "Bookings",
+   "targets": [
+    "ai.reservation_optimizer"
+   ]
+  },
+  {
+   "key": "labor",
+   "kind": "module",
+   "label": "Labour",
+   "targets": [
+    "ai.labor"
+   ]
+  },
+  {
+   "key": "supply_chain",
+   "kind": "module",
+   "label": "Suppliers",
+   "targets": [
+    "ai.supply_chain"
+   ]
+  },
+  {
+   "key": "marketing",
+   "kind": "module",
+   "label": "Marketing",
+   "targets": [
+    "ai.marketing"
+   ]
+  },
+  {
+   "key": "roi",
+   "kind": "module",
+   "label": "ROI / savings",
+   "targets": [
+    "ai.roi"
+   ]
+  },
+  {
+   "key": "twin",
+   "kind": "module",
+   "label": "30-day twin forecast",
+   "targets": [
+    "ai.simulation.twin"
+   ]
+  },
+  {
+   "key": "data_quality",
+   "kind": "module",
+   "label": "Data quality / trust",
+   "targets": [
+    "ai.data_quality"
+   ]
+  },
+  {
+   "key": "strategist",
+   "kind": "module",
+   "label": "Goal mode (strategist)",
+   "targets": [
+    "ai.orchestrator.strategist"
+   ]
+  },
+  {
+   "key": "decisions",
+   "kind": "module",
+   "label": "Decision ranking",
+   "targets": [
+    "ai.decisions"
+   ]
+  },
+  {
+   "key": "money",
+   "kind": "none",
+   "label": "Expenses \u00b7 P&L \u00b7 break-even \u00b7 bills",
+   "targets": [
+    "owner.money"
+   ]
+  },
+  {
+   "key": "mpesa_match",
+   "kind": "none",
+   "label": "M-Pesa statement match",
+   "targets": [
+    "parsers.mpesa_csv"
+   ]
+  },
+  {
+   "key": "owner_settings",
+   "kind": "none",
+   "label": "Owner settings (targets, limits)",
+   "targets": [
+    "owner.settings"
+   ]
+  }
+ ],
+ "inventory": {
+  "ai_modules": [
+   {
+    "module": "ai.analysis_clock",
+    "note": "window anchor / freshness used by engines",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.cash_reconciliation",
+    "note": "cash",
+    "status": "engine"
+   },
+   {
+    "module": "ai.cash_reconciliation.intelligence",
+    "note": "cash",
+    "status": "engine"
+   },
+   {
+    "module": "ai.cost_model",
+    "note": "LLM token cost accounting",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.creative",
+    "note": "creative layer = owner 'LEVIII's read' (Home zone 5)",
+    "status": "candidate"
+   },
+   {
+    "module": "ai.data_quality",
+    "note": "data_quality",
+    "status": "engine"
+   },
+   {
+    "module": "ai.decisions",
+    "note": "decisions",
+    "status": "engine"
+   },
+   {
+    "module": "ai.decisions.adapters",
+    "note": "decisions",
+    "status": "engine"
+   },
+   {
+    "module": "ai.decisions.model",
+    "note": "decisions",
+    "status": "engine"
+   },
+   {
+    "module": "ai.decisions.ranking",
+    "note": "decisions",
+    "status": "engine"
+   },
+   {
+    "module": "ai.enterprise",
+    "note": "multi-branch benchmarking (OS 'compare' form, P5)",
+    "status": "candidate"
+   },
+   {
+    "module": "ai.enterprise.audit_center",
+    "note": "multi-branch benchmarking (OS 'compare' form, P5)",
+    "status": "candidate"
+   },
+   {
+    "module": "ai.enterprise.benchmarking",
+    "note": "multi-branch benchmarking (OS 'compare' form, P5)",
+    "status": "candidate"
+   },
+   {
+    "module": "ai.escalation",
+    "note": "alert escalation engine (feeds S5.3 alert levels)",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.escalation.engine",
+    "note": "alert escalation engine (feeds S5.3 alert levels)",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.evaluation.feedback",
+    "note": "forecast tracking / audit log / feedback loop",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.evaluation.learning",
+    "note": "forecast tracking / audit log / feedback loop",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.evaluation.tracker",
+    "note": "forecast tracking / audit log / feedback loop",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.fraud",
+    "note": "fraud",
+    "status": "engine"
+   },
+   {
+    "module": "ai.fraud.detection",
+    "note": "fraud",
+    "status": "engine"
+   },
+   {
+    "module": "ai.graph",
+    "note": "knowledge-graph impact analysis (strategist tool)",
+    "status": "candidate"
+   },
+   {
+    "module": "ai.graph.build",
+    "note": "knowledge-graph impact analysis (strategist tool)",
+    "status": "candidate"
+   },
+   {
+    "module": "ai.graph.traverse",
+    "note": "knowledge-graph impact analysis (strategist tool)",
+    "status": "candidate"
+   },
+   {
+    "module": "ai.home_specialists",
+    "note": "glue that turns engine output into Home cards",
+    "status": "candidate"
+   },
+   {
+    "module": "ai.inventory_predictor",
+    "note": "inventory",
+    "status": "engine"
+   },
+   {
+    "module": "ai.kds_intelligence",
+    "note": "kds",
+    "status": "engine"
+   },
+   {
+    "module": "ai.labor.intelligence",
+    "note": "labor",
+    "status": "engine"
+   },
+   {
+    "module": "ai.llm_client",
+    "note": "provider client",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.marketing",
+    "note": "marketing",
+    "status": "engine"
+   },
+   {
+    "module": "ai.marketing.insights",
+    "note": "marketing",
+    "status": "engine"
+   },
+   {
+    "module": "ai.memory.store",
+    "note": "agent memory store",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.menu_engineer",
+    "note": "menu",
+    "status": "engine"
+   },
+   {
+    "module": "ai.notify",
+    "note": "outbound notification helpers",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.ops_manager",
+    "note": "operations dashboard = owner 'restaurant health' (SPEC \u00a73.4)",
+    "status": "candidate"
+   },
+   {
+    "module": "ai.orchestrator.executive",
+    "note": "agent orchestration (strategist is its own engine row)",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.orchestrator.push_notifier",
+    "note": "agent orchestration (strategist is its own engine row)",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.orchestrator.strategist",
+    "note": "strategist",
+    "status": "engine"
+   },
+   {
+    "module": "ai.order_stock",
+    "note": "order-time stock helper",
+    "status": "candidate"
+   },
+   {
+    "module": "ai.owner_narrative",
+    "note": "narration helpers",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.pii_scrub",
+    "note": "PII redaction for LLM payloads",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.plugins",
+    "note": "marketplace plugin SDK",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.plugins.examples",
+    "note": "marketplace plugin SDK",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.plugins.sdk",
+    "note": "marketplace plugin SDK",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.pricing",
+    "note": "pricing",
+    "status": "engine"
+   },
+   {
+    "module": "ai.pricing.analysis",
+    "note": "pricing",
+    "status": "engine"
+   },
+   {
+    "module": "ai.pricing.recommendations",
+    "note": "pricing",
+    "status": "engine"
+   },
+   {
+    "module": "ai.profit",
+    "note": "profit",
+    "status": "engine"
+   },
+   {
+    "module": "ai.profit.intelligence",
+    "note": "profit",
+    "status": "engine"
+   },
+   {
+    "module": "ai.reasoning",
+    "note": "grounded narration + number verification",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.reasoning.grounding",
+    "note": "grounded narration + number verification",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.reasoning.narrator",
+    "note": "grounded narration + number verification",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.reorder",
+    "note": "inventory",
+    "status": "engine"
+   },
+   {
+    "module": "ai.reservation_optimizer",
+    "note": "reservations",
+    "status": "engine"
+   },
+   {
+    "module": "ai.revenue_forecaster",
+    "note": "revenue_forecast",
+    "status": "engine"
+   },
+   {
+    "module": "ai.roi",
+    "note": "roi",
+    "status": "engine"
+   },
+   {
+    "module": "ai.roi.savings",
+    "note": "roi",
+    "status": "engine"
+   },
+   {
+    "module": "ai.routing",
+    "note": "model routing",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.routing.router",
+    "note": "model routing",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.simulation",
+    "note": "simulator",
+    "status": "engine"
+   },
+   {
+    "module": "ai.simulation.engine",
+    "note": "simulator",
+    "status": "engine"
+   },
+   {
+    "module": "ai.simulation.signals",
+    "note": "calendar signals consumed by the twin (D12 holidays live here)",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.simulation.twin",
+    "note": "twin",
+    "status": "engine"
+   },
+   {
+    "module": "ai.spend_cap",
+    "note": "LLM spend cap",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.stock_custody",
+    "note": "custody",
+    "status": "engine"
+   },
+   {
+    "module": "ai.supply_chain.intelligence",
+    "note": "supply_chain",
+    "status": "engine"
+   },
+   {
+    "module": "ai.whatsapp",
+    "note": "WhatsApp channel (brain, conversation, opt-out)",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.whatsapp.brain",
+    "note": "WhatsApp channel (brain, conversation, opt-out)",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.whatsapp.conversation",
+    "note": "WhatsApp channel (brain, conversation, opt-out)",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.whatsapp.optout",
+    "note": "WhatsApp channel (brain, conversation, opt-out)",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.whatsapp.orchestrator",
+    "note": "WhatsApp channel (brain, conversation, opt-out)",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.workflows",
+    "note": "workflow engine",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.workflows.engine",
+    "note": "workflow engine",
+    "status": "infrastructure"
+   },
+   {
+    "module": "ai.workflows.templates",
+    "note": "workflow engine",
+    "status": "infrastructure"
+   }
+  ]
+ },
+ "matrix": {
+  "cash": {
+   "area": "not_shown",
+   "demo": "reimplemented",
+   "home": "wired",
+   "old_dash": "wired",
+   "os": "not_shown",
+   "reports": "not_shown"
+  },
+  "custody": {
+   "area": "not_shown",
+   "demo": "not_shown",
+   "home": "not_shown",
+   "old_dash": "wired",
+   "os": "not_shown",
+   "reports": "not_shown"
+  },
+  "data_quality": {
+   "area": "not_shown",
+   "demo": "not_shown",
+   "home": "not_shown",
+   "old_dash": "wired",
+   "os": "not_shown",
+   "reports": "not_shown"
+  },
+  "decisions": {
+   "area": "not_shown",
+   "demo": "reimplemented",
+   "home": "wired",
+   "old_dash": "wired",
+   "os": "not_shown",
+   "reports": "not_shown"
+  },
+  "fraud": {
+   "area": "not_shown",
+   "demo": "reimplemented",
+   "home": "wired",
+   "old_dash": "wired",
+   "os": "not_shown",
+   "reports": "not_shown"
+  },
+  "inventory": {
+   "area": "partial",
+   "demo": "reimplemented",
+   "home": "wired",
+   "old_dash": "wired",
+   "os": "wired",
+   "reports": "not_shown"
+  },
+  "kds": {
+   "area": "partial",
+   "demo": "reimplemented",
+   "home": "wired",
+   "old_dash": "wired",
+   "os": "wired",
+   "reports": "not_shown"
+  },
+  "labor": {
+   "area": "partial",
+   "demo": "reimplemented",
+   "home": "wired",
+   "old_dash": "wired",
+   "os": "wired",
+   "reports": "not_shown"
+  },
+  "marketing": {
+   "area": "not_shown",
+   "demo": "reimplemented",
+   "home": "wired",
+   "old_dash": "wired",
+   "os": "not_shown",
+   "reports": "not_shown"
+  },
+  "menu": {
+   "area": "partial",
+   "demo": "reimplemented",
+   "home": "wired",
+   "old_dash": "wired",
+   "os": "wired",
+   "reports": "not_shown"
+  },
+  "money": {
+   "area": "not_built",
+   "demo": "reimplemented",
+   "home": "not_built",
+   "old_dash": "not_built",
+   "os": "not_built",
+   "reports": "not_built"
+  },
+  "mpesa_match": {
+   "area": "not_built",
+   "demo": "reimplemented",
+   "home": "not_built",
+   "old_dash": "not_built",
+   "os": "not_built",
+   "reports": "not_built"
+  },
+  "owner_settings": {
+   "area": "not_built",
+   "demo": "not_built",
+   "home": "not_built",
+   "old_dash": "not_built",
+   "os": "not_built",
+   "reports": "not_built"
+  },
+  "pricing": {
+   "area": "not_shown",
+   "demo": "reimplemented",
+   "home": "wired",
+   "old_dash": "wired",
+   "os": "wired",
+   "reports": "not_shown"
+  },
+  "profit": {
+   "area": "partial",
+   "demo": "reimplemented",
+   "home": "wired",
+   "old_dash": "wired",
+   "os": "wired",
+   "reports": "not_shown"
+  },
+  "reservations": {
+   "area": "partial",
+   "demo": "reimplemented",
+   "home": "wired",
+   "old_dash": "wired",
+   "os": "wired",
+   "reports": "not_shown"
+  },
+  "revenue_forecast": {
+   "area": "partial",
+   "demo": "reimplemented",
+   "home": "not_shown",
+   "old_dash": "wired",
+   "os": "wired",
+   "reports": "not_shown"
+  },
+  "roi": {
+   "area": "not_shown",
+   "demo": "reimplemented",
+   "home": "not_shown",
+   "old_dash": "wired",
+   "os": "not_shown",
+   "reports": "not_shown"
+  },
+  "sales_summary": {
+   "area": "not_shown",
+   "demo": "reimplemented",
+   "home": "wired",
+   "old_dash": "not_shown",
+   "os": "wired",
+   "reports": "wired"
+  },
+  "simulator": {
+   "area": "not_shown",
+   "demo": "reimplemented",
+   "home": "not_shown",
+   "old_dash": "wired",
+   "os": "not_shown",
+   "reports": "not_shown"
+  },
+  "strategist": {
+   "area": "not_shown",
+   "demo": "not_shown",
+   "home": "not_shown",
+   "old_dash": "wired",
+   "os": "not_shown",
+   "reports": "not_shown"
+  },
+  "supply_chain": {
+   "area": "partial",
+   "demo": "reimplemented",
+   "home": "wired",
+   "old_dash": "wired",
+   "os": "not_shown",
+   "reports": "not_shown"
+  },
+  "twin": {
+   "area": "partial",
+   "demo": "reimplemented",
+   "home": "not_shown",
+   "old_dash": "wired",
+   "os": "not_shown",
+   "reports": "not_shown"
+  }
+ },
+ "python": {
+  "edges": [
+   {
+    "from": "ai.analysis_clock",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.analysis_clock",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.cash_reconciliation.intelligence",
+    "lazy": true,
+    "to": "ai.evaluation.tracker"
+   },
+   {
+    "from": "ai.cash_reconciliation.intelligence",
+    "lazy": false,
+    "to": "ai.fraud.detection"
+   },
+   {
+    "from": "ai.cash_reconciliation.intelligence",
+    "lazy": true,
+    "to": "events.bus"
+   },
+   {
+    "from": "ai.cash_reconciliation.intelligence",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.cash_reconciliation.intelligence",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.creative",
+    "lazy": false,
+    "to": "ai.llm_client"
+   },
+   {
+    "from": "ai.creative",
+    "lazy": false,
+    "to": "ai.owner_narrative"
+   },
+   {
+    "from": "ai.creative",
+    "lazy": false,
+    "to": "ai.reasoning.grounding"
+   },
+   {
+    "from": "ai.creative",
+    "lazy": false,
+    "to": "feature_flags"
+   },
+   {
+    "from": "ai.creative",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.creative",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.data_quality",
+    "lazy": false,
+    "to": "ai.analysis_clock"
+   },
+   {
+    "from": "ai.data_quality",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.decisions",
+    "lazy": false,
+    "to": "ai.decisions.adapters"
+   },
+   {
+    "from": "ai.decisions",
+    "lazy": false,
+    "to": "ai.decisions.model"
+   },
+   {
+    "from": "ai.decisions",
+    "lazy": false,
+    "to": "ai.decisions.ranking"
+   },
+   {
+    "from": "ai.decisions",
+    "lazy": true,
+    "to": "ai.evaluation.feedback"
+   },
+   {
+    "from": "ai.decisions",
+    "lazy": true,
+    "to": "ai.plugins"
+   },
+   {
+    "from": "ai.decisions.adapters",
+    "lazy": false,
+    "to": "ai.decisions.model"
+   },
+   {
+    "from": "ai.decisions.adapters",
+    "lazy": true,
+    "to": "ai.inventory_predictor"
+   },
+   {
+    "from": "ai.decisions.adapters",
+    "lazy": true,
+    "to": "ai.labor.intelligence"
+   },
+   {
+    "from": "ai.decisions.adapters",
+    "lazy": true,
+    "to": "ai.marketing"
+   },
+   {
+    "from": "ai.decisions.adapters",
+    "lazy": true,
+    "to": "ai.menu_engineer"
+   },
+   {
+    "from": "ai.decisions.adapters",
+    "lazy": true,
+    "to": "ai.pricing.recommendations"
+   },
+   {
+    "from": "ai.decisions.adapters",
+    "lazy": true,
+    "to": "ai.supply_chain.intelligence"
+   },
+   {
+    "from": "ai.decisions.ranking",
+    "lazy": false,
+    "to": "ai.decisions.model"
+   },
+   {
+    "from": "ai.enterprise",
+    "lazy": false,
+    "to": "ai.enterprise.audit_center"
+   },
+   {
+    "from": "ai.enterprise",
+    "lazy": false,
+    "to": "ai.enterprise.benchmarking"
+   },
+   {
+    "from": "ai.enterprise.audit_center",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.enterprise.audit_center",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.enterprise.benchmarking",
+    "lazy": true,
+    "to": "ai.ops_manager"
+   },
+   {
+    "from": "ai.enterprise.benchmarking",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.enterprise.benchmarking",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.escalation.engine",
+    "lazy": false,
+    "to": "ai.notify"
+   },
+   {
+    "from": "ai.escalation.engine",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.escalation.engine",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "ai.escalation.engine",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.evaluation.feedback",
+    "lazy": false,
+    "to": "ai.evaluation.tracker"
+   },
+   {
+    "from": "ai.evaluation.feedback",
+    "lazy": true,
+    "to": "ai.simulation.signals"
+   },
+   {
+    "from": "ai.evaluation.feedback",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.evaluation.feedback",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.evaluation.learning",
+    "lazy": false,
+    "to": "ai.evaluation.tracker"
+   },
+   {
+    "from": "ai.evaluation.learning",
+    "lazy": true,
+    "to": "ai.revenue_forecaster"
+   },
+   {
+    "from": "ai.evaluation.learning",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.evaluation.learning",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.evaluation.tracker",
+    "lazy": true,
+    "to": "ai.cost_model"
+   },
+   {
+    "from": "ai.evaluation.tracker",
+    "lazy": true,
+    "to": "ai.reasoning.narrator"
+   },
+   {
+    "from": "ai.evaluation.tracker",
+    "lazy": true,
+    "to": "ai.roi.savings"
+   },
+   {
+    "from": "ai.evaluation.tracker",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.evaluation.tracker",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.fraud.detection",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.fraud.detection",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.graph",
+    "lazy": false,
+    "to": "ai.graph.build"
+   },
+   {
+    "from": "ai.graph",
+    "lazy": false,
+    "to": "ai.graph.traverse"
+   },
+   {
+    "from": "ai.graph.build",
+    "lazy": false,
+    "to": "ai.pricing.analysis"
+   },
+   {
+    "from": "ai.graph.build",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.graph.traverse",
+    "lazy": false,
+    "to": "ai.graph.build"
+   },
+   {
+    "from": "ai.home_specialists",
+    "lazy": true,
+    "to": "ai.cash_reconciliation.intelligence"
+   },
+   {
+    "from": "ai.home_specialists",
+    "lazy": true,
+    "to": "ai.fraud.detection"
+   },
+   {
+    "from": "ai.home_specialists",
+    "lazy": true,
+    "to": "ai.kds_intelligence"
+   },
+   {
+    "from": "ai.home_specialists",
+    "lazy": true,
+    "to": "ai.profit.intelligence"
+   },
+   {
+    "from": "ai.home_specialists",
+    "lazy": true,
+    "to": "ai.reservation_optimizer"
+   },
+   {
+    "from": "ai.home_specialists",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.inventory_predictor",
+    "lazy": false,
+    "to": "ai.analysis_clock"
+   },
+   {
+    "from": "ai.inventory_predictor",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.kds_intelligence",
+    "lazy": false,
+    "to": "ai.analysis_clock"
+   },
+   {
+    "from": "ai.kds_intelligence",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.labor.intelligence",
+    "lazy": false,
+    "to": "ai.analysis_clock"
+   },
+   {
+    "from": "ai.labor.intelligence",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.marketing",
+    "lazy": false,
+    "to": "ai.marketing.insights"
+   },
+   {
+    "from": "ai.marketing.insights",
+    "lazy": false,
+    "to": "ai.analysis_clock"
+   },
+   {
+    "from": "ai.marketing.insights",
+    "lazy": true,
+    "to": "ai.inventory_predictor"
+   },
+   {
+    "from": "ai.marketing.insights",
+    "lazy": true,
+    "to": "ai.menu_engineer"
+   },
+   {
+    "from": "ai.marketing.insights",
+    "lazy": true,
+    "to": "ai.whatsapp.brain"
+   },
+   {
+    "from": "ai.marketing.insights",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.memory.store",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.memory.store",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.menu_engineer",
+    "lazy": false,
+    "to": "ai.analysis_clock"
+   },
+   {
+    "from": "ai.menu_engineer",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.notify",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.ops_manager",
+    "lazy": false,
+    "to": "ai.inventory_predictor"
+   },
+   {
+    "from": "ai.ops_manager",
+    "lazy": false,
+    "to": "ai.kds_intelligence"
+   },
+   {
+    "from": "ai.ops_manager",
+    "lazy": false,
+    "to": "ai.menu_engineer"
+   },
+   {
+    "from": "ai.ops_manager",
+    "lazy": false,
+    "to": "ai.reservation_optimizer"
+   },
+   {
+    "from": "ai.ops_manager",
+    "lazy": false,
+    "to": "ai.revenue_forecaster"
+   },
+   {
+    "from": "ai.ops_manager",
+    "lazy": true,
+    "to": "database"
+   },
+   {
+    "from": "ai.ops_manager",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.ops_manager",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.orchestrator.executive",
+    "lazy": false,
+    "to": "ai.evaluation.tracker"
+   },
+   {
+    "from": "ai.orchestrator.executive",
+    "lazy": false,
+    "to": "ai.memory.store"
+   },
+   {
+    "from": "ai.orchestrator.executive",
+    "lazy": true,
+    "to": "ai.stock_custody"
+   },
+   {
+    "from": "ai.orchestrator.executive",
+    "lazy": true,
+    "to": "ai.whatsapp.brain"
+   },
+   {
+    "from": "ai.orchestrator.executive",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "ai.orchestrator.executive",
+    "lazy": false,
+    "to": "events.bus"
+   },
+   {
+    "from": "ai.orchestrator.executive",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.orchestrator.executive",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.orchestrator.push_notifier",
+    "lazy": true,
+    "to": "ai.escalation.engine"
+   },
+   {
+    "from": "ai.orchestrator.push_notifier",
+    "lazy": false,
+    "to": "ai.notify"
+   },
+   {
+    "from": "ai.orchestrator.push_notifier",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "ai.orchestrator.push_notifier",
+    "lazy": false,
+    "to": "events.bus"
+   },
+   {
+    "from": "ai.orchestrator.push_notifier",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.orchestrator.push_notifier",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "ai.orchestrator.strategist",
+    "lazy": true,
+    "to": "ai.decisions"
+   },
+   {
+    "from": "ai.orchestrator.strategist",
+    "lazy": true,
+    "to": "ai.evaluation.feedback"
+   },
+   {
+    "from": "ai.orchestrator.strategist",
+    "lazy": true,
+    "to": "ai.evaluation.tracker"
+   },
+   {
+    "from": "ai.orchestrator.strategist",
+    "lazy": true,
+    "to": "ai.graph"
+   },
+   {
+    "from": "ai.orchestrator.strategist",
+    "lazy": true,
+    "to": "ai.llm_client"
+   },
+   {
+    "from": "ai.orchestrator.strategist",
+    "lazy": true,
+    "to": "ai.memory.store"
+   },
+   {
+    "from": "ai.orchestrator.strategist",
+    "lazy": true,
+    "to": "ai.pii_scrub"
+   },
+   {
+    "from": "ai.orchestrator.strategist",
+    "lazy": true,
+    "to": "ai.reasoning.grounding"
+   },
+   {
+    "from": "ai.orchestrator.strategist",
+    "lazy": true,
+    "to": "ai.revenue_forecaster"
+   },
+   {
+    "from": "ai.orchestrator.strategist",
+    "lazy": true,
+    "to": "ai.simulation"
+   },
+   {
+    "from": "ai.orchestrator.strategist",
+    "lazy": true,
+    "to": "ai.spend_cap"
+   },
+   {
+    "from": "ai.orchestrator.strategist",
+    "lazy": true,
+    "to": "database"
+   },
+   {
+    "from": "ai.orchestrator.strategist",
+    "lazy": true,
+    "to": "feature_flags"
+   },
+   {
+    "from": "ai.orchestrator.strategist",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.orchestrator.strategist",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.order_stock",
+    "lazy": true,
+    "to": "events.bus"
+   },
+   {
+    "from": "ai.order_stock",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.owner_narrative",
+    "lazy": false,
+    "to": "ai.cost_model"
+   },
+   {
+    "from": "ai.owner_narrative",
+    "lazy": false,
+    "to": "ai.llm_client"
+   },
+   {
+    "from": "ai.owner_narrative",
+    "lazy": false,
+    "to": "ai.pii_scrub"
+   },
+   {
+    "from": "ai.owner_narrative",
+    "lazy": false,
+    "to": "ai.spend_cap"
+   },
+   {
+    "from": "ai.owner_narrative",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.pii_scrub",
+    "lazy": true,
+    "to": "models"
+   },
+   {
+    "from": "ai.plugins",
+    "lazy": false,
+    "to": "ai.plugins.sdk"
+   },
+   {
+    "from": "ai.plugins.examples",
+    "lazy": false,
+    "to": "ai.plugins.sdk"
+   },
+   {
+    "from": "ai.plugins.sdk",
+    "lazy": true,
+    "to": "ai.decisions"
+   },
+   {
+    "from": "ai.plugins.sdk",
+    "lazy": true,
+    "to": "ai.decisions.model"
+   },
+   {
+    "from": "ai.plugins.sdk",
+    "lazy": true,
+    "to": "ai.inventory_predictor"
+   },
+   {
+    "from": "ai.plugins.sdk",
+    "lazy": true,
+    "to": "models"
+   },
+   {
+    "from": "ai.pricing",
+    "lazy": false,
+    "to": "ai.pricing.recommendations"
+   },
+   {
+    "from": "ai.pricing.analysis",
+    "lazy": false,
+    "to": "ai.analysis_clock"
+   },
+   {
+    "from": "ai.pricing.analysis",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.pricing.analysis",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.pricing.recommendations",
+    "lazy": false,
+    "to": "ai.pricing.analysis"
+   },
+   {
+    "from": "ai.pricing.recommendations",
+    "lazy": true,
+    "to": "events.bus"
+   },
+   {
+    "from": "ai.pricing.recommendations",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.pricing.recommendations",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.profit",
+    "lazy": false,
+    "to": "ai.profit.intelligence"
+   },
+   {
+    "from": "ai.profit.intelligence",
+    "lazy": false,
+    "to": "ai.analysis_clock"
+   },
+   {
+    "from": "ai.profit.intelligence",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.profit.intelligence",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.reasoning",
+    "lazy": false,
+    "to": "ai.reasoning.narrator"
+   },
+   {
+    "from": "ai.reasoning.narrator",
+    "lazy": false,
+    "to": "ai.llm_client"
+   },
+   {
+    "from": "ai.reasoning.narrator",
+    "lazy": true,
+    "to": "ai.pii_scrub"
+   },
+   {
+    "from": "ai.reasoning.narrator",
+    "lazy": false,
+    "to": "ai.reasoning.grounding"
+   },
+   {
+    "from": "ai.reasoning.narrator",
+    "lazy": true,
+    "to": "database"
+   },
+   {
+    "from": "ai.reasoning.narrator",
+    "lazy": true,
+    "to": "feature_flags"
+   },
+   {
+    "from": "ai.reasoning.narrator",
+    "lazy": true,
+    "to": "models"
+   },
+   {
+    "from": "ai.reorder",
+    "lazy": true,
+    "to": "ai.evaluation.tracker"
+   },
+   {
+    "from": "ai.reorder",
+    "lazy": true,
+    "to": "ai.simulation.signals"
+   },
+   {
+    "from": "ai.reorder",
+    "lazy": false,
+    "to": "ai.supply_chain.intelligence"
+   },
+   {
+    "from": "ai.reorder",
+    "lazy": true,
+    "to": "ai.whatsapp"
+   },
+   {
+    "from": "ai.reorder",
+    "lazy": true,
+    "to": "events.bus"
+   },
+   {
+    "from": "ai.reorder",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.reorder",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.reservation_optimizer",
+    "lazy": false,
+    "to": "ai.analysis_clock"
+   },
+   {
+    "from": "ai.reservation_optimizer",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.revenue_forecaster",
+    "lazy": false,
+    "to": "ai.analysis_clock"
+   },
+   {
+    "from": "ai.revenue_forecaster",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.revenue_forecaster",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.roi.savings",
+    "lazy": false,
+    "to": "ai.analysis_clock"
+   },
+   {
+    "from": "ai.roi.savings",
+    "lazy": true,
+    "to": "ai.cost_model"
+   },
+   {
+    "from": "ai.roi.savings",
+    "lazy": true,
+    "to": "ai.inventory_predictor"
+   },
+   {
+    "from": "ai.roi.savings",
+    "lazy": true,
+    "to": "ai.kds_intelligence"
+   },
+   {
+    "from": "ai.roi.savings",
+    "lazy": true,
+    "to": "ai.labor.intelligence"
+   },
+   {
+    "from": "ai.roi.savings",
+    "lazy": true,
+    "to": "ai.profit.intelligence"
+   },
+   {
+    "from": "ai.roi.savings",
+    "lazy": true,
+    "to": "ai.reservation_optimizer"
+   },
+   {
+    "from": "ai.roi.savings",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.routing",
+    "lazy": false,
+    "to": "ai.routing.router"
+   },
+   {
+    "from": "ai.routing.router",
+    "lazy": false,
+    "to": "ai.llm_client"
+   },
+   {
+    "from": "ai.simulation",
+    "lazy": false,
+    "to": "ai.simulation.engine"
+   },
+   {
+    "from": "ai.simulation",
+    "lazy": false,
+    "to": "ai.simulation.twin"
+   },
+   {
+    "from": "ai.simulation",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.simulation.engine",
+    "lazy": false,
+    "to": "ai.analysis_clock"
+   },
+   {
+    "from": "ai.simulation.engine",
+    "lazy": false,
+    "to": "ai.pricing.analysis"
+   },
+   {
+    "from": "ai.simulation.engine",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.simulation.engine",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.simulation.twin",
+    "lazy": false,
+    "to": "ai.revenue_forecaster"
+   },
+   {
+    "from": "ai.simulation.twin",
+    "lazy": false,
+    "to": "ai.simulation.signals"
+   },
+   {
+    "from": "ai.simulation.twin",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.spend_cap",
+    "lazy": false,
+    "to": "ai.cost_model"
+   },
+   {
+    "from": "ai.spend_cap",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.spend_cap",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "ai.spend_cap",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.stock_custody",
+    "lazy": true,
+    "to": "ai.evaluation.tracker"
+   },
+   {
+    "from": "ai.stock_custody",
+    "lazy": true,
+    "to": "events.bus"
+   },
+   {
+    "from": "ai.stock_custody",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.stock_custody",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.supply_chain.intelligence",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.supply_chain.intelligence",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.whatsapp",
+    "lazy": false,
+    "to": "ai.whatsapp.brain"
+   },
+   {
+    "from": "ai.whatsapp.brain",
+    "lazy": true,
+    "to": "ai.data_quality"
+   },
+   {
+    "from": "ai.whatsapp.brain",
+    "lazy": true,
+    "to": "ai.notify"
+   },
+   {
+    "from": "ai.whatsapp.brain",
+    "lazy": true,
+    "to": "ai.pricing"
+   },
+   {
+    "from": "ai.whatsapp.brain",
+    "lazy": true,
+    "to": "ai.stock_custody"
+   },
+   {
+    "from": "ai.whatsapp.brain",
+    "lazy": true,
+    "to": "ai.whatsapp.optout"
+   },
+   {
+    "from": "ai.whatsapp.brain",
+    "lazy": true,
+    "to": "ai.whatsapp.orchestrator"
+   },
+   {
+    "from": "ai.whatsapp.brain",
+    "lazy": true,
+    "to": "database"
+   },
+   {
+    "from": "ai.whatsapp.brain",
+    "lazy": true,
+    "to": "events.bus"
+   },
+   {
+    "from": "ai.whatsapp.brain",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.whatsapp.brain",
+    "lazy": true,
+    "to": "routers.deps"
+   },
+   {
+    "from": "ai.whatsapp.brain",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.whatsapp.conversation",
+    "lazy": true,
+    "to": "database"
+   },
+   {
+    "from": "ai.whatsapp.conversation",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.whatsapp.optout",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.whatsapp.optout",
+    "lazy": false,
+    "to": "phone_utils"
+   },
+   {
+    "from": "ai.whatsapp.orchestrator",
+    "lazy": true,
+    "to": "ai.llm_client"
+   },
+   {
+    "from": "ai.whatsapp.orchestrator",
+    "lazy": true,
+    "to": "ai.pii_scrub"
+   },
+   {
+    "from": "ai.whatsapp.orchestrator",
+    "lazy": true,
+    "to": "ai.reasoning.grounding"
+   },
+   {
+    "from": "ai.whatsapp.orchestrator",
+    "lazy": true,
+    "to": "ai.spend_cap"
+   },
+   {
+    "from": "ai.whatsapp.orchestrator",
+    "lazy": false,
+    "to": "ai.whatsapp.brain"
+   },
+   {
+    "from": "ai.whatsapp.orchestrator",
+    "lazy": true,
+    "to": "ai.whatsapp.conversation"
+   },
+   {
+    "from": "ai.whatsapp.orchestrator",
+    "lazy": true,
+    "to": "database"
+   },
+   {
+    "from": "ai.whatsapp.orchestrator",
+    "lazy": true,
+    "to": "feature_flags"
+   },
+   {
+    "from": "ai.whatsapp.orchestrator",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.workflows",
+    "lazy": false,
+    "to": "ai.workflows.engine"
+   },
+   {
+    "from": "ai.workflows",
+    "lazy": false,
+    "to": "ai.workflows.templates"
+   },
+   {
+    "from": "ai.workflows.engine",
+    "lazy": true,
+    "to": "ai.evaluation.tracker"
+   },
+   {
+    "from": "ai.workflows.engine",
+    "lazy": false,
+    "to": "ai.workflows.templates"
+   },
+   {
+    "from": "ai.workflows.engine",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.workflows.engine",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "ai.workflows.templates",
+    "lazy": true,
+    "to": "ai.evaluation.tracker"
+   },
+   {
+    "from": "ai.workflows.templates",
+    "lazy": true,
+    "to": "ai.inventory_predictor"
+   },
+   {
+    "from": "ai.workflows.templates",
+    "lazy": true,
+    "to": "ai.reorder"
+   },
+   {
+    "from": "ai.workflows.templates",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "auth",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "auth",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "auth",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "database",
+    "lazy": true,
+    "to": "models"
+   },
+   {
+    "from": "dev_snapshot",
+    "lazy": true,
+    "to": "models"
+   },
+   {
+    "from": "domain.pricing",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "events",
+    "lazy": false,
+    "to": "events.bus"
+   },
+   {
+    "from": "events.bus",
+    "lazy": true,
+    "to": "database"
+   },
+   {
+    "from": "events.bus",
+    "lazy": true,
+    "to": "models"
+   },
+   {
+    "from": "events.bus",
+    "lazy": true,
+    "to": "time_utils"
+   },
+   {
+    "from": "integration.ingest",
+    "lazy": false,
+    "to": "integration.models"
+   },
+   {
+    "from": "integration.metrics",
+    "lazy": false,
+    "to": "integration.source_contract"
+   },
+   {
+    "from": "integration.reconcile",
+    "lazy": false,
+    "to": "integration.models"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "ai.escalation.engine"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "ai.evaluation.learning"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "ai.fraud.detection"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "ai.orchestrator.executive"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "ai.orchestrator.push_notifier"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "ai.orchestrator.strategist"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "ai.reorder"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "ai.stock_custody"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "ai.whatsapp.brain"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "alerting"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "database"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "events.bus"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "feature_flags"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "logging_config"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "metrics"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "middleware.body_limit"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "middleware.correlation"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "middleware.security_headers"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "middleware.timing"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "models"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "observer_mode"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "rate_limit"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.ai"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.ai_ask"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.analytics"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.attendance"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.auth"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.billing"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.cash_reconciliation"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.creative"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.demo"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.enterprise"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.events"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.export"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.flags"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.fraud"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.health"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.inventory"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.menu"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.notifications"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.observer"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.orders"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.overview"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.purchase_orders"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.reports"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.reservations"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.restaurants"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.staff"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.stock_custody"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.suppliers"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.support"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.tables"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.webhooks"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "startup_checks"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "tenant_provisioning"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "middleware.correlation",
+    "lazy": false,
+    "to": "logging_config"
+   },
+   {
+    "from": "middleware.timing",
+    "lazy": true,
+    "to": "metrics"
+   },
+   {
+    "from": "models",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "observer_mode",
+    "lazy": false,
+    "to": "feature_flags"
+   },
+   {
+    "from": "populate_production",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "populate_production",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "populate_production",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "populate_production",
+    "lazy": false,
+    "to": "seed_generators"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.data_quality"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.decisions"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.evaluation.feedback"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.evaluation.tracker"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.graph"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.inventory_predictor"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.labor.intelligence"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.marketing"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.orchestrator.strategist"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.plugins"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.pricing.recommendations"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.profit.intelligence"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.reasoning"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.roi.savings"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.simulation"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": false,
+    "to": "ai.spend_cap"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.supply_chain.intelligence"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "ai.workflows"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "events.bus"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": true,
+    "to": "feature_flags"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": false,
+    "to": "rate_limit"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.ai",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": true,
+    "to": "ai.analysis_clock"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": false,
+    "to": "ai.creative"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": true,
+    "to": "ai.inventory_predictor"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": true,
+    "to": "ai.kds_intelligence"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": true,
+    "to": "ai.labor.intelligence"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": true,
+    "to": "ai.llm_client"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": true,
+    "to": "ai.menu_engineer"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": true,
+    "to": "ai.ops_manager"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": false,
+    "to": "ai.owner_narrative"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": true,
+    "to": "ai.pricing.recommendations"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": true,
+    "to": "ai.profit.intelligence"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": true,
+    "to": "ai.reservation_optimizer"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": true,
+    "to": "ai.revenue_forecaster"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": false,
+    "to": "feature_flags"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": false,
+    "to": "rate_limit"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": false,
+    "to": "routers.overview"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": false,
+    "to": "routers.reports"
+   },
+   {
+    "from": "routers.ai_ask",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "routers.analytics",
+    "lazy": false,
+    "to": "ai.analysis_clock"
+   },
+   {
+    "from": "routers.analytics",
+    "lazy": false,
+    "to": "ai.inventory_predictor"
+   },
+   {
+    "from": "routers.analytics",
+    "lazy": false,
+    "to": "ai.kds_intelligence"
+   },
+   {
+    "from": "routers.analytics",
+    "lazy": false,
+    "to": "ai.menu_engineer"
+   },
+   {
+    "from": "routers.analytics",
+    "lazy": false,
+    "to": "ai.ops_manager"
+   },
+   {
+    "from": "routers.analytics",
+    "lazy": true,
+    "to": "ai.reasoning"
+   },
+   {
+    "from": "routers.analytics",
+    "lazy": false,
+    "to": "ai.reservation_optimizer"
+   },
+   {
+    "from": "routers.analytics",
+    "lazy": false,
+    "to": "ai.revenue_forecaster"
+   },
+   {
+    "from": "routers.analytics",
+    "lazy": false,
+    "to": "ai.spend_cap"
+   },
+   {
+    "from": "routers.analytics",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.analytics",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.analytics",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.analytics",
+    "lazy": false,
+    "to": "rate_limit"
+   },
+   {
+    "from": "routers.analytics",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.attendance",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.attendance",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.attendance",
+    "lazy": true,
+    "to": "events.bus"
+   },
+   {
+    "from": "routers.attendance",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.attendance",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.attendance",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.attendance",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "routers.auth",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.auth",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.auth",
+    "lazy": false,
+    "to": "email_utils"
+   },
+   {
+    "from": "routers.auth",
+    "lazy": true,
+    "to": "events.bus"
+   },
+   {
+    "from": "routers.auth",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.auth",
+    "lazy": true,
+    "to": "phone_utils"
+   },
+   {
+    "from": "routers.auth",
+    "lazy": false,
+    "to": "rate_limit"
+   },
+   {
+    "from": "routers.auth",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.auth",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.auth",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "routers.billing",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.billing",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.billing",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.billing",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.cash_reconciliation",
+    "lazy": false,
+    "to": "ai.cash_reconciliation.intelligence"
+   },
+   {
+    "from": "routers.cash_reconciliation",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.cash_reconciliation",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.cash_reconciliation",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.cash_reconciliation",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.cash_reconciliation",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.creative",
+    "lazy": false,
+    "to": "ai.creative"
+   },
+   {
+    "from": "routers.creative",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.creative",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.creative",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.creative",
+    "lazy": false,
+    "to": "rate_limit"
+   },
+   {
+    "from": "routers.creative",
+    "lazy": false,
+    "to": "routers.ai_ask"
+   },
+   {
+    "from": "routers.creative",
+    "lazy": false,
+    "to": "routers.overview"
+   },
+   {
+    "from": "routers.demo",
+    "lazy": true,
+    "to": "ai.creative"
+   },
+   {
+    "from": "routers.demo",
+    "lazy": true,
+    "to": "ai.llm_client"
+   },
+   {
+    "from": "routers.demo",
+    "lazy": true,
+    "to": "ai.owner_narrative"
+   },
+   {
+    "from": "routers.demo",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.demo",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.demo",
+    "lazy": true,
+    "to": "demo_report_pdf"
+   },
+   {
+    "from": "routers.demo",
+    "lazy": false,
+    "to": "demo_scenario"
+   },
+   {
+    "from": "routers.demo",
+    "lazy": true,
+    "to": "feature_flags"
+   },
+   {
+    "from": "routers.demo",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.demo",
+    "lazy": false,
+    "to": "rate_limit"
+   },
+   {
+    "from": "routers.demo",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.deps",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.enterprise",
+    "lazy": true,
+    "to": "ai.enterprise"
+   },
+   {
+    "from": "routers.enterprise",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.enterprise",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.enterprise",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.enterprise",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.events",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.events",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.events",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.events",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.events",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "routers.export",
+    "lazy": true,
+    "to": "ai.whatsapp.optout"
+   },
+   {
+    "from": "routers.export",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.export",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.export",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.export",
+    "lazy": false,
+    "to": "phone_utils"
+   },
+   {
+    "from": "routers.export",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.export",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.flags",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.flags",
+    "lazy": false,
+    "to": "feature_flags"
+   },
+   {
+    "from": "routers.flags",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.flags",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.fraud",
+    "lazy": false,
+    "to": "ai.fraud.detection"
+   },
+   {
+    "from": "routers.fraud",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.fraud",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.fraud",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.fraud",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.fraud",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.health",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.health",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.inventory",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.inventory",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.inventory",
+    "lazy": true,
+    "to": "events.bus"
+   },
+   {
+    "from": "routers.inventory",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.inventory",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.inventory",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.menu",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.menu",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.menu",
+    "lazy": true,
+    "to": "events.bus"
+   },
+   {
+    "from": "routers.menu",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.menu",
+    "lazy": false,
+    "to": "rate_limit"
+   },
+   {
+    "from": "routers.menu",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.menu",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.notifications",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.notifications",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.notifications",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.notifications",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.notifications",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "routers.observer",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.observer",
+    "lazy": false,
+    "to": "integration.source_contract"
+   },
+   {
+    "from": "routers.observer",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.observer",
+    "lazy": false,
+    "to": "reporting"
+   },
+   {
+    "from": "routers.orders",
+    "lazy": false,
+    "to": "ai.order_stock"
+   },
+   {
+    "from": "routers.orders",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.orders",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.orders",
+    "lazy": false,
+    "to": "domain.pricing"
+   },
+   {
+    "from": "routers.orders",
+    "lazy": true,
+    "to": "events.bus"
+   },
+   {
+    "from": "routers.orders",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.orders",
+    "lazy": false,
+    "to": "rate_limit"
+   },
+   {
+    "from": "routers.orders",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.orders",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.orders",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "routers.overview",
+    "lazy": true,
+    "to": "ai.decisions"
+   },
+   {
+    "from": "routers.overview",
+    "lazy": true,
+    "to": "ai.home_specialists"
+   },
+   {
+    "from": "routers.overview",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.overview",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.overview",
+    "lazy": true,
+    "to": "integration.models"
+   },
+   {
+    "from": "routers.overview",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.overview",
+    "lazy": true,
+    "to": "routers.webhooks"
+   },
+   {
+    "from": "routers.overview",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "routers.purchase_orders",
+    "lazy": false,
+    "to": "ai.reorder"
+   },
+   {
+    "from": "routers.purchase_orders",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.purchase_orders",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.purchase_orders",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.purchase_orders",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.purchase_orders",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.reports",
+    "lazy": false,
+    "to": "ai.creative"
+   },
+   {
+    "from": "routers.reports",
+    "lazy": true,
+    "to": "ai.llm_client"
+   },
+   {
+    "from": "routers.reports",
+    "lazy": false,
+    "to": "ai.owner_narrative"
+   },
+   {
+    "from": "routers.reports",
+    "lazy": true,
+    "to": "ai.reasoning.grounding"
+   },
+   {
+    "from": "routers.reports",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.reports",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.reports",
+    "lazy": true,
+    "to": "feature_flags"
+   },
+   {
+    "from": "routers.reports",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.reports",
+    "lazy": false,
+    "to": "rate_limit"
+   },
+   {
+    "from": "routers.reports",
+    "lazy": true,
+    "to": "routers.ai_ask"
+   },
+   {
+    "from": "routers.reports",
+    "lazy": true,
+    "to": "routers.creative"
+   },
+   {
+    "from": "routers.reports",
+    "lazy": false,
+    "to": "routers.overview"
+   },
+   {
+    "from": "routers.reports",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "routers.reservations",
+    "lazy": false,
+    "to": "ai.reservation_optimizer"
+   },
+   {
+    "from": "routers.reservations",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.reservations",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.reservations",
+    "lazy": true,
+    "to": "events.bus"
+   },
+   {
+    "from": "routers.reservations",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.reservations",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.reservations",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.restaurants",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.restaurants",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.restaurants",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.restaurants",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.restaurants",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.staff",
+    "lazy": false,
+    "to": "ai.evaluation.tracker"
+   },
+   {
+    "from": "routers.staff",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.staff",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.staff",
+    "lazy": true,
+    "to": "events.bus"
+   },
+   {
+    "from": "routers.staff",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.staff",
+    "lazy": false,
+    "to": "phone_utils"
+   },
+   {
+    "from": "routers.staff",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.staff",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.staff",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "routers.stock_custody",
+    "lazy": false,
+    "to": "ai.stock_custody"
+   },
+   {
+    "from": "routers.stock_custody",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.stock_custody",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.stock_custody",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.stock_custody",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.stock_custody",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.suppliers",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.suppliers",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.suppliers",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.suppliers",
+    "lazy": false,
+    "to": "phone_utils"
+   },
+   {
+    "from": "routers.suppliers",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.suppliers",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.support",
+    "lazy": false,
+    "to": "ai.notify"
+   },
+   {
+    "from": "routers.support",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.support",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.support",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.support",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.support",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.support",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "routers.tables",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.tables",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.tables",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.tables",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.tables",
+    "lazy": false,
+    "to": "schemas"
+   },
+   {
+    "from": "routers.webhooks",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.webhooks",
+    "lazy": false,
+    "to": "integration.ingest"
+   },
+   {
+    "from": "routers.webhooks",
+    "lazy": true,
+    "to": "integration.models"
+   },
+   {
+    "from": "routers.webhooks",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.webhooks",
+    "lazy": false,
+    "to": "rate_limit"
+   },
+   {
+    "from": "seed_generators",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "seed_generators",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "seed_recipes",
+    "lazy": true,
+    "to": "database"
+   },
+   {
+    "from": "seed_recipes",
+    "lazy": true,
+    "to": "models"
+   },
+   {
+    "from": "seed_vibanda",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "seed_vibanda",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "seed_vibanda",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "seed_vibanda",
+    "lazy": false,
+    "to": "seed_generators"
+   },
+   {
+    "from": "seed_vibanda",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "tenant_provisioning",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "tenant_provisioning",
+    "lazy": true,
+    "to": "database"
+   },
+   {
+    "from": "tenant_provisioning",
+    "lazy": false,
+    "to": "models"
+   }
+  ],
+  "nodes": [
+   {
+    "group": "other",
+    "id": "ai",
+    "kind": "py",
+    "loc": 6,
+    "path": "backend/ai/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.analysis_clock",
+    "kind": "py",
+    "loc": 123,
+    "path": "backend/ai/analysis_clock.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.cash_reconciliation",
+    "kind": "py",
+    "loc": 1,
+    "path": "backend/ai/cash_reconciliation/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.cash_reconciliation.intelligence",
+    "kind": "py",
+    "loc": 172,
+    "path": "backend/ai/cash_reconciliation/intelligence.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.cost_model",
+    "kind": "py",
+    "loc": 68,
+    "path": "backend/ai/cost_model.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.creative",
+    "kind": "py",
+    "loc": 396,
+    "path": "backend/ai/creative.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.data_quality",
+    "kind": "py",
+    "loc": 168,
+    "path": "backend/ai/data_quality.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.decisions",
+    "kind": "py",
+    "loc": 90,
+    "path": "backend/ai/decisions/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.decisions.adapters",
+    "kind": "py",
+    "loc": 262,
+    "path": "backend/ai/decisions/adapters.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.decisions.model",
+    "kind": "py",
+    "loc": 87,
+    "path": "backend/ai/decisions/model.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.decisions.ranking",
+    "kind": "py",
+    "loc": 119,
+    "path": "backend/ai/decisions/ranking.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.enterprise",
+    "kind": "py",
+    "loc": 17,
+    "path": "backend/ai/enterprise/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.enterprise.audit_center",
+    "kind": "py",
+    "loc": 83,
+    "path": "backend/ai/enterprise/audit_center.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.enterprise.benchmarking",
+    "kind": "py",
+    "loc": 111,
+    "path": "backend/ai/enterprise/benchmarking.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.escalation",
+    "kind": "py",
+    "loc": 1,
+    "path": "backend/ai/escalation/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.escalation.engine",
+    "kind": "py",
+    "loc": 154,
+    "path": "backend/ai/escalation/engine.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.evaluation.feedback",
+    "kind": "py",
+    "loc": 160,
+    "path": "backend/ai/evaluation/feedback.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.evaluation.learning",
+    "kind": "py",
+    "loc": 137,
+    "path": "backend/ai/evaluation/learning.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.evaluation.tracker",
+    "kind": "py",
+    "loc": 570,
+    "path": "backend/ai/evaluation/tracker.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.fraud",
+    "kind": "py",
+    "loc": 1,
+    "path": "backend/ai/fraud/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.fraud.detection",
+    "kind": "py",
+    "loc": 287,
+    "path": "backend/ai/fraud/detection.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.graph",
+    "kind": "py",
+    "loc": 25,
+    "path": "backend/ai/graph/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.graph.build",
+    "kind": "py",
+    "loc": 154,
+    "path": "backend/ai/graph/build.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.graph.traverse",
+    "kind": "py",
+    "loc": 121,
+    "path": "backend/ai/graph/traverse.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.home_specialists",
+    "kind": "py",
+    "loc": 82,
+    "path": "backend/ai/home_specialists.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.inventory_predictor",
+    "kind": "py",
+    "loc": 455,
+    "path": "backend/ai/inventory_predictor.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.kds_intelligence",
+    "kind": "py",
+    "loc": 356,
+    "path": "backend/ai/kds_intelligence.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.labor.intelligence",
+    "kind": "py",
+    "loc": 207,
+    "path": "backend/ai/labor/intelligence.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.llm_client",
+    "kind": "py",
+    "loc": 447,
+    "path": "backend/ai/llm_client.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.marketing",
+    "kind": "py",
+    "loc": 17,
+    "path": "backend/ai/marketing/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.marketing.insights",
+    "kind": "py",
+    "loc": 250,
+    "path": "backend/ai/marketing/insights.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.memory.store",
+    "kind": "py",
+    "loc": 295,
+    "path": "backend/ai/memory/store.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.menu_engineer",
+    "kind": "py",
+    "loc": 552,
+    "path": "backend/ai/menu_engineer.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.notify",
+    "kind": "py",
+    "loc": 168,
+    "path": "backend/ai/notify.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.ops_manager",
+    "kind": "py",
+    "loc": 423,
+    "path": "backend/ai/ops_manager.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.orchestrator.executive",
+    "kind": "py",
+    "loc": 786,
+    "path": "backend/ai/orchestrator/executive.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.orchestrator.push_notifier",
+    "kind": "py",
+    "loc": 1190,
+    "path": "backend/ai/orchestrator/push_notifier.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.orchestrator.strategist",
+    "kind": "py",
+    "loc": 569,
+    "path": "backend/ai/orchestrator/strategist.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.order_stock",
+    "kind": "py",
+    "loc": 188,
+    "path": "backend/ai/order_stock.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.owner_narrative",
+    "kind": "py",
+    "loc": 137,
+    "path": "backend/ai/owner_narrative.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.pii_scrub",
+    "kind": "py",
+    "loc": 124,
+    "path": "backend/ai/pii_scrub.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.plugins",
+    "kind": "py",
+    "loc": 14,
+    "path": "backend/ai/plugins/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.plugins.examples",
+    "kind": "py",
+    "loc": 46,
+    "path": "backend/ai/plugins/examples.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.plugins.sdk",
+    "kind": "py",
+    "loc": 212,
+    "path": "backend/ai/plugins/sdk.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.pricing",
+    "kind": "py",
+    "loc": 24,
+    "path": "backend/ai/pricing/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.pricing.analysis",
+    "kind": "py",
+    "loc": 375,
+    "path": "backend/ai/pricing/analysis.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.pricing.recommendations",
+    "kind": "py",
+    "loc": 353,
+    "path": "backend/ai/pricing/recommendations.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.profit",
+    "kind": "py",
+    "loc": 5,
+    "path": "backend/ai/profit/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.profit.intelligence",
+    "kind": "py",
+    "loc": 547,
+    "path": "backend/ai/profit/intelligence.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.reasoning",
+    "kind": "py",
+    "loc": 27,
+    "path": "backend/ai/reasoning/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.reasoning.grounding",
+    "kind": "py",
+    "loc": 308,
+    "path": "backend/ai/reasoning/grounding.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.reasoning.narrator",
+    "kind": "py",
+    "loc": 471,
+    "path": "backend/ai/reasoning/narrator.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.reorder",
+    "kind": "py",
+    "loc": 320,
+    "path": "backend/ai/reorder.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.reservation_optimizer",
+    "kind": "py",
+    "loc": 688,
+    "path": "backend/ai/reservation_optimizer.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.revenue_forecaster",
+    "kind": "py",
+    "loc": 406,
+    "path": "backend/ai/revenue_forecaster.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.roi",
+    "kind": "py",
+    "loc": 1,
+    "path": "backend/ai/roi/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.roi.savings",
+    "kind": "py",
+    "loc": 389,
+    "path": "backend/ai/roi/savings.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.routing",
+    "kind": "py",
+    "loc": 10,
+    "path": "backend/ai/routing/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.routing.router",
+    "kind": "py",
+    "loc": 109,
+    "path": "backend/ai/routing/router.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.simulation",
+    "kind": "py",
+    "loc": 83,
+    "path": "backend/ai/simulation/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.simulation.engine",
+    "kind": "py",
+    "loc": 309,
+    "path": "backend/ai/simulation/engine.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.simulation.signals",
+    "kind": "py",
+    "loc": 149,
+    "path": "backend/ai/simulation/signals.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.simulation.twin",
+    "kind": "py",
+    "loc": 121,
+    "path": "backend/ai/simulation/twin.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.spend_cap",
+    "kind": "py",
+    "loc": 69,
+    "path": "backend/ai/spend_cap.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.stock_custody",
+    "kind": "py",
+    "loc": 448,
+    "path": "backend/ai/stock_custody.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.supply_chain.intelligence",
+    "kind": "py",
+    "loc": 217,
+    "path": "backend/ai/supply_chain/intelligence.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.whatsapp",
+    "kind": "py",
+    "loc": 45,
+    "path": "backend/ai/whatsapp/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.whatsapp.brain",
+    "kind": "py",
+    "loc": 1358,
+    "path": "backend/ai/whatsapp/brain.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.whatsapp.conversation",
+    "kind": "py",
+    "loc": 56,
+    "path": "backend/ai/whatsapp/conversation.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.whatsapp.optout",
+    "kind": "py",
+    "loc": 90,
+    "path": "backend/ai/whatsapp/optout.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.whatsapp.orchestrator",
+    "kind": "py",
+    "loc": 214,
+    "path": "backend/ai/whatsapp/orchestrator.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.workflows",
+    "kind": "py",
+    "loc": 13,
+    "path": "backend/ai/workflows/__init__.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.workflows.engine",
+    "kind": "py",
+    "loc": 294,
+    "path": "backend/ai/workflows/engine.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.workflows.templates",
+    "kind": "py",
+    "loc": 150,
+    "path": "backend/ai/workflows/templates.py"
+   },
+   {
+    "group": "other",
+    "id": "alerting",
+    "kind": "py",
+    "loc": 85,
+    "path": "backend/alerting.py"
+   },
+   {
+    "group": "core",
+    "id": "auth",
+    "kind": "py",
+    "loc": 317,
+    "path": "backend/auth.py"
+   },
+   {
+    "group": "core",
+    "id": "database",
+    "kind": "py",
+    "loc": 58,
+    "path": "backend/database.py"
+   },
+   {
+    "group": "demo",
+    "id": "demo_report_pdf",
+    "kind": "py",
+    "loc": 229,
+    "path": "backend/demo_report_pdf.py"
+   },
+   {
+    "group": "demo",
+    "id": "demo_scenario",
+    "kind": "py",
+    "loc": 631,
+    "path": "backend/demo_scenario.py"
+   },
+   {
+    "group": "other",
+    "id": "dev_snapshot",
+    "kind": "py",
+    "loc": 88,
+    "path": "backend/dev_snapshot.py"
+   },
+   {
+    "group": "other",
+    "id": "domain",
+    "kind": "py",
+    "loc": 1,
+    "path": "backend/domain/__init__.py"
+   },
+   {
+    "group": "other",
+    "id": "domain.pricing",
+    "kind": "py",
+    "loc": 54,
+    "path": "backend/domain/pricing.py"
+   },
+   {
+    "group": "other",
+    "id": "email_utils",
+    "kind": "py",
+    "loc": 65,
+    "path": "backend/email_utils.py"
+   },
+   {
+    "group": "other",
+    "id": "events",
+    "kind": "py",
+    "loc": 7,
+    "path": "backend/events/__init__.py"
+   },
+   {
+    "group": "other",
+    "id": "events.bus",
+    "kind": "py",
+    "loc": 372,
+    "path": "backend/events/bus.py"
+   },
+   {
+    "group": "other",
+    "id": "feature_flags",
+    "kind": "py",
+    "loc": 80,
+    "path": "backend/feature_flags.py"
+   },
+   {
+    "group": "integration",
+    "id": "integration",
+    "kind": "py",
+    "loc": 1,
+    "path": "backend/integration/__init__.py"
+   },
+   {
+    "group": "integration",
+    "id": "integration.export_probe",
+    "kind": "py",
+    "loc": 102,
+    "path": "backend/integration/export_probe.py"
+   },
+   {
+    "group": "integration",
+    "id": "integration.ingest",
+    "kind": "py",
+    "loc": 98,
+    "path": "backend/integration/ingest.py"
+   },
+   {
+    "group": "integration",
+    "id": "integration.metrics",
+    "kind": "py",
+    "loc": 41,
+    "path": "backend/integration/metrics.py"
+   },
+   {
+    "group": "integration",
+    "id": "integration.models",
+    "kind": "py",
+    "loc": 82,
+    "path": "backend/integration/models.py"
+   },
+   {
+    "group": "integration",
+    "id": "integration.reconcile",
+    "kind": "py",
+    "loc": 65,
+    "path": "backend/integration/reconcile.py"
+   },
+   {
+    "group": "integration",
+    "id": "integration.source_client",
+    "kind": "py",
+    "loc": 63,
+    "path": "backend/integration/source_client.py"
+   },
+   {
+    "group": "integration",
+    "id": "integration.source_contract",
+    "kind": "py",
+    "loc": 73,
+    "path": "backend/integration/source_contract.py"
+   },
+   {
+    "group": "other",
+    "id": "logging_config",
+    "kind": "py",
+    "loc": 84,
+    "path": "backend/logging_config.py"
+   },
+   {
+    "group": "other",
+    "id": "main",
+    "kind": "py",
+    "loc": 665,
+    "path": "backend/main.py"
+   },
+   {
+    "group": "other",
+    "id": "metrics",
+    "kind": "py",
+    "loc": 59,
+    "path": "backend/metrics.py"
+   },
+   {
+    "group": "other",
+    "id": "middleware.body_limit",
+    "kind": "py",
+    "loc": 74,
+    "path": "backend/middleware/body_limit.py"
+   },
+   {
+    "group": "other",
+    "id": "middleware.correlation",
+    "kind": "py",
+    "loc": 32,
+    "path": "backend/middleware/correlation.py"
+   },
+   {
+    "group": "other",
+    "id": "middleware.security_headers",
+    "kind": "py",
+    "loc": 28,
+    "path": "backend/middleware/security_headers.py"
+   },
+   {
+    "group": "other",
+    "id": "middleware.timing",
+    "kind": "py",
+    "loc": 28,
+    "path": "backend/middleware/timing.py"
+   },
+   {
+    "group": "core",
+    "id": "models",
+    "kind": "py",
+    "loc": 1609,
+    "path": "backend/models.py"
+   },
+   {
+    "group": "integration",
+    "id": "observer_mode",
+    "kind": "py",
+    "loc": 50,
+    "path": "backend/observer_mode.py"
+   },
+   {
+    "group": "other",
+    "id": "payments",
+    "kind": "py",
+    "loc": 1,
+    "path": "backend/payments/__init__.py"
+   },
+   {
+    "group": "other",
+    "id": "phone_utils",
+    "kind": "py",
+    "loc": 54,
+    "path": "backend/phone_utils.py"
+   },
+   {
+    "group": "other",
+    "id": "populate_production",
+    "kind": "py",
+    "loc": 185,
+    "path": "backend/populate_production.py"
+   },
+   {
+    "group": "other",
+    "id": "rate_limit",
+    "kind": "py",
+    "loc": 109,
+    "path": "backend/rate_limit.py"
+   },
+   {
+    "group": "other",
+    "id": "reporting",
+    "kind": "py",
+    "loc": 41,
+    "path": "backend/reporting.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.ai",
+    "kind": "py",
+    "loc": 775,
+    "path": "backend/routers/ai.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.ai_ask",
+    "kind": "py",
+    "loc": 1018,
+    "path": "backend/routers/ai_ask.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.analytics",
+    "kind": "py",
+    "loc": 135,
+    "path": "backend/routers/analytics.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.attendance",
+    "kind": "py",
+    "loc": 214,
+    "path": "backend/routers/attendance.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.auth",
+    "kind": "py",
+    "loc": 788,
+    "path": "backend/routers/auth.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.billing",
+    "kind": "py",
+    "loc": 70,
+    "path": "backend/routers/billing.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.cash_reconciliation",
+    "kind": "py",
+    "loc": 75,
+    "path": "backend/routers/cash_reconciliation.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.creative",
+    "kind": "py",
+    "loc": 149,
+    "path": "backend/routers/creative.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.demo",
+    "kind": "py",
+    "loc": 353,
+    "path": "backend/routers/demo.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.deps",
+    "kind": "py",
+    "loc": 94,
+    "path": "backend/routers/deps.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.enterprise",
+    "kind": "py",
+    "loc": 75,
+    "path": "backend/routers/enterprise.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.events",
+    "kind": "py",
+    "loc": 91,
+    "path": "backend/routers/events.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.export",
+    "kind": "py",
+    "loc": 294,
+    "path": "backend/routers/export.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.flags",
+    "kind": "py",
+    "loc": 32,
+    "path": "backend/routers/flags.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.fraud",
+    "kind": "py",
+    "loc": 73,
+    "path": "backend/routers/fraud.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.health",
+    "kind": "py",
+    "loc": 42,
+    "path": "backend/routers/health.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.inventory",
+    "kind": "py",
+    "loc": 232,
+    "path": "backend/routers/inventory.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.menu",
+    "kind": "py",
+    "loc": 278,
+    "path": "backend/routers/menu.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.notifications",
+    "kind": "py",
+    "loc": 173,
+    "path": "backend/routers/notifications.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.observer",
+    "kind": "py",
+    "loc": 37,
+    "path": "backend/routers/observer.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.orders",
+    "kind": "py",
+    "loc": 533,
+    "path": "backend/routers/orders.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.overview",
+    "kind": "py",
+    "loc": 536,
+    "path": "backend/routers/overview.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.purchase_orders",
+    "kind": "py",
+    "loc": 106,
+    "path": "backend/routers/purchase_orders.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.reports",
+    "kind": "py",
+    "loc": 223,
+    "path": "backend/routers/reports.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.reservations",
+    "kind": "py",
+    "loc": 407,
+    "path": "backend/routers/reservations.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.restaurants",
+    "kind": "py",
+    "loc": 82,
+    "path": "backend/routers/restaurants.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.staff",
+    "kind": "py",
+    "loc": 516,
+    "path": "backend/routers/staff.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.stock_custody",
+    "kind": "py",
+    "loc": 225,
+    "path": "backend/routers/stock_custody.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.suppliers",
+    "kind": "py",
+    "loc": 126,
+    "path": "backend/routers/suppliers.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.support",
+    "kind": "py",
+    "loc": 239,
+    "path": "backend/routers/support.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.tables",
+    "kind": "py",
+    "loc": 146,
+    "path": "backend/routers/tables.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.webhooks",
+    "kind": "py",
+    "loc": 346,
+    "path": "backend/routers/webhooks.py"
+   },
+   {
+    "group": "other",
+    "id": "schemas",
+    "kind": "py",
+    "loc": 830,
+    "path": "backend/schemas.py"
+   },
+   {
+    "group": "other",
+    "id": "seed_generators",
+    "kind": "py",
+    "loc": 172,
+    "path": "backend/seed_generators.py"
+   },
+   {
+    "group": "other",
+    "id": "seed_recipes",
+    "kind": "py",
+    "loc": 119,
+    "path": "backend/seed_recipes.py"
+   },
+   {
+    "group": "other",
+    "id": "seed_vibanda",
+    "kind": "py",
+    "loc": 72,
+    "path": "backend/seed_vibanda.py"
+   },
+   {
+    "group": "other",
+    "id": "startup_checks",
+    "kind": "py",
+    "loc": 119,
+    "path": "backend/startup_checks.py"
+   },
+   {
+    "group": "other",
+    "id": "storage",
+    "kind": "py",
+    "loc": 75,
+    "path": "backend/storage.py"
+   },
+   {
+    "group": "other",
+    "id": "tenant_provisioning",
+    "kind": "py",
+    "loc": 112,
+    "path": "backend/tenant_provisioning.py"
+   },
+   {
+    "group": "core",
+    "id": "time_utils",
+    "kind": "py",
+    "loc": 57,
+    "path": "backend/time_utils.py"
+   }
+  ]
+ },
+ "routes": [
+  {
+   "func": "ai_data_quality",
+   "module": "routers.ai",
+   "path": "/ai/data-quality",
+   "verb": "GET"
+  },
+  {
+   "func": "ai_decisions",
+   "module": "routers.ai",
+   "path": "/ai/decisions",
+   "verb": "GET"
+  },
+  {
+   "func": "ai_explain",
+   "module": "routers.ai",
+   "path": "/ai/explain",
+   "verb": "POST"
+  },
+  {
+   "func": "ai_feedback",
+   "module": "routers.ai",
+   "path": "/ai/feedback",
+   "verb": "GET"
+  },
+  {
+   "func": "ai_forecast_twin",
+   "module": "routers.ai",
+   "path": "/ai/forecast/twin",
+   "verb": "GET"
+  },
+  {
+   "func": "ai_graph_impact",
+   "module": "routers.ai",
+   "path": "/ai/graph/impact",
+   "verb": "GET"
+  },
+  {
+   "func": "ai_inventory",
+   "module": "routers.ai",
+   "path": "/ai/inventory",
+   "verb": "GET"
+  },
+  {
+   "func": "ai_labor",
+   "module": "routers.ai",
+   "path": "/ai/labor",
+   "verb": "GET"
+  },
+  {
+   "func": "ai_marketing",
+   "module": "routers.ai",
+   "path": "/ai/marketing",
+   "verb": "GET"
+  },
+  {
+   "func": "ai_marketing_promo",
+   "module": "routers.ai",
+   "path": "/ai/marketing/promo",
+   "verb": "POST"
+  },
+  {
+   "func": "ai_marketing_winback",
+   "module": "routers.ai",
+   "path": "/ai/marketing/winback",
+   "verb": "POST"
+  },
+  {
+   "func": "ai_plugin_invoke",
+   "module": "routers.ai",
+   "path": "/ai/plugins/{name}/invoke",
+   "verb": "POST"
+  },
+  {
+   "func": "ai_plugins_list",
+   "module": "routers.ai",
+   "path": "/ai/plugins",
+   "verb": "GET"
+  },
+  {
+   "func": "ai_pricing",
+   "module": "routers.ai",
+   "path": "/ai/pricing",
+   "verb": "GET"
+  },
+  {
+   "func": "ai_profit",
+   "module": "routers.ai",
+   "path": "/ai/profit",
+   "verb": "GET"
+  },
+  {
+   "func": "ai_roi",
+   "module": "routers.ai",
+   "path": "/ai/roi",
+   "verb": "GET"
+  },
+  {
+   "func": "ai_simulate",
+   "module": "routers.ai",
+   "path": "/ai/simulate",
+   "verb": "POST"
+  },
+  {
+   "func": "ai_strategy",
+   "module": "routers.ai",
+   "path": "/ai/strategy",
+   "verb": "POST"
+  },
+  {
+   "func": "ai_strategy_plan",
+   "module": "routers.ai",
+   "path": "/ai/strategy/plan",
+   "verb": "POST"
+  },
+  {
+   "func": "ai_supply_chain",
+   "module": "routers.ai",
+   "path": "/ai/supply-chain",
+   "verb": "GET"
+  },
+  {
+   "func": "ai_usage",
+   "module": "routers.ai",
+   "path": "/ai/usage",
+   "verb": "GET"
+  },
+  {
+   "func": "ai_workflow_cancel",
+   "module": "routers.ai",
+   "path": "/ai/workflows/{run_id}/cancel",
+   "verb": "POST"
+  },
+  {
+   "func": "ai_workflow_get",
+   "module": "routers.ai",
+   "path": "/ai/workflows/{run_id}",
+   "verb": "GET"
+  },
+  {
+   "func": "ai_workflow_resume",
+   "module": "routers.ai",
+   "path": "/ai/workflows/{run_id}/resume",
+   "verb": "POST"
+  },
+  {
+   "func": "ai_workflow_start",
+   "module": "routers.ai",
+   "path": "/ai/workflows/{template}/start",
+   "verb": "POST"
+  },
+  {
+   "func": "ai_workflow_templates",
+   "module": "routers.ai",
+   "path": "/ai/workflows/templates",
+   "verb": "GET"
+  },
+  {
+   "func": "approve_pricing_rec",
+   "module": "routers.ai",
+   "path": "/ai/pricing/{rec_id}/approve",
+   "verb": "POST"
+  },
+  {
+   "func": "reject_pricing_rec",
+   "module": "routers.ai",
+   "path": "/ai/pricing/{rec_id}/reject",
+   "verb": "POST"
+  },
+  {
+   "func": "ask",
+   "module": "routers.ai_ask",
+   "path": "/ai/ask",
+   "verb": "GET"
+  },
+  {
+   "func": "chat_llm",
+   "module": "routers.ai_ask",
+   "path": "/ai/chat",
+   "verb": "POST"
+  },
+  {
+   "func": "create_os_conversation",
+   "module": "routers.ai_ask",
+   "path": "/ai/os/conversations",
+   "verb": "POST"
+  },
+  {
+   "func": "get_os_conversation",
+   "module": "routers.ai_ask",
+   "path": "/ai/os/conversations/{conversation_id}",
+   "verb": "GET"
+  },
+  {
+   "func": "get_os_preference",
+   "module": "routers.ai_ask",
+   "path": "/ai/os/preferences",
+   "verb": "GET"
+  },
+  {
+   "func": "list_os_conversations",
+   "module": "routers.ai_ask",
+   "path": "/ai/os/conversations",
+   "verb": "GET"
+  },
+  {
+   "func": "set_os_preference",
+   "module": "routers.ai_ask",
+   "path": "/ai/os/preferences",
+   "verb": "PUT"
+  },
+  {
+   "func": "ai_dashboard",
+   "module": "routers.analytics",
+   "path": "/ai/dashboard",
+   "verb": "GET"
+  },
+  {
+   "func": "ai_trust_stats",
+   "module": "routers.analytics",
+   "path": "/ai/trust-stats",
+   "verb": "GET"
+  },
+  {
+   "func": "inventory_intel",
+   "module": "routers.analytics",
+   "path": "/ai/inventory-predictions",
+   "verb": "GET"
+  },
+  {
+   "func": "kds_intel",
+   "module": "routers.analytics",
+   "path": "/ai/kds-intelligence",
+   "verb": "GET"
+  },
+  {
+   "func": "menu_engineering",
+   "module": "routers.analytics",
+   "path": "/ai/menu-engineering",
+   "verb": "GET"
+  },
+  {
+   "func": "reservation_intel",
+   "module": "routers.analytics",
+   "path": "/ai/reservation-insights",
+   "verb": "GET"
+  },
+  {
+   "func": "revenue_forecast",
+   "module": "routers.analytics",
+   "path": "/ai/revenue-forecast",
+   "verb": "GET"
+  },
+  {
+   "func": "attendance_status",
+   "module": "routers.attendance",
+   "path": "/attendance/status",
+   "verb": "GET"
+  },
+  {
+   "func": "clock_in",
+   "module": "routers.attendance",
+   "path": "/attendance/clock-in",
+   "verb": "POST"
+  },
+  {
+   "func": "clock_out",
+   "module": "routers.attendance",
+   "path": "/attendance/clock-out",
+   "verb": "POST"
+  },
+  {
+   "func": "list_shifts",
+   "module": "routers.attendance",
+   "path": "/attendance/",
+   "verb": "GET"
+  },
+  {
+   "func": "confirm_password_reset",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/password-reset/confirm",
+   "verb": "POST"
+  },
+  {
+   "func": "login",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/login",
+   "verb": "POST"
+  },
+  {
+   "func": "login_by_restaurant",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/login/restaurant",
+   "verb": "POST"
+  },
+  {
+   "func": "logout_all",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/logout-all",
+   "verb": "POST"
+  },
+  {
+   "func": "mfa_disable",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/mfa/disable",
+   "verb": "POST"
+  },
+  {
+   "func": "mfa_enable",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/mfa/enable",
+   "verb": "POST"
+  },
+  {
+   "func": "mfa_setup",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/mfa/setup",
+   "verb": "POST"
+  },
+  {
+   "func": "pin_clear",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/pin/clear",
+   "verb": "POST"
+  },
+  {
+   "func": "pin_set",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/pin/set",
+   "verb": "POST"
+  },
+  {
+   "func": "quick_switch",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/quick-switch",
+   "verb": "POST"
+  },
+  {
+   "func": "quick_switch_roster",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/quick-switch/roster",
+   "verb": "GET"
+  },
+  {
+   "func": "read_users_me",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/me",
+   "verb": "GET"
+  },
+  {
+   "func": "register",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/register",
+   "verb": "POST"
+  },
+  {
+   "func": "request_password_reset",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/password-reset/request",
+   "verb": "POST"
+  },
+  {
+   "func": "resend_verification",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/resend-verification",
+   "verb": "POST"
+  },
+  {
+   "func": "update_restaurant",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/restaurant",
+   "verb": "PUT"
+  },
+  {
+   "func": "verify_email",
+   "module": "routers.auth",
+   "path": "/api/v1/auth/verify-email",
+   "verb": "POST"
+  },
+  {
+   "func": "get_subscription",
+   "module": "routers.billing",
+   "path": "/billing/",
+   "verb": "GET"
+  },
+  {
+   "func": "set_plan",
+   "module": "routers.billing",
+   "path": "/billing/plan",
+   "verb": "POST"
+  },
+  {
+   "func": "reconciliation_report",
+   "module": "routers.cash_reconciliation",
+   "path": "/cash-reconciliation/report",
+   "verb": "GET"
+  },
+  {
+   "func": "submit_drawer_count",
+   "module": "routers.cash_reconciliation",
+   "path": "/cash-reconciliation/counts",
+   "verb": "POST"
+  },
+  {
+   "func": "creative_home",
+   "module": "routers.creative",
+   "path": "/ai/creative/home",
+   "verb": "GET"
+  },
+  {
+   "func": "area",
+   "module": "routers.demo",
+   "path": "/demo/areas/{area}",
+   "verb": "GET"
+  },
+  {
+   "func": "chat",
+   "module": "routers.demo",
+   "path": "/demo/chat",
+   "verb": "POST"
+  },
+  {
+   "func": "home",
+   "module": "routers.demo",
+   "path": "/demo/home",
+   "verb": "GET"
+  },
+  {
+   "func": "ideas",
+   "module": "routers.demo",
+   "path": "/demo/ideas",
+   "verb": "POST"
+  },
+  {
+   "func": "report",
+   "module": "routers.demo",
+   "path": "/demo/reports/{period}",
+   "verb": "GET"
+  },
+  {
+   "func": "report_pdf",
+   "module": "routers.demo",
+   "path": "/demo/reports/{period}/pdf",
+   "verb": "GET"
+  },
+  {
+   "func": "simulate",
+   "module": "routers.demo",
+   "path": "/demo/simulate",
+   "verb": "POST"
+  },
+  {
+   "func": "audit_center",
+   "module": "routers.enterprise",
+   "path": "/enterprise/audit",
+   "verb": "GET"
+  },
+  {
+   "func": "benchmark",
+   "module": "routers.enterprise",
+   "path": "/enterprise/benchmark",
+   "verb": "GET"
+  },
+  {
+   "func": "list_organizations",
+   "module": "routers.enterprise",
+   "path": "/enterprise/organizations",
+   "verb": "GET"
+  },
+  {
+   "func": "events_summary",
+   "module": "routers.events",
+   "path": "/events/summary",
+   "verb": "GET"
+  },
+  {
+   "func": "track_event",
+   "module": "routers.events",
+   "path": "/events/track",
+   "verb": "POST"
+  },
+  {
+   "func": "erase_customer",
+   "module": "routers.export",
+   "path": "/data/erase-customer",
+   "verb": "POST"
+  },
+  {
+   "func": "export_customers_csv",
+   "module": "routers.export",
+   "path": "/data/export/customers.csv",
+   "verb": "GET"
+  },
+  {
+   "func": "export_orders_csv",
+   "module": "routers.export",
+   "path": "/data/export/orders.csv",
+   "verb": "GET"
+  },
+  {
+   "func": "get_flag_details",
+   "module": "routers.flags",
+   "path": "/flags/details",
+   "verb": "GET"
+  },
+  {
+   "func": "get_flags",
+   "module": "routers.flags",
+   "path": "/flags/",
+   "verb": "GET"
+  },
+  {
+   "func": "fraud_report",
+   "module": "routers.fraud",
+   "path": "/fraud/report",
+   "verb": "GET"
+  },
+  {
+   "func": "db_health_check",
+   "module": "routers.health",
+   "path": "/health/db",
+   "verb": "GET"
+  },
+  {
+   "func": "health_check",
+   "module": "routers.health",
+   "path": "/health/",
+   "verb": "GET"
+  },
+  {
+   "func": "adjust_stock",
+   "module": "routers.inventory",
+   "path": "/inventory/{item_id}/adjust",
+   "verb": "POST"
+  },
+  {
+   "func": "create_inventory_item",
+   "module": "routers.inventory",
+   "path": "/inventory/",
+   "verb": "POST"
+  },
+  {
+   "func": "delete_inventory_item",
+   "module": "routers.inventory",
+   "path": "/inventory/{item_id}",
+   "verb": "DELETE"
+  },
+  {
+   "func": "get_inventory",
+   "module": "routers.inventory",
+   "path": "/inventory/",
+   "verb": "GET"
+  },
+  {
+   "func": "receive_stock",
+   "module": "routers.inventory",
+   "path": "/inventory/{item_id}/receive",
+   "verb": "POST"
+  },
+  {
+   "func": "update_inventory_item",
+   "module": "routers.inventory",
+   "path": "/inventory/{item_id}",
+   "verb": "PUT"
+  },
+  {
+   "func": "update_reorder_settings",
+   "module": "routers.inventory",
+   "path": "/inventory/{item_id}/reorder-settings",
+   "verb": "PUT"
+  },
+  {
+   "func": "add_ingredient",
+   "module": "routers.menu",
+   "path": "/menu/{item_id}/ingredients",
+   "verb": "POST"
+  },
+  {
+   "func": "create_menu_item",
+   "module": "routers.menu",
+   "path": "/menu/",
+   "verb": "POST"
+  },
+  {
+   "func": "delete_ingredient",
+   "module": "routers.menu",
+   "path": "/menu/{item_id}/ingredients/{ingredient_id}",
+   "verb": "DELETE"
+  },
+  {
+   "func": "delete_menu_item",
+   "module": "routers.menu",
+   "path": "/menu/{item_id}",
+   "verb": "DELETE"
+  },
+  {
+   "func": "get_public_menu",
+   "module": "routers.menu",
+   "path": "/menu/public/{restaurant_id}",
+   "verb": "GET"
+  },
+  {
+   "func": "list_ingredients",
+   "module": "routers.menu",
+   "path": "/menu/{item_id}/ingredients",
+   "verb": "GET"
+  },
+  {
+   "func": "read_menu_items",
+   "module": "routers.menu",
+   "path": "/menu/",
+   "verb": "GET"
+  },
+  {
+   "func": "update_ingredient",
+   "module": "routers.menu",
+   "path": "/menu/{item_id}/ingredients/{ingredient_id}",
+   "verb": "PUT"
+  },
+  {
+   "func": "update_menu_item",
+   "module": "routers.menu",
+   "path": "/menu/{item_id}",
+   "verb": "PUT"
+  },
+  {
+   "func": "acknowledge",
+   "module": "routers.notifications",
+   "path": "/notifications/{notification_id}/acknowledge",
+   "verb": "POST"
+  },
+  {
+   "func": "list_notifications",
+   "module": "routers.notifications",
+   "path": "/notifications/",
+   "verb": "GET"
+  },
+  {
+   "func": "mark_all_read",
+   "module": "routers.notifications",
+   "path": "/notifications/read-all",
+   "verb": "POST"
+  },
+  {
+   "func": "mark_read",
+   "module": "routers.notifications",
+   "path": "/notifications/{notification_id}/read",
+   "verb": "POST"
+  },
+  {
+   "func": "subscribe",
+   "module": "routers.notifications",
+   "path": "/notifications/subscribe",
+   "verb": "POST"
+  },
+  {
+   "func": "unsubscribe",
+   "module": "routers.notifications",
+   "path": "/notifications/unsubscribe",
+   "verb": "POST"
+  },
+  {
+   "func": "report_preview",
+   "module": "routers.observer",
+   "path": "/observer/reports/{kind}",
+   "verb": "GET"
+  },
+  {
+   "func": "source_status",
+   "module": "routers.observer",
+   "path": "/observer/source-status",
+   "verb": "GET"
+  },
+  {
+   "func": "active_orders",
+   "module": "routers.orders",
+   "path": "/orders/active",
+   "verb": "GET"
+  },
+  {
+   "func": "create_order",
+   "module": "routers.orders",
+   "path": "/orders/",
+   "verb": "POST"
+  },
+  {
+   "func": "create_public_order",
+   "module": "routers.orders",
+   "path": "/orders/public",
+   "verb": "POST"
+  },
+  {
+   "func": "list_kitchen_incidents",
+   "module": "routers.orders",
+   "path": "/orders/incidents",
+   "verb": "GET"
+  },
+  {
+   "func": "list_orders",
+   "module": "routers.orders",
+   "path": "/orders/",
+   "verb": "GET"
+  },
+  {
+   "func": "log_kitchen_incident",
+   "module": "routers.orders",
+   "path": "/orders/incidents",
+   "verb": "POST"
+  },
+  {
+   "func": "update_order_details",
+   "module": "routers.orders",
+   "path": "/orders/{order_id}/details",
+   "verb": "POST"
+  },
+  {
+   "func": "update_order_payment",
+   "module": "routers.orders",
+   "path": "/orders/{order_id}/payment",
+   "verb": "POST"
+  },
+  {
+   "func": "update_order_status",
+   "module": "routers.orders",
+   "path": "/orders/{order_id}/status",
+   "verb": "POST"
+  },
+  {
+   "func": "decide",
+   "module": "routers.overview",
+   "path": "/overview/attention/{card_key}/decision",
+   "verb": "POST"
+  },
+  {
+   "func": "today",
+   "module": "routers.overview",
+   "path": "/overview/today",
+   "verb": "GET"
+  },
+  {
+   "func": "approve_purchase_order",
+   "module": "routers.purchase_orders",
+   "path": "/purchase-orders/{po_id}/approve",
+   "verb": "POST"
+  },
+  {
+   "func": "list_purchase_orders",
+   "module": "routers.purchase_orders",
+   "path": "/purchase-orders/",
+   "verb": "GET"
+  },
+  {
+   "func": "receive_purchase_order",
+   "module": "routers.purchase_orders",
+   "path": "/purchase-orders/{po_id}/receive",
+   "verb": "POST"
+  },
+  {
+   "func": "report",
+   "module": "routers.reports",
+   "path": "/reports/{period}",
+   "verb": "GET"
+  },
+  {
+   "func": "report_creative",
+   "module": "routers.reports",
+   "path": "/reports/{period}/creative",
+   "verb": "GET"
+  },
+  {
+   "func": "create_reservation",
+   "module": "routers.reservations",
+   "path": "/reservations/",
+   "verb": "POST"
+  },
+  {
+   "func": "delete_reservation",
+   "module": "routers.reservations",
+   "path": "/reservations/{reservation_id}",
+   "verb": "DELETE"
+  },
+  {
+   "func": "get_available_tables",
+   "module": "routers.reservations",
+   "path": "/reservations/available-tables",
+   "verb": "GET"
+  },
+  {
+   "func": "get_reservations",
+   "module": "routers.reservations",
+   "path": "/reservations/",
+   "verb": "GET"
+  },
+  {
+   "func": "update_reservation",
+   "module": "routers.reservations",
+   "path": "/reservations/{reservation_id}",
+   "verb": "PUT"
+  },
+  {
+   "func": "update_reservation_status",
+   "module": "routers.reservations",
+   "path": "/reservations/{reservation_id}/status",
+   "verb": "POST"
+  },
+  {
+   "func": "list_restaurants",
+   "module": "routers.restaurants",
+   "path": "/restaurants/",
+   "verb": "GET"
+  },
+  {
+   "func": "select_restaurant",
+   "module": "routers.restaurants",
+   "path": "/restaurants/select",
+   "verb": "POST"
+  },
+  {
+   "func": "assign_role",
+   "module": "routers.staff",
+   "path": "/staff/{staff_id}/assign-role",
+   "verb": "POST"
+  },
+  {
+   "func": "create_staff",
+   "module": "routers.staff",
+   "path": "/staff/",
+   "verb": "POST"
+  },
+  {
+   "func": "end_impersonation",
+   "module": "routers.staff",
+   "path": "/staff/end-impersonation",
+   "verb": "POST"
+  },
+  {
+   "func": "impersonate_staff",
+   "module": "routers.staff",
+   "path": "/staff/{staff_id}/impersonate",
+   "verb": "POST"
+  },
+  {
+   "func": "impersonation_log",
+   "module": "routers.staff",
+   "path": "/staff/impersonation-log",
+   "verb": "GET"
+  },
+  {
+   "func": "list_staff",
+   "module": "routers.staff",
+   "path": "/staff/",
+   "verb": "GET"
+  },
+  {
+   "func": "update_staff",
+   "module": "routers.staff",
+   "path": "/staff/{staff_id}",
+   "verb": "PUT"
+  },
+  {
+   "func": "confirm_transfer",
+   "module": "routers.stock_custody",
+   "path": "/stock/transfers/{transfer_id}/confirm",
+   "verb": "POST"
+  },
+  {
+   "func": "fulfil_transfer",
+   "module": "routers.stock_custody",
+   "path": "/stock/transfers/{transfer_id}/fulfil",
+   "verb": "POST"
+  },
+  {
+   "func": "initiate_transfer",
+   "module": "routers.stock_custody",
+   "path": "/stock/transfers",
+   "verb": "POST"
+  },
+  {
+   "func": "list_stock_counts",
+   "module": "routers.stock_custody",
+   "path": "/stock/counts",
+   "verb": "GET"
+  },
+  {
+   "func": "list_transfers",
+   "module": "routers.stock_custody",
+   "path": "/stock/transfers",
+   "verb": "GET"
+  },
+  {
+   "func": "request_transfer",
+   "module": "routers.stock_custody",
+   "path": "/stock/transfers/request",
+   "verb": "POST"
+  },
+  {
+   "func": "submit_stock_count",
+   "module": "routers.stock_custody",
+   "path": "/stock/counts",
+   "verb": "POST"
+  },
+  {
+   "func": "variance_report",
+   "module": "routers.stock_custody",
+   "path": "/stock/variance-report",
+   "verb": "GET"
+  },
+  {
+   "func": "create_supplier",
+   "module": "routers.suppliers",
+   "path": "/suppliers/",
+   "verb": "POST"
+  },
+  {
+   "func": "delete_supplier",
+   "module": "routers.suppliers",
+   "path": "/suppliers/{supplier_id}",
+   "verb": "DELETE"
+  },
+  {
+   "func": "list_suppliers",
+   "module": "routers.suppliers",
+   "path": "/suppliers/",
+   "verb": "GET"
+  },
+  {
+   "func": "update_supplier",
+   "module": "routers.suppliers",
+   "path": "/suppliers/{supplier_id}",
+   "verb": "PUT"
+  },
+  {
+   "func": "add_message",
+   "module": "routers.support",
+   "path": "/support/tickets/{ticket_id}/messages",
+   "verb": "POST"
+  },
+  {
+   "func": "create_ticket",
+   "module": "routers.support",
+   "path": "/support/tickets",
+   "verb": "POST"
+  },
+  {
+   "func": "get_ticket",
+   "module": "routers.support",
+   "path": "/support/tickets/{ticket_id}",
+   "verb": "GET"
+  },
+  {
+   "func": "list_tickets",
+   "module": "routers.support",
+   "path": "/support/tickets",
+   "verb": "GET"
+  },
+  {
+   "func": "update_status",
+   "module": "routers.support",
+   "path": "/support/tickets/{ticket_id}/status",
+   "verb": "POST"
+  },
+  {
+   "func": "create_table",
+   "module": "routers.tables",
+   "path": "/tables/",
+   "verb": "POST"
+  },
+  {
+   "func": "delete_table",
+   "module": "routers.tables",
+   "path": "/tables/{table_id}",
+   "verb": "DELETE"
+  },
+  {
+   "func": "list_tables",
+   "module": "routers.tables",
+   "path": "/tables/",
+   "verb": "GET"
+  },
+  {
+   "func": "update_table",
+   "module": "routers.tables",
+   "path": "/tables/{table_id}",
+   "verb": "PUT"
+  },
+  {
+   "func": "update_table_status",
+   "module": "routers.tables",
+   "path": "/tables/{table_id}/status",
+   "verb": "POST"
+  },
+  {
+   "func": "macsoft_status",
+   "module": "routers.webhooks",
+   "path": "/webhooks/macsoft/status",
+   "verb": "GET"
+  },
+  {
+   "func": "receive_macsoft_data",
+   "module": "routers.webhooks",
+   "path": "/webhooks/macsoft/data",
+   "verb": "POST"
+  }
+ ],
+ "stats": {
+  "py_edges": 563,
+  "py_lazy_edges": 167,
+  "py_modules": 148,
+  "routes": 167,
+  "ts_edges": 485,
+  "ts_files": 231
+ },
+ "status_only": [
+  [
+   "app/vibanda/os/page.tsx",
+   "/overview/today"
+  ],
+  [
+   "app/vibanda/reports/page.tsx",
+   "/overview/today"
+  ],
+  [
+   "components/NotificationBell.tsx",
+   "/overview/today"
+  ],
+  [
+   "components/vibanda/OwnerHomeEmpty.tsx",
+   "/overview/today"
+  ],
+  [
+   "components/vibanda/SourceUnavailable.tsx",
+   "/observer/source-status"
+  ],
+  [
+   "components/vibanda/VibandaAreaClient.tsx",
+   "/overview/today"
+  ],
+  [
+   "components/vibanda/VibandaForecast.tsx",
+   "/overview/today"
+  ]
+ ],
+ "surfaces": {
+  "area": {
+   "api_calls": [
+    "GET /ai/forecast/twin -> routers.ai.ai_forecast_twin [conditional]",
+    "GET /ai/labor -> routers.ai.ai_labor [conditional]",
+    "GET /ai/profit -> routers.ai.ai_profit [conditional]",
+    "GET /ai/supply-chain -> routers.ai.ai_supply_chain [conditional]",
+    "GET /ai/inventory-predictions -> routers.analytics.inventory_intel [conditional]",
+    "GET /ai/kds-intelligence -> routers.analytics.kds_intel [conditional]",
+    "GET /ai/menu-engineering -> routers.analytics.menu_engineering [conditional]",
+    "GET /ai/reservation-insights -> routers.analytics.reservation_intel [conditional]",
+    "GET /ai/revenue-forecast -> routers.analytics.revenue_forecast [conditional]"
+   ],
+   "entries": [
+    "app/vibanda/[area]/page.tsx"
+   ],
+   "frontend_files": 8,
+   "label": "Area pages",
+   "parallel_backends": []
+  },
+  "demo": {
+   "api_calls": [
+    "GET /demo/areas/{area} -> routers.demo.area",
+    "POST /demo/chat -> routers.demo.chat",
+    "GET /demo/home -> routers.demo.home",
+    "POST /demo/ideas -> routers.demo.ideas",
+    "GET /demo/reports/{period} -> routers.demo.report",
+    "GET /demo/reports/{period}/pdf -> routers.demo.report_pdf",
+    "POST /demo/simulate -> routers.demo.simulate",
+    "POST /staff/end-impersonation -> routers.staff.end_impersonation",
+    "POST /staff/{staff_id}/impersonate -> routers.staff.impersonate_staff",
+    "PUT /staff/{staff_id} -> routers.staff.update_staff"
+   ],
+   "entries": [
+    "app/demo/page.tsx",
+    "app/demo/[area]/page.tsx",
+    "app/demo/os/page.tsx",
+    "app/demo/reports/page.tsx"
+   ],
+   "frontend_files": 17,
+   "label": "Demo",
+   "parallel_backends": [
+    "demo_scenario",
+    "routers.demo"
+   ]
+  },
+  "home": {
+   "api_calls": [
+    "GET /ai/creative/home -> routers.creative.creative_home",
+    "GET /overview/today -> routers.overview.today",
+    "GET /reports/{period} -> routers.reports.report",
+    "POST /staff/end-impersonation -> routers.staff.end_impersonation",
+    "POST /staff/{staff_id}/impersonate -> routers.staff.impersonate_staff",
+    "PUT /staff/{staff_id} -> routers.staff.update_staff"
+   ],
+   "entries": [
+    "app/vibanda/page.tsx"
+   ],
+   "frontend_files": 12,
+   "label": "Home",
+   "parallel_backends": []
+  },
+  "old_dash": {
+   "api_calls": [
+    "GET /ai/data-quality -> routers.ai.ai_data_quality",
+    "GET /ai/decisions -> routers.ai.ai_decisions",
+    "POST /ai/explain -> routers.ai.ai_explain",
+    "GET /ai/forecast/twin -> routers.ai.ai_forecast_twin",
+    "GET /ai/graph/impact -> routers.ai.ai_graph_impact",
+    "GET /ai/labor -> routers.ai.ai_labor",
+    "GET /ai/marketing -> routers.ai.ai_marketing",
+    "GET /ai/pricing -> routers.ai.ai_pricing",
+    "GET /ai/profit -> routers.ai.ai_profit",
+    "GET /ai/roi -> routers.ai.ai_roi",
+    "POST /ai/simulate -> routers.ai.ai_simulate",
+    "POST /ai/strategy -> routers.ai.ai_strategy",
+    "GET /ai/supply-chain -> routers.ai.ai_supply_chain",
+    "GET /ai/usage -> routers.ai.ai_usage",
+    "GET /ai/dashboard -> routers.analytics.ai_dashboard",
+    "GET /ai/trust-stats -> routers.analytics.ai_trust_stats",
+    "GET /ai/inventory-predictions -> routers.analytics.inventory_intel",
+    "GET /ai/kds-intelligence -> routers.analytics.kds_intel",
+    "GET /ai/menu-engineering -> routers.analytics.menu_engineering",
+    "GET /ai/reservation-insights -> routers.analytics.reservation_intel",
+    "GET /ai/revenue-forecast -> routers.analytics.revenue_forecast",
+    "GET /cash-reconciliation/report -> routers.cash_reconciliation.reconciliation_report",
+    "POST /cash-reconciliation/counts -> routers.cash_reconciliation.submit_drawer_count",
+    "GET /fraud/report -> routers.fraud.fraud_report",
+    "POST /inventory/{item_id}/adjust -> routers.inventory.adjust_stock",
+    "POST /inventory/ -> routers.inventory.create_inventory_item",
+    "GET /inventory/ -> routers.inventory.get_inventory",
+    "POST /inventory/{item_id}/receive -> routers.inventory.receive_stock",
+    "PUT /inventory/{item_id}/reorder-settings -> routers.inventory.update_reorder_settings",
+    "POST /menu/{item_id}/ingredients -> routers.menu.add_ingredient",
+    "POST /menu/ -> routers.menu.create_menu_item",
+    "DELETE /menu/{item_id}/ingredients/{ingredient_id} -> routers.menu.delete_ingredient",
+    "DELETE /menu/{item_id} -> routers.menu.delete_menu_item",
+    "GET /menu/{item_id}/ingredients -> routers.menu.list_ingredients",
+    "GET /menu/ -> routers.menu.read_menu_items",
+    "PUT /menu/{item_id}/ingredients/{ingredient_id} -> routers.menu.update_ingredient",
+    "PUT /menu/{item_id} -> routers.menu.update_menu_item",
+    "GET /orders/active -> routers.orders.active_orders",
+    "POST /orders/ -> routers.orders.create_order",
+    "GET /orders/incidents -> routers.orders.list_kitchen_incidents",
+    "GET /orders/ -> routers.orders.list_orders",
+    "POST /orders/incidents -> routers.orders.log_kitchen_incident",
+    "POST /orders/{order_id}/details -> routers.orders.update_order_details",
+    "POST /orders/{order_id}/payment -> routers.orders.update_order_payment",
+    "POST /orders/{order_id}/status -> routers.orders.update_order_status",
+    "POST /purchase-orders/{po_id}/approve -> routers.purchase_orders.approve_purchase_order",
+    "GET /purchase-orders/ -> routers.purchase_orders.list_purchase_orders",
+    "POST /purchase-orders/{po_id}/receive -> routers.purchase_orders.receive_purchase_order",
+    "POST /reservations/ -> routers.reservations.create_reservation",
+    "DELETE /reservations/{reservation_id} -> routers.reservations.delete_reservation",
+    "GET /reservations/available-tables -> routers.reservations.get_available_tables",
+    "GET /reservations/ -> routers.reservations.get_reservations",
+    "PUT /reservations/{reservation_id} -> routers.reservations.update_reservation",
+    "POST /reservations/{reservation_id}/status -> routers.reservations.update_reservation_status",
+    "POST /staff/{staff_id}/assign-role -> routers.staff.assign_role",
+    "POST /staff/ -> routers.staff.create_staff",
+    "POST /staff/end-impersonation -> routers.staff.end_impersonation",
+    "POST /staff/{staff_id}/impersonate -> routers.staff.impersonate_staff",
+    "GET /staff/ -> routers.staff.list_staff",
+    "PUT /staff/{staff_id} -> routers.staff.update_staff",
+    "POST /stock/transfers/{transfer_id}/confirm -> routers.stock_custody.confirm_transfer",
+    "POST /stock/transfers/{transfer_id}/fulfil -> routers.stock_custody.fulfil_transfer",
+    "POST /stock/transfers -> routers.stock_custody.initiate_transfer",
+    "GET /stock/counts -> routers.stock_custody.list_stock_counts",
+    "GET /stock/transfers -> routers.stock_custody.list_transfers",
+    "POST /stock/transfers/request -> routers.stock_custody.request_transfer",
+    "POST /stock/counts -> routers.stock_custody.submit_stock_count",
+    "GET /stock/variance-report -> routers.stock_custody.variance_report",
+    "POST /suppliers/ -> routers.suppliers.create_supplier",
+    "DELETE /suppliers/{supplier_id} -> routers.suppliers.delete_supplier",
+    "GET /suppliers/ -> routers.suppliers.list_suppliers",
+    "PUT /suppliers/{supplier_id} -> routers.suppliers.update_supplier",
+    "POST /support/tickets/{ticket_id}/messages -> routers.support.add_message",
+    "POST /support/tickets -> routers.support.create_ticket",
+    "GET /support/tickets/{ticket_id} -> routers.support.get_ticket",
+    "GET /support/tickets -> routers.support.list_tickets",
+    "POST /support/tickets/{ticket_id}/status -> routers.support.update_status",
+    "POST /tables/ -> routers.tables.create_table",
+    "GET /tables/ -> routers.tables.list_tables",
+    "POST /tables/{table_id}/status -> routers.tables.update_table_status"
+   ],
+   "entries": [
+    "app/dashboard/**/page.tsx"
+   ],
+   "frontend_files": 117,
+   "label": "Old dash",
+   "parallel_backends": []
+  },
+  "os": {
+   "api_calls": [
+    "POST /ai/chat -> routers.ai_ask.chat_llm",
+    "POST /ai/os/conversations -> routers.ai_ask.create_os_conversation",
+    "GET /ai/os/conversations/{conversation_id} -> routers.ai_ask.get_os_conversation",
+    "GET /ai/os/preferences -> routers.ai_ask.get_os_preference",
+    "GET /ai/os/conversations -> routers.ai_ask.list_os_conversations",
+    "PUT /ai/os/preferences -> routers.ai_ask.set_os_preference"
+   ],
+   "entries": [
+    "app/vibanda/os/page.tsx"
+   ],
+   "frontend_files": 5,
+   "label": "OS",
+   "parallel_backends": []
+  },
+  "reports": {
+   "api_calls": [
+    "GET /reports/{period} -> routers.reports.report",
+    "GET /reports/{period}/creative -> routers.reports.report_creative"
+   ],
+   "entries": [
+    "app/vibanda/reports/page.tsx"
+   ],
+   "frontend_files": 7,
+   "label": "Reports",
+   "parallel_backends": []
+  }
+ },
+ "typescript": {
+  "edges": [
+   {
+    "from": "app/dashboard/ai-ops/page.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/dashboard/ai-ops/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/dashboard/ai-ops/page.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "app/dashboard/ai/[module]/page.tsx",
+    "to": "app/dashboard/ai/_full/registry.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/CashSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/CashSection.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/CashSection.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/DataQualitySection.tsx",
+    "to": "components/ai/MiniStat.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/DataQualitySection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/DataQualitySection.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/DecisionsSection.tsx",
+    "to": "components/ai/DecisionCard.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/DecisionsSection.tsx",
+    "to": "components/ai/MiniStat.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/DecisionsSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/DecisionsSection.tsx",
+    "to": "components/ai/NarrativeBlock.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/DecisionsSection.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/DecisionsSection.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/FraudSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/FraudSection.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/GraphImpactSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/GraphImpactSection.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/GraphImpactSection.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/HealthBoostSection.tsx",
+    "to": "app/dashboard/ai/_components/healthAdvice.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/CashSection.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/DataQualitySection.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/DecisionsSection.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/FraudSection.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/GraphImpactSection.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/HealthBoostSection.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/InventoryPredictionsSection.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/KdsSection.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/LaborSection.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/MenuEngineeringSection.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/PricingSection.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/ProfitSection.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/RevenueForecastSection.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/SupplyChainSection.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/overview/taxonomy.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/overview/types.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "components/ai/DigitalTwin.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "components/ai/InsightCard.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "components/ai/StrategyAgent.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "components/ai/WhatIfSimulator.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "components/ui/SectionCard.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InventoryPredictionsSection.tsx",
+    "to": "components/ai/MiniStat.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InventoryPredictionsSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InventoryPredictionsSection.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/InventoryPredictionsSection.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/KdsSection.tsx",
+    "to": "components/ai/MiniStat.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/KdsSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/KdsSection.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/LaborSection.tsx",
+    "to": "components/ai/MiniStat.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/LaborSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/LaborSection.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/LaborSection.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/MenuEngineeringSection.tsx",
+    "to": "app/dashboard/ai/_components/constants.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/MenuEngineeringSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/MenuEngineeringSection.tsx",
+    "to": "components/ai/NarrativeBlock.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/MenuEngineeringSection.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/PricingSection.tsx",
+    "to": "components/ai/ExplainButton.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/PricingSection.tsx",
+    "to": "components/ai/MiniStat.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/PricingSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/PricingSection.tsx",
+    "to": "components/ai/NarrativeBlock.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/PricingSection.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/PricingSection.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/PricingSection.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/PricingSection.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/ProfitSection.tsx",
+    "to": "components/ai/ExplainButton.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/ProfitSection.tsx",
+    "to": "components/ai/MiniStat.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/ProfitSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/ProfitSection.tsx",
+    "to": "components/ai/NarrativeBlock.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/ProfitSection.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/ProfitSection.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/RevenueForecastSection.tsx",
+    "to": "components/ai/MiniStat.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/RevenueForecastSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/RevenueForecastSection.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/RevenueForecastSection.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/SupplyChainSection.tsx",
+    "to": "components/ai/MiniStat.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/SupplyChainSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/SupplyChainSection.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/overview/AttentionHero.tsx",
+    "to": "app/dashboard/ai/_components/overview/actions.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/overview/AttentionHero.tsx",
+    "to": "app/dashboard/ai/_components/overview/taxonomy.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/overview/AttentionHero.tsx",
+    "to": "components/ai/ExplainButton.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/overview/AttentionHero.tsx",
+    "to": "components/ui/SectionCard.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/overview/BusinessHealth.tsx",
+    "to": "app/dashboard/ai/_components/healthAdvice.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/overview/BusinessHealth.tsx",
+    "to": "app/dashboard/ai/_components/overview/types.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/overview/BusinessHealth.tsx",
+    "to": "components/ai/HowItWorks.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/overview/PerformanceSection.tsx",
+    "to": "components/ai/Sparkline.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/overview/PerformanceSection.tsx",
+    "to": "components/ui/SectionCard.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/overview/PerformanceSection.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/overview/PerformanceSection.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/overview/TodayStats.tsx",
+    "to": "app/dashboard/ai/_components/overview/types.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/overview/TodayStats.tsx",
+    "to": "components/ui/StatCard.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_components/overview/TodayStats.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_components/overview/actions.ts",
+    "to": "app/dashboard/ai/_components/overview/taxonomy.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_full/DecisionsFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/DecisionsFull.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_full/FraudFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/FraudFull.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_full/InventoryFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/InventoryFull.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_full/KitchenFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/KitchenFull.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_full/LaborFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/LaborFull.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_full/MenuFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/MenuFull.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_full/PricingFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/PricingFull.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_full/ProfitFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/ProfitFull.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_full/ReservationsFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/ReservationsFull.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_full/RevenueFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/RevenueFull.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_full/SuppliersFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/SuppliersFull.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/DecisionsFull.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/FraudFull.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/InventoryFull.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/KitchenFull.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/LaborFull.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/MenuFull.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/PricingFull.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/ProfitFull.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/ReservationsFull.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/RevenueFull.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/SuppliersFull.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/_full/shared.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/AiTabs.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/InsightsPanel.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/overview/AttentionHero.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/overview/BusinessHealth.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/overview/OverviewHeader.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/overview/PerformanceSection.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/overview/TodayStats.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/overview/taxonomy.ts"
+   },
+   {
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/overview/types.ts"
+   },
+   {
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "components/ui/EmptyState.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "app/dashboard/error.tsx",
+    "to": "components/ui/Button.tsx"
+   },
+   {
+    "from": "app/dashboard/inventory/page.tsx",
+    "to": "components/features/inventory/InventoryWorkspace.tsx"
+   },
+   {
+    "from": "app/dashboard/kitchen/page.tsx",
+    "to": "components/features/kitchen/KDSBoard.tsx"
+   },
+   {
+    "from": "app/dashboard/layout.tsx",
+    "to": "components/NotificationBell.tsx"
+   },
+   {
+    "from": "app/dashboard/layout.tsx",
+    "to": "components/PinSetupModal.tsx"
+   },
+   {
+    "from": "app/dashboard/layout.tsx",
+    "to": "components/QuickSwitchModal.tsx"
+   },
+   {
+    "from": "app/dashboard/layout.tsx",
+    "to": "components/RestaurantSwitcher.tsx"
+   },
+   {
+    "from": "app/dashboard/layout.tsx",
+    "to": "components/VerifyEmailBanner.tsx"
+   },
+   {
+    "from": "app/dashboard/layout.tsx",
+    "to": "components/staff/AttendanceWidget.tsx"
+   },
+   {
+    "from": "app/dashboard/layout.tsx",
+    "to": "components/ui/PageLoader.tsx"
+   },
+   {
+    "from": "app/dashboard/layout.tsx",
+    "to": "components/ui/SkipLink.tsx"
+   },
+   {
+    "from": "app/dashboard/layout.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/dashboard/layout.tsx",
+    "to": "lib/pathTitle.ts"
+   },
+   {
+    "from": "app/dashboard/layout.tsx",
+    "to": "lib/permissions.ts"
+   },
+   {
+    "from": "app/dashboard/layout.tsx",
+    "to": "lib/tenantHome.ts"
+   },
+   {
+    "from": "app/dashboard/marketing/page.tsx",
+    "to": "app/dashboard/marketing/_components/CampaignForm.tsx"
+   },
+   {
+    "from": "app/dashboard/marketing/page.tsx",
+    "to": "components/ai/HowItWorks.tsx"
+   },
+   {
+    "from": "app/dashboard/marketing/page.tsx",
+    "to": "components/ai/NarrativeBlock.tsx"
+   },
+   {
+    "from": "app/dashboard/marketing/page.tsx",
+    "to": "components/ui/EmptyState.tsx"
+   },
+   {
+    "from": "app/dashboard/marketing/page.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/dashboard/marketing/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/dashboard/marketing/page.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "app/dashboard/marketing/page.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/dashboard/menu/page.tsx",
+    "to": "components/features/menu/MenuEditor.tsx"
+   },
+   {
+    "from": "app/dashboard/orders/page.tsx",
+    "to": "components/features/orders/OrderList.tsx"
+   },
+   {
+    "from": "app/dashboard/page.tsx",
+    "to": "app/dashboard/_components/SystemStatus.tsx"
+   },
+   {
+    "from": "app/dashboard/page.tsx",
+    "to": "components/ui/StatCard.tsx"
+   },
+   {
+    "from": "app/dashboard/page.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/dashboard/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/dashboard/page.tsx",
+    "to": "lib/demo-data.ts"
+   },
+   {
+    "from": "app/dashboard/pos/page.tsx",
+    "to": "components/features/pos/POSWorkspace.tsx"
+   },
+   {
+    "from": "app/dashboard/purchasing/page.tsx",
+    "to": "components/features/purchasing/PurchasingWorkspace.tsx"
+   },
+   {
+    "from": "app/dashboard/reservations/page.tsx",
+    "to": "components/features/reservations/ReservationsWorkspace.tsx"
+   },
+   {
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "app/dashboard/roi/_components/RoiBreakdown.tsx"
+   },
+   {
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "app/dashboard/roi/_components/TrendChip.tsx"
+   },
+   {
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "components/ai/HowItWorks.tsx"
+   },
+   {
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "components/ai/NarrativeBlock.tsx"
+   },
+   {
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "components/ui/EmptyState.tsx"
+   },
+   {
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/dashboard/sales/page.tsx",
+    "to": "components/features/sales/SalesView.tsx"
+   },
+   {
+    "from": "app/dashboard/staff/page.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "app/dashboard/staff/page.tsx",
+    "to": "components/ui/Toast.tsx"
+   },
+   {
+    "from": "app/dashboard/staff/page.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/dashboard/staff/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/dashboard/staff/page.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "app/dashboard/staff/page.tsx",
+    "to": "lib/permissions.ts"
+   },
+   {
+    "from": "app/dashboard/support/page.tsx",
+    "to": "components/features/support/SupportView.tsx"
+   },
+   {
+    "from": "app/demo/[area]/page.tsx",
+    "to": "components/demo/DemoAreaClient.tsx"
+   },
+   {
+    "from": "app/demo/layout.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/demo/layout.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/demo/layout.tsx",
+    "to": "lib/permissions.ts"
+   },
+   {
+    "from": "app/demo/layout.tsx",
+    "to": "lib/tenantHome.ts"
+   },
+   {
+    "from": "app/demo/os/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/demo/os/page.tsx",
+    "to": "lib/demoQuestions.ts"
+   },
+   {
+    "from": "app/demo/os/page.tsx",
+    "to": "lib/retry.ts"
+   },
+   {
+    "from": "app/demo/page.tsx",
+    "to": "components/demo/DemoIdeas.tsx"
+   },
+   {
+    "from": "app/demo/page.tsx",
+    "to": "components/os/States.tsx"
+   },
+   {
+    "from": "app/demo/page.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/demo/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/demo/page.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/demo/page.tsx",
+    "to": "lib/retry.ts"
+   },
+   {
+    "from": "app/demo/page.tsx",
+    "to": "lib/vibandaAreas.ts"
+   },
+   {
+    "from": "app/demo/reports/page.tsx",
+    "to": "components/demo/DemoCharts.tsx"
+   },
+   {
+    "from": "app/demo/reports/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/demo/reports/page.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/demo/reports/page.tsx",
+    "to": "lib/retry.ts"
+   },
+   {
+    "from": "app/forgot-password/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/layout.tsx",
+    "to": "app/providers.tsx"
+   },
+   {
+    "from": "app/login/page.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/login/page.tsx",
+    "to": "lib/tenantHome.ts"
+   },
+   {
+    "from": "app/page.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/page.tsx",
+    "to": "lib/tenantHome.ts"
+   },
+   {
+    "from": "app/providers.tsx",
+    "to": "components/ImpersonationBanner.tsx"
+   },
+   {
+    "from": "app/providers.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/reset-password/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/staff/controller/ai-ops/page.tsx",
+    "to": "app/dashboard/ai-ops/page.tsx"
+   },
+   {
+    "from": "app/staff/controller/ai/page.tsx",
+    "to": "app/dashboard/ai/page.tsx"
+   },
+   {
+    "from": "app/staff/controller/layout.tsx",
+    "to": "components/staff/TierLayoutShell.tsx"
+   },
+   {
+    "from": "app/staff/controller/orders/page.tsx",
+    "to": "components/features/orders/OrderList.tsx"
+   },
+   {
+    "from": "app/staff/controller/page.tsx",
+    "to": "components/features/inventory/VarianceReportPanel.tsx"
+   },
+   {
+    "from": "app/staff/controller/purchasing/page.tsx",
+    "to": "components/features/purchasing/PurchasingWorkspace.tsx"
+   },
+   {
+    "from": "app/staff/controller/roi/page.tsx",
+    "to": "app/dashboard/roi/page.tsx"
+   },
+   {
+    "from": "app/staff/controller/sales/page.tsx",
+    "to": "components/features/sales/SalesView.tsx"
+   },
+   {
+    "from": "app/staff/controller/support/page.tsx",
+    "to": "components/features/support/SupportView.tsx"
+   },
+   {
+    "from": "app/staff/kitchen/layout.tsx",
+    "to": "components/staff/TierLayoutShell.tsx"
+   },
+   {
+    "from": "app/staff/kitchen/menu/page.tsx",
+    "to": "components/features/menu/MenuReadView.tsx"
+   },
+   {
+    "from": "app/staff/kitchen/orders/page.tsx",
+    "to": "components/features/orders/OrderList.tsx"
+   },
+   {
+    "from": "app/staff/kitchen/page.tsx",
+    "to": "components/features/kitchen/KDSBoard.tsx"
+   },
+   {
+    "from": "app/staff/kitchen/stock/page.tsx",
+    "to": "components/features/inventory/KitchenStockPanel.tsx"
+   },
+   {
+    "from": "app/staff/kitchen/support/page.tsx",
+    "to": "components/features/support/SupportView.tsx"
+   },
+   {
+    "from": "app/staff/layout.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/staff/layout.tsx",
+    "to": "lib/permissions.ts"
+   },
+   {
+    "from": "app/staff/manager/ai-ops/page.tsx",
+    "to": "app/dashboard/ai-ops/page.tsx"
+   },
+   {
+    "from": "app/staff/manager/ai/page.tsx",
+    "to": "app/dashboard/ai/page.tsx"
+   },
+   {
+    "from": "app/staff/manager/inventory/page.tsx",
+    "to": "components/features/inventory/InventoryWorkspace.tsx"
+   },
+   {
+    "from": "app/staff/manager/kitchen/page.tsx",
+    "to": "components/features/kitchen/KDSBoard.tsx"
+   },
+   {
+    "from": "app/staff/manager/layout.tsx",
+    "to": "components/staff/TierLayoutShell.tsx"
+   },
+   {
+    "from": "app/staff/manager/marketing/page.tsx",
+    "to": "app/dashboard/marketing/page.tsx"
+   },
+   {
+    "from": "app/staff/manager/menu/page.tsx",
+    "to": "components/features/menu/MenuEditor.tsx"
+   },
+   {
+    "from": "app/staff/manager/orders/page.tsx",
+    "to": "components/features/orders/OrderList.tsx"
+   },
+   {
+    "from": "app/staff/manager/page.tsx",
+    "to": "components/features/pos/POSWorkspace.tsx"
+   },
+   {
+    "from": "app/staff/manager/pos/page.tsx",
+    "to": "components/features/pos/POSWorkspace.tsx"
+   },
+   {
+    "from": "app/staff/manager/purchasing/page.tsx",
+    "to": "components/features/purchasing/PurchasingWorkspace.tsx"
+   },
+   {
+    "from": "app/staff/manager/reservations/page.tsx",
+    "to": "components/features/reservations/ReservationsWorkspace.tsx"
+   },
+   {
+    "from": "app/staff/manager/roi/page.tsx",
+    "to": "app/dashboard/roi/page.tsx"
+   },
+   {
+    "from": "app/staff/manager/sales/page.tsx",
+    "to": "components/features/sales/SalesView.tsx"
+   },
+   {
+    "from": "app/staff/manager/staff/page.tsx",
+    "to": "app/dashboard/staff/page.tsx"
+   },
+   {
+    "from": "app/staff/manager/support/page.tsx",
+    "to": "components/features/support/SupportView.tsx"
+   },
+   {
+    "from": "app/staff/stockkeeper/layout.tsx",
+    "to": "components/staff/TierLayoutShell.tsx"
+   },
+   {
+    "from": "app/staff/stockkeeper/page.tsx",
+    "to": "components/features/inventory/InventoryWorkspace.tsx"
+   },
+   {
+    "from": "app/staff/stockkeeper/purchasing/page.tsx",
+    "to": "components/features/purchasing/PurchasingWorkspace.tsx"
+   },
+   {
+    "from": "app/staff/stockkeeper/support/page.tsx",
+    "to": "components/features/support/SupportView.tsx"
+   },
+   {
+    "from": "app/staff/supervisor/kitchen/page.tsx",
+    "to": "components/features/kitchen/KDSBoard.tsx"
+   },
+   {
+    "from": "app/staff/supervisor/layout.tsx",
+    "to": "components/staff/TierLayoutShell.tsx"
+   },
+   {
+    "from": "app/staff/supervisor/menu/page.tsx",
+    "to": "components/features/menu/MenuReadView.tsx"
+   },
+   {
+    "from": "app/staff/supervisor/orders/page.tsx",
+    "to": "components/features/orders/OrderList.tsx"
+   },
+   {
+    "from": "app/staff/supervisor/page.tsx",
+    "to": "components/features/pos/POSWorkspace.tsx"
+   },
+   {
+    "from": "app/staff/supervisor/purchasing/page.tsx",
+    "to": "components/features/purchasing/PurchasingWorkspace.tsx"
+   },
+   {
+    "from": "app/staff/supervisor/reservations/page.tsx",
+    "to": "components/features/reservations/ReservationsWorkspace.tsx"
+   },
+   {
+    "from": "app/staff/supervisor/sales/page.tsx",
+    "to": "components/features/sales/SalesView.tsx"
+   },
+   {
+    "from": "app/staff/supervisor/support/page.tsx",
+    "to": "components/features/support/SupportView.tsx"
+   },
+   {
+    "from": "app/staff/waiter/kitchen/page.tsx",
+    "to": "components/features/kitchen/KDSBoard.tsx"
+   },
+   {
+    "from": "app/staff/waiter/layout.tsx",
+    "to": "components/staff/TierLayoutShell.tsx"
+   },
+   {
+    "from": "app/staff/waiter/menu/page.tsx",
+    "to": "components/features/menu/MenuReadView.tsx"
+   },
+   {
+    "from": "app/staff/waiter/orders/page.tsx",
+    "to": "components/features/orders/OrderList.tsx"
+   },
+   {
+    "from": "app/staff/waiter/page.tsx",
+    "to": "components/features/pos/POSWorkspace.tsx"
+   },
+   {
+    "from": "app/staff/waiter/reservations/page.tsx",
+    "to": "components/features/reservations/ReservationsWorkspace.tsx"
+   },
+   {
+    "from": "app/staff/waiter/support/page.tsx",
+    "to": "components/features/support/SupportView.tsx"
+   },
+   {
+    "from": "app/verify-email/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/verify-email/page.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "app/vibanda/[area]/page.tsx",
+    "to": "components/vibanda/VibandaAreaClient.tsx"
+   },
+   {
+    "from": "app/vibanda/[area]/page.tsx",
+    "to": "components/vibanda/VibandaForecast.tsx"
+   },
+   {
+    "from": "app/vibanda/layout.tsx",
+    "to": "components/NotificationBell.tsx"
+   },
+   {
+    "from": "app/vibanda/layout.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/vibanda/layout.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/vibanda/layout.tsx",
+    "to": "lib/permissions.ts"
+   },
+   {
+    "from": "app/vibanda/layout.tsx",
+    "to": "lib/tenantHome.ts"
+   },
+   {
+    "from": "app/vibanda/os/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/vibanda/os/page.tsx",
+    "to": "lib/osSuggestions.ts"
+   },
+   {
+    "from": "app/vibanda/os/page.tsx",
+    "to": "lib/vibandaAreas.ts"
+   },
+   {
+    "from": "app/vibanda/page.tsx",
+    "to": "components/os/States.tsx"
+   },
+   {
+    "from": "app/vibanda/page.tsx",
+    "to": "components/vibanda/CreativeNote.tsx"
+   },
+   {
+    "from": "app/vibanda/page.tsx",
+    "to": "components/vibanda/OwnerHomeEmpty.tsx"
+   },
+   {
+    "from": "app/vibanda/page.tsx",
+    "to": "components/vibanda/PartHealth.tsx"
+   },
+   {
+    "from": "app/vibanda/page.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/vibanda/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/vibanda/page.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "app/vibanda/page.tsx",
+    "to": "lib/vibandaAreas.ts"
+   },
+   {
+    "from": "app/vibanda/page.tsx",
+    "to": "lib/vibandaSource.ts"
+   },
+   {
+    "from": "app/vibanda/reports/page.tsx",
+    "to": "components/os/States.tsx"
+   },
+   {
+    "from": "app/vibanda/reports/page.tsx",
+    "to": "components/vibanda/CreativeNote.tsx"
+   },
+   {
+    "from": "app/vibanda/reports/page.tsx",
+    "to": "components/vibanda/SourceUnavailable.tsx"
+   },
+   {
+    "from": "app/vibanda/reports/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/vibanda/reports/page.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "components/ImpersonationBanner.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "components/NotificationBell.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/NotificationBell.tsx",
+    "to": "lib/directSource.ts"
+   },
+   {
+    "from": "components/NotificationBell.tsx",
+    "to": "lib/useNotifications.ts"
+   },
+   {
+    "from": "components/NotificationBell.tsx",
+    "to": "lib/vibandaSource.ts"
+   },
+   {
+    "from": "components/PinSetupModal.tsx",
+    "to": "components/ui/Button.tsx"
+   },
+   {
+    "from": "components/PinSetupModal.tsx",
+    "to": "components/ui/Modal.tsx"
+   },
+   {
+    "from": "components/PinSetupModal.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/PinSetupModal.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/QuickSwitchModal.tsx",
+    "to": "components/ui/Button.tsx"
+   },
+   {
+    "from": "components/QuickSwitchModal.tsx",
+    "to": "components/ui/Modal.tsx"
+   },
+   {
+    "from": "components/QuickSwitchModal.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "components/QuickSwitchModal.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/QuickSwitchModal.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/RestaurantSwitcher.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/VerifyEmailBanner.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "components/VerifyEmailBanner.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/ai/DecisionCard.tsx",
+    "to": "components/ai/ExplainButton.tsx"
+   },
+   {
+    "from": "components/ai/DecisionCard.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "components/ai/DigitalTwin.tsx",
+    "to": "components/ai/MiniStat.tsx"
+   },
+   {
+    "from": "components/ai/DigitalTwin.tsx",
+    "to": "components/ai/ModuleShell.tsx"
+   },
+   {
+    "from": "components/ai/DigitalTwin.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "components/ai/DigitalTwin.tsx",
+    "to": "lib/useAiModule.ts"
+   },
+   {
+    "from": "components/ai/ExplainButton.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/ai/InsightCard.tsx",
+    "to": "app/dashboard/ai/_components/overview/taxonomy.ts"
+   },
+   {
+    "from": "components/ai/InsightCard.tsx",
+    "to": "components/ai/ExplainButton.tsx"
+   },
+   {
+    "from": "components/ai/ModuleShell.tsx",
+    "to": "components/ai/HowItWorks.tsx"
+   },
+   {
+    "from": "components/ai/StrategyAgent.tsx",
+    "to": "components/ai/HowItWorks.tsx"
+   },
+   {
+    "from": "components/ai/StrategyAgent.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/ai/StrategyAgent.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/ai/StrategyAgent.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/ai/WhatIfSimulator.tsx",
+    "to": "components/ai/HowItWorks.tsx"
+   },
+   {
+    "from": "components/ai/WhatIfSimulator.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/ai/WhatIfSimulator.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/ai/WhatIfSimulator.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "components/demo/DemoAreaClient.tsx",
+    "to": "components/demo/DemoCharts.tsx"
+   },
+   {
+    "from": "components/demo/DemoAreaClient.tsx",
+    "to": "components/demo/DemoSimulation.tsx"
+   },
+   {
+    "from": "components/demo/DemoAreaClient.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/demo/DemoAreaClient.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "components/demo/DemoAreaClient.tsx",
+    "to": "lib/retry.ts"
+   },
+   {
+    "from": "components/demo/DemoCharts.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "components/demo/DemoDataViews.tsx",
+    "to": "lib/demo-modules.ts"
+   },
+   {
+    "from": "components/demo/DemoForecast.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/demo/DemoForecast.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/demo/DemoForecast.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "components/demo/DemoIdeas.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/demo/DemoIdeas.tsx",
+    "to": "lib/retry.ts"
+   },
+   {
+    "from": "components/demo/DemoOwnerInsights.tsx",
+    "to": "components/demo/DemoDataViews.tsx"
+   },
+   {
+    "from": "components/demo/DemoOwnerInsights.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/demo/DemoOwnerInsights.tsx",
+    "to": "lib/demo-modules.ts"
+   },
+   {
+    "from": "components/demo/DemoOwnerInsights.tsx",
+    "to": "lib/vibandaAreas.ts"
+   },
+   {
+    "from": "components/demo/DemoSimulation.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/demo/DemoSimulation.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "components/demo/DemoSimulation.tsx",
+    "to": "lib/retry.ts"
+   },
+   {
+    "from": "components/features/inventory/AddItemModal.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/features/inventory/AdjustStockModal.tsx",
+    "to": "components/features/inventory/types.ts"
+   },
+   {
+    "from": "components/features/inventory/AdjustStockModal.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/features/inventory/InventoryInsights.tsx",
+    "to": "components/features/inventory/types.ts"
+   },
+   {
+    "from": "components/features/inventory/InventoryList.tsx",
+    "to": "components/features/inventory/types.ts"
+   },
+   {
+    "from": "components/features/inventory/InventoryList.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/features/inventory/InventoryWorkspace.tsx",
+    "to": "components/features/inventory/AddItemModal.tsx"
+   },
+   {
+    "from": "components/features/inventory/InventoryWorkspace.tsx",
+    "to": "components/features/inventory/AdjustStockModal.tsx"
+   },
+   {
+    "from": "components/features/inventory/InventoryWorkspace.tsx",
+    "to": "components/features/inventory/InventoryInsights.tsx"
+   },
+   {
+    "from": "components/features/inventory/InventoryWorkspace.tsx",
+    "to": "components/features/inventory/InventoryList.tsx"
+   },
+   {
+    "from": "components/features/inventory/InventoryWorkspace.tsx",
+    "to": "components/features/inventory/StockAlertsPanel.tsx"
+   },
+   {
+    "from": "components/features/inventory/InventoryWorkspace.tsx",
+    "to": "components/features/inventory/useInventoryWorkspace.ts"
+   },
+   {
+    "from": "components/features/inventory/KitchenStockPanel.tsx",
+    "to": "components/features/inventory/types.ts"
+   },
+   {
+    "from": "components/features/inventory/KitchenStockPanel.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/features/inventory/KitchenStockPanel.tsx",
+    "to": "components/ui/Toast.tsx"
+   },
+   {
+    "from": "components/features/inventory/KitchenStockPanel.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/features/inventory/KitchenStockPanel.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/features/inventory/StockAlertsPanel.tsx",
+    "to": "components/features/inventory/types.ts"
+   },
+   {
+    "from": "components/features/inventory/VarianceReportPanel.tsx",
+    "to": "components/features/inventory/types.ts"
+   },
+   {
+    "from": "components/features/inventory/VarianceReportPanel.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/features/inventory/useInventoryWorkspace.ts",
+    "to": "components/features/inventory/types.ts"
+   },
+   {
+    "from": "components/features/inventory/useInventoryWorkspace.ts",
+    "to": "components/ui/Toast.tsx"
+   },
+   {
+    "from": "components/features/inventory/useInventoryWorkspace.ts",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/features/inventory/useInventoryWorkspace.ts",
+    "to": "lib/demo-data.ts"
+   },
+   {
+    "from": "components/features/inventory/useInventoryWorkspace.ts",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/features/kitchen/KDSBoard.tsx",
+    "to": "components/features/kitchen/KDSColumn.tsx"
+   },
+   {
+    "from": "components/features/kitchen/KDSBoard.tsx",
+    "to": "components/ui/Toast.tsx"
+   },
+   {
+    "from": "components/features/kitchen/KDSBoard.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/features/kitchen/KDSBoard.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/features/kitchen/KDSColumn.tsx",
+    "to": "components/features/kitchen/KDSBoard.tsx"
+   },
+   {
+    "from": "components/features/kitchen/KDSColumn.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/features/menu/AddMenuItemForm.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/features/menu/AddMenuItemForm.tsx",
+    "to": "components/ui/Toast.tsx"
+   },
+   {
+    "from": "components/features/menu/AddMenuItemForm.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/features/menu/AddMenuItemForm.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/features/menu/MenuEditor.tsx",
+    "to": "components/features/menu/AddMenuItemForm.tsx"
+   },
+   {
+    "from": "components/features/menu/MenuEditor.tsx",
+    "to": "components/features/menu/MenuInsightsPanel.tsx"
+   },
+   {
+    "from": "components/features/menu/MenuEditor.tsx",
+    "to": "components/features/menu/MenuItemRow.tsx"
+   },
+   {
+    "from": "components/features/menu/MenuEditor.tsx",
+    "to": "components/features/menu/types.ts"
+   },
+   {
+    "from": "components/features/menu/MenuEditor.tsx",
+    "to": "components/ui/Toast.tsx"
+   },
+   {
+    "from": "components/features/menu/MenuEditor.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/features/menu/MenuEditor.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/features/menu/MenuInsightsPanel.tsx",
+    "to": "components/features/menu/types.ts"
+   },
+   {
+    "from": "components/features/menu/MenuItemRow.tsx",
+    "to": "components/features/menu/types.ts"
+   },
+   {
+    "from": "components/features/menu/MenuItemRow.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/features/menu/MenuReadView.tsx",
+    "to": "components/features/menu/types.ts"
+   },
+   {
+    "from": "components/features/menu/MenuReadView.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/features/orders/OrderInsightsPanel.tsx",
+    "to": "components/features/orders/types.ts"
+   },
+   {
+    "from": "components/features/orders/OrderList.tsx",
+    "to": "components/features/orders/OrderInsightsPanel.tsx"
+   },
+   {
+    "from": "components/features/orders/OrderList.tsx",
+    "to": "components/features/orders/types.ts"
+   },
+   {
+    "from": "components/features/orders/OrderList.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/features/orders/OrderList.tsx",
+    "to": "components/ui/Toast.tsx"
+   },
+   {
+    "from": "components/features/orders/OrderList.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/features/orders/OrderList.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/features/pos/POSWorkspace.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/features/pos/POSWorkspace.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/features/pos/POSWorkspace.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/features/pos/POSWorkspace.tsx",
+    "to": "lib/offlineOrderOutbox.ts"
+   },
+   {
+    "from": "components/features/purchasing/PurchaseOrdersPanel.tsx",
+    "to": "components/features/purchasing/types.ts"
+   },
+   {
+    "from": "components/features/purchasing/PurchaseOrdersPanel.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/features/purchasing/PurchaseOrdersPanel.tsx",
+    "to": "components/ui/Toast.tsx"
+   },
+   {
+    "from": "components/features/purchasing/PurchaseOrdersPanel.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/features/purchasing/PurchaseOrdersPanel.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/features/purchasing/PurchasingWorkspace.tsx",
+    "to": "components/features/purchasing/PurchaseOrdersPanel.tsx"
+   },
+   {
+    "from": "components/features/purchasing/PurchasingWorkspace.tsx",
+    "to": "components/features/purchasing/ReorderSettingsPanel.tsx"
+   },
+   {
+    "from": "components/features/purchasing/PurchasingWorkspace.tsx",
+    "to": "components/features/purchasing/SupplierPanel.tsx"
+   },
+   {
+    "from": "components/features/purchasing/PurchasingWorkspace.tsx",
+    "to": "components/features/purchasing/types.ts"
+   },
+   {
+    "from": "components/features/purchasing/PurchasingWorkspace.tsx",
+    "to": "components/ui/Toast.tsx"
+   },
+   {
+    "from": "components/features/purchasing/PurchasingWorkspace.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/features/purchasing/PurchasingWorkspace.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/features/purchasing/ReorderSettingsPanel.tsx",
+    "to": "components/features/purchasing/types.ts"
+   },
+   {
+    "from": "components/features/purchasing/ReorderSettingsPanel.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/features/purchasing/ReorderSettingsPanel.tsx",
+    "to": "components/ui/Toast.tsx"
+   },
+   {
+    "from": "components/features/purchasing/ReorderSettingsPanel.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/features/purchasing/ReorderSettingsPanel.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/features/purchasing/SupplierPanel.tsx",
+    "to": "components/features/purchasing/types.ts"
+   },
+   {
+    "from": "components/features/purchasing/SupplierPanel.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/features/purchasing/SupplierPanel.tsx",
+    "to": "components/ui/Toast.tsx"
+   },
+   {
+    "from": "components/features/purchasing/SupplierPanel.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/features/purchasing/SupplierPanel.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/features/reservations/ReservationForm.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/features/reservations/ReservationList.tsx",
+    "to": "components/features/reservations/types.ts"
+   },
+   {
+    "from": "components/features/reservations/ReservationList.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/features/reservations/ReservationsWorkspace.tsx",
+    "to": "components/features/reservations/ReservationForm.tsx"
+   },
+   {
+    "from": "components/features/reservations/ReservationsWorkspace.tsx",
+    "to": "components/features/reservations/ReservationList.tsx"
+   },
+   {
+    "from": "components/features/reservations/ReservationsWorkspace.tsx",
+    "to": "components/features/reservations/TablesPanel.tsx"
+   },
+   {
+    "from": "components/features/reservations/ReservationsWorkspace.tsx",
+    "to": "components/features/reservations/types.ts"
+   },
+   {
+    "from": "components/features/reservations/ReservationsWorkspace.tsx",
+    "to": "components/ui/Toast.tsx"
+   },
+   {
+    "from": "components/features/reservations/ReservationsWorkspace.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/features/reservations/ReservationsWorkspace.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/features/reservations/TablesPanel.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/features/sales/SalesView.tsx",
+    "to": "components/features/sales/ChannelRow.tsx"
+   },
+   {
+    "from": "components/features/sales/SalesView.tsx",
+    "to": "components/features/sales/PaymentRow.tsx"
+   },
+   {
+    "from": "components/features/sales/SalesView.tsx",
+    "to": "components/ui/StatCard.tsx"
+   },
+   {
+    "from": "components/features/sales/SalesView.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/features/sales/SalesView.tsx",
+    "to": "lib/demo-data.ts"
+   },
+   {
+    "from": "components/features/support/SupportView.tsx",
+    "to": "components/ui/FormField.tsx"
+   },
+   {
+    "from": "components/features/support/SupportView.tsx",
+    "to": "components/ui/Toast.tsx"
+   },
+   {
+    "from": "components/features/support/SupportView.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "components/features/support/SupportView.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/features/support/SupportView.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/staff/AttendanceWidget.tsx",
+    "to": "components/ui/Toast.tsx"
+   },
+   {
+    "from": "components/staff/AttendanceWidget.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/staff/AttendanceWidget.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "components/NotificationBell.tsx"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "components/PinSetupModal.tsx"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "components/QuickSwitchModal.tsx"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "components/staff/AttendanceWidget.tsx"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "components/ui/PageLoader.tsx"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "components/ui/SkipLink.tsx"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "lib/pathTitle.ts"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "lib/permissions.ts"
+   },
+   {
+    "from": "components/vibanda/CreativeNote.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/vibanda/OwnerHomeEmpty.tsx",
+    "to": "components/vibanda/CreativeNote.tsx"
+   },
+   {
+    "from": "components/vibanda/OwnerHomeEmpty.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/vibanda/SourceUnavailable.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/vibanda/VibandaAreaClient.tsx",
+    "to": "components/vibanda/VibandaForecast.tsx"
+   },
+   {
+    "from": "components/vibanda/VibandaAreaClient.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/vibanda/VibandaAreaClient.tsx",
+    "to": "lib/vibandaSource.ts"
+   },
+   {
+    "from": "components/vibanda/VibandaForecast.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/vibanda/VibandaForecast.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/vibanda/VibandaForecast.tsx",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "components/vibanda/VibandaForecast.tsx",
+    "to": "lib/vibandaSource.ts"
+   },
+   {
+    "from": "context/AuthContext.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "context/AuthContext.tsx",
+    "to": "lib/offlineOrderOutbox.ts"
+   },
+   {
+    "from": "context/AuthContext.tsx",
+    "to": "lib/tokenStore.ts"
+   },
+   {
+    "from": "lib/api.ts",
+    "to": "lib/tokenStore.ts"
+   },
+   {
+    "from": "lib/demo-modules.ts",
+    "to": "lib/format.ts"
+   },
+   {
+    "from": "lib/osSuggestions.ts",
+    "to": "lib/vibandaAreas.ts"
+   },
+   {
+    "from": "lib/useAiModule.ts",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "lib/useAiModule.ts",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "lib/useNotifications.ts",
+    "to": "lib/api.ts"
+   }
+  ]
+ }
+}

@@ -4,7 +4,8 @@
 #   fe     E1 frontend — tsc --noEmit, vitest, eslint ratchet, next build
 #   evals  E2–E5       — backend/tests/evals (strict-xfail entries are the not-yet-built sprints)
 #   e6     E6          — Playwright owner tasks (skipped, loudly, until the spec file exists)
-#   gate   evals + test + fe + e6
+#   map    regenerate docs/v2/codemap.json + coverage.md from the code (execution/codemap.py)
+#   gate   map + evals + test + fe + e6
 #
 # Override the interpreter / skip the slow build when iterating:
 #   PY=/path/to/venv/bin/python make -C docs/v2 gate
@@ -19,7 +20,11 @@ PY         ?= python3
 LOGDIR     := $(ROOT)/.tmp/gate
 E6_SPEC    := $(ROOT)/frontend/tests/e2e/owner-tasks.spec.ts
 
-.PHONY: test fe evals e6 gate
+.PHONY: map test fe evals e6 gate
+
+map:
+	@echo "== code map (docs/v2/codemap.json, coverage.md)"
+	cd $(ROOT) && $(PY) -I execution/codemap.py
 
 test:
 	@mkdir -p $(LOGDIR)
@@ -52,5 +57,5 @@ e6:
 	  cd $(ROOT)/frontend && npx playwright test tests/e2e/owner-tasks.spec.ts 2>&1 | tee $(LOGDIR)/e6.log | tail -n 20; \
 	else echo "== E6 NOT RUN: frontend/tests/e2e/owner-tasks.spec.ts does not exist yet (due by P4)"; fi
 
-gate: evals test fe e6
+gate: map evals test fe e6
 	@echo "== GATE PASSED (logs in .tmp/gate/)"

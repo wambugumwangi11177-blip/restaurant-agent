@@ -8,6 +8,29 @@ Newest sprint first. Spec: [`SPEC.md`](SPEC.md). Gate: `make -C docs/v2 gate`.
 
 ## Sprint log (newest first)
 
+### S0.2 Code map script — done
+
+**Plan.** Goal: a code-derived map so "what is wired where" stops being a claim. Files: `execution/codemap.py`, `docs/v2/{codemap.json,coverage.md,figure_1_3.json}`, `backend/tests/test_codemap.py`, `docs/v2/Makefile` (`map` target, run first in `gate`). Tests: 6 structural tests.
+
+**Method.** Python AST import graph (module-level *and* lazy in-function imports; dispatch tables like `_HANDLERS = {...}` and `from .x import y` re-exports are followed); TypeScript import graph (`@/` and relative); route table from `@router.<verb>` decorators; a surface = frontend entry files → every string literal that matches a route → handler analysed at *function* granularity (stops at engine modules and at hub modules that import everything). `python3 execution/codemap.py --why <surface> <engine>` prints the exact chain behind any dot. File-scoped rules (human-verified) cover what imports cannot show: calls that only read connection state (`STATUS_ONLY`) and the forecast panel that renders only when the source is verified (`CONDITIONAL_FILES`).
+
+**Result.** 148 backend modules / 563 imports (167 lazy) · 231 frontend files / 485 imports · 167 routes. `codemap.py --compare-spec`: **127 of 132 cells of figure 1.3 reproduce from code.** The 5 that differ — the code wins, and none changes money maths:
+
+| Cell | Spec fig 1.3 | Code | Why |
+|---|---|---|---|
+| Sales summary × Old dash | ● | ○ | `overview._summarize` is not called by `/dashboard`; its sales numbers come from `/ai/dashboard` (`ops_manager`). Same fact, different function. |
+| Data quality × Home | ◐ | ○ | `ai.data_quality` is imported only by `/ai/data-quality` and the WhatsApp brain. Home never reaches it. |
+| Goal mode × Old dash | ◐ | ● | `/ai/strategy` reaches `ai.orchestrator.strategist` directly; "partial" is a UX condition the graph cannot see. |
+| Custody × Demo, Data quality × Demo | ≈ | ○ | `demo_scenario.py` has no variance/handover/data-quality maths (keyword evidence). |
+
+Also found: 10 `backend/ai` modules are real analysis but not rows of figure 1.3 (`ops_manager`, `creative`, `home_specialists`, `graph`, `enterprise.*`, `order_stock`) — listed as **candidates** in `coverage.md`; S1.4's registry must register each or write down why not. Any *unclassified* `ai.*` module now fails a test (mutation-checked: adding `ai/zz_new_engine.py` made it fail).
+
+**Gate.** backend **886 passed, 1 skipped** (880 baseline + 6 new) · vitest 55 · tsc clean · lint ratchet OK · build OK.
+
+**Discovered, not in SPEC §1.5 (add to a later sprint, not fixed now).**
+- **D17** — `func.date()` over naive-UTC columns, which SPEC §0.3 forbids (the day boundary drifts after 21:00 UTC): `ai/labor/intelligence.py:72,78`, `ai/fraud/detection.py:114,124`, `ai/whatsapp/brain.py:98,109,1045`. Fix alongside S1.3 or when each engine is next touched.
+- `ai/labor/intelligence.py` and the S0.3 characterisation: overtime cost is the whole shift's cost (that *is* D10), confirmed by reading the code.
+
 ### S0.1 Baseline — done
 
 **Plan.** Goal: a reproducible gate and recorded baseline before any behaviour changes. Files: `docs/v2/{SPEC.md,PROGRESS.md,Makefile,eslint-baseline.json}`, `execution/lint_ratchet.py`, `CLAUDE.md` (+ its mirror `GEMINI.md`). Tests added: none (infrastructure only).

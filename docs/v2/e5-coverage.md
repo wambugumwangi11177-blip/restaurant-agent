@@ -28,7 +28,7 @@ named in the report plan, not built) · — exempt (written reason in the regist
 | data_quality | How complete your costs are | built | ✔ | ✖ missing | ◌ planned |
 | strategist | Goal mode | built | — exempt | ✖ missing | — exempt |
 | decisions | What is costing you money | built | ✔ | ✔ | ◌ planned |
-| money | Profit & Loss, costs covered, bills | planned | ◌ S3.1–S3.3 | ◌ S3.1–S3.3 | ◌ S3.1–S3.3 |
+| money | Profit & Loss, costs covered, bills | planned | ◌ S3.3 | ◌ S3.3 | ✔ |
 | mpesa_match | M-Pesa statement check | planned | ◌ S6.1–S6.2 | ◌ S6.1–S6.2 | ◌ S6.1–S6.2 |
 | owner_settings | Your targets | built | ✔ | — exempt | ◌ planned |
 
@@ -39,7 +39,7 @@ named in the report plan, not built) · — exempt (written reason in the regist
 
 ## Not yet built engines (their surfaces are placeholders until their sprint)
 
-- **money** — Profit & Loss, costs covered, bills: S3.1–S3.3
+- **money** — Profit & Loss, costs covered, bills: S3.3
 - **mpesa_match** — M-Pesa statement check: S6.1–S6.2
 
 ## Exemptions (written reasons)

@@ -53,12 +53,23 @@ def _top_dishes(ctx: OwnerContext, period: str) -> dict:
     return {**ctx.order_state(), "dishes": [{"name": t["name"], "sold": t["qty"], "sales": t["sales_kes"]} for t in top]}
 
 
-BUILDERS = {"sales": _sales, "top_dishes": _top_dishes}
+def _pnl(ctx: OwnerContext, period: str) -> dict:
+    """The Profit & Loss for the calendar month so far (S3.2). The yearly report's "Profit & Loss by month" is S5.2."""
+    from owner.areas import month_pnl
+    return month_pnl(ctx)
+
+
+# section key -> (builder, the report periods it exists for; None = every period). The rest of PLAN is `planned`.
+BUILDERS = {"sales": (_sales, None), "top_dishes": (_top_dishes, None), "pnl": (_pnl, ("monthly",))}
+
+
+def _exists(key: str, period: str) -> bool:
+    return key in BUILDERS and (BUILDERS[key][1] is None or period in BUILDERS[key][1])
 
 
 def built_sections() -> set[str]:
     """`period.section` keys that exist today (used by E5 and the registry); the rest of PLAN is `planned`."""
-    return {f"{period}.{key}" for period, plan in PLAN.items() for key, _title in plan if key in BUILDERS}
+    return {f"{period}.{key}" for period, plan in PLAN.items() for key, _title in plan if _exists(key, period)}
 
 
 def planned_sections() -> set[str]:
@@ -71,8 +82,8 @@ def compose_report(ctx: OwnerContext, period: str) -> dict:
     _overview, reports = _routers()
     sections = []
     for key, title in PLAN[period]:
-        if key in BUILDERS:
-            body = ctx.safe(f"report.{key}", lambda k=key: BUILDERS[k](ctx, period))
+        if _exists(key, period):
+            body = ctx.safe(f"report.{key}", lambda k=key: BUILDERS[k][0](ctx, period))
         else:
             body = unavailable("This section is not available yet.", planned=True)
         sections.append({"key": key, "title": title, **body})

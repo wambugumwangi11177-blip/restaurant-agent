@@ -148,10 +148,15 @@ def test_every_home_block_belongs_to_a_registered_engine(payloads):
 
 
 def test_planned_engines_are_honest_placeholders_on_home(payloads):
+    """An engine that is not built yet has only `unavailable` blocks with a reason — except the blocks the registry says are
+    already built (a partly built engine, e.g. the P&L before break-even and bills)."""
     for e in registry.engines("planned"):
         for path in e.home_blocks:
             block = _resolve(payloads["home"], path)
-            assert block["state"] == "unavailable" and block.get("reason"), f"{e.key}: {path} pretends to be built"
+            if path in e.built_blocks:
+                assert block["state"] != "unavailable", f"{e.key}: {path} is declared built but is a placeholder"
+            else:
+                assert block["state"] == "unavailable" and block.get("reason"), f"{e.key}: {path} pretends to be built"
 
 
 def test_built_engines_are_never_stubbed_on_home(payloads):

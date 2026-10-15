@@ -77,9 +77,9 @@ ENGINES = [
     ("data_quality", "Data quality / trust", "module", ["ai.data_quality"]),
     ("strategist", "Goal mode (strategist)", "module", ["ai.orchestrator.strategist"]),
     ("decisions", "Decision ranking", "module", ["ai.decisions"]),
-    ("money", "Expenses · P&L · break-even · bills", "none", ["owner.money"]),
+    ("money", "Expenses · P&L · break-even · bills", "module", ["owner.money"]),
     ("mpesa_match", "M-Pesa statement match", "none", ["parsers.mpesa_csv"]),
-    ("owner_settings", "Owner settings (targets, limits)", "none", ["owner.settings"]),
+    ("owner_settings", "Owner settings (targets, limits)", "module", ["owner.settings"]),
 ]
 
 # Every module under backend/ai that is NOT a row above must be classified here, with a

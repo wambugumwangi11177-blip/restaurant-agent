@@ -166,7 +166,7 @@
   },
   {
    "key": "money",
-   "kind": "none",
+   "kind": "module",
    "label": "Expenses \u00b7 P&L \u00b7 break-even \u00b7 bills",
    "targets": [
     "owner.money"
@@ -182,7 +182,7 @@
   },
   {
    "key": "owner_settings",
-   "kind": "none",
+   "kind": "module",
    "label": "Owner settings (targets, limits)",
    "targets": [
     "owner.settings"
@@ -641,7 +641,7 @@
   },
   "money": {
    "area": "not_shown",
-   "demo": "not_shown",
+   "demo": "reimplemented",
    "home": "not_shown",
    "old_dash": "not_shown",
    "os": "not_shown",
@@ -2464,6 +2464,16 @@
    {
     "from": "owner.areas",
     "lazy": true,
+    "to": "owner.money.pnl"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "owner.money.view"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
     "to": "owner.settings"
    },
    {
@@ -2475,6 +2485,11 @@
     "from": "owner.areas",
     "lazy": true,
     "to": "routers.overview"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "time_utils"
    },
    {
     "from": "owner.ask",
@@ -2527,8 +2542,48 @@
     "to": "time_utils"
    },
    {
+    "from": "owner.money.pnl",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.money.pnl",
+    "lazy": false,
+    "to": "owner.money.categories"
+   },
+   {
+    "from": "owner.money.pnl",
+    "lazy": false,
+    "to": "owner.settings"
+   },
+   {
+    "from": "owner.money.pnl",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "owner.money.view",
+    "lazy": false,
+    "to": "owner.money.ledger"
+   },
+   {
+    "from": "owner.money.view",
+    "lazy": false,
+    "to": "owner.settings"
+   },
+   {
+    "from": "owner.money.view",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
     "from": "owner.registry",
     "lazy": false,
+    "to": "owner.areas"
+   },
+   {
+    "from": "owner.reports",
+    "lazy": true,
     "to": "owner.areas"
    },
    {
@@ -3564,7 +3619,22 @@
    {
     "from": "routers.owner_money",
     "lazy": false,
+    "to": "owner.money.pnl"
+   },
+   {
+    "from": "routers.owner_money",
+    "lazy": false,
+    "to": "owner.money.view"
+   },
+   {
+    "from": "routers.owner_money",
+    "lazy": false,
     "to": "owner.settings"
+   },
+   {
+    "from": "routers.owner_money",
+    "lazy": false,
+    "to": "owner.states"
    },
    {
     "from": "routers.owner_money",
@@ -4755,7 +4825,7 @@
     "group": "other",
     "id": "owner.areas",
     "kind": "py",
-    "loc": 563,
+    "loc": 574,
     "path": "backend/owner/areas.py"
    },
    {
@@ -4809,16 +4879,30 @@
    },
    {
     "group": "other",
+    "id": "owner.money.pnl",
+    "kind": "py",
+    "loc": 213,
+    "path": "backend/owner/money/pnl.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.money.view",
+    "kind": "py",
+    "loc": 99,
+    "path": "backend/owner/money/view.py"
+   },
+   {
+    "group": "other",
     "id": "owner.registry",
     "kind": "py",
-    "loc": 172,
+    "loc": 175,
     "path": "backend/owner/registry.py"
    },
    {
     "group": "other",
     "id": "owner.reports",
     "kind": "py",
-    "loc": 83,
+    "loc": 94,
     "path": "backend/owner/reports.py"
    },
    {
@@ -5035,7 +5119,7 @@
     "group": "router",
     "id": "routers.owner_money",
     "kind": "py",
-    "loc": 524,
+    "loc": 543,
     "path": "backend/routers/owner_money.py"
    },
    {
@@ -6002,6 +6086,12 @@
    "verb": "POST"
   },
   {
+   "func": "profit_and_loss",
+   "module": "routers.owner_money",
+   "path": "/owner/money/pnl",
+   "verb": "GET"
+  },
+  {
    "func": "read_expense",
    "module": "routers.owner_money",
    "path": "/owner/money/expenses/{expense_id}",
@@ -6303,10 +6393,10 @@
   }
  ],
  "stats": {
-  "py_edges": 648,
-  "py_lazy_edges": 193,
-  "py_modules": 168,
-  "routes": 189,
+  "py_edges": 662,
+  "py_lazy_edges": 197,
+  "py_modules": 170,
+  "routes": 190,
   "ts_edges": 485,
   "ts_files": 231
  },

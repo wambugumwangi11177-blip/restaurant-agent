@@ -26,6 +26,10 @@ from owner.money import categories as cats
 from owner.money.ledger import (LICENCE_MAX_DATE, LICENCE_MIN_DATE, MAX_KES, check_entry_date, nairobi_today, parse_money, to_cents,
                                 to_kes)
 from owner.money.licences import licence_status
+from owner.money.pnl import KINDS as PNL_KINDS
+from owner.money.pnl import compute_pnl, period_range
+from owner.money.view import owner_pnl
+from owner.states import OwnerContext
 from routers.deps import get_restaurant_or_none
 from time_utils import utcnow
 
@@ -521,3 +525,18 @@ def update_licence(licence_id: int, body: LicencePatch, db: Session = Depends(ge
     l.updated_at = utcnow()
     db.commit()
     return _licence_json(l, nairobi_today(), owner_settings.get_settings(db, rid).licence_warning_days)
+
+
+# ── Profit & Loss ────────────────────────────────────────────────────────────
+
+@router.get("/pnl")
+def profit_and_loss(period: Literal["day", "week", "month", "year"] = "month", on: Optional[date] = None,
+                    db: Session = Depends(get_db), user: models.User = Depends(_roles)):
+    """What you sold, what it cost, what you kept — for the calendar day, Monday-to-Sunday week, month or year containing `on`
+    (default today, Nairobi). The same block Home shows and the monthly report carries."""
+    restaurant = _restaurant(db, user)
+    ctx = OwnerContext(db, user, restaurant)
+    today = nairobi_today()
+    start, end = period_range(period, on or today)
+    result = compute_pnl(db, restaurant.id, start, end, ctx.settings, today=today)
+    return owner_pnl(result, period, ctx.settings, as_of=ctx.now, sales_state=ctx.order_state()["state"])

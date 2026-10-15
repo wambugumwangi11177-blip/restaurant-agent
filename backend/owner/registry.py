@@ -43,6 +43,7 @@ class Engine:
     settings: tuple[str, ...] = ()
     status: str = "built"
     planned_in: str | None = None
+    built_blocks: tuple[str, ...] = ()         # an engine still `planned` may already have some of its Home blocks built
     exemptions: dict = field(default_factory=dict)
 
     def __post_init__(self):
@@ -50,6 +51,8 @@ class Engine:
         assert self.zone in ZONES, self.key
         assert self.status in ("built", "planned"), self.key
         assert (self.status == "planned") == (self.planned_in is not None), self.key
+        assert set(self.built_blocks) <= set(self.home_blocks), self.key
+        assert not self.built_blocks or self.status == "planned", f"{self.key}: built_blocks only makes sense for a planned engine"
         assert set(self.exemptions) <= set(SURFACES), self.key
         assert all(self.exemptions.values()), f"{self.key}: an exemption needs a written reason"
 
@@ -134,7 +137,7 @@ ENGINES: tuple[Engine, ...] = (
            home_blocks=("money.pnl", "money.breakeven", "money.bills", "money.spikes", "coming_up.bills",
                       "permits.licences", "coming_up.licences"),
            os_topics=(), report_sections=("monthly.pnl", "yearly.pnl"),
-           inputs=("expenses", "recurring bills"), status="planned", planned_in="S3.1–S3.3"),
+           inputs=("expenses", "recurring bills"), status="planned", planned_in="S3.3", built_blocks=("money.pnl",)),
     Engine("mpesa_match", "M-Pesa statement check", "cash", "pulse",
            home_blocks=("cash.mpesa",), os_topics=(), report_sections=(),
            inputs=("your M-Pesa statement",), status="planned", planned_in="S6.1–S6.2"),

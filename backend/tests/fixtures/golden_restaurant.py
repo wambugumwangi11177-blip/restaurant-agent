@@ -352,3 +352,57 @@ def seed_overtime_shift(db, g: Golden, hours: float = 8.5) -> None:
         scheduled_hours=8.0, actual_hours=hours, labor_cost=int(hours * 12_500),
         actual_start=g.now.replace(hour=6), actual_end=g.now.replace(hour=14, minute=30)))
     db.commit()
+
+
+# ─── the money ledger (S3.2): §7 #1/#2 and #13 ───────────────────────────────
+
+def seed_expenses(db, g: Golden, entries, *, paid_on=None, spread_days: int = 0) -> None:
+    """Record expenses: `entries` = [(category key, amount cents)]. Paid on `paid_on` (default: today in Nairobi), or spread
+    over `spread_days` days ending then. Not a copy of the engine's maths — plain ledger rows, as the owner would enter them."""
+    from datetime import timedelta as _td
+    from owner.money.categories import ensure_categories
+    ensure_categories(db, g.rid)
+    cats = {c.key: c for c in db.query(models.ExpenseCategory).filter(models.ExpenseCategory.restaurant_id == g.rid)}
+    day = paid_on or (g.now + _td(hours=3)).date()
+    for i, (key, cents) in enumerate(entries):
+        db.add(models.Expense(restaurant_id=g.rid, category_id=cats[key].id, amount_cents=cents,
+                              paid_on=day - _td(days=(i % (spread_days + 1))), method="cash",
+                              paid_by_user_id=g.owner.id, supplier="", note=""))
+    db.commit()
+
+
+WEEK_OPEX = [("premises", 1_200_000), ("kplc", 600_000), ("water", 150_000), ("gas", 450_000), ("security", 400_000)]     # KES 28,000
+
+
+def seed_pnl_week_with_costs(db, g: Golden, *, price_rise: bool = False) -> None:
+    """§7 #1/#2: a week of sales (100,000 or 105,000), ingredients 32,000, wages 25,000 (shifts) and 28,000 of other costs."""
+    seed_pnl_week(db, g, price_rise=price_rise)
+    seed_expenses(db, g, WEEK_OPEX, spread_days=6)
+
+
+MONTH_OPEX = [("premises", 6_000_000), ("kplc", 1_400_000), ("water", 350_000), ("gas", 950_000), ("security", 800_000),
+              ("licences", 600_000), ("marketing", 500_000), ("repairs", 600_000)]                                          # KES 112,000
+
+
+def seed_pnl_month(db, g: Golden) -> None:
+    """§7 #13: a month of KES 412,000 sales (400 plates at 1,000 cost 320 + 10 at 1,200 cost 380), wages 103,000 (103 shifts of
+    KES 1,000) and KES 112,000 of other costs. Spread over the first 20 days of the month of `g.now`."""
+    plate = models.MenuItem(restaurant_id=g.rid, name="House set meal", category="Mains", price=100_000, cost_price=32_000, is_available=True)
+    special = models.MenuItem(restaurant_id=g.rid, name="Chef's special", category="Mains", price=120_000, cost_price=38_000, is_available=True)
+    db.add_all([plate, special])
+    db.flush()
+    first = g.now.replace(day=1, hour=10, minute=0, second=0)
+    for i in range(400):
+        add_order(db, g, [(plate, 1, 100_000)], first + timedelta(days=i % 20, minutes=i // 20))
+    for i in range(10):
+        add_order(db, g, [(special, 1, 120_000)], first + timedelta(days=2 * i, minutes=30))
+    member = models.StaffMember(restaurant_id=g.rid, name="Crew", role_title="Waiter", hourly_rate=12_500)
+    db.add(member)
+    db.flush()
+    for i in range(103):
+        day = (first + timedelta(days=i % 20)).date()
+        db.add(models.LaborShift(restaurant_id=g.rid, staff_member_id=member.id, shift_date=day, scheduled_hours=8.0, actual_hours=8.0,
+                                 labor_cost=100_000, actual_start=first.replace(hour=6) + timedelta(days=i % 20),
+                                 actual_end=first.replace(hour=14) + timedelta(days=i % 20)))
+    db.commit()
+    seed_expenses(db, g, MONTH_OPEX, paid_on=first.date() + timedelta(days=19), spread_days=19)

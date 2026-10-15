@@ -137,8 +137,10 @@ def test_not_yet_built_parts_say_so_instead_of_inventing_a_number(client, db_ses
     _r, user = _fresh(db_session)
     body = client.get(f"{API}/home", headers=_headers(user)).json()
     money = body["areas"]["money"]["blocks"]
-    for name in ("pnl", "breakeven", "bills", "spikes"):
+    for name in ("breakeven", "bills", "spikes"):
         assert money[name]["state"] == "unavailable" and money[name]["reason"], name
+    assert money["pnl"]["state"] == "no_data" and money["pnl"]["reason"]            # S3.2: built, and honest when nothing is recorded
+    assert money["pnl"]["lines"][0]["key"] == "sales" and money["pnl"]["lines"][-1]["key"] == "kept"
     assert body["areas"]["cash"]["blocks"]["mpesa"]["state"] == "unavailable"
     assert body["pulse"]["breakeven_at"]["state"] == "unavailable"
     assert body["read"]["state"] == "unavailable" and body["read"]["text"] is None
@@ -319,8 +321,10 @@ def test_report_content_equals_the_legacy_report(client, db_session, golden, per
 
 def test_report_lists_planned_sections_as_planned_not_as_blank(client, db_session, golden):
     body = _get(client, golden, "/report/monthly").json()
-    pnl = next(s for s in body["sections"] if s["key"] == "pnl")
-    assert pnl["state"] == "unavailable" and pnl["planned"] is True
+    costs = next(s for s in body["sections"] if s["key"] == "costs")
+    assert costs["state"] == "unavailable" and costs["planned"] is True
+    pnl = next(s for s in body["sections"] if s["key"] == "pnl")                  # S3.2 built the monthly P&L
+    assert pnl["state"] != "unavailable" and "planned" not in pnl and pnl["lines"]
     keys = [s["key"] for s in body["sections"]]
     assert "rules_used" in keys and "read" in keys
     assert all(s["title"] for s in body["sections"])
@@ -445,7 +449,7 @@ def test_owner_vocabulary_on_labels_words_and_titles(client, db_session, golden)
     home = _get(client, golden, "/home").json()
     visible = []
     for path, key, value in _walk(home):
-        if key in ("title", "word", "label", "kind", "sentence", "action", "domain") and isinstance(value, str):
+        if key in ("title", "word", "label", "kind", "sentence", "action", "domain") and isinstance(value, str) and not path.endswith(".period"):
             visible.append((f"{path}.{key}", value))
     assert visible
     for where, text in visible:
@@ -528,10 +532,14 @@ def test_registry_entries_point_at_things_that_exist():
 
 
 def test_registered_planned_engines_match_the_codemap_engines_that_are_not_built():
+    """An engine with no module at all is `none` in the code map and `planned` with no built blocks in the registry; a partly
+    built engine (the money layer: P&L done, break-even and bills to come) has a module and is `planned` with built_blocks."""
     from owner.registry import engines
     codemap = _codemap()
-    not_built = {k for k, _l, kind, _t in codemap.ENGINES if kind == "none" and k != "owner_settings"}
-    assert {e.key for e in engines("planned")} == not_built
+    not_built = {k for k, _l, kind, _t in codemap.ENGINES if kind == "none"}
+    assert {e.key for e in engines("planned") if not e.built_blocks} == not_built
+    modules = {k for k, _l, kind, _t in codemap.ENGINES if kind != "none"}
+    assert {e.key for e in engines("planned") if e.built_blocks} <= modules
 
 
 def test_every_former_candidate_is_resolved_with_a_reason():

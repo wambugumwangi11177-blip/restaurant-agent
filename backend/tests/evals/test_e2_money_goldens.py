@@ -18,6 +18,7 @@ silently missing:
 """
 import math
 import re
+from datetime import date, datetime
 from fractions import Fraction
 
 import pytest
@@ -215,16 +216,36 @@ def test_ex16_kes_beats_percent():
 # PENDING — owned by a later sprint (strict xfail: fails now, must be flipped when it lands)
 # ═════════════════════════════════════════════════════════════════════════════
 
-@pytest.mark.xfail(strict=True, reason="S3.2 P&L engine: kept 15,000 (15%), prime cost 57%")
+# ── S3.2: the P&L engine (flipped from strict xfail in the commit that built owner/money/pnl.py) ─────────────────
+
+PNL_NOW = datetime(2026, 10, 14, 10, 0)          # 13:00 in Nairobi on a Wednesday
+
+
+def _week_pnl(db_session, *, price_rise=False):
+    from owner.money.pnl import compute_pnl
+    g = gr.build_skeleton(db_session, now=PNL_NOW)
+    gr.seed_pnl_week_with_costs(db_session, g, price_rise=price_rise)
+    return compute_pnl(db_session, g.rid, date(2026, 10, 8), date(2026, 10, 14), today=date(2026, 10, 14))
+
+
 def test_ex01b_weekly_pnl_kept_and_prime_cost(db_session):
-    from owner.money.pnl import compute_pnl                                     # noqa: F401  (does not exist yet)
-    raise AssertionError("flip to: gross 6_800_000 · kept 1_500_000 (15.0%) · prime 57.0%")
+    """§7 #1: 100,000 − 32,000 = 68,000; 68,000 − 25,000 − 28,000 = 15,000 kept (15%); prime cost (32,000 + 25,000) = 57%."""
+    p = _week_pnl(db_session)
+    assert p["sales_cents"] == 10_000_000 and p["orders"] == 100
+    assert p["ingredients_cents"] == 3_200_000 and p["ingredients_basis"] == "recipe"
+    assert p["gross_profit_cents"] == 6_800_000
+    assert (p["labour_cents"], p["labour_basis"]) == (2_500_000, "shifts")
+    assert p["other_costs_cents"] == 2_800_000
+    assert p["operating_profit_cents"] == p["net_before_tax_cents"] == 1_500_000
+    assert (p["kept_pct"], p["prime_cost_pct"], p["food_cost_pct"], p["labour_pct"]) == (15.0, 57.0, 32.0, 25.0)
 
 
-@pytest.mark.xfail(strict=True, reason="S3.2 P&L engine: operating expenses 26.7% and profit 19.0% of 105,000")
 def test_ex02b_price_rise_opex_and_profit_percentages(db_session):
-    from owner.money.pnl import compute_pnl                                     # noqa: F401
-    raise AssertionError("flip to: opex 26.7% · profit 19.0%")
+    """§7 #2: the same plates sold 5% dearer → KES 105,000: food 30.5%, labour 23.8%, other costs 26.7%, kept 20,000 = 19.0%."""
+    p = _week_pnl(db_session, price_rise=True)
+    assert p["sales_cents"] == 10_500_000
+    assert (p["food_cost_pct"], p["labour_pct"], p["other_costs_pct"], p["kept_pct"]) == (30.5, 23.8, 26.7, 19.0)
+    assert p["operating_profit_cents"] == 2_000_000
 
 
 @pytest.mark.xfail(strict=True, reason="UNOWNED: no sprint builds a target-margin price (the '55% target', never pitched). "
@@ -258,10 +279,20 @@ def test_ex12_market_list(db_session):
     raise AssertionError("flip to: beef 11 kg · chicken 48 · tomatoes 7 kg · rice 0")
 
 
-@pytest.mark.xfail(strict=True, reason="S3.2 P&L engine: month totals")
 def test_ex13_monthly_pnl(db_session):
-    from owner.money.pnl import compute_pnl                                     # noqa: F401
-    raise AssertionError("flip to: 412,000 − 131,800 = 280,200; kept 65,200 (15.8%); food 32.0%")
+    """§7 #13: 412,000 − 131,800 = 280,200; − 103,000 wages − 112,000 other costs = 65,200 kept (15.8%); food 32.0%."""
+    from owner.money.pnl import compute_pnl, period_range
+    now = datetime(2026, 10, 25, 10, 0)
+    g = gr.build_skeleton(db_session, now=now)
+    gr.seed_pnl_month(db_session, g)
+    start, end = period_range("month", date(2026, 10, 25))
+    assert (start, end) == (date(2026, 10, 1), date(2026, 10, 31))
+    p = compute_pnl(db_session, g.rid, start, end, today=date(2026, 10, 25))
+    assert p["sales_cents"] == 41_200_000 and p["orders"] == 410
+    assert p["ingredients_cents"] == 13_180_000 and p["gross_profit_cents"] == 28_020_000
+    assert p["labour_cents"] == 10_300_000 and p["other_costs_cents"] == 11_200_000
+    assert p["operating_profit_cents"] == 6_520_000
+    assert (p["kept_pct"], p["food_cost_pct"], p["prime_cost_pct"]) == (15.8, 32.0, 57.0)
 
 
 @pytest.mark.xfail(strict=True, reason="S3.3 expense spike: month vs 3-month average ≥ 25% (setting)")

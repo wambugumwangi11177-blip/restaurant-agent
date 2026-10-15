@@ -97,6 +97,17 @@ def _money_cost_dials(ctx: OwnerContext) -> dict:
             "assumption": assume("food_cost_target_pct", s.food_cost_target_pct, label="Ingredient cost target")}
 
 
+def month_pnl(ctx: OwnerContext) -> dict:
+    """The Profit & Loss for the calendar month so far — Home's money.pnl block and the monthly report's P&L section."""
+    from owner.money.pnl import compute_pnl, period_range
+    from owner.money.view import owner_pnl
+    from time_utils import eat_date
+    today = eat_date(ctx.now)
+    start, end = period_range("month", today)
+    p = compute_pnl(ctx.db, ctx.rid, start, end, ctx.settings, today=today)
+    return owner_pnl(p, "month", ctx.settings, as_of=ctx.now, sales_state=ctx.order_state()["state"])
+
+
 def _money_savings(ctx: OwnerContext) -> dict:
     from ai.roi.savings import get_roi_savings
     roi = ctx.cached("roi", lambda: get_roi_savings(ctx.db, ctx.rid))
@@ -111,7 +122,7 @@ def _money_savings(ctx: OwnerContext) -> dict:
 def money_area(ctx: OwnerContext) -> tuple[dict, dict]:
     dials = ctx.safe("money.cost_dials", lambda: _money_cost_dials(ctx))
     blocks = {
-        "pnl": unavailable("Costs are not entered yet — your Profit & Loss appears once expenses are recorded."),
+        "pnl": ctx.safe("money.pnl", lambda: month_pnl(ctx)),
         "cost_dials": dials,
         "breakeven": unavailable("Costs covered needs your fixed costs; enter them to see when today's sales cover them."),
         "bills": unavailable("No bills entered yet."),

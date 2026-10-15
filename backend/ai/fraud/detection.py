@@ -38,7 +38,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 import models
-from time_utils import utcnow
+from time_utils import eat_date, utcnow
 
 MIN_BASELINE_DAYS = 7
 VOID_SPIKE_STDDEV_MULTIPLIER = 2.5
@@ -108,12 +108,10 @@ def _detect_void_spikes(db: Session, restaurant_id: int, window_hours: int) -> l
 
     # Per-actor daily cancel/refund counts over the trailing 30 days — this
     # builds each staff member's OWN baseline, not a restaurant-wide number.
-    baseline_rows = (
-        db.query(
-            models.OrderAudit.actor_user_id,
-            func.date(models.OrderAudit.created_at),
-            func.count(models.OrderAudit.id),
-        )
+    # D17: a "day" is the owner's (Nairobi) day. Bucketed in Python — func.date() over the naive-UTC column
+    # would split a late-night shift across two days and distort each staff member's own baseline.
+    baseline_audits = (
+        db.query(models.OrderAudit.actor_user_id, models.OrderAudit.created_at)
         .filter(
             models.OrderAudit.restaurant_id == restaurant_id,
             models.OrderAudit.action.in_(_CANCEL_LIKE_ACTIONS),
@@ -121,12 +119,14 @@ def _detect_void_spikes(db: Session, restaurant_id: int, window_hours: int) -> l
             models.OrderAudit.created_at < window_start,   # baseline excludes the window itself
             models.OrderAudit.actor_user_id.isnot(None),
         )
-        .group_by(models.OrderAudit.actor_user_id, func.date(models.OrderAudit.created_at))
         .all()
     )
-
+    per_day: dict = {}
+    for actor_id, created_at in baseline_audits:
+        key = (actor_id, eat_date(created_at))
+        per_day[key] = per_day.get(key, 0) + 1
     by_actor: dict = {}
-    for actor_id, _day, count in baseline_rows:
+    for (actor_id, _day), count in per_day.items():
         by_actor.setdefault(actor_id, []).append(count)
 
     window_rows = (
@@ -206,6 +206,14 @@ def _detect_refund_velocity(db: Session, restaurant_id: int, window_hours: int) 
 
 
 def _detect_payment_mismatches(db: Session, restaurant_id: int, window_hours: int) -> list:
+    """Orders marked paid through LEVIII's OWN M-Pesa request that never got a Safaricom receipt.
+
+    D1: this used to flag EVERY M-Pesa order marked paid without `mpesa_receipt`. A POS feed (MacSoft) never
+    carries receipts, so it flooded Home with one card per order. The receipt is only expected where LEVIII
+    itself started the payment — an STK push, which leaves `mpesa_checkout_request_id` on the order — so
+    that is the only case flagged. An order from a POS feed has no checkout id and is never flagged here.
+    (A missing receipt is something to check, not proof of non-payment.)
+    """
     since = utcnow() - timedelta(hours=window_hours)
     orders = db.query(models.Order).filter(
         models.Order.restaurant_id == restaurant_id,
@@ -213,13 +221,14 @@ def _detect_payment_mismatches(db: Session, restaurant_id: int, window_hours: in
         models.Order.payment_method == models.PaymentMethod.MPESA,
         models.Order.is_paid == True,  # noqa: E712
         models.Order.mpesa_receipt.is_(None),
+        models.Order.mpesa_checkout_request_id.isnot(None),
     ).all()
 
     return [
         PaymentMismatchFlag(
             order_id=o.id, payment_method=o.payment_method.value, total_cents=o.total or 0,
-            reason="Marked paid via M-Pesa with no Safaricom receipt on file — "
-                   "likely a manual override, not a real settled payment.",
+            reason="Marked paid through an M-Pesa request from this system, but no Safaricom receipt is on file. "
+                   "That can be a manual override; it does not prove the customer did not pay.",
         )
         for o in orders
     ]

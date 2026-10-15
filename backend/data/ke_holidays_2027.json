@@ -1,0 +1,70 @@
+{
+  "year": 2027,
+  "country": "KE",
+  "source_note": "Computed, not copied from a gazette: fixed-date holidays; Easter 28 March 2027 (Good Friday 26 March, Easter Monday 29 March); a holiday that falls on a Sunday is also observed on the Monday after it (Public Holidays Act), which applies to 10 Oct, 12 Dec and 26 Dec 2027. Eid dates are approximate (moon sighting). School-term breaks are NOT included for 2027: the term calendar was not available to verify, and an invented window would lift forecasts for no reason. Verify against the official gazette before relying on this.",
+  "public_holidays": [
+    {
+      "date": "2027-01-01",
+      "name": "New Year's Day"
+    },
+    {
+      "date": "2027-03-10",
+      "name": "Eid al-Fitr",
+      "approximate": true
+    },
+    {
+      "date": "2027-03-26",
+      "name": "Good Friday"
+    },
+    {
+      "date": "2027-03-29",
+      "name": "Easter Monday"
+    },
+    {
+      "date": "2027-05-01",
+      "name": "Labour Day"
+    },
+    {
+      "date": "2027-05-17",
+      "name": "Eid al-Adha",
+      "approximate": true
+    },
+    {
+      "date": "2027-06-01",
+      "name": "Madaraka Day"
+    },
+    {
+      "date": "2027-10-10",
+      "name": "Huduma Day"
+    },
+    {
+      "date": "2027-10-11",
+      "name": "Huduma Day (observed)"
+    },
+    {
+      "date": "2027-10-20",
+      "name": "Mashujaa Day"
+    },
+    {
+      "date": "2027-12-12",
+      "name": "Jamhuri Day"
+    },
+    {
+      "date": "2027-12-13",
+      "name": "Jamhuri Day (observed)"
+    },
+    {
+      "date": "2027-12-25",
+      "name": "Christmas Day"
+    },
+    {
+      "date": "2027-12-26",
+      "name": "Utamaduni Day"
+    },
+    {
+      "date": "2027-12-27",
+      "name": "Utamaduni Day (observed)"
+    }
+  ],
+  "school_breaks": []
+}

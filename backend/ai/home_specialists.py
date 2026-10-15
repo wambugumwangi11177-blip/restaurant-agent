@@ -57,10 +57,14 @@ def collect(db, rid):
                     'The counted amount differs from the recorded expectation beyond tolerance. This is not proof of theft.',
                     'Reconcile the count, float and receipts with the shift owner.',
                     f'Difference KSh {row.variance_cents / 100:,.2f}', row.count_id)
-        for row in fraud.payment_mismatches:
-            add('Payment review', f'Check payment evidence for order {row.order_id}',
-                'Marked paid via M-Pesa, but no receipt is recorded. A missing receipt does not prove non-payment.',
-                'Match the order to settlement records before taking action.', entity=row.order_id)
+        if fraud.payment_mismatches:
+            # D1: ONE summary card for the rule, however many orders it matches — never a card per order.
+            n = len(fraud.payment_mismatches)
+            total = sum(row.total_cents for row in fraud.payment_mismatches)
+            add('Payment review', f"Check M-Pesa payment evidence for {n} order{'s' if n != 1 else ''}",
+                'Marked paid through an M-Pesa request from this system, but no receipt is recorded. A missing receipt does not prove non-payment.',
+                'Match these orders to settlement records before taking action.',
+                f'KSh {total / 100:,.0f} across these orders', 'payment_review')
         for label, rows in [('void activity', fraud.void_spikes), ('refund activity', fraud.refund_velocity), ('off-hours activity', fraud.off_hours)]:
             if rows:
                 add('Transaction review', f'Review unusual {label}',

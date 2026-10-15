@@ -20,6 +20,12 @@ from time_utils import utcnow
 
 RELIABILITY_THRESHOLD = 85.0   # Below this = consider switching supplier
 
+# A reliability percentage means nothing until a supplier has a track record: one delivered order is 100% on
+# time, which is not "reliable", it is "unknown" (D3). Below this many closed orders (on time + late) the
+# supplier is "learning": no score, no at-risk flag, no recommendation. The tiered PO auto-approval
+# (ai/workflows/engine.py) uses the same number, from here.
+MIN_CLOSED_ORDERS_FOR_RELIABILITY = 3
+
 
 def get_supply_chain_intelligence(db: Session, restaurant_id: int) -> dict:
     """Complete supply chain analysis."""
@@ -41,8 +47,9 @@ def get_supply_chain_intelligence(db: Session, restaurant_id: int) -> dict:
         analysis = _analyse_supplier(supplier, orders_by_supplier.get(supplier.id, []))
         supplier_analyses.append(analysis)
 
-    # Sort by reliability descending
-    supplier_analyses.sort(key=lambda x: x["reliability_score"], reverse=True)
+    # Measured suppliers first, best to worst; suppliers still "learning" (no score yet) after them.
+    supplier_analyses.sort(key=lambda x: (x["reliability_score"] is not None, x["reliability_score"] or 0), reverse=True)
+    measured = [s["reliability_score"] for s in supplier_analyses if s["reliability_score"] is not None]
 
     # Pending orders (overdue)
     now = utcnow()
@@ -66,10 +73,9 @@ def get_supply_chain_intelligence(db: Session, restaurant_id: int) -> dict:
             "total_suppliers":            len(suppliers),
             "total_procurement_spend_30d": total_spend,
             "overdue_orders":             len(overdue),
-            "at_risk_suppliers":          sum(1 for s in supplier_analyses if s["reliability_score"] < RELIABILITY_THRESHOLD),
-            "avg_reliability_pct":        round(
-                sum(s["reliability_score"] for s in supplier_analyses) / max(len(supplier_analyses), 1), 1
-            ),
+            "at_risk_suppliers":          sum(1 for s in supplier_analyses if s["at_risk"]),
+            "suppliers_learning":         sum(1 for s in supplier_analyses if s["reliability_state"] == "learning"),
+            "avg_reliability_pct":        round(sum(measured) / len(measured), 1) if measured else None,
         },
         "suppliers":       supplier_analyses,
         "overdue_orders":  [_serialize_order(o) for o in overdue[:10]],
@@ -104,19 +110,43 @@ def _fetch_recent_orders_by_supplier(
     return result
 
 
+def reliability_from_orders(orders: list[models.PurchaseOrder]) -> tuple[float | None, int]:
+    """(on-time %, closed orders). The percentage is None until MIN_CLOSED_ORDERS_FOR_RELIABILITY orders have closed."""
+    on_time = sum(1 for o in orders if o.status == "DELIVERED")
+    closed = on_time + sum(1 for o in orders if o.status == "LATE")
+    if closed < MIN_CLOSED_ORDERS_FOR_RELIABILITY:
+        return None, closed
+    return on_time / closed * 100, closed
+
+
+def refresh_supplier_reliability(db: Session, supplier_id: int) -> float | None:
+    """The WRITE path for Supplier.reliability_score: recompute it from the supplier's last 50 orders and store it.
+
+    Called when a purchase order closes (ai/reorder.py::receive_purchase_order) — never from a read. D3: the
+    analysis below used to overwrite this column every time anyone opened the supply-chain page, so merely
+    looking at the data changed what the tiered auto-approval trusted. Stays put while the supplier is still
+    learning. The caller commits.
+    """
+    supplier = db.query(models.Supplier).filter(models.Supplier.id == supplier_id).first()
+    if supplier is None:
+        return None
+    orders = _fetch_recent_orders_by_supplier(db, [supplier_id], limit=50).get(supplier_id, [])
+    pct, _closed = reliability_from_orders(orders)
+    if pct is not None:
+        supplier.reliability_score = round(pct, 1)
+    return pct
+
+
 def _analyse_supplier(supplier: models.Supplier, orders: list[models.PurchaseOrder]) -> dict:
+    """Read-only: analyses a supplier, writes nothing (D3)."""
     delivered = [o for o in orders if o.status == "DELIVERED"]
     late      = [o for o in orders if o.status == "LATE"]
     pending   = [o for o in orders if o.status in ("PENDING", "SENT")]
 
     on_time_count = len(delivered)
     late_count    = len(late)
-    total_closed  = on_time_count + late_count
-
-    reliability_pct = (on_time_count / max(total_closed, 1)) * 100
-
-    # Update stored reliability score
-    supplier.reliability_score = round(reliability_pct, 1)
+    reliability_pct, total_closed = reliability_from_orders(orders)
+    learning = reliability_pct is None
 
     # Actual lead times for delivered orders
     lead_times = []
@@ -143,8 +173,11 @@ def _analyse_supplier(supplier: models.Supplier, orders: list[models.PurchaseOrd
         "id":                supplier.id,
         "name":              supplier.name,
         "contact_phone":     supplier.contact_phone,
-        "reliability_score": round(reliability_pct, 1),
-        "reliability_label": "EXCELLENT" if reliability_pct >= 95 else
+        "reliability_score": None if learning else round(reliability_pct, 1),
+        "reliability_state": "learning" if learning else "measured",
+        "closed_orders":     total_closed,
+        "reliability_label": "LEARNING" if learning else
+                             "EXCELLENT" if reliability_pct >= 95 else
                              "GOOD"      if reliability_pct >= 85 else
                              "POOR",
         "total_orders":      len(orders),
@@ -157,14 +190,14 @@ def _analyse_supplier(supplier: models.Supplier, orders: list[models.PurchaseOrd
         "cost_trend_pct":    cost_trend_pct,
         "cost_trend_label":  "increasing" if cost_trend_pct > 5 else
                              "decreasing" if cost_trend_pct < -5 else "stable",
-        "at_risk":           reliability_pct < RELIABILITY_THRESHOLD,
+        "at_risk":           (not learning) and reliability_pct < RELIABILITY_THRESHOLD,
     }
 
 
 def _generate_recommendations(supplier_analyses: list, overdue_orders: list) -> list[dict]:
     recs = []
     for s in supplier_analyses:
-        if s["reliability_score"] < RELIABILITY_THRESHOLD:
+        if s["reliability_score"] is not None and s["reliability_score"] < RELIABILITY_THRESHOLD:
             recs.append({
                 "priority":    "HIGH",
                 "supplier":    s["name"],
@@ -205,7 +238,7 @@ def _empty_response() -> dict:
     return {
         "summary": {
             "total_suppliers": 0, "total_procurement_spend_30d": 0,
-            "overdue_orders": 0, "at_risk_suppliers": 0, "avg_reliability_pct": 0,
+            "overdue_orders": 0, "at_risk_suppliers": 0, "suppliers_learning": 0, "avg_reliability_pct": None,
         },
         "suppliers": [], "overdue_orders": [],
         "recommendations": [{

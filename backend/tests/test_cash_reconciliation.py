@@ -165,7 +165,7 @@ def test_report_includes_mpesa_mismatches_from_fraud_module(db_session):
     o = models.Order(
         restaurant_id=restaurant.id, total=2000,
         payment_method=models.PaymentMethod.MPESA, is_paid=True,
-        mpesa_receipt=None, created_at=now,
+        mpesa_receipt=None, mpesa_checkout_request_id="ws_CO_cr6", created_at=now,   # LEVIII's own STK request (D1)
     )
     db_session.add(o)
     db_session.commit()

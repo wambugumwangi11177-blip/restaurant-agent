@@ -1117,6 +1117,11 @@
     "to": "owner.settings"
    },
    {
+    "from": "ai.labor.intelligence",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
     "from": "ai.marketing",
     "lazy": false,
     "to": "ai.marketing.insights"
@@ -1900,6 +1905,11 @@
     "from": "ai.workflows.engine",
     "lazy": true,
     "to": "ai.evaluation.tracker"
+   },
+   {
+    "from": "ai.workflows.engine",
+    "lazy": false,
+    "to": "ai.supply_chain.intelligence"
    },
    {
     "from": "ai.workflows.engine",
@@ -3797,7 +3807,7 @@
     "group": "ai",
     "id": "ai.fraud.detection",
     "kind": "py",
-    "loc": 287,
+    "loc": 296,
     "path": "backend/ai/fraud/detection.py"
    },
    {
@@ -3825,7 +3835,7 @@
     "group": "ai",
     "id": "ai.home_specialists",
     "kind": "py",
-    "loc": 82,
+    "loc": 86,
     "path": "backend/ai/home_specialists.py"
    },
    {
@@ -3846,7 +3856,7 @@
     "group": "ai",
     "id": "ai.labor.intelligence",
     "kind": "py",
-    "loc": 209,
+    "loc": 213,
     "path": "backend/ai/labor/intelligence.py"
    },
    {
@@ -3972,7 +3982,7 @@
     "group": "ai",
     "id": "ai.pricing.analysis",
     "kind": "py",
-    "loc": 383,
+    "loc": 391,
     "path": "backend/ai/pricing/analysis.py"
    },
    {
@@ -3993,7 +4003,7 @@
     "group": "ai",
     "id": "ai.profit.intelligence",
     "kind": "py",
-    "loc": 554,
+    "loc": 564,
     "path": "backend/ai/profit/intelligence.py"
    },
    {
@@ -4021,7 +4031,7 @@
     "group": "ai",
     "id": "ai.reorder",
     "kind": "py",
-    "loc": 320,
+    "loc": 325,
     "path": "backend/ai/reorder.py"
    },
    {
@@ -4084,7 +4094,7 @@
     "group": "ai",
     "id": "ai.simulation.signals",
     "kind": "py",
-    "loc": 149,
+    "loc": 158,
     "path": "backend/ai/simulation/signals.py"
    },
    {
@@ -4112,7 +4122,7 @@
     "group": "ai",
     "id": "ai.supply_chain.intelligence",
     "kind": "py",
-    "loc": 217,
+    "loc": 250,
     "path": "backend/ai/supply_chain/intelligence.py"
    },
    {
@@ -4707,7 +4717,7 @@
     "group": "core",
     "id": "time_utils",
     "kind": "py",
-    "loc": 57,
+    "loc": 70,
     "path": "backend/time_utils.py"
    }
   ]
@@ -5735,7 +5745,7 @@
   }
  ],
  "stats": {
-  "py_edges": 581,
+  "py_edges": 583,
   "py_lazy_edges": 167,
   "py_modules": 151,
   "routes": 170,

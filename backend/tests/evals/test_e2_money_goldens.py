@@ -77,35 +77,29 @@ def _chicken_reprice(db_session):
     return next(r for r in data["recommendations"] if r["item_name"] == "Quarter chicken")
 
 
-def test_ex03_quarter_chicken_reprice_today_is_433_50_not_435_defect_d16(db_session):
-    """§7 #3 — TODAY's answer. The spec's KES 435 / KES 10,500 needs the KES-5 step (D16, S1.3):
-    260/(1−0.40) = 433.33 and today's code rounds UP to the nearest KES 0.50 → 433.50."""
+def test_ex03_quarter_chicken_reprice_to_the_floor_is_435_and_10500(db_session):
+    """§7 #3: 260 / (1 − 0.40) = 433.33 → rounded UP to the KES 5 step = KES 435; (435 − 400) × 300 = KES 10,500 / month.
+    Characterised at KES 433.50 / 10,050 before S1.3 fixed D16 (the engine rounded to KES 0.50, not a menu step)."""
     rec = _chicken_reprice(db_session)
     assert rec["type"] == "REPRICE"
     assert rec["current_price"] == 40_000 and rec["cost_price"] == 26_000
     assert rec["margin_pct"] == 35.0
-    assert rec["suggested_price"] == 43_350                       # KES 433.50  (spec: 435)
-    assert rec["monthly_impact_cents"] == 1_005_000                # KES 10,050 (spec: 10,500)
-    assert rec["new_margin_pct"] == 40.0
+    assert rec["suggested_price"] == 43_500                       # KES 435
+    assert rec["monthly_impact_cents"] == 1_050_000                # KES 10,500 / month
+    assert rec["new_margin_pct"] == 40.2 and rec["new_food_cost_pct"] == 59.8
     assert rec["qty_30d"] == 300
 
 
-@pytest.mark.xfail(strict=True, reason="S1.3 (D16): round suggested prices up to the price_step_kes setting (5)")
-def test_ex03_quarter_chicken_reprice_after_d16_is_435_and_10500(db_session):
-    rec = _chicken_reprice(db_session)
-    assert rec["suggested_price"] == 43_500                       # KES 435
-    assert rec["monthly_impact_cents"] == 1_050_000                # KES 10,500 / month
-
-
-def test_ex05_chips_sold_below_menu_price_today(db_session):
-    """§7 #5: (300 − 270) × 400 × 30/14 = KES 25,714. Today the engine calls this 'portion_drift'
-    (D15: it measures sales below menu price; renamed `till_price_gap` in S1.3)."""
+def test_ex05_chips_sold_below_menu_price(db_session):
+    """§7 #5: (300 − 270) × 400 × 30/14 = KES 25,714. The engine's key is `till_price_gap` (D15: it measures sales
+    below the menu price; it was called `portion_drift`, which stays as a deprecated alias for one release)."""
     from ai.profit.intelligence import get_profit_intelligence
     g = gr.build_skeleton(db_session)
     gr.seed_chips_below_menu(db_session, g)
 
-    drift = get_profit_intelligence(db_session, g.rid)["portion_drift"]
-    chips = next(d for d in drift if d["item_name"] == "Chips")
+    data = get_profit_intelligence(db_session, g.rid)
+    assert data["portion_drift"] == data["till_price_gap"]
+    chips = next(d for d in data["till_price_gap"] if d["item_name"] == "Chips")
     assert chips["menu_price"] == 30_000
     assert chips["avg_captured_price"] == 27_000
     assert chips["drift_pct"] == 10.0

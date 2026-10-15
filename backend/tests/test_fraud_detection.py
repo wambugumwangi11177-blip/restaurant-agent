@@ -154,11 +154,13 @@ def test_refund_velocity_ignores_spread_out_refunds(db_session):
 # ── Payment mismatches ───────────────────────────────────────────────────────
 
 def test_payment_mismatch_flags_paid_mpesa_order_with_no_receipt(db_session):
+    """Only on LEVIII's own M-Pesa (STK) path — the order carries a checkout request id (S1.3 / D1). A POS-fed
+    order without one is never flagged (see tests/test_s13_defects.py)."""
     restaurant, owner, waiter = _make_restaurant_and_staff(db_session, "pm1")
     o = models.Order(
         restaurant_id=restaurant.id, total=1500,
         payment_method=models.PaymentMethod.MPESA, is_paid=True,
-        mpesa_receipt=None, created_at=utcnow(),
+        mpesa_receipt=None, mpesa_checkout_request_id="ws_CO_pm1", created_at=utcnow(),
     )
     db_session.add(o)
     db_session.commit()

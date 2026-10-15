@@ -12,7 +12,9 @@ Fixes vs previous version:
   BUG-11  — _upsell_lift: removed the type("x",(),{}) anonymous class hack
              (already fixed in the uploaded version — verified and kept).
   DS-02   — _profit_forecast now includes ±1 std-dev uncertainty band per day.
-  DS-04   — portion_drift monthly_leak uses * (30/14) not * 2.
+  DS-04   — till_price_gap monthly_leak uses * (30/14) not * 2.
+  D15     — "portion_drift" actually measured sales below the menu price: renamed till_price_gap;
+            `portion_drift` stays as a deprecated alias of the same rows for one release.
 """
 
 from sqlalchemy.orm import Session, joinedload
@@ -121,7 +123,7 @@ def get_profit_intelligence(db: Session, restaurant_id: int, settings: Settings 
 
     contribution_margins = _build_contribution_margins(items, item_profit, settings)
     profit_leaks         = _detect_profit_leaks(contribution_margins, settings)
-    portion_drift        = _detect_portion_drift(db, restaurant_id, item_map, now)
+    till_price_gap       = _detect_till_price_gap(db, restaurant_id, item_map, now)
     daypart_analysis     = _daypart_profitability(orders_30d, item_map)
     channel_analysis     = _channel_profitability(orders_30d, item_map, settings)
     customer_intel       = _customer_intelligence(orders_30d, total_revenue, now)
@@ -134,7 +136,7 @@ def get_profit_intelligence(db: Session, restaurant_id: int, settings: Settings 
         daypart_analysis = daypart_analysis,
         channel_analysis = channel_analysis,
         at_risk          = customer_intel["at_risk_customers"],
-        portion_drift    = portion_drift,
+        till_price_gap   = till_price_gap,
         revenue_mom      = revenue_mom,
         settings         = settings,
     )
@@ -161,7 +163,8 @@ def get_profit_intelligence(db: Session, restaurant_id: int, settings: Settings 
         },
         "contribution_margins":  contribution_margins[:20],
         "profit_leaks":          profit_leaks,
-        "portion_drift":         portion_drift,
+        "till_price_gap":        till_price_gap,
+        "portion_drift":         till_price_gap,   # DEPRECATED alias (D15) — same rows; remove after one release
         "daypart_analysis":      daypart_analysis,
         "channel_analysis":      channel_analysis,
         "customer_intelligence": customer_intel,
@@ -222,8 +225,11 @@ def _detect_profit_leaks(contribution_margins: list[dict], settings: Settings) -
     return leaks
 
 
-def _detect_portion_drift(db: Session, restaurant_id: int, item_map: dict, now: datetime) -> list[dict]:
+def _detect_till_price_gap(db: Session, restaurant_id: int, item_map: dict, now: datetime) -> list[dict]:
     """
+    Dishes the till charged for below their menu price, over the last 14 days (owner words: "sold below menu price").
+    This is a signal to check the till, not a finding about anyone. Was `_detect_portion_drift` (D15).
+
     DS-04 FIX: monthly_leak extrapolation uses * (30/14) not * 2.
     BUG-04 FIX: 14-day window uses UTC (now is already UTC from caller).
     """
@@ -260,7 +266,7 @@ def _detect_portion_drift(db: Session, restaurant_id: int, item_map: dict, now: 
                 "drift_pct":            round(drift_pct, 1),
                 "order_count":          row.cnt,
                 "estimated_monthly_leak": monthly_leak,
-                "action":               "Check POS — staff may be applying undocumented discounts",
+                "action":               "Check the till: this dish was charged below its menu price. Look at discounts, price changes and open-price items.",
             })
 
     return sorted(drift_items, key=lambda x: x["estimated_monthly_leak"], reverse=True)
@@ -474,7 +480,7 @@ def _profit_forecast(orders: list, total_cost: int, total_revenue: int) -> dict:
 
 def _generate_recommendations(
     food_cost_pct, profit_leaks, daypart_analysis,
-    channel_analysis, at_risk, portion_drift, revenue_mom, settings: Settings
+    channel_analysis, at_risk, till_price_gap, revenue_mom, settings: Settings
 ) -> list[dict]:
     recs = []
     if food_cost_pct > settings.food_cost_target_pct:
@@ -486,9 +492,9 @@ def _generate_recommendations(
         recs.append({"type": "margin_leak", "priority": leak["severity"],
             "message": f"{leak['item_name']}: margin at {leak['current_margin_pct']}% — leaking KES {leak['monthly_leak_cents']//100:,}/month",
             "action": leak["action"], "impact": f"KES {leak['monthly_leak_cents']//100:,}/month"})
-    for drift in portion_drift[:2]:
-        recs.append({"type": "portion_drift", "priority": "MEDIUM",
-            "message": f"{drift['item_name']}: prices captured {drift['drift_pct']}% below menu price",
+    for drift in till_price_gap[:2]:
+        recs.append({"type": "till_price_gap", "priority": "MEDIUM",
+            "message": f"{drift['item_name']}: sold {drift['drift_pct']}% below menu price",
             "action": drift["action"], "impact": f"KES {drift['estimated_monthly_leak']//100:,}/month"})
     if daypart_analysis:
         worst = min(daypart_analysis, key=lambda x: x["margin_pct"])
@@ -546,8 +552,12 @@ def _empty_response() -> dict:
             "avg_order_value": 0, "total_items_sold": 0,
             "profit_leaks_found": 0, "total_leak_amount": 0,
             "star_items": 0, "dog_items": 0},
-        "contribution_margins": [], "profit_leaks": [], "portion_drift": [],
+        "contribution_margins": [], "profit_leaks": [], "till_price_gap": [], "portion_drift": [],
         "daypart_analysis": [], "channel_analysis": [], "customer_intelligence": {},
         "upsell_uplift": [], "profit_forecast": {}, "stars": [], "dogs": [],
         "recommendations": [],
     }
+
+
+# Deprecated name (D15), kept for one release: execution/emit_capability_manifest.py and any external caller.
+_detect_portion_drift = _detect_till_price_gap

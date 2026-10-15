@@ -23,6 +23,7 @@ from sqlalchemy import func
 import models
 from ai.analysis_clock import analysis_anchor
 from owner.settings import Settings, resolve
+from time_utils import eat_date
 
 # The wages target (default 30% of sales — a placeholder to confirm with the first owner) and the hour after
 # which overtime applies (default 8) are the owner's settings: labour_target_pct, overtime_after_hours.
@@ -59,7 +60,10 @@ def get_labor_intelligence(db: Session, restaurant_id: int, settings: Settings |
     # ── Overtime analysis ─────────────────────────────────────────────────────
     overtime_shifts   = [s for s in shifts if (s.actual_hours or 0) > settings.overtime_after_hours]
     overtime_hours    = sum(max(0, (s.actual_hours or 0) - settings.overtime_after_hours) for s in overtime_shifts)
-    overtime_cost     = sum(s.labor_cost or 0 for s in overtime_shifts)
+    # D10: the overtime hours at the shift's own hourly rate (cost ÷ hours worked), not the whole shift's cost.
+    overtime_cost     = int(round(sum(
+        (max(0, (s.actual_hours or 0) - settings.overtime_after_hours)) * ((s.labor_cost or 0) / (s.actual_hours or 1))
+        for s in overtime_shifts)))
 
     # ── Daily labor vs revenue ─────────────────────────────────────────────────
     daily_data: dict[date, dict] = defaultdict(lambda: {"labor": 0, "hours": 0, "revenue": 0})
@@ -69,18 +73,18 @@ def get_labor_intelligence(db: Session, restaurant_id: int, settings: Settings |
         daily_data[d]["hours"]  += s.actual_hours or s.scheduled_hours or 0
 
     # Fill in revenue per day
-    daily_orders = db.query(
-        func.date(models.Order.created_at).label("day"),
-        func.sum(models.Order.total).label("rev"),
-    ).filter(
+    # D17: bucket into the owner's (Nairobi) days in Python. `func.date(created_at)` over the naive-UTC column
+    # returns the UTC date, which puts everything sold between 00:00 and 03:00 Nairobi time on the wrong day.
+    daily_rev: dict[date, int] = defaultdict(int)
+    for created_at, total in db.query(models.Order.created_at, models.Order.total).filter(
         models.Order.restaurant_id == restaurant_id,
         models.Order.status        != models.OrderStatus.CANCELLED,
         models.Order.created_at    >= thirty_days_ago,
-    ).group_by(func.date(models.Order.created_at)).all()
+    ).all():
+        daily_rev[eat_date(created_at)] += total or 0
 
-    for row in daily_orders:
-        d = row.day if isinstance(row.day, date) else datetime.strptime(str(row.day), "%Y-%m-%d").date()
-        daily_data[d]["revenue"] = row.rev or 0
+    for d, rev in daily_rev.items():
+        daily_data[d]["revenue"] = rev
 
     daily_breakdown = sorted([
         {

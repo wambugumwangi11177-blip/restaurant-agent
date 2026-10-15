@@ -42,7 +42,7 @@ AUTO_APPROVE_RELIABILITY_MIN = 85.0
 # this guard every never-ordered-from supplier would auto-qualify on day one,
 # which is the opposite of "earn the no-approval tier". Same cold-start-guard
 # posture as ai/fraud/detection.py's MIN_BASELINE_DAYS.
-MIN_CLOSED_ORDERS_FOR_TRUST = 3
+from ai.supply_chain.intelligence import MIN_CLOSED_ORDERS_FOR_RELIABILITY as MIN_CLOSED_ORDERS_FOR_TRUST   # one number, one place (D3)
 _CLOSED_PO_STATUSES = ("DELIVERED", "LATE", "PARTIAL")
 
 

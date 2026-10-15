@@ -331,6 +331,10 @@ def check_delivery_margins(
                     "current_margin_pct":         round(margin_pct, 1),
                     "commission_pct":             round(commission * 100),
                     "effective_delivery_margin":  round(effective_margin, 1),
+                    # What one plate leaves after ingredients: through the platform (its commission comes off the price)
+                    # and dine-in. Integer cents, same arithmetic as the margins above.
+                    "delivery_keeps_cents":       round(item.price * (1 - commission) - item.cost_price),
+                    "dine_in_keeps_cents":        item.price - item.cost_price,
                     "recommended_delivery_price": required_price,
                     "issue": f"{channel.replace('_',' ').title()} commission erodes margin below {min_margin:g}% floor",
                 })

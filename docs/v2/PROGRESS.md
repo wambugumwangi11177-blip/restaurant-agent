@@ -14,6 +14,41 @@ Newest sprint first. Spec: [`SPEC.md`](SPEC.md). Gate: `make -C docs/v2 gate`.
 
 ## Sprint log (newest first)
 
+### S2.2 Planted scenarios + E4 — done
+
+**Plan.** Goal: the demo is also the test. E4 (`tests/evals/test_e4_demo_scenarios.py`) was written first and run against the S2.1 baseline: **12 of 21 failed, each for the right reason** (no `keeps`/`times_short`/`short_deliveries` field, afternoon not the weakest hour, chips not charged 270, beef not flagged, no handover mismatch, no `summary.planted`). Then the generator plants (`PLANTS`, default on; `plant=()` is the calm baseline), three small engine functions were added where no engine could say what figure 6.1 says, and E4 went green. Files: `backend/demo/generator.py` (+plants), `backend/ai/pricing/analysis.py`, `backend/ai/cash_reconciliation/intelligence.py`, `backend/ai/supply_chain/intelligence.py`, `backend/owner/areas.py`, `tests/test_s22_engine_additions.py` (13), `tests/evals/test_e4_demo_scenarios.py`.
+
+| | Planted | Engine that finds it | Block | Measured on the demo |
+|---|---|---|---|---|
+| P1 | Quarter chicken 400 / cost 260 (the catalog) | pricing REPRICE + profit leak | `sales_dishes.price_ideas`, Home card | 400 → **435**, +KES 2,380 / month |
+| P2 | Chips charged 270 on a 300 menu for 3 weeks | profit `till_price_gap` | `cash.below_menu_price` | 300 → 270, 10 % below, KES 1,929 / month |
+| P3 | Glovo guests order burgers 8× as often | pricing delivery margins (+ new `delivery_keeps_cents`, `dine_in_keeps_cents`) | `sales_dishes.delivery` | keeps **170 vs 320** (Glovo, Uber 25 %), 200 (Bolt 20 %) |
+| P4 | 15:00–17:00 orders lean on chicken, burgers, stew | profit daypart margins | `delivery.best_and_weakest_hours` | afternoon **65.2 %** vs best 73.5 % |
+| P5 | kitchen draws a third more beef than sales explain (28 days) | stock custody variance | `store.missing` | 6.14 kg expected, 8.26 used, **2.12 kg = KES 1,694 / week, 34.5 %** |
+| P6 | store sends 4.0 kg beef, kitchen counts 3.8 | custody transfers | `store.handover` | one row, gap 0.2 |
+| P7 | Tuesday-night drawer short, the last 4 Tuesdays | **new** `recurring_drawer_gaps` | `cash.patterns` | "Tuesday evening", 4 of 4, KES 491 each, KES 1,965 |
+| P11 | Star · Puzzle · Plowhorse · Dog | menu engineering | `sales_dishes.matrix` | Nyama choma · Fish fillet · Chips · Spaghetti (by the catalog) |
+| P12 | the latest holiday Tuesday: sales ½, chips out from 19:00 | (data) holiday signal + custody-neutral stock adjustment | — | **planted only when the window contains a holiday Tuesday**: none today (2026-10-20 Mashujaa Day is five days away), so the live demo has no P12 yet; E4 pins a clock after it |
+| P13 | Kenchic delivers 56 of every 60 | **new** `short_deliveries` | `store.suppliers` | 9.3 of 10.0 kg of chicken |
+| P14 | branch B pays more for ingredients | profit food cost per branch | `money.cost_dials` ×2 | **A 29.3 %, B 37.1 %** |
+| P15 | a supplier with one delivery | D3 learning rule | `store.suppliers` | "Learning", no score, stored score untouched |
+| P16 | till-rung M-Pesa sales with no receipt (≈ 38 % of walk-ins) | D1 | `costing_you_money` | no payment card at all, ≤ 5 cards |
+
+**E4: 16 passed, 5 strict xfail.** The five are named with the sprint that will flip them: P2 and P5 *"in Zone 2"* (S4.3 ranks Home cards by KES — today the five cards are "Review margin on Quarter chicken", two kitchen-preparation cards, "Review 50 recorded no-shows" and the 435 reprice, so **the demo's Zone 2 does not yet show the chips gap or the missing beef**; the figures are right, the ranking is not), P8 (M-Pesa statement, S6.x), P9 and P10 (money layer, S3.x). `test_every_scenario_has_a_test` fails if any of the sixteen has no entry.
+
+**Gate.** backend **1138 passed, 1 skipped** (1125 + 13; 448 s) · evals **52 passed / 14 xfailed** (E2 28/9 · E5 8 · **E4 16/5**) · vitest 55 · tsc clean · lint ratchet OK (15E/4W) · `next build` OK · E6 not run (due by P4).
+
+**Deviations from figure 6.1 — read these.**
+1. **P5, P6 and P13 are scaled; their ratios are kept.** The guide's numbers (10 kg extra a week; 40 kg handed over; 56 of 60) belong to a kitchen that uses ~30 kg of beef a week. At the specified **KES 100,000 a week** a restaurant sells ~300 items and uses about **6 kg of beef a week** (measured: 6.14), so "10 kg extra" would be a 160 % variance and a 40 kg handover is seven weeks of beef. I kept the *ratios* — the kitchen draws +33 % (the guide's 10 of 30), 4.0 vs 3.8 kg is the same 5 % gap as 40 vs 38, 9.3 of 10.0 is 56 of 60 — and said so in the E4 docstring. If you want the literal numbers, the demo's scale must change (it cannot do both).
+2. **P14 needs Kasarani to pay 32 % more for ingredients.** The profit engine reads recipe cost × quantity, so a 29 % vs 37 % food cost between two branches with the same menu can only come from ingredient prices (portion and waste differences would show in missing stock, not in food cost). `cost_factor` is a per-branch parameter; the baseline (`plant=()`) has 1.00 for both.
+3. **P12 depends on the calendar** (above). The generator reports `summary.planted["P12"] = None` rather than inventing a holiday.
+4. **P4 is planted on 15:00–17:00** as the figure says; the profit engine's "afternoon" bucket is 15:00–18:00, so the measured gap (8.3 points) is diluted by the last hour.
+5. The figure's **P1, P11, P16** hold by construction of the catalog/baseline; E4 asserts them rather than planting them.
+
+**Engine additions (each pinned by tests, mutation-checked: Nairobi weekday, 2 % tolerance).** `pricing.check_delivery_margins` rows now carry what one plate keeps through the platform and dine-in (integer cents, same arithmetic as the margins already there). `cash_reconciliation.recurring_drawer_gaps` — read-only: the same Nairobi weekday + shift (day < 14:00 ≤ evening), the latest four counts, three or more short beyond the owner's tolerance → a pattern, worst first; the Home block waits for 28 days of counts (`learning day n of 28`), then shows the patterns or says none repeat. `supply_chain.short_deliveries` — deliveries in the last 30 days that arrived more than 2 % under what was ordered, valued at the price paid; separate from on-time reliability (a short delivery does not count as late).
+
+**Also changed.** The menu matrix shows all dishes (it cut at 20, hiding the Puzzle and the Dog on a 29-dish menu); delivery gaps show ten rows (the burger ranked seventh); the stock-cover bug of S2.1 is unchanged. Catalog: Beef fry added (29 dishes — beef needed a bigger share for P5 to be material), several non-fixed prices raised so Westlands lands at 29 % ingredients (the spec-fixed dishes — chicken 65 %, burger 47 %, fish 40 % — pull it up), Kasarani sells at 98 % of Westlands. `purchase orders on the way`: two items with the thinnest cover get a PO sent this morning so Home's "coming up" always has deliveries.
+
 ### S2.1 Demo generator — done
 
 **Plan (as written before the work).** Goal: a deterministic demo restaurant written through the ORM, so the demo runs on the real engines (P2) and every built engine in the registry has something to say. Files: `backend/demo/{catalog,generator,wipe,safety}.py`, `execution/reseed_demo.py`, `tests/test_demo_generator.py` (43 tests), `docs/v2/figures/scenarios.md` (a text transcription of figure 6.1 — the zip carried no `scenarios.png`; only the PDF has it — which S2.2/E4 use as the source of truth).

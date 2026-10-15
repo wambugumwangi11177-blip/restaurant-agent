@@ -50,7 +50,7 @@ def _scratch_session(tmp_path_factory, name):
 def demo(tmp_path_factory):
     """One demo build (fixed clock) shared by the read-only tests: building takes seconds, asserting takes none."""
     engine, db = _scratch_session(tmp_path_factory, "shared")
-    summary = build(db, OWNER, PASSWORD, now=NOW)
+    summary = build(db, OWNER, PASSWORD, now=NOW, plant=())            # the baseline: no scenario planted
     yield db, summary
     db.close()
     engine.dispose()
@@ -82,7 +82,7 @@ def fingerprint(db) -> str:
                 for o in db.query(models.Order).filter(models.Order.restaurant_id.in_(list(rest))).all())
     feed((rest[m.restaurant_id], m.name, m.price, m.cost_price) for m in db.query(models.MenuItem).all())
     feed((inv[m.inventory_item_id], m.movement_type.value, m.quantity, m.created_at, m.reason.split("#")[0]) for m in db.query(models.StockMovement).all())
-    feed((rest[p.restaurant_id], inv[p.inventory_item_id], p.quantity_ordered, p.status, p.ordered_at, p.delivered_at) for p in db.query(models.PurchaseOrder).all())
+    feed((rest[p.restaurant_id], inv.get(p.inventory_item_id), p.quantity_ordered, p.status, p.ordered_at, p.delivered_at) for p in db.query(models.PurchaseOrder).all())
     feed((rest[s.restaurant_id], s.shift_date, s.staff_member_id and s.actual_hours, s.labor_cost) for s in db.query(models.LaborShift).all())
     feed((rest[c.restaurant_id], c.window_start, c.expected_amount_cents, c.counted_amount_cents) for c in db.query(models.CashDrawerCount).all())
     feed((rest[r.restaurant_id], r.reservation_date, r.reservation_time, r.party_size, r.status.value) for r in db.query(models.Reservation).all())
@@ -552,7 +552,7 @@ OUTPUT = {
 def live_demo(tmp_path_factory):
     """The demo built against the real clock, so the engines' own 'now' agrees with the generator's."""
     engine, db = _scratch_session(tmp_path_factory, "live")
-    summary = build(db, OWNER, PASSWORD, now=utcnow())
+    summary = build(db, OWNER, PASSWORD, now=utcnow(), plant=())
     from owner.home import compose_home
     from owner.states import OwnerContext
     owner = db.query(models.User).filter(models.User.email == OWNER).one()

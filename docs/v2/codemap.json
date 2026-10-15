@@ -1973,6 +1973,11 @@
    },
    {
     "from": "demo.generator",
+    "lazy": true,
+    "to": "ai.simulation.signals"
+   },
+   {
+    "from": "demo.generator",
     "lazy": false,
     "to": "auth"
    },
@@ -3943,7 +3948,7 @@
     "group": "ai",
     "id": "ai.cash_reconciliation.intelligence",
     "kind": "py",
-    "loc": 177,
+    "loc": 239,
     "path": "backend/ai/cash_reconciliation/intelligence.py"
    },
    {
@@ -4237,7 +4242,7 @@
     "group": "ai",
     "id": "ai.pricing.analysis",
     "kind": "py",
-    "loc": 391,
+    "loc": 395,
     "path": "backend/ai/pricing/analysis.py"
    },
    {
@@ -4377,7 +4382,7 @@
     "group": "ai",
     "id": "ai.supply_chain.intelligence",
     "kind": "py",
-    "loc": 250,
+    "loc": 282,
     "path": "backend/ai/supply_chain/intelligence.py"
    },
    {
@@ -4468,14 +4473,14 @@
     "group": "demo",
     "id": "demo.catalog",
     "kind": "py",
-    "loc": 208,
+    "loc": 210,
     "path": "backend/demo/catalog.py"
    },
    {
     "group": "demo",
     "id": "demo.generator",
     "kind": "py",
-    "loc": 631,
+    "loc": 820,
     "path": "backend/demo/generator.py"
    },
    {
@@ -4685,7 +4690,7 @@
     "group": "other",
     "id": "owner.areas",
     "kind": "py",
-    "loc": 550,
+    "loc": 563,
     "path": "backend/owner/areas.py"
    },
    {
@@ -6101,8 +6106,8 @@
   }
  ],
  "stats": {
-  "py_edges": 634,
-  "py_lazy_edges": 192,
+  "py_edges": 635,
+  "py_lazy_edges": 193,
   "py_modules": 162,
   "routes": 174,
   "ts_edges": 485,

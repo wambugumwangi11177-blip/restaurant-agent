@@ -165,7 +165,7 @@ def _matrix(ctx: OwnerContext) -> dict:
             "popular_line_units": None,
             "dishes": [{"name": m["name"], "kind": QUADRANT_WORDS.get(m["classification"], m["classification"]),
                         "sold": m["qty_sold"], "keeps_pct": m["margin_pct"], "profit": kes(m["contribution"]),
-                        "trend": m["trend"]} for m in rows[:20]],
+                        "trend": m["trend"]} for m in rows[:40]],
             "assumption": assume("popular_cutoff", ctx.settings.popular_cutoff, label="Counts as popular")}
 
 
@@ -209,7 +209,8 @@ def _delivery_and_dayparts(ctx: OwnerContext) -> dict:
                          for c in channels],
             "delivery_gaps": [{"channel": CHANNEL_WORDS.get(g["channel"], g["channel"]), "dish": g["item_name"],
                                "commission_pct": g["commission_pct"], "keeps_pct": g["effective_delivery_margin"],
-                               "price_to_keep_floor": kes(g["recommended_delivery_price"])} for g in pricing.get("delivery_gaps", [])[:5]],
+                               "keeps": kes(g["delivery_keeps_cents"]), "keeps_dine_in": kes(g["dine_in_keeps_cents"]),
+                               "price_to_keep_floor": kes(g["recommended_delivery_price"])} for g in pricing.get("delivery_gaps", [])[:10]],
             "best_and_weakest_hours": [{"hours": d["daypart"].replace("_", " "), "keeps_pct": d["margin_pct"], "orders": d["orders"]}
                                        for d in profit.get("daypart_analysis", [])],
             "assumption": assume("commission_glovo_pct", s.commission_glovo_pct, label="Delivery commission"),
@@ -329,7 +330,10 @@ def _suppliers(ctx: OwnerContext) -> dict:
             "suppliers": [{"name": s["name"], "on_time_pct": s["reliability_score"], "closed_orders": s["closed_orders"],
                            "word": {"LEARNING": "Learning", "EXCELLENT": "Reliable", "GOOD": "Good", "POOR": "Late too often"}.get(s["reliability_label"], "")}
                           for s in data["suppliers"]],
-            "overdue_orders": data["summary"]["overdue_orders"]}
+            "overdue_orders": data["summary"]["overdue_orders"],
+            "short_deliveries": [{"supplier": d["supplier"], "item": d["item"], "unit": d["unit"], "ordered": d["ordered"], "received": d["received"],
+                                  "short_by": d["short_by"], "short_value": kes(d["short_value_cents"]), "on": d["delivered_at"][:10]}
+                                 for d in data.get("short_deliveries", [])]}
 
 
 def store_area(ctx: OwnerContext) -> tuple[dict, dict]:
@@ -401,14 +405,23 @@ PATTERN_DAYS = 28
 
 
 def _patterns(ctx: OwnerContext) -> dict:
-    """Repeating gaps (same weekday, same shift) need four weeks of cash counts; the detector itself arrives with P4."""
+    """The same weekday and shift short, again and again (ai.cash_reconciliation.recurring_drawer_gaps). It needs four
+    weeks of counts before it can say anything, so until then it says how far along it is."""
+    from ai.cash_reconciliation.intelligence import recurring_drawer_gaps
     first = ctx.db.query(func.min(models.CashDrawerCount.counted_at)).filter(models.CashDrawerCount.restaurant_id == ctx.rid).scalar()
     if first is None:
         return no_data("Needs four weeks of cash counts to spot a repeating pattern.")
     day = (ctx.now - first).days + 1
     if day < PATTERN_DAYS:
         return block("learning", as_of=ctx.now, day=day, of=PATTERN_DAYS, reason="Needs four weeks of cash counts to spot a repeating pattern.")
-    return unavailable("Spotting repeating gaps is not available yet.")
+    found = recurring_drawer_gaps(ctx.db, ctx.rid, ctx.settings)
+    s = ctx.settings
+    return block("live", as_of=ctx.now,
+                 patterns=[{"when": p.when, "times_short": p.times_short, "of_last": p.of_last, "short_each": kes(p.average_short_cents),
+                            "total": kes(p.total_short_cents)} for p in found],
+                 reason=None if found else "No shift has come up short again and again in the last four weeks.",
+                 note="A pattern is a reason to look at that shift, not a conclusion about anyone.",
+                 assumption=assume("cash_tolerance_kes", s.cash_tolerance_cents // 100, label="Cash count difference we accept"))
 
 
 def cash_area(ctx: OwnerContext) -> tuple[dict, dict]:

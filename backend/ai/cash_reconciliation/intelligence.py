@@ -174,3 +174,65 @@ def compute_reconciliation_report(
         drawer_variances=drawer_variances,
         mpesa_mismatches=mpesa_payment_mismatches(db, restaurant_id, window_hours),
     )
+
+
+# ── recurring gaps (figure 6.1 P7: "Tuesday night drawer short × 4 weeks") ───────────────────────────────────────
+
+SHIFT_SPLIT_HOUR_EAT = 14       # a counting window that starts before 14:00 Nairobi is the day shift, otherwise the evening
+RECURRING_LOOKBACK = 4          # the latest four counts of the same weekday and shift …
+RECURRING_MIN_SHORT = 3         # … three of which came up short beyond the tolerance, make a pattern
+RECURRING_HISTORY_WEEKS = 12    # counts older than this are not looked at
+WEEKDAY_NAMES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+
+@dataclass
+class RecurringGap:
+    weekday: int                  # Nairobi weekday, Monday = 0
+    shift: str                    # "day" | "evening"
+    times_short: int              # of the latest `of_last` counts of this weekday and shift, how many were short beyond tolerance
+    of_last: int
+    short_cents: list = field(default_factory=list)   # each shortage that counted, newest first
+
+    @property
+    def when(self) -> str:
+        return f"{WEEKDAY_NAMES[self.weekday]} {self.shift}"
+
+    @property
+    def total_short_cents(self) -> int:
+        return sum(self.short_cents)
+
+    @property
+    def average_short_cents(self) -> int:
+        return round(self.total_short_cents / len(self.short_cents)) if self.short_cents else 0
+
+
+def recurring_drawer_gaps(db: Session, restaurant_id: int, settings: Settings | None = None, *,
+                          lookback: int = RECURRING_LOOKBACK, min_short: int = RECURRING_MIN_SHORT) -> list[RecurringGap]:
+    """The same weekday and shift coming up short, again and again — a signal to look at that shift, not a finding about
+    anyone. Read-only. A count is *short* when the drawer held less than expected by more than the owner's tolerance.
+
+    Needs at least `min_short` counts of the same weekday and shift; returns the patterns worst first (largest total).
+    """
+    settings = resolve(db, restaurant_id, settings)
+    since = utcnow() - timedelta(weeks=RECURRING_HISTORY_WEEKS)
+    counts = db.query(models.CashDrawerCount).filter(
+        models.CashDrawerCount.restaurant_id == restaurant_id,
+        models.CashDrawerCount.window_start >= since,
+    ).order_by(models.CashDrawerCount.window_start.desc()).all()
+
+    groups: dict[tuple[int, str], list] = {}
+    for c in counts:
+        local = c.window_start + timedelta(hours=3)                       # Nairobi (UTC+3, no daylight saving)
+        shift = "day" if local.hour < SHIFT_SPLIT_HOUR_EAT else "evening"
+        groups.setdefault((local.weekday(), shift), []).append(c)
+
+    patterns = []
+    for (weekday, shift), rows in groups.items():
+        latest = rows[:lookback]                                          # newest first
+        if len(latest) < min_short:
+            continue
+        short = [c.expected_amount_cents - c.counted_amount_cents for c in latest
+                 if c.expected_amount_cents - c.counted_amount_cents > drawer_tolerance_cents(c.expected_amount_cents, settings)]
+        if len(short) >= min_short:
+            patterns.append(RecurringGap(weekday, shift, len(short), len(latest), short))
+    return sorted(patterns, key=lambda p: p.total_short_cents, reverse=True)

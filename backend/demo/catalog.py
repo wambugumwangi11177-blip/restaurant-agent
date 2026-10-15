@@ -96,33 +96,35 @@ class Dish:
 
 MENU: tuple[Dish, ...] = (
     # grill
-    Dish("Quarter chicken", "Mains", 40_000, "grill", 18, 6.5, {"chicken": 0.5, "oil": 0.1}),
-    Dish("Nyama choma (goat)", "Mains", 120_000, "grill", 22, 6.5,
+    Dish("Quarter chicken", "Mains", 40_000, "grill", 18, 5.5, {"chicken": 0.5, "oil": 0.1}),
+    Dish("Nyama choma (goat)", "Mains", 140_000, "grill", 22, 6.5,
          {"goat": 0.35, "tomatoes": 0.1, "onions": 0.08, "maize_flour": 0.15, "spices": 0.01}),
-    Dish("Burger", "Mains", 60_000, "grill", 12, 3.5,
+    Dish("Burger", "Mains", 60_000, "grill", 12, 3.0,
          {"beef_mince": 0.22, "buns": 1, "cheese": 1, "tomatoes": 0.15, "onions": 0.1, "lettuce": 0.1}),
-    Dish("Chicken burger", "Mains", 65_000, "grill", 12, 3.0,
+    Dish("Chicken burger", "Mains", 75_000, "grill", 12, 3.0,
          {"chicken": 0.2, "buns": 1, "cheese": 1, "lettuce": 0.1, "tomatoes": 0.15}),
     # fryer
     Dish("Chips", "Sides", 30_000, "fryer", 9, 10.0, {"potatoes": 0.4, "oil": 0.25}),
     Dish("Fish fillet", "Mains", 65_000, "fryer", 15, 1.8,
          {"tilapia": 0.3, "oil": 0.15, "lemons": 1, "maize_flour": 0.15, "tomatoes": 0.1, "onions": 0.07}),
-    Dish("Chicken wings", "Mains", 60_000, "fryer", 14, 3.0, {"chicken": 0.4, "oil": 0.1}),
+    Dish("Chicken wings", "Mains", 70_000, "fryer", 14, 2.5, {"chicken": 0.4, "oil": 0.1}),
     Dish("Samosa (2)", "Snacks", 20_000, "fryer", 6, 5.0, {"wheat_flour": 0.06, "beef": 0.05, "oil": 0.05, "onions": 0.03}),
     Dish("Mandazi (3)", "Snacks", 12_000, "fryer", 5, 4.0, {"wheat_flour": 0.1, "sugar": 0.02, "oil": 0.05}),
     # main kitchen
+    Dish("Beef fry", "Mains", 90_000, "main", 15, 5.0,
+         {"beef": 0.3, "onions": 0.06, "tomatoes": 0.08, "oil": 0.03, "spices": 0.005}),
     Dish("Pilau", "Mains", 35_000, "main", 14, 8.0,
          {"rice": 0.15, "beef": 0.1, "spices": 0.01, "onions": 0.05, "oil": 0.03}),
-    Dish("Beef stew", "Mains", 65_000, "main", 16, 4.0,
+    Dish("Beef stew", "Mains", 75_000, "main", 16, 4.0,
          {"beef": 0.22, "onions": 0.05, "tomatoes": 0.1, "oil": 0.03, "maize_flour": 0.12}),
-    Dish("Fried rice", "Mains", 45_000, "main", 13, 5.0,
+    Dish("Fried rice", "Mains", 50_000, "main", 13, 5.0,
          {"rice": 0.15, "eggs": 1, "carrots": 0.05, "oil": 0.03, "chicken": 0.08}),
     Dish("Ugali sukuma", "Mains", 30_000, "main", 10, 6.0,
          {"maize_flour": 0.2, "kale": 0.15, "oil": 0.02, "onions": 0.03}),
     Dish("Chapati beans", "Mains", 30_000, "main", 10, 4.0,
          {"wheat_flour": 0.1, "beans": 0.15, "oil": 0.04, "onions": 0.03}),
     Dish("Omelette", "Breakfast", 35_000, "main", 8, 3.0, {"eggs": 3, "onions": 0.03, "tomatoes": 0.05, "oil": 0.02}),
-    Dish("Spaghetti bolognese", "Mains", 38_000, "main", 13, 1.2,
+    Dish("Spaghetti bolognese", "Mains", 40_000, "main", 13, 1.2,
          {"pasta": 0.15, "beef_mince": 0.1, "tomatoes": 0.1, "onions": 0.05, "oil": 0.02}),
     # salad
     Dish("Garden salad", "Sides", 35_000, "salad", 5, 1.5,
@@ -136,9 +138,9 @@ MENU: tuple[Dish, ...] = (
     Dish("Pineapple juice", "Drinks", 30_000, "drinks", 4, 2.5, {"pineapple": 0.25, "sugar": 0.02}, drink=True),
     Dish("Orange juice", "Drinks", 30_000, "drinks", 4, 2.5, {"oranges": 0.5, "sugar": 0.02}, drink=True),
     Dish("Watermelon juice", "Drinks", 25_000, "drinks", 4, 2.5, {"watermelon": 0.5, "sugar": 0.02}, drink=True),
-    Dish("Soda", "Drinks", 12_000, "drinks", 1, 8.0, {"soda": 1}, drink=True),
+    Dish("Soda", "Drinks", 15_000, "drinks", 1, 8.0, {"soda": 1}, drink=True),
     Dish("Water 500 ml", "Drinks", 12_000, "drinks", 1, 4.0, {"water": 1}, drink=True),
-    Dish("Beer", "Drinks", 35_000, "drinks", 1, 6.0, {"beer": 1}, drink=True),
+    Dish("Beer", "Drinks", 45_000, "drinks", 1, 6.0, {"beer": 1}, drink=True),
     Dish("Whisky (shot)", "Drinks", 40_000, "drinks", 1, 2.0, {"whisky": 0.04}, drink=True),
 )
 DISH = {d.name: d for d in MENU}
@@ -176,9 +178,9 @@ SUPPLIERS: dict[str, dict] = {
 # raising Kasarani's).
 BRANCHES: tuple[dict, ...] = (
     {"key": "westlands", "name": "Demo Restaurant", "label": "Westlands", "address": "Westlands, Nairobi",
-     "scale": 1.00, "tables": 14, "waste": 0.012, "cost_factor": 1.00, "lat": -1.2673, "lng": 36.8103},
+     "scale": 1.00, "tables": 14, "waste": 0.012, "cost_factor": 1.00, "p14_cost_factor": 1.00, "lat": -1.2673, "lng": 36.8103},
     {"key": "kasarani", "name": "Demo Restaurant – Kasarani", "label": "Kasarani", "address": "Kasarani, Nairobi",
-     "scale": 0.93, "tables": 12, "waste": 0.016, "cost_factor": 1.00, "lat": -1.2210, "lng": 36.8990},
+     "scale": 0.98, "tables": 12, "waste": 0.016, "cost_factor": 1.00, "p14_cost_factor": 1.32, "lat": -1.2210, "lng": 36.8990},
 )
 WEEKLY_SALES_TARGET_CENTS = 10_000_000          # KES 100,000 per branch per week
 

@@ -46,6 +46,24 @@ TABLE_CAPACITIES = (2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 8, 8, 10)
 OFF_DAYS = ((0, 3), (1, 2), (0, 2), (1, 3), (0, 6), (2, 6), (3, 6), (1, 6))
 SHIFT_STARTS = (8, 8, 16, 8, 16, 8, 16, 8)          # per staff index: day (08:00) or evening (16:00), 7 h
 SHIFT_HOURS = 7.0
+# Figure 6.1 scenarios the generator plants (docs/v2/figures/scenarios.md). P1 (Quarter chicken 400/260), P11 (the four
+# menu kinds) and P16 (till-rung M-Pesa sales without a receipt) hold by construction of the catalog and the baseline.
+# P8 (M-Pesa statement), P9 (gas) and P10 (rent) wait for their phases. Planted on the owner's default branch (Westlands)
+# unless the scenario is about the comparison of the two (P14).
+PLANTS = ("P2", "P3", "P4", "P5", "P6", "P7", "P12", "P13", "P14", "P15")
+P2_DAYS = 21                    # Chips charged KES 270 on the till (menu 300) for three weeks (the engine looks at 14 days from its own anchor)
+P3_GLOVO_BURGER_BOOST = 8.0     # Glovo guests order burgers far more than the average guest does
+P4_AFTERNOON_MIX = {"Quarter chicken": 8.0, "Burger": 4.0, "Beef stew": 3.0, "Beef fry": 3.0, "Chicken burger": 3.0, "Chicken wings": 3.0,
+                    "Chai (milk tea)": 0.3, "Nyama choma (goat)": 0.05, "Pilau": 0.3, "Samosa (2)": 0.5, "Mandazi (3)": 0.5, "Beer": 0.3,
+                    "Whisky (shot)": 0.0}
+P5_EXTRA_BEEF_SHARE = 0.33      # the kitchen draws a third more beef than the sales explain (scaled to the demo, see PROGRESS)
+P5_DAYS = 28
+P6_HANDOVER = (4.0, 3.8)        # store says 4.0 kg of beef, the kitchen counts 3.8 kg (scaled from 40 / 38)
+P7_SHORT_CENTS = (45_000, 65_000)
+P12_OPEN_HOUR_OUT = 19          # chips are out from 19:00 Nairobi time
+P12_SALES_FACTOR = 0.5
+P13_RATIO = 56 / 60             # Kenchic delivers 56 of every 60 (ratio kept; the quantities are the demo's own)
+P15_SUPPLIER = "Ngong Charcoal Traders"
 APPROVED_PRICE_CHANGES = {"Ugali sukuma": (25_000, 20), "Chicken wings": (55_000, 41)}   # (old price, days ago approved); the menu holds the new price
 
 
@@ -90,14 +108,15 @@ class DemoSummary:
     weekly_sales_kes: dict
     min_stock: dict
     wiped: dict
+    planted: dict = field(default_factory=dict)       # scenario id -> what was planted (a date or a note), None if it could not be
 
     def as_dict(self) -> dict:
-        return {k: getattr(self, k) for k in ("tenant_id", "restaurant_ids", "seed", "days", "counts", "weekly_sales_kes", "wiped")}
+        return {k: getattr(self, k) for k in ("tenant_id", "restaurant_ids", "seed", "days", "counts", "weekly_sales_kes", "planted", "wiped")}
 
 
 class DemoBuilder:
     def __init__(self, db, *, seed: int = DEFAULT_SEED, now: datetime | None = None, days: int = DEFAULT_DAYS,
-                 plant: tuple = ()):
+                 plant: tuple = PLANTS):
         self.db = db
         self.seed = seed
         self.now = (now or utcnow()).replace(microsecond=0)
@@ -109,6 +128,34 @@ class DemoBuilder:
         self.branches: list[BranchState] = []
         self.sales_cents: dict[str, int] = {}
         self.counts: dict[str, int] = {}
+        self.planted: dict[str, str | None] = {}
+        self._p7_days = self._last_tuesday_evenings(4) if "P7" in self.plant else set()
+        self._p12_day = self._holiday_tuesday() if "P12" in self.plant else None
+        if "P12" in self.plant:
+            self.planted["P12"] = self._p12_day.isoformat() if self._p12_day else None
+
+    def planting(self, scenario: str, b: "BranchState") -> bool:
+        """Scenarios about one restaurant are planted on the owner's default branch (Westlands)."""
+        return scenario in self.plant and b.index == 0
+
+    def _last_tuesday_evenings(self, n: int) -> set:
+        """The latest `n` Tuesdays whose evening drawer count is already complete at `now`."""
+        found, day = [], self.today
+        while len(found) < n and day >= self.first_day:
+            if day.weekday() == 1 and local_utc(day, 23) + timedelta(minutes=20) <= self.now:
+                found.append(day)
+            day -= timedelta(days=1)
+        return set(found)
+
+    def _holiday_tuesday(self) -> date | None:
+        """The most recent Tuesday in the window that is a Kenyan public holiday (the same data the demand forecast uses)."""
+        from ai.simulation.signals import holiday_provider
+        day = self.today - timedelta(days=1)
+        while day >= self.first_day:
+            if day.weekday() == 1 and holiday_provider(day):
+                return day
+            day -= timedelta(days=1)
+        return None
 
     # ── helpers ──────────────────────────────────────────────────────────────
     def rng(self, *parts) -> random.Random:
@@ -134,6 +181,7 @@ class DemoBuilder:
         for b in self.branches:
             self._simulate(b)
             self._future(b)
+        self._plant_after(owner)
         self._ideas_and_activity(owner)
         self._owner_settings(owner)
         owner.active_restaurant_id = self.branches[0].restaurant.id
@@ -141,7 +189,7 @@ class DemoBuilder:
         weekly = {b.spec["key"]: round(self.sales_cents.get(b.spec["key"], 0) / 100 / (self.days / 7), 2) for b in self.branches}
         return DemoSummary(tenant.id, [b.restaurant.id for b in self.branches], self.seed, self.now, self.days,
                            dict(sorted(self.counts.items())), weekly,
-                           {b.spec["key"]: dict(b.min_stock) for b in self.branches}, wiped)
+                           {b.spec["key"]: dict(b.min_stock) for b in self.branches}, wiped, self.planted)
 
     # ── tenant, branches, people ─────────────────────────────────────────────
     def _branches_and_group(self, tenant: models.Tenant) -> None:
@@ -203,7 +251,8 @@ class DemoBuilder:
             base = daily * (lead + 4)
             reorder = max(base + 3 * math.sqrt(base), ing.pack * 0.5)        # cover for lead time, a late truck and a busy weekend
             par = reorder + max(daily * 5, ing.pack)
-            cost = round(ing.cost_cents * spec["cost_factor"])
+            factor = spec["p14_cost_factor"] if "P14" in self.plant else spec["cost_factor"]
+            cost = round(ing.cost_cents * factor)
             item = models.InventoryItem(restaurant_id=rid, item_name=ing.name, unit=ing.unit, quantity=round(par * 0.92, 2),
                                         cost_per_unit_cents=cost, low_stock_threshold=math.ceil(reorder * 0.6), par_level=round(par, 1),
                                         expiry_days=ing.shelf_days, default_supplier_id=b.suppliers[ing.supplier].id)
@@ -270,42 +319,62 @@ class DemoBuilder:
             day += timedelta(days=1)
 
     # ── orders ───────────────────────────────────────────────────────────────
-    def price_on(self, dish: cat.Dish, day: date) -> int:
+    def price_on(self, b: BranchState, dish: cat.Dish, day: date) -> int:
+        """What the till charges for `dish` on `day`: the menu price, the price before an approved idea took effect,
+        or (P2) KES 270 for Chips against a KES 300 menu price for the latest 14 days."""
+        if dish.name == "Chips" and self.planting("P2", b) and day >= self.today - timedelta(days=P2_DAYS):
+            return 27_000
         change = APPROVED_PRICE_CHANGES.get(dish.name)
         if change is not None and day < self.today - timedelta(days=change[1]):
             return change[0]
         return dish.price_cents
+
+    def _weights(self, b: BranchState, day: date, daypart: str, hour: int, channel) -> list[float]:
+        """Relative popularity of every dish for one order: the menu's own weights, bent by the scenarios planted here."""
+        w = [d.weight for d in cat.MENU]
+        if self.planting("P4", b) and daypart == "afternoon" and 15 <= hour < 17:
+            w = [x * P4_AFTERNOON_MIX.get(d.name, 1.0) for x, d in zip(w, cat.MENU)]
+        if self.planting("P3", b) and channel == models.DeliveryChannel.GLOVO:
+            w = [x * (P3_GLOVO_BURGER_BOOST if d.name == "Burger" else 1.0) for x, d in zip(w, cat.MENU)]
+        if self.planting("P12", b) and day == self._p12_day:
+            # the holiday crowd orders chips until the potatoes run out at 19:00, and cannot after
+            w = [(0.0 if hour >= P12_OPEN_HOUR_OUT else x * 6.0) if d.name == "Chips" else x for x, d in zip(w, cat.MENU)]
+        return w
 
     def _plan_orders(self, b: BranchState, day: date) -> list[dict]:
         rng = self.rng(b.spec["key"], day.isoformat(), "orders")
         expected = WEEKLY_ORDERS * b.spec["scale"] * cat.WEEKDAY_FACTORS[day.weekday()] / 7
         if day.day >= 25:
             expected *= 1.06                       # payday week
+        if self.planting("P12", b) and day == self._p12_day:
+            expected *= P12_SALES_FACTOR           # the holiday
         n = max(4, round(expected * rng.gauss(1.0, 0.08)))
-        weights = [d.weight for d in cat.MENU]
         active = [g for g in b.guests if g.lapses_on is None or day < g.lapses_on]
         parts = cat.DAYPARTS
         plans = []
         for _ in range(n):
             name, h0, h1, _share = rng.choices(parts, weights=[p[3] for p in parts])[0]
-            when = local_utc(day, rng.randrange(h0, h1), rng.randrange(0, 60))
+            hour, minute = rng.randrange(h0, h1), rng.randrange(0, 60)
+            when = local_utc(day, hour, minute)
             if when > self.now:
                 continue                           # nothing in the future
-            k = rng.choices(cat.BASKET_SIZES, weights=cat.BASKET_WEIGHTS)[0]
-            picked: list[cat.Dish] = []
-            pool, pw = list(cat.MENU), list(weights)
-            for _line in range(k):
-                i = rng.choices(range(len(pool)), weights=pw)[0]
-                picked.append(pool.pop(i))
-                pw.pop(i)
-            lines = [(d, rng.choices(cat.LINE_QTYS, weights=cat.LINE_QTY_WEIGHTS)[0], self.price_on(d, day)) for d in picked]
             r = rng.random()
             channel, otype = (models.DeliveryChannel.GLOVO, models.OrderType.DELIVERY) if r < 0.13 else \
                 (models.DeliveryChannel.UBER_EATS, models.OrderType.DELIVERY) if r < 0.22 else \
                 (models.DeliveryChannel.BOLT_FOOD, models.OrderType.DELIVERY) if r < 0.26 else \
                 (models.DeliveryChannel.APP, models.OrderType.TAKEOUT) if r < 0.29 else \
                 (models.DeliveryChannel.WALK_IN, models.OrderType.DINE_IN if rng.random() < 0.75 else models.OrderType.TAKEOUT)
-            if channel in (models.DeliveryChannel.GLOVO, models.DeliveryChannel.UBER_EATS, models.DeliveryChannel.BOLT_FOOD):
+            k = rng.choices(cat.BASKET_SIZES, weights=cat.BASKET_WEIGHTS)[0]
+            picked: list[cat.Dish] = []
+            pool, pw = list(cat.MENU), self._weights(b, day, name, hour, channel)
+            for _line in range(k):
+                i = rng.choices(range(len(pool)), weights=pw)[0]
+                picked.append(pool.pop(i))
+                pw.pop(i)
+            lines = [(d, rng.choices(cat.LINE_QTYS, weights=cat.LINE_QTY_WEIGHTS)[0], self.price_on(b, d, day)) for d in picked]
+            if self.planting("P7", b) and day in self._p7_days and hour >= 16 and channel == models.DeliveryChannel.WALK_IN:
+                pay = models.PaymentMethod.CASH               # P7: the Tuesday-night crowd pays cash, so there is cash to come up short
+            elif channel in (models.DeliveryChannel.GLOVO, models.DeliveryChannel.UBER_EATS, models.DeliveryChannel.BOLT_FOOD):
                 pay = models.PaymentMethod.CARD
             elif channel == models.DeliveryChannel.APP:
                 pay = models.PaymentMethod.MPESA
@@ -331,6 +400,9 @@ class DemoBuilder:
         db, rid = self.db, b.restaurant.id
         manager = self.users["manager"]
         written: list[tuple[models.Order, dict]] = []
+        day_used: dict[str, float] = {}
+        if self.planting("P12", b) and day == self._p12_day:
+            self._p12_potatoes(b, day, plans)
         for plan in plans:
             when = plan["when"]
             age_min = (self.now - when).total_seconds() / 60
@@ -385,6 +457,7 @@ class DemoBuilder:
                 inv = b.inv[k]
                 inv.quantity = round(inv.quantity - q, 4)
                 b.week_usage[k] += q
+                day_used[k] = day_used.get(k, 0.0) + q
                 b.min_stock[k] = min(b.min_stock[k], inv.quantity)
                 db.add(models.StockMovement(inventory_item_id=inv.id, movement_type=models.StockMovementType.OUT, quantity=q,
                                             reason=f"Order #{order.id}", created_at=order.created_at + timedelta(minutes=1),
@@ -401,9 +474,106 @@ class DemoBuilder:
                                               incident_type=feedback_rng.choice((models.IncidentType.REMAKE, models.IncidentType.QUALITY_ISSUE)),
                                               reason="Sent back at the pass", created_at=order.created_at + timedelta(minutes=25)))
                 self._count("kitchen_incidents")
+        if self.planting("P5", b) and (self.today - day).days < P5_DAYS and day_used.get("beef", 0) > 0:
+            self._p5_extra_beef(b, day, day_used["beef"])
         self._count("orders", len(written))
         self._count("order_items", sum(len(o.items) for o, _p in written))
         self._count("prep_times", sum(len(o.items) for o, _p in written if o.status != models.OrderStatus.CANCELLED))
+
+    # ── planted scenarios (figure 6.1) ───────────────────────────────────────
+    def _p12_potatoes(self, b: BranchState, day: date, plans: list[dict]) -> None:
+        """P12: the potatoes delivery was missed, so what is on the shelf lasts exactly until 19:00 and chips are out after
+        that. A stock-count adjustment at the start of the day records it (adjustments are not 'usage' for the custody check)."""
+        need = sum(q * d.recipe.get("potatoes", 0) for p in plans if not p["cancelled"] for d, q, _price in p["lines"]
+                   if (p["when"] + EAT_OFFSET).hour < P12_OPEN_HOUR_OUT)
+        inv = b.inv["potatoes"]
+        delta = round(need - inv.quantity, 3)
+        if delta < 0:
+            self.db.add(models.StockMovement(
+                inventory_item_id=inv.id, movement_type=models.StockMovementType.ADJUST, quantity=delta,
+                reason=f"stock count: only {need:.1f} kg of potatoes left - delivery missed, out of chips by {P12_OPEN_HOUR_OUT}:00",
+                created_at=local_utc(day, 7, 0), performed_by_user_id=self.users["storekeeper"].id))
+            inv.quantity = round(need, 4)
+            self._count("stock_movements")
+
+    def _p5_extra_beef(self, b: BranchState, day: date, used: float) -> None:
+        """P5: the kitchen draws a third more beef than the day's sales explain; it is recorded as issued to the kitchen."""
+        extra = round(used * P5_EXTRA_BEEF_SHARE, 3)
+        at = local_utc(day, 12, 0)
+        if extra <= 0 or at > self.now:
+            return
+        inv = b.inv["beef"]
+        inv.quantity = round(inv.quantity - extra, 4)
+        b.week_usage["beef"] += extra
+        b.min_stock["beef"] = min(b.min_stock["beef"], inv.quantity)
+        self.db.add(models.StockMovement(inventory_item_id=inv.id, movement_type=models.StockMovementType.OUT, quantity=extra,
+                                         reason="issued to kitchen", created_at=at, performed_by_user_id=self.users["kitchen"].id))
+        self._count("stock_movements")
+
+    def _plant_after(self, owner: models.User) -> None:
+        """The scenarios that edit or add a few specific rows once the baseline is written."""
+        b = self.branches[0]
+        db, rid = self.db, self.branches[0].restaurant.id
+        if "P2" in self.plant:
+            self.planted["P2"] = f"Chips charged KES 270 (menu KES 300) from {(self.today - timedelta(days=P2_DAYS)).isoformat()}"
+        if "P3" in self.plant:
+            self.planted["P3"] = "Glovo guests order burgers about eight times as often"
+        if "P4" in self.plant:
+            self.planted["P4"] = "15:00-17:00 orders lean on chicken, burgers and stew"
+        if "P5" in self.plant:
+            self.planted["P5"] = f"kitchen draws {P5_EXTRA_BEEF_SHARE:.0%} more beef than sales explain, last {P5_DAYS} days"
+        if "P7" in self.plant:
+            self.planted["P7"] = ", ".join(sorted(d.isoformat() for d in self._p7_days)) or None
+        if "P14" in self.plant:
+            self.planted["P14"] = "Kasarani pays {:.0%} more for ingredients".format(cat.BRANCHES[1]["p14_cost_factor"] - 1)
+        if "P6" in self.plant:
+            at = local_utc(self.today - timedelta(days=2), 9, 0)
+            said, counted = P6_HANDOVER
+            if at <= self.now:
+                db.add(models.StockTransfer(
+                    restaurant_id=rid, inventory_item_id=b.inv["beef"].id, quantity=said, unit="kg", from_location="store", to_location="kitchen",
+                    status=models.StockTransferStatus.DISPUTED, initiated_by_user_id=self.users["storekeeper"].id, initiated_at=at,
+                    confirmed_by_user_id=self.users["kitchen"].id, confirmed_at=at + timedelta(minutes=14), confirmed_quantity=counted,
+                    notes="Kitchen counted less than the store sent"))
+                self._count("stock_transfers")
+                self.planted["P6"] = f"store {said} kg, kitchen {counted} kg of beef on {eat_date(at).isoformat()}"
+            else:
+                self.planted["P6"] = None
+        if "P13" in self.plant:
+            db.flush()
+            po = (db.query(models.PurchaseOrder).join(models.Supplier, models.Supplier.id == models.PurchaseOrder.supplier_id)
+                  .join(models.InventoryItem, models.InventoryItem.id == models.PurchaseOrder.inventory_item_id)
+                  .filter(models.PurchaseOrder.restaurant_id == rid, models.Supplier.name == "Kenchic", models.InventoryItem.item_name == "Chicken",
+                          models.PurchaseOrder.delivered_at.isnot(None), models.PurchaseOrder.delivered_at <= self.now,
+                          models.PurchaseOrder.delivered_at >= self.now - timedelta(days=25))
+                  .order_by(models.PurchaseOrder.delivered_at.desc()).first())
+            if po is None:
+                self.planted["P13"] = None
+            else:
+                short = round(po.quantity_ordered * P13_RATIO, 1)
+                gap = po.quantity_received - short
+                po.quantity_received, po.status = short, "PARTIAL"
+                po.total_cost = round(short * po.cost_per_unit)
+                movement = db.query(models.StockMovement).filter(models.StockMovement.inventory_item_id == po.inventory_item_id,
+                                                                  models.StockMovement.created_at == po.delivered_at,
+                                                                  models.StockMovement.movement_type == models.StockMovementType.IN).first()
+                if movement is not None:
+                    movement.quantity = short
+                inv = db.get(models.InventoryItem, po.inventory_item_id)
+                inv.quantity = round(inv.quantity - gap, 4)
+                self.planted["P13"] = f"Kenchic delivered {short} of {po.quantity_ordered} kg of chicken on {eat_date(po.delivered_at).isoformat()}"
+        if "P15" in self.plant:
+            sup = models.Supplier(restaurant_id=rid, name=P15_SUPPLIER, avg_lead_days=1.0, reliability_score=100.0, notes="Illustrative demo supplier")
+            db.add(sup)
+            db.flush()
+            ordered = local_utc(self.today - timedelta(days=20), 17, 0)
+            db.add(models.PurchaseOrder(restaurant_id=rid, supplier_id=sup.id, inventory_item_id=None, quantity_ordered=10, quantity_received=10,
+                                        unit="bag", cost_per_unit=150_000, total_cost=1_500_000, status="DELIVERED", ordered_at=ordered,
+                                        expected_at=ordered + timedelta(days=1), delivered_at=ordered + timedelta(days=1, minutes=20),
+                                        notes="Charcoal, 10 bags"))
+            self._count("suppliers")
+            self._count("purchase_orders")
+            self.planted["P15"] = f"{P15_SUPPLIER}: one delivery"
 
     # ── stock: deliveries, reorders, handovers, counts ───────────────────────
     def _deliveries(self, b: BranchState, day: date) -> None:
@@ -540,6 +710,8 @@ class DemoBuilder:
             expected = expected_cash_amount_cents(self.db, b.restaurant.id, ws, we)
             roll = rng.random()
             off = 0 if roll < 0.65 else -rng.randint(10, 60) * 100 if roll < 0.88 else rng.randint(10, 50) * 100
+            if self.planting("P7", b) and hi == 23 and day in self._p7_days:
+                off = -rng.randint(*P7_SHORT_CENTS)                  # P7: Tuesday night, short, four weeks running
             self.db.add(models.CashDrawerCount(restaurant_id=b.restaurant.id, window_start=ws, window_end=we, expected_amount_cents=expected,
                                                counted_amount_cents=max(0, expected + off), counted_by_user_id=self.users["manager"].id,
                                                counted_at=we + timedelta(minutes=15), notes=""))
@@ -575,6 +747,23 @@ class DemoBuilder:
     def _future(self, b: BranchState) -> None:
         for offset in range(1, 15):
             self._reservations(b, self.today + timedelta(days=offset), future=True)
+        self._orders_on_the_way(b)
+
+    def _orders_on_the_way(self, b: BranchState) -> None:
+        """Deliveries coming up: the two items with the thinnest cover that have nothing on order get a purchase order the
+        manager sent this morning, due tomorrow at 07:30 (Home's "coming up" list)."""
+        on_order = {po.inventory_item_id for po in b.open_pos}
+        thin = sorted((i for i in cat.INGREDIENTS if b.inv[i.key].id not in on_order),
+                      key=lambda i: b.inv[i.key].quantity / max(b.reorder[i.key][1], 1e-9))[:2]
+        ordered_at = min(self.now - timedelta(minutes=30), local_utc(self.today, 9, 30))
+        for ing in thin:
+            inv = b.inv[ing.key]
+            qty = max(ing.pack, math.ceil((b.reorder[ing.key][1] - inv.quantity) / ing.pack) * ing.pack)
+            self.db.add(models.PurchaseOrder(
+                restaurant_id=b.restaurant.id, supplier_id=b.suppliers[ing.supplier].id, inventory_item_id=inv.id, quantity_ordered=qty,
+                quantity_received=None, unit=ing.unit, cost_per_unit=inv.cost_per_unit_cents, total_cost=round(qty * inv.cost_per_unit_cents),
+                status="SENT", ordered_at=ordered_at, expected_at=local_utc(self.today + timedelta(days=1), 7, 30), notes=""))
+            self._count("purchase_orders")
 
     # ── the owner's side: approved ideas, activity, settings ─────────────────
     def _ideas_and_activity(self, owner: models.User) -> None:
@@ -626,5 +815,5 @@ class DemoBuilder:
 
 
 def build(db, owner_email: str, owner_password: str, *, seed: int = DEFAULT_SEED, now: datetime | None = None,
-          days: int = DEFAULT_DAYS, plant: tuple = ()) -> DemoSummary:
+          days: int = DEFAULT_DAYS, plant: tuple = PLANTS) -> DemoSummary:
     return DemoBuilder(db, seed=seed, now=now, days=days, plant=plant).build(owner_email, owner_password)

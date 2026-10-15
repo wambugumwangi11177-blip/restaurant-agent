@@ -26,6 +26,10 @@ RELIABILITY_THRESHOLD = 85.0   # Below this = consider switching supplier
 # (ai/workflows/engine.py) uses the same number, from here.
 MIN_CLOSED_ORDERS_FOR_RELIABILITY = 3
 
+# A delivery under this share short is rounding (a bag a little light), not a short delivery.
+SHORT_DELIVERY_TOLERANCE = 0.02
+SHORT_DELIVERY_DAYS = 30
+
 
 def get_supply_chain_intelligence(db: Session, restaurant_id: int) -> dict:
     """Complete supply chain analysis."""
@@ -79,8 +83,36 @@ def get_supply_chain_intelligence(db: Session, restaurant_id: int) -> dict:
         },
         "suppliers":       supplier_analyses,
         "overdue_orders":  [_serialize_order(o) for o in overdue[:10]],
+        "short_deliveries": short_deliveries(db, restaurant_id, now),
         "recommendations": recommendations,
     }
+
+
+def short_deliveries(db: Session, restaurant_id: int, now=None) -> list[dict]:
+    """Deliveries in the last 30 days that arrived with less than was ordered (figure 6.1 P13: "delivers 56 of 60").
+    Read-only. Quantities are in the order's own unit; the value is the shortfall at the price paid, in integer cents."""
+    now = now or utcnow()
+    rows = db.query(models.PurchaseOrder).filter(
+        models.PurchaseOrder.restaurant_id == restaurant_id,
+        models.PurchaseOrder.delivered_at >= now - timedelta(days=SHORT_DELIVERY_DAYS),
+        models.PurchaseOrder.quantity_received.isnot(None),
+    ).all()
+    out = []
+    for o in rows:
+        if not o.quantity_ordered or o.quantity_received >= o.quantity_ordered * (1 - SHORT_DELIVERY_TOLERANCE):
+            continue
+        short = o.quantity_ordered - o.quantity_received
+        out.append({
+            "supplier":    o.supplier.name if o.supplier else "",
+            "item":        o.inventory_item.item_name if o.inventory_item else (o.notes or ""),
+            "unit":        o.unit,
+            "ordered":     o.quantity_ordered,
+            "received":    o.quantity_received,
+            "short_by":    round(short, 3),
+            "short_value_cents": round(short * (o.cost_per_unit or 0)),
+            "delivered_at": o.delivered_at.isoformat(),
+        })
+    return sorted(out, key=lambda r: r["short_value_cents"], reverse=True)
 
 
 def _fetch_recent_orders_by_supplier(
@@ -240,7 +272,7 @@ def _empty_response() -> dict:
             "total_suppliers": 0, "total_procurement_spend_30d": 0,
             "overdue_orders": 0, "at_risk_suppliers": 0, "suppliers_learning": 0, "avg_reliability_pct": None,
         },
-        "suppliers": [], "overdue_orders": [],
+        "suppliers": [], "overdue_orders": [], "short_deliveries": [],
         "recommendations": [{
             "priority": "INFO",
             "message": "No suppliers configured yet",

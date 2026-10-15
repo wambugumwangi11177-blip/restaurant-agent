@@ -640,12 +640,12 @@
    "reports": "not_shown"
   },
   "money": {
-   "area": "not_built",
-   "demo": "reimplemented",
-   "home": "not_built",
-   "old_dash": "not_built",
-   "os": "not_built",
-   "reports": "not_built"
+   "area": "not_shown",
+   "demo": "not_shown",
+   "home": "not_shown",
+   "old_dash": "not_shown",
+   "os": "not_shown",
+   "reports": "not_shown"
   },
   "mpesa_match": {
    "area": "not_built",
@@ -2289,6 +2289,11 @@
    {
     "from": "main",
     "lazy": false,
+    "to": "routers.owner_money"
+   },
+   {
+    "from": "main",
+    "lazy": false,
     "to": "routers.purchase_orders"
    },
    {
@@ -2510,6 +2515,16 @@
     "from": "owner.home",
     "lazy": true,
     "to": "routers.overview"
+   },
+   {
+    "from": "owner.money.categories",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.money.ledger",
+    "lazy": false,
+    "to": "time_utils"
    },
    {
     "from": "owner.registry",
@@ -3512,6 +3527,56 @@
     "to": "routers.deps"
    },
    {
+    "from": "routers.owner_money",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.owner_money",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.owner_money",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.owner_money",
+    "lazy": false,
+    "to": "owner.money.bills"
+   },
+   {
+    "from": "routers.owner_money",
+    "lazy": false,
+    "to": "owner.money.categories"
+   },
+   {
+    "from": "routers.owner_money",
+    "lazy": false,
+    "to": "owner.money.ledger"
+   },
+   {
+    "from": "routers.owner_money",
+    "lazy": false,
+    "to": "owner.money.licences"
+   },
+   {
+    "from": "routers.owner_money",
+    "lazy": false,
+    "to": "owner.settings"
+   },
+   {
+    "from": "routers.owner_money",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.owner_money",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
     "from": "routers.purchase_orders",
     "lazy": false,
     "to": "ai.reorder"
@@ -4494,7 +4559,7 @@
     "group": "demo",
     "id": "demo.wipe",
     "kind": "py",
-    "loc": 104,
+    "loc": 106,
     "path": "backend/demo/wipe.py"
    },
    {
@@ -4669,7 +4734,7 @@
     "group": "core",
     "id": "models",
     "kind": "py",
-    "loc": 1681,
+    "loc": 1797,
     "path": "backend/models.py"
    },
    {
@@ -4706,6 +4771,41 @@
     "kind": "py",
     "loc": 125,
     "path": "backend/owner/home.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.money",
+    "kind": "py",
+    "loc": 3,
+    "path": "backend/owner/money/__init__.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.money.bills",
+    "kind": "py",
+    "loc": 56,
+    "path": "backend/owner/money/bills.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.money.categories",
+    "kind": "py",
+    "loc": 72,
+    "path": "backend/owner/money/categories.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.money.ledger",
+    "kind": "py",
+    "loc": 59,
+    "path": "backend/owner/money/ledger.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.money.licences",
+    "kind": "py",
+    "loc": 13,
+    "path": "backend/owner/money/licences.py"
    },
    {
     "group": "other",
@@ -4930,6 +5030,13 @@
     "kind": "py",
     "loc": 117,
     "path": "backend/routers/owner.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.owner_money",
+    "kind": "py",
+    "loc": 524,
+    "path": "backend/routers/owner_money.py"
    },
    {
     "group": "router",
@@ -5841,6 +5948,96 @@
    "verb": "PUT"
   },
   {
+   "func": "create_bill",
+   "module": "routers.owner_money",
+   "path": "/owner/money/bills",
+   "verb": "POST"
+  },
+  {
+   "func": "create_category",
+   "module": "routers.owner_money",
+   "path": "/owner/money/categories",
+   "verb": "POST"
+  },
+  {
+   "func": "create_expense",
+   "module": "routers.owner_money",
+   "path": "/owner/money/expenses",
+   "verb": "POST"
+  },
+  {
+   "func": "create_licence",
+   "module": "routers.owner_money",
+   "path": "/owner/money/licences",
+   "verb": "POST"
+  },
+  {
+   "func": "list_bills",
+   "module": "routers.owner_money",
+   "path": "/owner/money/bills",
+   "verb": "GET"
+  },
+  {
+   "func": "list_categories",
+   "module": "routers.owner_money",
+   "path": "/owner/money/categories",
+   "verb": "GET"
+  },
+  {
+   "func": "list_expenses",
+   "module": "routers.owner_money",
+   "path": "/owner/money/expenses",
+   "verb": "GET"
+  },
+  {
+   "func": "list_licences",
+   "module": "routers.owner_money",
+   "path": "/owner/money/licences",
+   "verb": "GET"
+  },
+  {
+   "func": "pay_bill",
+   "module": "routers.owner_money",
+   "path": "/owner/money/bills/{bill_id}/pay",
+   "verb": "POST"
+  },
+  {
+   "func": "read_expense",
+   "module": "routers.owner_money",
+   "path": "/owner/money/expenses/{expense_id}",
+   "verb": "GET"
+  },
+  {
+   "func": "update_bill",
+   "module": "routers.owner_money",
+   "path": "/owner/money/bills/{bill_id}",
+   "verb": "PATCH"
+  },
+  {
+   "func": "update_category",
+   "module": "routers.owner_money",
+   "path": "/owner/money/categories/{category_id}",
+   "verb": "PATCH"
+  },
+  {
+   "func": "update_expense",
+   "module": "routers.owner_money",
+   "path": "/owner/money/expenses/{expense_id}",
+   "verb": "PATCH"
+  },
+  {
+   "func": "update_licence",
+   "module": "routers.owner_money",
+   "path": "/owner/money/licences/{licence_id}",
+   "verb": "PATCH"
+  },
+  {
+   "func": "void_expense",
+   "module": "routers.owner_money",
+   "path": "/owner/money/expenses/{expense_id}",
+   "verb": "DELETE"
+  },
+  {
    "func": "approve_purchase_order",
    "module": "routers.purchase_orders",
    "path": "/purchase-orders/{po_id}/approve",
@@ -6106,10 +6303,10 @@
   }
  ],
  "stats": {
-  "py_edges": 635,
+  "py_edges": 648,
   "py_lazy_edges": 193,
-  "py_modules": 162,
-  "routes": 174,
+  "py_modules": 168,
+  "routes": 189,
   "ts_edges": 485,
   "ts_files": 231
  },

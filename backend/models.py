@@ -1557,6 +1557,122 @@ class RestaurantSettingsAudit(Base):
     )
 
 
+class ExpenseCategory(Base):
+    """A line of the owner's costs ("Rent & premises", "Electricity (KPLC)", "Cooking gas" …), per restaurant.
+
+    The standard Kenyan P&L lines are created on first use (owner/money/categories.py); the owner can add their own and
+    switch any off. `pnl_line` is the section it is reported under, `is_fixed` says whether it counts towards the
+    costs that do not move with sales (what break-even is built from). Docs/v2/SPEC.md §4 S3.1, migration 052.
+    """
+    __tablename__ = "expense_categories"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    key           = Column(String(40), nullable=False)
+    name          = Column(String(80), nullable=False)
+    pnl_line      = Column(String(16), nullable=False)
+    is_fixed      = Column(Boolean, default=False, nullable=False)
+    is_standard   = Column(Boolean, default=False, nullable=False)
+    is_active     = Column(Boolean, default=True, nullable=False)
+    sort_order    = Column(Integer, default=0, nullable=False)
+    created_at    = Column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("restaurant_id", "key", name="uq_expense_categories_restaurant_key"),
+    )
+
+
+class Expense(Base):
+    """One thing the restaurant paid for. Money is integer cents; the day is a NAIROBI calendar date (`paid_on`).
+
+    Never deleted: a mistaken entry is voided (who, when, why) and drops out of every list and total, so the ledger can
+    always be audited. `bill_id` links the entry to the recurring bill it settled.
+    """
+    __tablename__ = "expenses"
+
+    id                 = Column(Integer, primary_key=True, index=True)
+    restaurant_id      = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    category_id        = Column(Integer, ForeignKey("expense_categories.id", ondelete="RESTRICT"), nullable=False)
+    amount_cents       = Column(Integer, nullable=False)
+    paid_on            = Column(Date, nullable=False)
+    method             = Column(String(8), default="cash", nullable=False)       # cash | mpesa | bank | card | other
+    supplier           = Column(String(120), default="", nullable=False)
+    note               = Column(String(500), default="", nullable=False)
+    receipt_ref        = Column(String(255), nullable=True)                      # an opaque storage key for the receipt photo
+    bill_id            = Column(Integer, ForeignKey("recurring_bills.id", ondelete="SET NULL"), nullable=True)
+    paid_by_user_id    = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at         = Column(DateTime, default=utcnow, nullable=False)
+    updated_at         = Column(DateTime, default=utcnow, nullable=False)
+    updated_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    voided_at          = Column(DateTime, nullable=True)
+    voided_by_user_id  = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    void_reason        = Column(String(200), nullable=True)
+
+    category = relationship("ExpenseCategory")
+    paid_by  = relationship("User", foreign_keys=[paid_by_user_id])
+    voided_by = relationship("User", foreign_keys=[voided_by_user_id])
+
+    __table_args__ = (
+        CheckConstraint("amount_cents > 0", name="ck_expenses_amount_pos"),
+        Index("ix_expenses_restaurant_paid_on", "restaurant_id", "paid_on"),
+        Index("ix_expenses_restaurant_category", "restaurant_id", "category_id"),
+    )
+
+
+class RecurringBill(Base):
+    """Something that falls due on a rule, not a date: rent on the 4th, KPLC on the 20th, a licence every June.
+
+    `frequency` "monthly": `due_day` is the day of the month (1-31, clamped to the month's length);
+    "weekly": `due_day` is the weekday (Monday = 0); "yearly": `due_month` + `due_day`.
+    """
+    __tablename__ = "recurring_bills"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    category_id   = Column(Integer, ForeignKey("expense_categories.id", ondelete="RESTRICT"), nullable=False)
+    name          = Column(String(120), nullable=False)
+    amount_cents  = Column(Integer, nullable=False)
+    frequency     = Column(String(8), nullable=False)
+    due_day       = Column(Integer, nullable=False)
+    due_month     = Column(Integer, nullable=True)
+    start_on      = Column(Date, nullable=False)
+    end_on        = Column(Date, nullable=True)
+    supplier      = Column(String(120), default="", nullable=False)
+    note          = Column(String(500), default="", nullable=False)
+    is_active     = Column(Boolean, default=True, nullable=False)
+    created_at    = Column(DateTime, default=utcnow, nullable=False)
+    updated_at    = Column(DateTime, default=utcnow, nullable=False)
+
+    category = relationship("ExpenseCategory")
+
+    __table_args__ = (
+        CheckConstraint("amount_cents > 0", name="ck_recurring_bills_amount_pos"),
+        Index("ix_recurring_bills_restaurant", "restaurant_id", "is_active"),
+    )
+
+
+class Licence(Base):
+    """A permit or certificate with an expiry date (single business permit, health, fire, liquor, music)."""
+    __tablename__ = "licences"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    name          = Column(String(120), nullable=False)
+    issuer        = Column(String(120), default="", nullable=False)
+    expires_on    = Column(Date, nullable=False)
+    cost_cents    = Column(Integer, nullable=True)
+    document_ref  = Column(String(255), nullable=True)
+    note          = Column(String(500), default="", nullable=False)
+    is_active     = Column(Boolean, default=True, nullable=False)
+    created_at    = Column(DateTime, default=utcnow, nullable=False)
+    updated_at    = Column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("cost_cents IS NULL OR cost_cents >= 0", name="ck_licences_cost_nonneg"),
+        Index("ix_licences_restaurant_expiry", "restaurant_id", "expires_on"),
+    )
+
+
 class CustomerFeedback(Base):
     """
     Lightweight customer rating captured over the messaging channel — a customer

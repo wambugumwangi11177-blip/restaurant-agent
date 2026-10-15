@@ -315,14 +315,16 @@ def _run_migration(connection, fn_name):
         getattr(module, fn_name)()
 
 
-def test_migration_051_chains_after_050_and_alembic_has_one_head():
+def test_migration_051_chains_after_050_and_is_in_the_single_history():
     module = _load_migration()
     assert module.down_revision == "050_creative_takes"
     from alembic.config import Config
     from alembic.script import ScriptDirectory
     config = Config(str(BACKEND / "alembic.ini"))
     config.set_main_option("script_location", str(BACKEND / "alembic"))
-    assert ScriptDirectory.from_config(config).get_heads() == [module.revision]
+    script = ScriptDirectory.from_config(config)
+    assert len(script.get_heads()) == 1                                       # one head, whatever has been added since 051
+    assert module.revision in {rev.revision for rev in script.walk_revisions()}
 
 
 def test_migration_051_creates_exactly_the_model_columns_and_is_reversible_and_idempotent(tmp_path):

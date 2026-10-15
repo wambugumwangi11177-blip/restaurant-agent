@@ -45,6 +45,8 @@ WIPED: tuple[str, ...] = (
     "agent_messages", "agent_executions", "agent_predictions", "memory_events", "conversation_turns", "customer_consents",
     "creative_takes", "attention_decisions", "owner_os_conversations", "owner_os_preferences", "workflow_runs",
     "restaurant_settings_audit", "restaurant_settings",
+    # the money ledger (S3.1): expenses reference bills and categories, bills reference categories
+    "licences", "expenses", "recurring_bills", "expense_categories",
     # these two are parents of children above and are removed after them
     "orders", "inventory_items", "menu_items", "suppliers",
 )

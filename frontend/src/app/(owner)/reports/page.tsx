@@ -1,5 +1,5 @@
 "use client";
-// Vibanda Reports — Daily / Weekly / Monthly / Yearly. Deterministic numbers
+// Reports — Daily / Weekly / Monthly / Yearly. Deterministic numbers
 // from /reports/{period}; LLM (OpenRouter) drafts the narrative when available,
 // deterministic template stays as fallback so a report NEVER fails.
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -49,11 +49,11 @@ function sourceLine(conn: SourceConnection): string {
   return received + when + checked;
 }
 
-export default function VibandaReportsPage() {
-  return observerMode ? <SourceUnavailable title="Reports" detail="Daily, weekly, monthly and yearly reports will be generated only after Macsoft periods and totals are reconciled." /> : <VibandaReportsContent />;
+export default function ReportsPage() {
+  return observerMode ? <SourceUnavailable title="Reports" detail="Daily, weekly, monthly and yearly reports will be generated only after Macsoft periods and totals are reconciled." /> : <ReportsContent />;
 }
 
-function VibandaReportsContent() {
+function ReportsContent() {
   const [period, setPeriod] = useState<string>("daily");
   const [report, setReport] = useState<Report | null>(null);
   const [err, setErr] = useState(false);

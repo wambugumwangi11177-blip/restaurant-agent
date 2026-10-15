@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useSearchParams } from "next/navigation";
 import { Check, ChevronDown, Clock3, Copy, Database, History, Search, Send, Sparkles, X } from "lucide-react";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { VIBANDA_AREA_SECTIONS } from "@/lib/vibandaAreas";
 import { OS_AREA_QUESTIONS, type OSQuestionPurpose } from "@/lib/osSuggestions";
 
@@ -78,6 +79,7 @@ function redactCredentials(value: string): string {
 
 function OSChatInner() {
   const params = useSearchParams();
+  const restaurantName = useAuth().user?.restaurant_name || "my restaurant";
   const [input, setInput] = useState("");
   const [search, setSearch] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -218,10 +220,10 @@ function OSChatInner() {
   const prepareHandoff = (turn: Turn) => {
     const transcript = turns.slice(-8).map((item) => `Owner: ${item.question}\nOS: ${item.answer?.answer_text ?? item.answer?.llm_reply ?? item.answer?.grounded?.finding ?? "No verified answer returned."}`).join("\n\n");
     const text = cleanHandoffText([
-      "Vibanda Restaurant OS — technical help request",
+      "Restaurant OS — technical help request",
       `Owner goal: ${turn.question}`,
-      `Page: ${window.location.origin}/vibanda/os`,
-      `Restaurant: Vibanda Village`,
+      `Page: ${window.location.origin}/os`,
+      `Restaurant: ${restaurantName}`,
       "Conversation context (recent messages):",
       transcript,
       "Requested next step: review this request with the owner by WhatsApp or phone.",
@@ -290,7 +292,7 @@ function OSChatInner() {
           </details>)}
         </section>
       </> : <>
-        <div className="flex items-center justify-between gap-3"><p className="text-xs text-[var(--v-muted-foreground)]">Conversation saved privately to your Vibanda owner account.</p><button type="button" onClick={() => { setSearch(""); document.getElementById("browse-questions")?.scrollIntoView({ block: "nearest" }); }} className="text-xs font-semibold text-[var(--v-primary)]">Browse questions</button></div>
+        <div className="flex items-center justify-between gap-3"><p className="text-xs text-[var(--v-muted-foreground)]">Conversation saved privately to your owner account.</p><button type="button" onClick={() => { setSearch(""); document.getElementById("browse-questions")?.scrollIntoView({ block: "nearest" }); }} className="text-xs font-semibold text-[var(--v-primary)]">Browse questions</button></div>
         {sourceStatus !== "verified" && <p className="flex items-center gap-2 rounded-lg bg-[hsl(42_40%_99_/_0.58)] px-3 py-2 text-[11px] text-[var(--v-muted-foreground)]"><Database size={13} />{sourceStatus === "needs_reconciliation" ? "Restaurant records need source reconciliation before the OS can treat findings as verified." : sourceStatus === "unknown" ? "The restaurant data status could not be verified; feature explanations and general guidance remain available." : "Restaurant data isn’t connected yet; feature explanations and general guidance remain available."}</p>}
         <div ref={chatViewport} role="region" aria-label="Conversation messages" aria-live="polite" onScroll={(event) => {
           const viewport = event.currentTarget;
@@ -332,6 +334,6 @@ function OSChatInner() {
   );
 }
 
-export default function VibandaOsPage() {
-  return <Suspense fallback={<div role="status" className="p-6 text-sm text-[var(--v-muted-foreground)]">Loading the Vibanda OS…</div>}><OSChatInner /></Suspense>;
+export default function OsPage() {
+  return <Suspense fallback={<div role="status" className="p-6 text-sm text-[var(--v-muted-foreground)]">Loading Ask LEVIII…</div>}><OSChatInner /></Suspense>;
 }

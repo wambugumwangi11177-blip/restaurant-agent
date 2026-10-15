@@ -4,7 +4,7 @@ import DemoHomePage from "../src/app/demo/page";
 import DemoReportsPage from "../src/app/demo/reports/page";
 import DemoOS from "../src/app/demo/os/page";
 import DemoAreaClient from "../src/components/demo/DemoAreaClient";
-import { homeFor } from "@/lib/tenantHome";
+import { homeFor, isDemoRestaurant } from "@/lib/tenantHome";
 import api from "@/lib/api";
 import { RETRY } from "@/lib/retry";
 
@@ -135,11 +135,12 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("routes the Demo Restaurant owner to /demo and leaves Vibanda on /vibanda", () => {
-  expect(homeFor("Demo Restaurant")).toBe("/demo");
-  expect(homeFor(" demo restaurant ")).toBe("/demo");
-  expect(homeFor("Vibanda Village")).toBe("/vibanda");
-  expect(homeFor("Someone Else")).toBe("/dashboard");
+it("recognises the Demo Restaurant and Vibanda by name, and sends their owners to the one owner shell", () => {
+  expect(isDemoRestaurant(" demo restaurant ")).toBe(true);
+  expect(isDemoRestaurant("Vibanda Village")).toBe(false);
+  expect(homeFor({ role: "admin", tenant_name: "Demo Restaurant" })).toBe("/home");
+  expect(homeFor({ role: "admin", tenant_name: "Vibanda Village" })).toBe("/home");
+  expect(homeFor({ role: "admin", tenant_name: "Someone Else" })).toBe("/home");
 });
 
 it("renders the demo owner home without the value block or a creative button", async () => {

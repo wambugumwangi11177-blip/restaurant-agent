@@ -12,7 +12,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!isLoading) {
       if (user) {
-        router.push(homeFor(user.tenant_name));
+        router.push(homeFor(user));
       } else {
         router.push("/login");
       }

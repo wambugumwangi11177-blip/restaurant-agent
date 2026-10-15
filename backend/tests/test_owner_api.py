@@ -247,6 +247,18 @@ def test_old_data_is_stale_with_its_age(client, db_session, golden):
     assert body["freshness"]["is_stale"] if "freshness" in body else body["pulse"]["freshness"]["is_stale"]
 
 
+def test_home_says_whether_the_source_can_be_trusted(client, db_session, golden):
+    """The shell withholds a Macsoft-fed restaurant's figures until the delivery is reconciled; Home carries what it needs."""
+    fresh = _get(client, golden, "/home").json()["pulse"]["freshness"]
+    assert fresh["source"] == "macsoft" and fresh["source_state"] in ("awaiting_first_delivery", "unavailable")      # no mirror in the test database
+    assert fresh["source_trusted"] is False and fresh["source_reconciled"] is False and fresh["source_notice"].startswith("Recorded data only")
+    tenant = db_session.get(models.Tenant, golden.owner.tenant_id)
+    tenant.name = "Demo Restaurant"                                                # a restaurant that records its data here
+    db_session.commit()
+    direct = _get(client, golden, "/home").json()["pulse"]["freshness"]
+    assert direct["source"] == "direct" and direct["source_trusted"] is True and direct["source_reconciled"] is True
+
+
 def test_a_young_restaurant_is_learning_with_day_n_of_n(client, db_session, golden):
     chicken = golden.items["Quarter chicken"]
     for days_ago in range(5):

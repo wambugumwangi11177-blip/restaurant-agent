@@ -604,7 +604,7 @@
    "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "wired",
+   "os": "not_shown",
    "reports": "not_shown"
   },
   "kds": {
@@ -612,7 +612,7 @@
    "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "wired",
+   "os": "not_shown",
    "reports": "not_shown"
   },
   "labor": {
@@ -620,7 +620,7 @@
    "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "wired",
+   "os": "not_shown",
    "reports": "not_shown"
   },
   "marketing": {
@@ -636,7 +636,7 @@
    "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "wired",
+   "os": "not_shown",
    "reports": "not_shown"
   },
   "money": {
@@ -668,7 +668,7 @@
    "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "wired",
+   "os": "not_shown",
    "reports": "not_shown"
   },
   "profit": {
@@ -676,7 +676,7 @@
    "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "wired",
+   "os": "not_shown",
    "reports": "not_shown"
   },
   "reservations": {
@@ -684,7 +684,7 @@
    "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "wired",
+   "os": "not_shown",
    "reports": "not_shown"
   },
   "revenue_forecast": {
@@ -692,7 +692,7 @@
    "demo": "reimplemented",
    "home": "not_shown",
    "old_dash": "wired",
-   "os": "wired",
+   "os": "not_shown",
    "reports": "not_shown"
   },
   "roi": {
@@ -708,8 +708,8 @@
    "demo": "reimplemented",
    "home": "wired",
    "old_dash": "not_shown",
-   "os": "wired",
-   "reports": "wired"
+   "os": "not_shown",
+   "reports": "not_shown"
   },
   "simulator": {
    "area": "not_shown",
@@ -4999,7 +4999,7 @@
     "group": "other",
     "id": "owner.home",
     "kind": "py",
-    "loc": 146,
+    "loc": 149,
     "path": "backend/owner/home.py"
    },
    {
@@ -6591,8 +6591,8 @@
   "py_lazy_edges": 208,
   "py_modules": 174,
   "routes": 191,
-  "ts_edges": 485,
-  "ts_files": 231
+  "ts_edges": 536,
+  "ts_files": 250
  },
  "status_only": [
   [
@@ -6777,36 +6777,122 @@
    "parallel_backends": []
   },
   "os": {
-   "api_calls": [
-    "POST /ai/chat -> routers.ai_ask.chat_llm",
-    "POST /ai/os/conversations -> routers.ai_ask.create_os_conversation",
-    "GET /ai/os/conversations/{conversation_id} -> routers.ai_ask.get_os_conversation",
-    "GET /ai/os/preferences -> routers.ai_ask.get_os_preference",
-    "GET /ai/os/conversations -> routers.ai_ask.list_os_conversations",
-    "PUT /ai/os/preferences -> routers.ai_ask.set_os_preference"
-   ],
+   "api_calls": [],
    "entries": [
     "app/vibanda/os/page.tsx"
    ],
-   "frontend_files": 5,
+   "frontend_files": 0,
    "label": "OS",
    "parallel_backends": []
   },
   "reports": {
-   "api_calls": [
-    "GET /reports/{period} -> routers.reports.report",
-    "GET /reports/{period}/creative -> routers.reports.report_creative"
-   ],
+   "api_calls": [],
    "entries": [
     "app/vibanda/reports/page.tsx"
    ],
-   "frontend_files": 7,
+   "frontend_files": 0,
    "label": "Reports",
    "parallel_backends": []
   }
  },
  "typescript": {
   "edges": [
+   {
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/os/States.tsx"
+   },
+   {
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/Section.tsx"
+   },
+   {
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/AreaPanels.tsx"
+   },
+   {
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/ComingUp.tsx"
+   },
+   {
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/CostingYouMoney.tsx"
+   },
+   {
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/HealthStrip.tsx"
+   },
+   {
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/Pulse.tsx"
+   },
+   {
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/ReadNote.tsx"
+   },
+   {
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/SourceWaiting.tsx"
+   },
+   {
+    "from": "app/(owner)/home/page.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/(owner)/home/page.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "app/(owner)/home/page.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "app/(owner)/home/page.tsx",
+    "to": "lib/owner/useOwnerHome.ts"
+   },
+   {
+    "from": "app/(owner)/home/page.tsx",
+    "to": "lib/tenantConfig.ts"
+   },
+   {
+    "from": "app/(owner)/layout.tsx",
+    "to": "components/owner/OwnerShell.tsx"
+   },
+   {
+    "from": "app/(owner)/os/page.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/(owner)/os/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/(owner)/os/page.tsx",
+    "to": "lib/osSuggestions.ts"
+   },
+   {
+    "from": "app/(owner)/os/page.tsx",
+    "to": "lib/vibandaAreas.ts"
+   },
+   {
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "components/os/States.tsx"
+   },
+   {
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "components/vibanda/CreativeNote.tsx"
+   },
+   {
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "components/vibanda/SourceUnavailable.tsx"
+   },
+   {
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "lib/format.ts"
+   },
    {
     "from": "app/dashboard/ai-ops/page.tsx",
     "to": "context/AuthContext.tsx"
@@ -7932,18 +8018,6 @@
     "to": "lib/tenantHome.ts"
    },
    {
-    "from": "app/vibanda/os/page.tsx",
-    "to": "lib/api.ts"
-   },
-   {
-    "from": "app/vibanda/os/page.tsx",
-    "to": "lib/osSuggestions.ts"
-   },
-   {
-    "from": "app/vibanda/os/page.tsx",
-    "to": "lib/vibandaAreas.ts"
-   },
-   {
     "from": "app/vibanda/page.tsx",
     "to": "components/os/States.tsx"
    },
@@ -7978,26 +8052,6 @@
    {
     "from": "app/vibanda/page.tsx",
     "to": "lib/vibandaSource.ts"
-   },
-   {
-    "from": "app/vibanda/reports/page.tsx",
-    "to": "components/os/States.tsx"
-   },
-   {
-    "from": "app/vibanda/reports/page.tsx",
-    "to": "components/vibanda/CreativeNote.tsx"
-   },
-   {
-    "from": "app/vibanda/reports/page.tsx",
-    "to": "components/vibanda/SourceUnavailable.tsx"
-   },
-   {
-    "from": "app/vibanda/reports/page.tsx",
-    "to": "lib/api.ts"
-   },
-   {
-    "from": "app/vibanda/reports/page.tsx",
-    "to": "lib/format.ts"
    },
    {
     "from": "components/ImpersonationBanner.tsx",
@@ -8138,6 +8192,14 @@
    {
     "from": "components/ai/WhatIfSimulator.tsx",
     "to": "lib/format.ts"
+   },
+   {
+    "from": "components/charts/Bars.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
+   },
+   {
+    "from": "components/charts/ChartEmpty.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
     "from": "components/demo/DemoAreaClient.tsx",
@@ -8620,6 +8682,114 @@
     "to": "lib/errors.ts"
    },
    {
+    "from": "components/owner/OwnerShell.tsx",
+    "to": "components/NotificationBell.tsx"
+   },
+   {
+    "from": "components/owner/OwnerShell.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "components/owner/OwnerShell.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/OwnerShell.tsx",
+    "to": "lib/tenantConfig.ts"
+   },
+   {
+    "from": "components/owner/OwnerShell.tsx",
+    "to": "lib/tenantHome.ts"
+   },
+   {
+    "from": "components/owner/StateChip.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/StateChip.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/AreaPanels.tsx",
+    "to": "components/owner/StateChip.tsx"
+   },
+   {
+    "from": "components/owner/home/AreaPanels.tsx",
+    "to": "lib/owner/blocks.ts"
+   },
+   {
+    "from": "components/owner/home/AreaPanels.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/home/AreaPanels.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/ComingUp.tsx",
+    "to": "components/owner/StateChip.tsx"
+   },
+   {
+    "from": "components/owner/home/ComingUp.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/home/ComingUp.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/CostingYouMoney.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/owner/home/CostingYouMoney.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/home/CostingYouMoney.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/HealthStrip.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/home/HealthStrip.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/Pulse.tsx",
+    "to": "components/charts/Bars.tsx"
+   },
+   {
+    "from": "components/owner/home/Pulse.tsx",
+    "to": "components/owner/StateChip.tsx"
+   },
+   {
+    "from": "components/owner/home/Pulse.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/home/Pulse.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/ReadNote.tsx",
+    "to": "components/owner/StateChip.tsx"
+   },
+   {
+    "from": "components/owner/home/ReadNote.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/SourceWaiting.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/home/SourceWaiting.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
     "from": "components/staff/AttendanceWidget.tsx",
     "to": "components/ui/Toast.tsx"
    },
@@ -8734,6 +8904,30 @@
    {
     "from": "lib/osSuggestions.ts",
     "to": "lib/vibandaAreas.ts"
+   },
+   {
+    "from": "lib/owner/blocks.ts",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "lib/owner/format.ts",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "lib/owner/useOwnerHome.ts",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "lib/owner/useOwnerHome.ts",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "lib/tenantConfig.ts",
+    "to": "lib/tenantHome.ts"
+   },
+   {
+    "from": "lib/tenantHome.ts",
+    "to": "lib/permissions.ts"
    },
    {
     "from": "lib/useAiModule.ts",

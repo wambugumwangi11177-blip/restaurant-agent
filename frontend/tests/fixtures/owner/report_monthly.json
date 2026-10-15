@@ -1,0 +1,366 @@
+{
+ "period": "monthly",
+ "range": "15 Sep – 15 Oct 2026",
+ "state": "as_entered",
+ "as_of": "2026-10-15T19:24:57.284160+00:00",
+ "sections": [
+  {
+   "key": "pnl",
+   "title": "Profit & Loss",
+   "state": "as_entered",
+   "as_of": "2026-10-15T19:24:57.284160+00:00",
+   "assumptions": [
+    {
+     "setting": "food_cost_target_pct",
+     "value": 35.0,
+     "label": "Ingredient cost target"
+    },
+    {
+     "setting": "prime_cost_target_pct",
+     "value": 62.0,
+     "label": "Ingredients + wages target"
+    },
+    {
+     "setting": "labour_target_pct",
+     "value": 32.0,
+     "label": "Wages target"
+    }
+   ],
+   "assumption": {
+    "setting": "food_cost_target_pct",
+    "value": 35.0,
+    "label": "Ingredient cost target"
+   },
+   "entered_up_to": "2026-10-14",
+   "period": {
+    "kind": "month",
+    "label": "October 2026 so far",
+    "start": "2026-10-01",
+    "end": "2026-10-31",
+    "days": 31,
+    "days_elapsed": 15,
+    "partial": true
+   },
+   "orders": 191,
+   "lines": [
+    {
+     "key": "sales",
+     "label": "Sales",
+     "kes": 215090.0,
+     "state": "live"
+    },
+    {
+     "key": "ingredients",
+     "label": "Ingredients",
+     "kes": -63317.05,
+     "state": "live"
+    },
+    {
+     "key": "left_after_ingredients",
+     "label": "Left after ingredients",
+     "kes": 151772.95,
+     "subtotal": true
+    },
+    {
+     "key": "wages",
+     "label": "Wages",
+     "kes": -60519.2,
+     "state": "live"
+    },
+    {
+     "key": "other_costs",
+     "label": "Other costs",
+     "kes": -58787.1,
+     "state": "as_entered"
+    },
+    {
+     "key": "kept",
+     "label": "What you kept",
+     "kes": 32466.65,
+     "total": true
+    }
+   ],
+   "sales_split": {
+    "food": 181840.0,
+    "drinks": 33250.0,
+    "other": 0.0
+   },
+   "sections": [
+    {
+     "key": "utilities",
+     "name": "Utilities",
+     "kes": 24292.21,
+     "lines": [
+      {
+       "key": "gas",
+       "name": "Cooking gas",
+       "kes": 18600.0,
+       "entries": 2,
+       "is_fixed": false
+      },
+      {
+       "key": "water",
+       "name": "Water",
+       "kes": 3192.21,
+       "entries": 1,
+       "is_fixed": true
+      },
+      {
+       "key": "garbage",
+       "name": "Garbage collection",
+       "kes": 2500.0,
+       "entries": 1,
+       "is_fixed": true
+      }
+     ]
+    },
+    {
+     "key": "fees",
+     "name": "Fees and charges",
+     "kes": 13644.5,
+     "lines": [
+      {
+       "key": "delivery_commissions",
+       "name": "Delivery app commissions",
+       "kes": 13644.5,
+       "entries": 0,
+       "is_fixed": false,
+       "basis": "estimated"
+      }
+     ]
+    },
+    {
+     "key": "operations",
+     "name": "Running the restaurant",
+     "kes": 20850.39,
+     "lines": [
+      {
+       "key": "security",
+       "name": "Security",
+       "kes": 8000.0,
+       "entries": 1,
+       "is_fixed": true
+      },
+      {
+       "key": "packaging",
+       "name": "Packaging",
+       "kes": 5222.45,
+       "entries": 1,
+       "is_fixed": false
+      },
+      {
+       "key": "pos_internet",
+       "name": "POS & internet",
+       "kes": 4500.0,
+       "entries": 1,
+       "is_fixed": true
+      },
+      {
+       "key": "cleaning",
+       "name": "Cleaning supplies",
+       "kes": 3127.94,
+       "entries": 1,
+       "is_fixed": false
+      }
+     ]
+    }
+   ],
+   "delivery_commission": {
+    "kes": 13644.5,
+    "basis": "estimated"
+   },
+   "out_of_every_100": {
+    "ingredients": 29.4,
+    "wages": 28.1,
+    "other_costs": 27.3,
+    "kept": 15.1
+   },
+   "ratios": {
+    "food_cost_pct": 29.4,
+    "labour_pct": 28.1,
+    "prime_cost_pct": 57.6,
+    "gross_margin_pct": 70.6,
+    "kept_pct": 15.1
+   },
+   "basis": {
+    "ingredients": "recipe",
+    "wages": "shifts",
+    "delivery_commission": "estimated"
+   },
+   "complete": false,
+   "missing_categories": [
+    {
+     "key": "premises",
+     "name": "Rent & premises",
+     "why": "entered before, nothing this period"
+    },
+    {
+     "key": "kplc",
+     "name": "Electricity (KPLC)",
+     "why": "entered before, nothing this period"
+    }
+   ],
+   "missing_costs": [],
+   "notes": [
+    "Wages are worked out from your shift records. Enter your salaries to use your real payroll.",
+    "Delivery app commissions are estimated from your commission rates. Enter the real ones to replace the estimate.",
+    "No rent & premises entered for this period — you entered it before.",
+    "No electricity (kplc) entered for this period — you entered it before.",
+    "October 2026 so far (15 of 31 days)."
+   ]
+  },
+  {
+   "key": "sales",
+   "title": "Sales",
+   "state": "live",
+   "as_of": "2026-10-15T18:07:00+00:00",
+   "sales": 447600.0,
+   "orders": 397,
+   "average_order": 1127.46,
+   "basis": "Paid orders that were not cancelled, by the time they were taken. Not a payment cash-flow report."
+  },
+  {
+   "key": "top_dishes",
+   "title": "Best sellers",
+   "state": "live",
+   "as_of": "2026-10-15T18:07:00+00:00",
+   "dishes": [
+    {
+     "name": "Soda",
+     "sold": 67,
+     "sales": 10050.0
+    },
+    {
+     "name": "Chips",
+     "sold": 62,
+     "sales": 17190.0
+    },
+    {
+     "name": "Quarter chicken",
+     "sold": 61,
+     "sales": 24400.0
+    },
+    {
+     "name": "Beef stew",
+     "sold": 59,
+     "sales": 44250.0
+    },
+    {
+     "name": "Chai (milk tea)",
+     "sold": 57,
+     "sales": 5700.0
+    }
+   ]
+  },
+  {
+   "key": "costs",
+   "title": "Costs",
+   "state": "unavailable",
+   "as_of": null,
+   "reason": "This section is not available yet.",
+   "planned": true
+  },
+  {
+   "key": "dishes",
+   "title": "Dishes",
+   "state": "unavailable",
+   "as_of": null,
+   "reason": "This section is not available yet.",
+   "planned": true
+  },
+  {
+   "key": "channels",
+   "title": "Delivery apps and dine-in",
+   "state": "unavailable",
+   "as_of": null,
+   "reason": "This section is not available yet.",
+   "planned": true
+  },
+  {
+   "key": "store",
+   "title": "Store & suppliers",
+   "state": "unavailable",
+   "as_of": null,
+   "reason": "This section is not available yet.",
+   "planned": true
+  },
+  {
+   "key": "wages",
+   "title": "Wages",
+   "state": "unavailable",
+   "as_of": null,
+   "reason": "This section is not available yet.",
+   "planned": true
+  },
+  {
+   "key": "cash_check",
+   "title": "Cash count check",
+   "state": "unavailable",
+   "as_of": null,
+   "reason": "This section is not available yet.",
+   "planned": true
+  },
+  {
+   "key": "decisions",
+   "title": "What cost you money",
+   "state": "unavailable",
+   "as_of": null,
+   "reason": "This section is not available yet.",
+   "planned": true
+  },
+  {
+   "key": "savings",
+   "title": "What LEVIII saved you",
+   "state": "unavailable",
+   "as_of": null,
+   "reason": "This section is not available yet.",
+   "planned": true
+  },
+  {
+   "key": "marketing",
+   "title": "Winning guests back",
+   "state": "unavailable",
+   "as_of": null,
+   "reason": "This section is not available yet.",
+   "planned": true
+  },
+  {
+   "key": "outlook",
+   "title": "Next 30 days",
+   "state": "unavailable",
+   "as_of": null,
+   "reason": "This section is not available yet.",
+   "planned": true
+  },
+  {
+   "key": "data_trust",
+   "title": "How complete your costs are",
+   "state": "unavailable",
+   "as_of": null,
+   "reason": "This section is not available yet.",
+   "planned": true
+  },
+  {
+   "key": "rules_used",
+   "title": "Targets used in this report",
+   "state": "unavailable",
+   "as_of": null,
+   "reason": "This section is not available yet.",
+   "planned": true
+  },
+  {
+   "key": "read",
+   "title": "LEVIII's read",
+   "state": "unavailable",
+   "as_of": null,
+   "reason": "This section is not available yet.",
+   "planned": true
+  }
+ ],
+ "read": {
+  "state": "unavailable",
+  "as_of": null,
+  "reason": "LEVIII's read is optional and is left out unless every number in it is backed.",
+  "text": null
+ }
+}

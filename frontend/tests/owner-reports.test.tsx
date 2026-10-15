@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import ReportsPage from "../src/app/vibanda/reports/page";
+import ReportsPage from "../src/app/(owner)/reports/page";
 import api from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn() } }));

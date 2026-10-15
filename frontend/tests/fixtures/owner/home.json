@@ -1,0 +1,2702 @@
+{
+ "restaurant": {
+  "id": 1,
+  "name": "Demo Restaurant"
+ },
+ "period": "today",
+ "timezone": "Africa/Nairobi",
+ "generated_at": "2026-10-15T19:24:54.648735+00:00",
+ "pulse": {
+  "state": "live",
+  "as_of": "2026-10-15T18:07:00+00:00",
+  "sales_today": 22290.0,
+  "orders_today": 13,
+  "vs_same_weekday_pct": 14.8,
+  "vs_same_weekday_state": "live",
+  "sales_in_period": 22290.0,
+  "orders_in_period": 13,
+  "trend_7d": [
+   {
+    "date": "2026-10-09",
+    "sales": 15180.0,
+    "orders": 16
+   },
+   {
+    "date": "2026-10-10",
+    "sales": 18250.0,
+    "orders": 19
+   },
+   {
+    "date": "2026-10-11",
+    "sales": 11060.0,
+    "orders": 11
+   },
+   {
+    "date": "2026-10-12",
+    "sales": 8360.0,
+    "orders": 10
+   },
+   {
+    "date": "2026-10-13",
+    "sales": 13750.0,
+    "orders": 10
+   },
+   {
+    "date": "2026-10-14",
+    "sales": 10200.0,
+    "orders": 11
+   },
+   {
+    "date": "2026-10-15",
+    "sales": 22290.0,
+    "orders": 13
+   }
+  ],
+  "breakeven_at": {
+   "state": "live",
+   "as_of": "2026-10-15T18:07:00+00:00",
+   "break_even_kes": 4945.85,
+   "sales_today_kes": 22290.0,
+   "to_go_kes": 0.0,
+   "covered": true,
+   "crossed_at": "12:31 pm",
+   "fixed_per_day_kes": 3471.99,
+   "food_cost_pct": 29.8,
+   "built_from": {
+    "label": "September 2026",
+    "period": "last_month",
+    "days": 30,
+    "fixed_costs_kes": 104159.71,
+    "wages_kes": 0.0,
+    "lines": [
+     {
+      "name": "Rent & premises",
+      "kes": 70000.0
+     },
+     {
+      "name": "Electricity (KPLC)",
+      "kes": 16144.03
+     },
+     {
+      "name": "Water",
+      "kes": 3015.68
+     },
+     {
+      "name": "Garbage collection",
+      "kes": 2500.0
+     },
+     {
+      "name": "Security",
+      "kes": 8000.0
+     },
+     {
+      "name": "POS & internet",
+      "kes": 4500.0
+     }
+    ]
+   },
+   "note": "Gas, packaging and other costs that move with sales are not counted, so the real figure is a little higher.",
+   "assumption": {
+    "setting": "food_cost_target_pct",
+    "value": 35.0,
+    "label": "Ingredient cost target"
+   }
+  },
+  "money_match": {
+   "cash": {
+    "state": "as_entered",
+    "as_of": "2026-10-15T13:15:00+00:00",
+    "checked": 27,
+    "to_check": 2,
+    "entered_up_to": "2026-10-15"
+   },
+   "mpesa": {
+    "state": "unavailable",
+    "as_of": null,
+    "reason": "Upload your M-Pesa statement to check it against your sales."
+   }
+  },
+  "freshness": {
+   "latest_sale_at": "2026-10-15T18:07:00",
+   "data_age_days": 0,
+   "is_stale": false,
+   "source": "direct",
+   "source_state": "direct"
+  }
+ },
+ "costing_you_money": {
+  "state": "live",
+  "as_of": "2026-10-15T18:07:00+00:00",
+  "cards": [
+   {
+    "id": "d-d0894ddbe4",
+    "domain": "Profit",
+    "sentence": "Review margin on Quarter chicken",
+    "kes_month": null,
+    "action": "Increase price from KES 400 to KES 577",
+    "why": "Recorded sales and recipe costs indicate a modelled margin opportunity; this is not verified recoverable profit.",
+    "assumption": null,
+    "decision": null
+   },
+   {
+    "id": "d-c3ce41ca61",
+    "domain": "Kitchen",
+    "sentence": "Review preparation at grill",
+    "kes_month": null,
+    "action": "Check recorded tickets and station staffing before changing the kitchen setup.",
+    "why": "A bottleneck was detected in recorded preparation times; this does not establish the live queue.",
+    "assumption": null,
+    "decision": null
+   },
+   {
+    "id": "d-1b188a8b7e",
+    "domain": "Kitchen",
+    "sentence": "Review preparation at main",
+    "kes_month": null,
+    "action": "Check recorded tickets and station staffing before changing the kitchen setup.",
+    "why": "A bottleneck was detected in recorded preparation times; this does not establish the live queue.",
+    "assumption": null,
+    "decision": null
+   },
+   {
+    "id": "d-1560e6f1b5",
+    "domain": "Bookings",
+    "sentence": "Review 50 recorded no-shows",
+    "kes_month": null,
+    "action": "Review booking confirmations and cancellation records before changing deposit policies.",
+    "why": "6.1% of 822 recorded reservations. Historical records, not today's arrivals.",
+    "assumption": null,
+    "decision": null
+   },
+   {
+    "id": "d-86dd8ccd58",
+    "domain": "Pricing",
+    "sentence": "Reprice: set Quarter chicken to KES 435 (from KES 400)",
+    "kes_month": 2310.0,
+    "action": "Reprice: set Quarter chicken to KES 435 (from KES 400)",
+    "why": "Margin at 35.0% — below 40% floor",
+    "assumption": null,
+    "decision": null
+   }
+  ],
+  "more": 7,
+  "ranking": "What is happening now first, then ideas by what they are worth in KES; an idea we cannot put a number on comes after those we can.",
+  "reason": null
+ },
+ "health": {
+  "state": "live",
+  "as_of": "2026-10-15T19:24:54.648735+00:00",
+  "tiles": [
+   {
+    "area": "money",
+    "title": "My Money",
+    "number": 29.3,
+    "unit": "%",
+    "word": "Fine",
+    "status": "good",
+    "label": "Out of every KES 100, ingredients"
+   },
+   {
+    "area": "sales_dishes",
+    "title": "Sales & Dishes",
+    "number": 99090.0,
+    "unit": "KES",
+    "word": "Steady",
+    "status": "good",
+    "label": "Sales, last 7 days"
+   },
+   {
+    "area": "store",
+    "title": "Store & Suppliers",
+    "number": 1,
+    "unit": "",
+    "word": "Missing stock to check",
+    "status": "bad",
+    "label": "Items to check"
+   },
+   {
+    "area": "cash",
+    "title": "Cash Check",
+    "number": 2,
+    "unit": "",
+    "word": "Things to check",
+    "status": "bad",
+    "label": "Things to check"
+   },
+   {
+    "area": "staff",
+    "title": "Staff",
+    "number": 28.2,
+    "unit": "%",
+    "word": "Fine",
+    "status": "good",
+    "label": "Out of every KES 100, wages"
+   },
+   {
+    "area": "permits",
+    "title": "Permits & Settings",
+    "number": 100.0,
+    "unit": "%",
+    "word": "Costs known",
+    "status": "good",
+    "label": "Dishes with a cost"
+   }
+  ],
+  "reason": null
+ },
+ "areas": {
+  "money": {
+   "key": "money",
+   "title": "My Money",
+   "state": "live",
+   "as_of": "2026-10-15T19:24:54.648735+00:00",
+   "summary": {
+    "number": 29.3,
+    "unit": "%",
+    "word": "Fine",
+    "status": "good",
+    "label": "Out of every KES 100, ingredients"
+   },
+   "blocks": {
+    "pnl": {
+     "state": "as_entered",
+     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "assumptions": [
+      {
+       "setting": "food_cost_target_pct",
+       "value": 35.0,
+       "label": "Ingredient cost target"
+      },
+      {
+       "setting": "prime_cost_target_pct",
+       "value": 62.0,
+       "label": "Ingredients + wages target"
+      },
+      {
+       "setting": "labour_target_pct",
+       "value": 32.0,
+       "label": "Wages target"
+      }
+     ],
+     "assumption": {
+      "setting": "food_cost_target_pct",
+      "value": 35.0,
+      "label": "Ingredient cost target"
+     },
+     "entered_up_to": "2026-10-14",
+     "period": {
+      "kind": "month",
+      "label": "October 2026 so far",
+      "start": "2026-10-01",
+      "end": "2026-10-31",
+      "days": 31,
+      "days_elapsed": 15,
+      "partial": true
+     },
+     "orders": 191,
+     "lines": [
+      {
+       "key": "sales",
+       "label": "Sales",
+       "kes": 215090.0,
+       "state": "live"
+      },
+      {
+       "key": "ingredients",
+       "label": "Ingredients",
+       "kes": -63317.05,
+       "state": "live"
+      },
+      {
+       "key": "left_after_ingredients",
+       "label": "Left after ingredients",
+       "kes": 151772.95,
+       "subtotal": true
+      },
+      {
+       "key": "wages",
+       "label": "Wages",
+       "kes": -60519.2,
+       "state": "live"
+      },
+      {
+       "key": "other_costs",
+       "label": "Other costs",
+       "kes": -58787.1,
+       "state": "as_entered"
+      },
+      {
+       "key": "kept",
+       "label": "What you kept",
+       "kes": 32466.65,
+       "total": true
+      }
+     ],
+     "sales_split": {
+      "food": 181840.0,
+      "drinks": 33250.0,
+      "other": 0.0
+     },
+     "sections": [
+      {
+       "key": "utilities",
+       "name": "Utilities",
+       "kes": 24292.21,
+       "lines": [
+        {
+         "key": "gas",
+         "name": "Cooking gas",
+         "kes": 18600.0,
+         "entries": 2,
+         "is_fixed": false
+        },
+        {
+         "key": "water",
+         "name": "Water",
+         "kes": 3192.21,
+         "entries": 1,
+         "is_fixed": true
+        },
+        {
+         "key": "garbage",
+         "name": "Garbage collection",
+         "kes": 2500.0,
+         "entries": 1,
+         "is_fixed": true
+        }
+       ]
+      },
+      {
+       "key": "fees",
+       "name": "Fees and charges",
+       "kes": 13644.5,
+       "lines": [
+        {
+         "key": "delivery_commissions",
+         "name": "Delivery app commissions",
+         "kes": 13644.5,
+         "entries": 0,
+         "is_fixed": false,
+         "basis": "estimated"
+        }
+       ]
+      },
+      {
+       "key": "operations",
+       "name": "Running the restaurant",
+       "kes": 20850.39,
+       "lines": [
+        {
+         "key": "security",
+         "name": "Security",
+         "kes": 8000.0,
+         "entries": 1,
+         "is_fixed": true
+        },
+        {
+         "key": "packaging",
+         "name": "Packaging",
+         "kes": 5222.45,
+         "entries": 1,
+         "is_fixed": false
+        },
+        {
+         "key": "pos_internet",
+         "name": "POS & internet",
+         "kes": 4500.0,
+         "entries": 1,
+         "is_fixed": true
+        },
+        {
+         "key": "cleaning",
+         "name": "Cleaning supplies",
+         "kes": 3127.94,
+         "entries": 1,
+         "is_fixed": false
+        }
+       ]
+      }
+     ],
+     "delivery_commission": {
+      "kes": 13644.5,
+      "basis": "estimated"
+     },
+     "out_of_every_100": {
+      "ingredients": 29.4,
+      "wages": 28.1,
+      "other_costs": 27.3,
+      "kept": 15.1
+     },
+     "ratios": {
+      "food_cost_pct": 29.4,
+      "labour_pct": 28.1,
+      "prime_cost_pct": 57.6,
+      "gross_margin_pct": 70.6,
+      "kept_pct": 15.1
+     },
+     "basis": {
+      "ingredients": "recipe",
+      "wages": "shifts",
+      "delivery_commission": "estimated"
+     },
+     "complete": false,
+     "missing_categories": [
+      {
+       "key": "premises",
+       "name": "Rent & premises",
+       "why": "entered before, nothing this period"
+      },
+      {
+       "key": "kplc",
+       "name": "Electricity (KPLC)",
+       "why": "entered before, nothing this period"
+      }
+     ],
+     "missing_costs": [],
+     "notes": [
+      "Wages are worked out from your shift records. Enter your salaries to use your real payroll.",
+      "Delivery app commissions are estimated from your commission rates. Enter the real ones to replace the estimate.",
+      "No rent & premises entered for this period — you entered it before.",
+      "No electricity (kplc) entered for this period — you entered it before.",
+      "October 2026 so far (15 of 31 days)."
+     ]
+    },
+    "cost_dials": {
+     "state": "live",
+     "as_of": "2026-10-15T18:07:00+00:00",
+     "food_cost_pct": 29.3,
+     "food_cost_target_pct": 35.0,
+     "food_cost_word": "Fine",
+     "wages_pct": 28.2,
+     "wages_target_pct": 32.0,
+     "wages_word": "Fine",
+     "assumptions": [
+      {
+       "setting": "food_cost_target_pct",
+       "value": 35.0,
+       "label": "Ingredient cost target"
+      },
+      {
+       "setting": "labour_target_pct",
+       "value": 32.0,
+       "label": "Wages target"
+      }
+     ],
+     "assumption": {
+      "setting": "food_cost_target_pct",
+      "value": 35.0,
+      "label": "Ingredient cost target"
+     }
+    },
+    "breakeven": {
+     "state": "live",
+     "as_of": "2026-10-15T18:07:00+00:00",
+     "break_even_kes": 4945.85,
+     "sales_today_kes": 22290.0,
+     "to_go_kes": 0.0,
+     "covered": true,
+     "crossed_at": "12:31 pm",
+     "fixed_per_day_kes": 3471.99,
+     "food_cost_pct": 29.8,
+     "built_from": {
+      "label": "September 2026",
+      "period": "last_month",
+      "days": 30,
+      "fixed_costs_kes": 104159.71,
+      "wages_kes": 0.0,
+      "lines": [
+       {
+        "name": "Rent & premises",
+        "kes": 70000.0
+       },
+       {
+        "name": "Electricity (KPLC)",
+        "kes": 16144.03
+       },
+       {
+        "name": "Water",
+        "kes": 3015.68
+       },
+       {
+        "name": "Garbage collection",
+        "kes": 2500.0
+       },
+       {
+        "name": "Security",
+        "kes": 8000.0
+       },
+       {
+        "name": "POS & internet",
+        "kes": 4500.0
+       }
+      ]
+     },
+     "note": "Gas, packaging and other costs that move with sales are not counted, so the real figure is a little higher.",
+     "assumption": {
+      "setting": "food_cost_target_pct",
+      "value": 35.0,
+      "label": "Ingredient cost target"
+     }
+    },
+    "bills": {
+     "state": "as_entered",
+     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "assumption": {
+      "setting": "bill_reserve_kes",
+      "value": 0,
+      "label": "Cash you keep aside for bills"
+     },
+     "upcoming": [
+      {
+       "name": "Rent",
+       "due_on": "2026-10-18",
+       "days_away": 3,
+       "amount_kes": 70000.0,
+       "short": true
+      },
+      {
+       "name": "Electricity (KPLC)",
+       "due_on": "2026-10-20",
+       "days_away": 5,
+       "amount_kes": 18000.0,
+       "short": true
+      },
+      {
+       "name": "Security",
+       "due_on": "2026-11-01",
+       "days_away": 17,
+       "amount_kes": 8000.0,
+       "short": false
+      },
+      {
+       "name": "Garbage collection",
+       "due_on": "2026-11-05",
+       "days_away": 21,
+       "amount_kes": 2500.0,
+       "short": false
+      },
+      {
+       "name": "POS & internet",
+       "due_on": "2026-11-10",
+       "days_away": 26,
+       "amount_kes": 4500.0,
+       "short": false
+      },
+      {
+       "name": "Water",
+       "due_on": "2026-11-12",
+       "days_away": 28,
+       "amount_kes": 3200.0,
+       "short": false
+      }
+     ],
+     "shortfalls": [
+      {
+       "date": "2026-10-18",
+       "short_by_kes": 19405.51,
+       "bills": [
+        "Rent"
+       ],
+       "bills_kes": 70000.0
+      },
+      {
+       "date": "2026-10-20",
+       "short_by_kes": 21034.85,
+       "bills": [
+        "Electricity (KPLC)"
+       ],
+       "bills_kes": 18000.0
+      }
+     ],
+     "lowest": {
+      "date": "2026-10-20",
+      "balance_kes": -21034.85
+     },
+     "days": [
+      {
+       "date": "2026-10-15",
+       "expected_sales_kes": 22290.0,
+       "left_kes": 15466.89,
+       "bills_kes": 0.0,
+       "balance_kes": 15466.89
+      },
+      {
+       "date": "2026-10-16",
+       "expected_sales_kes": 20714.61,
+       "left_kes": 14360.97,
+       "bills_kes": 0.0,
+       "balance_kes": 29827.86
+      },
+      {
+       "date": "2026-10-17",
+       "expected_sales_kes": 19483.53,
+       "left_kes": 13496.75,
+       "bills_kes": 0.0,
+       "balance_kes": 43324.61
+      },
+      {
+       "date": "2026-10-18",
+       "expected_sales_kes": 10613.35,
+       "left_kes": 7269.88,
+       "bills_kes": 70000.0,
+       "balance_kes": -19405.51
+      },
+      {
+       "date": "2026-10-19",
+       "expected_sales_kes": 10621.21,
+       "left_kes": 7275.4,
+       "bills_kes": 0.0,
+       "balance_kes": -12130.11
+      },
+      {
+       "date": "2026-10-20",
+       "expected_sales_kes": 13213.61,
+       "left_kes": 9095.26,
+       "bills_kes": 18000.0,
+       "balance_kes": -21034.85
+      },
+      {
+       "date": "2026-10-21",
+       "expected_sales_kes": 12353.08,
+       "left_kes": 8491.17,
+       "bills_kes": 0.0,
+       "balance_kes": -12543.68
+      },
+      {
+       "date": "2026-10-22",
+       "expected_sales_kes": 15712.63,
+       "left_kes": 10849.58,
+       "bills_kes": 0.0,
+       "balance_kes": -1694.1
+      },
+      {
+       "date": "2026-10-23",
+       "expected_sales_kes": 20714.61,
+       "left_kes": 14360.97,
+       "bills_kes": 0.0,
+       "balance_kes": 12666.87
+      },
+      {
+       "date": "2026-10-24",
+       "expected_sales_kes": 21042.21,
+       "left_kes": 14590.94,
+       "bills_kes": 0.0,
+       "balance_kes": 27257.81
+      },
+      {
+       "date": "2026-10-25",
+       "expected_sales_kes": 11462.42,
+       "left_kes": 7865.93,
+       "bills_kes": 0.0,
+       "balance_kes": 35123.74
+      },
+      {
+       "date": "2026-10-26",
+       "expected_sales_kes": 11470.91,
+       "left_kes": 7871.89,
+       "bills_kes": 0.0,
+       "balance_kes": 42995.63
+      },
+      {
+       "date": "2026-10-27",
+       "expected_sales_kes": 12409.3,
+       "left_kes": 8530.64,
+       "bills_kes": 0.0,
+       "balance_kes": 51526.27
+      },
+      {
+       "date": "2026-10-28",
+       "expected_sales_kes": 13341.33,
+       "left_kes": 9184.92,
+       "bills_kes": 0.0,
+       "balance_kes": 60711.19
+      },
+      {
+       "date": "2026-10-29",
+       "expected_sales_kes": 16969.65,
+       "left_kes": 11732.0,
+       "bills_kes": 0.0,
+       "balance_kes": 72443.19
+      },
+      {
+       "date": "2026-10-30",
+       "expected_sales_kes": 22371.78,
+       "left_kes": 15524.3,
+       "bills_kes": 0.0,
+       "balance_kes": 87967.49
+      },
+      {
+       "date": "2026-10-31",
+       "expected_sales_kes": 21042.21,
+       "left_kes": 14590.94,
+       "bills_kes": 0.0,
+       "balance_kes": 102558.43
+      },
+      {
+       "date": "2026-11-01",
+       "expected_sales_kes": 11462.42,
+       "left_kes": 7865.93,
+       "bills_kes": 8000.0,
+       "balance_kes": 102424.36
+      },
+      {
+       "date": "2026-11-02",
+       "expected_sales_kes": 11470.91,
+       "left_kes": 7871.89,
+       "bills_kes": 0.0,
+       "balance_kes": 110296.25
+      },
+      {
+       "date": "2026-11-03",
+       "expected_sales_kes": 12409.3,
+       "left_kes": 8530.64,
+       "bills_kes": 0.0,
+       "balance_kes": 118826.89
+      },
+      {
+       "date": "2026-11-04",
+       "expected_sales_kes": 13341.33,
+       "left_kes": 9184.92,
+       "bills_kes": 0.0,
+       "balance_kes": 128011.81
+      },
+      {
+       "date": "2026-11-05",
+       "expected_sales_kes": 16969.65,
+       "left_kes": 11732.0,
+       "bills_kes": 2500.0,
+       "balance_kes": 137243.81
+      },
+      {
+       "date": "2026-11-06",
+       "expected_sales_kes": 22371.78,
+       "left_kes": 15524.3,
+       "bills_kes": 0.0,
+       "balance_kes": 152768.11
+      },
+      {
+       "date": "2026-11-07",
+       "expected_sales_kes": 21042.21,
+       "left_kes": 14590.94,
+       "bills_kes": 0.0,
+       "balance_kes": 167359.05
+      },
+      {
+       "date": "2026-11-08",
+       "expected_sales_kes": 11462.42,
+       "left_kes": 7865.93,
+       "bills_kes": 0.0,
+       "balance_kes": 175224.98
+      },
+      {
+       "date": "2026-11-09",
+       "expected_sales_kes": 11470.91,
+       "left_kes": 7871.89,
+       "bills_kes": 0.0,
+       "balance_kes": 183096.87
+      },
+      {
+       "date": "2026-11-10",
+       "expected_sales_kes": 12409.3,
+       "left_kes": 8530.64,
+       "bills_kes": 4500.0,
+       "balance_kes": 187127.51
+      },
+      {
+       "date": "2026-11-11",
+       "expected_sales_kes": 13341.33,
+       "left_kes": 9184.92,
+       "bills_kes": 0.0,
+       "balance_kes": 196312.43
+      },
+      {
+       "date": "2026-11-12",
+       "expected_sales_kes": 16969.65,
+       "left_kes": 11732.0,
+       "bills_kes": 3200.0,
+       "balance_kes": 204844.43
+      },
+      {
+       "date": "2026-11-13",
+       "expected_sales_kes": 22371.78,
+       "left_kes": 15524.3,
+       "bills_kes": 0.0,
+       "balance_kes": 220368.73
+      }
+     ],
+     "opening_kes": 0.0,
+     "notes": [
+      "Sales are counted after ingredients and wages, starting from the cash you keep aside for bills."
+     ]
+    },
+    "spikes": {
+     "state": "as_entered",
+     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "assumption": {
+      "setting": "expense_spike_pct",
+      "value": 25.0,
+      "label": "Cost increase we flag"
+     },
+     "spikes": [
+      {
+       "name": "Cooking gas",
+       "this_month_kes": 18600.0,
+       "usual_kes": 14333.33,
+       "up_pct": 29.8,
+       "extra_kes": 4266.67
+      }
+     ],
+     "reason": null
+    },
+    "savings": {
+     "state": "live",
+     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "captured_kes_month": 2507.73,
+     "hours_saved_30d": 66.7,
+     "approved_ideas": 1,
+     "reason": null
+    }
+   }
+  },
+  "sales_dishes": {
+   "key": "sales_dishes",
+   "title": "Sales & Dishes",
+   "state": "live",
+   "as_of": "2026-10-15T18:07:00+00:00",
+   "summary": {
+    "number": 99090.0,
+    "unit": "KES",
+    "word": "Steady",
+    "status": "good",
+    "label": "Sales, last 7 days"
+   },
+   "blocks": {
+    "seven_day": {
+     "state": "live",
+     "as_of": "2026-10-15T18:07:00+00:00",
+     "days": [
+      {
+       "date": "2026-10-09",
+       "sales": 15180.0,
+       "orders": 16
+      },
+      {
+       "date": "2026-10-10",
+       "sales": 18250.0,
+       "orders": 19
+      },
+      {
+       "date": "2026-10-11",
+       "sales": 11060.0,
+       "orders": 11
+      },
+      {
+       "date": "2026-10-12",
+       "sales": 8360.0,
+       "orders": 10
+      },
+      {
+       "date": "2026-10-13",
+       "sales": 13750.0,
+       "orders": 10
+      },
+      {
+       "date": "2026-10-14",
+       "sales": 10200.0,
+       "orders": 11
+      },
+      {
+       "date": "2026-10-15",
+       "sales": 22290.0,
+       "orders": 13
+      }
+     ],
+     "total": 99090.0
+    },
+    "forecast": {
+     "state": "live",
+     "as_of": "2026-10-15T18:07:00+00:00",
+     "actual": [
+      {
+       "date": "2026-10-02",
+       "sales": 18220.0
+      },
+      {
+       "date": "2026-10-03",
+       "sales": 20090.0
+      },
+      {
+       "date": "2026-10-04",
+       "sales": 13280.0
+      },
+      {
+       "date": "2026-10-05",
+       "sales": 11160.0
+      },
+      {
+       "date": "2026-10-06",
+       "sales": 10930.0
+      },
+      {
+       "date": "2026-10-07",
+       "sales": 12010.0
+      },
+      {
+       "date": "2026-10-08",
+       "sales": 19410.0
+      },
+      {
+       "date": "2026-10-09",
+       "sales": 15180.0
+      },
+      {
+       "date": "2026-10-10",
+       "sales": 18250.0
+      },
+      {
+       "date": "2026-10-11",
+       "sales": 11060.0
+      },
+      {
+       "date": "2026-10-12",
+       "sales": 8360.0
+      },
+      {
+       "date": "2026-10-13",
+       "sales": 13750.0
+      },
+      {
+       "date": "2026-10-14",
+       "sales": 10200.0
+      },
+      {
+       "date": "2026-10-15",
+       "sales": 22290.0
+      }
+     ],
+     "next_7_days": [
+      {
+       "date": "2026-10-16",
+       "day": "Friday",
+       "usual": 20714.61,
+       "low": 17370.32,
+       "high": 24058.89
+      },
+      {
+       "date": "2026-10-17",
+       "day": "Saturday",
+       "usual": 19483.53,
+       "low": 16139.24,
+       "high": 22827.81
+      },
+      {
+       "date": "2026-10-18",
+       "day": "Sunday",
+       "usual": 10613.35,
+       "low": 7269.06,
+       "high": 13957.63
+      },
+      {
+       "date": "2026-10-19",
+       "day": "Monday",
+       "usual": 10621.21,
+       "low": 7276.92,
+       "high": 13965.49
+      },
+      {
+       "date": "2026-10-20",
+       "day": "Tuesday",
+       "usual": 11490.1,
+       "low": 8145.81,
+       "high": 14834.38
+      },
+      {
+       "date": "2026-10-21",
+       "day": "Wednesday",
+       "usual": 12353.08,
+       "low": 9008.79,
+       "high": 15697.36
+      },
+      {
+       "date": "2026-10-22",
+       "day": "Thursday",
+       "usual": 15712.63,
+       "low": 12368.34,
+       "high": 19056.91
+      }
+     ],
+     "unusual_days": [
+      {
+       "date": "2026-09-25",
+       "sales": 25670.0,
+       "expected": 14328.18,
+       "off_by_pct": 79.2
+      },
+      {
+       "date": "2026-09-18",
+       "sales": 25230.0,
+       "expected": 14328.18,
+       "off_by_pct": 76.1
+      }
+     ],
+     "note": "A range, not a promise."
+    },
+    "matrix": {
+     "state": "live",
+     "as_of": "2026-10-15T18:07:00+00:00",
+     "popular_line_units": null,
+     "dishes": [
+      {
+       "name": "Nyama choma (goat)",
+       "kind": "Best dish",
+       "sold": 59,
+       "keeps_pct": 74.3,
+       "profit": 61360.0,
+       "trend": "rising"
+      },
+      {
+       "name": "Beef stew",
+       "kind": "Best dish",
+       "sold": 62,
+       "keeps_pct": 71.2,
+       "profit": 33120.4,
+       "trend": "stable"
+      },
+      {
+       "name": "Beef fry",
+       "kind": "Best dish",
+       "sold": 42,
+       "keeps_pct": 70.7,
+       "profit": 26728.8,
+       "trend": "rising"
+      },
+      {
+       "name": "Fried rice",
+       "kind": "Best dish",
+       "sold": 53,
+       "keeps_pct": 79.8,
+       "profit": 21152.3,
+       "trend": "rising"
+      },
+      {
+       "name": "Quarter chicken",
+       "kind": "Popular, earns little",
+       "sold": 66,
+       "keeps_pct": 35.0,
+       "profit": 9240.0,
+       "trend": "falling"
+      },
+      {
+       "name": "Chicken burger",
+       "kind": "Best dish",
+       "sold": 30,
+       "keeps_pct": 74.7,
+       "profit": 16800.0,
+       "trend": "falling"
+      },
+      {
+       "name": "Burger",
+       "kind": "Best dish",
+       "sold": 37,
+       "keeps_pct": 53.3,
+       "profit": 11840.0,
+       "trend": "rising"
+      },
+      {
+       "name": "Chicken wings",
+       "kind": "Best dish",
+       "sold": 30,
+       "keeps_pct": 69.7,
+       "profit": 14640.0,
+       "trend": "falling"
+      },
+      {
+       "name": "Pilau",
+       "kind": "Popular, earns little",
+       "sold": 58,
+       "keeps_pct": 65.1,
+       "profit": 13224.0,
+       "trend": "falling"
+      },
+      {
+       "name": "Beer",
+       "kind": "Best dish",
+       "sold": 45,
+       "keeps_pct": 73.3,
+       "profit": 14850.0,
+       "trend": "rising"
+      },
+      {
+       "name": "Chips",
+       "kind": "Popular, earns little",
+       "sold": 65,
+       "keeps_pct": 70.0,
+       "profit": 13650.0,
+       "trend": "rising"
+      },
+      {
+       "name": "Ugali sukuma",
+       "kind": "Popular, earns little",
+       "sold": 50,
+       "keeps_pct": 85.3,
+       "profit": 12800.0,
+       "trend": "rising"
+      },
+      {
+       "name": "Fish fillet",
+       "kind": "Earns well, few order it",
+       "sold": 19,
+       "keeps_pct": 60.0,
+       "profit": 7410.0,
+       "trend": "rising"
+      },
+      {
+       "name": "Chapati beans",
+       "kind": "Popular, earns little",
+       "sold": 37,
+       "keeps_pct": 82.7,
+       "profit": 9176.0,
+       "trend": "falling"
+      },
+      {
+       "name": "Soda",
+       "kind": "Popular, earns little",
+       "sold": 72,
+       "keeps_pct": 70.0,
+       "profit": 7560.0,
+       "trend": "rising"
+      },
+      {
+       "name": "Omelette",
+       "kind": "Popular, earns little",
+       "sold": 27,
+       "keeps_pct": 74.9,
+       "profit": 7074.0,
+       "trend": "rising"
+      },
+      {
+       "name": "Mango juice",
+       "kind": "Popular, earns little",
+       "sold": 29,
+       "keeps_pct": 81.4,
+       "profit": 7084.7,
+       "trend": "falling"
+      },
+      {
+       "name": "Pineapple juice",
+       "kind": "Consider removing",
+       "sold": 22,
+       "keeps_pct": 86.4,
+       "profit": 5704.6,
+       "trend": "rising"
+      },
+      {
+       "name": "Chai (milk tea)",
+       "kind": "Popular, earns little",
+       "sold": 65,
+       "keeps_pct": 86.7,
+       "profit": 5632.25,
+       "trend": "stable"
+      },
+      {
+       "name": "Samosa (2)",
+       "kind": "Popular, earns little",
+       "sold": 32,
+       "keeps_pct": 70.2,
+       "profit": 4492.8,
+       "trend": "rising"
+      },
+      {
+       "name": "Spaghetti bolognese",
+       "kind": "Consider removing",
+       "sold": 16,
+       "keeps_pct": 65.4,
+       "profit": 4184.0,
+       "trend": "rising"
+      },
+      {
+       "name": "Passion juice",
+       "kind": "Consider removing",
+       "sold": 19,
+       "keeps_pct": 68.9,
+       "profit": 3929.2,
+       "trend": "falling"
+      },
+      {
+       "name": "Garden salad",
+       "kind": "Earns well, few order it",
+       "sold": 15,
+       "keeps_pct": 86.7,
+       "profit": 4552.5,
+       "trend": "falling"
+      },
+      {
+       "name": "Water 500 ml",
+       "kind": "Popular, earns little",
+       "sold": 42,
+       "keeps_pct": 83.3,
+       "profit": 4200.0,
+       "trend": "rising"
+      },
+      {
+       "name": "Orange juice",
+       "kind": "Consider removing",
+       "sold": 16,
+       "keeps_pct": 78.9,
+       "profit": 3788.8,
+       "trend": "stable"
+      },
+      {
+       "name": "Whisky (shot)",
+       "kind": "Earns well, few order it",
+       "sold": 12,
+       "keeps_pct": 75.0,
+       "profit": 3600.0,
+       "trend": "falling"
+      },
+      {
+       "name": "Watermelon juice",
+       "kind": "Consider removing",
+       "sold": 17,
+       "keeps_pct": 86.7,
+       "profit": 3685.6,
+       "trend": "falling"
+      },
+      {
+       "name": "Mandazi (3)",
+       "kind": "Popular, earns little",
+       "sold": 32,
+       "keeps_pct": 79.8,
+       "profit": 3065.6,
+       "trend": "rising"
+      },
+      {
+       "name": "Kachumbari",
+       "kind": "Consider removing",
+       "sold": 18,
+       "keeps_pct": 78.3,
+       "profit": 1692.0,
+       "trend": "rising"
+      }
+     ],
+     "assumption": {
+      "setting": "popular_cutoff",
+      "value": 0.7,
+      "label": "Counts as popular"
+     }
+    },
+    "dishes_by_kes": {
+     "state": "live",
+     "as_of": "2026-10-15T18:07:00+00:00",
+     "dishes": [
+      {
+       "name": "Nyama choma (goat)",
+       "profit": 61360.0,
+       "sold": 59,
+       "keeps_pct": 74.3
+      },
+      {
+       "name": "Beef stew",
+       "profit": 33120.4,
+       "sold": 62,
+       "keeps_pct": 71.2
+      },
+      {
+       "name": "Beef fry",
+       "profit": 26728.8,
+       "sold": 42,
+       "keeps_pct": 70.7
+      },
+      {
+       "name": "Fried rice",
+       "profit": 21152.3,
+       "sold": 53,
+       "keeps_pct": 79.8
+      },
+      {
+       "name": "Chicken burger",
+       "profit": 16800.0,
+       "sold": 30,
+       "keeps_pct": 74.7
+      },
+      {
+       "name": "Beer",
+       "profit": 14850.0,
+       "sold": 45,
+       "keeps_pct": 73.3
+      },
+      {
+       "name": "Chicken wings",
+       "profit": 14640.0,
+       "sold": 30,
+       "keeps_pct": 69.7
+      },
+      {
+       "name": "Pilau",
+       "profit": 13224.0,
+       "sold": 58,
+       "keeps_pct": 65.1
+      }
+     ]
+    },
+    "price_ideas": {
+     "state": "live",
+     "as_of": "2026-10-15T18:07:00+00:00",
+     "ideas": [
+      {
+       "id": 2,
+       "dish": "Nyama choma (goat)",
+       "kind": "Selling hot",
+       "from": 1400.0,
+       "to": 1500.0,
+       "month_gain": 5899.99,
+       "why": "Selling 1.4x above baseline (EWM-smoothed) this week"
+      },
+      {
+       "id": 4,
+       "dish": "Chicken burger",
+       "kind": "Selling slowly",
+       "from": 750.0,
+       "to": 675.0,
+       "month_gain": 3825.0,
+       "why": "Selling 0.6x below baseline — discount to stimulate demand"
+      },
+      {
+       "id": 1,
+       "dish": "Quarter chicken",
+       "kind": "Priced too low",
+       "from": 400.0,
+       "to": 435.0,
+       "month_gain": 2310.0,
+       "why": "Margin at 35.0% — below 40% floor"
+      },
+      {
+       "id": 28,
+       "dish": "Beer",
+       "kind": "Selling hot",
+       "from": 450.0,
+       "to": 485.0,
+       "month_gain": 1575.0,
+       "why": "Selling 1.4x above baseline (EWM-smoothed) this week"
+      },
+      {
+       "id": 14,
+       "dish": "Ugali sukuma",
+       "kind": "Selling hot",
+       "from": 300.0,
+       "to": 325.0,
+       "month_gain": 1250.0,
+       "why": "Selling 1.4x above baseline (EWM-smoothed) this week"
+      }
+     ],
+     "priced_too_low": [
+      {
+       "dish": "Quarter chicken",
+       "keeps_pct": 35.0,
+       "month_gain": 11732.82
+      }
+     ],
+     "assumptions": [
+      {
+       "setting": "margin_floor_pct",
+       "value": 40.0,
+       "label": "Lowest share you keep"
+      },
+      {
+       "setting": "price_step_kes",
+       "value": 5,
+       "label": "Price rounding step"
+      }
+     ],
+     "assumption": {
+      "setting": "margin_floor_pct",
+      "value": 40.0,
+      "label": "Lowest share you keep"
+     }
+    },
+    "delivery": {
+     "state": "live",
+     "as_of": "2026-10-15T18:07:00+00:00",
+     "channels": [
+      {
+       "channel": "Dine-in & takeaway",
+       "orders": 319,
+       "keeps": 249582.35,
+       "keeps_pct": 70.8,
+       "pays_commission": false
+      },
+      {
+       "channel": "Glovo",
+       "orders": 37,
+       "keeps": 23886.95,
+       "keeps_pct": 44.8,
+       "pays_commission": true
+      },
+      {
+       "channel": "Uber Eats",
+       "orders": 37,
+       "keeps": 15779.45,
+       "keeps_pct": 46.1,
+       "pays_commission": true
+      },
+      {
+       "channel": "LEVIII app",
+       "orders": 12,
+       "keeps": 10406.8,
+       "keeps_pct": 71.2,
+       "pays_commission": false
+      },
+      {
+       "channel": "Bolt Food",
+       "orders": 15,
+       "keeps": 9252.5,
+       "keeps_pct": 51.8,
+       "pays_commission": true
+      }
+     ],
+     "delivery_gaps": [
+      {
+       "channel": "Uber Eats",
+       "dish": "Quarter chicken",
+       "commission_pct": 25,
+       "keeps_pct": 10.0,
+       "keeps": 40.0,
+       "keeps_dine_in": 140.0,
+       "price_to_keep_floor": 745.0
+      },
+      {
+       "channel": "Glovo",
+       "dish": "Quarter chicken",
+       "commission_pct": 25,
+       "keeps_pct": 10.0,
+       "keeps": 40.0,
+       "keeps_dine_in": 140.0,
+       "price_to_keep_floor": 745.0
+      },
+      {
+       "channel": "Bolt Food",
+       "dish": "Quarter chicken",
+       "commission_pct": 20,
+       "keeps_pct": 15.0,
+       "keeps": 60.0,
+       "keeps_dine_in": 140.0,
+       "price_to_keep_floor": 650.0
+      },
+      {
+       "channel": "Uber Eats",
+       "dish": "Burger",
+       "commission_pct": 25,
+       "keeps_pct": 28.3,
+       "keeps": 170.0,
+       "keeps_dine_in": 320.0,
+       "price_to_keep_floor": 800.0
+      },
+      {
+       "channel": "Glovo",
+       "dish": "Burger",
+       "commission_pct": 25,
+       "keeps_pct": 28.3,
+       "keeps": 170.0,
+       "keeps_dine_in": 320.0,
+       "price_to_keep_floor": 800.0
+      },
+      {
+       "channel": "Bolt Food",
+       "dish": "Burger",
+       "commission_pct": 20,
+       "keeps_pct": 33.3,
+       "keeps": 200.0,
+       "keeps_dine_in": 320.0,
+       "price_to_keep_floor": 700.0
+      },
+      {
+       "channel": "Uber Eats",
+       "dish": "Fish fillet",
+       "commission_pct": 25,
+       "keeps_pct": 35.0,
+       "keeps": 227.5,
+       "keeps_dine_in": 390.0,
+       "price_to_keep_floor": 745.0
+      },
+      {
+       "channel": "Glovo",
+       "dish": "Fish fillet",
+       "commission_pct": 25,
+       "keeps_pct": 35.0,
+       "keeps": 227.5,
+       "keeps_dine_in": 390.0,
+       "price_to_keep_floor": 745.0
+      }
+     ],
+     "best_and_weakest_hours": [
+      {
+       "hours": "lunch",
+       "keeps_pct": 71.2,
+       "orders": 177
+      },
+      {
+       "hours": "dinner",
+       "keeps_pct": 72.1,
+       "orders": 134
+      },
+      {
+       "hours": "afternoon",
+       "keeps_pct": 65.3,
+       "orders": 59
+      },
+      {
+       "hours": "breakfast",
+       "keeps_pct": 73.5,
+       "orders": 31
+      },
+      {
+       "hours": "late night",
+       "keeps_pct": 72.6,
+       "orders": 19
+      }
+     ],
+     "assumption": {
+      "setting": "commission_glovo_pct",
+      "value": 25.0,
+      "label": "Delivery commission"
+     },
+     "assumptions": [
+      {
+       "setting": "commission_uber_eats_pct",
+       "value": 25.0,
+       "label": "Uber Eats commission"
+      },
+      {
+       "setting": "commission_glovo_pct",
+       "value": 25.0,
+       "label": "Glovo commission"
+      },
+      {
+       "setting": "commission_bolt_food_pct",
+       "value": 20.0,
+       "label": "Bolt Food commission"
+      }
+     ]
+    },
+    "outlook": {
+     "state": "live",
+     "as_of": "2026-10-15T18:07:00+00:00",
+     "next_30_days": 471671.81,
+     "low": 348911.75,
+     "high": 594431.86,
+     "confidence_pct": 45,
+     "note": "A range based on your own sales history and the calendar, not a promise."
+    },
+    "win_back": {
+     "state": "live",
+     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "lapsed_guests": 50,
+     "reachable": 31,
+     "offers": 3,
+     "reason": null
+    },
+    "simulator": {
+     "state": "live",
+     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "info": true,
+     "how": "Ask “what if I raise the price of <dish>?” in Ask LEVIII."
+    }
+   }
+  },
+  "store": {
+   "key": "store",
+   "title": "Store & Suppliers",
+   "state": "as_entered",
+   "as_of": "2026-10-15T18:08:00+00:00",
+   "summary": {
+    "number": 1,
+    "unit": "",
+    "word": "Missing stock to check",
+    "status": "bad",
+    "label": "Items to check"
+   },
+   "blocks": {
+    "missing": {
+     "state": "as_entered",
+     "as_of": "2026-10-15T18:08:00+00:00",
+     "entered_up_to": "2026-10-15",
+     "window_days": 7,
+     "items": [
+      {
+       "item": "Beef",
+       "unit": "kg",
+       "expected": 7.38,
+       "used": 9.91,
+       "missing": 2.53,
+       "missing_value": 2020.8,
+       "off_by_pct": 34.2,
+       "check": true
+      },
+      {
+       "item": "Goat meat",
+       "unit": "kg",
+       "expected": 4.55,
+       "used": 4.62,
+       "missing": 0.07,
+       "missing_value": 63.0,
+       "off_by_pct": 1.5,
+       "check": false
+      },
+      {
+       "item": "Chicken",
+       "unit": "kg",
+       "expected": 8.46,
+       "used": 8.57,
+       "missing": 0.11,
+       "missing_value": 53.76,
+       "off_by_pct": 1.3,
+       "check": false
+      },
+      {
+       "item": "Beef mince",
+       "unit": "kg",
+       "expected": 3.14,
+       "used": 3.16,
+       "missing": 0.02,
+       "missing_value": 18.4,
+       "off_by_pct": 0.7,
+       "check": false
+      },
+      {
+       "item": "Tomatoes",
+       "unit": "kg",
+       "expected": 7.75,
+       "used": 7.88,
+       "missing": 0.13,
+       "missing_value": 15.48,
+       "off_by_pct": 1.7,
+       "check": false
+      },
+      {
+       "item": "Tilapia",
+       "unit": "kg",
+       "expected": 1.2,
+       "used": 1.22,
+       "missing": 0.02,
+       "missing_value": 15.0,
+       "off_by_pct": 2.1,
+       "check": false
+      },
+      {
+       "item": "Potatoes",
+       "unit": "kg",
+       "expected": 6.4,
+       "used": 6.52,
+       "missing": 0.12,
+       "missing_value": 12.1,
+       "off_by_pct": 1.9,
+       "check": false
+      },
+      {
+       "item": "Eggs",
+       "unit": "piece",
+       "expected": 28.0,
+       "used": 28.41,
+       "missing": 0.41,
+       "missing_value": 10.18,
+       "off_by_pct": 1.5,
+       "check": false
+      },
+      {
+       "item": "Burger buns",
+       "unit": "piece",
+       "expected": 14.0,
+       "used": 14.16,
+       "missing": 0.16,
+       "missing_value": 6.36,
+       "off_by_pct": 1.1,
+       "check": false
+      },
+      {
+       "item": "Onions",
+       "unit": "kg",
+       "expected": 5.87,
+       "used": 5.91,
+       "missing": 0.04,
+       "missing_value": 3.8,
+       "off_by_pct": 0.6,
+       "check": false
+      },
+      {
+       "item": "Mangoes",
+       "unit": "kg",
+       "expected": 1.05,
+       "used": 1.07,
+       "missing": 0.02,
+       "missing_value": 2.7,
+       "off_by_pct": 1.7,
+       "check": false
+      },
+      {
+       "item": "Sukuma wiki (kale)",
+       "unit": "kg",
+       "expected": 2.4,
+       "used": 2.43,
+       "missing": 0.03,
+       "missing_value": 1.86,
+       "off_by_pct": 1.3,
+       "check": false
+      },
+      {
+       "item": "Pineapple",
+       "unit": "piece",
+       "expected": 1.25,
+       "used": 1.26,
+       "missing": 0.01,
+       "missing_value": 1.8,
+       "off_by_pct": 1.0,
+       "check": false
+      },
+      {
+       "item": "Passion fruit",
+       "unit": "kg",
+       "expected": 0.3,
+       "used": 0.3,
+       "missing": 0.0,
+       "missing_value": 1.2,
+       "off_by_pct": 1.3,
+       "check": false
+      },
+      {
+       "item": "Oranges",
+       "unit": "kg",
+       "expected": 1.5,
+       "used": 1.51,
+       "missing": 0.01,
+       "missing_value": 1.2,
+       "off_by_pct": 0.7,
+       "check": false
+      },
+      {
+       "item": "Milk",
+       "unit": "L",
+       "expected": 1.95,
+       "used": 1.97,
+       "missing": 0.02,
+       "missing_value": 1.17,
+       "off_by_pct": 0.9,
+       "check": false
+      },
+      {
+       "item": "Lettuce",
+       "unit": "kg",
+       "expected": 1.85,
+       "used": 1.86,
+       "missing": 0.01,
+       "missing_value": 0.9,
+       "off_by_pct": 0.8,
+       "check": false
+      },
+      {
+       "item": "Lemons",
+       "unit": "piece",
+       "expected": 4.0,
+       "used": 4.08,
+       "missing": 0.08,
+       "missing_value": 0.75,
+       "off_by_pct": 1.9,
+       "check": false
+      },
+      {
+       "item": "Carrots",
+       "unit": "kg",
+       "expected": 0.5,
+       "used": 0.51,
+       "missing": 0.01,
+       "missing_value": 0.54,
+       "off_by_pct": 1.2,
+       "check": false
+      },
+      {
+       "item": "Watermelon",
+       "unit": "kg",
+       "expected": 1.0,
+       "used": 1.0,
+       "missing": 0.0,
+       "missing_value": 0.3,
+       "off_by_pct": 0.5,
+       "check": false
+      },
+      {
+       "item": "Avocado",
+       "unit": "piece",
+       "expected": 1.5,
+       "used": 1.51,
+       "missing": 0.01,
+       "missing_value": 0.24,
+       "off_by_pct": 0.5,
+       "check": false
+      },
+      {
+       "item": "Rice",
+       "unit": "kg",
+       "expected": 2.4,
+       "used": 2.4,
+       "missing": 0.0,
+       "missing_value": 0.0,
+       "off_by_pct": 0.0,
+       "check": false
+      },
+      {
+       "item": "Pasta",
+       "unit": "kg",
+       "expected": 0.75,
+       "used": 0.75,
+       "missing": 0.0,
+       "missing_value": 0.0,
+       "off_by_pct": 0.0,
+       "check": false
+      },
+      {
+       "item": "Maize flour",
+       "unit": "kg",
+       "expected": 7.43,
+       "used": 7.43,
+       "missing": 0.0,
+       "missing_value": 0.0,
+       "off_by_pct": 0.0,
+       "check": false
+      },
+      {
+       "item": "Wheat flour",
+       "unit": "kg",
+       "expected": 1.88,
+       "used": 1.88,
+       "missing": 0.0,
+       "missing_value": 0.0,
+       "off_by_pct": 0.0,
+       "check": false
+      },
+      {
+       "item": "Beans",
+       "unit": "kg",
+       "expected": 0.9,
+       "used": 0.9,
+       "missing": 0.0,
+       "missing_value": 0.0,
+       "off_by_pct": 0.0,
+       "check": false
+      },
+      {
+       "item": "Sugar",
+       "unit": "kg",
+       "expected": 0.57,
+       "used": 0.57,
+       "missing": 0.0,
+       "missing_value": 0.0,
+       "off_by_pct": 0.0,
+       "check": false
+      },
+      {
+       "item": "Tea leaves",
+       "unit": "kg",
+       "expected": 0.07,
+       "used": 0.07,
+       "missing": 0.0,
+       "missing_value": 0.0,
+       "off_by_pct": 0.0,
+       "check": false
+      },
+      {
+       "item": "Spice mix",
+       "unit": "kg",
+       "expected": 0.27,
+       "used": 0.27,
+       "missing": 0.0,
+       "missing_value": 0.0,
+       "off_by_pct": 0.0,
+       "check": false
+      },
+      {
+       "item": "Cooking oil",
+       "unit": "L",
+       "expected": 9.0,
+       "used": 9.0,
+       "missing": 0.0,
+       "missing_value": 0.0,
+       "off_by_pct": 0.0,
+       "check": false
+      },
+      {
+       "item": "Cheese slices",
+       "unit": "piece",
+       "expected": 14.0,
+       "used": 14.0,
+       "missing": 0.0,
+       "missing_value": 0.0,
+       "off_by_pct": 0.0,
+       "check": false
+      },
+      {
+       "item": "Soda (300 ml)",
+       "unit": "bottle",
+       "expected": 19.0,
+       "used": 19.0,
+       "missing": 0.0,
+       "missing_value": 0.0,
+       "off_by_pct": 0.0,
+       "check": false
+      },
+      {
+       "item": "Drinking water (500 ml)",
+       "unit": "bottle",
+       "expected": 10.0,
+       "used": 10.0,
+       "missing": 0.0,
+       "missing_value": 0.0,
+       "off_by_pct": 0.0,
+       "check": false
+      },
+      {
+       "item": "Beer (500 ml)",
+       "unit": "bottle",
+       "expected": 15.0,
+       "used": 15.0,
+       "missing": 0.0,
+       "missing_value": 0.0,
+       "off_by_pct": 0.0,
+       "check": false
+      }
+     ],
+     "assumption": {
+      "setting": "missing_stock_flag_pct",
+      "value": 3.0,
+      "label": "Missing stock we flag"
+     }
+    },
+    "handover": {
+     "state": "as_entered",
+     "as_of": "2026-10-15T04:30:00+00:00",
+     "entered_up_to": "2026-10-15",
+     "doesnt_match": [
+      {
+       "item": "Beef",
+       "unit": "kg",
+       "store_said": 4.0,
+       "kitchen_counted": 3.8,
+       "gap": 0.2
+      }
+     ]
+    },
+    "reorder": {
+     "state": "as_entered",
+     "as_of": "2026-10-15T18:08:00+00:00",
+     "entered_up_to": "2026-10-15",
+     "tracked": 35,
+     "least_cover": [
+      {
+       "item": "Beer (500 ml)",
+       "unit": "bottle",
+       "left": 14.0,
+       "days_left": 5.8
+      },
+      {
+       "item": "Goat meat",
+       "unit": "kg",
+       "left": 9.18,
+       "days_left": 8.3
+      },
+      {
+       "item": "Beef mince",
+       "unit": "kg",
+       "left": 4.79,
+       "days_left": 8.5
+      },
+      {
+       "item": "Eggs",
+       "unit": "piece",
+       "left": 56.0,
+       "days_left": 9.2
+      },
+      {
+       "item": "Beef",
+       "unit": "kg",
+       "left": 16.493,
+       "days_left": 9.6
+      }
+     ],
+     "time_to_reorder": [],
+     "drafts": []
+    },
+    "suppliers": {
+     "state": "as_entered",
+     "as_of": "2026-10-15T06:30:00+00:00",
+     "entered_up_to": "2026-10-15",
+     "suppliers": [
+      {
+       "name": "Crown Beverages Distributors",
+       "on_time_pct": 100.0,
+       "closed_orders": 11,
+       "word": "Reliable"
+      },
+      {
+       "name": "Mama Pima Dry Goods",
+       "on_time_pct": 94.4,
+       "closed_orders": 18,
+       "word": "Good"
+      },
+      {
+       "name": "Rift Valley Butchery",
+       "on_time_pct": 91.7,
+       "closed_orders": 24,
+       "word": "Good"
+      },
+      {
+       "name": "Wangari Fresh Produce",
+       "on_time_pct": 88.0,
+       "closed_orders": 50,
+       "word": "Good"
+      },
+      {
+       "name": "Kenchic",
+       "on_time_pct": 84.2,
+       "closed_orders": 19,
+       "word": "Late too often"
+      },
+      {
+       "name": "Corner Bakery & Cheese",
+       "on_time_pct": 80.0,
+       "closed_orders": 10,
+       "word": "Late too often"
+      },
+      {
+       "name": "Lakeside Fish Traders",
+       "on_time_pct": null,
+       "closed_orders": 2,
+       "word": "Learning"
+      },
+      {
+       "name": "Highland Dairy Depot",
+       "on_time_pct": null,
+       "closed_orders": 1,
+       "word": "Learning"
+      },
+      {
+       "name": "Ngong Charcoal Traders",
+       "on_time_pct": null,
+       "closed_orders": 1,
+       "word": "Learning"
+      }
+     ],
+     "overdue_orders": 0,
+     "short_deliveries": [
+      {
+       "supplier": "Kenchic",
+       "item": "Chicken",
+       "unit": "kg",
+       "ordered": 10.0,
+       "received": 9.3,
+       "short_by": 0.7,
+       "short_value": 333.79,
+       "on": "2026-10-10"
+      }
+     ]
+    }
+   }
+  },
+  "cash": {
+   "key": "cash",
+   "title": "Cash Check",
+   "state": "live",
+   "as_of": "2026-10-15T13:15:00+00:00",
+   "summary": {
+    "number": 2,
+    "unit": "",
+    "word": "Things to check",
+    "status": "bad",
+    "label": "Things to check"
+   },
+   "blocks": {
+    "shifts": {
+     "state": "as_entered",
+     "as_of": "2026-10-15T13:15:00+00:00",
+     "entered_up_to": "2026-10-15",
+     "shifts": [
+      {
+       "from": "2026-10-15T05:00:00",
+       "expected": 1720.0,
+       "counted": 1710.0,
+       "gap": -10.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-14T13:00:00",
+       "expected": 2460.0,
+       "counted": 2460.0,
+       "gap": 0.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-14T05:00:00",
+       "expected": 2220.0,
+       "counted": 2220.0,
+       "gap": 0.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-13T13:00:00",
+       "expected": 5610.0,
+       "counted": 5134.77,
+       "gap": -475.23,
+       "check": true
+      },
+      {
+       "from": "2026-10-13T05:00:00",
+       "expected": 1990.0,
+       "counted": 1990.0,
+       "gap": 0.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-12T13:00:00",
+       "expected": 1720.0,
+       "counted": 1700.0,
+       "gap": -20.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-12T05:00:00",
+       "expected": 2150.0,
+       "counted": 2140.0,
+       "gap": -10.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-11T13:00:00",
+       "expected": 1500.0,
+       "counted": 1500.0,
+       "gap": 0.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-11T05:00:00",
+       "expected": 220.0,
+       "counted": 220.0,
+       "gap": 0.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-10T13:00:00",
+       "expected": 4820.0,
+       "counted": 4820.0,
+       "gap": 0.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-10T05:00:00",
+       "expected": 3370.0,
+       "counted": 3356.0,
+       "gap": -14.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-09T13:00:00",
+       "expected": 950.0,
+       "counted": 950.0,
+       "gap": 0.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-09T05:00:00",
+       "expected": 2140.0,
+       "counted": 2182.0,
+       "gap": 42.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-08T13:00:00",
+       "expected": 0.0,
+       "counted": 25.0,
+       "gap": 25.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-08T05:00:00",
+       "expected": 5510.0,
+       "counted": 5462.0,
+       "gap": -48.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-07T13:00:00",
+       "expected": 0.0,
+       "counted": 50.0,
+       "gap": 50.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-07T05:00:00",
+       "expected": 3550.0,
+       "counted": 3515.0,
+       "gap": -35.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-06T13:00:00",
+       "expected": 3170.0,
+       "counted": 2650.96,
+       "gap": -519.04,
+       "check": true
+      },
+      {
+       "from": "2026-10-06T05:00:00",
+       "expected": 870.0,
+       "counted": 870.0,
+       "gap": 0.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-05T13:00:00",
+       "expected": 1050.0,
+       "counted": 1010.0,
+       "gap": -40.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-05T05:00:00",
+       "expected": 6310.0,
+       "counted": 6310.0,
+       "gap": 0.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-04T13:00:00",
+       "expected": 0.0,
+       "counted": 0.0,
+       "gap": 0.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-04T05:00:00",
+       "expected": 1720.0,
+       "counted": 1672.0,
+       "gap": -48.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-03T13:00:00",
+       "expected": 0.0,
+       "counted": 0.0,
+       "gap": 0.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-03T05:00:00",
+       "expected": 5490.0,
+       "counted": 5490.0,
+       "gap": 0.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-02T13:00:00",
+       "expected": 2320.0,
+       "counted": 2320.0,
+       "gap": 0.0,
+       "check": false
+      },
+      {
+       "from": "2026-10-02T05:00:00",
+       "expected": 2190.0,
+       "counted": 2190.0,
+       "gap": 0.0,
+       "check": false
+      }
+     ],
+     "assumptions": [
+      {
+       "setting": "cash_tolerance_kes",
+       "value": 200,
+       "label": "Cash count difference we accept"
+      },
+      {
+       "setting": "cash_tolerance_pct",
+       "value": 1.0,
+       "label": "…or this share of takings"
+      }
+     ],
+     "assumption": {
+      "setting": "cash_tolerance_kes",
+      "value": 200,
+      "label": "Cash count difference we accept"
+     }
+    },
+    "cancelled_sales": {
+     "state": "live",
+     "as_of": "2026-10-15T18:07:00+00:00",
+     "cancelled_last_7_days": 3,
+     "unusual_cancelling": 0,
+     "unusual_refunds": 0,
+     "late_night_activity": 0,
+     "to_check": 0,
+     "note": "These are things to check, not conclusions about anyone."
+    },
+    "below_menu_price": {
+     "state": "live",
+     "as_of": "2026-10-15T18:07:00+00:00",
+     "dishes": [
+      {
+       "dish": "Chips",
+       "menu_price": 300.0,
+       "charged": 270.0,
+       "below_pct": 10.0,
+       "month_loss": 2057.14
+      }
+     ]
+    },
+    "mpesa": {
+     "state": "unavailable",
+     "as_of": null,
+     "reason": "Upload your M-Pesa statement to check it against your sales."
+    },
+    "patterns": {
+     "state": "live",
+     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "assumption": {
+      "setting": "cash_tolerance_kes",
+      "value": 200,
+      "label": "Cash count difference we accept"
+     },
+     "patterns": [
+      {
+       "when": "Tuesday evening",
+       "times_short": 4,
+       "of_last": 4,
+       "short_each": 491.14,
+       "total": 1964.57
+      }
+     ],
+     "reason": null,
+     "note": "A pattern is a reason to look at that shift, not a conclusion about anyone."
+    }
+   }
+  },
+  "staff": {
+   "key": "staff",
+   "title": "Staff",
+   "state": "live",
+   "as_of": "2026-10-15T19:24:23.059113+00:00",
+   "summary": {
+    "number": 28.2,
+    "unit": "%",
+    "word": "Fine",
+    "status": "good",
+    "label": "Out of every KES 100, wages"
+   },
+   "blocks": {
+    "wages": {
+     "state": "as_entered",
+     "as_of": "2026-10-15T19:24:23.059113+00:00",
+     "entered_up_to": "2026-10-15",
+     "wages_pct": 28.2,
+     "wages_30d": 133145.6,
+     "sales_per_staff_hour": 361.58,
+     "overtime_hours": 5.6,
+     "overtime_cost": 784.0,
+     "word": "Fine",
+     "by_person": [
+      {
+       "name": "Otieno",
+       "hours": 170.4,
+       "wages": 23854.6
+      },
+      {
+       "name": "Wanjiru",
+       "hours": 163.2,
+       "wages": 26120.0
+      },
+      {
+       "name": "Achieng",
+       "hours": 163.0,
+       "wages": 15481.2
+      },
+      {
+       "name": "Barasa",
+       "hours": 162.9,
+       "wages": 13842.25
+      },
+      {
+       "name": "Chebet",
+       "hours": 162.8,
+       "wages": 13838.0
+      },
+      {
+       "name": "Kamau",
+       "hours": 162.3,
+       "wages": 15532.0
+      },
+      {
+       "name": "Njoroge",
+       "hours": 161.8,
+       "wages": 12132.75
+      },
+      {
+       "name": "Mwende",
+       "hours": 161.3,
+       "wages": 12344.8
+      }
+     ],
+     "assumptions": [
+      {
+       "setting": "labour_target_pct",
+       "value": 32.0,
+       "label": "Wages target"
+      },
+      {
+       "setting": "overtime_after_hours",
+       "value": 8.0,
+       "label": "Overtime starts after (hours)"
+      }
+     ],
+     "assumption": {
+      "setting": "labour_target_pct",
+      "value": 32.0,
+      "label": "Wages target"
+     }
+    },
+    "on_shift": {
+     "state": "live",
+     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "scheduled": 5,
+     "on_shift": 2
+    },
+    "kitchen": {
+     "state": "live",
+     "as_of": "2026-10-15T18:07:00+00:00",
+     "stations": [
+      {
+       "station": "main",
+       "avg_minutes": 12.9
+      },
+      {
+       "station": "drinks",
+       "avg_minutes": 2.4
+      },
+      {
+       "station": "grill",
+       "avg_minutes": 18.2
+      },
+      {
+       "station": "fryer",
+       "avg_minutes": 9.9
+      },
+      {
+       "station": "salad",
+       "avg_minutes": 3.8
+      }
+     ],
+     "slowest": [
+      {
+       "station": "grill",
+       "minutes_over_average": 8.4
+      },
+      {
+       "station": "main",
+       "minutes_over_average": 3.1
+      }
+     ]
+    }
+   }
+  },
+  "permits": {
+   "key": "permits",
+   "title": "Permits & Settings",
+   "state": "live",
+   "as_of": "2026-10-15T19:24:54.648735+00:00",
+   "summary": {
+    "number": 100.0,
+    "unit": "%",
+    "word": "Costs known",
+    "status": "good",
+    "label": "Dishes with a cost"
+   },
+   "blocks": {
+    "licences": {
+     "state": "as_entered",
+     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "assumption": {
+      "setting": "licence_warning_days",
+      "value": 14,
+      "label": "Licence warning (days)"
+     },
+     "items": [
+      {
+       "name": "Health certificate",
+       "issuer": "Public Health Office",
+       "expires_on": "2026-10-26",
+       "days_left": 11,
+       "status": "expiring",
+       "word": "Expires soon"
+      },
+      {
+       "name": "Liquor licence",
+       "issuer": "County Liquor Board",
+       "expires_on": "2026-12-14",
+       "days_left": 60,
+       "status": "ok",
+       "word": "Fine"
+      },
+      {
+       "name": "Single business permit",
+       "issuer": "Nairobi County",
+       "expires_on": "2027-04-23",
+       "days_left": 190,
+       "status": "ok",
+       "word": "Fine"
+      },
+      {
+       "name": "Fire safety certificate",
+       "issuer": "County Fire Service",
+       "expires_on": "2027-09-10",
+       "days_left": 330,
+       "status": "ok",
+       "word": "Fine"
+      }
+     ]
+    },
+    "settings": {
+     "state": "as_entered",
+     "as_of": "2026-10-15T19:24:26.217214",
+     "chosen": true,
+     "changed": 2,
+     "total": 24,
+     "updated_at": "2026-10-15T19:24:26.217214",
+     "reason": null
+    },
+    "till_connection": {
+     "state": "live",
+     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "info": true,
+     "source": "direct",
+     "word": "Recorded here",
+     "reconciled": true,
+     "records": null
+    },
+    "data_trust": {
+     "state": "live",
+     "as_of": "2026-10-15T19:24:54.648735+00:00",
+     "dishes": 29,
+     "costs_known_pct": 100.0,
+     "missing_costs": 0,
+     "to_fix": 0
+    }
+   }
+  }
+ },
+ "coming_up": {
+  "bills": {
+   "state": "as_entered",
+   "as_of": "2026-10-15T19:24:54.648735+00:00",
+   "reason": null,
+   "items": [
+    {
+     "name": "Rent",
+     "due_on": "2026-10-18",
+     "days_away": 3,
+     "amount_kes": 70000.0,
+     "short": true
+    },
+    {
+     "name": "Electricity (KPLC)",
+     "due_on": "2026-10-20",
+     "days_away": 5,
+     "amount_kes": 18000.0,
+     "short": true
+    }
+   ]
+  },
+  "licences": {
+   "state": "as_entered",
+   "as_of": "2026-10-15T19:24:54.648735+00:00",
+   "assumption": {
+    "setting": "licence_warning_days",
+    "value": 14,
+    "label": "Licence warning (days)"
+   },
+   "items": [
+    {
+     "name": "Health certificate",
+     "issuer": "Public Health Office",
+     "expires_on": "2026-10-26",
+     "days_left": 11,
+     "status": "expiring",
+     "word": "Expires soon"
+    }
+   ],
+   "reason": null
+  },
+  "deliveries": {
+   "state": "as_entered",
+   "as_of": "2026-10-15T19:24:54.648735+00:00",
+   "reason": null,
+   "items": [
+    {
+     "item": "Beer (500 ml)",
+     "supplier": "Crown Beverages Distributors",
+     "expected_at": "2026-10-16T04:30:00+00:00",
+     "status": "SENT"
+    },
+    {
+     "item": "Cheese slices",
+     "supplier": "Corner Bakery & Cheese",
+     "expected_at": "2026-10-16T04:30:00+00:00",
+     "status": "SENT"
+    },
+    {
+     "item": "Pasta",
+     "supplier": "Mama Pima Dry Goods",
+     "expected_at": "2026-10-16T04:30:00+00:00",
+     "status": "SENT"
+    }
+   ]
+  },
+  "bookings": {
+   "state": "live",
+   "as_of": "2026-10-15T19:24:54.648735+00:00",
+   "covers_today": 0,
+   "next_days": [
+    {
+     "date": "2026-10-16",
+     "bookings": 6,
+     "covers": 20
+    },
+    {
+     "date": "2026-10-17",
+     "bookings": 6,
+     "covers": 16
+    },
+    {
+     "date": "2026-10-18",
+     "bookings": 3,
+     "covers": 14
+    },
+    {
+     "date": "2026-10-19",
+     "bookings": 1,
+     "covers": 2
+    },
+    {
+     "date": "2026-10-20",
+     "bookings": 2,
+     "covers": 7
+    },
+    {
+     "date": "2026-10-21",
+     "bookings": 2,
+     "covers": 8
+    }
+   ],
+   "reason": "No bookings tonight."
+  }
+ },
+ "read": {
+  "state": "unavailable",
+  "as_of": null,
+  "reason": "LEVIII's read has not been written yet.",
+  "text": null
+ }
+}

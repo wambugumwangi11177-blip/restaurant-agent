@@ -56,7 +56,10 @@ def _pulse(ctx: OwnerContext, period: str) -> dict:
             "breakeven_at": ctx.safe("home.breakeven", lambda: areas.breakeven_summary(ctx)),
             "money_match": {"cash": cash, "mpesa": unavailable("Upload your M-Pesa statement to check it against your sales.")},
             "freshness": {"latest_sale_at": freshness["latest_order_at"], "data_age_days": freshness["data_age_days"],
-                          "is_stale": freshness["is_stale"], "source": conn["source"], "source_state": conn["state"]}}
+                          "is_stale": freshness["is_stale"], "source": conn["source"], "source_state": conn["state"],
+                          "source_reconciled": bool(conn.get("reconciled")), "source_trusted": overview.source_is_trusted(conn),
+                          "source_notice": overview._SOURCE_NOTICE.get(conn["state"], ""),
+                          "source_records": conn.get("records"), "source_last_received_at": conn.get("last_received_at")}}
 
 
 def _costing_you_money(ctx: OwnerContext) -> dict:

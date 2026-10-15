@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import OsPage from "../src/app/vibanda/os/page";
+import OsPage from "../src/app/(owner)/os/page";
 import api from "@/lib/api";
 
 const navigationState = vi.hoisted(() => ({ query: "" }));
 vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn() } }));
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { restaurant_name: "Vibanda Village" } }) }));
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(navigationState.query) }));
 
 const reply = {

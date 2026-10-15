@@ -104,17 +104,18 @@ INFRASTRUCTURE = {
     "ai.orchestrator": "agent orchestration (strategist is its own engine row)",
     "ai.escalation": "alert escalation engine (feeds S5.3 alert levels)",
     "ai.simulation.signals": "calendar signals consumed by the twin (D12 holidays live here)",
+    # S1.4 — the former candidates, each resolved (see backend/owner/registry.py::NOT_ENGINES):
+    "ai.ops_manager": "resolved: 'restaurant health' = the Home health tiles' rule set, not a separate figure",
+    "ai.creative": "resolved: 'LEVIII's read' = optional AI note (text only; every number must be backed)",
+    "ai.home_specialists": "glue that turns engine output into Home cards; the engines it calls are registered",
+    "ai.graph": "knowledge-graph impact analysis, a strategist tool; shows no figure",
+    "ai.enterprise": "multi-branch compare (OS 'compare' form, S5.1); registered with that form when it lands",
+    "ai.order_stock": "order-time stock deduction helper; its figures are shown by inventory and custody",
 }
-# Real analysis modules the figure 1.3 rows do not cover. Not infrastructure: S1.4 must
-# either register each as an engine or give a written reason it is not one.
-CANDIDATES = {
-    "ai.ops_manager": "operations dashboard = owner 'restaurant health' (SPEC §3.4)",
-    "ai.creative": "creative layer = owner 'LEVIII's read' (Home zone 5)",
-    "ai.home_specialists": "glue that turns engine output into Home cards",
-    "ai.graph": "knowledge-graph impact analysis (strategist tool)",
-    "ai.enterprise": "multi-branch benchmarking (OS 'compare' form, P5)",
-    "ai.order_stock": "order-time stock helper",
-}
+# Real analysis modules the figure 1.3 rows do not cover. S1.4 resolved every one of them (reasons in
+# backend/owner/registry.py::NOT_ENGINES, which a test keeps in step with INFRASTRUCTURE): either it is an
+# engine row above or it is not an engine and says why. A new unclassified module still fails the test.
+CANDIDATES: dict[str, str] = {}
 
 
 # ── Surfaces (columns of figure 1.3) ─────────────────────────────────────────

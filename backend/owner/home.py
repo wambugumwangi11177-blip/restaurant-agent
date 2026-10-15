@@ -1,0 +1,124 @@
+"""
+backend/owner/home.py — GET /owner/home (docs/v2/SPEC.md §3.1): everything of value on one page.
+
+  zone 1  pulse               today's sales vs the same weekday, trend, costs covered, money match, freshness
+  zone 2  costing_you_money   top 5 things costing money, each with KES, one action, why, the rule used
+  zone 3  health              six tiles, one per area: a number, a word, a colour
+  areas   the six area panels (owner/areas.py): collapsed to one line on Home, same block on /owner/area/{key}
+  zone 4  coming_up           bills, licences, deliveries, bookings
+  zone 5  read                LEVIII's AI-written note (optional; absent unless every number in it is backed)
+
+Every block has `state`, `as_of` and — where a rule was used — `assumption: {setting, value}` (owner/states.py).
+Money is KES at this edge (integer cents inside); nothing here is computed in a router.
+"""
+from __future__ import annotations
+
+from datetime import timedelta
+
+import models
+from ai.analysis_clock import data_freshness
+from owner import areas
+from owner.states import OwnerContext, block, iso, kes, no_data, unavailable
+
+PERIODS = ("today", "7d", "30d")
+
+
+def _overview():
+    from routers import overview
+    return overview
+
+
+def _pulse(ctx: OwnerContext, period: str) -> dict:
+    overview = _overview()
+    start, end = overview._eat_range("today")
+    today = overview._summarize(ctx.db, ctx.rid, start, end)
+    base = ctx.order_state()
+    # Same weekday last week, over the same elapsed part of the day: a fair comparison at 3 pm.
+    last_week = overview._summarize(ctx.db, ctx.rid, start - timedelta(days=7), end - timedelta(days=7))
+    vs = round((today["revenue"] - last_week["revenue"]) / last_week["revenue"] * 100, 1) if last_week["revenue"] else None
+    win_start, win_end = overview._eat_range(period)
+    window = overview._summarize(ctx.db, ctx.rid, win_start, win_end)
+    shifts = ctx.cached("cash_shifts", lambda: areas._shifts(ctx))
+    if shifts["state"] in ("no_data", "unavailable"):
+        cash = {k: shifts[k] for k in ("state", "as_of", "reason") if k in shifts}
+    else:
+        cash = block(shifts["state"], as_of=shifts.get("as_of"), checked=len(shifts.get("shifts", [])),
+                     to_check=sum(1 for s in shifts.get("shifts", []) if s["check"]),
+                     **({"entered_up_to": shifts["entered_up_to"]} if "entered_up_to" in shifts else {}))
+    freshness = ctx.cached("freshness", lambda: data_freshness(ctx.db, ctx.rid, ctx.latest_order_at))
+    conn = overview._source_connection(ctx.db, ctx.tenant_id)
+    return {**base,
+            "sales_today": today["revenue"], "orders_today": today["orders"],
+            "vs_same_weekday_pct": vs,
+            "vs_same_weekday_state": "live" if vs is not None else "learning",
+            "sales_in_period": window["revenue"], "orders_in_period": window["orders"],
+            "trend_7d": [{"date": d["date"], "sales": d["revenue"], "orders": d["orders"]} for d in overview._performance(ctx.db, ctx.rid)["revenue_trend"]],
+            "breakeven_at": unavailable("Costs covered needs your fixed costs; enter them to see when today's sales cover them."),
+            "money_match": {"cash": cash, "mpesa": unavailable("Upload your M-Pesa statement to check it against your sales.")},
+            "freshness": {"latest_sale_at": freshness["latest_order_at"], "data_age_days": freshness["data_age_days"],
+                          "is_stale": freshness["is_stale"], "source": conn["source"], "source_state": conn["state"]}}
+
+
+def _costing_you_money(ctx: OwnerContext) -> dict:
+    overview = _overview()
+    base = ctx.order_state()
+    cards = overview._attention_cards(ctx.db, ctx.rid, ctx.tenant_id)
+    if base["state"] == "no_data" and not cards:
+        return no_data("Nothing to rank until sales are recorded.", cards=[])
+    top = cards[:5]
+    return {**(base if base["state"] != "no_data" else block("live", as_of=ctx.now)),
+            "cards": [{"id": c["id"], "domain": c["domain"], "sentence": c["title"], "kes_month": kes(c.get("impact_cents_month")),
+                       "action": c.get("what_to_do", ""), "why": c.get("why", ""), "assumption": None, "decision": None} for c in top],
+            "more": max(len(cards) - len(top), 0),
+            "ranking": "What is happening now first, then ideas by what they are worth in KES; an idea we cannot put a number on comes after those we can.",
+            "reason": None if top else "Nothing is costing you money that we can see right now."}
+
+
+def _health(ctx: OwnerContext, area_blocks: dict) -> dict:
+    tiles = [{"area": key, "title": area["title"], **area["summary"]} for key, area in area_blocks.items()]
+    known = any(t["number"] is not None for t in tiles)
+    return block("live" if known else "no_data", as_of=ctx.now, tiles=tiles,
+                 reason=None if known else "The tiles fill in as sales and costs are recorded.")
+
+
+def _coming_up(ctx: OwnerContext) -> dict:
+    overview = _overview()
+    deliveries = ctx.db.query(models.PurchaseOrder).filter(
+        models.PurchaseOrder.restaurant_id == ctx.rid, models.PurchaseOrder.status.in_(("PENDING", "SENT"))
+    ).order_by(models.PurchaseOrder.expected_at.asc()).limit(10).all()
+    start, end = overview._eat_range("today")
+    bookings = overview._bookings_card(ctx.db, ctx.rid, start, end)
+    return {
+        "bills": unavailable("No bills entered yet."),
+        "licences": unavailable("No licences entered yet."),
+        "deliveries": block("as_entered" if deliveries else "no_data", as_of=ctx.now, reason=None if deliveries else "No deliveries expected.",
+                            items=[{"item": d.inventory_item.item_name if d.inventory_item else "", "supplier": d.supplier.name if d.supplier else "",
+                                    "expected_at": iso(d.expected_at), "status": d.status} for d in deliveries]),
+        "bookings": block("live" if bookings["covers_today"] else "no_data", as_of=ctx.now, covers_today=bookings["covers_today"],
+                          reason=None if bookings["covers_today"] else "No bookings tonight."),
+    }
+
+
+def _read(ctx: OwnerContext) -> dict:
+    import feature_flags
+    if not feature_flags.is_enabled("ai_narration"):
+        return unavailable("LEVIII's read is switched off.", text=None)
+    return unavailable("LEVIII's read has not been written yet.", text=None)
+
+
+def compose_home(ctx: OwnerContext, period: str = "today") -> dict:
+    if period not in PERIODS:
+        raise ValueError(f"period must be one of {PERIODS}")
+    area_blocks = {key: areas.compose_area(ctx, key) for key in areas.AREAS}
+    return {
+        "restaurant": {"id": ctx.rid, "name": ctx.restaurant.name},
+        "period": period,
+        "timezone": "Africa/Nairobi",
+        "generated_at": iso(ctx.now),
+        "pulse": ctx.safe("home.pulse", lambda: _pulse(ctx, period)),
+        "costing_you_money": ctx.safe("home.costing_you_money", lambda: _costing_you_money(ctx)),
+        "health": _health(ctx, area_blocks),
+        "areas": area_blocks,
+        "coming_up": ctx.safe("home.coming_up", lambda: _coming_up(ctx)),
+        "read": _read(ctx),
+    }

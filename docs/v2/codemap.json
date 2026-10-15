@@ -213,8 +213,8 @@
    },
    {
     "module": "ai.creative",
-    "note": "creative layer = owner 'LEVIII's read' (Home zone 5)",
-    "status": "candidate"
+    "note": "resolved: 'LEVIII's read' = optional AI note (text only; every number must be backed)",
+    "status": "infrastructure"
    },
    {
     "module": "ai.data_quality",
@@ -243,18 +243,18 @@
    },
    {
     "module": "ai.enterprise",
-    "note": "multi-branch benchmarking (OS 'compare' form, P5)",
-    "status": "candidate"
+    "note": "multi-branch compare (OS 'compare' form, S5.1); registered with that form when it lands",
+    "status": "infrastructure"
    },
    {
     "module": "ai.enterprise.audit_center",
-    "note": "multi-branch benchmarking (OS 'compare' form, P5)",
-    "status": "candidate"
+    "note": "multi-branch compare (OS 'compare' form, S5.1); registered with that form when it lands",
+    "status": "infrastructure"
    },
    {
     "module": "ai.enterprise.benchmarking",
-    "note": "multi-branch benchmarking (OS 'compare' form, P5)",
-    "status": "candidate"
+    "note": "multi-branch compare (OS 'compare' form, S5.1); registered with that form when it lands",
+    "status": "infrastructure"
    },
    {
     "module": "ai.escalation",
@@ -293,23 +293,23 @@
    },
    {
     "module": "ai.graph",
-    "note": "knowledge-graph impact analysis (strategist tool)",
-    "status": "candidate"
+    "note": "knowledge-graph impact analysis, a strategist tool; shows no figure",
+    "status": "infrastructure"
    },
    {
     "module": "ai.graph.build",
-    "note": "knowledge-graph impact analysis (strategist tool)",
-    "status": "candidate"
+    "note": "knowledge-graph impact analysis, a strategist tool; shows no figure",
+    "status": "infrastructure"
    },
    {
     "module": "ai.graph.traverse",
-    "note": "knowledge-graph impact analysis (strategist tool)",
-    "status": "candidate"
+    "note": "knowledge-graph impact analysis, a strategist tool; shows no figure",
+    "status": "infrastructure"
    },
    {
     "module": "ai.home_specialists",
-    "note": "glue that turns engine output into Home cards",
-    "status": "candidate"
+    "note": "glue that turns engine output into Home cards; the engines it calls are registered",
+    "status": "infrastructure"
    },
    {
     "module": "ai.inventory_predictor",
@@ -358,8 +358,8 @@
    },
    {
     "module": "ai.ops_manager",
-    "note": "operations dashboard = owner 'restaurant health' (SPEC \u00a73.4)",
-    "status": "candidate"
+    "note": "resolved: 'restaurant health' = the Home health tiles' rule set, not a separate figure",
+    "status": "infrastructure"
    },
    {
     "module": "ai.orchestrator.executive",
@@ -378,8 +378,8 @@
    },
    {
     "module": "ai.order_stock",
-    "note": "order-time stock helper",
-    "status": "candidate"
+    "note": "order-time stock deduction helper; its figures are shown by inventory and custody",
+    "status": "infrastructure"
    },
    {
     "module": "ai.owner_narrative",
@@ -2317,12 +2317,187 @@
     "to": "feature_flags"
    },
    {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "ai.cash_reconciliation.intelligence"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "ai.data_quality"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "ai.fraud.detection"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "ai.inventory_predictor"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "ai.kds_intelligence"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "ai.labor.intelligence"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "ai.marketing"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "ai.menu_engineer"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "ai.pricing.recommendations"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "ai.profit.intelligence"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "ai.reorder"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "ai.revenue_forecaster"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "ai.roi.savings"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "ai.simulation.twin"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "ai.stock_custody"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "ai.supply_chain.intelligence"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "owner.settings"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
+    "to": "routers.overview"
+   },
+   {
+    "from": "owner.ask",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "owner.ask",
+    "lazy": true,
+    "to": "routers.ai_ask"
+   },
+   {
+    "from": "owner.home",
+    "lazy": true,
+    "to": "feature_flags"
+   },
+   {
+    "from": "owner.home",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.home",
+    "lazy": false,
+    "to": "owner.areas"
+   },
+   {
+    "from": "owner.home",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "owner.home",
+    "lazy": true,
+    "to": "routers.overview"
+   },
+   {
+    "from": "owner.registry",
+    "lazy": false,
+    "to": "owner.areas"
+   },
+   {
+    "from": "owner.reports",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "owner.reports",
+    "lazy": true,
+    "to": "routers.overview"
+   },
+   {
+    "from": "owner.reports",
+    "lazy": true,
+    "to": "routers.reports"
+   },
+   {
     "from": "owner.settings",
     "lazy": false,
     "to": "models"
    },
    {
     "from": "owner.settings",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "owner.states",
+    "lazy": false,
+    "to": "ai.analysis_clock"
+   },
+   {
+    "from": "owner.states",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.states",
+    "lazy": false,
+    "to": "owner.settings"
+   },
+   {
+    "from": "owner.states",
     "lazy": false,
     "to": "time_utils"
    },
@@ -3244,7 +3419,32 @@
    {
     "from": "routers.owner",
     "lazy": false,
+    "to": "owner.areas"
+   },
+   {
+    "from": "routers.owner",
+    "lazy": false,
+    "to": "owner.ask"
+   },
+   {
+    "from": "routers.owner",
+    "lazy": false,
+    "to": "owner.home"
+   },
+   {
+    "from": "routers.owner",
+    "lazy": false,
+    "to": "owner.reports"
+   },
+   {
+    "from": "routers.owner",
+    "lazy": false,
     "to": "owner.settings"
+   },
+   {
+    "from": "routers.owner",
+    "lazy": false,
+    "to": "owner.states"
    },
    {
     "from": "routers.owner",
@@ -4393,10 +4593,52 @@
    },
    {
     "group": "other",
+    "id": "owner.areas",
+    "kind": "py",
+    "loc": 546,
+    "path": "backend/owner/areas.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.ask",
+    "kind": "py",
+    "loc": 30,
+    "path": "backend/owner/ask.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.home",
+    "kind": "py",
+    "loc": 124,
+    "path": "backend/owner/home.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.registry",
+    "kind": "py",
+    "loc": 172,
+    "path": "backend/owner/registry.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.reports",
+    "kind": "py",
+    "loc": 83,
+    "path": "backend/owner/reports.py"
+   },
+   {
+    "group": "other",
     "id": "owner.settings",
     "kind": "py",
     "loc": 309,
     "path": "backend/owner/settings.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.states",
+    "kind": "py",
+    "loc": 149,
+    "path": "backend/owner/states.py"
    },
    {
     "group": "other",
@@ -4584,14 +4826,14 @@
     "group": "router",
     "id": "routers.overview",
     "kind": "py",
-    "loc": 536,
+    "loc": 538,
     "path": "backend/routers/overview.py"
    },
    {
     "group": "router",
     "id": "routers.owner",
     "kind": "py",
-    "loc": 74,
+    "loc": 117,
     "path": "backend/routers/owner.py"
    },
    {
@@ -5462,9 +5704,33 @@
    "verb": "GET"
   },
   {
+   "func": "area",
+   "module": "routers.owner",
+   "path": "/owner/area/{key}",
+   "verb": "GET"
+  },
+  {
+   "func": "ask",
+   "module": "routers.owner",
+   "path": "/owner/ask",
+   "verb": "POST"
+  },
+  {
+   "func": "home",
+   "module": "routers.owner",
+   "path": "/owner/home",
+   "verb": "GET"
+  },
+  {
    "func": "read_settings",
    "module": "routers.owner",
    "path": "/owner/settings",
+   "verb": "GET"
+  },
+  {
+   "func": "report",
+   "module": "routers.owner",
+   "path": "/owner/report/{period}",
    "verb": "GET"
   },
   {
@@ -5745,10 +6011,10 @@
   }
  ],
  "stats": {
-  "py_edges": 583,
-  "py_lazy_edges": 167,
-  "py_modules": 151,
-  "routes": 170,
+  "py_edges": 623,
+  "py_lazy_edges": 190,
+  "py_modules": 157,
+  "routes": 174,
   "ts_edges": 485,
   "ts_files": 231
  },

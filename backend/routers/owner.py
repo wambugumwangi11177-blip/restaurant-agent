@@ -11,13 +11,18 @@ Observer-mode deployments (read-only Macsoft) block this whole prefix, like /ove
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import ConfigDict, Field, StrictFloat, StrictInt, create_model
+from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, create_model
 from sqlalchemy.orm import Session
 
 import models
 from auth import require_staff_role
 from database import get_db
+from owner import areas as owner_areas
+from owner import ask as owner_ask
+from owner import home as owner_home
+from owner import reports as owner_reports
 from owner import settings as owner_settings
+from owner.states import OwnerContext
 from routers.deps import get_restaurant_or_none
 
 router = APIRouter(prefix="/owner", tags=["owner"])
@@ -71,3 +76,41 @@ def settings_history(limit: int = Query(50, ge=1, le=200), db: Session = Depends
                      user: models.User = Depends(_owner_only)):
     restaurant = _restaurant(db, user)
     return {"history": owner_settings.history(db, restaurant.id, limit)}
+
+
+def _context(db: Session, user: models.User) -> OwnerContext:
+    return OwnerContext(db, user, _restaurant(db, user))
+
+
+@router.get("/home")
+def home(period: str = Query("today", pattern="^(today|7d|30d)$"), db: Session = Depends(get_db),
+         user: models.User = Depends(_owner_only)):
+    """Home in one call: pulse, costing-you-money, health tiles, the six areas, coming up, LEVIII's read."""
+    return owner_home.compose_home(_context(db, user), period)
+
+
+@router.get("/area/{key}")
+def area(key: str, db: Session = Depends(get_db), user: models.User = Depends(_owner_only)):
+    """One area, the very block Home embeds (so Home and the deep link cannot disagree)."""
+    if key not in owner_areas.AREAS:
+        raise HTTPException(404, "Unknown area")
+    return owner_areas.compose_area(_context(db, user), key)
+
+
+@router.get("/report/{period}")
+def report(period: str, db: Session = Depends(get_db), user: models.User = Depends(_owner_only)):
+    """daily · weekly · monthly · yearly. Sections that are not built yet say so (`planned`)."""
+    if period not in owner_reports.PERIODS:
+        raise HTTPException(404, "Unknown report")
+    return owner_reports.compose_report(_context(db, user), period)
+
+
+class AskBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    question: str = Field(..., min_length=3, max_length=500)
+
+
+@router.post("/ask")
+def ask(body: AskBody, db: Session = Depends(get_db), user: models.User = Depends(_owner_only)):
+    """Ask LEVIII. Answers come from the deterministic handlers; the language model never computes a figure."""
+    return owner_ask.ask(_context(db, user), body.question.strip())

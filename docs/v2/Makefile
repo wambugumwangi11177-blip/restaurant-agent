@@ -2,7 +2,8 @@
 #
 #   test   E1 backend  — the whole existing suite (tests/evals is run by `evals`, not twice)
 #   fe     E1 frontend — tsc --noEmit, vitest, eslint ratchet, next build
-#   evals  E2–E5       — backend/tests/evals (strict-xfail entries are the not-yet-built sprints)
+#   evals  E2–E5       — backend/tests/evals (strict-xfail entries are the not-yet-built sprints);
+#                        also regenerates docs/v2/e5-coverage.md
 #   e6     E6          — Playwright owner tasks (skipped, loudly, until the spec file exists)
 #   map    regenerate docs/v2/codemap.json + coverage.md from the code (execution/codemap.py)
 #   gate   map + evals + test + fe + e6
@@ -35,7 +36,7 @@ evals:
 	@mkdir -p $(LOGDIR)
 	@echo "== E2-E5 evals: pytest tests/evals"
 	@if [ -d $(ROOT)/backend/tests/evals ]; then \
-	  cd $(ROOT)/backend && $(PY) -m pytest -q -p no:cacheprovider tests/evals -rxX 2>&1 | tee $(LOGDIR)/evals.log | tail -n 40; \
+	  cd $(ROOT)/backend && E5_WRITE_REPORT=1 $(PY) -m pytest -q -p no:cacheprovider tests/evals -rxX 2>&1 | tee $(LOGDIR)/evals.log | tail -n 40; \
 	else echo "no tests/evals yet"; fi
 
 fe:

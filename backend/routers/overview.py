@@ -213,6 +213,8 @@ def _decision_cards(db: Session, rid: int, source_status: dict | None = None) ->
             "why": (d.get("rationale") or "").strip(),
             "what_to_do": action,
             "impact": f"About KSh {impact_cents // 100:,} a month" if impact_cents else "",
+            # The same figure as a number (cents; None = not quantified) so the owner API can rank and show it in KES.
+            "impact_cents_month": impact_cents,
             "status": "open",
             # Surfaced so the UI can show WHY this is first, not just that it is.
             "priority_score": d.get("priority_score"),

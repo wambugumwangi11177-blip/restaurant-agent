@@ -14,6 +14,25 @@ Newest sprint first. Spec: [`SPEC.md`](SPEC.md). Gate: `make -C docs/v2 gate`.
 
 ## Sprint log (newest first)
 
+### S4.6 (part 1 of 2) The answers on the first screen, E6, the mobile pass — done
+
+**Plan.** Goal: an owner opens the app on a phone and sees, without scrolling, *did the cash balance*, *what is costing me most*, *when is the next bill* — and a browser test proves it at 390 px and 1440 px. Test first: `frontend/tests/e2e/owner-tasks.spec.ts` (Playwright, **E6**, 11 tests × 2 widths = 22 runs, one of them phone-only and skipped on the desk) and `tests/owner-answers.test.tsx` (6). Files: `components/owner/home/AnswersStrip`, `frontend/playwright.config.ts`, `frontend/tests/e2e/owner-tasks.spec.ts`, `execution/e6_backend.py`, `@playwright/test` **1.56.1** pinned exactly (the version that matches the Chromium already installed here; nothing is downloaded).
+
+**The strip.** Three one-line answers directly under the greeting, each a plain link to its detail: "Did the cash balance? — 2 counts to look at, of 27 checked" (or "Yes — all 27 counts match"; or the reason when no counts exist) · "What's costing me most? — Check where the Beef went: 2.5 kg more… — about KES 8,661 a month" (a fact happening now is asked as "Happening now") · "What's the next bill? — Rent — KES 70,000 in 3 days (18 Oct) — your sales will not cover it". On a brand-new restaurant each gives its honest empty answer. Before this, a phone's first screen was the pulse: three tall cards and no answer.
+
+**E6 as built.** `npx playwright test` starts its own stack: the real backend on a throwaway SQLite demo built by `execution/e6_backend.py` (the demo restaurant with every scenario planted, plus three brand-new restaurants; local file only, refuses anything else, never reads `.env` or `DATABASE_URL`) and the production build of the frontend. Per width: the three answers are on the first screen (the element's whole box inside the viewport) and carry their numbers; tapping an answer opens its panel; Home → an area → Ask LEVIII → Reports with **no console error and no 5xx**; no "—" standing alone in any of the six open panels; no sideways scroll; every button, link and fold on a phone is ≥ 40 px tall; the old `/vibanda/stock` and `/demo` addresses land on Home; a brand-new restaurant is asked for its targets, sees one panel, honest empty answers, and can save its targets. 21 passed and 1 skipped by design in 1.7 minutes, including starting both servers.
+
+**What E6 found that no unit test had (all fixed here).**
+1. **Tapping an answer did not open its panel.** A client-side `<Link href="#area-cash">` changes the URL with `pushState`, which never fires `hashchange` — the event the panels listen for. The strip now uses plain anchors (and a unit test pins that a `hashchange` opens a panel).
+2. **A freshly seeded Demo Restaurant was put on the guided first week** — its *tenant* is days old. "How new is this restaurant" is now the earlier of the day the tenant joined and its first recorded sale, so a restaurant that arrives with history is not new (a test pins it).
+3. **Two taps on login per test hit the production login limit (10 a minute).** The E6 backend turns the limiter off *for its own process only*; production is untouched.
+4. **Tap targets**: the "Change" chips (32 px), every "Why"/"What is in it" fold (17 px) and the notification bell (20 px, shared with the dashboard — its hit area is bigger, its look unchanged) were too small for a thumb.
+5. Chromium inside this sandbox waited on update and sync services it cannot reach, which made the first runs hang silently; the config passes the flags that stop it.
+
+**Mobile pass.** Home, Ask LEVIII and Reports at 390 px: no sideways scroll on any, all six panels open. Ask LEVIII and Reports are the old pages moved (P5 rebuilds them) and keep their old small targets until then.
+
+**Gate.** backend **1385 passed, 1 skipped** (1384 + 1; 793 s) · evals **61 passed / 5 xfailed** · vitest **185** (178 + 7: answers 6, hashchange 1) · tsc clean · lint ratchet OK (15E/4W) · `next build` OK · **E6 21 passed, 1 skipped** (first time it runs in the gate).
+
 ### S4.4 Coming up and LEVIII's read · S4.5 Settings chips, "Your targets", the guided first week — done
 
 **S4.4.** Zone 4 (bills with the shortfall in red, licences, deliveries, bookings) and Zone 5 were built with Home in S4.1; what this sprint adds is the proof that they hold up: `tests/owner-home-fresh.test.tsx` renders Home from a real payload of a brand-new restaurant (every block empty) — every zone says what is not there and why, none throws, none shows `NaN`/`undefined`, and every one of the six panels opens and draws no chart. **LEVIII's read stays hidden** until it has text: the owner API still says `unavailable` and Home shows nothing rather than a sentence whose numbers are not proven backed (the E3 grounding eval is P5; I have not connected the old creative layer to a screen that now promises "no number without its data state").

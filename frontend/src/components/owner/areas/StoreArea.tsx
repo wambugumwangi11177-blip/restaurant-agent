@@ -40,7 +40,7 @@ function Missing({ block }: { block: MissingBlock }) {
         )}
       {rest.length > 0 && (
         <details className="mt-3">
-          <summary className="cursor-pointer text-[11px] font-semibold text-[var(--v-muted-foreground)]">The other items</summary>
+          <summary className="flex min-h-10 cursor-pointer items-center text-[11px] font-semibold text-[var(--v-muted-foreground)]">The other items</summary>
           <div className="mt-2"><HBars label="Used against what sales explain" max={100} rows={rest.map((i) => ({ key: i.item, label: i.item, value: Math.min(i.off_by_pct, 100), valueLabel: `${i.off_by_pct}% off`, note: `used ${num(i.used)} ${i.unit} · expected ${num(i.expected)} ${i.unit}` }))} /></div>
         </details>
       )}

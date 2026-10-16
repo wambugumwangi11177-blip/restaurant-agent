@@ -83,7 +83,7 @@ function Card({ card, onDone }: { card: DecisionCard; onDone: () => void }) {
       {card.action && card.action !== card.sentence && <p className="mt-2 text-xs leading-relaxed">{card.action}</p>}
       {card.why && (
         <details className="mt-2">
-          <summary className="cursor-pointer text-[11px] font-semibold text-[var(--v-muted-foreground)]">Why</summary>
+          <summary className="flex min-h-10 cursor-pointer items-center text-[11px] font-semibold text-[var(--v-muted-foreground)]">Why</summary>
           <p className="mt-1 text-xs leading-relaxed text-[var(--v-muted-foreground)]">{card.why}</p>
         </details>
       )}

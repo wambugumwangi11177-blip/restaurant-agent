@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import HomePage from "../src/app/(owner)/home/page";
 import api from "@/lib/api";
 import fixture from "./fixtures/owner/home.json";
@@ -201,4 +201,13 @@ it("once Vibanda's delivery is reconciled its figures appear; other restaurants 
   serve(untrusted);
   render(<HomePage />);
   expect((await screen.findByTestId("sales-today")).textContent).toBe("KES 22,290");
+});
+
+it("a link to a panel on this page opens it without a reload (the browser's hashchange)", async () => {
+  render(<HomePage />);
+  await screen.findByTestId("sales-today");
+  const cash = screen.getByRole("button", { name: /Cash Check/ });
+  expect(cash.getAttribute("aria-expanded")).toBe("false");
+  await act(async () => { window.location.hash = "#area-cash"; await new Promise((r) => setTimeout(r, 30)); });
+  await waitFor(() => expect(cash.getAttribute("aria-expanded")).toBe("true"));
 });

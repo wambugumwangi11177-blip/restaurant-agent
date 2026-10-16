@@ -49,3 +49,7 @@ backend/.storage/
 
 .vercel
 backend/local_dev.db
+
+# Playwright (E6)
+frontend/test-results/
+frontend/playwright-report/

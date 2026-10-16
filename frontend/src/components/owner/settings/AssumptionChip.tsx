@@ -12,7 +12,7 @@ export default function AssumptionChip({ assumption, className = "" }: { assumpt
   return (
     <span className={`inline-flex flex-wrap items-center gap-x-1.5 text-[10px] text-[var(--v-muted-foreground)] ${className}`} data-testid="based-on">
       <span>Based on: {label} <b className="text-[var(--v-foreground)]">{value}</b></span>
-      {field && <button type="button" aria-label={`Change ${label}`} onClick={() => openSetting(assumption.setting)} className="min-h-8 px-1 font-bold text-[var(--v-primary)] underline-offset-2 hover:underline">· Change</button>}
+      {field && <button type="button" aria-label={`Change ${label}`} onClick={() => openSetting(assumption.setting)} className="min-h-10 px-2 font-bold text-[var(--v-primary)] underline-offset-2 hover:underline">· Change</button>}
     </span>
   );
 }

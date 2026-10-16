@@ -5049,7 +5049,7 @@
     "group": "other",
     "id": "owner.home",
     "kind": "py",
-    "loc": 191,
+    "loc": 196,
     "path": "backend/owner/home.py"
    },
    {
@@ -6654,8 +6654,8 @@
   "py_lazy_edges": 212,
   "py_modules": 175,
   "routes": 192,
-  "ts_edges": 627,
-  "ts_files": 277
+  "ts_edges": 630,
+  "ts_files": 278
  },
  "status_only": [
   [
@@ -6867,6 +6867,10 @@
    {
     "from": "app/(owner)/home/page.tsx",
     "to": "components/owner/Section.tsx"
+   },
+   {
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/AnswersStrip.tsx"
    },
    {
     "from": "app/(owner)/home/page.tsx",
@@ -9074,6 +9078,14 @@
    },
    {
     "from": "components/owner/areas/ui.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/AnswersStrip.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/home/AnswersStrip.tsx",
     "to": "lib/owner/types.ts"
    },
    {

@@ -13,7 +13,7 @@ import pytest
 import auth
 import models
 from tests.fixtures import golden_restaurant as gr
-from time_utils import utcnow
+from time_utils import eat_date, utcnow
 
 API = "/api/v1/owner"
 
@@ -166,3 +166,11 @@ def test_the_age_is_nairobi_days_since_the_tenant_was_created(client, db_session
     tenant.created_at = utcnow() - timedelta(days=10, hours=1)
     db_session.commit()
     assert client.get(f"{API}/home", headers=_h(g.owner)).json()["setup"]["age_days"] == 10
+
+
+def test_a_restaurant_that_arrives_with_a_history_is_not_new(client, db_session):
+    g = gr.build_skeleton(db_session)
+    gr.seed_pnl_week(db_session, g)                                                       # sales from the days before today; the tenant was created just now
+    age = client.get(f"{API}/home", headers=_h(g.owner)).json()["setup"]["age_days"]
+    first = db_session.query(models.Order.created_at).filter_by(restaurant_id=g.rid).order_by(models.Order.created_at).first()[0]
+    assert age == (eat_date(utcnow()) - eat_date(first)).days >= 5                         # old enough that the guided first week never starts

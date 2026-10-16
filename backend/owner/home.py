@@ -162,11 +162,16 @@ def _read(ctx: OwnerContext) -> dict:
 
 
 def _setup(ctx: OwnerContext) -> dict:
-    """What the first-run screens need: has the owner chosen their targets, and how many Nairobi days old is the restaurant (the day
-    its tenant was created is day 0). The guided first week and the "Your targets" step are driven by these two facts."""
+    """What the first-run screens need: has the owner chosen their targets, and how old is the restaurant — in Nairobi days since the
+    earlier of the day its tenant joined and its first recorded sale (a restaurant that arrives with a history is not new). The
+    guided first week and the "Your targets" step are driven by these two facts."""
+    from sqlalchemy import func
+
     from time_utils import eat_date
-    created = ctx.db.query(models.Tenant.created_at).filter(models.Tenant.id == ctx.tenant_id).scalar()
-    age = max((eat_date(ctx.now) - eat_date(created)).days, 0) if created else 0
+    joined = ctx.db.query(models.Tenant.created_at).filter(models.Tenant.id == ctx.tenant_id).scalar()
+    first_sale = ctx.db.query(func.min(models.Order.created_at)).filter(models.Order.restaurant_id == ctx.rid).scalar()
+    began = min((d for d in (joined, first_sale) if d is not None), default=None)
+    age = max((eat_date(ctx.now) - eat_date(began)).days, 0) if began else 0
     return {"targets_chosen": ctx.db.query(models.RestaurantSettings.id).filter(models.RestaurantSettings.restaurant_id == ctx.rid).first() is not None,
             "age_days": age}
 

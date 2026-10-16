@@ -67,7 +67,7 @@ function Pnl({ block }: { block: PnlBlock }) {
       )}
       {block.sections?.length > 0 && (
         <details className="mt-4">
-          <summary className="cursor-pointer text-[11px] font-bold">Where the other costs went</summary>
+          <summary className="flex min-h-10 cursor-pointer items-center text-[11px] font-bold">Where the other costs went</summary>
           <ul className="mt-2 space-y-2">
             {block.sections.map((s) => (
               <li key={s.key} className="text-xs">
@@ -144,7 +144,7 @@ function Clock({ block }: { block: BreakEvenBlock }) {
       <BreakEvenClock label="Costs covered" breakEven={block.break_even_kes} soldSoFar={block.sales_today_kes} coveredAt={block.crossed_at} />
       <p className="mt-3 text-xs">Your fixed costs come to <b>{kes(block.fixed_per_day_kes)} a day</b>. Built from {block.built_from.label}.</p>
       <details className="mt-1">
-        <summary className="cursor-pointer text-[11px] font-semibold text-[var(--v-muted-foreground)]">What is in it</summary>
+        <summary className="flex min-h-10 cursor-pointer items-center text-[11px] font-semibold text-[var(--v-muted-foreground)]">What is in it</summary>
         <ul className="mt-1 space-y-0.5 text-[11px] text-[var(--v-muted-foreground)]">{block.built_from.lines.map((l) => <li key={l.name} className="flex justify-between"><span>{l.name}</span><span className="tabular-nums">{kes(l.kes)}</span></li>)}</ul>
       </details>
       <Note>{block.note}</Note>

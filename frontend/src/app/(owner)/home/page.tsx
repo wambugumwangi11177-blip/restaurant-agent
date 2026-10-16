@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { OsError, OsLoading } from "@/components/os/States";
 import AreaPanels from "@/components/owner/home/AreaPanels";
+import AnswersStrip from "@/components/owner/home/AnswersStrip";
 import ComingUp from "@/components/owner/home/ComingUp";
 import CostingYouMoney from "@/components/owner/home/CostingYouMoney";
 import { FirstWeekBanner, lockedAreas, useFirstWeek } from "@/components/owner/home/FirstWeek";
@@ -56,6 +57,7 @@ export default function HomePage() {
       {home && !waiting && (
         <>
           {error && <p role="alert" className="text-xs text-[var(--v-warn)]">Couldn&apos;t refresh just now — showing what we had.</p>}
+          <AnswersStrip home={home} />
           <TargetsOnboarding restaurantId={home.restaurant.id} chosen={home.setup?.targets_chosen ?? true} />
           {firstWeek.active && <FirstWeekBanner ageDays={ageDays} onSkip={firstWeek.skip} />}
           <Pulse pulse={home.pulse} period={period} />

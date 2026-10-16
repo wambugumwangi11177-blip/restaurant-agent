@@ -2,33 +2,36 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import OsPage from "../src/app/(owner)/os/page";
 import api from "@/lib/api";
+import money from "./fixtures/owner/ask_what.json";
+import compare from "./fixtures/owner/ask_compare_branches.json";
+import type { OwnerAnswer } from "@/lib/owner/ask";
 
-const navigationState = vi.hoisted(() => ({ query: "" }));
+const navigationState = vi.hoisted(() => ({ query: "", tenant: "Demo Restaurant" }));
 vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn() } }));
-vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { restaurant_name: "Vibanda Village" } }) }));
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { restaurant_name: "Mama Oliech", tenant_name: navigationState.tenant } }) }));
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(navigationState.query) }));
 
-const reply = {
-  module: "stock", grounded: { finding: "I can’t verify stock levels yet.", why: "No source records.", recommendation: "Connect stock records.", data: { available: false } },
-  llm_reply: null, answer_text: "I can’t verify stock levels yet. Connect inventory quantities and stock movements.",
-  answer_type: "restaurant_analysis", data_availability: "needs_connected_data",
-  follow_up_prompts: ["What information needs to connect for this answer?"], conversation_id: 42,
+const answer = (over: Partial<OwnerAnswer> = {}): OwnerAnswer => ({ ...(money as unknown as OwnerAnswer), conversation_id: 42, ...over });
+const chatReply = {
+  module: "ops", grounded: { finding: "x" }, llm_reply: null, answer_text: "Here is how the software can help.", answer_type: "capability_explanation",
+  follow_up_prompts: ["Which part of the software would you like explained?"], conversation_id: 42,
 };
+const asks = () => vi.mocked(api.post).mock.calls.filter(([url]) => url.endsWith("/owner/ask"));
+const chats = () => vi.mocked(api.post).mock.calls.filter(([url]) => url.endsWith("/ai/chat"));
 
 beforeEach(() => {
   vi.clearAllMocks();
   navigationState.query = "";
+  navigationState.tenant = "Demo Restaurant";
   vi.mocked(api.get).mockImplementation(async (url: string) => {
-    if (url.endsWith("/ai/os/preferences")) return { data: { default_area: null } } as never;
     if (url.endsWith("/ai/os/conversations")) return { data: { conversations: [] } } as never;
-    return { data: { data_provenance: { source_connection: { state: "awaiting_first_delivery", records: 0, reconciled: false } } } } as never;
+    return { data: { data_provenance: { source_connection: { state: "receiving", reconciled: true } } } } as never;
   });
-  vi.mocked(api.post).mockImplementation(async (url: string, payload?: unknown) => {
+  vi.mocked(api.post).mockImplementation(async (url: string) => {
     if (url.endsWith("/ai/os/conversations")) return { data: { id: 42 } } as never;
-    if ((payload as { topic?: string } | undefined)?.topic === "suppliers") return { data: { ...reply, answer_type: "planned_feature", data_availability: "planned_feature", answer_text: "The Suppliers page is planned and is not available yet." } } as never;
-    return { data: reply } as never;
+    if (url.endsWith("/ai/chat")) return { data: chatReply } as never;
+    return { data: answer() } as never;
   });
-  vi.mocked(api.put).mockResolvedValue({ data: { default_area: "money" } } as never);
   Object.defineProperty(globalThis.crypto, "randomUUID", { configurable: true, value: vi.fn(() => "message-uuid-1234") });
   Element.prototype.scrollIntoView = vi.fn();
 });
@@ -39,32 +42,117 @@ function submit(question: string) {
   fireEvent.click(screen.getByRole("button", { name: "Send question" }));
 }
 
-describe("owner OS without restaurant data", () => {
-  it("lets linked questions use the same intent routing as typed questions", async () => {
+describe("Ask LEVIII in five forms", () => {
+  it("opens with the five forms to try and no label that says a feature is not live", async () => {
+    render(<OsPage />);
+    expect(screen.getByRole("heading", { name: /what would you like to work on/i })).toBeTruthy();
+    for (const form of ["What", "Why", "What if", "What should I do", "Compare"]) expect(screen.getAllByText(form, { exact: true }).length).toBeGreaterThan(0);
+    const body = document.body.textContent ?? "";
+    for (const bad of ["Planned feature", "Needs connected data", "planned and is not available", "Vibanda"]) expect(body).not.toContain(bad);
+    expect(screen.getByText("Show me how this software can help my restaurant.")).toBeTruthy();
+  });
+
+  it("a question about the owner's figures goes to the five forms and its answer is drawn as a card", async () => {
+    render(<OsPage />);
+    submit("Am I making a profit this month?");
+    expect(await screen.findByText(money.headline)).toBeTruthy();
+    expect(asks()).toHaveLength(1);
+    expect(asks()[0][1]).toEqual({ question: "Am I making a profit this month?", conversation_id: 42, client_message_id: "message-uuid-1234" });   // no form: the words choose it
+    expect(chats()).toHaveLength(0);
+  });
+
+  it("the form the owner picks is the form that is asked for", async () => {
+    render(<OsPage />);
+    fireEvent.click(screen.getByRole("radio", { name: "Why" }));
+    expect(screen.getByRole("radio", { name: "Why" }).getAttribute("aria-checked")).toBe("true");
+    submit("sales on Tuesday");
+    await screen.findByText(money.headline);
+    expect(asks()[0][1]).toMatchObject({ question: "sales on Tuesday", form: "why" });
+  });
+
+  it("a tried question is asked in the form of its group", async () => {
+    render(<OsPage />);
+    const group = screen.getByText("What if", { selector: "span.block" }).closest("details")!;
+    fireEvent.click(group.querySelector("summary")!);
+    fireEvent.click(within(group).getByRole("button", { name: "What if I cut Burger by 10%?" }));
+    await screen.findByText(money.headline);
+    expect(asks()[0][1]).toMatchObject({ question: "What if I cut Burger by 10%?", form: "what_if" });
+  });
+
+  it("a request for help or an explanation goes to the writing assistant, not the five forms", async () => {
+    render(<OsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /Show me how this software can help/ }));
+    expect(await screen.findByText(chatReply.answer_text)).toBeTruthy();
+    expect(chats()[0][1]).toMatchObject({ question: "Show me how this software can help my restaurant.", answer_mode: "capabilities", conversation_id: 42 });
+    expect(asks()).toHaveLength(0);
+    cleanup();
+    render(<OsPage />);
+    submit("Can you help with a creative idea?");
+    await screen.findByText(chatReply.answer_text);
+    expect(chats().at(-1)?.[1]).toMatchObject({ answer_mode: "auto" });
+  });
+
+  it("lets a linked question use the same routing as a typed one", async () => {
+    navigationState.query = "q=Who%20should%20I%20win%20back%3F";
+    render(<OsPage />);
+    await screen.findByText(money.headline);
+    expect(asks()[0][1]).toMatchObject({ question: "Who should I win back?" });
+    cleanup();
     navigationState.query = "q=Can%20you%20help%20with%20a%20creative%20idea%3F";
     render(<OsPage />);
-    await screen.findByText(reply.answer_text);
-    const chatCall = vi.mocked(api.post).mock.calls.find(([url]) => url.endsWith("/ai/chat"));
-    expect(chatCall?.[1]).toMatchObject({
-      question: "Can you help with a creative idea?", answer_mode: "auto",
-    });
+    await screen.findByText(chatReply.answer_text);
+    expect(chats().at(-1)?.[1]).toMatchObject({ question: "Can you help with a creative idea?", answer_mode: "auto" });
+  });
+
+  it("follow-up questions on an answer are asked in the same conversation", async () => {
+    vi.mocked(api.post).mockImplementation(async (url: string) =>
+      (url.endsWith("/ai/os/conversations") ? { data: { id: 42 } } : { data: answer({ next: ["Compare my branches"] }) }) as never);
+    render(<OsPage />);
+    submit("Am I making a profit this month?");
+    fireEvent.click(await screen.findByRole("button", { name: "Compare my branches" }));
+    await waitFor(() => expect(asks()).toHaveLength(2));
+    expect(asks()[1][1]).toMatchObject({ question: "Compare my branches", conversation_id: 42 });
+    expect(vi.mocked(api.post).mock.calls.filter(([url]) => url.endsWith("/ai/os/conversations"))).toHaveLength(1);
+  });
+
+  it("removes anything that looks like a credential before it is sent", async () => {
+    render(<OsPage />);
+    submit("Am I making a profit? password=should-not-leak");
+    await screen.findByText(money.headline);
+    expect(asks()[0][1]).toMatchObject({ question: "Am I making a profit? password: [removed]" });
+    expect(JSON.stringify(asks()[0][1])).not.toContain("should-not-leak");
+  });
+
+  it("keeps the draft and retries the same turn without duplicating it", async () => {
+    const post = vi.mocked(api.post);
+    post.mockImplementationOnce(async () => ({ data: { id: 42 } } as never));
+    post.mockRejectedValueOnce(new Error("temporary network error"));
+    post.mockResolvedValueOnce({ data: answer() } as never);
+    render(<OsPage />);
+    submit("Am I making a profit this month?");
+    await screen.findByRole("button", { name: "Retry answer" });
+    expect((screen.getByLabelText("Ask or describe a change") as HTMLTextAreaElement).value).toBe("Am I making a profit this month?");
+    fireEvent.click(screen.getByRole("button", { name: "Retry answer" }));
+    await screen.findByText(money.headline);
+    expect(within(screen.getByRole("region", { name: "Conversation messages" })).getAllByText("Am I making a profit this month?")).toHaveLength(1);
+    expect(asks()).toHaveLength(2);
+    expect(asks()[1][1]).toEqual(asks()[0][1]);                                              // same client_message_id: the server will not work it out twice
   });
 
   it("preserves reading position when the owner scrolls while an answer is pending", async () => {
-    let finishReply!: (value: { data: typeof reply }) => void;
-    const pendingReply = new Promise<{ data: typeof reply }>((resolve) => { finishReply = resolve; });
+    let finish!: (value: { data: OwnerAnswer }) => void;
+    const pending = new Promise<{ data: OwnerAnswer }>((resolve) => { finish = resolve; });
     vi.mocked(api.post).mockResolvedValueOnce({ data: { id: 42 } } as never);
-    vi.mocked(api.post).mockImplementationOnce(() => pendingReply as never);
+    vi.mocked(api.post).mockImplementationOnce(() => pending as never);
     render(<OsPage />);
-    submit("Which ingredients are running low?");
+    submit("Am I making a profit this month?");
     const viewport = await screen.findByRole("region", { name: "Conversation messages" });
     Object.defineProperties(viewport, {
-      scrollHeight: { configurable: true, value: 1200 },
-      clientHeight: { configurable: true, value: 400 },
+      scrollHeight: { configurable: true, value: 1200 }, clientHeight: { configurable: true, value: 400 },
       scrollTop: { configurable: true, writable: true, value: 200 },
     });
     fireEvent.scroll(viewport);
-    await act(async () => { finishReply({ data: reply }); });
+    await act(async () => { finish({ data: answer() }); });
     expect(await screen.findByRole("button", { name: /New response/ })).toBeTruthy();
     expect(viewport.scrollTop).toBe(200);
     viewport.scrollTop = 800;
@@ -72,125 +160,53 @@ describe("owner OS without restaurant data", () => {
     expect(screen.queryByRole("button", { name: /New response/ })).toBeNull();
   });
 
-  it("opens with the starting questions and all four shared Home areas", async () => {
-    render(<OsPage />);
-    expect(screen.getByRole("heading", { name: /what would you like to work on/i })).toBeTruthy();
-    expect(screen.getByText("Show me how this software can help my restaurant.")).toBeTruthy();
-    expect(screen.getByText("Restaurant health")).toBeTruthy();
-    expect(screen.getByText("Money and control")).toBeTruthy();
-    expect(screen.getByText("Sales and risk")).toBeTruthy();
-    expect(screen.getByText("Governance and setup")).toBeTruthy();
-    expect(await screen.findByText(/Restaurant data isn’t connected yet/)).toBeTruthy();
-  });
-
-  it("searches planned questions and tells the owner their feature is not live", async () => {
-    render(<OsPage />);
-    fireEvent.change(screen.getByLabelText("Search all OS questions"), { target: { value: "Which supplier is most reliable?" } });
-    const question = await screen.findByRole("button", { name: /Which supplier is most reliable.*Needs connected data.*Planned feature/i });
-    fireEvent.click(question);
-    await screen.findByText(/supplier.*planned and is not available yet/i);
-    const chatCall = vi.mocked(api.post).mock.calls.find(([url]) => url.endsWith("/ai/chat"));
-    expect(chatCall?.[1]).toMatchObject({ answer_mode: "analysis", topic: "suppliers", conversation_id: 42 });
-  });
-
-  it("submits a typed analytical question through auto routing and explains missing data", async () => {
-    render(<OsPage />);
-    submit("Which ingredients are running low? password=should-not-leak");
-    await screen.findByText(reply.answer_text);
-    expect(screen.getByText("Data needed before analysis")).toBeTruthy();
-    expect(screen.getByText(/needs connected restaurant records/i)).toBeTruthy();
-    const chatCall = vi.mocked(api.post).mock.calls.find(([url]) => url.endsWith("/ai/chat"));
-    expect(chatCall?.[1]).toMatchObject({ question: "Which ingredients are running low? password: [removed]", answer_mode: "auto", conversation_id: 42, client_message_id: "message-uuid-1234" });
-    expect(JSON.stringify(chatCall?.[1])).not.toContain("should-not-leak");
-    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
-  });
-
-  it("keeps the draft and retries the same turn without duplicating it", async () => {
-    const chatReply = vi.mocked(api.post);
-    chatReply.mockImplementationOnce(async () => ({ data: { id: 42 } } as never));
-    chatReply.mockRejectedValueOnce(new Error("temporary network error"));
-    chatReply.mockResolvedValueOnce({ data: reply } as never);
-    render(<OsPage />);
-    submit("Which ingredients are running low?");
-    await screen.findByRole("button", { name: "Retry answer" });
-    expect((screen.getByLabelText("Ask or describe a change") as HTMLTextAreaElement).value).toBe("Which ingredients are running low?");
-    fireEvent.click(screen.getByRole("button", { name: "Retry answer" }));
-    await screen.findByText(reply.answer_text);
-    expect(screen.getAllByText("Which ingredients are running low?")).toHaveLength(1);
-    const calls = chatReply.mock.calls.filter(([url]) => url.endsWith("/ai/chat"));
-    expect(calls).toHaveLength(2);
-    expect(calls[0][1]).toMatchObject({ client_message_id: "message-uuid-1234", conversation_id: 42, answer_mode: "auto" });
-    expect(calls[1][1]).toEqual(calls[0][1]);
-  });
-
-  it("retains the current conversation for follow-ups", async () => {
-    render(<OsPage />);
-    submit("Which ingredients are running low?");
-    await screen.findByText(reply.answer_text);
-    submit("What information should I connect?");
-    await waitFor(() => expect(vi.mocked(api.post).mock.calls.filter(([url]) => url.endsWith("/ai/chat"))).toHaveLength(2));
-    const calls = vi.mocked(api.post).mock.calls.filter(([url]) => url.endsWith("/ai/chat"));
-    expect(calls[0][1]).toMatchObject({ conversation_id: 42 });
-    expect(calls[1][1]).toMatchObject({ conversation_id: 42, question: "What information should I connect?" });
-  });
-
-  it("loads a saved conversation from the previous conversations list", async () => {
-    const savedAnswer = { ...reply, answer_text: "The stored answer is general guidance." };
+  it("loads a saved conversation, drawing our answers as cards and older chat replies as text", async () => {
     vi.mocked(api.get).mockImplementation(async (url: string) => {
-      if (url.endsWith("/ai/os/preferences")) return { data: { default_area: null } } as never;
-      if (url.endsWith("/ai/os/conversations")) return { data: { conversations: [{ id: 7, title: "Saved stock question", updated_at: "2026-09-25T10:00:00Z" }] } } as never;
+      if (url.endsWith("/ai/os/conversations")) return { data: { conversations: [{ id: 7, title: "Saved branch comparison", updated_at: "2026-09-25T10:00:00Z" }] } } as never;
       if (url.endsWith("/ai/os/conversations/7")) return { data: { id: 7, messages: [
-        { id: 1, role: "user", content: "Saved stock question" },
-        { id: 2, role: "assistant", content: JSON.stringify(savedAnswer) },
+        { id: 1, role: "user", content: "Compare my branches" }, { id: 2, role: "assistant", content: JSON.stringify(compare) },
+        { id: 3, role: "user", content: "Help me reduce waste" }, { id: 4, role: "assistant", content: JSON.stringify({ ...chatReply, answer_text: "An older chat reply.", answer_type: "general_guidance" }) },
       ] } } as never;
-      return { data: { data_provenance: { source_connection: { state: "awaiting_first_delivery", reconciled: false } } } } as never;
+      return { data: {} } as never;
     });
     render(<OsPage />);
     fireEvent.click(screen.getByRole("button", { name: "Previous conversations" }));
-    fireEvent.click(await screen.findByRole("button", { name: /Saved stock question/ }));
-    expect(await screen.findByText("Saved stock question")).toBeTruthy();
-    expect(await screen.findByText("The stored answer is general guidance.")).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: /Saved branch comparison/ }));
+    await screen.findByText(/Kasarani spends 37% of every sale/);
+    expect(screen.getByText("An older chat reply.")).toBeTruthy();
   });
 
-  it("previews and saves the OS default area only after Apply", async () => {
+  it("a restaurant that records its own sales has no data-source banner; a mirrored one says what it is waiting for", async () => {
     render(<OsPage />);
-    const moneyDetails = screen.getByText("Money and control").closest("details")!;
-    fireEvent.click(moneyDetails.querySelector("summary")!);
-    fireEvent.click((await within(moneyDetails).findAllByRole("button", { name: "Make my default" }))[0]);
-    expect(screen.getByRole("dialog", { name: "Preview default OS area" })).toBeTruthy();
-    expect(screen.getByText("After: Money and control")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Apply preference" }));
-    await screen.findByText("Your default area is saved.");
-    expect(api.put).toHaveBeenCalledWith("/api/v1/ai/os/preferences", { default_area: "money" });
+    expect(screen.queryByText(/Restaurant data/)).toBeNull();
+    expect(vi.mocked(api.get).mock.calls.some(([url]) => url.includes("/overview/today"))).toBe(false);
+    cleanup();
+    navigationState.tenant = "Vibanda Village";
+    vi.mocked(api.get).mockImplementation(async (url: string) => (url.endsWith("/ai/os/conversations")
+      ? { data: { conversations: [] } } : { data: { data_provenance: { source_connection: { state: "awaiting_first_delivery", reconciled: false } } } }) as never);
+    render(<OsPage />);
+    expect(await screen.findByText(/Restaurant data isn’t connected yet/)).toBeTruthy();
   });
 
   it("labels a creative answer as AI-written and names the modules it drew on", async () => {
-    const creative = { ...reply, answer_type: "restaurant_analysis", data_availability: "available", llm_used: true,
-      creative: true, consulted_modules: ["revenue", "menu", "staff"], llm_reply: "A warm, connected answer.",
-      answer_text: "A warm, connected answer." };
-    vi.mocked(api.post).mockImplementation(async (url: string) =>
-      (url.endsWith("/ai/os/conversations") ? { data: { id: 42 } } : { data: creative }) as never);
+    const creative = { ...chatReply, answer_type: "restaurant_analysis", llm_used: true, creative: true, consulted_modules: ["revenue", "menu", "staff"], llm_reply: "A warm, connected answer.", answer_text: "A warm, connected answer." };
+    vi.mocked(api.post).mockImplementation(async (url: string) => (url.endsWith("/ai/os/conversations") ? { data: { id: 42 } } : { data: creative }) as never);
     render(<OsPage />);
-    submit("How are my sales today and which dishes sell best?");
+    submit("Help me think about sales and dishes");
     await screen.findByText("A warm, connected answer.");
-    expect(screen.getByText("Creative · AI-written · Verified restaurant analysis")).toBeTruthy();
-    const drewOn = screen.getByText("Drew on:").closest("p")!;
-    expect(drewOn.textContent).toBe("Drew on:SalesMenuTeam");
+    expect(screen.getByText("Creative · AI-written · Restaurant analysis")).toBeTruthy();
+    expect(screen.getByText("Drew on:").closest("p")!.textContent).toBe("Drew on:SalesMenuTeam");
   });
 
   it("says only AI-written when the layer is off, and adds no AI label when no model answered", async () => {
-    const plain = { ...reply, answer_type: "general_guidance", llm_used: true, llm_reply: "Plain guidance.", answer_text: "Plain guidance." };
-    vi.mocked(api.post).mockImplementation(async (url: string) =>
-      (url.endsWith("/ai/os/conversations") ? { data: { id: 42 } } : { data: plain }) as never);
+    const plain = { ...chatReply, answer_type: "general_guidance", llm_used: true, llm_reply: "Plain guidance.", answer_text: "Plain guidance." };
+    vi.mocked(api.post).mockImplementation(async (url: string) => (url.endsWith("/ai/os/conversations") ? { data: { id: 42 } } : { data: plain }) as never);
     const first = render(<OsPage />);
     submit("Help me reduce food waste.");
     await screen.findByText("Plain guidance.");
     expect(screen.getByText("AI-written · General guidance from your description")).toBeTruthy();
-    expect(screen.queryByText("Drew on:")).toBeNull();
     first.unmount();
-
-    vi.mocked(api.post).mockImplementation(async (url: string) =>
-      (url.endsWith("/ai/os/conversations") ? { data: { id: 42 } } : { data: { ...plain, llm_used: false, llm_reply: null, answer_text: "Deterministic fallback text." } }) as never);
+    vi.mocked(api.post).mockImplementation(async (url: string) => (url.endsWith("/ai/os/conversations") ? { data: { id: 42 } } : { data: { ...plain, llm_used: false, llm_reply: null, answer_text: "Deterministic fallback text." } }) as never);
     render(<OsPage />);
     submit("Help me reduce food waste.");
     await screen.findByText("Deterministic fallback text.");

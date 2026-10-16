@@ -572,7 +572,7 @@
   "data_quality": {
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
+   "os": "wired",
    "reports": "not_shown"
   },
   "decisions": {
@@ -620,7 +620,7 @@
   "money": {
    "home": "wired",
    "old_dash": "not_shown",
-   "os": "not_shown",
+   "os": "wired",
    "reports": "not_shown"
   },
   "mpesa_match": {
@@ -662,7 +662,7 @@
   "roi": {
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
+   "os": "wired",
    "reports": "not_shown"
   },
   "sales_summary": {
@@ -674,7 +674,7 @@
   "simulator": {
    "home": "not_shown",
    "old_dash": "wired",
-   "os": "not_shown",
+   "os": "wired",
    "reports": "not_shown"
   },
   "strategist": {
@@ -692,7 +692,7 @@
   "twin": {
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
+   "os": "wired",
    "reports": "not_shown"
   }
  },
@@ -2354,6 +2354,131 @@
     "to": "feature_flags"
    },
    {
+    "from": "owner.answer_compare",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.answer_compare",
+    "lazy": false,
+    "to": "owner.answers"
+   },
+   {
+    "from": "owner.answer_compare",
+    "lazy": false,
+    "to": "owner.areas"
+   },
+   {
+    "from": "owner.answer_compare",
+    "lazy": false,
+    "to": "owner.money.pnl"
+   },
+   {
+    "from": "owner.answer_compare",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "owner.answer_compare",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "owner.answer_compare",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "owner.answer_todo",
+    "lazy": false,
+    "to": "owner.answers"
+   },
+   {
+    "from": "owner.answer_todo",
+    "lazy": false,
+    "to": "owner.home"
+   },
+   {
+    "from": "owner.answer_todo",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "owner.answer_what",
+    "lazy": false,
+    "to": "owner.answers"
+   },
+   {
+    "from": "owner.answer_what",
+    "lazy": false,
+    "to": "owner.areas"
+   },
+   {
+    "from": "owner.answer_what",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "owner.answer_what",
+    "lazy": true,
+    "to": "routers.ai_ask"
+   },
+   {
+    "from": "owner.answer_whatif",
+    "lazy": false,
+    "to": "ai.simulation.engine"
+   },
+   {
+    "from": "owner.answer_whatif",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.answer_whatif",
+    "lazy": false,
+    "to": "owner.answers"
+   },
+   {
+    "from": "owner.answer_whatif",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "owner.answer_why",
+    "lazy": true,
+    "to": "ai.simulation.signals"
+   },
+   {
+    "from": "owner.answer_why",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.answer_why",
+    "lazy": false,
+    "to": "owner.answers"
+   },
+   {
+    "from": "owner.answer_why",
+    "lazy": false,
+    "to": "owner.money.pnl"
+   },
+   {
+    "from": "owner.answer_why",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "owner.answer_why",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "owner.answers",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
     "from": "owner.areas",
     "lazy": true,
     "to": "ai.cash_reconciliation.intelligence"
@@ -2487,6 +2612,36 @@
     "from": "owner.areas",
     "lazy": false,
     "to": "time_utils"
+   },
+   {
+    "from": "owner.ask",
+    "lazy": false,
+    "to": "owner.answer_compare"
+   },
+   {
+    "from": "owner.ask",
+    "lazy": false,
+    "to": "owner.answer_todo"
+   },
+   {
+    "from": "owner.ask",
+    "lazy": false,
+    "to": "owner.answer_what"
+   },
+   {
+    "from": "owner.ask",
+    "lazy": false,
+    "to": "owner.answer_whatif"
+   },
+   {
+    "from": "owner.ask",
+    "lazy": false,
+    "to": "owner.answer_why"
+   },
+   {
+    "from": "owner.ask",
+    "lazy": false,
+    "to": "owner.answers"
    },
    {
     "from": "owner.ask",
@@ -3672,6 +3827,11 @@
     "from": "routers.owner",
     "lazy": false,
     "to": "routers.deps"
+   },
+   {
+    "from": "routers.owner",
+    "lazy": false,
+    "to": "time_utils"
    },
    {
     "from": "routers.owner_money",
@@ -4911,6 +5071,48 @@
    },
    {
     "group": "other",
+    "id": "owner.answer_compare",
+    "kind": "py",
+    "loc": 146,
+    "path": "backend/owner/answer_compare.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.answer_todo",
+    "kind": "py",
+    "loc": 70,
+    "path": "backend/owner/answer_todo.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.answer_what",
+    "kind": "py",
+    "loc": 218,
+    "path": "backend/owner/answer_what.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.answer_whatif",
+    "kind": "py",
+    "loc": 131,
+    "path": "backend/owner/answer_whatif.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.answer_why",
+    "kind": "py",
+    "loc": 296,
+    "path": "backend/owner/answer_why.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.answers",
+    "kind": "py",
+    "loc": 127,
+    "path": "backend/owner/answers.py"
+   },
+   {
+    "group": "other",
     "id": "owner.areas",
     "kind": "py",
     "loc": 688,
@@ -4920,7 +5122,7 @@
     "group": "other",
     "id": "owner.ask",
     "kind": "py",
-    "loc": 30,
+    "loc": 122,
     "path": "backend/owner/ask.py"
    },
    {
@@ -5228,7 +5430,7 @@
     "group": "router",
     "id": "routers.owner",
     "kind": "py",
-    "loc": 139,
+    "loc": 172,
     "path": "backend/routers/owner.py"
    },
    {
@@ -6479,12 +6681,12 @@
   }
  ],
  "stats": {
-  "py_edges": 692,
-  "py_lazy_edges": 207,
-  "py_modules": 172,
+  "py_edges": 724,
+  "py_lazy_edges": 209,
+  "py_modules": 178,
   "routes": 185,
-  "ts_edges": 565,
-  "ts_files": 257
+  "ts_edges": 571,
+  "ts_files": 258
  },
  "status_only": [
   [
@@ -6610,10 +6812,12 @@
     "POST /ai/chat -> routers.ai_ask.chat_llm",
     "POST /ai/os/conversations -> routers.ai_ask.create_os_conversation",
     "GET /ai/os/conversations/{conversation_id} -> routers.ai_ask.get_os_conversation",
-    "GET /ai/os/preferences -> routers.ai_ask.get_os_preference",
     "GET /ai/os/conversations -> routers.ai_ask.list_os_conversations",
-    "PUT /ai/os/preferences -> routers.ai_ask.set_os_preference",
     "GET /overview/today -> routers.overview.today",
+    "POST /owner/ask -> routers.owner.ask",
+    "POST /owner/settings/preview -> routers.owner.preview_settings",
+    "GET /owner/settings -> routers.owner.read_settings",
+    "PUT /owner/settings -> routers.owner.write_settings",
     "POST /staff/end-impersonation -> routers.staff.end_impersonation",
     "POST /staff/{staff_id}/impersonate -> routers.staff.impersonate_staff",
     "PUT /staff/{staff_id} -> routers.staff.update_staff"
@@ -6621,7 +6825,7 @@
    "entries": [
     "app/(owner)/os/page.tsx"
    ],
-   "frontend_files": 7,
+   "frontend_files": 16,
    "label": "OS",
    "parallel_backends": []
   },
@@ -6715,6 +6919,10 @@
    },
    {
     "from": "app/(owner)/os/page.tsx",
+    "to": "components/owner/ask/AnswerCard.tsx"
+   },
+   {
+    "from": "app/(owner)/os/page.tsx",
     "to": "context/AuthContext.tsx"
    },
    {
@@ -6723,11 +6931,11 @@
    },
    {
     "from": "app/(owner)/os/page.tsx",
-    "to": "lib/osSuggestions.ts"
+    "to": "lib/owner/ask.ts"
    },
    {
     "from": "app/(owner)/os/page.tsx",
-    "to": "lib/vibandaAreas.ts"
+    "to": "lib/tenantConfig.ts"
    },
    {
     "from": "app/(owner)/reports/page.tsx",
@@ -8650,6 +8858,22 @@
     "to": "lib/owner/types.ts"
    },
    {
+    "from": "components/owner/ask/AnswerCard.tsx",
+    "to": "components/owner/StateChip.tsx"
+   },
+   {
+    "from": "components/owner/ask/AnswerCard.tsx",
+    "to": "components/owner/settings/SettingsProvider.tsx"
+   },
+   {
+    "from": "components/owner/ask/AnswerCard.tsx",
+    "to": "lib/owner/ask.ts"
+   },
+   {
+    "from": "components/owner/ask/AnswerCard.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
     "from": "components/owner/home/AnswersStrip.tsx",
     "to": "lib/owner/format.ts"
    },
@@ -8854,11 +9078,15 @@
     "to": "lib/tokenStore.ts"
    },
    {
-    "from": "lib/osSuggestions.ts",
-    "to": "lib/vibandaAreas.ts"
+    "from": "lib/owner/areaTypes.ts",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "lib/owner/areaTypes.ts",
+    "from": "lib/owner/ask.ts",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "lib/owner/ask.ts",
     "to": "lib/owner/types.ts"
    },
    {

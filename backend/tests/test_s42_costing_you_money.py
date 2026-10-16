@@ -11,6 +11,8 @@ import math
 from collections import Counter
 from decimal import Decimal
 
+import re
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -120,7 +122,8 @@ def test_the_beef_card_is_the_missing_stock_over_a_month(demo):
     beef = _decision(demo, "stock_custody", "Beef")
     row = next(i for i in _block(demo, "store", "missing")["items"] if i["item"] == "Beef")
     assert beef.impact_cents_month == pytest.approx(row["missing_value"] * 100 * 30 / 7, abs=3)     # the 7-day gap, said as a month
-    assert "33" in beef.rationale or "32" in beef.rationale or "34" in beef.rationale        # how far off it is, in the owner's words
+    said = int(re.search(r"(\d+)% more", beef.rationale).group(1))                         # how far off it is, in the owner's words
+    assert abs(said - row["off_by_pct"]) <= 1.0 and 25 <= said <= 45                        # the same figure as the Store panel; the planted third, give or take a week's noise
     assert not any(word in (beef.action + beef.rationale).lower() for word in ("theft", "stealing", "fraud", "steal"))
 
 

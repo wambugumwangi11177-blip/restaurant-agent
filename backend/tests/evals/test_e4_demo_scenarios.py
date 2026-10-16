@@ -18,7 +18,7 @@ finds it and that it shows up in the block the owner will look at. Each test say
   P11 Star · Puzzle · Plowhorse · Dog                                 asserted
   P12 Holiday Tuesday + chips out 19:00  why was Tuesday bad          data asserted; the OS "why" form is S5.1
   P13 Kenchic delivers 56 of 60        short delivery                 asserted (scaled; new engine field)
-  P14 Branch B food cost 37% vs A 29%  branch comparison              asserted; the OS "compare" form is S5.1
+  P14 Branch B food cost 37% vs A 29%  branch comparison              asserted (data, and the OS "compare" form)
   P15 Supplier with one delivery       must NOT show 100% reliable    asserted (regression of D3)
   P16 POS orders without M-Pesa receipt must NOT flood Home           asserted (regression of D1)
 
@@ -61,7 +61,8 @@ def demo(tmp_path_factory):
     homes = {}
     for key, rid in zip(("A", "B"), summary.restaurant_ids):
         homes[key] = compose_home(OwnerContext(db, owner, db.get(models.Restaurant, rid)), "30d")
-    yield {"db": db, "summary": summary, "A": homes["A"], "B": homes["B"], "rid": {"A": summary.restaurant_ids[0], "B": summary.restaurant_ids[1]}}
+    ctx = {k: OwnerContext(db, owner, db.get(models.Restaurant, rid)) for k, rid in zip(("A", "B"), summary.restaurant_ids)}
+    yield {"db": db, "summary": summary, "A": homes["A"], "B": homes["B"], "ctx": ctx, "rid": {"A": summary.restaurant_ids[0], "B": summary.restaurant_ids[1]}}
     db.close()
     engine.dispose()
 
@@ -266,6 +267,32 @@ def test_p12_a_holiday_tuesday_with_chips_out_at_19(tmp_path_factory):
         engine.dispose()
 
 
+def test_p12_the_os_why_form_names_the_holiday_then_the_chips(tmp_path_factory):
+    """Engine: the OS "why" form (owner/answer_why.py). Screen: Ask LEVIII. The drivers come in the spec's order: holiday, then the dish that ran out."""
+    from owner import ask
+    from owner.states import OwnerContext
+    engine, db = _session(tmp_path_factory, "p12os")
+    try:
+        now = datetime(2026, 10, 28, 13, 0)
+        summary = build(db, OWNER, PASSWORD, now=now)
+        owner = db.query(models.User).filter(models.User.email == OWNER).one()
+        ctx = OwnerContext(db, owner, db.get(models.Restaurant, summary.restaurant_ids[0]))
+        ctx.now = now
+        out = ask.ask(ctx, "Why was Tuesday last week bad?")
+        assert out["form"] == "why" and out["day"] == "2026-10-20"
+        found = [d for d in out["drivers"] if d["found"]]
+        assert [d["key"] for d in found] == ["holiday", "stock_out"]
+        assert "Mashujaa Day" in found[0]["label"]
+        assert found[1]["dish"] == "Chips" and found[1]["ingredient"] == "Potatoes"
+        assert "ran short at" in found[1]["note"] and "Chips ran out" in out["headline"]
+        sales = next(r for r in out["rows"] if r["key"] == "sales")["value"]
+        usual = next(r for r in out["rows"] if r["key"] == "usual")["value"]
+        assert sales < 0.6 * usual
+    finally:
+        db.close()
+        engine.dispose()
+
+
 def test_p12_is_not_invented_when_the_window_has_no_holiday_tuesday(tmp_path_factory):
     engine, db = _session(tmp_path_factory, "p12none")
     try:
@@ -305,6 +332,20 @@ def test_p14_branch_b_spends_37_on_ingredients_branch_a_29(demo):
     org = db.get(models.Restaurant, demo["rid"]["A"]).organization_id
     sites = benchmark_organization(db, org)
     assert len(sites["sites"]) == 2 and {s["name"] for s in sites["sites"]} == {"Demo Restaurant", "Demo Restaurant – Kasarani"}
+
+
+def test_p14_the_os_compare_form_puts_the_branches_side_by_side(demo):
+    """Engine: the OS "compare" form (owner/answer_compare.py). Screen: Ask LEVIII. The same figures as each branch's Home."""
+    from owner import ask
+    out = ask.ask(demo["ctx"]["A"], "Compare my branches")
+    assert out["form"] == "compare" and out["kind"] == "branches"
+    cols = {c["name"]: c for c in out["columns"]}
+    assert set(cols) == {"Demo Restaurant", "Demo Restaurant – Kasarani"}
+    a, b = cols["Demo Restaurant"], cols["Demo Restaurant – Kasarani"]
+    assert a["food_cost_pct"] == demo["A"]["areas"]["money"]["blocks"]["cost_dials"]["food_cost_pct"]
+    assert b["food_cost_pct"] == demo["B"]["areas"]["money"]["blocks"]["cost_dials"]["food_cost_pct"]
+    assert 36.0 <= b["food_cost_pct"] <= 38.0 and 28.0 <= a["food_cost_pct"] <= 30.0
+    assert "Kasarani" in out["headline"] and next(r for r in out["rows"] if r["key"] == "gap_kes_month")["value"] > 0
 
 
 # ── P15 · P16 (regression guards) ────────────────────────────────────────────

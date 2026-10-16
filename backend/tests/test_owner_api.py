@@ -534,15 +534,15 @@ def test_registry_has_exactly_the_engines_of_figure_1_3():
 
 def test_registry_entries_point_at_things_that_exist():
     from owner import areas, reports
+    from owner import ask as owner_ask
     from owner.registry import ENGINES
     from owner.settings import FIELDS
-    from routers import ai_ask
     setting_keys = {f.key for f in FIELDS}
     plan = {f"{p}.{k}" for p, sections in reports.PLAN.items() for k, _t in sections}
     for e in ENGINES:
         assert e.area in areas.AREAS
         assert set(e.settings) <= setting_keys, (e.key, set(e.settings) - setting_keys)
-        assert set(e.os_topics) <= set(ai_ask._HANDLERS), (e.key, e.os_topics)
+        assert set(e.os_topics) <= set(owner_ask.topics()), (e.key, e.os_topics)
         assert set(e.report_sections) <= plan, (e.key, set(e.report_sections) - plan)
         assert e.owner_name
 

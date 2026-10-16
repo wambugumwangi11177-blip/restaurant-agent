@@ -1,0 +1,104 @@
+{
+ "question": "Am I making a profit this month?",
+ "form": "what",
+ "topic": "money",
+ "topic_label": "Profit & Loss, costs covered, bills",
+ "state": "as_entered",
+ "as_of": "2026-10-16T08:29:58.177452+00:00",
+ "headline": "October 2026 so far: you sold KES 212,280 and kept KES 24,132 (11.4%). KES 2,741 of sales still to go to cover today's costs. Next bill: Rent, KES 70,000 on Monday 19 Oct — your sales will not cover it.",
+ "rows": [
+  {
+   "key": "sales",
+   "label": "Sales",
+   "value": 212280.0,
+   "unit": "kes"
+  },
+  {
+   "key": "ingredients",
+   "label": "Ingredients",
+   "value": -62120.45,
+   "unit": "kes"
+  },
+  {
+   "key": "left_after_ingredients",
+   "label": "Left after ingredients",
+   "value": 150159.55,
+   "unit": "kes"
+  },
+  {
+   "key": "wages",
+   "label": "Wages",
+   "value": -61825.0,
+   "unit": "kes"
+  },
+  {
+   "key": "other_costs",
+   "label": "Other costs",
+   "value": -64202.39,
+   "unit": "kes"
+  },
+  {
+   "key": "kept",
+   "label": "What you kept",
+   "value": 24132.16,
+   "unit": "kes"
+  },
+  {
+   "key": "kept_pct",
+   "label": "What you kept, out of every KES 100 sold",
+   "value": 11.4,
+   "unit": "pct"
+  },
+  {
+   "key": "costs_covered",
+   "label": "Sales needed to cover today's costs",
+   "value": 4960.54,
+   "unit": "kes",
+   "note": "KES 2,741 still to go"
+  },
+  {
+   "key": "bill",
+   "label": "Rent",
+   "value": 70000.0,
+   "unit": "kes",
+   "note": "due 2026-10-19, in 3 days; your sales will not cover it"
+  },
+  {
+   "key": "bill",
+   "label": "Electricity (KPLC)",
+   "value": 18000.0,
+   "unit": "kes",
+   "note": "due 2026-10-20, in 4 days; your sales will not cover it"
+  },
+  {
+   "key": "bill",
+   "label": "Security",
+   "value": 8000.0,
+   "unit": "kes",
+   "note": "due 2026-11-01, in 16 days"
+  },
+  {
+   "key": "spike",
+   "label": "Cooking gas",
+   "value": 4266.67,
+   "unit": "kes",
+   "note": "29.8% above usual"
+  }
+ ],
+ "assumptions": [
+  {
+   "text": "Ingredient cost target: 35.0",
+   "setting": "food_cost_target_pct",
+   "value": 35.0
+  },
+  {
+   "text": "Cash you keep aside for bills: 0",
+   "setting": "bill_reserve_kes",
+   "value": 0
+  }
+ ],
+ "next": [
+  "Which bills are due soon?",
+  "Compare this month with last month"
+ ]
+}

@@ -70,6 +70,38 @@ test.describe("the owner of a restaurant with a history", () => {
     expect(problems).toEqual([]);
   });
 
+  test("Ask LEVIII answers in five ways, each from the owner's own records", async ({ page }) => {
+    const problems = watch(page);
+    await page.goto("/os");
+    const asks: [string, string, RegExp][] = [
+      ["What should I do to make more money?", "what_to_do", /KES [\d,]+/],
+      ["What if I raise the price of Chips to 350?", "what_if", /Worth trying|Be careful|Not worth it/],
+      ["Compare my branches", "compare", /Kasarani/],
+      ["Am I making a profit this month?", "what", /you sold KES [\d,]+/],
+    ];
+    for (const [question, form, expected] of asks) {
+      await page.getByLabel("Ask or describe a change").fill(question);
+      await page.getByRole("button", { name: "Send question" }).click();
+      const card = page.locator(`[data-form=${form}]`).last();
+      await expect(card, question).toBeVisible({ timeout: 30_000 });
+      await expect(card, question).toContainText(expected);
+      await expect(card).not.toContainText(/planned|not available yet/i);
+    }
+    expect(problems).toEqual([]);
+  });
+
+  test("Ask LEVIII has no sideways scroll, and every button on it is a comfortable tap target", async ({ page }, testInfo) => {
+    await page.goto("/os");
+    await page.getByRole("radio", { name: "Why" }).click();
+    const [scroll, client] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+    expect(scroll).toBeLessThanOrEqual(client);
+    test.skip(testInfo.project.name !== "phone-390", "a phone is where a thumb has to hit it");
+    const small = await page.evaluate(() => [...document.querySelectorAll("main a, main button, main summary")]
+      .filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && b.height < 39.5; })
+      .map((e) => `${e.tagName} "${(e.getAttribute("aria-label") || e.textContent || "").trim().slice(0, 40)}" ${Math.round(e.getBoundingClientRect().height)}px`));
+    expect(small).toEqual([]);
+  });
+
   test("no dash stands in for a number that exists", async ({ page }) => {
     for (const area of ["My Money", "Sales & Dishes", "Store & Suppliers", "Cash Check", "Staff", "Permits & Settings"]) await page.getByRole("button", { name: new RegExp(area) }).click();
     const dashes = await page.evaluate(() => [...document.querySelectorAll("main *")].filter((e) => e.children.length === 0 && e.textContent?.trim() === "—").map((e) => e.parentElement?.textContent?.slice(0, 80)));

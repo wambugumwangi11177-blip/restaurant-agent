@@ -8,7 +8,7 @@ backend/owner/registry.py — every engine, and where the owner meets it (docs/v
   area             which of the six areas it lives in
   zone             where on Home it appears: pulse · costing_you_money · area · coming_up · os
   home_blocks      the block paths in the /owner/home payload that carry its output ("area.block" or a zone name)
-  os_topics        the Ask LEVIII topics (routers/ai_ask.py handlers) that can answer questions about it
+  os_topics        the Ask LEVIII topics (owner/ask.py::topics — the five forms and the areas) that can answer questions about it
   report_sections  `period.section` keys in owner/reports.py::PLAN
   inputs           what the owner must have recorded for it to say anything (honest `no_data` otherwise)
   settings         the owner settings (owner/settings.py) it reads — empty means it reads none
@@ -59,7 +59,7 @@ class Engine:
 
 ENGINES: tuple[Engine, ...] = (
     Engine("sales_summary", "Sales", "sales_dishes", "pulse",
-           home_blocks=("pulse", "sales_dishes.seven_day"), os_topics=("revenue",),
+           home_blocks=("pulse", "sales_dishes.seven_day"), os_topics=("revenue", "why", "compare"),
            report_sections=("daily.sales", "weekly.sales", "monthly.sales", "yearly.sales"),
            inputs=("orders from the till",)),
     Engine("revenue_forecast", "Sales forecast", "sales_dishes", "area",
@@ -67,7 +67,7 @@ ENGINES: tuple[Engine, ...] = (
            report_sections=("weekly.outlook",), inputs=("two weeks of sales",)),
     Engine("profit", "What each dish earns", "money", "area",
            home_blocks=("money.cost_dials", "sales_dishes.dishes_by_kes", "sales_dishes.delivery", "cash.below_menu_price"),
-           os_topics=("profit",), report_sections=("monthly.costs", "monthly.dishes", "monthly.channels"),
+           os_topics=("profit", "compare"), report_sections=("monthly.costs", "monthly.dishes", "monthly.channels"),
            inputs=("orders from the till", "dish costs (recipes)"),
            settings=("food_cost_target_pct", "margin_floor_pct", "commission_uber_eats_pct", "commission_glovo_pct",
                      "commission_bolt_food_pct")),
@@ -80,7 +80,7 @@ ENGINES: tuple[Engine, ...] = (
            inputs=("orders from the till", "dish costs (recipes)"),
            settings=("food_cost_target_pct", "popular_cutoff")),
     Engine("simulator", "What if I change a price", "sales_dishes", "area",
-           home_blocks=("sales_dishes.simulator",), os_topics=(),
+           home_blocks=("sales_dishes.simulator",), os_topics=("what_if",),
            inputs=("orders from the till", "dish costs (recipes)"),
            settings=("price_sensitivity", "offer_size_pct", "offer_lift_pct"),
            exemptions={"reports": "A what-if is a question you ask, not a figure to report; the numbers it moves are in the reports."}),
@@ -92,11 +92,11 @@ ENGINES: tuple[Engine, ...] = (
            report_sections=("daily.things_to_check", "weekly.missing_stock"),
            inputs=("stock movements", "store-to-kitchen handovers"), settings=("missing_stock_flag_pct",)),
     Engine("cash", "Cash count check", "cash", "area",
-           home_blocks=("cash.shifts", "cash.patterns"), os_topics=(),
+           home_blocks=("cash.shifts", "cash.patterns"), os_topics=("cash",),
            report_sections=("daily.cash_check", "weekly.cash_check", "monthly.cash_check"),
            inputs=("cash drawer counts",), settings=("cash_tolerance_kes", "cash_tolerance_pct")),
     Engine("fraud", "Things to check at the till", "cash", "area",
-           home_blocks=("cash.cancelled_sales",), os_topics=(), report_sections=("daily.things_to_check",),
+           home_blocks=("cash.cancelled_sales",), os_topics=("things_to_check",), report_sections=("daily.things_to_check",),
            inputs=("orders from the till",)),
     Engine("kds", "Kitchen speed", "staff", "area",
            home_blocks=("staff.kitchen",), os_topics=("kitchen",), report_sections=("weekly.kitchen",),
@@ -109,22 +109,22 @@ ENGINES: tuple[Engine, ...] = (
            report_sections=("weekly.wages", "monthly.wages"), inputs=("staff shifts and hourly rates",),
            settings=("labour_target_pct", "overtime_after_hours")),
     Engine("supply_chain", "Suppliers", "store", "area",
-           home_blocks=("store.suppliers", "coming_up.deliveries"), os_topics=(),
+           home_blocks=("store.suppliers", "coming_up.deliveries"), os_topics=("suppliers",),
            report_sections=("weekly.suppliers", "monthly.store"), inputs=("purchase orders and deliveries",)),
     Engine("marketing", "Winning guests back", "sales_dishes", "area",
-           home_blocks=("sales_dishes.win_back",), os_topics=(), report_sections=("monthly.marketing",),
+           home_blocks=("sales_dishes.win_back",), os_topics=("win_back",), report_sections=("monthly.marketing",),
            inputs=("guest contacts and visits",), settings=("offer_size_pct", "offer_lift_pct")),
     Engine("roi", "What LEVIII saved you", "money", "area",
-           home_blocks=("money.savings",), os_topics=(), report_sections=("monthly.savings",),
+           home_blocks=("money.savings",), os_topics=("savings",), report_sections=("monthly.savings",),
            inputs=("ideas you approved",)),
     Engine("twin", "Next 30 days", "sales_dishes", "area",
            home_blocks=("sales_dishes.outlook",), os_topics=("revenue",), report_sections=("monthly.outlook",),
            inputs=("two weeks of sales",)),
     Engine("data_quality", "How complete your costs are", "permits", "area",
-           home_blocks=("permits.data_trust",), os_topics=(), report_sections=("monthly.data_trust",),
+           home_blocks=("permits.data_trust",), os_topics=("data_trust",), report_sections=("monthly.data_trust",),
            inputs=("dish costs (recipes)",)),
     Engine("strategist", "Goal mode", "sales_dishes", "os",
-           home_blocks=(), os_topics=(), report_sections=(),
+           home_blocks=(), os_topics=("what_to_do",), report_sections=(),
            inputs=("all of the above",),
            exemptions={
                "home": "Goal mode is a conversation in Ask LEVIII (the 'what should I do' form, S5.1); Home already carries the ranked ideas it starts from (costing_you_money).",
@@ -136,7 +136,7 @@ ENGINES: tuple[Engine, ...] = (
     Engine("money", "Profit & Loss, costs covered, bills", "money", "area",
            home_blocks=("money.pnl", "money.breakeven", "money.bills", "money.spikes", "coming_up.bills",
                       "permits.licences", "coming_up.licences"),
-           os_topics=(), report_sections=("monthly.pnl", "yearly.pnl"),
+           os_topics=("money",), report_sections=("monthly.pnl", "yearly.pnl"),
            inputs=("expenses", "recurring bills", "licences"),
            settings=("food_cost_target_pct", "prime_cost_target_pct", "labour_target_pct", "commission_uber_eats_pct", "commission_glovo_pct",
                      "commission_bolt_food_pct", "expense_spike_pct", "bill_reserve_kes", "licence_warning_days")),

@@ -40,7 +40,6 @@ from tests.fixtures import golden_restaurant as gr
 REPORT_PATH = Path(__file__).resolve().parents[3] / "docs" / "v2" / "e5-coverage.md"
 
 # The debt: (engine, surface) -> where it is paid off. May only shrink.
-_OS = "S5.1 (Ask LEVIII answers every area in five forms)"
 _REPORT = "S5.2 (report sections built)"
 _P4 = "S4.x (Home v2 blocks)"
 ALLOWED_GAPS: dict[tuple[str, str], str] = {
@@ -50,21 +49,18 @@ ALLOWED_GAPS: dict[tuple[str, str], str] = {
     ("menu", "reports"): _REPORT,
     ("inventory", "reports"): _REPORT,
     ("custody", "reports"): _REPORT,
-    ("cash", "os"): _OS, ("cash", "reports"): _REPORT,
-    ("fraud", "os"): _OS, ("fraud", "reports"): _REPORT,
+    ("cash", "reports"): _REPORT,
+    ("fraud", "reports"): _REPORT,
     ("kds", "reports"): _REPORT,
     ("reservations", "reports"): _REPORT,
     ("labor", "reports"): _REPORT,
-    ("supply_chain", "os"): _OS, ("supply_chain", "reports"): _REPORT,
-    ("marketing", "os"): _OS, ("marketing", "reports"): _REPORT,
-    ("roi", "os"): _OS, ("roi", "reports"): _REPORT,
+    ("supply_chain", "reports"): _REPORT,
+    ("marketing", "reports"): _REPORT,
+    ("roi", "reports"): _REPORT,
     ("twin", "reports"): _REPORT,
-    ("data_quality", "os"): _OS, ("data_quality", "reports"): _REPORT,
-    ("simulator", "os"): _OS,
-    ("strategist", "os"): _OS,
+    ("data_quality", "reports"): _REPORT,
     ("decisions", "reports"): _REPORT,
     ("owner_settings", "reports"): _REPORT,
-    ("money", "os"): _OS,
 }
 
 

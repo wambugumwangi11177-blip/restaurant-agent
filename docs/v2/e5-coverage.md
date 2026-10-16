@@ -4,7 +4,7 @@ Source of truth: `backend/owner/registry.py`, checked against the composed `/own
 topics (`routers/ai_ask.py`) and the report plan (`owner/reports.py`). ✔ present · ◌ planned (placeholder or
 named in the report plan, not built) · — exempt (written reason in the registry) · ✖ missing.
 
-**23 registered engines · 22 built · 1 complete on all three surfaces · 27 open gaps** (P4 exit: 0).
+**23 registered engines · 22 built · 4 complete on all three surfaces · 18 open gaps** (P4 exit: 0).
 
 | engine | owner name | status | Home | OS | Reports |
 |---|---|---|---|---|---|
@@ -13,28 +13,27 @@ named in the report plan, not built) · — exempt (written reason in the regist
 | profit | What each dish earns | built | ✔ | ✔ | ◌ planned |
 | pricing | Price ideas | built | ✔ | ✔ | ◌ planned |
 | menu | Best and weakest dishes | built | ✔ | ✔ | ◌ planned |
-| simulator | What if I change a price | built | ✔ | ✖ missing | — exempt |
+| simulator | What if I change a price | built | ✔ | ✔ | — exempt |
 | inventory | Time to reorder | built | ✔ | ✔ | ◌ planned |
 | custody | Missing stock and handovers | built | ✔ | ✔ | ◌ planned |
-| cash | Cash count check | built | ✔ | ✖ missing | ◌ planned |
-| fraud | Things to check at the till | built | ✔ | ✖ missing | ◌ planned |
+| cash | Cash count check | built | ✔ | ✔ | ◌ planned |
+| fraud | Things to check at the till | built | ✔ | ✔ | ◌ planned |
 | kds | Kitchen speed | built | ✔ | ✔ | ◌ planned |
 | reservations | Bookings | built | ✔ | ✔ | ◌ planned |
 | labor | Wages | built | ✔ | ✔ | ◌ planned |
-| supply_chain | Suppliers | built | ✔ | ✖ missing | ◌ planned |
-| marketing | Winning guests back | built | ✔ | ✖ missing | ◌ planned |
-| roi | What LEVIII saved you | built | ✔ | ✖ missing | ◌ planned |
+| supply_chain | Suppliers | built | ✔ | ✔ | ◌ planned |
+| marketing | Winning guests back | built | ✔ | ✔ | ◌ planned |
+| roi | What LEVIII saved you | built | ✔ | ✔ | ◌ planned |
 | twin | Next 30 days | built | ✔ | ✔ | ◌ planned |
-| data_quality | How complete your costs are | built | ✔ | ✖ missing | ◌ planned |
-| strategist | Goal mode | built | — exempt | ✖ missing | — exempt |
+| data_quality | How complete your costs are | built | ✔ | ✔ | ◌ planned |
+| strategist | Goal mode | built | — exempt | ✔ | — exempt |
 | decisions | What is costing you money | built | ✔ | ✔ | ◌ planned |
-| money | Profit & Loss, costs covered, bills | built | ✔ | ✖ missing | ✔ |
+| money | Profit & Loss, costs covered, bills | built | ✔ | ✔ | ✔ |
 | mpesa_match | M-Pesa statement check | planned | ◌ S6.1–S6.2 | ◌ S6.1–S6.2 | ◌ S6.1–S6.2 |
 | owner_settings | Your targets | built | ✔ | — exempt | ◌ planned |
 
 ## Open gaps (the allow-list; may only shrink)
 
-- **os** (9): cash, data_quality, fraud, marketing, money, roi, simulator, strategist, supply_chain — S5.1 (Ask LEVIII answers every area in five forms)
 - **reports** (18): cash, custody, data_quality, decisions, fraud, inventory, kds, labor, marketing, menu, owner_settings, pricing, profit, reservations, revenue_forecast, roi, supply_chain, twin — S5.2 (report sections built)
 
 ## Not yet built engines (their surfaces are placeholders until their sprint)

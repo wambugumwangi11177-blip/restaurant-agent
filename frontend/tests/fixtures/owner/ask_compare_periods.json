@@ -1,0 +1,73 @@
+{
+ "question": "This week vs last week",
+ "form": "compare",
+ "topic": "compare",
+ "topic_label": "Compare",
+ "state": "live",
+ "as_of": "2026-10-16T07:40:00+00:00",
+ "headline": "This week so far you sold KES 49,570 in the first 4 days, 7.4% down on the same days of last week (KES 53,510).",
+ "rows": [
+  {
+   "key": "sales",
+   "label": "Sales",
+   "value": 49570.0,
+   "unit": "kes",
+   "note": "Last week: KES 53,510"
+  },
+  {
+   "key": "orders",
+   "label": "Orders",
+   "value": 45,
+   "unit": "count",
+   "note": "Last week: 43"
+  },
+  {
+   "key": "sales_change_pct",
+   "label": "Sales compared with last week",
+   "value": 7.36310969912166,
+   "unit": "pct",
+   "note": "down"
+  },
+  {
+   "key": "food_cost_pct",
+   "label": "Out of every KES 100, ingredients",
+   "value": 28.8,
+   "unit": "pct",
+   "note": "Last week: 28.5%"
+  }
+ ],
+ "assumptions": [
+  {
+   "text": "Only finished days are compared: the first 4 days of this week and of last week."
+  }
+ ],
+ "next": [
+  "Compare my branches",
+  "What should I do to make more money?"
+ ],
+ "kind": "periods",
+ "columns": [
+  {
+   "from": "2026-10-12",
+   "to": "2026-10-15",
+   "days": 4,
+   "sales": 49570.0,
+   "orders": 45,
+   "average_order": 1101.56,
+   "food_cost_pct": 28.8,
+   "key": "this",
+   "label": "This week so far"
+  },
+  {
+   "from": "2026-10-05",
+   "to": "2026-10-08",
+   "days": 4,
+   "sales": 53510.0,
+   "orders": 43,
+   "average_order": 1244.42,
+   "food_cost_pct": 28.5,
+   "key": "last",
+   "label": "Last week"
+  }
+ ]
+}

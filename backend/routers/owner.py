@@ -8,7 +8,8 @@ parameter anywhere in this API, so there is no id to forge.
 Observer-mode deployments (read-only Macsoft) block this whole prefix, like /overview, /reports and /ai
 (observer_mode.py): these endpoints compose figures from local tables.
 """
-from typing import Optional
+import json
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, create_model
@@ -26,6 +27,7 @@ from owner import settings as owner_settings
 from owner.money.ledger import parse_month
 from owner.states import OwnerContext
 from routers.deps import get_restaurant_or_none
+from time_utils import utcnow
 
 router = APIRouter(prefix="/owner", tags=["owner"])
 
@@ -130,9 +132,40 @@ def report(period: str, month: Optional[str] = Query(None, description="monthly 
 class AskBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     question: str = Field(..., min_length=3, max_length=500)
+    form: Optional[Literal["what", "why", "what_if", "what_to_do", "compare"]] = Field(
+        None, description="The form of answer. Left out, the words of the question choose it.")
+    conversation_id: Optional[int] = Field(None, ge=1, description="Save the question and its answer in this conversation (Previous conversations).")
+    client_message_id: Optional[str] = Field(None, max_length=64, description="Asking again with the same id returns the saved answer instead of working it out twice.")
 
 
 @router.post("/ask")
 def ask(body: AskBody, db: Session = Depends(get_db), user: models.User = Depends(_owner_only)):
-    """Ask LEVIII. Answers come from the deterministic handlers; the language model never computes a figure."""
-    return owner_ask.ask(_context(db, user), body.question.strip())
+    """Ask LEVIII, in five forms: what · why · what if · what should I do · compare. Every answer is worked out by code from the
+    restaurant's own records and carries its state; the language model never computes a figure. With a `conversation_id` the exchange
+    is saved in the owner's own conversation history."""
+    restaurant = _restaurant(db, user)
+    question = body.question.strip()
+    conversation = None
+    if body.conversation_id is not None:
+        conversation = db.query(models.OwnerOSConversation).filter_by(
+            id=body.conversation_id, owner_user_id=user.id, restaurant_id=restaurant.id).with_for_update().first()
+        if conversation is None:
+            raise HTTPException(404, "Conversation not found")
+        if body.client_message_id:
+            prior = db.query(models.OwnerOSMessage).filter_by(
+                conversation_id=conversation.id, role="user", client_message_id=body.client_message_id).first()
+            if prior:
+                saved = db.query(models.OwnerOSMessage).filter(
+                    models.OwnerOSMessage.conversation_id == conversation.id, models.OwnerOSMessage.role == "assistant",
+                    models.OwnerOSMessage.id > prior.id).order_by(models.OwnerOSMessage.id.asc()).first()
+                if saved:
+                    return {**json.loads(saved.content), "conversation_id": conversation.id}
+    answer = owner_ask.ask(OwnerContext(db, user, restaurant), question, body.form)
+    if conversation is not None:
+        db.add(models.OwnerOSMessage(conversation_id=conversation.id, role="user", content=question, client_message_id=body.client_message_id))
+        db.add(models.OwnerOSMessage(conversation_id=conversation.id, role="assistant", content=json.dumps(answer, ensure_ascii=False),
+                                     answer_type=f"owner_{answer['form']}"))
+        conversation.updated_at = utcnow()
+        db.commit()
+        answer = {**answer, "conversation_id": conversation.id}
+    return answer

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Lock } from "lucide-react";
 import AreaBody from "@/components/owner/AreaBody";
 import { kes } from "@/lib/owner/format";
 import { AREA_KEYS, type AreaKey, type AreaSummary, type HealthStatus, type OwnerHome } from "@/lib/owner/types";
@@ -21,7 +21,11 @@ export function areaFromHash(hash: string): AreaKey | null {
 }
 
 /** The six area panels: one line each (one number, one word), opening in place. A link to `#area-<key>` opens that panel. */
-export default function AreaPanels({ areas }: { areas: OwnerHome["areas"] }) {
+export default function AreaPanels({ areas, opensOn = {} }: {
+  areas: OwnerHome["areas"];
+  /** Panels that are still shut in the guided first week, each with the day it opens. */
+  opensOn?: Partial<Record<AreaKey, number>>;
+}) {
   const [open, setOpen] = useState<Set<AreaKey>>(new Set());
 
   useEffect(() => {
@@ -43,7 +47,18 @@ export default function AreaPanels({ areas }: { areas: OwnerHome["areas"] }) {
       {AREA_KEYS.map((key) => {
         const area = areas[key];
         if (!area) return null;
-        const isOpen = open.has(key);
+        const shut = opensOn[key];
+        const isOpen = open.has(key) && shut == null;
+        if (shut != null) {
+          return (
+            <section key={key} id={`area-${key}`} aria-label={`${area.title}, opens on day ${shut}`} className="rounded-xl border border-dashed border-[var(--v-border)] bg-[var(--v-muted)]">
+              <div className="flex min-h-14 items-center gap-3 px-4 py-3 text-[var(--v-muted-foreground)]">
+                <Lock size={14} aria-hidden className="shrink-0" />
+                <span className="min-w-0 flex-1"><span className="block text-sm font-bold">{area.title}</span><span className="block text-[11px]">Opens on day {shut} of your first week</span></span>
+              </div>
+            </section>
+          );
+        }
         return (
           <section key={key} id={`area-${key}`} className="scroll-mt-4 rounded-xl border border-[var(--v-border)] bg-[var(--v-card)]">
             <h3>
@@ -52,7 +67,7 @@ export default function AreaPanels({ areas }: { areas: OwnerHome["areas"] }) {
                 <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${DOT[area.summary.status]}`} />
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-bold">{area.title}</span>
-                  <span className="block truncate text-[11px] text-[var(--v-muted-foreground)]">{area.summary.word} · {area.summary.label}</span>
+                  <span className="block truncate text-[11px] text-[var(--v-muted-foreground)]">{area.summary.number == null ? area.summary.label : `${area.summary.word} · ${area.summary.label}`}</span>
                 </span>
                 <span className="font-display text-lg font-semibold tracking-[-0.03em]">{headline(area.summary)}</span>
                 <ChevronDown size={16} aria-hidden className={`shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />

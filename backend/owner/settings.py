@@ -281,11 +281,14 @@ def _check_together(new: Settings) -> None:
             "margin_floor_pct")
 
 
-def update_settings(db: Session, restaurant_id: int, user_id: int | None, changes: dict[str, Any]) -> Settings:
+def update_settings(db: Session, restaurant_id: int, user_id: int | None, changes: dict[str, Any], *, commit: bool = True) -> Settings:
     """Validate and save `changes` (API units, keyed by FieldSpec.key); audit every field that changed.
 
     A complete row is always written (no NULL-means-default). Re-saving a value an owner already has
     writes nothing and leaves updated_at alone. Raises SettingsError; the caller maps it to a 422.
+
+    `commit=False` only flushes: the new values are visible to everything that reads settings in this transaction, and the caller owns
+    the rollback (owner/preview.py runs the engines under a proposed setting that way, inside a SAVEPOINT, and throws it away).
     """
     stored_changes = _validate(changes)
     for attempt in (1, 2):
@@ -309,7 +312,7 @@ def update_settings(db: Session, restaurant_id: int, user_id: int | None, change
                 db.add(models.RestaurantSettingsAudit(
                     restaurant_id=restaurant_id, field=attr, old_value=str(getattr(before, attr)),
                     new_value=str(getattr(after, attr)), changed_by_user_id=user_id, changed_at=now))
-            db.commit()
+            db.commit() if commit else db.flush()
             return after
         except IntegrityError:
             db.rollback()          # two first-saves raced on the unique restaurant_id; redo against the winner

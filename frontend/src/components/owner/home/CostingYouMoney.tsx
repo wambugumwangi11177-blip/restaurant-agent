@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import api from "@/lib/api";
+import AssumptionChip from "@/components/owner/settings/AssumptionChip";
 import { kes } from "@/lib/owner/format";
 import type { CardTier, CostingYouMoney as Data, DecisionCard, RankedCard } from "@/lib/owner/types";
 
@@ -78,6 +79,7 @@ function Card({ card, onDone }: { card: DecisionCard; onDone: () => void }) {
         <span className="rounded-full bg-[hsl(42_71%_75%_/_0.55)] px-2 py-0.5 text-[10px] font-bold text-[var(--v-accent-foreground)]">{worth(card.tier, card.kes_month)}</span>
       </div>
       <h3 className="mt-2 text-sm font-bold leading-snug">{card.sentence}</h3>
+      {card.assumption && <AssumptionChip assumption={card.assumption} className="mt-1" />}
       {card.action && card.action !== card.sentence && <p className="mt-2 text-xs leading-relaxed">{card.action}</p>}
       {card.why && (
         <details className="mt-2">

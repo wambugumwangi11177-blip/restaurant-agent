@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
+import { SETTINGS_CHANGED } from "@/components/owner/settings/SettingsProvider";
 import type { OwnerHome } from "./types";
 
 const REFRESH_MS = 60_000;
@@ -31,7 +32,8 @@ export function useOwnerHome(period: OwnerHome["period"]): HomeState {
     setLoading(true);
     load();
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") load(); }, REFRESH_MS);
-    return () => { latest.current += 1; window.clearInterval(timer); };
+    window.addEventListener(SETTINGS_CHANGED, load);                  // a rule was changed: every card and figure may have moved
+    return () => { latest.current += 1; window.clearInterval(timer); window.removeEventListener(SETTINGS_CHANGED, load); };
   }, [load]);
 
   return { home, error, loading, reload: load };

@@ -23,7 +23,7 @@ export default function HealthStrip({ health }: { health: Health }) {
               <span aria-hidden className={`h-2 w-2 rounded-full ${DOT[t.status]}`} />{t.title}
             </p>
             <p className="font-display mt-2 text-xl font-semibold tracking-[-0.03em]">{value(t.number, t.unit)}</p>
-            <p className="mt-0.5 text-[11px] font-semibold">{t.word}</p>
+            {t.number != null && <p className="mt-0.5 text-[11px] font-semibold">{t.word}</p>}
             <p className="mt-0.5 text-[10px] leading-snug text-[var(--v-muted-foreground)]">{t.label}</p>
           </a>
         </li>

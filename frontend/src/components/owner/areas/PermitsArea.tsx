@@ -2,6 +2,7 @@
 import { BLOCK_TITLES } from "@/lib/owner/blocks";
 import { plural, shortDay } from "@/lib/owner/format";
 import type { DataTrustBlock, InfoBlock, LicencesBlock, SettingsBlock } from "@/lib/owner/areaTypes";
+import { useSettings } from "@/components/owner/settings/SettingsProvider";
 import type { Area } from "@/lib/owner/types";
 import { BlockFrame, Empty, Note, Pill, Stat } from "./ui";
 
@@ -40,9 +41,11 @@ function Licences({ block }: { block: LicencesBlock }) {
 }
 
 function Settings({ block }: { block: SettingsBlock }) {
+  const { fields, openTargets } = useSettings();
   return (
     <BlockFrame title={T.settings} block={block}>{() => (<>
       <Stat label="Targets you set" value={`${block.changed} of ${block.total}`} note={block.chosen ? "the rest use our defaults" : "all of them use our defaults for now"} />
+      {fields && <button type="button" onClick={openTargets} className="mt-3 min-h-10 text-[11px] font-bold text-[var(--v-primary)]">Review my targets →</button>}
     </>)}</BlockFrame>
   );
 }

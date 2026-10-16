@@ -6,10 +6,12 @@ import { OsError, OsLoading } from "@/components/os/States";
 import AreaPanels from "@/components/owner/home/AreaPanels";
 import ComingUp from "@/components/owner/home/ComingUp";
 import CostingYouMoney from "@/components/owner/home/CostingYouMoney";
+import { FirstWeekBanner, lockedAreas, useFirstWeek } from "@/components/owner/home/FirstWeek";
 import HealthStrip from "@/components/owner/home/HealthStrip";
 import Pulse from "@/components/owner/home/Pulse";
 import ReadNote from "@/components/owner/home/ReadNote";
 import SourceWaiting from "@/components/owner/home/SourceWaiting";
+import TargetsOnboarding from "@/components/owner/home/TargetsOnboarding";
 import Section from "@/components/owner/Section";
 import { useAuth } from "@/context/AuthContext";
 import { greeting } from "@/lib/owner/format";
@@ -24,6 +26,8 @@ export default function HomePage() {
   const config = tenantConfig(user?.tenant_name);
   const [period, setPeriod] = useState<OwnerHome["period"]>("today");
   const { home, error, reload } = useOwnerHome(period);
+  const ageDays = home?.setup?.age_days ?? 999;
+  const firstWeek = useFirstWeek(home?.restaurant.id ?? 0, ageDays);
 
   const waiting = home != null && config.source === "macsoft" && !home.pulse.freshness.source_trusted;
 
@@ -52,10 +56,12 @@ export default function HomePage() {
       {home && !waiting && (
         <>
           {error && <p role="alert" className="text-xs text-[var(--v-warn)]">Couldn&apos;t refresh just now — showing what we had.</p>}
+          <TargetsOnboarding restaurantId={home.restaurant.id} chosen={home.setup?.targets_chosen ?? true} />
+          {firstWeek.active && <FirstWeekBanner ageDays={ageDays} onSkip={firstWeek.skip} />}
           <Pulse pulse={home.pulse} period={period} />
           <Section id="costing-you-money" eyebrow="What deserves your attention" title="What's costing you money"><CostingYouMoney data={home.costing_you_money} /></Section>
           <Section id="health" eyebrow="How is each part doing?" title="Your restaurant's health"><HealthStrip health={home.health} /></Section>
-          <Section id="areas" eyebrow="Open any part for the detail" title="The six areas"><AreaPanels areas={home.areas} /></Section>
+          <Section id="areas" eyebrow="Open any part for the detail" title="The six areas"><AreaPanels areas={home.areas} opensOn={firstWeek.active ? lockedAreas(ageDays) : {}} /></Section>
           <Section id="coming-up" eyebrow="Before it surprises you" title="Coming up"><ComingUp data={home.coming_up} /></Section>
           <ReadNote read={home.read} />
         </>

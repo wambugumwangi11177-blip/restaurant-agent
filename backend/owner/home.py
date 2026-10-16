@@ -87,10 +87,15 @@ def _card(c: dict) -> dict:
             "decision": {"options": DECISION_OPTIONS}, "tier": "now" if c.get("now") else ("loss" if c.get("kind") == "loss" else "idea")}
 
 
+def ranked_cards(ctx: OwnerContext) -> list[dict]:
+    """Every card, in Home's order (internal shape: `title`, `impact_cents_month`, `kind` …). Home shows the first five; the settings
+    preview compares the whole list before and after a proposed change."""
+    return _rank(_overview()._attention_cards(ctx.db, ctx.rid, ctx.tenant_id, decision_limit=40))
+
+
 def _costing_you_money(ctx: OwnerContext) -> dict:
-    overview = _overview()
     base = ctx.order_state()
-    cards = _rank(overview._attention_cards(ctx.db, ctx.rid, ctx.tenant_id, decision_limit=40))
+    cards = ranked_cards(ctx)
     if base["state"] == "no_data" and not cards:
         return no_data("Nothing to rank until sales are recorded.", cards=[])
     top = cards[:CARDS_SHOWN]
@@ -156,6 +161,16 @@ def _read(ctx: OwnerContext) -> dict:
     return unavailable("LEVIII's read has not been written yet.", text=None)
 
 
+def _setup(ctx: OwnerContext) -> dict:
+    """What the first-run screens need: has the owner chosen their targets, and how many Nairobi days old is the restaurant (the day
+    its tenant was created is day 0). The guided first week and the "Your targets" step are driven by these two facts."""
+    from time_utils import eat_date
+    created = ctx.db.query(models.Tenant.created_at).filter(models.Tenant.id == ctx.tenant_id).scalar()
+    age = max((eat_date(ctx.now) - eat_date(created)).days, 0) if created else 0
+    return {"targets_chosen": ctx.db.query(models.RestaurantSettings.id).filter(models.RestaurantSettings.restaurant_id == ctx.rid).first() is not None,
+            "age_days": age}
+
+
 def compose_home(ctx: OwnerContext, period: str = "today") -> dict:
     if period not in PERIODS:
         raise ValueError(f"period must be one of {PERIODS}")
@@ -171,4 +186,5 @@ def compose_home(ctx: OwnerContext, period: str = "today") -> dict:
         "areas": area_blocks,
         "coming_up": ctx.safe("home.coming_up", lambda: _coming_up(ctx)),
         "read": _read(ctx),
+        "setup": _setup(ctx),
     }

@@ -2732,6 +2732,26 @@
     "to": "owner.states"
    },
    {
+    "from": "owner.preview",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.preview",
+    "lazy": false,
+    "to": "owner.home"
+   },
+   {
+    "from": "owner.preview",
+    "lazy": false,
+    "to": "owner.settings"
+   },
+   {
+    "from": "owner.preview",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
     "from": "owner.registry",
     "lazy": false,
     "to": "owner.areas"
@@ -3735,6 +3755,11 @@
     "from": "routers.owner",
     "lazy": false,
     "to": "owner.money.ledger"
+   },
+   {
+    "from": "routers.owner",
+    "lazy": false,
+    "to": "owner.preview"
    },
    {
     "from": "routers.owner",
@@ -5024,7 +5049,7 @@
     "group": "other",
     "id": "owner.home",
     "kind": "py",
-    "loc": 175,
+    "loc": 191,
     "path": "backend/owner/home.py"
    },
    {
@@ -5106,6 +5131,13 @@
    },
    {
     "group": "other",
+    "id": "owner.preview",
+    "kind": "py",
+    "loc": 68,
+    "path": "backend/owner/preview.py"
+   },
+   {
+    "group": "other",
     "id": "owner.registry",
     "kind": "py",
     "loc": 177,
@@ -5122,7 +5154,7 @@
     "group": "other",
     "id": "owner.settings",
     "kind": "py",
-    "loc": 319,
+    "loc": 322,
     "path": "backend/owner/settings.py"
    },
    {
@@ -5325,7 +5357,7 @@
     "group": "router",
     "id": "routers.owner",
     "kind": "py",
-    "loc": 128,
+    "loc": 139,
     "path": "backend/routers/owner.py"
    },
    {
@@ -6221,6 +6253,12 @@
    "verb": "GET"
   },
   {
+   "func": "preview_settings",
+   "module": "routers.owner",
+   "path": "/owner/settings/preview",
+   "verb": "POST"
+  },
+  {
    "func": "read_settings",
    "module": "routers.owner",
    "path": "/owner/settings",
@@ -6612,12 +6650,12 @@
   }
  ],
  "stats": {
-  "py_edges": 699,
+  "py_edges": 704,
   "py_lazy_edges": 212,
-  "py_modules": 174,
-  "routes": 191,
-  "ts_edges": 607,
-  "ts_files": 270
+  "py_modules": 175,
+  "routes": 192,
+  "ts_edges": 627,
+  "ts_files": 277
  },
  "status_only": [
   [
@@ -6844,6 +6882,10 @@
    },
    {
     "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/FirstWeek.tsx"
+   },
+   {
+    "from": "app/(owner)/home/page.tsx",
     "to": "components/owner/home/HealthStrip.tsx"
    },
    {
@@ -6857,6 +6899,10 @@
    {
     "from": "app/(owner)/home/page.tsx",
     "to": "components/owner/home/SourceWaiting.tsx"
+   },
+   {
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/TargetsOnboarding.tsx"
    },
    {
     "from": "app/(owner)/home/page.tsx",
@@ -8804,6 +8850,10 @@
    },
    {
     "from": "components/owner/OwnerShell.tsx",
+    "to": "components/owner/settings/SettingsProvider.tsx"
+   },
+   {
+    "from": "components/owner/OwnerShell.tsx",
     "to": "context/AuthContext.tsx"
    },
    {
@@ -8901,6 +8951,10 @@
    {
     "from": "components/owner/areas/PermitsArea.tsx",
     "to": "components/owner/areas/ui.tsx"
+   },
+   {
+    "from": "components/owner/areas/PermitsArea.tsx",
+    "to": "components/owner/settings/SettingsProvider.tsx"
    },
    {
     "from": "components/owner/areas/PermitsArea.tsx",
@@ -9016,6 +9070,10 @@
    },
    {
     "from": "components/owner/areas/ui.tsx",
+    "to": "components/owner/settings/AssumptionChip.tsx"
+   },
+   {
+    "from": "components/owner/areas/ui.tsx",
     "to": "lib/owner/types.ts"
    },
    {
@@ -9044,6 +9102,10 @@
    },
    {
     "from": "components/owner/home/CostingYouMoney.tsx",
+    "to": "components/owner/settings/AssumptionChip.tsx"
+   },
+   {
+    "from": "components/owner/home/CostingYouMoney.tsx",
     "to": "lib/api.ts"
    },
    {
@@ -9052,6 +9114,14 @@
    },
    {
     "from": "components/owner/home/CostingYouMoney.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/FirstWeek.tsx",
+    "to": "lib/owner/storage.ts"
+   },
+   {
+    "from": "components/owner/home/FirstWeek.tsx",
     "to": "lib/owner/types.ts"
    },
    {
@@ -9093,6 +9163,50 @@
    {
     "from": "components/owner/home/SourceWaiting.tsx",
     "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/TargetsOnboarding.tsx",
+    "to": "components/owner/settings/SettingsProvider.tsx"
+   },
+   {
+    "from": "components/owner/home/TargetsOnboarding.tsx",
+    "to": "lib/owner/settings.ts"
+   },
+   {
+    "from": "components/owner/home/TargetsOnboarding.tsx",
+    "to": "lib/owner/storage.ts"
+   },
+   {
+    "from": "components/owner/settings/AssumptionChip.tsx",
+    "to": "components/owner/settings/SettingsProvider.tsx"
+   },
+   {
+    "from": "components/owner/settings/AssumptionChip.tsx",
+    "to": "lib/owner/settings.ts"
+   },
+   {
+    "from": "components/owner/settings/AssumptionChip.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/settings/SettingsProvider.tsx",
+    "to": "components/owner/settings/SettingsSheet.tsx"
+   },
+   {
+    "from": "components/owner/settings/SettingsProvider.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/owner/settings/SettingsProvider.tsx",
+    "to": "lib/owner/settings.ts"
+   },
+   {
+    "from": "components/owner/settings/SettingsSheet.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/owner/settings/SettingsSheet.tsx",
+    "to": "lib/owner/settings.ts"
    },
    {
     "from": "components/staff/AttendanceWidget.tsx",
@@ -9221,6 +9335,10 @@
    {
     "from": "lib/owner/format.ts",
     "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "lib/owner/useOwnerHome.ts",
+    "to": "components/owner/settings/SettingsProvider.tsx"
    },
    {
     "from": "lib/owner/useOwnerHome.ts",

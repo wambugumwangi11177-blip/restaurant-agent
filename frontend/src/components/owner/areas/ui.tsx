@@ -1,6 +1,7 @@
 "use client";
 import type { ReactNode } from "react";
 import ChartEmpty, { isEmpty } from "@/components/charts/ChartEmpty";
+import AssumptionChip from "@/components/owner/settings/AssumptionChip";
 import StateChip from "@/components/owner/StateChip";
 import type { Block } from "@/lib/owner/types";
 
@@ -21,6 +22,7 @@ export function BlockFrame({ title, block, children, quiet = false }: {
         {!quiet && <StateChip block={block} />}
       </div>
       {empty ? <ChartEmpty state={block.state} reason={block.reason as string | null | undefined} day={block.day} of={block.of} height={64} /> : children()}
+      <Rules block={block} />
     </section>
   );
 }
@@ -49,3 +51,12 @@ export const Grid = ({ children, cols = 3 }: { children: ReactNode; cols?: 2 | 3
 );
 
 export const Empty = ({ children }: { children: ReactNode }) => <p className="text-xs text-[var(--v-muted-foreground)]">{children}</p>;
+
+/** The owner's own rules a block was judged by, each with a way to change it: "Based on: Wages target 32% · Change". */
+function Rules({ block }: { block: Block }) {
+  const list = block.assumptions?.length ? block.assumptions : block.assumption ? [block.assumption] : [];
+  const seen = new Set<string>();
+  const rules = list.filter((a) => (seen.has(a.setting) ? false : (seen.add(a.setting), true)));
+  if (rules.length === 0 || isEmpty(block.state)) return null;
+  return <div className="mt-3 flex flex-wrap gap-x-4 gap-y-0.5 border-t border-[var(--v-border)] pt-2">{rules.map((a) => <AssumptionChip key={a.setting} assumption={a} />)}</div>;
+}

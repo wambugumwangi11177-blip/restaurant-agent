@@ -19,7 +19,17 @@ it("a restaurant with nothing recorded gets a Home that says so, zone by zone, a
   expect(document.body.textContent).not.toMatch(/NaN|undefined|Infinity|\[object/);
 });
 
+it("a tile with no number says 'Not set up' once, not twice", async () => {
+  render(<HomePage />);
+  const strip = (await screen.findByRole("heading", { name: "Your restaurant's health" })).closest("section")!;
+  for (const tile of within(strip).getAllByRole("link")) expect(within(tile).getAllByText("Not set up")).toHaveLength(1);
+  expect(screen.getByRole("button", { name: /Permits & Settings/ }).textContent).not.toMatch(/Not set up.*Not set up/);
+});
+
 it("every one of the six panels opens on an empty restaurant, gives a reason, and draws no chart", async () => {
+  const week = structuredClone(fresh) as unknown as { setup: { age_days: number } };
+  week.setup.age_days = 30;                                                                    // past the guided first week: nothing is shut
+  vi.mocked(api.get).mockResolvedValue({ data: week } as never);
   render(<HomePage />);
   await screen.findByText("No sale recorded yet.");
   for (const name of ["My Money", "Sales & Dishes", "Store & Suppliers", "Cash Check", "Staff", "Permits & Settings"]) {

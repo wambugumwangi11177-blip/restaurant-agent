@@ -9,6 +9,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { FileText, Home, MessageCircle, Settings2 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
+import SettingsProvider from "@/components/owner/settings/SettingsProvider";
 import { useAuth } from "@/context/AuthContext";
 import { nairobiDate } from "@/lib/owner/format";
 import { tenantConfig } from "@/lib/tenantConfig";
@@ -55,7 +56,7 @@ export default function OwnerShell({ children }: { children: React.ReactNode }) 
           ))}
         </nav>
       </header>
-      <main className="mx-auto max-w-[1180px] px-4 pb-16 pt-4 sm:px-7 lg:px-10">{children}</main>
+      <main className="mx-auto max-w-[1180px] px-4 pb-16 pt-4 sm:px-7 lg:px-10"><SettingsProvider>{children}</SettingsProvider></main>
       <nav aria-label="Owner pages" className="fixed inset-x-0 bottom-0 grid border-t border-[var(--v-border)] bg-[var(--v-card)] md:hidden print:hidden"
         style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
         {tabs.map(({ href, label, icon: Icon }) => (

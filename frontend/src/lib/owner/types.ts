@@ -116,4 +116,6 @@ export type OwnerHome = {
   areas: Record<AreaKey, Area>;
   coming_up: ComingUp;
   read: Block & { text: string | null };
+  /** Has the owner chosen their targets, and how many Nairobi days old is the restaurant (0 = the day it joined). */
+  setup: { targets_chosen: boolean; age_days: number };
 };

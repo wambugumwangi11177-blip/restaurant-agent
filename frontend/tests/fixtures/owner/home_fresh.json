@@ -585,5 +585,9 @@
   "as_of": null,
   "reason": "LEVIII's read has not been written yet.",
   "text": null
+ },
+ "setup": {
+  "targets_chosen": false,
+  "age_days": 0
  }
 }

@@ -20,6 +20,7 @@ from database import get_db
 from owner import areas as owner_areas
 from owner import ask as owner_ask
 from owner import home as owner_home
+from owner import preview as owner_preview
 from owner import reports as owner_reports
 from owner import settings as owner_settings
 from owner.money.ledger import parse_month
@@ -70,6 +71,16 @@ def write_settings(body: SettingsPatch, db: Session = Depends(get_db), user: mod
     except owner_settings.SettingsError as exc:
         raise HTTPException(422, detail={"field": exc.field, "message": str(exc)}) from exc
     return owner_settings.describe(db, restaurant.id)
+
+
+@router.post("/settings/preview")
+def preview_settings(body: SettingsPatch, db: Session = Depends(get_db), user: models.User = Depends(_owner_only)):
+    """What a change would do to Home's cards, worked out with the real engines and rolled back: nothing is saved or audited."""
+    restaurant = _restaurant(db, user)
+    try:
+        return owner_preview.preview_settings(db, user, restaurant, body.model_dump(exclude_none=True))
+    except owner_settings.SettingsError as exc:
+        raise HTTPException(422, detail={"field": exc.field, "message": str(exc)}) from exc
 
 
 @router.get("/settings/history")

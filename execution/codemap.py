@@ -11,7 +11,7 @@ re-run on unchanged code produces an identical diff.
 
 How "an engine appears on a surface" is derived (no hand-drawn dots):
 
-  1. A SURFACE is a set of frontend entry files (e.g. app/vibanda/page.tsx).
+  1. A SURFACE is a set of frontend entry files (e.g. app/(owner)/home/page.tsx).
      Their TypeScript import closure gives every file the surface can render.
   2. Every string/template literal in those files that matches a backend route
      (after stripping /api/v1, query strings, ${...}) is an API call the
@@ -119,20 +119,20 @@ CANDIDATES: dict[str, str] = {}
 
 
 # ── Surfaces (columns of figure 1.3) ─────────────────────────────────────────
-# Entry files are relative to frontend/src. Demo is also flagged as a PARALLEL
-# implementation surface: it reaches backend/demo_scenario.py instead of engines.
+# Entry files are relative to frontend/src. S4.6b retired the "area" and "demo" columns of figure 1.3: the area
+# pages are panels of Home now, and the legacy demo (its own pages over backend/demo_scenario.py) is deleted.
 SURFACES = [
-    ("home", "Home", ["app/vibanda/page.tsx"]),
-    ("area", "Area pages", ["app/vibanda/[area]/page.tsx"]),
-    ("os", "OS", ["app/vibanda/os/page.tsx"]),
-    ("reports", "Reports", ["app/vibanda/reports/page.tsx"]),
-    ("demo", "Demo", ["app/demo/page.tsx", "app/demo/[area]/page.tsx",
-                      "app/demo/os/page.tsx", "app/demo/reports/page.tsx"]),
+    ("home", "Home", ["app/(owner)/home/page.tsx"]),
+    ("os", "OS", ["app/(owner)/os/page.tsx"]),
+    ("reports", "Reports", ["app/(owner)/reports/page.tsx"]),
     ("old_dash", "Old dash", ["app/dashboard/**/page.tsx"]),
 ]
-PARALLEL_BACKENDS = {"demo": ["demo_scenario", "routers.demo"]}
+# A surface can be flagged as a PARALLEL implementation: it reaches a backend module that computes a topic itself
+# instead of calling the engine. None is left (the only one was the legacy demo); the mechanism stays so a new
+# one would show as "reimplemented" (≈) rather than hide.
+PARALLEL_BACKENDS: dict[str, list[str]] = {}
 # An engine shows as re-implemented (≈) on a surface whose parallel backend
-# (demo_scenario + routers/demo.py) computes the same topic itself: the backend's
+# computes the same topic itself: the backend's
 # source mentions one of these words. This is keyword EVIDENCE, reported as such;
 # it says "the demo has its own maths for this", not that the maths is equivalent.
 PARALLEL_KEYWORDS = {
@@ -154,18 +154,11 @@ PARALLEL_KEYWORDS = {
 # state (data_provenance.source_connection) and renders none of its engine output.
 STATUS_ONLY = {
     ("components/NotificationBell.tsx", "/overview/today"),
-    ("components/vibanda/VibandaAreaClient.tsx", "/overview/today"),
-    ("components/vibanda/OwnerHomeEmpty.tsx", "/overview/today"),
-    ("components/vibanda/VibandaForecast.tsx", "/overview/today"),
-    ("app/vibanda/os/page.tsx", "/overview/today"),
-    ("app/vibanda/reports/page.tsx", "/overview/today"),
-    ("components/vibanda/SourceUnavailable.tsx", "/observer/source-status"),
+    ("components/owner/SourceUnavailable.tsx", "/observer/source-status"),
 }
 # CONDITIONAL_FILES: calls made only from here render only when a condition holds
 # (a source verified), so an engine reached solely through them is "partial".
-CONDITIONAL_FILES = {
-    "components/vibanda/VibandaForecast.tsx": "forecast panel renders only when the source is verified",
-}
+CONDITIONAL_FILES: dict[str, str] = {}
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -294,8 +287,33 @@ def build_python() -> dict:
                 for kw in node.value.keywords:
                     if kw.arg == "prefix" and isinstance(kw.value, ast.Constant):
                         router_prefix = kw.value.value
+        # Accessors: `def _overview(): from routers import overview; return overview` (a lazy import behind a function,
+        # used to avoid import cycles). `_overview().x` is then a reference to routers.overview.x.
+        accessors = {}
+        for fn in [n for n in m.tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
+            bound = {}
+            for sub in ast.walk(fn):
+                if isinstance(sub, ast.ImportFrom):
+                    for alias, (t, nm) in zip(sub.names, resolve_from(m, sub, known)):
+                        if nm is None:
+                            bound[alias.asname or alias.name] = t
+            rets = [n for n in ast.walk(fn) if isinstance(n, ast.Return)]
+            if len(rets) == 1 and isinstance(rets[0].value, ast.Name) and rets[0].value.id in bound:
+                accessors[fn.name] = bound[rets[0].value.id]
         for fn in [n for n in m.tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
             refs, calls, routes = set(), set(), []
+            # module aliases visible in this function: module-level imports, imports inside it, `x = accessor()`
+            aliases = {k: v[0] for k, v in imported_names[name].items() if v[1] is None}
+            for sub in ast.walk(fn):
+                if isinstance(sub, ast.ImportFrom):
+                    for alias, (t, nm) in zip(sub.names, resolve_from(m, sub, known)):
+                        if nm is None:
+                            aliases[alias.asname or alias.name] = t
+                elif isinstance(sub, ast.Assign) and isinstance(sub.value, ast.Call) \
+                        and getattr(sub.value.func, "id", "") in accessors:
+                    for tgt in sub.targets:
+                        if isinstance(tgt, ast.Name):
+                            aliases[tgt.id] = accessors[sub.value.func.id]
             for sub in ast.walk(fn):
                 if isinstance(sub, ast.ImportFrom):
                     refs |= {(t, nm) for t, nm in resolve_from(m, sub, known)}
@@ -311,6 +329,12 @@ def build_python() -> dict:
                 elif isinstance(sub, ast.Attribute) and isinstance(sub.value, ast.Name):
                     if sub.value.id in imported_names[name]:
                         refs.add(imported_names[name][sub.value.id])
+                    if sub.value.id in aliases:
+                        refs.add((aliases[sub.value.id], sub.attr))        # `overview._summarize` -> that function
+                if isinstance(sub, ast.Attribute) and isinstance(sub.value, ast.Call) \
+                        and getattr(sub.value.func, "id", "") in accessors:
+                    refs.add((accessors[sub.value.func.id], None))
+                    refs.add((accessors[sub.value.func.id], sub.attr))     # `_overview()._attention_cards`
             for dec in fn.decorator_list:
                 if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Attribute) \
                         and getattr(dec.func.value, "id", "") == "router" \
@@ -331,7 +355,7 @@ def group_of(name: str) -> str:
         return "ai"
     if name.startswith("integration") or name in {"observer_mode"}:
         return "integration"
-    if name in {"demo_scenario", "demo_report_pdf"} or name.startswith("demo"):
+    if name.startswith("demo"):
         return "demo"
     return "other"
 
@@ -346,10 +370,12 @@ def engine_targets() -> list[str]:
 
 def is_engine_leaf(name: str) -> bool:
     """A module that IS an engine (or lives inside one): reaching it counts, walking out of it does not."""
-    for t in engine_targets():
-        t = t.split(":")[0]
-        if name == t or name.startswith(t + "."):
-            return name != "ai.decisions" and not name.startswith("ai.decisions.")
+    for _k, _l, kind, targets in ENGINES:
+        if kind != "module":
+            continue        # a "symbol" engine is one function of a bigger module (routers.overview); the module is not a leaf
+        for t in targets:
+            if name == t or name.startswith(t + "."):
+                return name != "ai.decisions" and not name.startswith("ai.decisions.")
     return False
 
 
@@ -723,13 +749,18 @@ def compare_spec() -> int:
     figure = json.load(open(os.path.join(ROOT, "docs", "v2", "figure_1_3.json")))
     payload, _ = build()
     diffs = []
+    retired = [c for c in figure["columns"] if c not in payload["surfaces"]]
+    kept = [c for c in figure["columns"] if c in payload["surfaces"]]
     for ekey, want in figure["rows"].items():
         for col, w in zip(figure["columns"], want):
+            if col in retired:
+                continue
             got = payload["matrix"][ekey][col]
             if got != w:
                 diffs.append((ekey, col, w, got))
-    total = len(figure["rows"]) * len(figure["columns"])
-    print(f"figure 1.3: {total - len(diffs)}/{total} cells reproduced from code")
+    total = len(figure["rows"]) * len(kept)
+    print(f"figure 1.3: {total - len(diffs)}/{total} cells reproduced from code"
+          + (f" (columns retired since the spec was written: {', '.join(retired)})" if retired else ""))
     for ekey, col, w, got in diffs:
         print(f"  differs  {ekey:<16} x {col:<9} spec={w:<14} code={got}")
     return 0

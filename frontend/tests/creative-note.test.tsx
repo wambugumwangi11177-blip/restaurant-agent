@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import CreativeNote from "../src/components/vibanda/CreativeNote";
+import CreativeNote from "../src/components/owner/CreativeNote";
 import api from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn() } }));

@@ -6,8 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import { fmtKes } from "@/lib/format";
 import { OsLoading, OsEmpty, OsError } from "@/components/os/States";
-import SourceUnavailable from "@/components/vibanda/SourceUnavailable";
-import CreativeNote from "@/components/vibanda/CreativeNote";
+import SourceUnavailable from "@/components/owner/SourceUnavailable";
+import CreativeNote from "@/components/owner/CreativeNote";
 
 const observerMode = process.env.NEXT_PUBLIC_OBSERVER_MODE === "true";
 

@@ -71,7 +71,7 @@ def test_every_built_engine_row_points_at_real_code(built):
 def test_matrix_has_a_cell_for_every_engine_and_surface(built):
     payload, _ = built
     surfaces = list(payload["surfaces"])
-    assert surfaces == ["home", "area", "os", "reports", "demo", "old_dash"]
+    assert surfaces == ["home", "os", "reports", "old_dash"]
     for engine in payload["engines"]:
         assert set(payload["matrix"][engine["key"]]) == set(surfaces)
         for state in payload["matrix"][engine["key"]].values():
@@ -79,8 +79,8 @@ def test_matrix_has_a_cell_for_every_engine_and_surface(built):
 
 
 def test_home_surface_reaches_its_known_engines(built):
-    """Sanity anchors that are true by construction today (Home calls overview.today)."""
+    """Sanity anchors that are true by construction today (Home is one call to owner.home, which reads the overview engines)."""
     payload, _ = built
-    assert any("overview.today" in c for c in payload["surfaces"]["home"]["api_calls"])
+    assert any("owner.home" in c for c in payload["surfaces"]["home"]["api_calls"])
     assert payload["matrix"]["decisions"]["home"] == "wired"
     assert payload["matrix"]["sales_summary"]["home"] == "wired"

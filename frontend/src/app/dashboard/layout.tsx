@@ -118,15 +118,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             router.push("/login");
             return;
         }
-        // Vibanda tenants live in their own 3-page shell — never in the
-        // generic dashboard (plan 2026-09-12). Bounce any deep link.
-        if (isVibanda(user.tenant_name)) {
-            router.push("/vibanda");
-            return;
-        }
-        // Demo Restaurant gets the same owner shell, cloned under /demo.
-        if (isDemoRestaurant(user.tenant_name)) {
-            router.push("/demo");
+        // Vibanda and the Demo Restaurant live in the owner shell (Home / Ask LEVIII / Reports) — never in the
+        // generic dashboard. Bounce any deep link.
+        if (isVibanda(user.tenant_name) || isDemoRestaurant(user.tenant_name)) {
+            router.push("/home");
             return;
         }
         if (isStaffAccount && staffRole) {

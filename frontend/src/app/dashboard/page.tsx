@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import api from "@/lib/api";
-import { demoData, isDashboardEmpty, isDemoMode } from "@/lib/demo-data";
+import { isDashboardEmpty } from "@/lib/emptiness";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -116,10 +116,8 @@ export default function DashboardPage() {
         );
     }
 
-    // Demo (Lavy showcase) only when explicitly enabled. A real account with no
-    // data gets an honest empty state below — never another restaurant's numbers.
-    const isDemo = isDemoMode() && isDashboardEmpty(data);
-    if (!isDemo && isDashboardEmpty(data)) {
+    // An account with no data gets an honest empty state — never another restaurant's numbers.
+    if (isDashboardEmpty(data)) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-4 px-6">
                 <div className="w-14 h-14 rounded-2xl bg-[var(--accent)]/10 flex items-center justify-center">
@@ -144,29 +142,20 @@ export default function DashboardPage() {
             </div>
         );
     }
-    const activeData: DashboardData | null = isDemo ? demoData.dashboard : data;
-
-    const qs = activeData?.quick_stats || {
+    const qs = data?.quick_stats || {
         today_revenue: 0, today_orders: 0, avg_order_value: 0, active_alerts: 0,
         pending_orders: 0, menu_items: 0, day_over_day_change: 0,
     };
-    const healthScore = activeData?.health_score ?? 0;
-    const breakdown = activeData?.health_breakdown || [];
-    const alerts = activeData?.alerts || [];
-    const risks = activeData?.risks || [];
-    const opportunities = activeData?.opportunities || [];
+    const healthScore = data?.health_score ?? 0;
+    const breakdown = data?.health_breakdown || [];
+    const alerts = data?.alerts || [];
+    const risks = data?.risks || [];
+    const opportunities = data?.opportunities || [];
 
     const healthLabel = healthScore >= 80 ? "Looking great" : healthScore >= 60 ? "Doing okay" : healthScore >= 40 ? "Needs attention" : "Let's fix a few things";
 
     return (
         <div className="space-y-6">
-            {/* Demo Mode Banner */}
-            {isDemo && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent)]/8 border border-[var(--accent)]/20 rounded-lg">
-                    <span className="text-[10px] text-[var(--accent)]">📊 Demo Mode — Showing sample data for Lavy restaurant</span>
-                </div>
-            )}
-
             {/* Greeting */}
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div>
@@ -270,7 +259,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <StatCard
                     label="Today's Sales"
-                    value={isDemo ? `KES ${(52400).toLocaleString("en-KE")}` : formatKES(qs.today_revenue)}
+                    value={formatKES(qs.today_revenue)}
                     sub={qs.day_over_day_change ? `${qs.day_over_day_change > 0 ? "Up" : "Down"} ${Math.abs(qs.day_over_day_change)}% from yesterday` : "No data from yesterday"}
                     color={qs.day_over_day_change >= 0 ? "#22c55e" : "#ef4444"}
                 />
@@ -282,7 +271,7 @@ export default function DashboardPage() {
                 />
                 <StatCard
                     label="Average Spend"
-                    value={isDemo ? `KES ${(2114).toLocaleString("en-KE")}` : formatKES(qs.avg_order_value)}
+                    value={formatKES(qs.avg_order_value)}
                     sub={`Across ${qs.menu_items || 0} menu items`}
                     color="#3b82f6"
                 />

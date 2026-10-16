@@ -1,7 +1,5 @@
 {
- "conditional_files": {
-  "components/vibanda/VibandaForecast.tsx": "forecast panel renders only when the source is verified"
- },
+ "conditional_files": {},
  "engines": [
   {
    "key": "sales_summary",
@@ -560,185 +558,139 @@
  },
  "matrix": {
   "cash": {
-   "area": "not_shown",
-   "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
-   "reports": "not_shown"
+   "os": "wired",
+   "reports": "wired"
   },
   "custody": {
-   "area": "not_shown",
-   "demo": "not_shown",
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
-   "reports": "not_shown"
+   "os": "wired",
+   "reports": "wired"
   },
   "data_quality": {
-   "area": "not_shown",
-   "demo": "not_shown",
-   "home": "not_shown",
+   "home": "wired",
    "old_dash": "wired",
    "os": "not_shown",
    "reports": "not_shown"
   },
   "decisions": {
-   "area": "not_shown",
-   "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
-   "reports": "not_shown"
+   "os": "wired",
+   "reports": "wired"
   },
   "fraud": {
-   "area": "not_shown",
-   "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
-   "reports": "not_shown"
+   "os": "wired",
+   "reports": "wired"
   },
   "inventory": {
-   "area": "partial",
-   "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
-   "reports": "not_shown"
+   "os": "wired",
+   "reports": "wired"
   },
   "kds": {
-   "area": "partial",
-   "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
-   "reports": "not_shown"
+   "os": "wired",
+   "reports": "wired"
   },
   "labor": {
-   "area": "partial",
-   "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
-   "reports": "not_shown"
+   "os": "wired",
+   "reports": "wired"
   },
   "marketing": {
-   "area": "not_shown",
-   "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
-   "reports": "not_shown"
+   "os": "wired",
+   "reports": "wired"
   },
   "menu": {
-   "area": "partial",
-   "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
-   "reports": "not_shown"
+   "os": "wired",
+   "reports": "wired"
   },
   "money": {
-   "area": "not_shown",
-   "demo": "reimplemented",
-   "home": "not_shown",
+   "home": "wired",
    "old_dash": "not_shown",
    "os": "not_shown",
    "reports": "not_shown"
   },
   "mpesa_match": {
-   "area": "not_built",
-   "demo": "reimplemented",
    "home": "not_built",
    "old_dash": "not_built",
    "os": "not_built",
    "reports": "not_built"
   },
   "owner_settings": {
-   "area": "not_shown",
-   "demo": "not_shown",
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
-   "reports": "not_shown"
+   "os": "wired",
+   "reports": "wired"
   },
   "pricing": {
-   "area": "not_shown",
-   "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
-   "reports": "not_shown"
+   "os": "wired",
+   "reports": "wired"
   },
   "profit": {
-   "area": "partial",
-   "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
-   "reports": "not_shown"
+   "os": "wired",
+   "reports": "wired"
   },
   "reservations": {
-   "area": "partial",
-   "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
-   "reports": "not_shown"
+   "os": "wired",
+   "reports": "wired"
   },
   "revenue_forecast": {
-   "area": "partial",
-   "demo": "reimplemented",
-   "home": "not_shown",
+   "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
-   "reports": "not_shown"
+   "os": "wired",
+   "reports": "wired"
   },
   "roi": {
-   "area": "not_shown",
-   "demo": "reimplemented",
-   "home": "not_shown",
+   "home": "wired",
    "old_dash": "wired",
    "os": "not_shown",
    "reports": "not_shown"
   },
   "sales_summary": {
-   "area": "not_shown",
-   "demo": "reimplemented",
    "home": "wired",
    "old_dash": "not_shown",
-   "os": "not_shown",
-   "reports": "not_shown"
+   "os": "wired",
+   "reports": "wired"
   },
   "simulator": {
-   "area": "not_shown",
-   "demo": "reimplemented",
    "home": "not_shown",
    "old_dash": "wired",
    "os": "not_shown",
    "reports": "not_shown"
   },
   "strategist": {
-   "area": "not_shown",
-   "demo": "not_shown",
    "home": "not_shown",
    "old_dash": "wired",
    "os": "not_shown",
    "reports": "not_shown"
   },
   "supply_chain": {
-   "area": "partial",
-   "demo": "reimplemented",
    "home": "wired",
    "old_dash": "wired",
-   "os": "not_shown",
-   "reports": "not_shown"
+   "os": "wired",
+   "reports": "wired"
   },
   "twin": {
-   "area": "partial",
-   "demo": "reimplemented",
-   "home": "not_shown",
+   "home": "wired",
    "old_dash": "wired",
    "os": "not_shown",
    "reports": "not_shown"
@@ -2249,11 +2201,6 @@
    {
     "from": "main",
     "lazy": false,
-    "to": "routers.demo"
-   },
-   {
-    "from": "main",
-    "lazy": false,
     "to": "routers.enterprise"
    },
    {
@@ -3315,61 +3262,6 @@
     "from": "routers.creative",
     "lazy": false,
     "to": "routers.overview"
-   },
-   {
-    "from": "routers.demo",
-    "lazy": true,
-    "to": "ai.creative"
-   },
-   {
-    "from": "routers.demo",
-    "lazy": true,
-    "to": "ai.llm_client"
-   },
-   {
-    "from": "routers.demo",
-    "lazy": true,
-    "to": "ai.owner_narrative"
-   },
-   {
-    "from": "routers.demo",
-    "lazy": false,
-    "to": "auth"
-   },
-   {
-    "from": "routers.demo",
-    "lazy": false,
-    "to": "database"
-   },
-   {
-    "from": "routers.demo",
-    "lazy": true,
-    "to": "demo_report_pdf"
-   },
-   {
-    "from": "routers.demo",
-    "lazy": false,
-    "to": "demo_scenario"
-   },
-   {
-    "from": "routers.demo",
-    "lazy": true,
-    "to": "feature_flags"
-   },
-   {
-    "from": "routers.demo",
-    "lazy": false,
-    "to": "models"
-   },
-   {
-    "from": "routers.demo",
-    "lazy": false,
-    "to": "rate_limit"
-   },
-   {
-    "from": "routers.demo",
-    "lazy": false,
-    "to": "routers.deps"
    },
    {
     "from": "routers.deps",
@@ -4843,20 +4735,6 @@
     "path": "backend/demo/wipe.py"
    },
    {
-    "group": "demo",
-    "id": "demo_report_pdf",
-    "kind": "py",
-    "loc": 229,
-    "path": "backend/demo_report_pdf.py"
-   },
-   {
-    "group": "demo",
-    "id": "demo_scenario",
-    "kind": "py",
-    "loc": 631,
-    "path": "backend/demo_scenario.py"
-   },
-   {
     "group": "other",
     "id": "dev_snapshot",
     "kind": "py",
@@ -4972,7 +4850,7 @@
     "group": "other",
     "id": "main",
     "kind": "py",
-    "loc": 665,
+    "loc": 663,
     "path": "backend/main.py"
    },
    {
@@ -5254,13 +5132,6 @@
     "kind": "py",
     "loc": 149,
     "path": "backend/routers/creative.py"
-   },
-   {
-    "group": "router",
-    "id": "routers.demo",
-    "kind": "py",
-    "loc": 353,
-    "path": "backend/routers/demo.py"
    },
    {
     "group": "router",
@@ -5903,48 +5774,6 @@
    "module": "routers.creative",
    "path": "/ai/creative/home",
    "verb": "GET"
-  },
-  {
-   "func": "area",
-   "module": "routers.demo",
-   "path": "/demo/areas/{area}",
-   "verb": "GET"
-  },
-  {
-   "func": "chat",
-   "module": "routers.demo",
-   "path": "/demo/chat",
-   "verb": "POST"
-  },
-  {
-   "func": "home",
-   "module": "routers.demo",
-   "path": "/demo/home",
-   "verb": "GET"
-  },
-  {
-   "func": "ideas",
-   "module": "routers.demo",
-   "path": "/demo/ideas",
-   "verb": "POST"
-  },
-  {
-   "func": "report",
-   "module": "routers.demo",
-   "path": "/demo/reports/{period}",
-   "verb": "GET"
-  },
-  {
-   "func": "report_pdf",
-   "module": "routers.demo",
-   "path": "/demo/reports/{period}/pdf",
-   "verb": "GET"
-  },
-  {
-   "func": "simulate",
-   "module": "routers.demo",
-   "path": "/demo/simulate",
-   "verb": "POST"
   },
   {
    "func": "audit_center",
@@ -6650,102 +6479,39 @@
   }
  ],
  "stats": {
-  "py_edges": 704,
-  "py_lazy_edges": 212,
-  "py_modules": 175,
-  "routes": 192,
-  "ts_edges": 630,
-  "ts_files": 278
+  "py_edges": 692,
+  "py_lazy_edges": 207,
+  "py_modules": 172,
+  "routes": 185,
+  "ts_edges": 565,
+  "ts_files": 257
  },
  "status_only": [
-  [
-   "app/vibanda/os/page.tsx",
-   "/overview/today"
-  ],
-  [
-   "app/vibanda/reports/page.tsx",
-   "/overview/today"
-  ],
   [
    "components/NotificationBell.tsx",
    "/overview/today"
   ],
   [
-   "components/vibanda/OwnerHomeEmpty.tsx",
-   "/overview/today"
-  ],
-  [
-   "components/vibanda/SourceUnavailable.tsx",
+   "components/owner/SourceUnavailable.tsx",
    "/observer/source-status"
-  ],
-  [
-   "components/vibanda/VibandaAreaClient.tsx",
-   "/overview/today"
-  ],
-  [
-   "components/vibanda/VibandaForecast.tsx",
-   "/overview/today"
   ]
  ],
  "surfaces": {
-  "area": {
-   "api_calls": [
-    "GET /ai/forecast/twin -> routers.ai.ai_forecast_twin [conditional]",
-    "GET /ai/labor -> routers.ai.ai_labor [conditional]",
-    "GET /ai/profit -> routers.ai.ai_profit [conditional]",
-    "GET /ai/supply-chain -> routers.ai.ai_supply_chain [conditional]",
-    "GET /ai/inventory-predictions -> routers.analytics.inventory_intel [conditional]",
-    "GET /ai/kds-intelligence -> routers.analytics.kds_intel [conditional]",
-    "GET /ai/menu-engineering -> routers.analytics.menu_engineering [conditional]",
-    "GET /ai/reservation-insights -> routers.analytics.reservation_intel [conditional]",
-    "GET /ai/revenue-forecast -> routers.analytics.revenue_forecast [conditional]"
-   ],
-   "entries": [
-    "app/vibanda/[area]/page.tsx"
-   ],
-   "frontend_files": 8,
-   "label": "Area pages",
-   "parallel_backends": []
-  },
-  "demo": {
-   "api_calls": [
-    "GET /demo/areas/{area} -> routers.demo.area",
-    "POST /demo/chat -> routers.demo.chat",
-    "GET /demo/home -> routers.demo.home",
-    "POST /demo/ideas -> routers.demo.ideas",
-    "GET /demo/reports/{period} -> routers.demo.report",
-    "GET /demo/reports/{period}/pdf -> routers.demo.report_pdf",
-    "POST /demo/simulate -> routers.demo.simulate",
-    "POST /staff/end-impersonation -> routers.staff.end_impersonation",
-    "POST /staff/{staff_id}/impersonate -> routers.staff.impersonate_staff",
-    "PUT /staff/{staff_id} -> routers.staff.update_staff"
-   ],
-   "entries": [
-    "app/demo/page.tsx",
-    "app/demo/[area]/page.tsx",
-    "app/demo/os/page.tsx",
-    "app/demo/reports/page.tsx"
-   ],
-   "frontend_files": 17,
-   "label": "Demo",
-   "parallel_backends": [
-    "demo_scenario",
-    "routers.demo"
-   ]
-  },
   "home": {
    "api_calls": [
-    "GET /ai/creative/home -> routers.creative.creative_home",
-    "GET /overview/today -> routers.overview.today",
-    "GET /reports/{period} -> routers.reports.report",
+    "GET /owner/home -> routers.owner.home",
+    "POST /owner/settings/preview -> routers.owner.preview_settings",
+    "GET /owner/settings -> routers.owner.read_settings",
+    "PUT /owner/settings -> routers.owner.write_settings",
+    "GET /owner/money/pnl/export -> routers.owner_money.export_profit_and_loss",
     "POST /staff/end-impersonation -> routers.staff.end_impersonation",
     "POST /staff/{staff_id}/impersonate -> routers.staff.impersonate_staff",
     "PUT /staff/{staff_id} -> routers.staff.update_staff"
    ],
    "entries": [
-    "app/vibanda/page.tsx"
+    "app/(owner)/home/page.tsx"
    ],
-   "frontend_files": 12,
+   "frontend_files": 51,
    "label": "Home",
    "parallel_backends": []
   },
@@ -6840,20 +6606,35 @@
    "parallel_backends": []
   },
   "os": {
-   "api_calls": [],
-   "entries": [
-    "app/vibanda/os/page.tsx"
+   "api_calls": [
+    "POST /ai/chat -> routers.ai_ask.chat_llm",
+    "POST /ai/os/conversations -> routers.ai_ask.create_os_conversation",
+    "GET /ai/os/conversations/{conversation_id} -> routers.ai_ask.get_os_conversation",
+    "GET /ai/os/preferences -> routers.ai_ask.get_os_preference",
+    "GET /ai/os/conversations -> routers.ai_ask.list_os_conversations",
+    "PUT /ai/os/preferences -> routers.ai_ask.set_os_preference",
+    "GET /overview/today -> routers.overview.today",
+    "POST /staff/end-impersonation -> routers.staff.end_impersonation",
+    "POST /staff/{staff_id}/impersonate -> routers.staff.impersonate_staff",
+    "PUT /staff/{staff_id} -> routers.staff.update_staff"
    ],
-   "frontend_files": 0,
+   "entries": [
+    "app/(owner)/os/page.tsx"
+   ],
+   "frontend_files": 7,
    "label": "OS",
    "parallel_backends": []
   },
   "reports": {
-   "api_calls": [],
-   "entries": [
-    "app/vibanda/reports/page.tsx"
+   "api_calls": [
+    "GET /overview/today -> routers.overview.today",
+    "GET /reports/{period} -> routers.reports.report",
+    "GET /reports/{period}/creative -> routers.reports.report_creative"
    ],
-   "frontend_files": 0,
+   "entries": [
+    "app/(owner)/reports/page.tsx"
+   ],
+   "frontend_files": 7,
    "label": "Reports",
    "parallel_backends": []
   }
@@ -6954,11 +6735,11 @@
    },
    {
     "from": "app/(owner)/reports/page.tsx",
-    "to": "components/vibanda/CreativeNote.tsx"
+    "to": "components/owner/CreativeNote.tsx"
    },
    {
     "from": "app/(owner)/reports/page.tsx",
-    "to": "components/vibanda/SourceUnavailable.tsx"
+    "to": "components/owner/SourceUnavailable.tsx"
    },
    {
     "from": "app/(owner)/reports/page.tsx",
@@ -7650,7 +7431,7 @@
    },
    {
     "from": "app/dashboard/page.tsx",
-    "to": "lib/demo-data.ts"
+    "to": "lib/emptiness.ts"
    },
    {
     "from": "app/dashboard/pos/page.tsx",
@@ -7731,82 +7512,6 @@
    {
     "from": "app/dashboard/support/page.tsx",
     "to": "components/features/support/SupportView.tsx"
-   },
-   {
-    "from": "app/demo/[area]/page.tsx",
-    "to": "components/demo/DemoAreaClient.tsx"
-   },
-   {
-    "from": "app/demo/layout.tsx",
-    "to": "context/AuthContext.tsx"
-   },
-   {
-    "from": "app/demo/layout.tsx",
-    "to": "lib/format.ts"
-   },
-   {
-    "from": "app/demo/layout.tsx",
-    "to": "lib/permissions.ts"
-   },
-   {
-    "from": "app/demo/layout.tsx",
-    "to": "lib/tenantHome.ts"
-   },
-   {
-    "from": "app/demo/os/page.tsx",
-    "to": "lib/api.ts"
-   },
-   {
-    "from": "app/demo/os/page.tsx",
-    "to": "lib/demoQuestions.ts"
-   },
-   {
-    "from": "app/demo/os/page.tsx",
-    "to": "lib/retry.ts"
-   },
-   {
-    "from": "app/demo/page.tsx",
-    "to": "components/demo/DemoIdeas.tsx"
-   },
-   {
-    "from": "app/demo/page.tsx",
-    "to": "components/os/States.tsx"
-   },
-   {
-    "from": "app/demo/page.tsx",
-    "to": "context/AuthContext.tsx"
-   },
-   {
-    "from": "app/demo/page.tsx",
-    "to": "lib/api.ts"
-   },
-   {
-    "from": "app/demo/page.tsx",
-    "to": "lib/format.ts"
-   },
-   {
-    "from": "app/demo/page.tsx",
-    "to": "lib/retry.ts"
-   },
-   {
-    "from": "app/demo/page.tsx",
-    "to": "lib/vibandaAreas.ts"
-   },
-   {
-    "from": "app/demo/reports/page.tsx",
-    "to": "components/demo/DemoCharts.tsx"
-   },
-   {
-    "from": "app/demo/reports/page.tsx",
-    "to": "lib/api.ts"
-   },
-   {
-    "from": "app/demo/reports/page.tsx",
-    "to": "lib/format.ts"
-   },
-   {
-    "from": "app/demo/reports/page.tsx",
-    "to": "lib/retry.ts"
    },
    {
     "from": "app/forgot-password/page.tsx",
@@ -8065,70 +7770,6 @@
     "to": "lib/errors.ts"
    },
    {
-    "from": "app/vibanda/[area]/page.tsx",
-    "to": "components/vibanda/VibandaAreaClient.tsx"
-   },
-   {
-    "from": "app/vibanda/[area]/page.tsx",
-    "to": "components/vibanda/VibandaForecast.tsx"
-   },
-   {
-    "from": "app/vibanda/layout.tsx",
-    "to": "components/NotificationBell.tsx"
-   },
-   {
-    "from": "app/vibanda/layout.tsx",
-    "to": "context/AuthContext.tsx"
-   },
-   {
-    "from": "app/vibanda/layout.tsx",
-    "to": "lib/format.ts"
-   },
-   {
-    "from": "app/vibanda/layout.tsx",
-    "to": "lib/permissions.ts"
-   },
-   {
-    "from": "app/vibanda/layout.tsx",
-    "to": "lib/tenantHome.ts"
-   },
-   {
-    "from": "app/vibanda/page.tsx",
-    "to": "components/os/States.tsx"
-   },
-   {
-    "from": "app/vibanda/page.tsx",
-    "to": "components/vibanda/CreativeNote.tsx"
-   },
-   {
-    "from": "app/vibanda/page.tsx",
-    "to": "components/vibanda/OwnerHomeEmpty.tsx"
-   },
-   {
-    "from": "app/vibanda/page.tsx",
-    "to": "components/vibanda/PartHealth.tsx"
-   },
-   {
-    "from": "app/vibanda/page.tsx",
-    "to": "context/AuthContext.tsx"
-   },
-   {
-    "from": "app/vibanda/page.tsx",
-    "to": "lib/api.ts"
-   },
-   {
-    "from": "app/vibanda/page.tsx",
-    "to": "lib/format.ts"
-   },
-   {
-    "from": "app/vibanda/page.tsx",
-    "to": "lib/vibandaAreas.ts"
-   },
-   {
-    "from": "app/vibanda/page.tsx",
-    "to": "lib/vibandaSource.ts"
-   },
-   {
     "from": "components/ImpersonationBanner.tsx",
     "to": "context/AuthContext.tsx"
    },
@@ -8333,82 +7974,6 @@
     "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components/demo/DemoAreaClient.tsx",
-    "to": "components/demo/DemoCharts.tsx"
-   },
-   {
-    "from": "components/demo/DemoAreaClient.tsx",
-    "to": "components/demo/DemoSimulation.tsx"
-   },
-   {
-    "from": "components/demo/DemoAreaClient.tsx",
-    "to": "lib/api.ts"
-   },
-   {
-    "from": "components/demo/DemoAreaClient.tsx",
-    "to": "lib/format.ts"
-   },
-   {
-    "from": "components/demo/DemoAreaClient.tsx",
-    "to": "lib/retry.ts"
-   },
-   {
-    "from": "components/demo/DemoCharts.tsx",
-    "to": "lib/format.ts"
-   },
-   {
-    "from": "components/demo/DemoDataViews.tsx",
-    "to": "lib/demo-modules.ts"
-   },
-   {
-    "from": "components/demo/DemoForecast.tsx",
-    "to": "lib/api.ts"
-   },
-   {
-    "from": "components/demo/DemoForecast.tsx",
-    "to": "lib/errors.ts"
-   },
-   {
-    "from": "components/demo/DemoForecast.tsx",
-    "to": "lib/format.ts"
-   },
-   {
-    "from": "components/demo/DemoIdeas.tsx",
-    "to": "lib/api.ts"
-   },
-   {
-    "from": "components/demo/DemoIdeas.tsx",
-    "to": "lib/retry.ts"
-   },
-   {
-    "from": "components/demo/DemoOwnerInsights.tsx",
-    "to": "components/demo/DemoDataViews.tsx"
-   },
-   {
-    "from": "components/demo/DemoOwnerInsights.tsx",
-    "to": "lib/api.ts"
-   },
-   {
-    "from": "components/demo/DemoOwnerInsights.tsx",
-    "to": "lib/demo-modules.ts"
-   },
-   {
-    "from": "components/demo/DemoOwnerInsights.tsx",
-    "to": "lib/vibandaAreas.ts"
-   },
-   {
-    "from": "components/demo/DemoSimulation.tsx",
-    "to": "lib/api.ts"
-   },
-   {
-    "from": "components/demo/DemoSimulation.tsx",
-    "to": "lib/format.ts"
-   },
-   {
-    "from": "components/demo/DemoSimulation.tsx",
-    "to": "lib/retry.ts"
-   },
-   {
     "from": "components/features/inventory/AddItemModal.tsx",
     "to": "components/ui/FormField.tsx"
    },
@@ -8499,10 +8064,6 @@
    {
     "from": "components/features/inventory/useInventoryWorkspace.ts",
     "to": "lib/api.ts"
-   },
-   {
-    "from": "components/features/inventory/useInventoryWorkspace.ts",
-    "to": "lib/demo-data.ts"
    },
    {
     "from": "components/features/inventory/useInventoryWorkspace.ts",
@@ -8790,7 +8351,7 @@
    },
    {
     "from": "components/features/sales/SalesView.tsx",
-    "to": "lib/demo-data.ts"
+    "to": "lib/emptiness.ts"
    },
    {
     "from": "components/features/support/SupportView.tsx",
@@ -8849,6 +8410,10 @@
     "to": "lib/owner/types.ts"
    },
    {
+    "from": "components/owner/CreativeNote.tsx",
+    "to": "lib/api.ts"
+   },
+   {
     "from": "components/owner/OwnerShell.tsx",
     "to": "components/NotificationBell.tsx"
    },
@@ -8871,6 +8436,10 @@
    {
     "from": "components/owner/OwnerShell.tsx",
     "to": "lib/tenantHome.ts"
+   },
+   {
+    "from": "components/owner/SourceUnavailable.tsx",
+    "to": "lib/api.ts"
    },
    {
     "from": "components/owner/StateChip.tsx",
@@ -9269,50 +8838,6 @@
     "to": "lib/permissions.ts"
    },
    {
-    "from": "components/vibanda/CreativeNote.tsx",
-    "to": "lib/api.ts"
-   },
-   {
-    "from": "components/vibanda/OwnerHomeEmpty.tsx",
-    "to": "components/vibanda/CreativeNote.tsx"
-   },
-   {
-    "from": "components/vibanda/OwnerHomeEmpty.tsx",
-    "to": "lib/api.ts"
-   },
-   {
-    "from": "components/vibanda/SourceUnavailable.tsx",
-    "to": "lib/api.ts"
-   },
-   {
-    "from": "components/vibanda/VibandaAreaClient.tsx",
-    "to": "components/vibanda/VibandaForecast.tsx"
-   },
-   {
-    "from": "components/vibanda/VibandaAreaClient.tsx",
-    "to": "lib/api.ts"
-   },
-   {
-    "from": "components/vibanda/VibandaAreaClient.tsx",
-    "to": "lib/vibandaSource.ts"
-   },
-   {
-    "from": "components/vibanda/VibandaForecast.tsx",
-    "to": "lib/api.ts"
-   },
-   {
-    "from": "components/vibanda/VibandaForecast.tsx",
-    "to": "lib/errors.ts"
-   },
-   {
-    "from": "components/vibanda/VibandaForecast.tsx",
-    "to": "lib/format.ts"
-   },
-   {
-    "from": "components/vibanda/VibandaForecast.tsx",
-    "to": "lib/vibandaSource.ts"
-   },
-   {
     "from": "context/AuthContext.tsx",
     "to": "lib/api.ts"
    },
@@ -9327,10 +8852,6 @@
    {
     "from": "lib/api.ts",
     "to": "lib/tokenStore.ts"
-   },
-   {
-    "from": "lib/demo-modules.ts",
-    "to": "lib/format.ts"
    },
    {
     "from": "lib/osSuggestions.ts",

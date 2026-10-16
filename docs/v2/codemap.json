@@ -4471,7 +4471,7 @@
     "group": "ai",
     "id": "ai.menu_engineer",
     "kind": "py",
-    "loc": 554,
+    "loc": 558,
     "path": "backend/ai/menu_engineer.py"
    },
    {
@@ -4800,7 +4800,7 @@
     "group": "demo",
     "id": "demo.generator",
     "kind": "py",
-    "loc": 892,
+    "loc": 895,
     "path": "backend/demo/generator.py"
    },
    {
@@ -5010,7 +5010,7 @@
     "group": "other",
     "id": "owner.areas",
     "kind": "py",
-    "loc": 685,
+    "loc": 688,
     "path": "backend/owner/areas.py"
    },
    {
@@ -6616,8 +6616,8 @@
   "py_lazy_edges": 212,
   "py_modules": 174,
   "routes": 191,
-  "ts_edges": 536,
-  "ts_files": 250
+  "ts_edges": 607,
+  "ts_files": 270
  },
  "status_only": [
   [
@@ -8219,12 +8219,68 @@
     "to": "lib/format.ts"
    },
    {
+    "from": "components/charts/BandForecast.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
+   },
+   {
+    "from": "components/charts/BandForecast.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
     "from": "components/charts/Bars.tsx",
     "to": "components/charts/ChartEmpty.tsx"
    },
    {
+    "from": "components/charts/BreakEvenClock.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
+   },
+   {
+    "from": "components/charts/BreakEvenClock.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/charts/CashRunway.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
+   },
+   {
+    "from": "components/charts/CashRunway.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
     "from": "components/charts/ChartEmpty.tsx",
     "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/charts/Dial.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
+   },
+   {
+    "from": "components/charts/HBars.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
+   },
+   {
+    "from": "components/charts/HeatGrid.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
+   },
+   {
+    "from": "components/charts/Quadrant.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
+   },
+   {
+    "from": "components/charts/ShiftTable.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
+   },
+   {
+    "from": "components/charts/ShiftTable.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/charts/StackedBar.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
+   },
+   {
+    "from": "components/charts/Waterfall.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
     "from": "components/demo/DemoAreaClient.tsx",
@@ -8707,6 +8763,42 @@
     "to": "lib/errors.ts"
    },
    {
+    "from": "components/owner/AreaBody.tsx",
+    "to": "components/owner/StateChip.tsx"
+   },
+   {
+    "from": "components/owner/AreaBody.tsx",
+    "to": "components/owner/areas/CashArea.tsx"
+   },
+   {
+    "from": "components/owner/AreaBody.tsx",
+    "to": "components/owner/areas/MoneyArea.tsx"
+   },
+   {
+    "from": "components/owner/AreaBody.tsx",
+    "to": "components/owner/areas/PermitsArea.tsx"
+   },
+   {
+    "from": "components/owner/AreaBody.tsx",
+    "to": "components/owner/areas/SalesArea.tsx"
+   },
+   {
+    "from": "components/owner/AreaBody.tsx",
+    "to": "components/owner/areas/StaffArea.tsx"
+   },
+   {
+    "from": "components/owner/AreaBody.tsx",
+    "to": "components/owner/areas/StoreArea.tsx"
+   },
+   {
+    "from": "components/owner/AreaBody.tsx",
+    "to": "lib/owner/blocks.ts"
+   },
+   {
+    "from": "components/owner/AreaBody.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
     "from": "components/owner/OwnerShell.tsx",
     "to": "components/NotificationBell.tsx"
    },
@@ -8735,12 +8827,200 @@
     "to": "lib/owner/types.ts"
    },
    {
-    "from": "components/owner/home/AreaPanels.tsx",
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "components/charts/HeatGrid.tsx"
+   },
+   {
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "components/charts/ShiftTable.tsx"
+   },
+   {
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "components/owner/areas/ui.tsx"
+   },
+   {
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "lib/owner/areaTypes.ts"
+   },
+   {
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "lib/owner/blocks.ts"
+   },
+   {
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "components/charts/BreakEvenClock.tsx"
+   },
+   {
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "components/charts/CashRunway.tsx"
+   },
+   {
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "components/charts/Dial.tsx"
+   },
+   {
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "components/charts/StackedBar.tsx"
+   },
+   {
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "components/charts/Waterfall.tsx"
+   },
+   {
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "components/owner/areas/ui.tsx"
+   },
+   {
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "lib/owner/areaTypes.ts"
+   },
+   {
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "lib/owner/blocks.ts"
+   },
+   {
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/areas/PermitsArea.tsx",
+    "to": "components/owner/areas/ui.tsx"
+   },
+   {
+    "from": "components/owner/areas/PermitsArea.tsx",
+    "to": "lib/owner/areaTypes.ts"
+   },
+   {
+    "from": "components/owner/areas/PermitsArea.tsx",
+    "to": "lib/owner/blocks.ts"
+   },
+   {
+    "from": "components/owner/areas/PermitsArea.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/areas/PermitsArea.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "components/charts/BandForecast.tsx"
+   },
+   {
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "components/charts/Bars.tsx"
+   },
+   {
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "components/charts/HBars.tsx"
+   },
+   {
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "components/charts/Quadrant.tsx"
+   },
+   {
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "components/owner/areas/ui.tsx"
+   },
+   {
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "lib/owner/areaTypes.ts"
+   },
+   {
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "lib/owner/blocks.ts"
+   },
+   {
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/areas/StaffArea.tsx",
+    "to": "components/charts/Dial.tsx"
+   },
+   {
+    "from": "components/owner/areas/StaffArea.tsx",
+    "to": "components/charts/HBars.tsx"
+   },
+   {
+    "from": "components/owner/areas/StaffArea.tsx",
+    "to": "components/owner/areas/ui.tsx"
+   },
+   {
+    "from": "components/owner/areas/StaffArea.tsx",
+    "to": "lib/owner/areaTypes.ts"
+   },
+   {
+    "from": "components/owner/areas/StaffArea.tsx",
+    "to": "lib/owner/blocks.ts"
+   },
+   {
+    "from": "components/owner/areas/StaffArea.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/areas/StaffArea.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "components/charts/HBars.tsx"
+   },
+   {
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "components/owner/areas/ui.tsx"
+   },
+   {
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "lib/owner/areaTypes.ts"
+   },
+   {
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "lib/owner/blocks.ts"
+   },
+   {
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/areas/ui.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
+   },
+   {
+    "from": "components/owner/areas/ui.tsx",
     "to": "components/owner/StateChip.tsx"
    },
    {
+    "from": "components/owner/areas/ui.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
     "from": "components/owner/home/AreaPanels.tsx",
-    "to": "lib/owner/blocks.ts"
+    "to": "components/owner/AreaBody.tsx"
    },
    {
     "from": "components/owner/home/AreaPanels.tsx",
@@ -8929,6 +9209,10 @@
    {
     "from": "lib/osSuggestions.ts",
     "to": "lib/vibandaAreas.ts"
+   },
+   {
+    "from": "lib/owner/areaTypes.ts",
+    "to": "lib/owner/types.ts"
    },
    {
     "from": "lib/owner/blocks.ts",

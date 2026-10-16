@@ -187,3 +187,29 @@ def test_rank_is_a_pure_ordering_rule():
     ]
     assert [c["id"] for c in _rank(cards)] == ["fact", "loss-big", "loss-small", "idea-big", "idea-small", "no-figure", "zero"]
     assert _rank([]) == []
+
+
+# ── S4.3: what the charts need from the blocks, from the engines, not worked out on the screen ─────────
+
+def test_the_dish_matrix_carries_the_engines_own_cut_lines(demo):
+    matrix = _block(demo, "sales_dishes", "matrix")
+    menu = _menu_engineering(demo)
+    assert matrix["popular_line_units"] == menu["summary"]["popularity_cutoff_units"] > 0
+    assert matrix["earns_line"] == round(menu["summary"]["avg_margin_cents"] / 100, 2) > 0
+    by_name = {m["name"]: m for m in menu["matrix"]}
+    for dish in matrix["dishes"]:
+        assert dish["earns_per_plate"] == round(by_name[dish["name"]]["margin"] / 100, 2)
+        # the word is exactly which side of each line the dish is on
+        popular, earns = dish["sold"] >= matrix["popular_line_units"], dish["earns_per_plate"] >= matrix["earns_line"] - 0.005
+        assert dish["kind"] == {(True, True): "Best dish", (True, False): "Popular, earns little",
+                                (False, True): "Earns well, few order it", (False, False): "Consider removing"}[(popular, earns)]
+
+
+def test_a_recurring_cash_pattern_says_which_weekday_and_shift_in_numbers(demo):
+    tuesday = next(p for p in _block(demo, "cash", "patterns")["patterns"] if p["when"] == "Tuesday evening")
+    assert (tuesday["weekday"], tuesday["shift"]) == (1, "evening")
+
+
+def _menu_engineering(demo):
+    from ai.menu_engineer import get_menu_engineering
+    return get_menu_engineering(demo["db"], demo["rid"], demo["ctx"].settings)

@@ -322,6 +322,10 @@ def get_menu_engineering(db: Session, restaurant_id: int, settings: Settings | N
             "rising_items": rising_count,
             "falling_items": falling_count,
             "total_days_analyzed": total_days,
+            # The two lines the matrix is cut on, so a screen can draw them: orders at which a dish counts as popular, and the
+            # average margin per plate (cents) a dish must reach to count as earning well.
+            "popularity_cutoff_units": round(popularity_cutoff, 1),
+            "avg_margin_cents": round(avg_margin),
         }
     }
 

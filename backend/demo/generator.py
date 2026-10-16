@@ -485,9 +485,12 @@ class DemoBuilder:
 
     # ── the money ledger: what the restaurant pays for (S3.1–S3.3) ───────────
     # key, monthly cents, day of month paid, is it a recurring bill, spread of the amount month to month
-    LEDGER = (("premises", 7_000_000, None, True, 0.0), ("kplc", 1_800_000, 20, True, 0.12), ("water", 320_000, 12, True, 0.08),
+    # (line, cents a month, day paid, recurring bill?, spread). The spread is how far an ordinary month may stray from the usual, and it
+    # is kept under 11 %: a month 11 % over against three months 11 % under is 1.25× — the owner's default "cost increase we flag" — so
+    # a wider spread would make an unplanted line look like a spike on some days of the year (the demo is built relative to today).
+    LEDGER = (("premises", 7_000_000, None, True, 0.0), ("kplc", 1_800_000, 20, True, 0.10), ("water", 320_000, 12, True, 0.08),
               ("garbage", 250_000, 5, True, 0.0), ("pos_internet", 450_000, 10, True, 0.0), ("security", 800_000, 1, True, 0.0),
-              ("cleaning", 350_000, 8, False, 0.20), ("packaging", 480_000, 14, False, 0.20), ("marketing", 600_000, 16, False, 0.30),
+              ("cleaning", 350_000, 8, False, 0.10), ("packaging", 480_000, 14, False, 0.10), ("marketing", 600_000, 16, False, 0.10),
               ("mpesa_charges", 180_000, 28, False, 0.10), ("staff_meals", 600_000, 27, False, 0.10), ("gas", 1_400_000, 3, False, 0.04))
 
     def _ledger(self, b: BranchState) -> None:

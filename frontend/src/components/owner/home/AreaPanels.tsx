@@ -1,10 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import StateChip from "@/components/owner/StateChip";
-import { BLOCK_TITLES } from "@/lib/owner/blocks";
+import AreaBody from "@/components/owner/AreaBody";
 import { kes } from "@/lib/owner/format";
-import { AREA_KEYS, type Area, type AreaKey, type AreaSummary, type HealthStatus, type OwnerHome } from "@/lib/owner/types";
+import { AREA_KEYS, type AreaKey, type AreaSummary, type HealthStatus, type OwnerHome } from "@/lib/owner/types";
 
 const DOT: Record<HealthStatus, string> = {
   good: "bg-[var(--v-good)]", watch: "bg-[var(--v-warn)]", bad: "bg-[var(--v-destructive)]", unknown: "bg-[var(--v-border)]",
@@ -64,21 +63,5 @@ export default function AreaPanels({ areas }: { areas: OwnerHome["areas"] }) {
         );
       })}
     </div>
-  );
-}
-
-/** Every block of an area, in the owner's words, with its state. A block without a drawing of its own still says what it is and why it is empty. */
-function AreaBody({ area }: { area: Area }) {
-  const titles = BLOCK_TITLES[area.key] ?? {};
-  return (
-    <ul className="space-y-2">
-      {Object.entries(area.blocks).map(([key, block]) => (
-        <li key={key} className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="font-semibold">{titles[key] ?? key.replace(/_/g, " ")}</span>
-          <StateChip block={block} />
-          {block.reason && <span className="text-[var(--v-muted-foreground)]">{String(block.reason)}</span>}
-        </li>
-      ))}
-    </ul>
   );
 }

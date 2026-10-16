@@ -283,11 +283,14 @@ def _matrix(ctx: OwnerContext) -> dict:
     rows = menu.get("matrix", [])
     if not rows:
         return no_data("No dishes sold yet.")
+    summary = menu.get("summary", {})
     return {**base,
-            "popular_line_units": None,
+            # The engine's own two lines: popular from this many orders, earns well from this much a plate (KES).
+            "popular_line_units": summary.get("popularity_cutoff_units"),
+            "earns_line": kes(summary["avg_margin_cents"]) if summary.get("avg_margin_cents") is not None else None,
             "dishes": [{"name": m["name"], "kind": QUADRANT_WORDS.get(m["classification"], m["classification"]),
-                        "sold": m["qty_sold"], "keeps_pct": m["margin_pct"], "profit": kes(m["contribution"]),
-                        "trend": m["trend"]} for m in rows[:40]],
+                        "sold": m["qty_sold"], "keeps_pct": m["margin_pct"], "earns_per_plate": kes(m["margin"]),
+                        "profit": kes(m["contribution"]), "trend": m["trend"]} for m in rows[:40]],
             "assumption": assume("popular_cutoff", ctx.settings.popular_cutoff, label="Counts as popular")}
 
 
@@ -539,7 +542,7 @@ def _patterns(ctx: OwnerContext) -> dict:
     found = recurring_drawer_gaps(ctx.db, ctx.rid, ctx.settings)
     s = ctx.settings
     return block("live", as_of=ctx.now,
-                 patterns=[{"when": p.when, "times_short": p.times_short, "of_last": p.of_last, "short_each": kes(p.average_short_cents),
+                 patterns=[{"when": p.when, "weekday": p.weekday, "shift": p.shift, "times_short": p.times_short, "of_last": p.of_last, "short_each": kes(p.average_short_cents),
                             "total": kes(p.total_short_cents)} for p in found],
                  reason=None if found else "No shift has come up short again and again in the last four weeks.",
                  note="A pattern is a reason to look at that shift, not a conclusion about anyone.",
@@ -555,11 +558,11 @@ def cash_area(ctx: OwnerContext) -> tuple[dict, dict]:
               "patterns": ctx.safe("cash.patterns", lambda: _patterns(ctx))}
     flagged = sum(1 for s in shifts.get("shifts", []) if s["check"]) + (cancelled.get("to_check", 0) if cancelled["state"] == "live" else 0)
     if shifts["state"] in ("no_data", "unavailable") and cancelled["state"] in ("no_data", "unavailable"):
-        head = summary(None, _STATUS_WORD["unknown"], "unknown", label="Things to check")
+        head = summary(None, _STATUS_WORD["unknown"], "unknown", label="Counts and sales to look at")
     elif flagged:
-        head = summary(flagged, "Things to check", "bad", label="Things to check")
+        head = summary(flagged, "Things to check", "bad", label="Counts and sales to look at")
     else:
-        head = summary(0, "Balanced", "good", label="Things to check")
+        head = summary(0, "Balanced", "good", label="Counts and sales to look at")
     return head, blocks
 
 

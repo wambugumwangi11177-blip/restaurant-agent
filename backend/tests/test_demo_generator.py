@@ -611,3 +611,12 @@ def test_home_on_the_demo_is_fast_enough_to_use(live_demo):
     elapsed = time.perf_counter() - t0
     print(f"\n[S2.1] /owner/home (30d) on the 120-day, 3.5k-order demo branch: {elapsed * 1000:.0f} ms")
     assert elapsed < 20
+
+
+def test_no_unplanted_cost_line_can_look_like_a_spike_on_any_day():
+    """The demo is built relative to today, so its ordinary noise changes with the date. P9 (gas) is the only planted spike:
+    every other line must stay under the owner's default 25% however the noise falls (one month at +s against three at −s)."""
+    from demo.generator import DemoBuilder
+    from owner.settings import DEFAULTS
+    worst = max((1 + spread) / (1 - spread) for *_rest, spread in DemoBuilder.LEDGER)
+    assert worst < 1 + DEFAULTS.expense_spike_pct / 100, worst

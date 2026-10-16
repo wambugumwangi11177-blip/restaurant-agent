@@ -305,9 +305,13 @@ def test_area_endpoint_is_exactly_the_block_home_embeds(client, db_session, gold
 def test_costing_you_money_is_the_overview_attention_list(client, db_session, golden):
     gr.seed_chicken_reprice(db_session, golden)
     gr.seed_chips_below_menu(db_session, golden)
-    owner_cards = _get(client, golden, "/home").json()["costing_you_money"]["cards"]
+    costing = _get(client, golden, "/home").json()["costing_you_money"]
     legacy = client.get("/api/v1/overview/today", headers=_headers(golden.owner)).json()["attention"]
-    assert [c["id"] for c in owner_cards] == [c["id"] for c in legacy][:5]
+    # Same cards, same ids (so a decision made on one screen holds on the other); since S4.2 the order is Home's own: what is happening
+    # now, money going out, money to make, what cannot be priced — not the legacy decision-score order.
+    ranked = {c["id"] for c in costing["ranked"]}
+    assert {c["id"] for c in legacy} <= ranked
+    assert [c["id"] for c in costing["cards"]] == [c["id"] for c in costing["ranked"]][:5]
     decisions = [c for c in legacy if "priority_score" in c]            # cards from the decision-ranking layer
     assert decisions and all("impact_cents_month" in c for c in decisions)       # S1.4 exposes the KES behind the ranking
 

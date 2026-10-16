@@ -1305,13 +1305,15 @@
     "matrix": {
      "state": "live",
      "as_of": "2026-10-15T18:07:00+00:00",
-     "popular_line_units": null,
+     "popular_line_units": 26.2,
+     "earns_line": 299.74,
      "dishes": [
       {
        "name": "Nyama choma (goat)",
        "kind": "Best dish",
        "sold": 59,
        "keeps_pct": 74.3,
+       "earns_per_plate": 1040.0,
        "profit": 61360.0,
        "trend": "rising"
       },
@@ -1320,6 +1322,7 @@
        "kind": "Best dish",
        "sold": 62,
        "keeps_pct": 71.2,
+       "earns_per_plate": 534.2,
        "profit": 33120.4,
        "trend": "stable"
       },
@@ -1328,6 +1331,7 @@
        "kind": "Best dish",
        "sold": 42,
        "keeps_pct": 70.7,
+       "earns_per_plate": 636.4,
        "profit": 26728.8,
        "trend": "rising"
       },
@@ -1336,6 +1340,7 @@
        "kind": "Best dish",
        "sold": 53,
        "keeps_pct": 79.8,
+       "earns_per_plate": 399.1,
        "profit": 21152.3,
        "trend": "rising"
       },
@@ -1344,6 +1349,7 @@
        "kind": "Popular, earns little",
        "sold": 66,
        "keeps_pct": 35.0,
+       "earns_per_plate": 140.0,
        "profit": 9240.0,
        "trend": "falling"
       },
@@ -1352,6 +1358,7 @@
        "kind": "Best dish",
        "sold": 30,
        "keeps_pct": 74.7,
+       "earns_per_plate": 560.0,
        "profit": 16800.0,
        "trend": "falling"
       },
@@ -1360,6 +1367,7 @@
        "kind": "Best dish",
        "sold": 37,
        "keeps_pct": 53.3,
+       "earns_per_plate": 320.0,
        "profit": 11840.0,
        "trend": "rising"
       },
@@ -1368,6 +1376,7 @@
        "kind": "Best dish",
        "sold": 30,
        "keeps_pct": 69.7,
+       "earns_per_plate": 488.0,
        "profit": 14640.0,
        "trend": "falling"
       },
@@ -1376,6 +1385,7 @@
        "kind": "Popular, earns little",
        "sold": 58,
        "keeps_pct": 65.1,
+       "earns_per_plate": 228.0,
        "profit": 13224.0,
        "trend": "falling"
       },
@@ -1384,6 +1394,7 @@
        "kind": "Best dish",
        "sold": 45,
        "keeps_pct": 73.3,
+       "earns_per_plate": 330.0,
        "profit": 14850.0,
        "trend": "rising"
       },
@@ -1392,6 +1403,7 @@
        "kind": "Popular, earns little",
        "sold": 65,
        "keeps_pct": 70.0,
+       "earns_per_plate": 210.0,
        "profit": 13650.0,
        "trend": "rising"
       },
@@ -1400,6 +1412,7 @@
        "kind": "Popular, earns little",
        "sold": 50,
        "keeps_pct": 85.3,
+       "earns_per_plate": 256.0,
        "profit": 12800.0,
        "trend": "rising"
       },
@@ -1408,6 +1421,7 @@
        "kind": "Earns well, few order it",
        "sold": 19,
        "keeps_pct": 60.0,
+       "earns_per_plate": 390.0,
        "profit": 7410.0,
        "trend": "rising"
       },
@@ -1416,6 +1430,7 @@
        "kind": "Popular, earns little",
        "sold": 37,
        "keeps_pct": 82.7,
+       "earns_per_plate": 248.0,
        "profit": 9176.0,
        "trend": "falling"
       },
@@ -1424,6 +1439,7 @@
        "kind": "Popular, earns little",
        "sold": 72,
        "keeps_pct": 70.0,
+       "earns_per_plate": 105.0,
        "profit": 7560.0,
        "trend": "rising"
       },
@@ -1432,6 +1448,7 @@
        "kind": "Popular, earns little",
        "sold": 27,
        "keeps_pct": 74.9,
+       "earns_per_plate": 262.0,
        "profit": 7074.0,
        "trend": "rising"
       },
@@ -1440,6 +1457,7 @@
        "kind": "Popular, earns little",
        "sold": 29,
        "keeps_pct": 81.4,
+       "earns_per_plate": 244.3,
        "profit": 7084.7,
        "trend": "falling"
       },
@@ -1448,6 +1466,7 @@
        "kind": "Consider removing",
        "sold": 22,
        "keeps_pct": 86.4,
+       "earns_per_plate": 259.3,
        "profit": 5704.6,
        "trend": "rising"
       },
@@ -1456,6 +1475,7 @@
        "kind": "Popular, earns little",
        "sold": 65,
        "keeps_pct": 86.7,
+       "earns_per_plate": 86.65,
        "profit": 5632.25,
        "trend": "stable"
       },
@@ -1464,6 +1484,7 @@
        "kind": "Popular, earns little",
        "sold": 32,
        "keeps_pct": 70.2,
+       "earns_per_plate": 140.4,
        "profit": 4492.8,
        "trend": "rising"
       },
@@ -1472,6 +1493,7 @@
        "kind": "Consider removing",
        "sold": 16,
        "keeps_pct": 65.4,
+       "earns_per_plate": 261.5,
        "profit": 4184.0,
        "trend": "rising"
       },
@@ -1480,6 +1502,7 @@
        "kind": "Consider removing",
        "sold": 19,
        "keeps_pct": 68.9,
+       "earns_per_plate": 206.8,
        "profit": 3929.2,
        "trend": "falling"
       },
@@ -1488,6 +1511,7 @@
        "kind": "Earns well, few order it",
        "sold": 15,
        "keeps_pct": 86.7,
+       "earns_per_plate": 303.5,
        "profit": 4552.5,
        "trend": "falling"
       },
@@ -1496,6 +1520,7 @@
        "kind": "Popular, earns little",
        "sold": 42,
        "keeps_pct": 83.3,
+       "earns_per_plate": 100.0,
        "profit": 4200.0,
        "trend": "rising"
       },
@@ -1504,6 +1529,7 @@
        "kind": "Consider removing",
        "sold": 16,
        "keeps_pct": 78.9,
+       "earns_per_plate": 236.8,
        "profit": 3788.8,
        "trend": "stable"
       },
@@ -1512,6 +1538,7 @@
        "kind": "Earns well, few order it",
        "sold": 12,
        "keeps_pct": 75.0,
+       "earns_per_plate": 300.0,
        "profit": 3600.0,
        "trend": "falling"
       },
@@ -1520,6 +1547,7 @@
        "kind": "Consider removing",
        "sold": 17,
        "keeps_pct": 86.7,
+       "earns_per_plate": 216.8,
        "profit": 3685.6,
        "trend": "falling"
       },
@@ -1528,6 +1556,7 @@
        "kind": "Popular, earns little",
        "sold": 32,
        "keeps_pct": 79.8,
+       "earns_per_plate": 95.8,
        "profit": 3065.6,
        "trend": "rising"
       },
@@ -1536,6 +1565,7 @@
        "kind": "Consider removing",
        "sold": 18,
        "keeps_pct": 78.3,
+       "earns_per_plate": 94.0,
        "profit": 1692.0,
        "trend": "rising"
       }
@@ -2616,7 +2646,7 @@
     },
     "patterns": {
      "state": "live",
-     "as_of": "2026-10-15T19:57:49.573262+00:00",
+     "as_of": "2026-10-16T05:45:52.775770+00:00",
      "assumption": {
       "setting": "cash_tolerance_kes",
       "value": 200,
@@ -2625,6 +2655,8 @@
      "patterns": [
       {
        "when": "Tuesday evening",
+       "weekday": 1,
+       "shift": "evening",
        "times_short": 4,
        "of_last": 4,
        "short_each": 491.14,

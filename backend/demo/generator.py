@@ -48,9 +48,9 @@ SHIFT_STARTS = (8, 8, 16, 8, 16, 8, 16, 8)          # per staff index: day (08:0
 SHIFT_HOURS = 7.0
 # Figure 6.1 scenarios the generator plants (docs/v2/figures/scenarios.md). P1 (Quarter chicken 400/260), P11 (the four
 # menu kinds) and P16 (till-rung M-Pesa sales without a receipt) hold by construction of the catalog and the baseline.
-# P8 (M-Pesa statement), P9 (gas) and P10 (rent) wait for their phases. Planted on the owner's default branch (Westlands)
+# P8 (M-Pesa statement), P9 (gas) and P10 (rent) are planted by their own phases. Planted on the owner's default branch (Westlands)
 # unless the scenario is about the comparison of the two (P14).
-PLANTS = ("P2", "P3", "P4", "P5", "P6", "P7", "P9", "P10", "P12", "P13", "P14", "P15")
+PLANTS = ("P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P12", "P13", "P14", "P15")
 P2_DAYS = 21                    # Chips charged KES 270 on the till (menu 300) for three weeks (the engine looks at 14 days from its own anchor)
 P3_GLOVO_BURGER_BOOST = 8.0     # Glovo guests order burgers far more than the average guest does
 P4_AFTERNOON_MIX = {"Quarter chicken": 8.0, "Burger": 4.0, "Beef stew": 3.0, "Beef fry": 3.0, "Chicken burger": 3.0, "Chicken wings": 3.0,
@@ -60,6 +60,9 @@ P5_EXTRA_BEEF_SHARE = 0.33      # the kitchen draws a third more beef than the s
 P5_DAYS = 28
 P6_HANDOVER = (4.0, 3.8)        # store says 4.0 kg of beef, the kitchen counts 3.8 kg (scaled from 40 / 38)
 P7_SHORT_CENTS = (45_000, 65_000)
+P8_DAYS = 14                    # the statement covers the last two weeks of M-Pesa sales
+P8_MISSING = 3                  # three M-Pesa sales the statement never shows
+P8_GROUPS = 2                   # and two pairs of sales the guests paid with one payment
 P12_OPEN_HOUR_OUT = 19          # chips are out from 19:00 Nairobi time
 P12_SALES_FACTOR = 0.5
 P13_RATIO = 56 / 60             # Kenchic delivers 56 of every 60 (ratio kept; the quantities are the demo's own)
@@ -585,10 +588,84 @@ class DemoBuilder:
                                          reason="issued to kitchen", created_at=at, performed_by_user_id=self.users["kitchen"].id))
         self._count("stock_movements")
 
+    def _upload_statement(self, owner: models.User, b: "BranchState") -> None:
+        """The owner has uploaded two weeks of their M-Pesa statement, on the default branch. It is written as the CSV an export would be and read
+        by the real parser (parsers/mpesa_csv.py) through the real importer, so the demo is also the test. Every M-Pesa sale has its payment a
+        few minutes after the bill closed, and two pairs of sales were paid with one payment. P8 plants the problem: three M-Pesa sales are not on it."""
+        from owner.mpesa_statement import import_statement
+        rng = self.rng(b.spec["key"], "P8")
+        rid = b.restaurant.id
+        closed = lambda o: o.completed_at or o.created_at      # noqa: E731  when the bill was closed
+        since, until = self.now - timedelta(days=P8_DAYS), self.now - timedelta(minutes=45)
+        orders = [o for o in self.db.query(models.Order).filter(
+            models.Order.restaurant_id == rid, models.Order.payment_method == models.PaymentMethod.MPESA, models.Order.is_paid.is_(True),
+            models.Order.status != models.OrderStatus.CANCELLED, models.Order.total > 0).order_by(models.Order.id)
+            if since <= closed(o) <= until]
+        plant = "P8" in self.plant
+        if len(orders) < 20:
+            if plant:
+                self.planted["P8"] = None
+            return
+
+        def alone(o, minutes=25):                              # no other sale of the same amount near it: it can only match its own payment
+            return not any(x.id != o.id and x.total == o.total and abs((closed(x) - closed(o)).total_seconds()) < minutes * 60 for x in orders)
+
+        middle = [o for o in orders if self.now - timedelta(days=10) <= closed(o) <= self.now - timedelta(days=2) and alone(o)]
+        if plant and len(middle) < P8_MISSING:
+            self.planted["P8"] = None
+            return
+        missing = rng.sample(middle, P8_MISSING) if plant else []
+        gone = {o.id for o in missing}
+        groups, used = [], set(gone)
+        for o in sorted(orders, key=closed):                   # two pairs of sales closed within twelve minutes of each other
+            if o.id in used or len(groups) >= P8_GROUPS:
+                continue
+            mate = next((x for x in orders if x.id not in used and x.id != o.id and 0 < (closed(x) - closed(o)).total_seconds() <= 720), None)
+            if mate and alone(o) and alone(mate):
+                groups.append((o, mate))
+                used.update((o.id, mate.id))
+        grouped = {o.id for pair in groups for o in pair}
+        payers = (("JOHN KAMAU", "1234"), ("MARY ACHIENG", "8821"), ("PETER OMONDI", "0042"), ("GRACE WANJIKU", "7710"), ("SAMUEL MUTUA", "3309"),
+                  ("AMINA HASSAN", "5566"), ("DAVID KIPROP", "9013"), ("FAITH NJERI", "2468"))
+        seen, rows = set(), []
+
+        def receipt() -> str:
+            while True:
+                r = "S" + "".join(rng.choice("ABCDEFGHJKLMNPQRSTUVWXYZ0123456789") for _ in range(9))
+                if r not in seen:
+                    seen.add(r)
+                    return r
+
+        def line(at: datetime, cents: int) -> None:
+            who, tail = rng.choice(payers)
+            local = at + EAT_OFFSET
+            rows.append((at, f'{receipt()},{local:%Y-%m-%d %H:%M:%S},{(local - timedelta(seconds=11)):%Y-%m-%d %H:%M:%S},'
+                             f'Customer Payment from 2547****{tail} - {who},Completed,"{cents / 100:,.2f}",,,Yes,Customer Payment,,,'))
+
+        for o in orders:
+            if o.id not in gone and o.id not in grouped:
+                line(closed(o) + timedelta(seconds=rng.randint(5, 240)), o.total)
+        for first, second in groups:                           # paid once, between the two closes, so each sale is inside the matching window
+            line(closed(first) + (closed(second) - closed(first)) / 2 + timedelta(seconds=rng.randint(0, 60)), first.total + second.total)
+        for n in range(2):                                     # money going out, which the check ignores
+            at = self.now - timedelta(days=3 + 5 * n, hours=1)
+            rows.append((at, f"{receipt()},{at + EAT_OFFSET:%Y-%m-%d %H:%M:%S},,Business Payment to KENCHIC LTD,Completed,,\"8,000.00\",,Yes,Business Payment,,,"))
+        rows.sort(key=lambda r: r[0])
+        text = "\n".join([f"Account Name,{b.restaurant.name} - Till", "Short Code,174379", "Account Type,Till (Buy Goods)",
+                          f"Statement Period,{(since + EAT_OFFSET):%d-%m-%Y} to {(self.now + EAT_OFFSET):%d-%m-%Y}", "Currency,KES", "",
+                          "Receipt No.,Completion Time,Initiation Time,Details,Transaction Status,Paid In,Withdrawn,Balance,Balance Confirmed,Reason Type,Other Party Info,Linked Transaction ID,A/C No.",
+                          *(r for _at, r in rows)]) + "\n"
+        result = import_statement(self.db, rid, owner.id, "mpesa-statement.csv", text.encode(), commit=False)
+        self._count("mpesa_statement_lines", result["new"])
+        if plant:
+            self.planted["P8"] = (f"{P8_MISSING} M-Pesa sales (KES {sum(o.total for o in missing) // 100:,}) are not on the statement; "
+                                  f"{len(groups)} pairs of sales were paid with one payment")
+
     def _plant_after(self, owner: models.User) -> None:
         """The scenarios that edit or add a few specific rows once the baseline is written."""
         b = self.branches[0]
         db, rid = self.db, self.branches[0].restaurant.id
+        self._upload_statement(owner, b)              # the owner has uploaded two weeks of their statement; P8 is the three sales missing from it
         if "P2" in self.plant:
             self.planted["P2"] = f"Chips charged KES 270 (menu KES 300) from {(self.today - timedelta(days=P2_DAYS)).isoformat()}"
         if "P3" in self.plant:

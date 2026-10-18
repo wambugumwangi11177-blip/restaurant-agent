@@ -534,6 +534,7 @@ OUTPUT = {
                   and all(i["days_left"] is not None for i in b["least_cover"])),
     "custody": ("store.missing", lambda b: _has(b, "items")),
     "cash": ("cash.shifts", lambda b: _has(b, "shifts")),
+    "mpesa_match": ("cash.mpesa", lambda b: b["state"] == "not_from_pos" and b["checked"]["sales"] > 15 and b["matched"]["count"] > 15 and b["headline"]),
     "fraud": ("cash.cancelled_sales", lambda b: b["state"] == "live" and b["cancelled_last_7_days"] >= 0 and "to_check" in b),
     "kds": ("staff.kitchen", lambda b: _has(b, "stations")),
     "reservations": ("coming_up.bookings", lambda b: b["state"] == "live" and (b["covers_today"] > 0 or len(b["next_days"]) >= 3)),

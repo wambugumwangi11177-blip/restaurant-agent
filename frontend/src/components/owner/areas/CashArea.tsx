@@ -3,8 +3,9 @@ import HeatGrid from "@/components/charts/HeatGrid";
 import ShiftTable from "@/components/charts/ShiftTable";
 import { BLOCK_TITLES } from "@/lib/owner/blocks";
 import { kes, nairobiTime, shortDay, toDate, weekday } from "@/lib/owner/format";
-import type { BelowMenuPriceBlock, CancelledBlock, PatternsBlock, ShiftsBlock } from "@/lib/owner/areaTypes";
+import type { BelowMenuPriceBlock, CancelledBlock, MpesaBlock, PatternsBlock, ShiftsBlock } from "@/lib/owner/areaTypes";
 import type { Area } from "@/lib/owner/types";
+import MpesaUpload from "./MpesaUpload";
 import { BlockFrame, Empty, Grid, Note, Pill, Stat } from "./ui";
 
 const T = BLOCK_TITLES.cash;
@@ -19,7 +20,54 @@ export default function CashArea({ area }: { area: Area }) {
         <BelowMenu block={b.below_menu_price as BelowMenuPriceBlock} />
       </div>
       <Patterns block={b.patterns as PatternsBlock} />
-      <BlockFrame title={T.mpesa} block={b.mpesa}>{() => (<><Empty>{String(b.mpesa.reason ?? "")}</Empty></>)}</BlockFrame>
+      <Mpesa block={b.mpesa as MpesaBlock} />
+    </div>
+  );
+}
+
+function sinceWhen(iso: string) {
+  const local = new Date(toDate(iso).getTime() + 3 * 3600_000).toISOString().slice(0, 10);
+  return `${weekday(local)} ${shortDay(local)}, ${nairobiTime(iso)}`;
+}
+
+/** The statement against the M-Pesa sales: the sentence, what was checked, then the two kinds of gap. The upload is always here: with no statement, it is the whole panel. */
+function Mpesa({ block }: { block: MpesaBlock }) {
+  return (
+    <div className="space-y-3">
+      <BlockFrame title={T.mpesa} block={block}>{() => {
+        const sales = block.sales_without_payment!, pays = block.payments_without_sale!, matched = block.matched!, checked = block.checked!;
+        const moreSales = sales.count - (sales.items?.length ?? 0), morePays = pays.count - (pays.items?.length ?? 0);
+        return (<>
+          <p className="text-sm leading-relaxed">{block.headline}</p>
+          <div className="mt-3"><Grid cols={3}>
+            <Stat label="Sales checked" value={checked.sales} note={`${checked.payments} payments on the statement`} />
+            <Stat label="Matched" value={matched.sales} note={kes(matched.kes)} />
+            <Stat label="To look at" value={sales.count + pays.count + (block.different_amounts?.length ?? 0)} note="sales or payments with no match" />
+          </Grid></div>
+          {sales.count > 0 && (
+            <div className="mt-3"><p className="mb-1 text-[11px] font-bold">Sales with no payment on the statement · {kes(sales.kes)}</p>
+              <ul className="space-y-1 text-xs">{sales.items!.map((s) => <li key={s.order_id} className="flex justify-between gap-3"><span>{sinceWhen(s.at)} · {s.what}</span><b className="shrink-0">{kes(s.kes)}</b></li>)}</ul>
+              {moreSales > 0 && <Note>and {moreSales} more</Note>}
+            </div>
+          )}
+          {pays.count > 0 && (
+            <div className="mt-3"><p className="mb-1 text-[11px] font-bold">Payments with no sale recorded · {kes(pays.kes)}</p>
+              <ul className="space-y-1 text-xs">{pays.items!.map((p) => <li key={p.receipt} className="flex justify-between gap-3"><span>{sinceWhen(p.at)} · {p.from || p.receipt}</span><b className="shrink-0">{kes(p.kes)}</b></li>)}</ul>
+              {morePays > 0 && <Note>and {morePays} more</Note>}
+            </div>
+          )}
+          {(block.different_amounts?.length ?? 0) > 0 && (
+            <div className="mt-3"><p className="mb-1 text-[11px] font-bold">Paid a different amount from the one recorded</p>
+              <ul className="space-y-1 text-xs">{block.different_amounts!.map((d) => <li key={d.receipt}>{d.receipt}: recorded {kes(d.sale_kes)}, paid {kes(d.payment_kes)}</li>)}</ul>
+            </div>
+          )}
+          {block.outside_statement && block.outside_statement.sales > 0 && (
+            <Note>{block.outside_statement.sales} M-Pesa sales ({kes(block.outside_statement.kes)}) fall outside the days this statement covers, so they are not checked.</Note>
+          )}
+          <Note>{block.note}</Note>
+        </>);
+      }}</BlockFrame>
+      <MpesaUpload />
     </div>
   );
 }

@@ -30,7 +30,7 @@ it("Zone 1 shows today's sales, the comparison, costs covered and the money chec
   expect(screen.getByText("Covered at 12:31 pm")).toBeTruthy();
   expect(screen.getByText("KES 22,290 of KES 4,946 a day")).toBeTruthy();
   expect(screen.getByText(/27 shifts checked · 2 to look at/)).toBeTruthy();
-  expect(screen.getByText(/Upload your M-Pesa statement/)).toBeTruthy();
+  expect(screen.getByText((fixture as unknown as OwnerHome).pulse.money_match.mpesa.headline!)).toBeTruthy();
   expect(screen.getByRole("img", { name: "Sales for each of the last 7 days" })).toBeTruthy();
   expect(screen.getByText("Good evening", { exact: false })).toBeTruthy();
 });
@@ -40,7 +40,7 @@ it("every number carries its state in words", async () => {
   await screen.findByTestId("sales-today");
   expect(screen.getAllByText("Live").length).toBeGreaterThan(0);
   expect(screen.getAllByText(/As entered up to/).length).toBeGreaterThan(0);
-  expect(screen.getByText("Not available")).toBeTruthy();                // the M-Pesa check, until a statement is uploaded
+  expect(screen.getByText("From your M-Pesa statement")).toBeTruthy();    // the M-Pesa check is computed from a statement, not from the till
 });
 
 it("Zone 2 lists the money going out, the biggest first, each in KES a month", async () => {

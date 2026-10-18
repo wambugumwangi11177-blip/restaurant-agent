@@ -57,7 +57,11 @@ export type Pulse = Block & {
   orders_in_period: number;
   trend_7d: TrendDay[];
   breakeven_at: BreakEven;
-  money_match: { cash: Block & { checked?: number; to_check?: number }; mpesa: Block };
+  money_match: {
+    cash: Block & { checked?: number; to_check?: number };
+    /** Zone 1 carries the totals; the lists are in the cash panel. */
+    mpesa: Block & { headline?: string; sales_without_payment?: { count: number; kes: number }; payments_without_sale?: { count: number; kes: number }; different_amounts?: number };
+  };
   freshness: Freshness;
 };
 

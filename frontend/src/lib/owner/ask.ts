@@ -73,7 +73,7 @@ export type OwnerAnswer = {
 };
 
 export const ASK_FORMS: { id: AskForm; label: string; hint: string; examples: string[] }[] = [
-  { id: "what", label: "What", hint: "Where things stand", examples: ["Am I making a profit this month?", "How is my cash count looking?", "How are my suppliers doing?", "What will run out soon?", "Which dishes earn the most?", "Which guests haven't come back?"] },
+  { id: "what", label: "What", hint: "Where things stand", examples: ["Am I making a profit this month?", "How is my cash count looking?", "Do my M-Pesa payments match my sales?", "How are my suppliers doing?", "What will run out soon?", "Which dishes earn the most?", "Which guests haven't come back?"] },
   { id: "why", label: "Why", hint: "What lay behind a day", examples: ["Why were sales down yesterday?", "Why was Tuesday last week bad?", "What happened to sales on Friday?"] },
   { id: "what_if", label: "What if", hint: "Try a price before you change it", examples: ["What if I raise the price of my best seller?", "What if I cut Burger by 10%?"] },
   { id: "what_to_do", label: "What should I do", hint: "The biggest wins, in KES", examples: ["What should I do to make more money?", "How can I find KES 20,000 more a month?"] },

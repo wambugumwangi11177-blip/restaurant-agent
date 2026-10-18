@@ -28,6 +28,15 @@ def _overview():
     return overview
 
 
+def _mpesa_summary(b: dict) -> dict:
+    """Zone 1 carries the totals, not the lists: the sentence, how many sales and payments have no match and what they add up to."""
+    if b.get("state") in ("no_data", "unavailable"):
+        return b
+    keep = {k: b[k] for k in ("state", "as_of", "source", "headline", "checked", "matched", "outside_statement", "assumption") if k in b}
+    return {**keep, "sales_without_payment": {k: b["sales_without_payment"][k] for k in ("count", "kes")},
+            "payments_without_sale": {k: b["payments_without_sale"][k] for k in ("count", "kes")}, "different_amounts": len(b["different_amounts"])}
+
+
 def _pulse(ctx: OwnerContext, period: str) -> dict:
     overview = _overview()
     start, end = overview._eat_range("today")
@@ -54,7 +63,7 @@ def _pulse(ctx: OwnerContext, period: str) -> dict:
             "sales_in_period": window["revenue"], "orders_in_period": window["orders"],
             "trend_7d": [{"date": d["date"], "sales": d["revenue"], "orders": d["orders"]} for d in overview._performance(ctx.db, ctx.rid)["revenue_trend"]],
             "breakeven_at": ctx.safe("home.breakeven", lambda: areas.breakeven_summary(ctx)),
-            "money_match": {"cash": cash, "mpesa": unavailable("Upload your M-Pesa statement to check it against your sales.")},
+            "money_match": {"cash": cash, "mpesa": _mpesa_summary(areas._mpesa(ctx))},
             "freshness": {"latest_sale_at": freshness["latest_order_at"], "data_age_days": freshness["data_age_days"],
                           "is_stale": freshness["is_stale"], "source": conn["source"], "source_state": conn["state"],
                           "source_reconciled": bool(conn.get("reconciled")), "source_trusted": overview.source_is_trusted(conn),

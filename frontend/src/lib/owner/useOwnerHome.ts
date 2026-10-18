@@ -5,6 +5,8 @@ import { SETTINGS_CHANGED } from "@/components/owner/settings/SettingsProvider";
 import type { OwnerHome } from "./types";
 
 const REFRESH_MS = 60_000;
+/** Something the owner entered or uploaded (a statement) moved figures on Home; whoever did it says so with this event. */
+export const OWNER_DATA_CHANGED = "owner-data-changed";
 
 export type HomeState = { home: OwnerHome | null; error: boolean; loading: boolean; reload: () => void };
 
@@ -33,7 +35,8 @@ export function useOwnerHome(period: OwnerHome["period"]): HomeState {
     load();
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") load(); }, REFRESH_MS);
     window.addEventListener(SETTINGS_CHANGED, load);                  // a rule was changed: every card and figure may have moved
-    return () => { latest.current += 1; window.clearInterval(timer); window.removeEventListener(SETTINGS_CHANGED, load); };
+    window.addEventListener(OWNER_DATA_CHANGED, load);                // a statement was uploaded or removed
+    return () => { latest.current += 1; window.clearInterval(timer); window.removeEventListener(SETTINGS_CHANGED, load); window.removeEventListener(OWNER_DATA_CHANGED, load); };
   }, [load]);
 
   return { home, error, loading, reload: load };

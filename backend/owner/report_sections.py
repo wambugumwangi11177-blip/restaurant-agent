@@ -191,6 +191,36 @@ def missing_stock(ctx: OwnerContext, period: str, month: date | None) -> dict:
     return _done(b, "The last 7 days", head, rows, from_setting(b.get("assumption")) + [assumption("A gap is a reason to check the store and the portions, not a finding about anyone.")])
 
 
+# ── M-Pesa check ─────────────────────────────────────────────────────────────
+
+def mpesa_check(ctx: OwnerContext, period: str, month: date | None) -> dict:
+    """The statement against the M-Pesa sales, over the days the statement covers (not the report's days: a statement is a file)."""
+    b = areas._mpesa(ctx)
+    window = "The days your M-Pesa statement covers"
+    if _empty(b):
+        return _nothing(b, window, "Upload your M-Pesa statement to check it against your sales.")
+    gap_s, gap_p = b["sales_without_payment"], b["payments_without_sale"]
+    rows = [row("checked_sales", "M-Pesa sales checked", b["checked"]["sales"], "count"), row("checked_payments", "Payments on the statement", b["checked"]["payments"], "count"),
+            row("matched", "Sales with a payment", b["matched"]["sales"], "count", f"worth {kes_text(b['matched']['kes'])}"),
+            row("sales_without_payment", "Sales with no payment on the statement", gap_s["count"], "count", f"together {kes_text(gap_s['kes'])}"),
+            row("sales_without_payment_kes", "Value of sales with no payment", gap_s["kes"], "kes"),
+            row("payments_without_sale", "Payments with no sale recorded", gap_p["count"], "count", f"together {kes_text(gap_p['kes'])}"),
+            row("payments_without_sale_kes", "Value of payments with no sale", gap_p["kes"], "kes")]
+    if b["different_amounts"]:
+        rows.append(row("different_amounts", "Sales paid a different amount from the one recorded", len(b["different_amounts"]), "count"))
+    for item in gap_s["items"][:5]:
+        rows.append(row("sale", f"{day_text(_local(_utc(item['at'])).date())} · {item['what']}", item["kes"], "kes", "no payment on the statement"))
+    for item in gap_p["items"][:5]:
+        rows.append(row("payment", f"{day_text(_local(_utc(item['at'])).date())} · {item['from'] or 'payment'}", item["kes"], "kes", "no sale recorded"))
+    return _done(b, window, b["headline"], rows, from_setting(b.get("assumption")) + [assumption(b["note"])],
+                 source=b.get("source"), outside_statement=b["outside_statement"])
+
+
+def _utc(text: str):
+    from datetime import datetime
+    return datetime.fromisoformat(text).replace(tzinfo=None)
+
+
 # ── wages ────────────────────────────────────────────────────────────────────
 
 def wages(ctx: OwnerContext, period: str, month: date | None) -> dict:

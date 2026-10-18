@@ -111,9 +111,41 @@
     "entered_up_to": "2026-10-15"
    },
    "mpesa": {
-    "state": "unavailable",
-    "as_of": null,
-    "reason": "Upload your M-Pesa statement to check it against your sales."
+    "state": "not_from_pos",
+    "as_of": "2026-10-18T18:37:52+00:00",
+    "source": "M-Pesa statement",
+    "headline": "3 M-Pesa sales (KES 2,130) have no payment on your statement.",
+    "checked": {
+     "sales": 48,
+     "payments": 43
+    },
+    "matched": {
+     "count": 43,
+     "sales": 45,
+     "kes": 46320.0,
+     "receipt": 0,
+     "exact": 41,
+     "grouped": 2,
+     "split": 0
+    },
+    "outside_statement": {
+     "sales": 434,
+     "kes": 454160.0
+    },
+    "assumption": {
+     "setting": "mpesa_match_minutes",
+     "value": 10,
+     "label": "Minutes between a sale and its payment"
+    },
+    "sales_without_payment": {
+     "count": 3,
+     "kes": 2130.0
+    },
+    "payments_without_sale": {
+     "count": 0,
+     "kes": 0.0
+    },
+    "different_amounts": 0
    }
   },
   "freshness": {
@@ -2396,11 +2428,11 @@
    "state": "live",
    "as_of": "2026-10-15T13:15:00+00:00",
    "summary": {
-    "number": 2,
+    "number": 3,
     "unit": "",
     "word": "Things to check",
     "status": "bad",
-    "label": "Things to check"
+    "label": "Counts and sales to look at"
    },
    "blocks": {
     "shifts": {
@@ -2640,9 +2672,67 @@
      ]
     },
     "mpesa": {
-     "state": "unavailable",
-     "as_of": null,
-     "reason": "Upload your M-Pesa statement to check it against your sales."
+     "state": "not_from_pos",
+     "as_of": "2026-10-18T18:37:52+00:00",
+     "source": "M-Pesa statement",
+     "headline": "3 M-Pesa sales (KES 2,130) have no payment on your statement.",
+     "window": {
+      "from": "2026-10-04T21:00:00+00:00",
+      "to": "2026-10-18T18:37:52+00:00"
+     },
+     "checked": {
+      "sales": 48,
+      "payments": 43
+     },
+     "matched": {
+      "count": 43,
+      "sales": 45,
+      "kes": 46320.0,
+      "receipt": 0,
+      "exact": 41,
+      "grouped": 2,
+      "split": 0
+     },
+     "sales_without_payment": {
+      "count": 3,
+      "kes": 2130.0,
+      "items": [
+       {
+        "order_id": 1559,
+        "at": "2026-10-14T09:57:00+00:00",
+        "kes": 250.0,
+        "what": "Table 12, 2 items"
+       },
+       {
+        "order_id": 1531,
+        "at": "2026-10-11T15:13:00+00:00",
+        "kes": 1070.0,
+        "what": "Table 3, 3 items"
+       },
+       {
+        "order_id": 1522,
+        "at": "2026-10-10T17:16:00+00:00",
+        "kes": 810.0,
+        "what": "Takeaway or delivery, 3 items"
+       }
+      ]
+     },
+     "payments_without_sale": {
+      "count": 0,
+      "kes": 0.0,
+      "items": []
+     },
+     "different_amounts": [],
+     "outside_statement": {
+      "sales": 434,
+      "kes": 454160.0
+     },
+     "assumption": {
+      "setting": "mpesa_match_minutes",
+      "value": 10,
+      "label": "Minutes between a sale and its payment"
+     },
+     "note": "A gap is a reason to look at the till and the statement, not a finding about anyone."
     },
     "patterns": {
      "state": "live",

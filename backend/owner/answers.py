@@ -21,7 +21,7 @@ FORMS = ("what", "why", "what_if", "what_to_do", "compare")
 TOPIC_LABELS = {
     "stock": "Stock", "revenue": "Sales", "bookings": "Bookings", "kitchen": "Kitchen speed", "staff": "Wages and staff",
     "menu": "Best and weakest dishes", "pricing": "Price ideas", "profit": "What each dish earns", "ops": "How the restaurant is doing",
-    "cash": "Cash count check", "things_to_check": "Things to check at the till", "suppliers": "Suppliers",
+    "cash": "Cash count check", "mpesa": "M-Pesa check", "things_to_check": "Things to check at the till", "suppliers": "Suppliers",
     "win_back": "Winning guests back", "savings": "What LEVIII saved you", "data_trust": "How complete your costs are",
     "money": "Profit & Loss, costs covered, bills",
     "why": "Why", "what_if": "What if", "what_to_do": "What to do", "compare": "Compare",

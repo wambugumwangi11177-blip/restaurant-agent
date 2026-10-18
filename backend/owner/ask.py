@@ -49,6 +49,7 @@ _WHAT_TO_DO = (r"\bwhat should i do\b", r"\bwhat can i do\b", r"\bwhat do i do\b
 # area topics that are answered from Home's blocks: topic -> keywords (the longest keyword that appears scores)
 _TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("things_to_check", ("things to check", "to check at", "voids", "void ", "cancelled sale", "cancelled order", "refund", "fraud", "suspicious", "unusual", "late-night", "late night")),
+    ("mpesa", ("m-pesa", "mpesa", "m pesa", "mobile money", "my statement", "the statement")),
     ("cash", ("cash count", "cash check", "till short", "short on any", "drawer", "cash short", "counted", "cash")),
     ("suppliers", ("supplier", "short delivery", "purchase order", "delivered")),
     ("win_back", ("win back", "winning back", "come back", "came back", "haven't come", "lapsed", "regulars", "guests who")),

@@ -1534,6 +1534,8 @@ class RestaurantSettings(Base):
     # added by migration 053 (S3.3): server defaults so rows written before it read as the defaults
     expense_spike_pct        = Column(Float, nullable=False, default=25.0, server_default="25")
     bill_reserve_cents       = Column(Integer, nullable=False, default=0, server_default="0")
+    # added by migration 056 (S6.2)
+    mpesa_match_minutes      = Column(Integer, nullable=False, default=10, server_default="10")
 
     # SET NULL: a deleted user must not take the settings row (or its history) with them.
     updated_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

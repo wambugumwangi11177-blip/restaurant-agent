@@ -56,6 +56,11 @@ def build() -> None:
         db.commit()
     finally:
         db.close()
+    # The first-week screens count days from the Nairobi date a restaurant was created, so a run that crosses Nairobi midnight (21:00 UTC)
+    # meets "day 2" where the tests expect "day 1". The browser tests read this and say so rather than fail.
+    from time_utils import eat_date
+    with open(os.path.join(os.path.dirname(DB_PATH), "built_on.txt"), "w") as f:
+        f.write(eat_date(utcnow()).isoformat())
 
 
 if __name__ == "__main__":

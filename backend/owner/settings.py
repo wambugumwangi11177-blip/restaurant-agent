@@ -64,6 +64,7 @@ class Settings:
     # Money (S3.3)
     expense_spike_pct: float = 25.0          # a cost this far above its usual (3-month average) is flagged
     bill_reserve_cents: int = 0              # cash the owner keeps aside for bills: the bill radar's opening position
+    mpesa_match_minutes: int = 10            # how far apart a sale and its M-Pesa payment may be and still count as the same (S6.2)
 
     def commission_rate(self, channel: str) -> float:
         """Delivery commission as a fraction (0.25) for a DeliveryChannel value; 0 for channels without one."""
@@ -170,6 +171,9 @@ FIELDS: list[FieldSpec] = [
        "How much cash do you keep aside for bills?", "KES", 0, 10_000_000, 1000,
        attr="bill_reserve_cents", kind="int", scale=100,
        hint="We count it when we check whether your sales will cover the bills that fall due."),
+    _f("mpesa_match_minutes", "Money", "Minutes between a sale and its M-Pesa payment",
+       "How many minutes apart can a sale and its M-Pesa payment be and still count as the same one?", "minutes", 2, 60, 1, kind="int",
+       hint="We match a payment on your statement to the sale with the same amount that is closest in time."),
 ]
 BY_KEY = {f.key: f for f in FIELDS}
 BY_ATTR = {f.attr: f for f in FIELDS}

@@ -12,7 +12,7 @@ finds it and that it shows up in the block the owner will look at. Each test say
   P5  Beef: kitchen draws extra        missing stock (kitchen zone)   asserted (scaled — see PROGRESS)
   P6  Handover: store 4.0 / kitchen 3.8 doesn't match                  asserted (scaled)
   P7  Tuesday night drawer short ×4    recurring pattern              asserted (new engine function)
-  P8  3 'M-Pesa' sales, no statement   M-Pesa gap                     strict xfail — P6 phase (S6.x)
+  P8  3 'M-Pesa' sales, no statement   M-Pesa gap                     asserted (S6.2: the statement is read by the real parser)
   P9  Gas +30% vs 3-month average      costs going up                 asserted (S3.3)
   P10 Rent 70k due on the 4th          bill radar shortfall           asserted (S3.3; the date is relative)
   P11 Star · Puzzle · Plowhorse · Dog                                 asserted
@@ -39,6 +39,7 @@ from sqlalchemy.orm import sessionmaker
 
 import models
 from demo.generator import build
+from owner.answers import kes_text
 from time_utils import eat_date, utcnow
 
 OWNER, PASSWORD = "owner@demo-restaurant.example", "Demo-Passw0rd!x"
@@ -187,9 +188,22 @@ def test_p07_tuesday_night_is_short_four_weeks_running(demo):
 
 # ── P8 (the M-Pesa phase) ─────────────────────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason="P6 phase (S6.x): the M-Pesa statement parser and matcher do not exist yet")
 def test_p08_three_mpesa_sales_have_no_statement_line(demo):
-    assert block(demo["A"], "cash", "mpesa")["state"] == "live"
+    """Engine: owner/mpesa_match, over a statement the generator wrote as a CSV and the real parser (parsers/mpesa_csv.py) read. Blocks: cash.mpesa
+    and the totals in Zone 1 (pulse.money_match.mpesa). The state is `not_from_pos`, not `live`: the spec's first draft said live, but owner/states.py
+    reserves `not_from_pos` for what is computed from "a bank / M-Pesa statement", and a statement is not the till."""
+    mpesa = block(demo["A"], "cash", "mpesa")
+    assert mpesa["state"] == "not_from_pos" and mpesa["source"] == "M-Pesa statement"
+    gap = mpesa["sales_without_payment"]
+    assert gap["count"] == 3 and len(gap["items"]) == 3 and gap["kes"] == pytest.approx(sum(i["kes"] for i in gap["items"]))
+    assert mpesa["payments_without_sale"]["count"] == 0 and mpesa["different_amounts"] == []
+    pairs = mpesa["matched"]["grouped"]
+    assert f"{pairs} pairs of sales were paid with one payment" in demo["summary"].planted["P8"]            # as many as the generator found to plant
+    assert mpesa["matched"]["exact"] > 15 and mpesa["matched"]["count"] == mpesa["checked"]["payments"]      # every other payment found its sale
+    assert mpesa["headline"] == f"3 M-Pesa sales ({kes_text(gap['kes'])}) have no payment on your statement."
+    zone = demo["A"]["pulse"]["money_match"]["mpesa"]
+    assert zone["sales_without_payment"] == {"count": 3, "kes": gap["kes"]} and zone["headline"] == mpesa["headline"] and zone["state"] == "not_from_pos"
+    assert block(demo["B"], "cash", "mpesa")["state"] == "no_data"                                          # Kasarani has uploaded nothing
 
 
 def test_p09_gas_is_30_percent_above_its_three_month_average(demo):

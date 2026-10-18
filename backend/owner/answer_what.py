@@ -84,6 +84,26 @@ def _cash(ctx: OwnerContext, q: str) -> dict:
                 next=["Anything to check at the till?"])
 
 
+# ── the M-Pesa check ─────────────────────────────────────────────────────────
+
+def _mpesa(ctx: OwnerContext, q: str) -> dict:
+    b = areas._mpesa(ctx)
+    if b.get("state") in ("no_data", "unavailable"):
+        return nothing("what", "mpesa", q, b.get("reason") or "Upload your M-Pesa statement to check it against your sales.", state=b["state"],
+                       next=["Anything to check at the till?"])
+    gap_s, gap_p = b["sales_without_payment"], b["payments_without_sale"]
+    rows = [row("checked_sales", "M-Pesa sales checked", b["checked"]["sales"], "count"), row("checked_payments", "Payments on the statement", b["checked"]["payments"], "count"),
+            row("matched", "Sales with a payment", b["matched"]["sales"], "count", f"worth {kes_text(b['matched']['kes'])}"),
+            row("sales_without_payment", "Sales with no payment on the statement", gap_s["count"], "count"),
+            row("sales_without_payment_kes", "Value of sales with no payment", gap_s["kes"], "kes"),
+            row("payments_without_sale", "Payments with no sale recorded", gap_p["count"], "count"),
+            row("payments_without_sale_kes", "Value of payments with no sale", gap_p["kes"], "kes")]
+    if b["different_amounts"]:
+        rows.append(row("different_amounts", "Sales paid a different amount from the one recorded", len(b["different_amounts"]), "count"))
+    return make("what", "mpesa", q, state=b["state"], as_of=b.get("as_of"), headline=b["headline"], rows=rows,
+                assumptions=from_setting(b.get("assumption")) + [assumption(b["note"])], next=["Anything to check at the till?"])
+
+
 # ── things to check at the till ──────────────────────────────────────────────
 
 def _things_to_check(ctx: OwnerContext, q: str) -> dict:
@@ -206,7 +226,7 @@ def _money(ctx: OwnerContext, q: str) -> dict:
 # ── the table ────────────────────────────────────────────────────────────────
 
 AREA_TOPICS: dict[str, Callable[[OwnerContext, str], dict]] = {
-    "cash": _cash, "things_to_check": _things_to_check, "suppliers": _suppliers, "win_back": _win_back,
+    "cash": _cash, "mpesa": _mpesa, "things_to_check": _things_to_check, "suppliers": _suppliers, "win_back": _win_back,
     "savings": _savings, "data_trust": _data_trust, "money": _money,
 }
 

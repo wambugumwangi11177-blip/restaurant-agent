@@ -12,7 +12,7 @@ ASK_CATALOGUE = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src"
 
 # The questions the OS offers to try, and where each must go: the form it is listed under and, for "what", the topic.
 TOPIC_OF = {
-    "Am I making a profit this month?": "money", "How is my cash count looking?": "cash", "How are my suppliers doing?": "suppliers",
+    "Am I making a profit this month?": "money", "How is my cash count looking?": "cash", "Do my M-Pesa payments match my sales?": "mpesa", "How are my suppliers doing?": "suppliers",
     "What will run out soon?": "stock", "Which dishes earn the most?": "menu", "Which guests haven't come back?": "win_back",
 }
 

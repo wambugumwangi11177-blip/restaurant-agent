@@ -549,14 +549,23 @@ def _patterns(ctx: OwnerContext) -> dict:
                  assumption=assume("cash_tolerance_kes", s.cash_tolerance_cents // 100, label="Cash count difference we accept"))
 
 
+def _mpesa(ctx: OwnerContext) -> dict:
+    """The M-Pesa check (owner/mpesa_match.py): memoised, because Home shows it twice (Zone 1 and the cash panel)."""
+    from owner import mpesa_match
+    return ctx.cached("mpesa", lambda: ctx.safe("cash.mpesa", lambda: mpesa_match.block(ctx)))
+
+
 def cash_area(ctx: OwnerContext) -> tuple[dict, dict]:
     shifts = ctx.safe("cash.shifts", lambda: _shifts(ctx))
     cancelled = ctx.safe("cash.cancelled", lambda: _cancelled_sales(ctx))
     below = ctx.safe("cash.below_menu_price", lambda: _below_menu_price(ctx))
-    blocks = {"shifts": shifts, "cancelled_sales": cancelled, "below_menu_price": below,
-              "mpesa": unavailable("Upload your M-Pesa statement to check it against your sales."),
+    mpesa = _mpesa(ctx)
+    blocks = {"shifts": shifts, "cancelled_sales": cancelled, "below_menu_price": below, "mpesa": mpesa,
               "patterns": ctx.safe("cash.patterns", lambda: _patterns(ctx))}
-    flagged = sum(1 for s in shifts.get("shifts", []) if s["check"]) + (cancelled.get("to_check", 0) if cancelled["state"] == "live" else 0)
+    # a gap between the till and the statement is one more thing to look at (one, however many sales or payments it spans)
+    gap = 1 if mpesa.get("state") in ("not_from_pos", "stale") and (mpesa["sales_without_payment"]["count"] or mpesa["payments_without_sale"]["count"]
+                                                                   or mpesa["different_amounts"]) else 0
+    flagged = sum(1 for s in shifts.get("shifts", []) if s["check"]) + (cancelled.get("to_check", 0) if cancelled["state"] == "live" else 0) + gap
     if shifts["state"] in ("no_data", "unavailable") and cancelled["state"] in ("no_data", "unavailable"):
         head = summary(None, _STATUS_WORD["unknown"], "unknown", label="Counts and sales to look at")
     elif flagged:

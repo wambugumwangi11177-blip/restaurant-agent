@@ -23,11 +23,11 @@ PLAN: dict[str, list[tuple[str, str]]] = {
     "daily": [("sales", "Sales"), ("top_dishes", "Best sellers"), ("cash_check", "Cash count check"),
               ("things_to_check", "Things to check"), ("stock_today", "Stock today")],
     "weekly": [("sales", "Sales"), ("top_dishes", "Best sellers"), ("dishes", "Best and weakest dishes"), ("price_ideas", "Price ideas"),
-               ("missing_stock", "Missing stock"), ("wages", "Wages"), ("cash_check", "Cash count check"), ("things_to_check", "Things to check"),
+               ("missing_stock", "Missing stock"), ("wages", "Wages"), ("cash_check", "Cash count check"), ("mpesa_check", "M-Pesa check"), ("things_to_check", "Things to check"),
                ("outlook", "Next week"), ("kitchen", "Kitchen speed"), ("bookings", "Bookings"), ("suppliers", "Suppliers")],
     "monthly": [("pnl", "Profit & Loss"), ("sales", "Sales"), ("top_dishes", "Best sellers"), ("costs", "Costs"), ("dishes", "Dishes"),
                 ("channels", "Delivery apps and dine-in"), ("store", "Store & suppliers"), ("wages", "Wages"), ("cash_check", "Cash count check"),
-                ("decisions", "What cost you money"), ("savings", "What LEVIII saved you"), ("marketing", "Winning guests back"),
+                ("mpesa_check", "M-Pesa check"), ("decisions", "What cost you money"), ("savings", "What LEVIII saved you"), ("marketing", "Winning guests back"),
                 ("outlook", "Next 30 days"), ("data_trust", "How complete your costs are"), ("rules_used", "Targets used in this report")],
     "yearly": [("sales", "Sales"), ("trends", "Trends"), ("pnl", "Profit & Loss by month"), ("seasons", "Busy and quiet months")],
 }
@@ -90,7 +90,7 @@ def _pnl_for(ctx: OwnerContext, period: str, month: date | None) -> dict:
 ALL, WEEK, MONTH = ("daily", "weekly", "monthly", "yearly"), ("weekly",), ("monthly",)
 BUILDERS = {
     "sales": (_sales, None), "top_dishes": (_top_dishes, None), "pnl": (_pnl_for, ("monthly", "yearly")),
-    "cash_check": (rs.cash_check, ("daily", "weekly", "monthly")), "things_to_check": (rs.things_to_check, ("daily", "weekly")), "stock_today": (rs.stock_today, ("daily",)),
+    "cash_check": (rs.cash_check, ("daily", "weekly", "monthly")), "mpesa_check": (rs.mpesa_check, ("weekly", "monthly")), "things_to_check": (rs.things_to_check, ("daily", "weekly")), "stock_today": (rs.stock_today, ("daily",)),
     "dishes": (rs.dishes, ("weekly", "monthly")), "price_ideas": (rs.price_ideas, WEEK), "missing_stock": (rs.missing_stock, WEEK),
     "wages": (rs.wages, ("weekly", "monthly")), "outlook": (rs.outlook, ("weekly", "monthly")), "kitchen": (rs.kitchen, WEEK),
     "bookings": (rs.bookings, WEEK), "suppliers": (rs.suppliers, WEEK),

@@ -62,7 +62,7 @@ ALL = [(p, k) for p in reports.PERIODS for k, _t in reports.PLAN[p]]
 
 def test_the_plan_is_the_sections_of_each_report_and_none_is_planned():
     assert reports.planned_sections() == set()
-    assert {p: len(s) for p, s in reports.PLAN.items()} == {"daily": 5, "weekly": 12, "monthly": 15, "yearly": 4}
+    assert {p: len(s) for p, s in reports.PLAN.items()} == {"daily": 5, "weekly": 13, "monthly": 16, "yearly": 4}
     assert [k for k, _ in reports.PLAN["yearly"]] == ["sales", "trends", "pnl", "seasons"]
     assert "things_to_check" in dict(reports.PLAN["weekly"])                        # "this week" alerts are read here (S5.3)
 

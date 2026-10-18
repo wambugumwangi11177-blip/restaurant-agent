@@ -48,7 +48,7 @@ export default function Pulse({ pulse, period }: { pulse: PulseData; period: Own
         <Match label="Cash count check" block={pulse.money_match.cash}
           text={pulse.money_match.cash.state === "no_data" || pulse.money_match.cash.state === "unavailable" ? pulse.money_match.cash.reason ?? "" :
             `${plural((pulse.money_match.cash.checked as number) ?? 0, "shift")} checked · ${(pulse.money_match.cash.to_check as number) ? `${pulse.money_match.cash.to_check} to look at` : "all match"}`} />
-        <Match label="M-Pesa check" block={pulse.money_match.mpesa} text={pulse.money_match.mpesa.reason ?? ""} />
+        <Match label="M-Pesa check" block={pulse.money_match.mpesa} text={pulse.money_match.mpesa.headline ?? pulse.money_match.mpesa.reason ?? ""} />
       </div>
     </section>
   );

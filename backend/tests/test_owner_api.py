@@ -140,7 +140,9 @@ def test_not_yet_built_parts_say_so_instead_of_inventing_a_number(client, db_ses
     for name in ("pnl", "breakeven", "bills", "spikes"):                              # S3.2/S3.3: built, and honest when nothing is recorded
         assert money[name]["state"] == "no_data" and money[name]["reason"], name
     assert money["pnl"]["lines"][0]["key"] == "sales" and money["pnl"]["lines"][-1]["key"] == "kept"
-    assert body["areas"]["cash"]["blocks"]["mpesa"]["state"] == "unavailable"
+    mpesa = body["areas"]["cash"]["blocks"]["mpesa"]                                   # S6.2: built, and honest when no statement has been uploaded
+    assert mpesa["state"] == "no_data" and "Upload your M-Pesa statement" in mpesa["reason"]
+    assert body["pulse"]["money_match"]["mpesa"]["state"] == "no_data"
     assert body["pulse"]["breakeven_at"]["state"] == "no_data"
     assert body["read"]["state"] == "unavailable" and body["read"]["text"] is None
     for bill in ("bills", "licences"):

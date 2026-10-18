@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 /**
@@ -6,6 +8,10 @@ import { expect, test, type Page } from "@playwright/test";
  * at 390 px and 1440 px, with no console error and no "—" standing in for a number that exists.
  */
 const PASSWORD = "E6-Passw0rd!x";
+
+/** The Nairobi day the test database was built on (execution/e6_backend.py) and today's. They differ when a run crosses Nairobi midnight. */
+const builtOn = () => { try { return readFileSync(path.resolve(process.cwd(), "..", ".tmp", "e6", "built_on.txt"), "utf8").trim(); } catch { return ""; } };
+const nairobiToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Nairobi" }).format(new Date());
 
 async function signIn(page: Page, restaurant: string) {
   await page.goto("/login");
@@ -70,6 +76,43 @@ test.describe("the owner of a restaurant with a history", () => {
     expect(problems).toEqual([]);
   });
 
+  test("did the M-Pesa money arrive? — Home and the cash panel name the three sales the statement never shows", async ({ page }) => {
+    const sentence = /3 M-Pesa sales \(KES [\d,]+\) have no payment on your statement\./;
+    await expect(page.getByText(sentence).first()).toBeVisible();                                         // Zone 1
+    await page.getByRole("button", { name: /Cash Check/ }).click();
+    const panel = page.getByRole("region", { name: "M-Pesa check" });
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText(sentence);
+    await expect(panel).toContainText("From your M-Pesa statement");
+    await expect(panel.getByText(/^Sales with no payment on the statement · KES [\d,]+$/)).toBeVisible();
+    await expect(panel.getByRole("listitem").filter({ hasText: /Table \d+|Takeaway or delivery/ })).toHaveCount(3);
+  });
+
+  test("a statement can be uploaded, the rows it could not read are listed, and the upload can be taken back", async ({ page }) => {
+    const problems = watch(page);
+    await page.getByRole("button", { name: /Cash Check/ }).click();
+    const upload = page.getByRole("region", { name: "Your M-Pesa statement" });
+    await expect(upload).toBeVisible();
+    // Money going out is not a payment to explain, and a row without a time is left out and listed: the check itself does not move.
+    const csv = ["Receipt No.,Completion Time,Details,Transaction Status,Paid In,Withdrawn,Balance",
+      "E6OUT00001,2026-09-01 10:00:00,Business Payment to E6 SUPPLIER,Completed,,\"1,200.00\",",
+      "E6BAD00001,not a time,Customer Payment,Completed,50.00,,"].join("\n");
+    await upload.locator("input[type=file]").setInputFiles({ name: "e6-statement.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+    const status = upload.getByRole("status");
+    await expect(status).toContainText("Read 1 new payment from e6-statement.csv", { timeout: 30_000 });
+    await expect(status).toContainText("1 row was not read");
+    await status.getByText("1 row was not read").click();
+    await expect(status).toContainText("Row 3: the time 'not a time' is not one we can read");
+    await expect(page.getByRole("region", { name: "M-Pesa check" })).toContainText(/3 M-Pesa sales/);        // unchanged
+    await upload.getByText(/payments? on file from \d+ uploads?/).click();           // the demo's own statement is on file too: take back only this one
+    const mine = upload.getByRole("listitem").filter({ hasText: "e6-statement.csv" });
+    await expect(mine).toHaveCount(1);
+    await mine.getByRole("button", { name: "Remove this upload" }).click();
+    await expect(mine).toHaveCount(0, { timeout: 30_000 });
+    await expect(page.getByRole("region", { name: "M-Pesa check" })).toContainText(/3 M-Pesa sales/);        // and the check is as it was
+    expect(problems).toEqual([]);
+  });
+
   test("Ask LEVIII answers in five ways, each from the owner's own records", async ({ page }) => {
     const problems = watch(page);
     await page.goto("/os");
@@ -78,6 +121,7 @@ test.describe("the owner of a restaurant with a history", () => {
       ["What if I raise the price of Chips to 350?", "what_if", /Worth trying|Be careful|Not worth it/],
       ["Compare my branches", "compare", /Kasarani/],
       ["Am I making a profit this month?", "what", /you sold KES [\d,]+/],
+      ["Do my M-Pesa payments match my sales?", "what", /3 M-Pesa sales \(KES [\d,]+\) have no payment on your statement/],
     ];
     for (const [question, form, expected] of asks) {
       await page.getByLabel("Ask or describe a change").fill(question);
@@ -176,6 +220,7 @@ test.describe("the owner of a restaurant with a history", () => {
 
 test.describe("the owner of a brand-new restaurant", () => {
   test("is asked for their targets, sees one panel and honest empty answers on the first screen", async ({ page }) => {
+    test.skip(builtOn() !== nairobiToday(), "this run crossed Nairobi midnight, so a restaurant created at its start is on day 2, not day 1");
     const problems = watch(page);
     await signIn(page, "New Kitchen");
     await expect(page.getByRole("heading", { name: "Set your targets" })).toBeVisible();

@@ -4,7 +4,7 @@ Source of truth: `backend/owner/registry.py`, checked against the composed `/own
 topics (`routers/ai_ask.py`) and the report plan (`owner/reports.py`). ✔ present · ◌ planned (placeholder or
 named in the report plan, not built) · — exempt (written reason in the registry) · ✖ missing.
 
-**23 registered engines · 22 built · 22 complete on all three surfaces · 0 open gaps** (P4 exit: 0).
+**23 registered engines · 23 built · 23 complete on all three surfaces · 0 open gaps** (P4 exit: 0).
 
 | engine | owner name | status | Home | OS | Reports |
 |---|---|---|---|---|---|
@@ -29,7 +29,7 @@ named in the report plan, not built) · — exempt (written reason in the regist
 | strategist | Goal mode | built | — exempt | ✔ | — exempt |
 | decisions | What is costing you money | built | ✔ | ✔ | ✔ |
 | money | Profit & Loss, costs covered, bills | built | ✔ | ✔ | ✔ |
-| mpesa_match | M-Pesa statement check | planned | ◌ S6.1–S6.2 | ◌ S6.1–S6.2 | ◌ S6.1–S6.2 |
+| mpesa_match | M-Pesa statement check | built | ✔ | ✔ | ✔ |
 | owner_settings | Your targets | built | ✔ | — exempt | ✔ |
 
 ## Open gaps (the allow-list; may only shrink)
@@ -37,7 +37,6 @@ named in the report plan, not built) · — exempt (written reason in the regist
 
 ## Not yet built engines (their surfaces are placeholders until their sprint)
 
-- **mpesa_match** — M-Pesa statement check: S6.1–S6.2
 
 ## Exemptions (written reasons)
 

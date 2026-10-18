@@ -172,7 +172,7 @@
   },
   {
    "key": "mpesa_match",
-   "kind": "none",
+   "kind": "module",
    "label": "M-Pesa statement match",
    "targets": [
     "owner.mpesa_match"
@@ -629,10 +629,10 @@
    "reports": "wired"
   },
   "mpesa_match": {
-   "home": "not_built",
-   "old_dash": "not_built",
-   "os": "not_built",
-   "reports": "not_built"
+   "home": "wired",
+   "old_dash": "not_shown",
+   "os": "wired",
+   "reports": "wired"
   },
   "owner_settings": {
    "home": "wired",
@@ -2041,6 +2041,11 @@
    {
     "from": "demo.generator",
     "lazy": true,
+    "to": "owner.mpesa_statement"
+   },
+   {
+    "from": "demo.generator",
+    "lazy": true,
     "to": "owner.settings"
    },
    {
@@ -2671,6 +2676,11 @@
    {
     "from": "owner.areas",
     "lazy": true,
+    "to": "owner.mpesa_match"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
     "to": "owner.settings"
    },
    {
@@ -2907,6 +2917,31 @@
     "from": "owner.money.view",
     "lazy": false,
     "to": "owner.states"
+   },
+   {
+    "from": "owner.mpesa_match",
+    "lazy": false,
+    "to": "ai.analysis_clock"
+   },
+   {
+    "from": "owner.mpesa_match",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.mpesa_match",
+    "lazy": false,
+    "to": "owner.answers"
+   },
+   {
+    "from": "owner.mpesa_match",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "owner.mpesa_match",
+    "lazy": false,
+    "to": "time_utils"
    },
    {
     "from": "owner.mpesa_statement",
@@ -5079,7 +5114,7 @@
     "group": "demo",
     "id": "demo.generator",
     "kind": "py",
-    "loc": 895,
+    "loc": 972,
     "path": "backend/demo/generator.py"
    },
    {
@@ -5254,7 +5289,7 @@
     "group": "core",
     "id": "models",
     "kind": "py",
-    "loc": 1852,
+    "loc": 1854,
     "path": "backend/models.py"
    },
    {
@@ -5289,7 +5324,7 @@
     "group": "other",
     "id": "owner.answer_what",
     "kind": "py",
-    "loc": 218,
+    "loc": 238,
     "path": "backend/owner/answer_what.py"
    },
    {
@@ -5317,21 +5352,21 @@
     "group": "other",
     "id": "owner.areas",
     "kind": "py",
-    "loc": 688,
+    "loc": 697,
     "path": "backend/owner/areas.py"
    },
    {
     "group": "other",
     "id": "owner.ask",
     "kind": "py",
-    "loc": 122,
+    "loc": 123,
     "path": "backend/owner/ask.py"
    },
    {
     "group": "other",
     "id": "owner.home",
     "kind": "py",
-    "loc": 196,
+    "loc": 205,
     "path": "backend/owner/home.py"
    },
    {
@@ -5413,6 +5448,13 @@
    },
    {
     "group": "other",
+    "id": "owner.mpesa_match",
+    "kind": "py",
+    "loc": 228,
+    "path": "backend/owner/mpesa_match.py"
+   },
+   {
+    "group": "other",
     "id": "owner.mpesa_statement",
     "kind": "py",
     "loc": 80,
@@ -5436,7 +5478,7 @@
     "group": "other",
     "id": "owner.report_sections",
     "kind": "py",
-    "loc": 467,
+    "loc": 497,
     "path": "backend/owner/report_sections.py"
    },
    {
@@ -5450,7 +5492,7 @@
     "group": "other",
     "id": "owner.settings",
     "kind": "py",
-    "loc": 322,
+    "loc": 326,
     "path": "backend/owner/settings.py"
    },
    {
@@ -6936,12 +6978,12 @@
   }
  ],
  "stats": {
-  "py_edges": 762,
-  "py_lazy_edges": 221,
-  "py_modules": 184,
+  "py_edges": 769,
+  "py_lazy_edges": 223,
+  "py_modules": 185,
   "routes": 188,
-  "ts_edges": 587,
-  "ts_files": 261
+  "ts_edges": 592,
+  "ts_files": 262
  },
  "status_only": [
   [
@@ -6961,6 +7003,9 @@
     "GET /owner/settings -> routers.owner.read_settings",
     "PUT /owner/settings -> routers.owner.write_settings",
     "GET /owner/money/pnl/export -> routers.owner_money.export_profit_and_loss",
+    "DELETE /owner/mpesa/statements/{upload_id} -> routers.owner_mpesa.delete_statement",
+    "GET /owner/mpesa/statements -> routers.owner_mpesa.list_statements",
+    "POST /owner/mpesa/statement -> routers.owner_mpesa.upload_statement",
     "POST /staff/end-impersonation -> routers.staff.end_impersonation",
     "POST /staff/{staff_id}/impersonate -> routers.staff.impersonate_staff",
     "PUT /staff/{staff_id} -> routers.staff.update_staff"
@@ -6968,7 +7013,7 @@
    "entries": [
     "app/(owner)/home/page.tsx"
    ],
-   "frontend_files": 51,
+   "frontend_files": 52,
    "label": "Home",
    "parallel_backends": []
   },
@@ -8957,6 +9002,10 @@
    },
    {
     "from": "components/owner/areas/CashArea.tsx",
+    "to": "components/owner/areas/MpesaUpload.tsx"
+   },
+   {
+    "from": "components/owner/areas/CashArea.tsx",
     "to": "components/owner/areas/ui.tsx"
    },
    {
@@ -9018,6 +9067,22 @@
    {
     "from": "components/owner/areas/MoneyArea.tsx",
     "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/areas/MpesaUpload.tsx",
+    "to": "components/owner/areas/ui.tsx"
+   },
+   {
+    "from": "components/owner/areas/MpesaUpload.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/owner/areas/MpesaUpload.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/areas/MpesaUpload.tsx",
+    "to": "lib/owner/useOwnerHome.ts"
    },
    {
     "from": "components/owner/areas/PermitsArea.tsx",

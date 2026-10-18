@@ -150,7 +150,8 @@ it("Cash Check: each count against the till, the shift to look at flagged, the r
   expect(within(patterns).getByText("4/4")).toBeTruthy();
   expect(patterns.textContent).toMatch(/Tuesday evening: short 4 of the last 4 times, about KES 491 each — KES 1,965 in all\./);
   expect(within(panel("Sold below menu price")).getByText(/Menu KES 300, charged KES 270 — about KES 2,057 a month/)).toBeTruthy();
-  expect(within(panel("M-Pesa check")).getByText(/Upload your M-Pesa statement/)).toBeTruthy();
+  const mpesa = areas().cash.blocks.mpesa as unknown as { headline: string };
+  expect(within(panel("M-Pesa check")).getByText(mpesa.headline)).toBeTruthy();              // the figures themselves are tested in owner-mpesa.test.tsx
 });
 
 // ── Staff ────────────────────────────────────────────────────────────────────

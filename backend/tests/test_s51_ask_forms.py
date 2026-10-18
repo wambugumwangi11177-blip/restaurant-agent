@@ -114,7 +114,7 @@ WHAT_SAMPLES = {
     "stock": "What will run out soon?", "revenue": "How are my sales this week?", "bookings": "How many bookings today?",
     "kitchen": "What is slowing my kitchen down?", "staff": "Who is working today?", "menu": "Which dishes earn the most?",
     "pricing": "Which prices should I change?", "profit": "Where am I losing money?", "ops": "How is my restaurant doing?",
-    "cash": "How is my cash count looking?", "things_to_check": "Anything to check at the till?",
+    "cash": "How is my cash count looking?", "mpesa": "Do my M-Pesa payments match my sales?", "things_to_check": "Anything to check at the till?",
     "suppliers": "How are my suppliers doing?", "win_back": "Which guests haven't come back?",
     "savings": "What has LEVIII saved me?", "data_trust": "How complete are my costs?", "money": "Am I making a profit this month?",
 }

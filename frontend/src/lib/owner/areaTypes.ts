@@ -84,6 +84,19 @@ export type SuppliersBlock = Block & {
 // ── Cash Check ───────────────────────────────────────────────────────────────
 export type ShiftsBlock = Block & { shifts: { from: string; expected: Money; counted: Money; gap: Money; check: boolean }[] };
 export type CancelledBlock = Block & { cancelled_last_7_days: number; unusual_cancelling: number; unusual_refunds: number; late_night_activity: number; to_check: number; note: string };
+/** The M-Pesa check (backend/owner/mpesa_match.py): a statement against the M-Pesa sales, over the days the statement covers. */
+export type MpesaBlock = Block & {
+  source?: string;
+  headline?: string;
+  window?: { from: string; to: string };
+  checked?: { sales: number; payments: number };
+  matched?: { count: number; sales: number; kes: Money; receipt: number; exact: number; grouped: number; split: number };
+  sales_without_payment?: { count: number; kes: Money; items?: { order_id: number; at: string; kes: Money; what: string }[] };
+  payments_without_sale?: { count: number; kes: Money; items?: { receipt: string; at: string; kes: Money; from: string }[] };
+  different_amounts?: { order_id: number; receipt: string; sale_kes: Money; payment_kes: Money }[];
+  outside_statement?: { sales: number; kes: Money };
+  note?: string;
+};
 export type BelowMenuPriceBlock = Block & { dishes: { dish: string; menu_price: Money; charged: Money; below_pct: number; month_loss: Money }[] };
 export type PatternsBlock = Block & {
   patterns: { when: string; weekday: number; shift: "day" | "evening"; times_short: number; of_last: number; short_each: Money; total: Money }[];

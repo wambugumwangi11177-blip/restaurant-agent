@@ -340,6 +340,23 @@ def test_what_to_do_with_a_goal_larger_than_every_idea_says_so(demo):
     assert out["covered_by"] is None and "not enough" in out["headline"].lower()
 
 
+def test_when_the_goal_is_not_met_every_idea_that_was_counted_is_on_the_screen(demo):
+    """"All 12 ideas add up to about KES 19,790": the twelve are listed and 12 is a figure of the answer. (Found by E3 on a day when the
+    ideas fell just short of KES 20,000; on the days they reached it the sentence named a smaller count that was already backed.)"""
+    out = ask.ask(demo["A"], "How can I find KES 90,000,000 more a month?")
+    priced = [r for r in out["rows"] if r["unit"] == "kes" and r["value"] and r["tier"] != "now"]
+    assert out["ideas_counted"] == len(priced) > 0
+    assert f"All {out['ideas_counted']} ideas" in out["headline"] or f"All {out['ideas_counted']} idea" in out["headline"]
+    assert out["total_kes"] == pytest.approx(sum(r["value"] for r in priced), abs=0.01)
+    assert answers.ungrounded(out) == []
+
+
+@pytest.mark.parametrize("goal", ["KES 1,000", "KES 5,000", "KES 10,000", "KES 15,000", "KES 20,000", "KES 25,000", "KES 40,000", "KES 90,000,000"])
+def test_the_sentence_is_backed_whether_or_not_the_ideas_reach_the_goal(demo, goal):
+    out = ask.ask(demo["A"], f"How can I find {goal} more a month?")
+    assert answers.ungrounded(out) == [], out["headline"]
+
+
 def test_what_to_do_on_a_restaurant_with_nothing_to_say_is_honest():
     # a fresh tenant: nothing recorded, so no ranking and no invented advice
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False})

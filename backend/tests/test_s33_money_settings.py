@@ -91,14 +91,16 @@ def _run(conn, fn):
         getattr(module, fn)()
 
 
-def test_migration_053_follows_052_and_is_the_single_head():
+def test_migration_053_follows_052_and_the_chain_has_one_head():
+    """(It used to say 053 *is* the head; every later migration made that false. What matters: it follows 052 and nothing forks.)"""
     module = _load()
     assert module.down_revision == "052_money_ledger"
     from alembic.config import Config
     from alembic.script import ScriptDirectory
     config = Config(str(BACKEND / "alembic.ini"))
     config.set_main_option("script_location", str(BACKEND / "alembic"))
-    assert ScriptDirectory.from_config(config).get_heads() == [module.revision]
+    script = ScriptDirectory.from_config(config)
+    assert len(script.get_heads()) == 1 and module.revision in {r.revision for r in script.walk_revisions()}
 
 
 def test_migration_053_adds_the_columns_with_defaults_to_an_existing_table_and_is_idempotent(tmp_path):

@@ -927,6 +927,9 @@ class Notification(Base):
     severity          = Column(String, nullable=True)   # "critical" | "high" | "medium" | None
     acknowledged_at   = Column(DateTime, nullable=True)
     escalation_level  = Column(Integer, default=0, nullable=False)
+    # Alert levels (ai/alert_levels.py, S5.3): why no push went out for this row — "quiet_hours" · "daily_cap" · "today".
+    # NULL = it was pushed, or the person is not under the owner policy. The row is written either way (the feed never depends on push).
+    push_held         = Column(String, nullable=True)
 
     __table_args__ = (
         Index("ix_notifications_user_unread", "user_id", "is_read"),

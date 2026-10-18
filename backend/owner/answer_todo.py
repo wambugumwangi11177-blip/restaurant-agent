@@ -34,7 +34,7 @@ def build(ctx: OwnerContext, question: str) -> dict:
     follow = ["Compare this week with last week", "Why were sales down yesterday?"]
     if not cards:
         reason = "Nothing is recorded yet to rank." if base["state"] == "no_data" else "Nothing is costing you money that we can see right now."
-        return nothing("what_to_do", "what_to_do", question, reason, next=follow, goal_kes=None, covered_by=None, total_kes=None)
+        return nothing("what_to_do", "what_to_do", question, reason, next=follow, goal_kes=None, covered_by=None, total_kes=None, ideas_counted=None)
     goal = parse_goal(question)
     priced = [c for c in cards if (c["kes_month"] or 0) > 0 and c["tier"] != "now"]
     covered_by, running, total = None, 0.0, 0.0
@@ -46,7 +46,8 @@ def build(ctx: OwnerContext, question: str) -> dict:
                 break
         else:
             total = round(running, 2)
-    show = cards[: max(SHOWN, covered_by or 0)]
+    # "All 12 ideas add up to …" is only honest if those twelve are on the screen: when the goal is not met, every idea is shown.
+    show = cards if goal and not covered_by else cards[: max(SHOWN, covered_by or 0)]
     rows = [row("idea", c["sentence"], c["kes_month"], "kes" if c["kes_month"] else "text",
                 id=c["id"], action=c["action"], why=c["why"] or None, tier=c["tier"], domain=c["domain"]) for c in show]
     top = cards[0]
@@ -66,4 +67,5 @@ def build(ctx: OwnerContext, question: str) -> dict:
         assumptions.append(assumption("The ideas are added up in the order Home shows them: what is happening now, money already going out, then money you could make."))
     state = base if base["state"] != "no_data" else {"state": "live", "as_of": None}
     return make("what_to_do", "what_to_do", question, state=state["state"], as_of=state.get("as_of"), headline=head, rows=rows, assumptions=assumptions,
-                next=follow, goal_kes=goal, covered_by=covered_by, total_kes=total if goal else None)
+                next=follow, goal_kes=goal, covered_by=covered_by, total_kes=total if goal else None,
+                ideas_counted=len(priced) if goal else None)

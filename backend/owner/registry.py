@@ -132,7 +132,10 @@ ENGINES: tuple[Engine, ...] = (
            }),
     Engine("decisions", "What is costing you money", "money", "costing_you_money",
            home_blocks=("costing_you_money",), os_topics=("ops",), report_sections=("monthly.decisions",),
-           inputs=("every engine above",), settings=("urgent_alerts_per_day",)),
+           inputs=("every engine above",),
+           # the alert levels (ai/alert_levels.py, S5.3) are how a decision reaches the owner's phone: a push at most this many times a
+           # day, and never in the quiet hours; everything else waits for the evening digest or the weekly report
+           settings=("urgent_alerts_per_day", "quiet_hours_start", "quiet_hours_end")),
     Engine("money", "Profit & Loss, costs covered, bills", "money", "area",
            home_blocks=("money.pnl", "money.breakeven", "money.bills", "money.spikes", "coming_up.bills",
                       "permits.licences", "coming_up.licences"),

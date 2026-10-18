@@ -103,6 +103,7 @@ INFRASTRUCTURE = {
     "ai.workflows": "workflow engine",
     "ai.orchestrator": "agent orchestration (strategist is its own engine row)",
     "ai.escalation": "alert escalation engine (feeds S5.3 alert levels)",
+    "ai.alert_levels": "alert levels (S5.3): which events become a push, the daily limit, quiet hours, the evening digest; reads the owner settings, and every figure in the digest is copied from Home's blocks",
     "ai.simulation.signals": "calendar signals consumed by the twin (D12 holidays live here)",
     # S1.4 — the former candidates, each resolved (see backend/owner/registry.py::NOT_ENGINES):
     "ai.ops_manager": "resolved: 'restaurant health' = the Home health tiles' rule set, not a separate figure",

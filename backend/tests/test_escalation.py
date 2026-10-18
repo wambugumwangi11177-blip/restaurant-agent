@@ -12,6 +12,7 @@ from datetime import timedelta
 
 import auth
 import models
+from owner.settings import update_settings
 from time_utils import utcnow
 from ai.escalation.engine import (
     run_escalation_sweep, severity_for, LEVEL_1_TIMEOUT_MINUTES, LEVEL_2_TIMEOUT_MINUTES,
@@ -147,7 +148,8 @@ def test_critical_alert_escalates_to_call_after_second_timeout(db_session, monke
     restaurant.owner_phone = "+254700000001"
     db_session.commit()
     owner = _make_user(db_session, tenant, "esc6owner", role=models.Role.ADMIN, staff_role=models.StaffRole.OWNER)
-
+    # The reminder waits for the owner's quiet hours to end (S5.3): this test is about the reminder, not the hour it runs at.
+    update_settings(db_session, restaurant.id, owner.id, {"quiet_hours_start": 9, "quiet_hours_end": 9})
 
     timeout = LEVEL_2_TIMEOUT_MINUTES["critical"]
     notif = _backdated_notification(db_session, owner, "critical", minutes_ago=timeout + 1, escalation_level=1)

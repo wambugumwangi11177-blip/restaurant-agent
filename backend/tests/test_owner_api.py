@@ -584,7 +584,5 @@ def test_every_setting_an_engine_reads_is_listed_by_at_least_one_engine_or_surfa
     from owner.registry import ENGINES
     from owner.settings import FIELDS
     read = {s for e in ENGINES for s in e.settings}
-    # the quiet hours are read by the alert levels (S5.3), which are not an engine row yet
-    awaiting = {"quiet_hours_start", "quiet_hours_end"}
-    dead = {f.key for f in FIELDS} - read - awaiting
+    dead = {f.key for f in FIELDS} - read
     assert dead == set(), f"settings no engine reads: {sorted(dead)}"

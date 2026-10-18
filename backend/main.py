@@ -244,6 +244,17 @@ def _start_scheduler():
             replace_existing=True,
         )
 
+        # S5.3 — the evening digest: what the owner's day held and what is still waiting (ai/alert_levels.py). After the dinner
+        # rush and before the default quiet hours; the scheduler runs in UTC, Nairobi is UTC+3.
+        from ai.alert_levels import DIGEST_HOUR_EAT
+        scheduler.add_job(
+            _send_all_evening_digests,
+            CronTrigger(hour=DIGEST_HOUR_EAT - 3, minute=0),
+            id="evening_digest",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+
         # Audit remediation, Tier 2 item 5 — retry failed event-bus deliveries
         # (see events/bus.py's NotificationOutbox). Same 5-min cadence as
         # escalation_sweep above, for the same reason: this is the one job in
@@ -286,6 +297,21 @@ def _send_all_morning_briefings():
         run_morning_briefing(SessionLocal)
     except Exception as exc:
         logger.error(f"[Briefing] Scheduler job failed: {exc}")
+
+
+def _send_all_evening_digests():
+    """S5.3: one evening digest per owner (ai/alert_levels.py). A failed job is logged, never raised into the scheduler."""
+    try:
+        from database import SessionLocal
+        from ai import alert_levels
+        db = SessionLocal()
+        try:
+            result = alert_levels.send_evening_digests(db)
+            logger.info(f"[Digest] evening digests: {result}")
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Digest] Scheduler job failed: {exc}")
 
 
 def _check_late_purchase_orders():

@@ -24,7 +24,8 @@ from collections import defaultdict
 from database import SessionLocal
 import models
 from events.bus import subscribe, EventType
-from ai.notify import notify_users
+from ai import alert_levels
+from ai.notify import notify_user, notify_users
 from routers.deps import get_staff_users_for_restaurant
 
 logger = logging.getLogger("ai.orchestrator.push_notifier")
@@ -147,15 +148,17 @@ _EVENT_TARGET_ROLES: dict[EventType, list[StaffRole]] = {
     # signal is exactly the kind of thing one accountable person should see).
     EventType.SHIFT_CLOCK_IN_FLAGGED:     [StaffRole.OWNER, StaffRole.MANAGER],
     # Sprint 3 — suspicious-transaction pattern flagged (void spike, refund
-    # burst, payment mismatch, off-hours activity). Owner + Controller only,
-    # deliberately excluding Manager/Supervisor: the flagged actor could BE a
-    # manager-tier staff member, so this stays with the same oversight-only
-    # posture as ACCOUNT_LOCKED/STAFF_ROLE_CHANGED above, not a wide fan-out.
-    EventType.SUSPICIOUS_TRANSACTION_FLAGGED: [StaffRole.OWNER, StaffRole.CONTROLLER],
-    # Sprint 4 — drawer count landed outside tolerance. Same oversight-only
-    # posture as SUSPICIOUS_TRANSACTION_FLAGGED (the counting staff member
-    # could be the one the variance implicates).
-    EventType.CASH_RECONCILIATION_FLAGGED: [StaffRole.OWNER, StaffRole.CONTROLLER],
+    # burst, payment mismatch, off-hours activity). Owner ONLY (S5.3, SPEC
+    # section 4: "cash/fraud to owner only"): the flagged actor could BE a
+    # manager or a controller, so it reaches the one accountable person, and
+    # ai/escalation/engine.py never pages a manager about it either
+    # (ai/alert_levels.py::OWNER_ONLY_EVENTS). The Controller used to be in
+    # this list; the owner's Fraud report is where the evidence is.
+    EventType.SUSPICIOUS_TRANSACTION_FLAGGED: [StaffRole.OWNER],
+    # Sprint 4 — drawer count landed outside tolerance. Owner ONLY, same
+    # reasoning (the counting staff member could be the one the variance
+    # implicates).
+    EventType.CASH_RECONCILIATION_FLAGGED: [StaffRole.OWNER],
 }
 
 # Where each domain actually lives per tier, post-2026-07-17 (every staff
@@ -317,14 +320,29 @@ def _fan_out(db, restaurant, event_type: EventType, title: str, body: str, domai
 
     users = get_staff_users_for_restaurant(db, restaurant, roles)
     by_role: dict[StaffRole, list[int]] = defaultdict(list)
+    owners: list[models.User] = []
     for u in users:
         if exclude_user_id is not None and u.id == exclude_user_id:
             continue
-        by_role[u.staff_role].append(u.id)
+        if alert_levels.is_owner(u):
+            owners.append(u)
+        else:
+            by_role[u.staff_role].append(u.id)
 
     for role, user_ids in by_role.items():
         notify_users(db, user_ids, title, body, event_type.value, _resolve_link(role, domain),
                      severity=severity)
+
+    # The owner is under the alert-level policy (ai/alert_levels.py, S5.3): an urgent alert is pushed unless it is the quiet hours or
+    # the daily limit; everything else is written to the feed without a push and left to the evening digest. The row is always
+    # written, with the reason on it. The floor tiers above are not under that policy: they get what their role must act on.
+    for u in owners:
+        try:
+            decision = alert_levels.push_decision(db, restaurant, u, event_type.value)
+            notify_user(db, u.id, title, body, event_type.value, _resolve_link(u.staff_role, domain),
+                        severity=severity, push=decision.push, push_held=decision.held)
+        except Exception as exc:
+            logger.error(f"[PushNotifier] Failed to notify owner {u.id}: {exc}")
 
 
 def _get_restaurant(db, restaurant_id):

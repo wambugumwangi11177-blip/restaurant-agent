@@ -190,6 +190,11 @@
  "inventory": {
   "ai_modules": [
    {
+    "module": "ai.alert_levels",
+    "note": "alert levels (S5.3): which events become a push, the daily limit, quiet hours, the evening digest; reads the owner settings, and every figure in the digest is copied from Home's blocks",
+    "status": "infrastructure"
+   },
+   {
     "module": "ai.analysis_clock",
     "note": "window anchor / freshness used by engines",
     "status": "infrastructure"
@@ -699,6 +704,46 @@
  "python": {
   "edges": [
    {
+    "from": "ai.alert_levels",
+    "lazy": true,
+    "to": "ai.notify"
+   },
+   {
+    "from": "ai.alert_levels",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.alert_levels",
+    "lazy": true,
+    "to": "owner.answers"
+   },
+   {
+    "from": "ai.alert_levels",
+    "lazy": true,
+    "to": "owner.home"
+   },
+   {
+    "from": "ai.alert_levels",
+    "lazy": false,
+    "to": "owner.settings"
+   },
+   {
+    "from": "ai.alert_levels",
+    "lazy": true,
+    "to": "owner.states"
+   },
+   {
+    "from": "ai.alert_levels",
+    "lazy": true,
+    "to": "routers.deps"
+   },
+   {
+    "from": "ai.alert_levels",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
     "from": "ai.analysis_clock",
     "lazy": false,
     "to": "models"
@@ -911,12 +956,22 @@
    {
     "from": "ai.escalation.engine",
     "lazy": false,
+    "to": "ai.alert_levels"
+   },
+   {
+    "from": "ai.escalation.engine",
+    "lazy": false,
     "to": "ai.notify"
    },
    {
     "from": "ai.escalation.engine",
     "lazy": false,
     "to": "models"
+   },
+   {
+    "from": "ai.escalation.engine",
+    "lazy": false,
+    "to": "owner.settings"
    },
    {
     "from": "ai.escalation.engine",
@@ -1237,6 +1292,11 @@
     "from": "ai.orchestrator.executive",
     "lazy": false,
     "to": "time_utils"
+   },
+   {
+    "from": "ai.orchestrator.push_notifier",
+    "lazy": false,
+    "to": "ai.alert_levels"
    },
    {
     "from": "ai.orchestrator.push_notifier",
@@ -2047,6 +2107,11 @@
     "from": "integration.reconcile",
     "lazy": false,
     "to": "integration.models"
+   },
+   {
+    "from": "main",
+    "lazy": true,
+    "to": "ai.alert_levels"
    },
    {
     "from": "main",
@@ -4399,6 +4464,13 @@
    },
    {
     "group": "ai",
+    "id": "ai.alert_levels",
+    "kind": "py",
+    "loc": 212,
+    "path": "backend/ai/alert_levels.py"
+   },
+   {
+    "group": "ai",
     "id": "ai.analysis_clock",
     "kind": "py",
     "loc": 123,
@@ -4499,7 +4571,7 @@
     "group": "ai",
     "id": "ai.escalation.engine",
     "kind": "py",
-    "loc": 154,
+    "loc": 172,
     "path": "backend/ai/escalation/engine.py"
    },
    {
@@ -4625,7 +4697,7 @@
     "group": "ai",
     "id": "ai.notify",
     "kind": "py",
-    "loc": 168,
+    "loc": 174,
     "path": "backend/ai/notify.py"
    },
    {
@@ -4646,7 +4718,7 @@
     "group": "ai",
     "id": "ai.orchestrator.push_notifier",
     "kind": "py",
-    "loc": 1190,
+    "loc": 1208,
     "path": "backend/ai/orchestrator/push_notifier.py"
    },
    {
@@ -5080,7 +5152,7 @@
     "group": "other",
     "id": "main",
     "kind": "py",
-    "loc": 663,
+    "loc": 689,
     "path": "backend/main.py"
    },
    {
@@ -5122,7 +5194,7 @@
     "group": "core",
     "id": "models",
     "kind": "py",
-    "loc": 1800,
+    "loc": 1803,
     "path": "backend/models.py"
    },
    {
@@ -5150,7 +5222,7 @@
     "group": "other",
     "id": "owner.answer_todo",
     "kind": "py",
-    "loc": 70,
+    "loc": 72,
     "path": "backend/owner/answer_todo.py"
    },
    {
@@ -5290,7 +5362,7 @@
     "group": "other",
     "id": "owner.registry",
     "kind": "py",
-    "loc": 177,
+    "loc": 180,
     "path": "backend/owner/registry.py"
    },
    {
@@ -5367,7 +5439,7 @@
     "group": "router",
     "id": "routers.ai_ask",
     "kind": "py",
-    "loc": 1018,
+    "loc": 1023,
     "path": "backend/routers/ai_ask.py"
    },
    {
@@ -6758,9 +6830,9 @@
   }
  ],
  "stats": {
-  "py_edges": 738,
-  "py_lazy_edges": 215,
-  "py_modules": 179,
+  "py_edges": 750,
+  "py_lazy_edges": 221,
+  "py_modules": 180,
   "routes": 185,
   "ts_edges": 587,
   "ts_files": 261

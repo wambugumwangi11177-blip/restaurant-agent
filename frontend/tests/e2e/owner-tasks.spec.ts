@@ -102,6 +102,49 @@ test.describe("the owner of a restaurant with a history", () => {
     expect(small).toEqual([]);
   });
 
+  test("the four reports open, each with its own sections and nothing marked as planned", async ({ page }) => {
+    const problems = watch(page);
+    await page.goto("/reports");
+    const expected: [string, string[]][] = [
+      ["Daily", ["Sales", "Cash count check", "Things to check", "Stock today"]],
+      ["Weekly", ["Best and weakest dishes", "Price ideas", "Missing stock", "Wages", "Suppliers"]],
+      ["Monthly", ["Profit & Loss", "Costs", "Delivery apps and dine-in", "What cost you money", "Targets used in this report"]],
+      ["Yearly", ["Trends", "Profit & Loss by month", "Busy and quiet months"]],
+    ];
+    for (const [tab, sections] of expected) {
+      await page.getByRole("tab", { name: tab }).click();
+      for (const title of sections) await expect(page.getByRole("region", { name: title }).first(), `${tab}: ${title}`).toBeVisible({ timeout: 30_000 });
+      await expect(page.locator("main")).not.toContainText(/planned|not available yet/i);
+    }
+    expect(problems).toEqual([]);
+  });
+
+  test("the monthly report can be read for a past month, and the accountant's file is offered", async ({ page }) => {
+    await page.goto("/reports");
+    await page.getByRole("tab", { name: "Monthly" }).click();
+    await expect(page.getByRole("region", { name: "Profit & Loss" })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("button", { name: /Excel/ })).toBeVisible();
+    const select = page.getByLabel("Month");
+    const labels = await select.locator("option").allTextContents();
+    expect(labels).toHaveLength(12);
+    await select.selectOption({ index: 1 });
+    await expect(page.getByText(`monthly · ${labels[1].replace(" (so far)", "")}`, { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("region", { name: "Sales" })).not.toContainText(/so far/i, { timeout: 30_000 });      // a month that is over is not "so far"
+  });
+
+  test("Reports has no sideways scroll, and every button on it is a comfortable tap target", async ({ page }, testInfo) => {
+    await page.goto("/reports");
+    await page.getByRole("tab", { name: "Weekly" }).click();
+    await expect(page.getByRole("region", { name: "Suppliers" })).toBeVisible({ timeout: 30_000 });
+    const [scroll, client] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+    expect(scroll).toBeLessThanOrEqual(client);
+    test.skip(testInfo.project.name !== "phone-390", "a phone is where a thumb has to hit it");
+    const small = await page.evaluate(() => [...document.querySelectorAll("main a, main button, main summary, main select, main [role=tab]")]
+      .filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && b.height < 39.5; })
+      .map((e) => `${e.tagName} "${(e.getAttribute("aria-label") || e.textContent || "").trim().slice(0, 40)}" ${Math.round(e.getBoundingClientRect().height)}px`));
+    expect(small).toEqual([]);
+  });
+
   test("no dash stands in for a number that exists", async ({ page }) => {
     for (const area of ["My Money", "Sales & Dishes", "Store & Suppliers", "Cash Check", "Staff", "Permits & Settings"]) await page.getByRole("button", { name: new RegExp(area) }).click();
     const dashes = await page.evaluate(() => [...document.querySelectorAll("main *")].filter((e) => e.children.length === 0 && e.textContent?.trim() === "—").map((e) => e.parentElement?.textContent?.slice(0, 80)));

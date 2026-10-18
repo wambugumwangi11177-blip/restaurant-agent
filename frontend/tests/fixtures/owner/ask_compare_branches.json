@@ -4,29 +4,29 @@
  "topic": "compare",
  "topic_label": "Compare",
  "state": "live",
- "as_of": "2026-10-16T07:40:00+00:00",
- "headline": "Demo Restaurant – Kasarani spends 37% of every sale on ingredients; Demo Restaurant spends 29.2%. That is 7.8 points more, about KES 33,278 a month at Demo Restaurant – Kasarani's sales.",
+ "as_of": "2026-10-16T09:03:00+00:00",
+ "headline": "Demo Restaurant – Kasarani spends 37% of every sale on ingredients; Demo Restaurant spends 29.3%. That is 7.7 points more, about KES 32,697 a month at Demo Restaurant – Kasarani's sales.",
  "rows": [
   {
    "key": "food_cost_pct",
    "label": "Out of every KES 100, ingredients",
    "value": 37.0,
    "unit": "pct",
-   "note": "Demo Restaurant – Kasarani (the higher); Demo Restaurant 29.2%"
+   "note": "Demo Restaurant – Kasarani (the higher); Demo Restaurant 29.3%"
   },
   {
    "key": "food_cost_gap",
    "label": "Difference",
-   "value": 7.8,
+   "value": 7.7,
    "unit": "pct_points",
    "note": "Demo Restaurant – Kasarani spends more of each sale on ingredients"
   },
   {
    "key": "gap_kes_month",
    "label": "What Demo Restaurant – Kasarani would keep a month at Demo Restaurant's ingredient cost",
-   "value": 33277.92,
+   "value": 32697.28,
    "unit": "kes",
-   "note": "7.8% of its last 30 days of sales (KES 426,640)"
+   "note": "7.7% of its last 30 days of sales (KES 424,640)"
   }
  ],
  "assumptions": [
@@ -45,17 +45,17 @@
  "columns": [
   {
    "name": "Demo Restaurant",
-   "sales": 444440.0,
+   "sales": 444420.0,
    "orders": 400,
-   "food_cost_pct": 29.2,
+   "food_cost_pct": 29.3,
    "wages_pct": 28.7,
    "food_cost_word": "Fine",
    "state": "live"
   },
   {
    "name": "Demo Restaurant – Kasarani",
-   "sales": 426640.0,
-   "orders": 400,
+   "sales": 424640.0,
+   "orders": 399,
    "food_cost_pct": 37.0,
    "wages_pct": 30.0,
    "food_cost_word": "Watch",

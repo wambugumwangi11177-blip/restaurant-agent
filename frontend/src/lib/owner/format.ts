@@ -36,7 +36,19 @@ export function signedPct(value: number): string {
   return `${value > 0 ? "+" : value < 0 ? "-" : ""}${Math.abs(value).toFixed(1).replace(/\.0$/, "")}%`;
 }
 
-export function plural(n: number, one: string, many = `${one}s`): string {
+/** The last twelve calendar months, newest first, as the owner API takes them (2026-10) and says them (October 2026). */
+export function lastMonths(now: Date = new Date(), count = 12): { value: string; label: string }[] {
+  const nairobi = new Date(now.getTime() + 3 * 3600_000);
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date(Date.UTC(nairobi.getUTCFullYear(), nairobi.getUTCMonth() - i, 1));
+    return {
+      value: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`,
+      label: new Intl.DateTimeFormat("en-KE", { timeZone: "UTC", month: "long", year: "numeric" }).format(d),
+    };
+  });
+}
+export function plural(
+n: number, one: string, many = `${one}s`): string {
   return `${n.toLocaleString("en-KE")} ${n === 1 ? one : many}`;
 }
 

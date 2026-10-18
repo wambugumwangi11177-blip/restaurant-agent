@@ -4,8 +4,8 @@
  "topic": "what_if",
  "topic_label": "What if",
  "state": "live",
- "as_of": "2026-10-16T07:40:00+00:00",
- "headline": "If the price of Chips goes from KES 300 to KES 350, about 8.2% fewer plates would sell and profit would rise by about KES 1,899 a month. You would keep 74.3% of each plate's price, up from 70%. Worth trying.",
+ "as_of": "2026-10-16T09:03:00+00:00",
+ "headline": "If the price of Chips goes from KES 300 to KES 350, about 8.5% fewer plates would sell and profit would rise by about KES 1,819 a month. You would keep 74.3% of each plate's price, up from 70%. Worth trying.",
  "rows": [
   {
    "key": "price_from",
@@ -22,14 +22,14 @@
   {
    "key": "sales_change_pct",
    "label": "Plates sold",
-   "value": -8.2,
+   "value": -8.5,
    "unit": "pct",
    "note": "a rise in price is expected to sell fewer; a cut, more"
   },
   {
    "key": "profit_change_month",
    "label": "Profit a month",
-   "value": 1899.39,
+   "value": 1819.05,
    "unit": "kes",
    "note": "more if positive, less if negative"
   },
@@ -50,7 +50,7 @@
    "label": "How sure",
    "value": 62,
    "unit": "pct",
-   "note": "from 66 plates sold in the last 30 days"
+   "note": "from 65 plates sold in the last 30 days"
   }
  ],
  "assumptions": [
@@ -60,7 +60,7 @@
    "value": -0.7
   },
   {
-   "text": "The starting point is 2.2 plates a day, from the last 30 days of sales."
+   "text": "The starting point is 2.17 plates a day, from the last 30 days of sales."
   },
   {
    "text": "How guests react is a rough guide, not something measured; try a small change first."

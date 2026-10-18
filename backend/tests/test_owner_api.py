@@ -318,10 +318,22 @@ def test_costing_you_money_is_the_overview_attention_list(client, db_session, go
 
 @pytest.mark.parametrize("period", REPORT_PERIODS)
 def test_report_content_equals_the_legacy_report(client, db_session, golden, period):
+    """Daily, weekly and yearly are the legacy windows, so their sales equal `/reports/{period}`. The monthly report is the calendar month
+    so far (so it agrees with its Profit & Loss), not the legacy rolling 30 days: its sales are checked against that month directly."""
     gr.seed_pnl_week(db_session, golden)
     new = _get(client, golden, f"/report/{period}").json()
-    old = client.get(f"/api/v1/reports/{period}?narrate=false", headers=_headers(golden.owner)).json()
     sales = next(s for s in new["sections"] if s["key"] == "sales")
+    if period == "monthly":
+        from owner.money.pnl import nairobi_utc_range
+        from routers import overview
+        from time_utils import eat_date
+        today = eat_date(utcnow())
+        lo, hi = nairobi_utc_range(today.replace(day=1), today)
+        core = overview._summarize(db_session, golden.rid, lo, hi)
+        assert new["month"] == today.strftime("%Y-%m") and new["range"].endswith("so far")
+        assert (sales["sales"], sales["orders"]) == ((core["revenue"], core["orders"]) if core["orders"] else (0.0, 0))
+        return
+    old = client.get(f"/api/v1/reports/{period}?narrate=false", headers=_headers(golden.owner)).json()
     assert new["range"] == old["range"]
     if period == "yearly" or old["orders"]:
         assert sales["state"] in ("live", "stale", "no_data")
@@ -335,15 +347,16 @@ def test_report_content_equals_the_legacy_report(client, db_session, golden, per
         assert sales["state"] == "no_data"
 
 
-def test_report_lists_planned_sections_as_planned_not_as_blank(client, db_session, golden):
-    body = _get(client, golden, "/report/monthly").json()
-    costs = next(s for s in body["sections"] if s["key"] == "costs")
-    assert costs["state"] == "unavailable" and costs["planned"] is True
-    pnl = next(s for s in body["sections"] if s["key"] == "pnl")                  # S3.2 built the monthly P&L
-    assert pnl["state"] != "unavailable" and "planned" not in pnl and pnl["lines"]
-    keys = [s["key"] for s in body["sections"]]
-    assert "rules_used" in keys and "read" in keys
-    assert all(s["title"] for s in body["sections"])
+def test_every_report_section_is_built_and_none_is_planned(client, db_session, golden):
+    from owner import reports
+    assert reports.planned_sections() == set()
+    for period in REPORT_PERIODS:
+        body = _get(client, golden, f"/report/{period}").json()
+        assert body["sections"], period
+        for s in body["sections"]:
+            assert "planned" not in s and s["title"], (period, s["key"])
+        assert "read" not in {s["key"] for s in body["sections"]}               # LEVIII's read is its own, optional, key
+        assert body["read"]["text"] is None
 
 
 def test_ask_delegates_to_the_deterministic_handlers(client, db_session, golden):

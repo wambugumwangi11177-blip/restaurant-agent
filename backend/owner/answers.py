@@ -62,11 +62,23 @@ def assumption(text: str, setting: str | None = None, value: Any = None) -> dict
     return out
 
 
+def setting_text(unit: str, value) -> str:
+    """A setting's value the way the sheet writes it: "35%", "KES 200", "8 hours", "0.7"."""
+    if unit == "KES":
+        return f"KES {value:,.0f}"
+    if unit == "%":
+        return pct_text(value)
+    return f"{value:g}" + (f" {unit}" if unit else "")
+
+
 def from_setting(a: dict | None) -> list[dict]:
-    """An engine block's `{setting, value, label}` as an answer assumption."""
+    """An engine block's `{setting, value, label}` as an answer assumption, the value written as the settings sheet writes it."""
     if not a:
         return []
-    return [assumption(f"{a.get('label') or a['setting']}: {a['value']}", a["setting"], a["value"])]
+    from owner.settings import BY_KEY
+    spec = BY_KEY.get(a["setting"])
+    shown = setting_text(spec.unit, a["value"]) if spec else f"{a['value']}"
+    return [assumption(f"{a.get('label') or a['setting']}: {shown}", a["setting"], a["value"])]
 
 
 def make(form: str, topic: str, question: str, *, state: str, headline: str, label: str | None = None, reason: str | None = None,
@@ -117,10 +129,16 @@ def _backing(node: Any, acc: set[float]) -> None:
 
 def ungrounded(answer: dict) -> list[float]:
     """The numbers in the sentence that no row, driver, column or assumption of the answer (nor the question) carries.
-    A figure may be shown to 0, 1 or 2 decimals; zero is "nothing" and needs no backing."""
+    A figure may be shown to 0, 1 or 2 decimals; zero is "nothing" and needs no backing; the number of rows (or of one kind of row) counts as shown."""
     have: set[float] = set()
     _backing({k: v for k, v in answer.items() if k != "answer"}, have)
     have.update(numbers_in(answer.get("question", "")))
+    # how many rows there are, and how many of each kind, is on the screen too ("4 price ideas", "12 months")
+    from collections import Counter
+    for listing in ("rows", "drivers", "columns", "series"):
+        items = [i for i in answer.get(listing) or [] if isinstance(i, dict)]
+        have.add(float(len(items)))
+        have.update(float(n) for n in Counter(i.get("key") for i in items).values())
     shown = {round(v, d) for v in have for d in (0, 1, 2)} | have
     stray = {n for n in numbers_in(answer.get("headline", "")) if n != 0 and not any(abs(n - h) < 1e-6 for h in shown)}
     return sorted(stray)

@@ -573,7 +573,7 @@
    "home": "wired",
    "old_dash": "wired",
    "os": "wired",
-   "reports": "not_shown"
+   "reports": "wired"
   },
   "decisions": {
    "home": "wired",
@@ -621,7 +621,7 @@
    "home": "wired",
    "old_dash": "not_shown",
    "os": "wired",
-   "reports": "not_shown"
+   "reports": "wired"
   },
   "mpesa_match": {
    "home": "not_built",
@@ -663,7 +663,7 @@
    "home": "wired",
    "old_dash": "wired",
    "os": "wired",
-   "reports": "not_shown"
+   "reports": "wired"
   },
   "sales_summary": {
    "home": "wired",
@@ -693,7 +693,7 @@
    "home": "wired",
    "old_dash": "wired",
    "os": "wired",
-   "reports": "not_shown"
+   "reports": "wired"
   }
  },
  "python": {
@@ -2475,6 +2475,11 @@
    },
    {
     "from": "owner.answers",
+    "lazy": true,
+    "to": "owner.settings"
+   },
+   {
+    "from": "owner.answers",
     "lazy": false,
     "to": "owner.states"
    },
@@ -2859,6 +2864,66 @@
     "to": "owner.areas"
    },
    {
+    "from": "owner.report_sections",
+    "lazy": true,
+    "to": "ai.cash_reconciliation.intelligence"
+   },
+   {
+    "from": "owner.report_sections",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.report_sections",
+    "lazy": false,
+    "to": "owner.answers"
+   },
+   {
+    "from": "owner.report_sections",
+    "lazy": false,
+    "to": "owner.areas"
+   },
+   {
+    "from": "owner.report_sections",
+    "lazy": true,
+    "to": "owner.home"
+   },
+   {
+    "from": "owner.report_sections",
+    "lazy": true,
+    "to": "owner.money.pnl"
+   },
+   {
+    "from": "owner.report_sections",
+    "lazy": true,
+    "to": "owner.reports"
+   },
+   {
+    "from": "owner.report_sections",
+    "lazy": true,
+    "to": "owner.settings"
+   },
+   {
+    "from": "owner.report_sections",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "owner.report_sections",
+    "lazy": true,
+    "to": "routers.overview"
+   },
+   {
+    "from": "owner.report_sections",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "owner.reports",
+    "lazy": false,
+    "to": "owner.answers"
+   },
+   {
     "from": "owner.reports",
     "lazy": true,
     "to": "owner.areas"
@@ -2872,6 +2937,11 @@
     "from": "owner.reports",
     "lazy": true,
     "to": "owner.money.view"
+   },
+   {
+    "from": "owner.reports",
+    "lazy": false,
+    "to": "owner.report_sections"
    },
    {
     "from": "owner.reports",
@@ -2890,7 +2960,7 @@
    },
    {
     "from": "owner.reports",
-    "lazy": true,
+    "lazy": false,
     "to": "time_utils"
    },
    {
@@ -4772,7 +4842,7 @@
     "group": "ai",
     "id": "ai.stock_custody",
     "kind": "py",
-    "loc": 451,
+    "loc": 475,
     "path": "backend/ai/stock_custody.py"
    },
    {
@@ -5108,7 +5178,7 @@
     "group": "other",
     "id": "owner.answers",
     "kind": "py",
-    "loc": 127,
+    "loc": 145,
     "path": "backend/owner/answers.py"
    },
    {
@@ -5225,9 +5295,16 @@
    },
    {
     "group": "other",
+    "id": "owner.report_sections",
+    "kind": "py",
+    "loc": 467,
+    "path": "backend/owner/report_sections.py"
+   },
+   {
+    "group": "other",
     "id": "owner.reports",
     "kind": "py",
-    "loc": 115,
+    "loc": 143,
     "path": "backend/owner/reports.py"
    },
    {
@@ -6681,12 +6758,12 @@
   }
  ],
  "stats": {
-  "py_edges": 724,
-  "py_lazy_edges": 209,
-  "py_modules": 178,
+  "py_edges": 738,
+  "py_lazy_edges": 215,
+  "py_modules": 179,
   "routes": 185,
-  "ts_edges": 571,
-  "ts_files": 258
+  "ts_edges": 587,
+  "ts_files": 261
  },
  "status_only": [
   [
@@ -6825,20 +6902,27 @@
    "entries": [
     "app/(owner)/os/page.tsx"
    ],
-   "frontend_files": 16,
+   "frontend_files": 17,
    "label": "OS",
    "parallel_backends": []
   },
   "reports": {
    "api_calls": [
     "GET /overview/today -> routers.overview.today",
-    "GET /reports/{period} -> routers.reports.report",
-    "GET /reports/{period}/creative -> routers.reports.report_creative"
+    "POST /owner/settings/preview -> routers.owner.preview_settings",
+    "GET /owner/settings -> routers.owner.read_settings",
+    "GET /owner/report/{period} -> routers.owner.report",
+    "PUT /owner/settings -> routers.owner.write_settings",
+    "GET /owner/money/pnl/export -> routers.owner_money.export_profit_and_loss",
+    "GET /reports/{period}/creative -> routers.reports.report_creative",
+    "POST /staff/end-impersonation -> routers.staff.end_impersonation",
+    "POST /staff/{staff_id}/impersonate -> routers.staff.impersonate_staff",
+    "PUT /staff/{staff_id} -> routers.staff.update_staff"
    ],
    "entries": [
     "app/(owner)/reports/page.tsx"
    ],
-   "frontend_files": 7,
+   "frontend_files": 33,
    "label": "Reports",
    "parallel_backends": []
   }
@@ -6951,11 +7035,31 @@
    },
    {
     "from": "app/(owner)/reports/page.tsx",
+    "to": "components/owner/StateChip.tsx"
+   },
+   {
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "components/owner/reports/ReportSectionCard.tsx"
+   },
+   {
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "app/(owner)/reports/page.tsx",
     "to": "lib/api.ts"
    },
    {
     "from": "app/(owner)/reports/page.tsx",
-    "to": "lib/format.ts"
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "lib/owner/reportTypes.ts"
+   },
+   {
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "lib/tenantConfig.ts"
    },
    {
     "from": "app/dashboard/ai-ops/page.tsx",
@@ -8582,6 +8686,14 @@
     "to": "lib/errors.ts"
    },
    {
+    "from": "components/owner/AnswerParts.tsx",
+    "to": "components/owner/settings/SettingsProvider.tsx"
+   },
+   {
+    "from": "components/owner/AnswerParts.tsx",
+    "to": "lib/owner/ask.ts"
+   },
+   {
     "from": "components/owner/AreaBody.tsx",
     "to": "components/owner/StateChip.tsx"
    },
@@ -8859,11 +8971,11 @@
    },
    {
     "from": "components/owner/ask/AnswerCard.tsx",
-    "to": "components/owner/StateChip.tsx"
+    "to": "components/owner/AnswerParts.tsx"
    },
    {
     "from": "components/owner/ask/AnswerCard.tsx",
-    "to": "components/owner/settings/SettingsProvider.tsx"
+    "to": "components/owner/StateChip.tsx"
    },
    {
     "from": "components/owner/ask/AnswerCard.tsx",
@@ -8982,6 +9094,34 @@
     "to": "lib/owner/storage.ts"
    },
    {
+    "from": "components/owner/reports/ReportSectionCard.tsx",
+    "to": "components/charts/Bars.tsx"
+   },
+   {
+    "from": "components/owner/reports/ReportSectionCard.tsx",
+    "to": "components/owner/AnswerParts.tsx"
+   },
+   {
+    "from": "components/owner/reports/ReportSectionCard.tsx",
+    "to": "components/owner/StateChip.tsx"
+   },
+   {
+    "from": "components/owner/reports/ReportSectionCard.tsx",
+    "to": "components/owner/areas/MoneyArea.tsx"
+   },
+   {
+    "from": "components/owner/reports/ReportSectionCard.tsx",
+    "to": "lib/owner/areaTypes.ts"
+   },
+   {
+    "from": "components/owner/reports/ReportSectionCard.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/reports/ReportSectionCard.tsx",
+    "to": "lib/owner/reportTypes.ts"
+   },
+   {
     "from": "components/owner/settings/AssumptionChip.tsx",
     "to": "components/owner/settings/SettingsProvider.tsx"
    },
@@ -9095,6 +9235,14 @@
    },
    {
     "from": "lib/owner/format.ts",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "lib/owner/reportTypes.ts",
+    "to": "lib/owner/ask.ts"
+   },
+   {
+    "from": "lib/owner/reportTypes.ts",
     "to": "lib/owner/types.ts"
    },
    {

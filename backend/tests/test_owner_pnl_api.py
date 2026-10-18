@@ -137,7 +137,7 @@ def test_home_and_the_monthly_report_carry_the_same_block(client, month):
     home = client.get(f"{API}/home", headers=_h(month.owner)).json()["areas"]["money"]["blocks"]["pnl"]
     report = next(s for s in client.get(f"{API}/report/monthly", headers=_h(month.owner)).json()["sections"] if s["key"] == "pnl")
     assert _clockless(home) == _clockless(api)
-    assert _clockless({k: v for k, v in report.items() if k not in ("key", "title")}) == _clockless(api)
+    assert _clockless({k: v for k, v in report.items() if k not in ("key", "title", "window", "rows")}) == _clockless(api)    # a report section also says which days it covers
     assert client.get(f"{API}/area/money", headers=_h(month.owner)).json()["blocks"]["pnl"]["lines"] == api["lines"]
 
 

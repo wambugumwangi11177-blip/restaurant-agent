@@ -5,30 +5,15 @@
  */
 import type { ReactNode } from "react";
 import StateChip from "@/components/owner/StateChip";
-import { useSettings } from "@/components/owner/settings/SettingsProvider";
+import { Assumptions, LABEL, Rows } from "@/components/owner/AnswerParts";
 import { kes, pct } from "@/lib/owner/format";
-import { rowValue, type AnswerRow, type AskForm, type Column, type Driver, type OwnerAnswer } from "@/lib/owner/ask";
+import { rowValue, type AskForm, type Column, type Driver, type OwnerAnswer } from "@/lib/owner/ask";
 
 type Ask = (question: string, form?: AskForm) => void;
 
 const FORM_WORDS: Record<AskForm, string> = { what: "What", why: "Why", what_if: "What if", what_to_do: "What should I do", compare: "Compare" };
 
-const label = "text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]";
-
-function Rows({ rows }: { rows: AnswerRow[] }) {
-  const shown = rows.filter((r) => r.value != null || r.note);
-  if (shown.length === 0) return null;
-  return (
-    <dl className="divide-y divide-[var(--v-border)] rounded-lg border border-[var(--v-border)] bg-[var(--v-bg)]">
-      {shown.map((r, i) => (
-        <div key={`${r.key}-${i}`} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-3 py-2">
-          <dt className="min-w-0 flex-1 basis-40 text-xs">{r.label}{r.note && <span className="mt-0.5 block text-[11px] text-[var(--v-muted-foreground)]">{r.note}</span>}</dt>
-          {r.value != null && r.unit !== "text" && <dd className="font-display shrink-0 text-sm font-semibold">{rowValue(r)}</dd>}
-        </div>
-      ))}
-    </dl>
-  );
-}
+const label = LABEL;
 
 // ── why ──────────────────────────────────────────────────────────────────────
 
@@ -116,7 +101,6 @@ function TodoBody({ answer }: { answer: OwnerAnswer }) {
 // ── the card ─────────────────────────────────────────────────────────────────
 
 export default function AnswerCard({ answer, onAsk }: { answer: OwnerAnswer; onAsk: Ask }) {
-  const { fields, openSetting } = useSettings();
   const empty = answer.state === "no_data" || answer.state === "unavailable";
   const body = empty ? null
     : answer.form === "why" ? <WhyBody answer={answer} />
@@ -132,18 +116,7 @@ export default function AnswerCard({ answer, onAsk }: { answer: OwnerAnswer; onA
       </div>
       <p className="text-sm leading-relaxed">{answer.headline}</p>
       {body}
-      {answer.assumptions.length > 0 && (
-        <div className="space-y-1 border-t border-[var(--v-border)] pt-2 text-[11px] text-[var(--v-muted-foreground)]">
-          <p className={label}>What this rests on</p>
-          <ul className="list-disc space-y-0.5 pl-4">
-            {answer.assumptions.map((a, i) => (
-              <li key={i}>{a.text}{a.setting && fields?.[a.setting] && (
-                <button type="button" aria-label={`Change ${fields[a.setting].label}`} onClick={() => openSetting(a.setting!)} className="ml-1 min-h-10 px-1 font-bold text-[var(--v-primary)] underline-offset-2 hover:underline">Change</button>
-              )}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <Assumptions items={answer.assumptions} />
       {answer.next.length > 0 && (
         <div className="flex flex-wrap gap-2" aria-label="Ask next">
           {answer.next.map((q) => <button key={q} type="button" onClick={() => onAsk(q)} className="min-h-10 rounded-full border border-[var(--v-border)] px-3 py-1.5 text-[11px] hover:border-[var(--v-primary)]">{q}</button>)}

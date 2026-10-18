@@ -4,17 +4,17 @@
  "topic": "what_to_do",
  "topic_label": "What to do",
  "state": "live",
- "as_of": "2026-10-16T07:40:00+00:00",
- "headline": "To find KES 5,000 a month, do the first idea below: together worth about KES 7,406 a month. Start with: Check where the Beef went: 2.2 kg more was used than your sales explain.",
+ "as_of": "2026-10-16T09:03:00+00:00",
+ "headline": "To find KES 5,000 a month, do the first idea below: together worth about KES 5,832 a month. Start with: Check where the Beef went: 1.7 kg more was used than your sales explain.",
  "rows": [
   {
    "key": "idea",
-   "label": "Check where the Beef went: 2.2 kg more was used than your sales explain",
-   "value": 7405.71,
+   "label": "Check where the Beef went: 1.7 kg more was used than your sales explain",
+   "value": 5832.0,
    "unit": "kes",
-   "id": "d-29050b54ef",
-   "action": "Check where the Beef went: 2.2 kg more was used than your sales explain",
-   "why": "In the last 7 days the kitchen used 8.4 kg of Beef; the dishes sold explain 6.2 kg. That is 35% more. A reason to check the store and the portions, not a finding about anyone.",
+   "id": "d-e71f40b3c9",
+   "action": "Check where the Beef went: 1.7 kg more was used than your sales explain",
+   "why": "In the last 7 days the kitchen used 7.5 kg of Beef; the dishes sold explain 5.8 kg. That is 29% more. A reason to check the store and the portions, not a finding about anyone.",
    "tier": "loss",
    "domain": "Stock"
   },
@@ -54,11 +54,11 @@
   {
    "key": "idea",
    "label": "Check the till price for Chips: it was charged KES 270 against KES 300 on the menu",
-   "value": 2057.14,
+   "value": 1992.85,
    "unit": "kes",
    "id": "d-c3d5cd5101",
    "action": "Check the till price for Chips: it was charged KES 270 against KES 300 on the menu",
-   "why": "32 orders in the last 14 days charged 10% less than the menu price. Look at discounts, price changes and open-price items. A reason to check the till, not a finding about anyone.",
+   "why": "31 orders in the last 14 days charged 10% less than the menu price. Look at discounts, price changes and open-price items. A reason to check the till, not a finding about anyone.",
    "tier": "loss",
    "domain": "Profit"
   }
@@ -68,7 +68,7 @@
    "text": "Each figure is an estimate of what the idea is worth in a month, worked out from your own sales; it is not a promise."
   },
   {
-   "text": "Missing stock we flag: 3.0",
+   "text": "Missing stock we flag: 3%",
    "setting": "missing_stock_flag_pct",
    "value": 3.0
   },
@@ -82,5 +82,5 @@
  ],
  "goal_kes": 5000.0,
  "covered_by": 1,
- "total_kes": 7405.71
+ "total_kes": 5832.0
 }

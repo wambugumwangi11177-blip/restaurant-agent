@@ -10,10 +10,15 @@ import branches from "./fixtures/owner/ask_compare_branches.json";
 import periods from "./fixtures/owner/ask_compare_periods.json";
 import cash from "./fixtures/owner/ask_cash.json";
 import unavailable from "./fixtures/owner/ask_unavailable.json";
+import { kes, pct } from "@/lib/owner/format";
 
 afterEach(cleanup);
 const as = (a: unknown) => a as OwnerAnswer;
 const show = (a: unknown, onAsk = vi.fn()) => { render(<AnswerCard answer={as(a)} onAsk={onAsk} />); return onAsk; };
+// The fixtures are snapshots of the real engines on the demo restaurant, whose figures move with the date it is built on: what a test expects
+// is read from the fixture it renders (formatted the way the screen formats it), never typed in.
+const rowOf = (a: unknown, key: string) => as(a).rows.find((r) => r.key === key)!;
+const shown = (a: unknown, key: string) => rowValue(rowOf(a, key));
 
 describe("one answer card for five forms", () => {
   it("every answer says its form and topic, its state in words, and its sentence", () => {
@@ -29,9 +34,10 @@ describe("one answer card for five forms", () => {
   it("WHAT: the figures sit under the sentence in KES and percent, with their notes", () => {
     show(what);
     const sales = screen.getByText("Sales", { selector: "dt" }).closest("div")!;
-    expect(within(sales).getByText("KES 212,280")).toBeTruthy();
-    expect(screen.getByText("What you kept, out of every KES 100 sold").closest("div")!.textContent).toContain("11.4%");
-    expect(screen.getByText("Ingredients", { selector: "dt" }).closest("div")!.textContent).toContain("-KES 62,120");
+    expect(within(sales).getByText(shown(what, "sales"))).toBeTruthy();
+    expect(screen.getByText("What you kept, out of every KES 100 sold").closest("div")!.textContent).toContain(shown(what, "kept_pct"));
+    expect(shown(what, "ingredients")).toMatch(/^-KES [\d,]+$/);                                  // a cost is written with its minus sign
+    expect(screen.getByText("Ingredients", { selector: "dt" }).closest("div")!.textContent).toContain(shown(what, "ingredients"));
   });
 
   it("WHY: the day's sales beside a usual day, the drivers numbered in order, and what was checked folded away", () => {
@@ -50,9 +56,9 @@ describe("one answer card for five forms", () => {
   it("WHAT IF: the verdict, both prices and what the answer rests on", () => {
     show(whatIf);
     expect(screen.getByText("Worth trying", { selector: "span" })).toBeTruthy();
-    expect(screen.getByText("Chips now").closest("div")!.textContent).toContain("KES 300");
-    expect(screen.getByText("Chips at").closest("div")!.textContent).toContain("KES 350");
-    expect(screen.getByText("Profit a month").closest("div")!.textContent).toContain("KES 1,899");
+    expect(screen.getByText("Chips now").closest("div")!.textContent).toContain(shown(whatIf, "price_from"));
+    expect(screen.getByText("Chips at").closest("div")!.textContent).toContain(shown(whatIf, "price_to"));
+    expect(screen.getByText("Profit a month").closest("div")!.textContent).toContain(shown(whatIf, "profit_change_month"));
     expect(screen.getByText("What this rests on")).toBeTruthy();
     expect(screen.getByText(/rough guide/)).toBeTruthy();
   });
@@ -61,7 +67,7 @@ describe("one answer card for five forms", () => {
     show(todo);
     const ideas = within(screen.getByRole("list", { name: "Ideas, biggest first" })).getAllByRole("listitem");
     expect(ideas.length).toBe(as(todo).rows.length);
-    expect(ideas[0].textContent).toContain("KES 7,406");
+    expect(ideas[0].textContent).toContain(rowValue(as(todo).rows[0]));
     expect(ideas[0].textContent).toContain("a month");
     expect(ideas[0].className).toContain("150_28%");                                           // inside the goal
     expect(ideas[1].className).not.toContain("150_28%");
@@ -76,8 +82,9 @@ describe("one answer card for five forms", () => {
     expect(rows).toHaveLength(3);
     expect(within(table).getByRole("columnheader", { name: "Ingredients" })).toBeTruthy();
     expect(rows[1].textContent).toContain("Demo Restaurant");
-    expect(rows.some((r) => r.textContent?.includes("Kasarani") && r.textContent.includes("37%"))).toBe(true);
-    expect(screen.getByText("Difference").closest("div")!.textContent).toContain("7.8 points");
+    const kasarani = as(branches).columns!.find((c) => String(c.name).includes("Kasarani"))!;
+    expect(rows.some((r) => r.textContent?.includes("Kasarani") && r.textContent.includes(pct(kasarani.food_cost_pct!)))).toBe(true);
+    expect(screen.getByText("Difference").closest("div")!.textContent).toContain(shown(branches, "food_cost_gap"));
   });
 
   it("COMPARE periods: each side with its days, sales, orders and average order", () => {
@@ -86,7 +93,7 @@ describe("one answer card for five forms", () => {
     expect(within(table).getByRole("columnheader", { name: "Average order" })).toBeTruthy();
     const [, thisWeek, lastWeek] = within(table).getAllByRole("row");
     expect(thisWeek.textContent).toContain("This week so far");
-    expect(thisWeek.textContent).toContain("KES 49,570");
+    expect(thisWeek.textContent).toContain(kes(as(periods).columns!.find((c) => c.key === "this")!.sales!));
     expect(lastWeek.textContent).toContain("Last week");
   });
 

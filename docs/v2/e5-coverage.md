@@ -4,37 +4,36 @@ Source of truth: `backend/owner/registry.py`, checked against the composed `/own
 topics (`routers/ai_ask.py`) and the report plan (`owner/reports.py`). ✔ present · ◌ planned (placeholder or
 named in the report plan, not built) · — exempt (written reason in the registry) · ✖ missing.
 
-**23 registered engines · 22 built · 4 complete on all three surfaces · 18 open gaps** (P4 exit: 0).
+**23 registered engines · 22 built · 22 complete on all three surfaces · 0 open gaps** (P4 exit: 0).
 
 | engine | owner name | status | Home | OS | Reports |
 |---|---|---|---|---|---|
 | sales_summary | Sales | built | ✔ | ✔ | ✔ |
-| revenue_forecast | Sales forecast | built | ✔ | ✔ | ◌ planned |
-| profit | What each dish earns | built | ✔ | ✔ | ◌ planned |
-| pricing | Price ideas | built | ✔ | ✔ | ◌ planned |
-| menu | Best and weakest dishes | built | ✔ | ✔ | ◌ planned |
+| revenue_forecast | Sales forecast | built | ✔ | ✔ | ✔ |
+| profit | What each dish earns | built | ✔ | ✔ | ✔ |
+| pricing | Price ideas | built | ✔ | ✔ | ✔ |
+| menu | Best and weakest dishes | built | ✔ | ✔ | ✔ |
 | simulator | What if I change a price | built | ✔ | ✔ | — exempt |
-| inventory | Time to reorder | built | ✔ | ✔ | ◌ planned |
-| custody | Missing stock and handovers | built | ✔ | ✔ | ◌ planned |
-| cash | Cash count check | built | ✔ | ✔ | ◌ planned |
-| fraud | Things to check at the till | built | ✔ | ✔ | ◌ planned |
-| kds | Kitchen speed | built | ✔ | ✔ | ◌ planned |
-| reservations | Bookings | built | ✔ | ✔ | ◌ planned |
-| labor | Wages | built | ✔ | ✔ | ◌ planned |
-| supply_chain | Suppliers | built | ✔ | ✔ | ◌ planned |
-| marketing | Winning guests back | built | ✔ | ✔ | ◌ planned |
-| roi | What LEVIII saved you | built | ✔ | ✔ | ◌ planned |
-| twin | Next 30 days | built | ✔ | ✔ | ◌ planned |
-| data_quality | How complete your costs are | built | ✔ | ✔ | ◌ planned |
+| inventory | Time to reorder | built | ✔ | ✔ | ✔ |
+| custody | Missing stock and handovers | built | ✔ | ✔ | ✔ |
+| cash | Cash count check | built | ✔ | ✔ | ✔ |
+| fraud | Things to check at the till | built | ✔ | ✔ | ✔ |
+| kds | Kitchen speed | built | ✔ | ✔ | ✔ |
+| reservations | Bookings | built | ✔ | ✔ | ✔ |
+| labor | Wages | built | ✔ | ✔ | ✔ |
+| supply_chain | Suppliers | built | ✔ | ✔ | ✔ |
+| marketing | Winning guests back | built | ✔ | ✔ | ✔ |
+| roi | What LEVIII saved you | built | ✔ | ✔ | ✔ |
+| twin | Next 30 days | built | ✔ | ✔ | ✔ |
+| data_quality | How complete your costs are | built | ✔ | ✔ | ✔ |
 | strategist | Goal mode | built | — exempt | ✔ | — exempt |
-| decisions | What is costing you money | built | ✔ | ✔ | ◌ planned |
+| decisions | What is costing you money | built | ✔ | ✔ | ✔ |
 | money | Profit & Loss, costs covered, bills | built | ✔ | ✔ | ✔ |
 | mpesa_match | M-Pesa statement check | planned | ◌ S6.1–S6.2 | ◌ S6.1–S6.2 | ◌ S6.1–S6.2 |
-| owner_settings | Your targets | built | ✔ | — exempt | ◌ planned |
+| owner_settings | Your targets | built | ✔ | — exempt | ✔ |
 
 ## Open gaps (the allow-list; may only shrink)
 
-- **reports** (18): cash, custody, data_quality, decisions, fraud, inventory, kds, labor, marketing, menu, owner_settings, pricing, profit, reservations, revenue_forecast, roi, supply_chain, twin — S5.2 (report sections built)
 
 ## Not yet built engines (their surfaces are placeholders until their sprint)
 

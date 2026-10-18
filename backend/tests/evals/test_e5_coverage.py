@@ -40,28 +40,7 @@ from tests.fixtures import golden_restaurant as gr
 REPORT_PATH = Path(__file__).resolve().parents[3] / "docs" / "v2" / "e5-coverage.md"
 
 # The debt: (engine, surface) -> where it is paid off. May only shrink.
-_REPORT = "S5.2 (report sections built)"
-_P4 = "S4.x (Home v2 blocks)"
-ALLOWED_GAPS: dict[tuple[str, str], str] = {
-    ("revenue_forecast", "reports"): _REPORT,
-    ("profit", "reports"): _REPORT,
-    ("pricing", "reports"): _REPORT,
-    ("menu", "reports"): _REPORT,
-    ("inventory", "reports"): _REPORT,
-    ("custody", "reports"): _REPORT,
-    ("cash", "reports"): _REPORT,
-    ("fraud", "reports"): _REPORT,
-    ("kds", "reports"): _REPORT,
-    ("reservations", "reports"): _REPORT,
-    ("labor", "reports"): _REPORT,
-    ("supply_chain", "reports"): _REPORT,
-    ("marketing", "reports"): _REPORT,
-    ("roi", "reports"): _REPORT,
-    ("twin", "reports"): _REPORT,
-    ("data_quality", "reports"): _REPORT,
-    ("decisions", "reports"): _REPORT,
-    ("owner_settings", "reports"): _REPORT,
-}
+ALLOWED_GAPS: dict[tuple[str, str], str] = {}
 
 
 # ── resolve the registry against the real payloads ───────────────────────────

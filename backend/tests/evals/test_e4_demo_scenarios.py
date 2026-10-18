@@ -145,8 +145,12 @@ def test_p05_the_kitchen_uses_more_beef_than_the_sales_explain(demo):
     missing = block(demo["A"], "store", "missing")
     beef = next(i for i in missing["items"] if i["item"] == "Beef")
     assert beef["check"] is True
-    assert 30 <= beef["off_by_pct"] <= 38 and beef["missing"] >= 1.5
+    # The planted third more than the sales explain; the measured figure moves with the time of day (the kitchen draws at noon, the sales keep coming),
+    # so the band is the planted third give or take a week's noise, not a single number.
+    assert 25 <= beef["off_by_pct"] <= 42 and beef["missing"] >= 1.5
     assert beef["missing_value"] == pytest.approx(beef["missing"] * 800, rel=0.01) and beef["missing_value"] > 1000
+    # Only the planted item is flagged. The engine forgives a gap smaller than one serving (ai/stock_custody.py): without that, the
+    # Sunday waste write-off crossed 3% on a small item (2 portions of tilapia a week) on some days of the week, measured on the real clock.
     others = [i for i in missing["items"] if i["check"] and i["item"] != "Beef"]
     assert others == [], f"only the planted item should be flagged: {others}"
     head = demo["A"]["areas"]["store"]["summary"]
@@ -211,7 +215,10 @@ def test_p10_rent_of_70k_falls_due_before_the_sales_can_cover_it(demo):
     assert short["bills_kes"] == 70_000.0 and 0 < short["short_by_kes"] < 70_000        # three or four days of sales cannot pay it all
     assert len(bills["days"]) == 30 and bills["lowest"]["balance_kes"] < 0
     coming = demo["A"]["coming_up"]["bills"]
-    assert coming["state"] == "as_entered" and coming["items"][0]["name"] == "Rent" and coming["items"][0]["short"] is True
+    # Zone 4 lists bills by due date, and the other bills fall due on fixed days of the month, so on some dates (18 Oct: the electricity
+    # on the 20th) one comes before the planted rent. Find the rent by name; the order is checked as an order.
+    assert coming["state"] == "as_entered" and next(i for i in coming["items"] if i["name"] == "Rent")["short"] is True
+    assert [i["days_away"] for i in coming["items"]] == sorted(i["days_away"] for i in coming["items"])
     assert {i["name"] for i in coming["items"]} >= {"Rent"} and all(i["days_away"] < 14 for i in coming["items"])
 
 

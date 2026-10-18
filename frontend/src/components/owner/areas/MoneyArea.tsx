@@ -34,7 +34,7 @@ export default function MoneyArea({ area }: { area: Area }) {
   );
 }
 
-function Pnl({ block }: { block: PnlBlock }) {
+export function Pnl({ block }: { block: PnlBlock }) {
   const line = (key: string) => block.lines?.find((l) => l.key === key);
   const steps: Step[] = block.lines
     ? [

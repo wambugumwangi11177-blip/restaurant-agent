@@ -1,0 +1,195 @@
+{
+ "period": "daily",
+ "range": "16 Oct 2026",
+ "state": "live",
+ "as_of": "2026-10-16T09:03:00+00:00",
+ "sections": [
+  {
+   "key": "sales",
+   "title": "Sales",
+   "state": "live",
+   "as_of": "2026-10-16T09:03:00+00:00",
+   "sales": 3070.0,
+   "orders": 3,
+   "average_order": 1023.33,
+   "headline": "You sold KES 3,070 from 3 orders, an average of KES 1,023 an order.",
+   "rows": [
+    {
+     "key": "sales",
+     "label": "Sales",
+     "value": 3070.0,
+     "unit": "kes"
+    },
+    {
+     "key": "orders",
+     "label": "Orders",
+     "value": 3,
+     "unit": "count"
+    },
+    {
+     "key": "average_order",
+     "label": "Average order",
+     "value": 1023.33,
+     "unit": "kes"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "Sales are paid orders that were not cancelled, by the time they were taken. This is not a payment cash-flow report."
+    }
+   ],
+   "basis": "Paid orders that were not cancelled, by the time they were taken. Not a payment cash-flow report.",
+   "window": "Today"
+  },
+  {
+   "key": "top_dishes",
+   "title": "Best sellers",
+   "state": "live",
+   "as_of": "2026-10-16T09:03:00+00:00",
+   "dishes": [
+    {
+     "name": "Chai (milk tea)",
+     "sold": 3,
+     "sales": 300.0
+    },
+    {
+     "name": "Burger",
+     "sold": 2,
+     "sales": 1200.0
+    },
+    {
+     "name": "Ugali sukuma",
+     "sold": 1,
+     "sales": 300.0
+    },
+    {
+     "name": "Kachumbari",
+     "sold": 1,
+     "sales": 120.0
+    },
+    {
+     "name": "Chicken wings",
+     "sold": 1,
+     "sales": 700.0
+    }
+   ],
+   "rows": [
+    {
+     "key": "dish",
+     "label": "Chai (milk tea)",
+     "value": 300.0,
+     "unit": "kes",
+     "note": "3 sold"
+    },
+    {
+     "key": "dish",
+     "label": "Burger",
+     "value": 1200.0,
+     "unit": "kes",
+     "note": "2 sold"
+    },
+    {
+     "key": "dish",
+     "label": "Ugali sukuma",
+     "value": 300.0,
+     "unit": "kes",
+     "note": "1 sold"
+    },
+    {
+     "key": "dish",
+     "label": "Kachumbari",
+     "value": 120.0,
+     "unit": "kes",
+     "note": "1 sold"
+    },
+    {
+     "key": "dish",
+     "label": "Chicken wings",
+     "value": 700.0,
+     "unit": "kes",
+     "note": "1 sold"
+    }
+   ],
+   "headline": "Chai (milk tea) sold the most: 3 plates, KES 300.",
+   "window": "Today",
+   "assumptions": []
+  },
+  {
+   "key": "cash_check",
+   "title": "Cash count check",
+   "state": "no_data",
+   "as_of": null,
+   "window": "Today",
+   "reason": "No cash count has been entered today.",
+   "rows": [],
+   "assumptions": []
+  },
+  {
+   "key": "things_to_check",
+   "title": "Things to check",
+   "state": "live",
+   "as_of": "2026-10-16T09:03:00+00:00",
+   "window": "The last 7 days",
+   "headline": "4 things to check: 3 item used more than your sales explains; 1 handover that doesn't match.",
+   "rows": [
+    {
+     "key": "missing_stock",
+     "label": "Beef: 1.7 kg more used than your sales explain",
+     "value": 1360.8,
+     "unit": "kes",
+     "note": "29.4% more than expected, last 7 days"
+    },
+    {
+     "key": "missing_stock",
+     "label": "Tilapia: 0.03 kg more used than your sales explain",
+     "value": 15.0,
+     "unit": "kes",
+     "note": "4.2% more than expected, last 7 days"
+    },
+    {
+     "key": "missing_stock",
+     "label": "Lemons: 0.08 piece more used than your sales explain",
+     "value": 0.75,
+     "unit": "kes",
+     "note": "3.8% more than expected, last 7 days"
+    },
+    {
+     "key": "handover",
+     "label": "Beef: the store said 4 kg, the kitchen counted 3.8",
+     "value": null,
+     "unit": "text",
+     "note": "a handover that doesn't match, last 30 days"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "These are things to check, not conclusions about anyone."
+    }
+   ]
+  },
+  {
+   "key": "stock_today",
+   "title": "Stock today",
+   "state": "as_entered",
+   "as_of": "2026-10-16T09:04:00+00:00",
+   "entered_up_to": "2026-10-16",
+   "window": "Right now",
+   "headline": "Nothing is due to reorder; 35 items tracked.",
+   "rows": [
+    {
+     "key": "tracked",
+     "label": "Items tracked",
+     "value": 35,
+     "unit": "count"
+    }
+   ],
+   "assumptions": []
+  }
+ ],
+ "read": {
+  "state": "unavailable",
+  "as_of": null,
+  "reason": "LEVIII's read is optional and is left out unless every number in it is backed.",
+  "text": null
+ }
+}

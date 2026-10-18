@@ -43,7 +43,7 @@
  ],
  "assumptions": [
   {
-   "text": "Cash count difference we accept: 200",
+   "text": "Cash count difference we accept: KES 200",
    "setting": "cash_tolerance_kes",
    "value": 200
   },

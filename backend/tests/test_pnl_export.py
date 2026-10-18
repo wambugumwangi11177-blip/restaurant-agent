@@ -153,7 +153,9 @@ def test_the_monthly_report_of_a_chosen_month_covers_that_whole_month(client, se
     assert [d["name"] for d in sections["top_dishes"]["dishes"]][0] == "House set meal"
     other = client.get(f"{API}/report/monthly", params={"month": "2026-03"}, headers=_h(sept.owner)).json()
     assert {s["key"]: s["state"] for s in other["sections"]}["sales"] == "no_data"
-    assert "month" not in client.get(f"{API}/report/monthly", headers=_h(sept.owner)).json()
+    default = client.get(f"{API}/report/monthly", headers=_h(sept.owner)).json()                 # no month asked for: the month so far, not a rolling 30 days
+    from time_utils import eat_date, utcnow
+    assert default["month"] == eat_date(utcnow()).strftime("%Y-%m") and default["range"].endswith("so far")
 
 
 @pytest.mark.parametrize("period,month", [("monthly", "2026-13"), ("monthly", "2026-9"), ("monthly", "2999-01"), ("monthly", "1999-12"), ("weekly", "2026-09"),

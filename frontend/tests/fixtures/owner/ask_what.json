@@ -4,25 +4,25 @@
  "topic": "money",
  "topic_label": "Profit & Loss, costs covered, bills",
  "state": "as_entered",
- "as_of": "2026-10-16T08:29:58.177452+00:00",
- "headline": "October 2026 so far: you sold KES 212,280 and kept KES 24,132 (11.4%). KES 2,741 of sales still to go to cover today's costs. Next bill: Rent, KES 70,000 on Monday 19 Oct — your sales will not cover it.",
+ "as_of": "2026-10-16T09:48:59.371757+00:00",
+ "headline": "October 2026 so far: you sold KES 213,130 and kept KES 24,387 (11.4%). KES 1,891 of sales still to go to cover today's costs. Next bill: Rent, KES 70,000 on Monday 19 Oct — your sales will not cover it.",
  "rows": [
   {
    "key": "sales",
    "label": "Sales",
-   "value": 212280.0,
+   "value": 213130.0,
    "unit": "kes"
   },
   {
    "key": "ingredients",
    "label": "Ingredients",
-   "value": -62120.45,
+   "value": -62610.25,
    "unit": "kes"
   },
   {
    "key": "left_after_ingredients",
    "label": "Left after ingredients",
-   "value": 150159.55,
+   "value": 150519.75,
    "unit": "kes"
   },
   {
@@ -34,13 +34,13 @@
   {
    "key": "other_costs",
    "label": "Other costs",
-   "value": -64202.39,
+   "value": -64307.39,
    "unit": "kes"
   },
   {
    "key": "kept",
    "label": "What you kept",
-   "value": 24132.16,
+   "value": 24387.36,
    "unit": "kes"
   },
   {
@@ -54,7 +54,7 @@
    "label": "Sales needed to cover today's costs",
    "value": 4960.54,
    "unit": "kes",
-   "note": "KES 2,741 still to go"
+   "note": "KES 1,891 still to go"
   },
   {
    "key": "bill",
@@ -87,12 +87,12 @@
  ],
  "assumptions": [
   {
-   "text": "Ingredient cost target: 35.0",
+   "text": "Ingredient cost target: 35%",
    "setting": "food_cost_target_pct",
    "value": 35.0
   },
   {
-   "text": "Cash you keep aside for bills: 0",
+   "text": "Cash you keep aside for bills: KES 0",
    "setting": "bill_reserve_kes",
    "value": 0
   }

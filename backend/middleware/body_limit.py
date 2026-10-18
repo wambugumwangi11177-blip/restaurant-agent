@@ -26,19 +26,29 @@ logger = logging.getLogger("uvicorn")
 
 MAX_REQUEST_BODY_BYTES = int(os.getenv("MAX_REQUEST_BODY_BYTES", str(1 * 1024 * 1024)))
 
+# The few paths that take a FILE, not JSON, and so may carry more. Keep this list short and each entry bounded: the body is read before
+# the caller is authenticated, so every byte allowed here is allowed to anyone. A statement is at most 5 MB (parsers/mpesa_csv.MAX_BYTES)
+# plus the multipart form's framing.
+LARGER_BODY_PATHS: dict[str, int] = {"/api/v1/owner/mpesa/statement": 6 * 1024 * 1024}
+
+
+def limit_for(path: str) -> int:
+    return max(MAX_REQUEST_BODY_BYTES, LARGER_BODY_PATHS.get(path, 0))
+
 _TOO_LARGE = JSONResponse({"detail": "Request body too large"}, status_code=413)
 
 
 class BodySizeLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        limit = limit_for(request.url.path)
         # 1. Fast path: honour a declared Content-Length.
         content_length = request.headers.get("content-length")
         if content_length is not None:
             try:
-                if int(content_length) > MAX_REQUEST_BODY_BYTES:
+                if int(content_length) > limit:
                     logger.warning(
                         "[BodyLimit] Rejected %s %s — Content-Length %s exceeds %d",
-                        request.method, request.url.path, content_length, MAX_REQUEST_BODY_BYTES,
+                        request.method, request.url.path, content_length, limit,
                     )
                     return _TOO_LARGE
             except ValueError:
@@ -54,7 +64,7 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
             message = await original_receive()
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
-                if received > MAX_REQUEST_BODY_BYTES:
+                if received > limit:
                     raise _BodyTooLarge()
             return message
 
@@ -64,7 +74,7 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
         except _BodyTooLarge:
             logger.warning(
                 "[BodyLimit] Rejected %s %s — streamed body exceeded %d bytes",
-                request.method, request.url.path, MAX_REQUEST_BODY_BYTES,
+                request.method, request.url.path, limit,
             )
             return _TOO_LARGE
 

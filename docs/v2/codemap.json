@@ -175,7 +175,7 @@
    "kind": "none",
    "label": "M-Pesa statement match",
    "targets": [
-    "parsers.mpesa_csv"
+    "owner.mpesa_match"
    ]
   },
   {
@@ -2336,6 +2336,11 @@
    {
     "from": "main",
     "lazy": false,
+    "to": "routers.owner_mpesa"
+   },
+   {
+    "from": "main",
+    "lazy": false,
     "to": "routers.purchase_orders"
    },
    {
@@ -2904,6 +2909,21 @@
     "to": "owner.states"
    },
    {
+    "from": "owner.mpesa_statement",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.mpesa_statement",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "owner.mpesa_statement",
+    "lazy": false,
+    "to": "parsers.mpesa_csv"
+   },
+   {
     "from": "owner.preview",
     "lazy": false,
     "to": "models"
@@ -3055,6 +3075,11 @@
    },
    {
     "from": "owner.states",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
+    "from": "parsers.mpesa_csv",
     "lazy": false,
     "to": "time_utils"
    },
@@ -4042,6 +4067,41 @@
     "from": "routers.owner_money",
     "lazy": false,
     "to": "time_utils"
+   },
+   {
+    "from": "routers.owner_mpesa",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.owner_mpesa",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.owner_mpesa",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.owner_mpesa",
+    "lazy": false,
+    "to": "owner.mpesa_statement"
+   },
+   {
+    "from": "routers.owner_mpesa",
+    "lazy": false,
+    "to": "parsers.mpesa_csv"
+   },
+   {
+    "from": "routers.owner_mpesa",
+    "lazy": false,
+    "to": "rate_limit"
+   },
+   {
+    "from": "routers.owner_mpesa",
+    "lazy": false,
+    "to": "routers.deps"
    },
    {
     "from": "routers.purchase_orders",
@@ -5033,7 +5093,7 @@
     "group": "demo",
     "id": "demo.wipe",
     "kind": "py",
-    "loc": 106,
+    "loc": 108,
     "path": "backend/demo/wipe.py"
    },
    {
@@ -5166,7 +5226,7 @@
     "group": "other",
     "id": "middleware.body_limit",
     "kind": "py",
-    "loc": 74,
+    "loc": 84,
     "path": "backend/middleware/body_limit.py"
    },
    {
@@ -5194,7 +5254,7 @@
     "group": "core",
     "id": "models",
     "kind": "py",
-    "loc": 1803,
+    "loc": 1852,
     "path": "backend/models.py"
    },
    {
@@ -5353,6 +5413,13 @@
    },
    {
     "group": "other",
+    "id": "owner.mpesa_statement",
+    "kind": "py",
+    "loc": 80,
+    "path": "backend/owner/mpesa_statement.py"
+   },
+   {
+    "group": "other",
     "id": "owner.preview",
     "kind": "py",
     "loc": 68,
@@ -5392,6 +5459,20 @@
     "kind": "py",
     "loc": 149,
     "path": "backend/owner/states.py"
+   },
+   {
+    "group": "other",
+    "id": "parsers",
+    "kind": "py",
+    "loc": 2,
+    "path": "backend/parsers/__init__.py"
+   },
+   {
+    "group": "other",
+    "id": "parsers.mpesa_csv",
+    "kind": "py",
+    "loc": 231,
+    "path": "backend/parsers/mpesa_csv.py"
    },
    {
     "group": "other",
@@ -5588,6 +5669,13 @@
     "kind": "py",
     "loc": 570,
     "path": "backend/routers/owner_money.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.owner_mpesa",
+    "kind": "py",
+    "loc": 77,
+    "path": "backend/routers/owner_mpesa.py"
    },
    {
     "group": "router",
@@ -6565,6 +6653,24 @@
    "verb": "DELETE"
   },
   {
+   "func": "delete_statement",
+   "module": "routers.owner_mpesa",
+   "path": "/owner/mpesa/statements/{upload_id}",
+   "verb": "DELETE"
+  },
+  {
+   "func": "list_statements",
+   "module": "routers.owner_mpesa",
+   "path": "/owner/mpesa/statements",
+   "verb": "GET"
+  },
+  {
+   "func": "upload_statement",
+   "module": "routers.owner_mpesa",
+   "path": "/owner/mpesa/statement",
+   "verb": "POST"
+  },
+  {
    "func": "approve_purchase_order",
    "module": "routers.purchase_orders",
    "path": "/purchase-orders/{po_id}/approve",
@@ -6830,10 +6936,10 @@
   }
  ],
  "stats": {
-  "py_edges": 750,
+  "py_edges": 762,
   "py_lazy_edges": 221,
-  "py_modules": 180,
-  "routes": 185,
+  "py_modules": 184,
+  "routes": 188,
   "ts_edges": 587,
   "ts_files": 261
  },

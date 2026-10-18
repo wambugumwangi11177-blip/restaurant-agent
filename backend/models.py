@@ -1800,3 +1800,52 @@ class Region(Base):
     created_at      = Column(DateTime, default=utcnow)
 
     organization = relationship("Organization")
+
+
+class MpesaStatementUpload(Base):
+    """One M-Pesa statement file an owner uploaded (docs/v2/SPEC.md S6.1). The lines it brought are `lines`; deleting an upload undoes it.
+
+    The statement's times are Nairobi time in the file and naive UTC here, like every timestamp; money is integer cents.
+    """
+    __tablename__ = "mpesa_statement_uploads"
+
+    id                  = Column(Integer, primary_key=True, index=True)
+    restaurant_id       = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    filename            = Column(String(255), default="", nullable=False)
+    parser              = Column(String(32), nullable=False)
+    uploaded_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    uploaded_at         = Column(DateTime, default=utcnow, nullable=False)
+    line_count          = Column(Integer, default=0, nullable=False)
+    period_start        = Column(DateTime, nullable=True)
+    period_end          = Column(DateTime, nullable=True)
+
+    uploaded_by = relationship("User", foreign_keys=[uploaded_by_user_id])
+    lines       = relationship("MpesaStatementLine", cascade="all, delete-orphan", passive_deletes=True)
+
+    __table_args__ = (
+        Index("ix_mpesa_uploads_restaurant_uploaded", "restaurant_id", "uploaded_at"),
+    )
+
+
+class MpesaStatementLine(Base):
+    """One transaction on an M-Pesa statement. `receipt` is M-Pesa's own number, so uploading the same payment twice (overlapping
+    periods, or the same file again) adds nothing: it is unique per restaurant."""
+    __tablename__ = "mpesa_statement_lines"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    restaurant_id   = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    upload_id       = Column(Integer, ForeignKey("mpesa_statement_uploads.id", ondelete="CASCADE"), nullable=False)
+    receipt         = Column(String(20), nullable=False)
+    completed_at    = Column(DateTime, nullable=False)
+    paid_in_cents   = Column(Integer, default=0, nullable=False)
+    withdrawn_cents = Column(Integer, default=0, nullable=False)
+    details         = Column(String(500), default="", nullable=False)
+    status          = Column(String(20), default="Completed", nullable=False)
+    balance_cents   = Column(Integer, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("restaurant_id", "receipt", name="uq_mpesa_lines_restaurant_receipt"),
+        CheckConstraint("paid_in_cents >= 0 AND withdrawn_cents >= 0", name="ck_mpesa_lines_amounts"),
+        Index("ix_mpesa_lines_restaurant_completed", "restaurant_id", "completed_at"),
+        Index("ix_mpesa_lines_upload", "upload_id"),
+    )

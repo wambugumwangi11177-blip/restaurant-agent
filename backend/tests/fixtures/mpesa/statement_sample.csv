@@ -1,0 +1,20 @@
+Account Name,Vibanda Restaurant - Till
+Short Code,174379
+Account Type,Till (Buy Goods)
+Statement Period,01-10-2026 to 14-10-2026
+Currency,KES
+,
+Receipt No.,Completion Time,Initiation Time,Details,Transaction Status,Paid In,Withdrawn,Balance,Balance Confirmed,Reason Type,Other Party Info,Linked Transaction ID,A/C No.
+SJE4K2L9QA,2026-10-14 12:41:07,2026-10-14 12:40:55,Customer Payment from 2547****1234 - JOHN KAMAU,Completed,"1,250.00",,"48,310.00",Yes,Customer Payment,2547****1234 - JOHN KAMAU,,
+SJE4K2LAB7,2026-10-14 12:52:40,2026-10-14 12:52:31,Customer Payment from 2547****8821 - MARY ACHIENG,Completed,640.00,,"48,950.00",Yes,Customer Payment,2547****8821 - MARY ACHIENG,,
+SJE4K2LC03,2026-10-14 13:05:12,2026-10-14 13:05:02,Customer Payment from 2547****0042 - PETER OMONDI,Completed,300.00,,"49,250.00",Yes,Customer Payment,2547****0042 - PETER OMONDI,,
+SJE4K2LD55,2026-10-14 13:05:48,2026-10-14 13:05:40,Customer Payment from 2547****0042 - PETER OMONDI,Completed,450.00,,"49,700.00",Yes,Customer Payment,2547****0042 - PETER OMONDI,,
+SJE4K2LE21,2026-10-14 13:20:00,2026-10-14 13:19:50,Customer Payment from 2547****7710 - GRACE WANJIKU,Failed,980.00,,"49,700.00",Yes,Customer Payment,2547****7710 - GRACE WANJIKU,,
+SJE4K2LF90,2026-10-14 14:11:35,2026-10-14 14:11:25,Customer Payment from 2547****3309 - SAMUEL MUTUA,Completed,"2,100.00",,"51,800.00",Yes,Customer Payment,2547****3309 - SAMUEL MUTUA,,
+SJE4K2LG44,2026-10-14 15:30:01,2026-10-14 15:30:01,Business Payment to KENCHIC LTD,Completed,,"8,000.00","43,800.00",Yes,Business Payment,KENCHIC LTD,,
+SJE4K2LH18,2026-10-14 15:30:02,2026-10-14 15:30:01,Transaction Charge,Completed,,35.00,"43,765.00",Yes,Charge,,,
+sje4k2lj77,2026-10-14 18:44:19,2026-10-14 18:44:09,Customer Payment from 2547****5566 - AMINA HASSAN,Completed,"1,575.00",,"45,340.00",Yes,Customer Payment,2547****5566 - AMINA HASSAN,,
+SJE4K2LJ77,2026-10-14 18:44:19,2026-10-14 18:44:09,Customer Payment from 2547****5566 - AMINA HASSAN,Completed,"1,575.00",,"45,340.00",Yes,Customer Payment,2547****5566 - AMINA HASSAN,,
+SJE4K2LK02,not a time,2026-10-14 19:10:00,Customer Payment from 2547****9000 - TEST,Completed,100.00,,"45,440.00",Yes,Customer Payment,,,
+,,,,,,,,,,,,
+Total,,,,,"6,315.00","8,035.00",,,,,,

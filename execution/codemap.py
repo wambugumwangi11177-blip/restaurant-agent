@@ -78,7 +78,7 @@ ENGINES = [
     ("strategist", "Goal mode (strategist)", "module", ["ai.orchestrator.strategist"]),
     ("decisions", "Decision ranking", "module", ["ai.decisions"]),
     ("money", "Expenses · P&L · break-even · bills", "module", ["owner.money"]),
-    ("mpesa_match", "M-Pesa statement match", "none", ["parsers.mpesa_csv"]),
+    ("mpesa_match", "M-Pesa statement match", "none", ["owner.mpesa_match"]),
     ("owner_settings", "Owner settings (targets, limits)", "module", ["owner.settings"]),
 ]
 

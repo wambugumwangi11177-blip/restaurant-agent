@@ -10,7 +10,9 @@ silently missing:
                435; #7: 33.3% not 25%) the live test asserts what the code does today and says so.
   PENDING      the example belongs to a later sprint. `xfail(strict=True)`: it fails today for the
                right reason (the feature does not exist) and turns the build RED the moment the
-               feature lands without this test being flipped to a live assertion.
+               feature lands without this test being flipped to a live assertion. (None is pending
+               now: the last four, #4 #10 #11 #12, were pure functions and are built, in
+               owner/menu_math.py and owner/kitchen.py.)
   ARITHMETIC   `TestSpecArithmetic` re-derives every spec result with exact integer / Fraction maths,
                independent of any engine, so a typo in the spec cannot hide behind a green engine.
 
@@ -248,11 +250,18 @@ def test_ex02b_price_rise_opex_and_profit_percentages(db_session):
     assert p["operating_profit_cents"] == 2_000_000
 
 
-@pytest.mark.xfail(strict=True, reason="UNOWNED: no sprint builds a target-margin price (the '55% target', never pitched). "
-                                       "Rounding conflict to resolve first: spec says 578 (whole KES) but #3 rounds to the KES 5 step (580 → 54,000).")
-def test_ex04_same_dish_to_55_percent_target(db_session):
-    from owner.menu_math import target_price_cents                              # noqa: F401
-    raise AssertionError("flip to: 260 / 0.45 → 578 → (578 − 400) × 300 = KES 53,400 / month")
+def test_ex04_same_dish_to_55_percent_target():
+    """§7 #4: 260 / 0.45 = 577.8 → 578; (578 − 400) × 300 = KES 53,400 a month. The guide rounds to whole shillings; the product's own price step
+    is the owner's setting (KES 5 by default, #3 above), so the step is an input: on KES 1 it is 578, on the default KES 5 it is 580 (KES 54,000)."""
+    from owner.menu_math import month_gain_cents, target_price_cents
+    from owner.settings import DEFAULTS
+    assert DEFAULTS.margin_target_pct == 55.0 and DEFAULTS.price_step_cents == 500          # the '55% target' and the KES 5 step are the owner's settings
+    price = target_price_cents(26_000, DEFAULTS.margin_target_pct, step_cents=100)
+    assert price == 57_800
+    assert month_gain_cents(40_000, price, 300) == 5_340_000                    # KES 53,400
+    on_default_step = target_price_cents(26_000, DEFAULTS.margin_target_pct, DEFAULTS.price_step_cents)
+    assert on_default_step == 58_000
+    assert month_gain_cents(40_000, on_default_step, 300) == 5_400_000          # KES 54,000
 
 
 def test_ex09_break_even_sales(db_session):
@@ -262,22 +271,33 @@ def test_ex09_break_even_sales(db_session):
     assert round(1_176_471 / 100) == 11_765
 
 
-@pytest.mark.xfail(strict=True, reason="UNOWNED: no combo pricing engine exists and no sprint builds one")
-def test_ex10_combo_margin(db_session):
-    from owner.menu_math import combo_margin_pct                                # noqa: F401
-    raise AssertionError("flip to: 650 + 550 = 1,200 → 1,050; cost 460 → 56.2% margin (above the 40% floor)")
+def test_ex10_combo_margin():
+    """§7 #10: 650 + 550 = 1,200 → a combo at 1,050; cost 260 + 200 = 460; (1,050 − 460) / 1,050 = 56.2%, above the owner's 40% floor."""
+    from owner.menu_math import combo_margin_pct, combo_summary
+    from owner.settings import DEFAULTS
+    assert DEFAULTS.margin_floor_pct == 40.0
+    assert combo_margin_pct(105_000, [26_000, 20_000]) == 56.2
+    c = combo_summary([65_000, 55_000], 105_000, [26_000, 20_000], DEFAULTS.margin_floor_pct)
+    assert (c["regular_cents"], c["combo_cents"], c["discount_cents"], c["cost_cents"]) == (120_000, 105_000, 15_000, 46_000)
+    assert c["margin_pct"] == 56.2 and c["above_floor"] is True
 
 
-@pytest.mark.xfail(strict=True, reason="UNOWNED: recipes have no cooked-yield concept anywhere in the code")
-def test_ex11_prep_quantity_with_yield(db_session):
-    from owner.kitchen import prep_raw_quantity                                 # noqa: F401
-    raise AssertionError("flip to: 45 portions × 0.25 kg cooked ÷ 0.80 yield = 14.06 kg raw")
+def test_ex11_prep_quantity_with_yield():
+    """§7 #11: 45 portions × 0.25 kg cooked ÷ 0.80 yield = 14.0625 → 14.06 kg raw."""
+    from owner.kitchen import prep_raw_quantity
+    assert prep_raw_quantity(45, 0.25, 0.80) == 14.06
 
 
-@pytest.mark.xfail(strict=True, reason="UNOWNED: ai/reorder.py is par − on-hand; the spec's market list is need + buffer − on-hand")
-def test_ex12_market_list(db_session):
-    from owner.kitchen import market_list                                       # noqa: F401
-    raise AssertionError("flip to: beef 11 kg · chicken 48 · tomatoes 7 kg · rice 0")
+def test_ex12_market_list():
+    """§7 #12: need + buffer − on hand, never below zero: beef 14 + 5 − 8 = 11 · chicken 60 + 20 − 32 = 48 · tomatoes 6 + 2 − 1 = 7 · rice 13.5 + 10 − 25 → 0."""
+    from owner.kitchen import market_list
+    rows = market_list([
+        {"item": "Beef", "unit": "kg", "need": 14, "buffer": 5, "on_hand": 8},
+        {"item": "Chicken", "unit": "kg", "need": 60, "buffer": 20, "on_hand": 32},
+        {"item": "Tomatoes", "unit": "kg", "need": 6, "buffer": 2, "on_hand": 1},
+        {"item": "Rice", "unit": "kg", "need": 13.5, "buffer": 10, "on_hand": 25},
+    ])
+    assert {r["item"]: r["buy"] for r in rows} == {"Beef": 11, "Chicken": 48, "Tomatoes": 7, "Rice": 0}
 
 
 def test_ex13_monthly_pnl(db_session):

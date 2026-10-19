@@ -5371,6 +5371,20 @@
    },
    {
     "group": "other",
+    "id": "owner.kitchen",
+    "kind": "py",
+    "loc": 48,
+    "path": "backend/owner/kitchen.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.menu_math",
+    "kind": "py",
+    "loc": 65,
+    "path": "backend/owner/menu_math.py"
+   },
+   {
+    "group": "other",
     "id": "owner.money",
     "kind": "py",
     "loc": 3,
@@ -6980,7 +6994,7 @@
  "stats": {
   "py_edges": 769,
   "py_lazy_edges": 223,
-  "py_modules": 185,
+  "py_modules": 187,
   "routes": 188,
   "ts_edges": 592,
   "ts_files": 262

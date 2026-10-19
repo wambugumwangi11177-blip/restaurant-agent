@@ -213,7 +213,12 @@ def test_every_report_section_headline_on_the_demo_restaurant_is_backed_by_its_r
             stray = ungrounded(section)
             assert stray == [], f"{period}.{section['key']} states {stray} that no row carries: {section['headline']!r}"
             checked += 1
-    assert checked >= 3
+    # The sweep must not be vacuous, whatever the hour. The engines read the real clock, and a daily report asked before the restaurant has taken
+    # its first sale (07:00 in Nairobi) has nothing to say about today's sales, best sellers or drawer: those say "no data" and carry no headline,
+    # which is right. Then only the two sections that do not depend on today's sales speak (things to check, stock today).
+    sales = next((s for s in report["sections"] if s["key"] == "sales"), None)
+    quiet_day = period == "daily" and (sales is None or sales.get("state") == "no_data")
+    assert checked >= (2 if quiet_day else 3), f"{period}: only {checked} section headlines were checked"
 
 
 def test_the_alert_digest_is_backed_by_its_rows(demo):  # noqa: F811

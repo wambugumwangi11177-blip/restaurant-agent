@@ -21,6 +21,14 @@ Newest sprint first. Spec: [`SPEC.md`](SPEC.md). Gate: `make -C docs/v2 gate`.
 
 ## Sprint log (newest first)
 
+### Production rollout rehearsal (19 Oct 2026) — done; the deploy itself is logged in `ROLLOUT.md`
+
+The owner asked for the production steps (production holds demo data only). Before merging, the exact container boot (`init_db()` then `alembic upgrade head`) was rehearsed on a scratch Postgres 16 that had been brought to production's state with the 30 Sept code. Everything is in [`ROLLOUT.md`](ROLLOUT.md); what it changed in my earlier reports:
+1. **Six migrations are pending in production, not three** (051–056). Production last deployed `4fe7ae5`, at head 050. I had said 054–056.
+2. **A merge to `master` is the deploy, and the deploy is the migration** (the Dockerfile runs it at boot). There is no separate step to run by hand.
+3. **Rolling back needs the database downgraded first.** The old code cannot boot on a database stamped 056 (`Can't locate revision`). The six downgrades were rehearsed and work, with data intact.
+4. **Production has had no running backend since 17 Oct 07:07 UTC.** A merge starts it; it does not update a live service.
+
 ### The last four worked examples (§7 #4, #10, #11, #12) — done
 
 **Plan.** These were the four strict-xfail goldens no sprint owned. Smallest honest thing: pure functions on integer cents / exact decimals, no database, no endpoint, no screen, so the client guide's numbers are reproduced by the product's own code and a later screen has one place to ask. Test first: `tests/test_menu_math_kitchen.py` (property tests over cost × margin × step, the edges, the refusals), then the four goldens in `tests/evals/test_e2_money_goldens.py` flipped from `xfail(strict=True)` to assertions.

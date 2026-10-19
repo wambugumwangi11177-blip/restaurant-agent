@@ -17,7 +17,7 @@ What it takes to move production from `4fe7ae5` (30 Sept) to the v2 build, what 
 3. New app on the migrated database: login and 8 owner endpoints return 200 for both tenants; writes work on Postgres (setting + its audit row, expense + void, 19 lazily created categories, M-Pesa statement upload and removal, Ask).
 4. `alembic check` reports the same four tables (`mirror_events`, `reconcile_runs`, `source_systems`, `sync_cursors`) before and after: drift that predates v2. v2 adds none.
 5. Downgrade 056 → 050 with the new code: all six downgrades run, data intact; re-upgrade works (round trip).
-6. **Not rehearsed:** Postgres 18 (rehearsed on 16; the DDL is plain CREATE TABLE / ADD COLUMN, so **[Likely]** fine), the Docker build itself (no daemon here), the real production data.
+6. **Not rehearsed:** Postgres 18 (rehearsed on 16; the DDL is plain CREATE TABLE / ADD COLUMN, so **[Likely]** fine) and the real production data. The Docker build was not run here (no daemon) but CI's `container-scan` job built the image on the PR and passed **[Certain]**; the repo's own `owner-postgres-release` CI job also passed.
 
 ## Rollback — the part that is not obvious
 

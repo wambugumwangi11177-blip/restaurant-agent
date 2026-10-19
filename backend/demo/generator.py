@@ -77,6 +77,16 @@ def local_utc(day: date, hour: int, minute: int = 0) -> datetime:
     return datetime(day.year, day.month, day.day, hour, minute) - EAT_OFFSET
 
 
+def statement_window(now: datetime) -> tuple[datetime, datetime]:
+    """The span of the demo owner's M-Pesa statement: whole Nairobi days, from midnight P8_DAYS ago to 45 minutes before `now`.
+
+    An export is for days, and the matcher reads it as days (coverage starts at midnight Nairobi of the first payment's day, S6.2 decision b). A start
+    of `now - 14 days` moves through the day, and a sale on the first day earlier than the hour of the build was then left off the statement yet
+    counted as covered: the gap read 4 instead of the planted 3 after about noon in Nairobi.
+    """
+    return local_utc(eat_date(now - timedelta(days=P8_DAYS)), 0), now - timedelta(minutes=45)
+
+
 @dataclass
 class Guest:
     name: str
@@ -596,7 +606,7 @@ class DemoBuilder:
         rng = self.rng(b.spec["key"], "P8")
         rid = b.restaurant.id
         closed = lambda o: o.completed_at or o.created_at      # noqa: E731  when the bill was closed
-        since, until = self.now - timedelta(days=P8_DAYS), self.now - timedelta(minutes=45)
+        since, until = statement_window(self.now)
         orders = [o for o in self.db.query(models.Order).filter(
             models.Order.restaurant_id == rid, models.Order.payment_method == models.PaymentMethod.MPESA, models.Order.is_paid.is_(True),
             models.Order.status != models.OrderStatus.CANCELLED, models.Order.total > 0).order_by(models.Order.id)

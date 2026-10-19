@@ -621,3 +621,22 @@ def test_no_unplanted_cost_line_can_look_like_a_spike_on_any_day():
     from owner.settings import DEFAULTS
     worst = max((1 + spread) / (1 - spread) for *_rest, spread in DemoBuilder.LEDGER)
     assert worst < 1 + DEFAULTS.expense_spike_pct / 100, worst
+
+
+def test_the_demo_statement_starts_at_a_nairobi_midnight_whatever_the_hour():
+    """A statement is exported for whole days and the matcher reads it that way (coverage starts at midnight Nairobi of the first payment's day, S6.2
+    decision b). The demo's statement used to start at "now minus 14 days", a moment that moves through the day: a sale on that first day earlier
+    than the hour of the build was left off the statement yet counted as covered, so the gap read 4 instead of the planted 3 after about noon in
+    Nairobi (found by running the gate in the afternoon). The start may move only when the Nairobi date does."""
+    from demo.generator import P8_DAYS, statement_window
+    from time_utils import EAT_OFFSET, eat_date
+    base = datetime(2026, 10, 28)
+    starts = set()
+    for hour in range(24):
+        now = base + timedelta(hours=hour, minutes=17)
+        since, until = statement_window(now)
+        assert since + EAT_OFFSET == datetime.combine(eat_date(now - timedelta(days=P8_DAYS)), datetime.min.time()), (hour, since)
+        assert (since + EAT_OFFSET).time() == datetime.min.time()
+        assert until == now - timedelta(minutes=45)
+        starts.add(since)
+    assert len(starts) == 2                       # one start before Nairobi midnight (21:00 UTC), the next day's after

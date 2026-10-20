@@ -10,7 +10,7 @@ reconciliation isn't buildable yet. What's buildable today, and still a real
      at shift end; expected_amount is computed from Order rows
      (payment_method=CASH, is_paid=True) for the same window. A gap beyond
      tolerance is flagged — same "threshold, not zero-tolerance" posture as
-     ai/stock_custody.py's VARIANCE_THRESHOLD (spoilage/float errors are
+     the missing-stock flag in ai/stock_custody.py (spoilage/float errors are
      real and not theft, which is why there's a tolerance).
   2. M-Pesa settlement gaps: reuses ai.fraud.detection.payment_mismatches
      directly rather than reimplementing it — an M-Pesa order marked paid
@@ -31,12 +31,15 @@ from sqlalchemy import func
 import models
 from time_utils import utcnow
 from ai.fraud.detection import payment_mismatches as mpesa_payment_mismatches
+from owner.settings import Settings, resolve
 
-# KES 200 (in cents) or 1% of expected, whichever is larger — a small,
-# consistent till float discrepancy (change-making errors, rounding) is
-# normal and shouldn't page anyone; a real gap should.
-DRAWER_TOLERANCE_CENTS = 20000
-DRAWER_TOLERANCE_PCT = 0.01
+# The drawer tolerance — a shilling amount or a share of takings, whichever is larger — is the owner's
+# setting (settings.cash_tolerance_cents / cash_tolerance_pct; defaults KES 200 / 1%): a small, consistent till
+# float discrepancy (change-making errors, rounding) is normal and shouldn't page anyone; a real gap should.
+
+
+def drawer_tolerance_cents(expected_cents: int, settings: Settings) -> int:
+    return max(settings.cash_tolerance_cents, int(expected_cents * settings.cash_tolerance_pct / 100))
 
 
 class DrawerCountError(Exception):
@@ -86,6 +89,7 @@ def record_drawer_count(
     window_end,
     labor_shift_id: int | None = None,
     notes: str = "",
+    settings: Settings | None = None,
 ) -> models.CashDrawerCount:
     """
     Record a physical drawer count and compute variance against expected
@@ -93,6 +97,7 @@ def record_drawer_count(
     ai/stock_custody.py::submit_count's shape (compute expected, snapshot it,
     persist, flag if beyond tolerance).
     """
+    settings = resolve(db, restaurant_id, settings)
     if counted_amount_cents < 0:
         raise DrawerCountError("counted_amount_cents cannot be negative")
     if window_end <= window_start:
@@ -124,8 +129,7 @@ def record_drawer_count(
     )
 
     variance = counted_amount_cents - expected
-    tolerance = max(DRAWER_TOLERANCE_CENTS, int(expected * DRAWER_TOLERANCE_PCT))
-    if abs(variance) > tolerance:
+    if abs(variance) > drawer_tolerance_cents(expected, settings):
         from events.bus import emit_async, EventType
         emit_async(EventType.CASH_RECONCILIATION_FLAGGED, {
             "restaurant_id": restaurant_id,
@@ -139,13 +143,14 @@ def record_drawer_count(
 
 
 def compute_reconciliation_report(
-    db: Session, restaurant_id: int, window_hours: int = 24
+    db: Session, restaurant_id: int, window_hours: int = 24, settings: Settings | None = None
 ) -> CashReconciliationReport:
     """On-demand combined view: recent drawer-count variances + M-Pesa
     settlement gaps. Callers: routers/cash_reconciliation.py (dashboard) and
     the SHIFT_ENDED handler (ai/orchestrator/executive.py or push_notifier.py)
     which triggers a fresh drawer expectation, not this report directly —
     this function is read-only over whatever counts already exist."""
+    settings = resolve(db, restaurant_id, settings)
     since = utcnow() - timedelta(hours=window_hours)
 
     counts = db.query(models.CashDrawerCount).filter(
@@ -156,7 +161,7 @@ def compute_reconciliation_report(
     drawer_variances = []
     for c in counts:
         variance = c.counted_amount_cents - c.expected_amount_cents
-        tolerance = max(DRAWER_TOLERANCE_CENTS, int(c.expected_amount_cents * DRAWER_TOLERANCE_PCT))
+        tolerance = drawer_tolerance_cents(c.expected_amount_cents, settings)
         drawer_variances.append(DrawerVarianceResult(
             count_id=c.id,
             expected_amount_cents=c.expected_amount_cents,
@@ -169,3 +174,65 @@ def compute_reconciliation_report(
         drawer_variances=drawer_variances,
         mpesa_mismatches=mpesa_payment_mismatches(db, restaurant_id, window_hours),
     )
+
+
+# ── recurring gaps (figure 6.1 P7: "Tuesday night drawer short × 4 weeks") ───────────────────────────────────────
+
+SHIFT_SPLIT_HOUR_EAT = 14       # a counting window that starts before 14:00 Nairobi is the day shift, otherwise the evening
+RECURRING_LOOKBACK = 4          # the latest four counts of the same weekday and shift …
+RECURRING_MIN_SHORT = 3         # … three of which came up short beyond the tolerance, make a pattern
+RECURRING_HISTORY_WEEKS = 12    # counts older than this are not looked at
+WEEKDAY_NAMES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+
+@dataclass
+class RecurringGap:
+    weekday: int                  # Nairobi weekday, Monday = 0
+    shift: str                    # "day" | "evening"
+    times_short: int              # of the latest `of_last` counts of this weekday and shift, how many were short beyond tolerance
+    of_last: int
+    short_cents: list = field(default_factory=list)   # each shortage that counted, newest first
+
+    @property
+    def when(self) -> str:
+        return f"{WEEKDAY_NAMES[self.weekday]} {self.shift}"
+
+    @property
+    def total_short_cents(self) -> int:
+        return sum(self.short_cents)
+
+    @property
+    def average_short_cents(self) -> int:
+        return round(self.total_short_cents / len(self.short_cents)) if self.short_cents else 0
+
+
+def recurring_drawer_gaps(db: Session, restaurant_id: int, settings: Settings | None = None, *,
+                          lookback: int = RECURRING_LOOKBACK, min_short: int = RECURRING_MIN_SHORT) -> list[RecurringGap]:
+    """The same weekday and shift coming up short, again and again — a signal to look at that shift, not a finding about
+    anyone. Read-only. A count is *short* when the drawer held less than expected by more than the owner's tolerance.
+
+    Needs at least `min_short` counts of the same weekday and shift; returns the patterns worst first (largest total).
+    """
+    settings = resolve(db, restaurant_id, settings)
+    since = utcnow() - timedelta(weeks=RECURRING_HISTORY_WEEKS)
+    counts = db.query(models.CashDrawerCount).filter(
+        models.CashDrawerCount.restaurant_id == restaurant_id,
+        models.CashDrawerCount.window_start >= since,
+    ).order_by(models.CashDrawerCount.window_start.desc()).all()
+
+    groups: dict[tuple[int, str], list] = {}
+    for c in counts:
+        local = c.window_start + timedelta(hours=3)                       # Nairobi (UTC+3, no daylight saving)
+        shift = "day" if local.hour < SHIFT_SPLIT_HOUR_EAT else "evening"
+        groups.setdefault((local.weekday(), shift), []).append(c)
+
+    patterns = []
+    for (weekday, shift), rows in groups.items():
+        latest = rows[:lookback]                                          # newest first
+        if len(latest) < min_short:
+            continue
+        short = [c.expected_amount_cents - c.counted_amount_cents for c in latest
+                 if c.expected_amount_cents - c.counted_amount_cents > drawer_tolerance_cents(c.expected_amount_cents, settings)]
+        if len(short) >= min_short:
+            patterns.append(RecurringGap(weekday, shift, len(short), len(latest), short))
+    return sorted(patterns, key=lambda p: p.total_short_cents, reverse=True)

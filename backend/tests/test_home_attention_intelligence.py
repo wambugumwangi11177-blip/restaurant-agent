@@ -171,13 +171,20 @@ def test_a_new_restaurant_gets_an_empty_list_not_an_error(db_session):
 def test_home_includes_profit_and_missing_payment_evidence(db_session, restaurant):
     tenant, r = restaurant
     order = models.Order(restaurant_id=r.id, total=40000, is_paid=True,
-                         payment_method=models.PaymentMethod.MPESA, mpesa_receipt=None)
-    db_session.add(order)
+                         payment_method=models.PaymentMethod.MPESA, mpesa_receipt=None,
+                         mpesa_checkout_request_id="ws_CO_home1")        # LEVIII's own STK request (D1)
+    pos_order = models.Order(restaurant_id=r.id, total=40000, is_paid=True,   # POS-fed: no receipt, never flagged
+                             payment_method=models.PaymentMethod.MPESA, mpesa_receipt=None)
+    db_session.add_all([order, pos_order])
     db_session.commit()
     state = {}
     cards = _attention_cards(db_session, r.id, tenant.id, source_status=state)
-    assert any(c['domain'] == 'Profit' and 'Modelled' in c['impact'] for c in cards)
-    assert any(c['domain'] == 'Payment review' and str(order.id) in c['title'] for c in cards)
+    # S4.2: a dish under the owner's floor is one card, with a KES figure — the pricing engine's idea when it has one for the
+    # dish (the margin review of the same dish is dropped as the same problem), else the margin review measured to the floor.
+    margin = [c for c in cards if 'Grilled Chicken' in c['title'] and c['domain'] in ('Profit', 'Pricing')]
+    assert len(margin) == 1 and margin[0]['impact_cents_month'] > 0 and margin[0]['kind'] == 'loss'
+    payment_cards = [c for c in cards if c['domain'] == 'Payment review']
+    assert len(payment_cards) == 1 and '1 order' in payment_cards[0]['title']      # one summary card, only the STK order
     assert state['profit']['state'] == 'evaluated'
     assert state['kitchen']['state'] == 'insufficient_data'
 

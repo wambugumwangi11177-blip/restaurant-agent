@@ -32,7 +32,10 @@ Zero project imports on purpose — `models.py` imports this, and models.py sits
 near the bottom of the import graph.
 """
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+
+# Nairobi is UTC+3 all year (no daylight saving). The database stores naive UTC; the OWNER's day is the Nairobi day.
+EAT_OFFSET = timedelta(hours=3)
 
 
 def utcnow() -> datetime:
@@ -43,6 +46,16 @@ def utcnow() -> datetime:
     Use for anything compared against, or written to, a `DateTime` column.
     """
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def eat_date(utc_naive: datetime) -> date:
+    """The Nairobi calendar date of a naive-UTC timestamp read from a DateTime column.
+
+    Use this (in Python) to bucket rows into the owner's days. Never `func.date(column)` over a UTC column:
+    it returns the UTC date, which is the wrong day for everything between 21:00 and 24:00 UTC (00:00-03:00
+    in Nairobi). See routers/overview.py::_eat_range for the same rule applied to windows.
+    """
+    return (utc_naive + EAT_OFFSET).date()
 
 
 def aware_utcnow() -> datetime:

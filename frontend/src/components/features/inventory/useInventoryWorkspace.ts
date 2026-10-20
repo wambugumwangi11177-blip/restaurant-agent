@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { demoData, isDemoMode } from "@/lib/demo-data";
 import { useToast } from "@/components/ui/Toast";
 import { getErrorMessage } from "@/lib/errors";
 import type { InventoryItem, StockTransfer, VarianceReport, InventoryAiData } from "./types";
@@ -244,16 +243,11 @@ export function useInventoryWorkspace() {
     const predictions = aiData?.predictions || [];
     const alerts = aiData?.alerts || [];
 
-    // Demo stock alerts only in explicit demo mode; a real empty store shows
-    // its own (empty) workspace with add controls, not Lavy's fake alerts.
-    const isDemo = isDemoMode() && items.length === 0 && alerts.length === 0;
-    const demoAlerts = demoData.stockAlerts;
-
     return {
         // status
         loading, toastNode,
         // derived
-        items, summary, predictions, alerts, isDemo, demoAlerts,
+        items, summary, predictions, alerts,
         // add item
         showAddForm, setShowAddForm,
         newName, setNewName, newQty, setNewQty, newUnit, setNewUnit,

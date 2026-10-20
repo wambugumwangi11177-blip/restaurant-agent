@@ -12,18 +12,19 @@ logger = logging.getLogger(__name__)
 def collect(db, rid):
     cards, states = [], {}
 
-    def add(domain, title, why, action, impact='', entity=''):
+    def add(domain, title, why, action, impact='', entity='', impact_cents_month=None, kind=None):
         cards.append(dict(domain=domain, title=title, why=why, what_to_do=action,
-                          impact=impact, status='open', entity=str(entity)))
+                          impact=impact, status='open', entity=str(entity), impact_cents_month=impact_cents_month, kind=kind))
 
     def profit():
         from ai.profit.intelligence import get_profit_intelligence
         data = get_profit_intelligence(db, rid)
         for leak in data.get('profit_leaks', [])[:4]:
             add('Profit', f"Review margin on {leak['item_name']}",
-                'Recorded sales and recipe costs indicate a modelled margin opportunity; this is not verified recoverable profit.',
-                leak['action'], f"Modelled KSh {leak['monthly_leak_cents'] / 100:,.0f} per month",
-                leak.get('item_id', leak['item_name']))
+                f"It keeps {leak['current_margin_pct']:g}% of its price, under the lowest share you said you accept. "
+                'The figure is what the gap to your floor costs in a month at the prices and sales recorded; it is not verified recoverable profit.',
+                leak['action'], f"About KSh {leak['monthly_leak_cents'] / 100:,.0f} a month to your floor",
+                leak.get('item_id', leak['item_name']), impact_cents_month=leak['monthly_leak_cents'] or None, kind='loss')
         return bool(data.get('summary', {}).get('total_orders_30d'))
 
     def kitchen():
@@ -57,10 +58,14 @@ def collect(db, rid):
                     'The counted amount differs from the recorded expectation beyond tolerance. This is not proof of theft.',
                     'Reconcile the count, float and receipts with the shift owner.',
                     f'Difference KSh {row.variance_cents / 100:,.2f}', row.count_id)
-        for row in fraud.payment_mismatches:
-            add('Payment review', f'Check payment evidence for order {row.order_id}',
-                'Marked paid via M-Pesa, but no receipt is recorded. A missing receipt does not prove non-payment.',
-                'Match the order to settlement records before taking action.', entity=row.order_id)
+        if fraud.payment_mismatches:
+            # D1: ONE summary card for the rule, however many orders it matches — never a card per order.
+            n = len(fraud.payment_mismatches)
+            total = sum(row.total_cents for row in fraud.payment_mismatches)
+            add('Payment review', f"Check M-Pesa payment evidence for {n} order{'s' if n != 1 else ''}",
+                'Marked paid through an M-Pesa request from this system, but no receipt is recorded. A missing receipt does not prove non-payment.',
+                'Match these orders to settlement records before taking action.',
+                f'KSh {total / 100:,.0f} across these orders', 'payment_review')
         for label, rows in [('void activity', fraud.void_spikes), ('refund activity', fraud.refund_velocity), ('off-hours activity', fraud.off_hours)]:
             if rows:
                 add('Transaction review', f'Review unusual {label}',

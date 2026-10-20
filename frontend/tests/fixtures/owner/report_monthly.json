@@ -1,0 +1,1414 @@
+{
+ "period": "monthly",
+ "range": "October 2026 so far",
+ "month": "2026-10",
+ "state": "as_entered",
+ "as_of": "2026-10-16T09:48:48.597189+00:00",
+ "sections": [
+  {
+   "key": "pnl",
+   "title": "Profit & Loss",
+   "state": "as_entered",
+   "as_of": "2026-10-16T09:48:48.597189+00:00",
+   "assumptions": [
+    {
+     "setting": "food_cost_target_pct",
+     "value": 35.0,
+     "label": "Ingredient cost target"
+    },
+    {
+     "setting": "prime_cost_target_pct",
+     "value": 62.0,
+     "label": "Ingredients + wages target"
+    },
+    {
+     "setting": "labour_target_pct",
+     "value": 32.0,
+     "label": "Wages target"
+    }
+   ],
+   "assumption": {
+    "setting": "food_cost_target_pct",
+    "value": 35.0,
+    "label": "Ingredient cost target"
+   },
+   "entered_up_to": "2026-10-16",
+   "period": {
+    "kind": "month",
+    "label": "October 2026 so far",
+    "start": "2026-10-01",
+    "end": "2026-10-31",
+    "days": 31,
+    "days_elapsed": 16,
+    "partial": true
+   },
+   "orders": 195,
+   "lines": [
+    {
+     "key": "sales",
+     "label": "Sales",
+     "kes": 213130.0,
+     "state": "live"
+    },
+    {
+     "key": "ingredients",
+     "label": "Ingredients",
+     "kes": -62610.25,
+     "state": "live"
+    },
+    {
+     "key": "left_after_ingredients",
+     "label": "Left after ingredients",
+     "kes": 150519.75,
+     "subtotal": true
+    },
+    {
+     "key": "wages",
+     "label": "Wages",
+     "kes": -61825.0,
+     "state": "live"
+    },
+    {
+     "key": "other_costs",
+     "label": "Other costs",
+     "kes": -64307.39,
+     "state": "as_entered"
+    },
+    {
+     "key": "kept",
+     "label": "What you kept",
+     "kes": 24387.36,
+     "total": true
+    }
+   ],
+   "sales_split": {
+    "food": 178300.0,
+    "drinks": 34830.0,
+    "other": 0.0
+   },
+   "sections": [
+    {
+     "key": "utilities",
+     "name": "Utilities",
+     "kes": 24292.21,
+     "lines": [
+      {
+       "key": "gas",
+       "name": "Cooking gas",
+       "kes": 18600.0,
+       "entries": 2,
+       "is_fixed": false
+      },
+      {
+       "key": "water",
+       "name": "Water",
+       "kes": 3192.21,
+       "entries": 1,
+       "is_fixed": true
+      },
+      {
+       "key": "garbage",
+       "name": "Garbage collection",
+       "kes": 2500.0,
+       "entries": 1,
+       "is_fixed": true
+      }
+     ]
+    },
+    {
+     "key": "fees",
+     "name": "Fees and charges",
+     "kes": 13667.0,
+     "lines": [
+      {
+       "key": "delivery_commissions",
+       "name": "Delivery app commissions",
+       "kes": 13667.0,
+       "entries": 0,
+       "is_fixed": false,
+       "basis": "estimated"
+      }
+     ]
+    },
+    {
+     "key": "operations",
+     "name": "Running the restaurant",
+     "kes": 20825.19,
+     "lines": [
+      {
+       "key": "security",
+       "name": "Security",
+       "kes": 8000.0,
+       "entries": 1,
+       "is_fixed": true
+      },
+      {
+       "key": "packaging",
+       "name": "Packaging",
+       "kes": 5011.22,
+       "entries": 1,
+       "is_fixed": false
+      },
+      {
+       "key": "pos_internet",
+       "name": "POS & internet",
+       "kes": 4500.0,
+       "entries": 1,
+       "is_fixed": true
+      },
+      {
+       "key": "cleaning",
+       "name": "Cleaning supplies",
+       "kes": 3313.97,
+       "entries": 1,
+       "is_fixed": false
+      }
+     ]
+    },
+    {
+     "key": "marketing",
+     "name": "Marketing",
+     "kes": 5522.99,
+     "lines": [
+      {
+       "key": "marketing",
+       "name": "Marketing",
+       "kes": 5522.99,
+       "entries": 1,
+       "is_fixed": false
+      }
+     ]
+    }
+   ],
+   "delivery_commission": {
+    "kes": 13667.0,
+    "basis": "estimated"
+   },
+   "out_of_every_100": {
+    "ingredients": 29.4,
+    "wages": 29.0,
+    "other_costs": 30.2,
+    "kept": 11.4
+   },
+   "ratios": {
+    "food_cost_pct": 29.4,
+    "labour_pct": 29.0,
+    "prime_cost_pct": 58.4,
+    "gross_margin_pct": 70.6,
+    "kept_pct": 11.4
+   },
+   "basis": {
+    "ingredients": "recipe",
+    "wages": "shifts",
+    "delivery_commission": "estimated"
+   },
+   "complete": false,
+   "missing_categories": [
+    {
+     "key": "premises",
+     "name": "Rent & premises",
+     "why": "entered before, nothing this period"
+    },
+    {
+     "key": "kplc",
+     "name": "Electricity (KPLC)",
+     "why": "entered before, nothing this period"
+    }
+   ],
+   "missing_costs": [],
+   "notes": [
+    "Wages are worked out from your shift records. Enter your salaries to use your real payroll.",
+    "Delivery app commissions are estimated from your commission rates. Enter the real ones to replace the estimate.",
+    "No rent & premises entered for this period — you entered it before.",
+    "No electricity (kplc) entered for this period — you entered it before.",
+    "October 2026 so far (16 of 31 days)."
+   ],
+   "window": "October 2026 so far",
+   "rows": []
+  },
+  {
+   "key": "sales",
+   "title": "Sales",
+   "state": "live",
+   "as_of": "2026-10-16T09:03:00+00:00",
+   "sales": 213130.0,
+   "orders": 195,
+   "average_order": 1092.97,
+   "headline": "You sold KES 213,130 from 195 orders, an average of KES 1,093 an order.",
+   "rows": [
+    {
+     "key": "sales",
+     "label": "Sales",
+     "value": 213130.0,
+     "unit": "kes"
+    },
+    {
+     "key": "orders",
+     "label": "Orders",
+     "value": 195,
+     "unit": "count"
+    },
+    {
+     "key": "average_order",
+     "label": "Average order",
+     "value": 1092.97,
+     "unit": "kes"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "Sales are paid orders that were not cancelled, by the time they were taken. This is not a payment cash-flow report."
+    }
+   ],
+   "basis": "Paid orders that were not cancelled, by the time they were taken. Not a payment cash-flow report.",
+   "window": "October 2026 so far"
+  },
+  {
+   "key": "top_dishes",
+   "title": "Best sellers",
+   "state": "live",
+   "as_of": "2026-10-16T09:03:00+00:00",
+   "dishes": [
+    {
+     "name": "Soda",
+     "sold": 31,
+     "sales": 4650.0
+    },
+    {
+     "name": "Nyama choma (goat)",
+     "sold": 30,
+     "sales": 42000.0
+    },
+    {
+     "name": "Chips",
+     "sold": 30,
+     "sales": 8100.0
+    },
+    {
+     "name": "Water 500 ml",
+     "sold": 29,
+     "sales": 3480.0
+    },
+    {
+     "name": "Chai (milk tea)",
+     "sold": 29,
+     "sales": 2900.0
+    }
+   ],
+   "rows": [
+    {
+     "key": "dish",
+     "label": "Soda",
+     "value": 4650.0,
+     "unit": "kes",
+     "note": "31 sold"
+    },
+    {
+     "key": "dish",
+     "label": "Nyama choma (goat)",
+     "value": 42000.0,
+     "unit": "kes",
+     "note": "30 sold"
+    },
+    {
+     "key": "dish",
+     "label": "Chips",
+     "value": 8100.0,
+     "unit": "kes",
+     "note": "30 sold"
+    },
+    {
+     "key": "dish",
+     "label": "Water 500 ml",
+     "value": 3480.0,
+     "unit": "kes",
+     "note": "29 sold"
+    },
+    {
+     "key": "dish",
+     "label": "Chai (milk tea)",
+     "value": 2900.0,
+     "unit": "kes",
+     "note": "29 sold"
+    }
+   ],
+   "headline": "Soda sold the most: 31 plates, KES 4,650.",
+   "window": "October 2026 so far",
+   "assumptions": []
+  },
+  {
+   "key": "costs",
+   "title": "Costs",
+   "state": "live",
+   "as_of": "2026-10-16T09:03:00+00:00",
+   "window": "The last 30 days",
+   "headline": "Ingredients are 29.3% of sales (fine) and wages 28.7% (fine).",
+   "rows": [
+    {
+     "key": "food_cost",
+     "label": "Out of every KES 100, ingredients",
+     "value": 29.3,
+     "unit": "pct",
+     "note": "Fine (your target 35%)"
+    },
+    {
+     "key": "wages",
+     "label": "Out of every KES 100, wages",
+     "value": 28.7,
+     "unit": "pct",
+     "note": "Fine (your target 32%)"
+    },
+    {
+     "key": "spike",
+     "label": "Cooking gas is 29.8% above usual",
+     "value": 4266.67,
+     "unit": "kes",
+     "note": "KES 18,600 this month against KES 14,333"
+    },
+    {
+     "key": "bill",
+     "label": "Rent",
+     "value": 70000.0,
+     "unit": "kes",
+     "note": "due Monday 19 Oct; your sales will not cover it"
+    },
+    {
+     "key": "bill",
+     "label": "Electricity (KPLC)",
+     "value": 18000.0,
+     "unit": "kes",
+     "note": "due Tuesday 20 Oct; your sales will not cover it"
+    },
+    {
+     "key": "bill",
+     "label": "Security",
+     "value": 8000.0,
+     "unit": "kes",
+     "note": "due Sunday 1 Nov"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "Ingredient cost target: 35%",
+     "setting": "food_cost_target_pct",
+     "value": 35.0
+    },
+    {
+     "text": "Wages target: 32%",
+     "setting": "labour_target_pct",
+     "value": 32.0
+    }
+   ]
+  },
+  {
+   "key": "dishes",
+   "title": "Dishes",
+   "state": "live",
+   "as_of": "2026-10-16T09:03:00+00:00",
+   "window": "The last 30 days",
+   "headline": "Nyama choma (goat) earned the most (KES 59,280) and Kachumbari the least (KES 1,786).",
+   "rows": [
+    {
+     "key": "dish",
+     "label": "Nyama choma (goat)",
+     "value": 59280.0,
+     "unit": "kes",
+     "note": "Best dish · 57 sold · keeps 74.3%"
+    },
+    {
+     "key": "dish",
+     "label": "Beef stew",
+     "value": 31517.8,
+     "unit": "kes",
+     "note": "Best dish · 59 sold · keeps 71.2%"
+    },
+    {
+     "key": "dish",
+     "label": "Beef fry",
+     "value": 25456.0,
+     "unit": "kes",
+     "note": "Best dish · 40 sold · keeps 70.7%"
+    },
+    {
+     "key": "dish",
+     "label": "Fried rice",
+     "value": 21551.4,
+     "unit": "kes",
+     "note": "Best dish · 54 sold · keeps 79.8%"
+    },
+    {
+     "key": "dish",
+     "label": "Chicken burger",
+     "value": 17920.0,
+     "unit": "kes",
+     "note": "Best dish · 32 sold · keeps 74.7%"
+    },
+    {
+     "key": "dish",
+     "label": "Chicken wings",
+     "value": 14640.0,
+     "unit": "kes",
+     "note": "Best dish · 30 sold · keeps 69.7%"
+    },
+    {
+     "key": "dish",
+     "label": "Pilau",
+     "value": 13908.0,
+     "unit": "kes",
+     "note": "Popular, earns little · 61 sold · keeps 65.1%"
+    },
+    {
+     "key": "dish",
+     "label": "Kachumbari",
+     "value": 1786.0,
+     "unit": "kes",
+     "note": "Consider removing · 19 sold · keeps 78.3%"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "Counts as popular: 0.7 × average",
+     "setting": "popular_cutoff",
+     "value": 0.7
+    }
+   ]
+  },
+  {
+   "key": "channels",
+   "title": "Delivery apps and dine-in",
+   "state": "live",
+   "as_of": "2026-10-16T09:03:00+00:00",
+   "window": "The last 30 days",
+   "headline": "Dine-in & takeaway keeps the most (KES 246,865); Quarter chicken on Uber Eats keeps KES 40 where dine-in keeps KES 140.",
+   "rows": [
+    {
+     "key": "channel",
+     "label": "Dine-in & takeaway",
+     "value": 246865.3,
+     "unit": "kes",
+     "note": "319 orders · keeps 70.7%"
+    },
+    {
+     "key": "channel",
+     "label": "Glovo",
+     "value": 23241.45,
+     "unit": "kes",
+     "note": "38 orders · keeps 44.7%"
+    },
+    {
+     "key": "channel",
+     "label": "Uber Eats",
+     "value": 16531.7,
+     "unit": "kes",
+     "note": "38 orders · keeps 46.3%"
+    },
+    {
+     "key": "channel",
+     "label": "LEVIII app",
+     "value": 10306.8,
+     "unit": "kes",
+     "note": "12 orders · keeps 71%"
+    },
+    {
+     "key": "channel",
+     "label": "Bolt Food",
+     "value": 9212.5,
+     "unit": "kes",
+     "note": "15 orders · keeps 51.7%"
+    },
+    {
+     "key": "gap",
+     "label": "Quarter chicken on Uber Eats keeps KES 40",
+     "value": 140.0,
+     "unit": "kes",
+     "note": "against KES 140 dine-in; to keep your floor, price it at KES 745"
+    },
+    {
+     "key": "gap",
+     "label": "Quarter chicken on Glovo keeps KES 40",
+     "value": 140.0,
+     "unit": "kes",
+     "note": "against KES 140 dine-in; to keep your floor, price it at KES 745"
+    },
+    {
+     "key": "gap",
+     "label": "Quarter chicken on Bolt Food keeps KES 60",
+     "value": 140.0,
+     "unit": "kes",
+     "note": "against KES 140 dine-in; to keep your floor, price it at KES 650"
+    },
+    {
+     "key": "hours",
+     "label": "Lunch",
+     "value": 71.1,
+     "unit": "pct",
+     "note": "176 orders"
+    },
+    {
+     "key": "hours",
+     "label": "Dinner",
+     "value": 72.0,
+     "unit": "pct",
+     "note": "134 orders"
+    },
+    {
+     "key": "hours",
+     "label": "Afternoon",
+     "value": 65.2,
+     "unit": "pct",
+     "note": "58 orders"
+    },
+    {
+     "key": "hours",
+     "label": "Breakfast",
+     "value": 73.5,
+     "unit": "pct",
+     "note": "33 orders"
+    },
+    {
+     "key": "hours",
+     "label": "Late night",
+     "value": 72.6,
+     "unit": "pct",
+     "note": "21 orders"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "Uber Eats commission: 25%",
+     "setting": "commission_uber_eats_pct",
+     "value": 25.0
+    },
+    {
+     "text": "Glovo commission: 25%",
+     "setting": "commission_glovo_pct",
+     "value": 25.0
+    },
+    {
+     "text": "Bolt Food commission: 20%",
+     "setting": "commission_bolt_food_pct",
+     "value": 20.0
+    }
+   ]
+  },
+  {
+   "key": "store",
+   "title": "Store & suppliers",
+   "state": "as_entered",
+   "as_of": "2026-10-16T09:04:00+00:00",
+   "entered_up_to": "2026-10-16",
+   "window": "The last 7 days",
+   "headline": "Store: 0 items due to reorder; 3 items used more than sales explain; 1 short delivery.",
+   "rows": [
+    {
+     "key": "reorder",
+     "label": "Items due to reorder",
+     "value": 0,
+     "unit": "count"
+    },
+    {
+     "key": "missing",
+     "label": "Items used more than your sales explain",
+     "value": 3,
+     "unit": "count",
+     "note": "worth KES 1,377"
+    },
+    {
+     "key": "missing_value",
+     "label": "Value of that stock",
+     "value": 1376.55,
+     "unit": "kes"
+    },
+    {
+     "key": "short",
+     "label": "Short deliveries",
+     "value": 1,
+     "unit": "count",
+     "note": "worth KES 334"
+    }
+   ],
+   "assumptions": []
+  },
+  {
+   "key": "wages",
+   "title": "Wages",
+   "state": "as_entered",
+   "as_of": "2026-10-16T09:48:45.775917+00:00",
+   "entered_up_to": "2026-10-16",
+   "window": "The last 30 days",
+   "headline": "Wages are 28.7% of sales (fine): KES 134,451, with 5.6 hours of overtime.",
+   "rows": [
+    {
+     "key": "wages_pct",
+     "label": "Out of every KES 100, wages",
+     "value": 28.7,
+     "unit": "pct",
+     "note": "Fine"
+    },
+    {
+     "key": "wages",
+     "label": "Wages",
+     "value": 134451.4,
+     "unit": "kes"
+    },
+    {
+     "key": "per_hour",
+     "label": "Sales for each staff hour",
+     "value": 349.21,
+     "unit": "kes"
+    },
+    {
+     "key": "overtime_hours",
+     "label": "Overtime",
+     "value": 5.6,
+     "unit": "hours",
+     "note": "costing KES 784"
+    },
+    {
+     "key": "person",
+     "label": "Otieno",
+     "value": 23854.6,
+     "unit": "kes",
+     "note": "177.4 hours"
+    },
+    {
+     "key": "person",
+     "label": "Wanjiru",
+     "value": 26120.0,
+     "unit": "kes",
+     "note": "170.2 hours"
+    },
+    {
+     "key": "person",
+     "label": "Achieng",
+     "value": 15481.2,
+     "unit": "kes",
+     "note": "170 hours"
+    },
+    {
+     "key": "person",
+     "label": "Barasa",
+     "value": 13842.25,
+     "unit": "kes",
+     "note": "169.9 hours"
+    },
+    {
+     "key": "person",
+     "label": "Njoroge",
+     "value": 12132.75,
+     "unit": "kes",
+     "note": "168.8 hours"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "Wages target: 32%",
+     "setting": "labour_target_pct",
+     "value": 32.0
+    },
+    {
+     "text": "Overtime starts after (hours): 8 hours",
+     "setting": "overtime_after_hours",
+     "value": 8.0
+    }
+   ]
+  },
+  {
+   "key": "cash_check",
+   "title": "Cash count check",
+   "state": "as_entered",
+   "as_of": "2026-10-15T20:15:00+00:00",
+   "entered_up_to": "2026-10-15",
+   "window": "October 2026 so far",
+   "headline": "2 of the 30 cash counts are worth a look. Tuesday evening was short 4 of the last 4 times.",
+   "rows": [
+    {
+     "key": "counts",
+     "label": "Counts checked",
+     "value": 30,
+     "unit": "count"
+    },
+    {
+     "key": "to_look_at",
+     "label": "Counts to look at",
+     "value": 2,
+     "unit": "count"
+    },
+    {
+     "key": "count",
+     "label": "Thursday 15 Oct",
+     "value": -10.0,
+     "unit": "kes",
+     "note": "counted KES 7,610, expected KES 7,620",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Thursday 15 Oct",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "counted KES 0, expected KES 0",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Wednesday 14 Oct",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "counted KES 2,460, expected KES 2,460",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Wednesday 14 Oct",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "counted KES 2,220, expected KES 2,220",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Tuesday 13 Oct · to look at",
+     "value": -475.23,
+     "unit": "kes",
+     "note": "counted KES 5,135, expected KES 5,610",
+     "check": true
+    },
+    {
+     "key": "count",
+     "label": "Tuesday 13 Oct",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "counted KES 1,990, expected KES 1,990",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Monday 12 Oct",
+     "value": -20.0,
+     "unit": "kes",
+     "note": "counted KES 1,700, expected KES 1,720",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Monday 12 Oct",
+     "value": -10.0,
+     "unit": "kes",
+     "note": "counted KES 2,140, expected KES 2,150",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Sunday 11 Oct",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "counted KES 1,500, expected KES 1,500",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Sunday 11 Oct",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "counted KES 220, expected KES 220",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Saturday 10 Oct",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "counted KES 4,820, expected KES 4,820",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Saturday 10 Oct",
+     "value": -14.0,
+     "unit": "kes",
+     "note": "counted KES 3,356, expected KES 3,370",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Friday 9 Oct",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "counted KES 950, expected KES 950",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Friday 9 Oct",
+     "value": 42.0,
+     "unit": "kes",
+     "note": "counted KES 2,182, expected KES 2,140",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Thursday 8 Oct",
+     "value": 25.0,
+     "unit": "kes",
+     "note": "counted KES 25, expected KES 0",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Thursday 8 Oct",
+     "value": -48.0,
+     "unit": "kes",
+     "note": "counted KES 5,462, expected KES 5,510",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Wednesday 7 Oct",
+     "value": 50.0,
+     "unit": "kes",
+     "note": "counted KES 50, expected KES 0",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Wednesday 7 Oct",
+     "value": -35.0,
+     "unit": "kes",
+     "note": "counted KES 3,515, expected KES 3,550",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Tuesday 6 Oct · to look at",
+     "value": -519.04,
+     "unit": "kes",
+     "note": "counted KES 2,651, expected KES 3,170",
+     "check": true
+    },
+    {
+     "key": "count",
+     "label": "Tuesday 6 Oct",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "counted KES 870, expected KES 870",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Monday 5 Oct",
+     "value": -40.0,
+     "unit": "kes",
+     "note": "counted KES 1,010, expected KES 1,050",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Monday 5 Oct",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "counted KES 6,310, expected KES 6,310",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Sunday 4 Oct",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "counted KES 0, expected KES 0",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Sunday 4 Oct",
+     "value": -48.0,
+     "unit": "kes",
+     "note": "counted KES 1,672, expected KES 1,720",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Saturday 3 Oct",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "counted KES 0, expected KES 0",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Saturday 3 Oct",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "counted KES 5,490, expected KES 5,490",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Friday 2 Oct",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "counted KES 2,320, expected KES 2,320",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Friday 2 Oct",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "counted KES 2,190, expected KES 2,190",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Thursday 1 Oct",
+     "value": 25.0,
+     "unit": "kes",
+     "note": "counted KES 325, expected KES 300",
+     "check": false
+    },
+    {
+     "key": "count",
+     "label": "Thursday 1 Oct",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "counted KES 3,340, expected KES 3,340",
+     "check": false
+    },
+    {
+     "key": "pattern",
+     "label": "Tuesday evening",
+     "value": 1964.57,
+     "unit": "kes",
+     "note": "short 4 of the last 4 times, about KES 491 each time"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "Cash count difference we accept: KES 200",
+     "setting": "cash_tolerance_kes",
+     "value": 200
+    },
+    {
+     "text": "A pattern is a reason to look at that shift, not a conclusion about anyone."
+    }
+   ]
+  },
+  {
+   "key": "decisions",
+   "title": "What cost you money",
+   "state": "live",
+   "as_of": "2026-10-16T09:03:00+00:00",
+   "window": "Right now",
+   "headline": "Start with: Check where the Beef went: 1.7 kg more was used than your sales explain — about KES 5,832 a month.",
+   "rows": [
+    {
+     "key": "idea",
+     "label": "Check where the Beef went: 1.7 kg more was used than your sales explain",
+     "value": 5832.0,
+     "unit": "kes",
+     "id": "d-e71f40b3c9",
+     "action": "Check where the Beef went: 1.7 kg more was used than your sales explain",
+     "why": "In the last 7 days the kitchen used 7.5 kg of Beef; the dishes sold explain 5.8 kg. That is 29% more. A reason to check the store and the portions, not a finding about anyone.",
+     "tier": "loss",
+     "domain": "Stock"
+    },
+    {
+     "key": "idea",
+     "label": "Reprice: set Quarter chicken to KES 435 (from KES 400)",
+     "value": 2275.0,
+     "unit": "kes",
+     "id": "d-86dd8ccd58",
+     "action": "Reprice: set Quarter chicken to KES 435 (from KES 400)",
+     "why": "Margin at 35.0% — below 40% floor",
+     "tier": "loss",
+     "domain": "Pricing"
+    },
+    {
+     "key": "idea",
+     "label": "Look at Tuesday evening: the cash has been short 4 of the last 4 times",
+     "value": 2104.9,
+     "unit": "kes",
+     "id": "d-d61782032c",
+     "action": "Look at Tuesday evening: the cash has been short 4 of the last 4 times",
+     "why": "Tuesday evening came up short 4 of the last 4 times, by about KES 491 each time. A repeating gap is a reason to look at how that shift is counted and run, not a finding about anyone.",
+     "tier": "loss",
+     "domain": "Cash"
+    },
+    {
+     "key": "idea",
+     "label": "Raise Burger on Glovo to KES 800 (from KES 600)",
+     "value": 2100.0,
+     "unit": "kes",
+     "id": "d-dff0e9c9d5",
+     "action": "Raise Burger on Glovo to KES 800 (from KES 600)",
+     "why": "Glovo takes 25%, so a Burger sold there keeps KES 170 instead of KES 320 in the restaurant; 14 sold through Glovo in the last 30 days.",
+     "tier": "loss",
+     "domain": "Pricing"
+    },
+    {
+     "key": "idea",
+     "label": "Check the till price for Chips: it was charged KES 270 against KES 300 on the menu",
+     "value": 1992.85,
+     "unit": "kes",
+     "id": "d-c3d5cd5101",
+     "action": "Check the till price for Chips: it was charged KES 270 against KES 300 on the menu",
+     "why": "31 orders in the last 14 days charged 10% less than the menu price. Look at discounts, price changes and open-price items. A reason to check the till, not a finding about anyone.",
+     "tier": "loss",
+     "domain": "Profit"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "Each figure is an estimate of what the idea is worth in a month, from your own sales; it is not a promise."
+    },
+    {
+     "text": "Missing stock we flag: 3%",
+     "setting": "missing_stock_flag_pct",
+     "value": 3.0
+    }
+   ]
+  },
+  {
+   "key": "savings",
+   "title": "What LEVIII saved you",
+   "state": "live",
+   "as_of": "2026-10-16T09:48:48.597189+00:00",
+   "window": "Since you started",
+   "headline": "The idea you approved brings in about KES 2,508 a month and saved about 68.8 hours.",
+   "rows": [
+    {
+     "key": "captured",
+     "label": "Brought in by ideas you approved, a month",
+     "value": 2507.73,
+     "unit": "kes"
+    },
+    {
+     "key": "hours",
+     "label": "Hours saved, last 30 days",
+     "value": 68.8,
+     "unit": "hours"
+    },
+    {
+     "key": "approved",
+     "label": "Ideas you approved",
+     "value": 1,
+     "unit": "count"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "These are estimates from the ideas you approved, not money counted in the till."
+    }
+   ]
+  },
+  {
+   "key": "marketing",
+   "title": "Winning guests back",
+   "state": "live",
+   "as_of": "2026-10-16T09:48:48.597189+00:00",
+   "window": "Right now",
+   "headline": "50 guests haven't been back for a while; 30 have a phone number and 3 offers are ready.",
+   "rows": [
+    {
+     "key": "lapsed",
+     "label": "Guests who haven't been back",
+     "value": 50,
+     "unit": "count"
+    },
+    {
+     "key": "reachable",
+     "label": "Of them, with a phone number",
+     "value": 30,
+     "unit": "count"
+    },
+    {
+     "key": "offers",
+     "label": "Offers ready",
+     "value": 3,
+     "unit": "count"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "An offer is a draft for you to send; nothing is sent for you."
+    }
+   ]
+  },
+  {
+   "key": "outlook",
+   "title": "Next 30 days",
+   "state": "live",
+   "as_of": "2026-10-16T09:03:00+00:00",
+   "window": "The next 30 days",
+   "headline": "The next 30 days should bring about KES 422,530, between KES 295,700 and KES 549,360.",
+   "rows": [
+    {
+     "key": "expected",
+     "label": "The next 30 days",
+     "value": 422529.96,
+     "unit": "kes"
+    },
+    {
+     "key": "low",
+     "label": "At the low end",
+     "value": 295699.63,
+     "unit": "kes"
+    },
+    {
+     "key": "high",
+     "label": "At the high end",
+     "value": 549360.29,
+     "unit": "kes"
+    },
+    {
+     "key": "confidence",
+     "label": "How sure",
+     "value": 45,
+     "unit": "pct"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "A range based on your own sales history and the calendar, not a promise."
+    }
+   ]
+  },
+  {
+   "key": "data_trust",
+   "title": "How complete your costs are",
+   "state": "live",
+   "as_of": "2026-10-16T09:48:48.597189+00:00",
+   "window": "Right now",
+   "headline": "The cost is known for 100% of your 29 dishes.",
+   "rows": [
+    {
+     "key": "dishes",
+     "label": "Dishes",
+     "value": 29,
+     "unit": "count"
+    },
+    {
+     "key": "known",
+     "label": "Dishes whose cost is known",
+     "value": 100.0,
+     "unit": "pct"
+    },
+    {
+     "key": "missing",
+     "label": "Dishes with no cost yet",
+     "value": 0,
+     "unit": "count"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "A dish with no recipe cost is left out of food cost, so the real figure is higher."
+    }
+   ]
+  },
+  {
+   "key": "rules_used",
+   "title": "Targets used in this report",
+   "state": "as_entered",
+   "as_of": "2026-10-16T09:48:48.597189+00:00",
+   "entered_up_to": "2026-10-16",
+   "window": "Used for every figure in this report",
+   "headline": "2 of your 24 targets are your own; the rest are the usual answers.",
+   "rows": [
+    {
+     "key": "changed",
+     "label": "Targets you changed",
+     "value": 2,
+     "unit": "count"
+    },
+    {
+     "key": "total",
+     "label": "Targets in all",
+     "value": 24,
+     "unit": "count"
+    },
+    {
+     "key": "rule",
+     "label": "Ingredient cost target",
+     "value": 35.0,
+     "unit": "pct",
+     "setting": "food_cost_target_pct",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "Ingredients + wages target",
+     "value": 62.0,
+     "unit": "pct",
+     "setting": "prime_cost_target_pct",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "Lowest share you keep on a dish",
+     "value": 40.0,
+     "unit": "pct",
+     "setting": "margin_floor_pct",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "Share you would like to keep on a dish",
+     "value": 55.0,
+     "unit": "pct",
+     "setting": "margin_target_pct",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "What counts as a popular dish",
+     "value": null,
+     "unit": "text",
+     "note": "0.7 × average",
+     "setting": "popular_cutoff",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "Missing stock we flag",
+     "value": 3.0,
+     "unit": "pct",
+     "setting": "missing_stock_flag_pct",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "Cash count difference we accept",
+     "value": 200,
+     "unit": "kes",
+     "setting": "cash_tolerance_kes",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "Cash count difference we accept (share of takings)",
+     "value": 1.0,
+     "unit": "pct",
+     "setting": "cash_tolerance_pct",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "Uber Eats commission",
+     "value": 25.0,
+     "unit": "pct",
+     "setting": "commission_uber_eats_pct",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "Glovo commission",
+     "value": 25.0,
+     "unit": "pct",
+     "setting": "commission_glovo_pct",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "Bolt Food commission",
+     "value": 20.0,
+     "unit": "pct",
+     "setting": "commission_bolt_food_pct",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "Offer size",
+     "value": 10.0,
+     "unit": "pct",
+     "setting": "offer_size_pct",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "Extra sales you expect from an offer",
+     "value": 30.0,
+     "unit": "pct",
+     "setting": "offer_lift_pct",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "Biggest price rise at once",
+     "value": 15.0,
+     "unit": "pct",
+     "setting": "max_raise_pct",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "Price rounding step",
+     "value": 5,
+     "unit": "kes",
+     "setting": "price_step_kes",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "How guests react to price changes",
+     "value": null,
+     "unit": "text",
+     "note": "-0.7",
+     "setting": "price_sensitivity",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "Wages target",
+     "value": 32.0,
+     "unit": "pct",
+     "note": "you changed it from 30%",
+     "setting": "labour_target_pct",
+     "changed": true
+    },
+    {
+     "key": "rule",
+     "label": "Overtime starts after",
+     "value": null,
+     "unit": "text",
+     "note": "8 hours",
+     "setting": "overtime_after_hours",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "Urgent alerts per day",
+     "value": null,
+     "unit": "text",
+     "note": "3 per day (you changed it from 5 per day)",
+     "setting": "urgent_alerts_per_day",
+     "changed": true
+    },
+    {
+     "key": "rule",
+     "label": "Cost increase we flag",
+     "value": 25.0,
+     "unit": "pct",
+     "setting": "expense_spike_pct",
+     "changed": false
+    },
+    {
+     "key": "rule",
+     "label": "Cash you keep aside for bills",
+     "value": 0,
+     "unit": "kes",
+     "setting": "bill_reserve_kes",
+     "changed": false
+    }
+   ],
+   "assumptions": [],
+   "info": true
+  }
+ ],
+ "read": {
+  "state": "unavailable",
+  "as_of": null,
+  "reason": "LEVIII's read is optional and is left out unless every number in it is backed.",
+  "text": null
+ }
+}

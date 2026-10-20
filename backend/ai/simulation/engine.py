@@ -34,10 +34,12 @@ from sqlalchemy import func
 import models
 from time_utils import utcnow
 from ai.analysis_clock import analysis_anchor
-from ai.pricing.analysis import fetch_item_velocities, MIN_MARGIN_PCT
+from ai.pricing.analysis import fetch_item_velocities
+from owner.settings import DEFAULTS, Settings, resolve
 
 # ── Demand model constants (explicit + documented, not buried in a formula) ────
-BASE_ELASTICITY = -0.7          # own-price elasticity at normal (baseline) velocity
+# The base own-price elasticity (default -0.7 at normal velocity) is the owner's setting `price_sensitivity`
+# (owner/settings.py); what stays here is the clamp the model never leaves, whatever the setting says.
 ELASTICITY_MIN, ELASTICITY_MAX = -1.2, -0.4   # clamp — never outside sane bounds
 DAYS_IN_MONTH = 30
 
@@ -46,14 +48,14 @@ _CONF_BY_DATA_DAYS = [(30, 80), (14, 65), (7, 45)]   # (min_days, confidence)
 _CONF_FLOOR, _CONF_CEIL = 20, 90
 
 
-def _effective_elasticity(velocity_ratio: float) -> float:
+def _effective_elasticity(velocity_ratio: float, base_elasticity: float = DEFAULTS.price_sensitivity) -> float:
     """
     Tilt the base elasticity by the item's own recent velocity. A dish selling
     ABOVE its baseline (ratio > 1) is running hot → less price-sensitive (toward
     -0.4). One selling BELOW baseline (ratio < 1) is fragile → more sensitive
-    (toward -1.2). At ratio 1.0 this is exactly BASE_ELASTICITY.
+    (toward -1.2). At ratio 1.0 this is exactly `base_elasticity` (the owner's price_sensitivity).
     """
-    tilted = BASE_ELASTICITY * (2.0 - max(0.3, min(1.7, velocity_ratio)))
+    tilted = base_elasticity * (2.0 - max(0.3, min(1.7, velocity_ratio)))
     return max(ELASTICITY_MIN, min(ELASTICITY_MAX, tilted))
 
 
@@ -120,11 +122,11 @@ def _item_baseline(db: Session, restaurant_id: int, item_id: int) -> dict:
 
 
 def _verdict(profit_delta: int, projected_margin_pct: float,
-             satisfaction_delta: float, breaches_floor: bool) -> tuple[str, str]:
+             satisfaction_delta: float, breaches_floor: bool, margin_floor_pct: float) -> tuple[str, str]:
     if breaches_floor:
         return "NO", (
             f"Projected margin {projected_margin_pct:.0f}% falls below the "
-            f"{MIN_MARGIN_PCT:.0f}% healthy floor."
+            f"{margin_floor_pct:.0f}% healthy floor."
         )
     if profit_delta > 0 and satisfaction_delta >= -10:
         return "YES", "Projected to raise monthly profit with limited customer-perception risk."
@@ -140,12 +142,15 @@ def simulate_price_change(
     restaurant_id: int,
     item_id: int,
     new_price_cents: int,
+    settings: Settings | None = None,
 ) -> dict:
     """
     Project the effect of setting `item_id`'s price to `new_price_cents`.
     A promo/discount is just a price_change to a lower price; a cost change is
-    handled by simulate_cost_change below.
+    handled by simulate_cost_change below. `settings` supplies the owner's price sensitivity and margin
+    floor (None → the restaurant's saved settings).
     """
+    settings = resolve(db, restaurant_id, settings)
     item = (
         db.query(models.MenuItem)
         .filter(models.MenuItem.id == item_id,
@@ -166,7 +171,7 @@ def simulate_price_change(
     baseline = _item_baseline(db, restaurant_id, item_id)
     price_change_pct = (new_price - current_price) / current_price * 100
 
-    elasticity = _effective_elasticity(baseline["velocity_ratio"])
+    elasticity = _effective_elasticity(baseline["velocity_ratio"], settings.price_sensitivity)
     demand_change_pct = elasticity * price_change_pct
     # Demand can't go negative; a >100% projected drop is clamped to ~0 sales.
     demand_factor = max(0.0, 1.0 + demand_change_pct / 100.0)
@@ -185,8 +190,9 @@ def simulate_price_change(
     satisfaction_delta = _satisfaction_delta(price_change_pct)
     profit_delta = proj_profit_month - base_profit_month
     # Only a downward margin move that crosses under the floor is a hard no.
-    breaches_floor = proj_margin < MIN_MARGIN_PCT and proj_margin < base_margin
-    verdict, reason = _verdict(profit_delta, proj_margin, satisfaction_delta, breaches_floor)
+    breaches_floor = proj_margin < settings.margin_floor_pct and proj_margin < base_margin
+    verdict, reason = _verdict(profit_delta, proj_margin, satisfaction_delta, breaches_floor,
+                               settings.margin_floor_pct)
 
     return {
         "available": True,
@@ -237,6 +243,7 @@ def simulate_cost_change(
     item_id: int,
     new_cost_cents: int,
     pass_through: bool = False,
+    settings: Settings | None = None,
 ) -> dict:
     """
     Project a supplier ingredient-cost change on an item. If pass_through is
@@ -244,6 +251,7 @@ def simulate_cost_change(
     price is lifted to keep the current margin, and demand responds via the
     price-change model.
     """
+    settings = resolve(db, restaurant_id, settings)
     item = (
         db.query(models.MenuItem)
         .filter(models.MenuItem.id == item_id,
@@ -266,8 +274,8 @@ def simulate_cost_change(
         proj_margin = (current_price - new_cost) / current_price * 100 if current_price else 0.0
         base_margin = (current_price - old_cost) / current_price * 100 if current_price else 0.0
         profit_delta = proj_profit - base_profit
-        breaches_floor = proj_margin < MIN_MARGIN_PCT and proj_margin < base_margin
-        verdict, reason = _verdict(profit_delta, proj_margin, 0.0, breaches_floor)
+        breaches_floor = proj_margin < settings.margin_floor_pct and proj_margin < base_margin
+        verdict, reason = _verdict(profit_delta, proj_margin, 0.0, breaches_floor, settings.margin_floor_pct)
         return {
             "available": True,
             "change": {
@@ -297,7 +305,7 @@ def simulate_cost_change(
     # price-change demand model on that new price.
     base_margin_frac = (current_price - old_cost) / current_price if current_price else 0.0
     new_price = int(round(new_cost / max(1 - base_margin_frac, 0.01)))
-    result = simulate_price_change(db, restaurant_id, item_id, new_price)
+    result = simulate_price_change(db, restaurant_id, item_id, new_price, settings)
     if result.get("available"):
         result["change"]["type"] = "cost_change_pass_through"
         result["change"]["old_cost"] = old_cost

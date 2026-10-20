@@ -21,27 +21,24 @@ Fixes vs previous version:
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+import math
 from collections import defaultdict
 from datetime import timedelta
 from typing import NamedTuple
 import models
 from ai.analysis_clock import analysis_anchor
+from owner.settings import DEFAULTS, Settings
 from time_utils import utcnow
 
 # ── Constants ────────────────────────────────────────────────────────────────
+# Analytic tuning of the velocity signal (how hot / how slow counts as a signal, how much history is
+# enough). The owner's business rules — margin floor and target, food-cost ceiling, delivery commissions,
+# offer size and lift, biggest raise — are NOT constants here: they are owner settings (owner/settings.py).
 SURGE_THRESHOLD         = 1.30
 SLOW_THRESHOLD          = 0.60
-MIN_MARGIN_PCT          = 40.0
-MAX_FOOD_COST_PCT       = 35.0
 MIN_ORDERS_FOR_VELOCITY = 5     # Minimum orders to compute velocity at all
 MIN_DAYS_FOR_VELOCITY   = 14    # DS-01 FIX: minimum days of history for SURGE/STIMULATE
 COOLDOWN_DAYS           = 7
-
-DELIVERY_COMMISSIONS = {
-    "uber_eats":  0.25,
-    "glovo":      0.25,
-    "bolt_food":  0.20,
-}
 
 
 class ItemVelocity(NamedTuple):
@@ -172,6 +169,7 @@ def analyse_item(
     item: models.MenuItem,
     vel: ItemVelocity,
     on_cooldown: bool,
+    settings: Settings | None = None,
 ) -> dict | None:
     """
     Compute a single pricing recommendation for one item.
@@ -180,7 +178,13 @@ def analyse_item(
     at least MIN_DAYS_FOR_VELOCITY (14) days of actual order history.
     Items newer than this get only REPRICE recommendations (hard floor
     violations are always valid regardless of data age).
+
+    `settings` are the owner's thresholds (None → the defaults; callers with a database resolve the
+    restaurant's saved settings first — see get_pricing_intelligence).
     """
+    settings = settings or DEFAULTS
+    min_margin    = settings.margin_floor_pct
+    max_food_cost = settings.food_cost_target_pct
     current_price = item.price
     cost          = item.cost_price or 0
     margin_pct    = ((current_price - cost) / max(current_price, 1)) * 100
@@ -221,13 +225,14 @@ def analyse_item(
         return base
 
     # ── SURGE (requires velocity data — DS-01) ───────────────────────────────
-    if has_velocity_data and vel.velocity_ratio >= SURGE_THRESHOLD and margin_pct >= MIN_MARGIN_PCT:
-        surge_pct       = min(15, round((vel.velocity_ratio - 1) * 20))
-        suggested_price = _round_price(current_price * (1 + surge_pct / 100))
+    if has_velocity_data and vel.velocity_ratio >= SURGE_THRESHOLD and margin_pct >= min_margin:
+        surge_pct       = min(settings.max_raise_pct, round((vel.velocity_ratio - 1) * 20))
+        suggested_price = _round_price(current_price * (1 + surge_pct / 100), settings.price_step_cents)
         new_food_cost   = (cost / max(suggested_price, 1)) * 100
         new_margin      = ((suggested_price - cost) / max(suggested_price, 1)) * 100
 
-        if new_food_cost <= MAX_FOOD_COST_PCT and new_margin >= MIN_MARGIN_PCT:
+        # (A step that rounds the "raise" back to today's price is not a recommendation.)
+        if suggested_price > current_price and new_food_cost <= max_food_cost and new_margin >= min_margin:
             monthly_impact = int((suggested_price - current_price) * vel.avg_daily_baseline * 30)
             return {
                 **base,
@@ -243,10 +248,10 @@ def analyse_item(
             }
 
     # ── REPRICE — margin floor violation (always valid, no velocity required) ─
-    if margin_pct < MIN_MARGIN_PCT and cost > 0:
+    if margin_pct < min_margin and cost > 0:
         # Round UP, not to nearest: REPRICE must never emit a price that is still
         # under the floor it exists to restore. See _round_price_up().
-        target_price   = _round_price_up(cost / (1 - MIN_MARGIN_PCT / 100))
+        target_price   = _round_price_up(cost / (1 - min_margin / 100), settings.price_step_cents)
         new_food_cost  = (cost / max(target_price, 1)) * 100
         new_margin     = ((target_price - cost) / max(target_price, 1)) * 100
         monthly_impact = int((target_price - current_price) * vel.avg_daily_baseline * 30)
@@ -256,7 +261,7 @@ def analyse_item(
             "type":                    "REPRICE",
             "suggested_price":         target_price,
             "price_change_pct":        round(((target_price - current_price) / max(current_price, 1)) * 100, 1),
-            "reason":                  f"Margin at {round(margin_pct, 1)}% — below {MIN_MARGIN_PCT}% floor",
+            "reason":                  f"Margin at {round(margin_pct, 1)}% — below {min_margin:g}% floor",
             "when":                    "All times",
             "monthly_impact_cents":    monthly_impact,
             "recommendation_strength": 85,
@@ -265,15 +270,15 @@ def analyse_item(
         }
 
     # ── STIMULATE (requires velocity data — DS-01) ───────────────────────────
-    if has_velocity_data and 0 < vel.velocity_ratio <= SLOW_THRESHOLD and margin_pct >= 55:
-        discount_pct    = 10
-        suggested_price = _round_price(current_price * (1 - discount_pct / 100))
+    if has_velocity_data and 0 < vel.velocity_ratio <= SLOW_THRESHOLD and margin_pct >= settings.margin_target_pct:
+        discount_pct    = settings.offer_size_pct
+        suggested_price = _round_price(current_price * (1 - discount_pct / 100), settings.price_step_cents)
         new_margin      = ((suggested_price - cost) / max(suggested_price, 1)) * 100
         new_food_cost   = (cost / max(suggested_price, 1)) * 100
 
-        if new_margin >= MIN_MARGIN_PCT and new_food_cost <= MAX_FOOD_COST_PCT:
+        if suggested_price < current_price and new_margin >= min_margin and new_food_cost <= max_food_cost:
             # DS-04 FIX: correct monthly impact extrapolation
-            projected_daily = vel.avg_daily_baseline * 1.30
+            projected_daily = vel.avg_daily_baseline * (1 + settings.offer_lift_pct / 100)
             monthly_impact  = int(
                 ((projected_daily * suggested_price) - (vel.avg_daily_baseline * current_price)) * 30
             )
@@ -296,10 +301,15 @@ def analyse_item(
 def check_delivery_margins(
     items: list,
     velocities: dict[int, ItemVelocity],
+    settings: Settings | None = None,
 ) -> list[dict]:
-    """Per-channel delivery margin check."""
+    """Per-channel delivery margin check, using the owner's commission rates."""
+    settings = settings or DEFAULTS
+    min_margin = settings.margin_floor_pct
     gaps = []
-    for channel, commission in DELIVERY_COMMISSIONS.items():
+    for channel, commission in settings.commissions.items():
+        if commission <= 0:
+            continue                              # a platform that takes nothing cannot erode the margin
         for item in items:
             if not item.cost_price:
                 continue
@@ -309,11 +319,11 @@ def check_delivery_margins(
 
             margin_pct       = ((item.price - item.cost_price) / max(item.price, 1)) * 100
             effective_margin = margin_pct - (commission * 100)
-            required_price   = _round_price(
-                item.cost_price / (1 - (MIN_MARGIN_PCT + commission * 100) / 100)
+            required_price   = _round_price_up(
+                item.cost_price / (1 - (min_margin + commission * 100) / 100), settings.price_step_cents
             )
 
-            if effective_margin < MIN_MARGIN_PCT:
+            if effective_margin < min_margin:
                 gaps.append({
                     "channel":                    channel,
                     "item_name":                  item.name,
@@ -321,8 +331,12 @@ def check_delivery_margins(
                     "current_margin_pct":         round(margin_pct, 1),
                     "commission_pct":             round(commission * 100),
                     "effective_delivery_margin":  round(effective_margin, 1),
+                    # What one plate leaves after ingredients: through the platform (its commission comes off the price)
+                    # and dine-in. Integer cents, same arithmetic as the margins above.
+                    "delivery_keeps_cents":       round(item.price * (1 - commission) - item.cost_price),
+                    "dine_in_keeps_cents":        item.price - item.cost_price,
                     "recommended_delivery_price": required_price,
-                    "issue": f"{channel.replace('_',' ').title()} commission erodes margin below {MIN_MARGIN_PCT}% floor",
+                    "issue": f"{channel.replace('_',' ').title()} commission erodes margin below {min_margin:g}% floor",
                 })
 
     gaps.sort(key=lambda x: x["effective_delivery_margin"])
@@ -331,24 +345,30 @@ def check_delivery_margins(
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _round_price(price_cents: float) -> int:
-    rounded = round(price_cents / 50) * 50
-    return int(max(rounded, 100))
+def _round_price(price_cents: float, step_cents: int = DEFAULTS.price_step_cents) -> int:
+    """Round to the NEAREST price step (SURGE / STIMULATE). The step is the owner's `price_step_kes` setting,
+    in cents (default 500 = KES 5). Never below one step.
+
+    D16: this used to divide cents by 50 — a KES 0.50 step, with a docstring example that assumed KES — so a
+    KES 433.33 target came out as KES 433.50 instead of a menu-friendly KES 435.
+    """
+    step = max(int(step_cents), 1)
+    return int(max(math.floor(price_cents / step + 0.5) * step, step))
 
 
-def _round_price_up(price_cents: float) -> int:
+def _round_price_up(price_cents: float, step_cents: int = DEFAULTS.price_step_cents) -> int:
     """
-    Round UP to the nearest 50. Used by REPRICE, whose whole job is to lift a
-    below-floor item back to the margin floor: nearest-50 rounding can land just
-    under the exact target (cost 610 → 610/0.6 = 1016.67 → nearest-50 = 1000 →
-    39%, one point under the 40% floor), so REPRICE would recommend a price that
-    still violates the floor it exists to restore. Ceiling to 50 guarantees the
-    rounded price is >= the exact floor price, so the resulting margin is always
-    >= MIN_MARGIN_PCT.
+    Round UP to the next price step. Used by REPRICE (and the delivery price), whose whole job is to lift a
+    below-floor item back to the margin floor: nearest rounding can land just under the exact target (cost
+    25,900 cents → 25,900/0.6 = 43,167 → nearest KES 5 is 43,000 = a 39.8% margin, under the 40% floor), so
+    REPRICE would recommend a price that still violates the floor it exists to restore. Ceiling
+    to the step guarantees the rounded price is >= the exact floor price, so the resulting margin is always
+    >= the margin floor (settings.margin_floor_pct).
+
+    The 6-decimal guard stops float noise (40000.000000000007 / 500) from adding a whole extra step.
     """
-    import math
-    ceiled = math.ceil(price_cents / 50) * 50
-    return int(max(ceiled, 100))
+    step = max(int(step_cents), 1)
+    return int(max(math.ceil(round(price_cents / step, 6)) * step, step))
 
 
 def _describe_when(is_weekend_heavy: bool, daypart: str) -> str:

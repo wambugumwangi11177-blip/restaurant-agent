@@ -1,0 +1,593 @@
+{
+ "restaurant": {
+  "id": 1,
+  "name": "Mama Oliech"
+ },
+ "period": "today",
+ "timezone": "Africa/Nairobi",
+ "generated_at": "2026-10-16T05:54:00.656834+00:00",
+ "pulse": {
+  "state": "no_data",
+  "as_of": null,
+  "reason": "No sales recorded yet.",
+  "sales_today": 0.0,
+  "orders_today": 0,
+  "vs_same_weekday_pct": null,
+  "vs_same_weekday_state": "learning",
+  "sales_in_period": 0.0,
+  "orders_in_period": 0,
+  "trend_7d": [
+   {
+    "date": "2026-10-10",
+    "sales": 0.0,
+    "orders": 0
+   },
+   {
+    "date": "2026-10-11",
+    "sales": 0.0,
+    "orders": 0
+   },
+   {
+    "date": "2026-10-12",
+    "sales": 0.0,
+    "orders": 0
+   },
+   {
+    "date": "2026-10-13",
+    "sales": 0.0,
+    "orders": 0
+   },
+   {
+    "date": "2026-10-14",
+    "sales": 0.0,
+    "orders": 0
+   },
+   {
+    "date": "2026-10-15",
+    "sales": 0.0,
+    "orders": 0
+   },
+   {
+    "date": "2026-10-16",
+    "sales": 0.0,
+    "orders": 0
+   }
+  ],
+  "breakeven_at": {
+   "state": "no_data",
+   "as_of": null,
+   "reason": "Costs covered needs your costs and some sales: enter your costs to see when today's sales cover them."
+  },
+  "money_match": {
+   "cash": {
+    "state": "no_data",
+    "as_of": null,
+    "reason": "No cash counts entered yet."
+   },
+   "mpesa": {
+    "state": "unavailable",
+    "as_of": null,
+    "reason": "Upload your M-Pesa statement to check it against your sales."
+   }
+  },
+  "freshness": {
+   "latest_sale_at": null,
+   "data_age_days": 0,
+   "is_stale": false,
+   "source": "macsoft",
+   "source_state": "unavailable",
+   "source_reconciled": false,
+   "source_trusted": false,
+   "source_notice": "Recorded data only. The Macsoft mirror could not be read, so its delivery state is unknown.",
+   "source_records": null,
+   "source_last_received_at": null
+  }
+ },
+ "costing_you_money": {
+  "state": "no_data",
+  "as_of": null,
+  "reason": "Nothing to rank until sales are recorded.",
+  "cards": []
+ },
+ "health": {
+  "state": "no_data",
+  "as_of": "2026-10-16T05:54:00.656834+00:00",
+  "tiles": [
+   {
+    "area": "money",
+    "title": "My Money",
+    "number": null,
+    "unit": "",
+    "word": "Not set up",
+    "status": "unknown",
+    "label": "Out of every KES 100, ingredients"
+   },
+   {
+    "area": "sales_dishes",
+    "title": "Sales & Dishes",
+    "number": null,
+    "unit": "",
+    "word": "Not set up",
+    "status": "unknown",
+    "label": "Sales, last 7 days"
+   },
+   {
+    "area": "store",
+    "title": "Store & Suppliers",
+    "number": null,
+    "unit": "",
+    "word": "Not set up",
+    "status": "unknown",
+    "label": "Items to check"
+   },
+   {
+    "area": "cash",
+    "title": "Cash Check",
+    "number": null,
+    "unit": "",
+    "word": "Not set up",
+    "status": "unknown",
+    "label": "Counts and sales to look at"
+   },
+   {
+    "area": "staff",
+    "title": "Staff",
+    "number": null,
+    "unit": "",
+    "word": "Not set up",
+    "status": "unknown",
+    "label": "Out of every KES 100, wages"
+   },
+   {
+    "area": "permits",
+    "title": "Permits & Settings",
+    "number": null,
+    "unit": "",
+    "word": "Not set up",
+    "status": "unknown",
+    "label": "Dishes with a cost"
+   }
+  ],
+  "reason": "The tiles fill in as sales and costs are recorded."
+ },
+ "areas": {
+  "money": {
+   "key": "money",
+   "title": "My Money",
+   "state": "no_data",
+   "as_of": "2026-10-16T05:54:00.656834+00:00",
+   "summary": {
+    "number": null,
+    "unit": "",
+    "word": "Not set up",
+    "status": "unknown",
+    "label": "Out of every KES 100, ingredients"
+   },
+   "blocks": {
+    "pnl": {
+     "state": "no_data",
+     "as_of": null,
+     "assumptions": [
+      {
+       "setting": "food_cost_target_pct",
+       "value": 35.0,
+       "label": "Ingredient cost target"
+      },
+      {
+       "setting": "prime_cost_target_pct",
+       "value": 62.0,
+       "label": "Ingredients + wages target"
+      },
+      {
+       "setting": "labour_target_pct",
+       "value": 30.0,
+       "label": "Wages target"
+      }
+     ],
+     "assumption": {
+      "setting": "food_cost_target_pct",
+      "value": 35.0,
+      "label": "Ingredient cost target"
+     },
+     "reason": "Nothing recorded in this period yet.",
+     "period": {
+      "kind": "month",
+      "label": "October 2026 so far",
+      "start": "2026-10-01",
+      "end": "2026-10-31",
+      "days": 31,
+      "days_elapsed": 16,
+      "partial": true
+     },
+     "orders": 0,
+     "lines": [
+      {
+       "key": "sales",
+       "label": "Sales",
+       "kes": 0.0,
+       "state": "no_data"
+      },
+      {
+       "key": "ingredients",
+       "label": "Ingredients",
+       "kes": -0.0,
+       "state": "live"
+      },
+      {
+       "key": "left_after_ingredients",
+       "label": "Left after ingredients",
+       "kes": 0.0,
+       "subtotal": true
+      },
+      {
+       "key": "wages",
+       "label": "Wages",
+       "kes": -0.0,
+       "state": "no_data"
+      },
+      {
+       "key": "other_costs",
+       "label": "Other costs",
+       "kes": -0.0,
+       "state": "no_data"
+      },
+      {
+       "key": "kept",
+       "label": "What you kept",
+       "kes": 0.0,
+       "total": true
+      }
+     ],
+     "sales_split": {
+      "food": 0.0,
+      "drinks": 0.0,
+      "other": 0.0
+     },
+     "sections": [],
+     "delivery_commission": {
+      "kes": 0.0,
+      "basis": "none"
+     },
+     "out_of_every_100": {
+      "ingredients": null,
+      "wages": null,
+      "other_costs": null,
+      "kept": null
+     },
+     "ratios": {
+      "food_cost_pct": null,
+      "labour_pct": null,
+      "prime_cost_pct": null,
+      "gross_margin_pct": null,
+      "kept_pct": null
+     },
+     "basis": {
+      "ingredients": "recipe",
+      "wages": "none",
+      "delivery_commission": "none"
+     },
+     "complete": false,
+     "missing_categories": [],
+     "missing_costs": [],
+     "notes": [
+      "No wages recorded for this period yet.",
+      "October 2026 so far (16 of 31 days)."
+     ]
+    },
+    "cost_dials": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No sales recorded yet."
+    },
+    "breakeven": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "Costs covered needs your costs and some sales: enter your costs to see when today's sales cover them."
+    },
+    "bills": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No bills entered yet."
+    },
+    "spikes": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "Needs three months of entered costs."
+    },
+    "savings": {
+     "state": "no_data",
+     "as_of": "2026-10-16T05:54:00.656834+00:00",
+     "captured_kes_month": 0.0,
+     "hours_saved_30d": 0.0,
+     "approved_ideas": 0,
+     "reason": "Nothing approved yet."
+    }
+   }
+  },
+  "sales_dishes": {
+   "key": "sales_dishes",
+   "title": "Sales & Dishes",
+   "state": "no_data",
+   "as_of": "2026-10-16T05:54:00.656834+00:00",
+   "summary": {
+    "number": null,
+    "unit": "",
+    "word": "Not set up",
+    "status": "unknown",
+    "label": "Sales, last 7 days"
+   },
+   "blocks": {
+    "seven_day": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No sales recorded yet.",
+     "days": [
+      {
+       "date": "2026-10-10",
+       "sales": 0.0,
+       "orders": 0
+      },
+      {
+       "date": "2026-10-11",
+       "sales": 0.0,
+       "orders": 0
+      },
+      {
+       "date": "2026-10-12",
+       "sales": 0.0,
+       "orders": 0
+      },
+      {
+       "date": "2026-10-13",
+       "sales": 0.0,
+       "orders": 0
+      },
+      {
+       "date": "2026-10-14",
+       "sales": 0.0,
+       "orders": 0
+      },
+      {
+       "date": "2026-10-15",
+       "sales": 0.0,
+       "orders": 0
+      },
+      {
+       "date": "2026-10-16",
+       "sales": 0.0,
+       "orders": 0
+      }
+     ],
+     "total": 0.0
+    },
+    "forecast": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No sales recorded yet."
+    },
+    "matrix": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No dishes sold yet."
+    },
+    "dishes_by_kes": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No dishes sold yet."
+    },
+    "price_ideas": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No sales recorded yet."
+    },
+    "delivery": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No sales recorded yet."
+    },
+    "outlook": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No sales recorded yet."
+    },
+    "win_back": {
+     "state": "no_data",
+     "as_of": "2026-10-16T05:54:00.656834+00:00",
+     "lapsed_guests": 0,
+     "reachable": 0,
+     "offers": 0,
+     "reason": "No lapsed regulars to win back."
+    },
+    "simulator": {
+     "state": "live",
+     "as_of": "2026-10-16T05:54:00.656834+00:00",
+     "info": true,
+     "how": "Ask “what if I raise the price of <dish>?” in Ask LEVIII."
+    }
+   }
+  },
+  "store": {
+   "key": "store",
+   "title": "Store & Suppliers",
+   "state": "no_data",
+   "as_of": null,
+   "summary": {
+    "number": null,
+    "unit": "",
+    "word": "Not set up",
+    "status": "unknown",
+    "label": "Items to check"
+   },
+   "blocks": {
+    "missing": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No stock movements recorded yet."
+    },
+    "handover": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No store-to-kitchen handovers recorded yet."
+    },
+    "reorder": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No stock items recorded yet."
+    },
+    "suppliers": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No suppliers added yet."
+    }
+   }
+  },
+  "cash": {
+   "key": "cash",
+   "title": "Cash Check",
+   "state": "no_data",
+   "as_of": null,
+   "summary": {
+    "number": null,
+    "unit": "",
+    "word": "Not set up",
+    "status": "unknown",
+    "label": "Counts and sales to look at"
+   },
+   "blocks": {
+    "shifts": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No cash counts entered yet."
+    },
+    "cancelled_sales": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No sales recorded yet."
+    },
+    "below_menu_price": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No sales recorded yet."
+    },
+    "mpesa": {
+     "state": "unavailable",
+     "as_of": null,
+     "reason": "Upload your M-Pesa statement to check it against your sales."
+    },
+    "patterns": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "Needs four weeks of cash counts to spot a repeating pattern."
+    }
+   }
+  },
+  "staff": {
+   "key": "staff",
+   "title": "Staff",
+   "state": "no_data",
+   "as_of": null,
+   "summary": {
+    "number": null,
+    "unit": "",
+    "word": "Not set up",
+    "status": "unknown",
+    "label": "Out of every KES 100, wages"
+   },
+   "blocks": {
+    "wages": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No staff shifts recorded yet."
+    },
+    "on_shift": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No shifts scheduled today."
+    },
+    "kitchen": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No kitchen preparation times recorded yet."
+    }
+   }
+  },
+  "permits": {
+   "key": "permits",
+   "title": "Permits & Settings",
+   "state": "no_data",
+   "as_of": null,
+   "summary": {
+    "number": null,
+    "unit": "",
+    "word": "Not set up",
+    "status": "unknown",
+    "label": "Dishes with a cost"
+   },
+   "blocks": {
+    "licences": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No licences entered yet."
+    },
+    "settings": {
+     "state": "no_data",
+     "as_of": null,
+     "chosen": false,
+     "changed": 0,
+     "total": 24,
+     "updated_at": null,
+     "reason": "You have not set your own targets yet — defaults are in use."
+    },
+    "till_connection": {
+     "state": "live",
+     "as_of": "2026-10-16T05:54:00.656834+00:00",
+     "info": true,
+     "source": "macsoft",
+     "word": "Can't be read",
+     "reconciled": false,
+     "records": null
+    },
+    "data_trust": {
+     "state": "no_data",
+     "as_of": null,
+     "reason": "No dishes on the menu yet."
+    }
+   }
+  }
+ },
+ "coming_up": {
+  "bills": {
+   "state": "no_data",
+   "as_of": null,
+   "reason": "No bills entered yet."
+  },
+  "licences": {
+   "state": "no_data",
+   "as_of": null,
+   "reason": "No licences entered yet."
+  },
+  "deliveries": {
+   "state": "no_data",
+   "as_of": "2026-10-16T05:54:00.656834+00:00",
+   "reason": "No deliveries expected.",
+   "items": []
+  },
+  "bookings": {
+   "state": "no_data",
+   "as_of": null,
+   "reason": "No bookings in the next 7 days.",
+   "covers_today": 0,
+   "next_days": []
+  }
+ },
+ "read": {
+  "state": "unavailable",
+  "as_of": null,
+  "reason": "LEVIII's read has not been written yet.",
+  "text": null
+ },
+ "setup": {
+  "targets_chosen": false,
+  "age_days": 0
+ }
+}

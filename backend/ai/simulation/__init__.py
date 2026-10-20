@@ -27,7 +27,7 @@ def _current_price(db: Session, restaurant_id: int, item_id: int) -> int | None:
     return item[0] if item else None
 
 
-def run_simulation(db: Session, restaurant_id: int, change: dict) -> dict:
+def run_simulation(db: Session, restaurant_id: int, change: dict, settings=None) -> dict:
     """
     Dispatch a change request to the right engine function.
 
@@ -58,7 +58,7 @@ def run_simulation(db: Session, restaurant_id: int, change: dict) -> dict:
             else:
                 pct = float(change.get("change_pct", 0) or 0)
                 new_price = current * (1 + pct / 100.0)
-        return simulate_price_change(db, restaurant_id, item_id, int(round(float(new_price))))
+        return simulate_price_change(db, restaurant_id, item_id, int(round(float(new_price))), settings=settings)
 
     if ctype == "cost_change":
         new_cost = change.get("new_cost")
@@ -76,7 +76,7 @@ def run_simulation(db: Session, restaurant_id: int, change: dict) -> dict:
             new_cost = old_cost * (1 + pct / 100.0)
         return simulate_cost_change(
             db, restaurant_id, item_id, int(round(float(new_cost))),
-            pass_through=bool(change.get("pass_through", False)),
+            pass_through=bool(change.get("pass_through", False)), settings=settings,
         )
 
     return {"available": False, "error": f"Unknown simulation type '{ctype}'."}

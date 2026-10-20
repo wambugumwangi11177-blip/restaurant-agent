@@ -280,7 +280,7 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
         _add("profit_leaks", "Margin leaking from low-margin items",
              (profit.get("summary") or {}).get("total_leak_amount"))
         _add("portion_drift", "Lost to portion / discount drift",
-             sum(d.get("estimated_monthly_leak", 0) for d in (profit.get("portion_drift") or [])))
+             sum(d.get("estimated_monthly_leak", 0) for d in (profit.get("till_price_gap") or profit.get("portion_drift") or [])))
     except Exception as exc:  # noqa: BLE001
         _swallow("profit_leaks", exc)
 

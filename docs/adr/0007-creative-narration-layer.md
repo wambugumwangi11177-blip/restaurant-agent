@@ -76,4 +76,4 @@ LLM never computes a figure**:
 `backend/ai/creative.py`, `backend/routers/creative.py`, `backend/routers/reports.py`
 (`report_creative`), `backend/routers/ai_ask.py` (`_orchestrate`, `_gather_evidence`),
 `backend/ai/owner_narrative.py`, `backend/alembic/versions/050_add_creative_takes.py`,
-`frontend/src/components/vibanda/CreativeNote.tsx`, [ai-governance.md](../ai-governance.md)
+`frontend/src/components/owner/CreativeNote.tsx`, [ai-governance.md](../ai-governance.md)

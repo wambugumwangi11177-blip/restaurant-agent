@@ -12,7 +12,9 @@ Fixes vs previous version:
   BUG-11  — _upsell_lift: removed the type("x",(),{}) anonymous class hack
              (already fixed in the uploaded version — verified and kept).
   DS-02   — _profit_forecast now includes ±1 std-dev uncertainty band per day.
-  DS-04   — portion_drift monthly_leak uses * (30/14) not * 2.
+  DS-04   — till_price_gap monthly_leak uses * (30/14) not * 2.
+  D15     — "portion_drift" actually measured sales below the menu price: renamed till_price_gap;
+            `portion_drift` stays as a deprecated alias of the same rows for one release.
 """
 
 from sqlalchemy.orm import Session, joinedload
@@ -22,14 +24,13 @@ from datetime import datetime, timedelta
 import math
 import models
 from ai.analysis_clock import analysis_anchor
+from owner.settings import Settings, resolve
 from time_utils import utcnow
 
 # ── Benchmarks ────────────────────────────────────────────────────────────────
-HEALTHY_FOOD_COST_MAX = 35.0
-HEALTHY_MARGIN_MIN    = 55.0
-CRITICAL_MARGIN_FLOOR = 40.0
+# The business thresholds (food-cost ceiling, margin floor/target, delivery commissions) are the owner's
+# settings (owner/settings.py, docs/v2 S1.2) — not constants here. This is a definition, not a rule:
 RETURNING_GUEST_DAYS  = 14
-DELIVERY_COMMISSIONS  = {"uber_eats": 0.25, "glovo": 0.25, "bolt_food": 0.20}
 
 
 def _item_cost(item_map: dict, mid: int) -> int:
@@ -42,8 +43,12 @@ def _item_cost(item_map: dict, mid: int) -> int:
 # MAIN ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
 
-def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
-    """Complete profit intelligence — UTC-correct, AttributeError-safe."""
+def get_profit_intelligence(db: Session, restaurant_id: int, settings: Settings | None = None) -> dict:
+    """Complete profit intelligence — UTC-correct, AttributeError-safe.
+
+    `settings` (the owner's thresholds) defaults to the restaurant's saved settings, else the defaults.
+    """
+    settings = resolve(db, restaurant_id, settings)
 
     # BUG-04 FIX: use UTC for all DB range filters. Anchored to the
     # restaurant's most recent order, not wall-clock time (2026-07-07) — see
@@ -116,11 +121,11 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
     else:
         revenue_mom = 0.0
 
-    contribution_margins = _build_contribution_margins(items, item_profit)
-    profit_leaks         = _detect_profit_leaks(contribution_margins)
-    portion_drift        = _detect_portion_drift(db, restaurant_id, item_map, now)
+    contribution_margins = _build_contribution_margins(items, item_profit, settings)
+    profit_leaks         = _detect_profit_leaks(contribution_margins, settings)
+    till_price_gap       = _detect_till_price_gap(db, restaurant_id, item_map, now)
     daypart_analysis     = _daypart_profitability(orders_30d, item_map)
-    channel_analysis     = _channel_profitability(orders_30d, item_map)
+    channel_analysis     = _channel_profitability(orders_30d, item_map, settings)
     customer_intel       = _customer_intelligence(orders_30d, total_revenue, now)
     upsell_uplift        = _upsell_lift(orders_30d, item_map)
     profit_forecast      = _profit_forecast(orders_30d, total_food_cost, total_revenue)
@@ -131,8 +136,9 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
         daypart_analysis = daypart_analysis,
         channel_analysis = channel_analysis,
         at_risk          = customer_intel["at_risk_customers"],
-        portion_drift    = portion_drift,
+        till_price_gap   = till_price_gap,
         revenue_mom      = revenue_mom,
+        settings         = settings,
     )
 
     stars = [cm for cm in contribution_margins if cm["status"] == "STAR"]
@@ -145,7 +151,7 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
             "total_gross_profit_30d": total_gross_profit,
             "gross_margin_pct":       round(gross_margin_pct, 1),
             "food_cost_pct":          round(food_cost_pct, 1),
-            "food_cost_status":       _food_cost_status(food_cost_pct),
+            "food_cost_status":       _food_cost_status(food_cost_pct, settings),
             "revenue_mom_pct":        revenue_mom,
             "total_orders_30d":       len(orders_30d),
             "avg_order_value":        int(total_revenue / max(len(orders_30d), 1)),
@@ -157,7 +163,8 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
         },
         "contribution_margins":  contribution_margins[:20],
         "profit_leaks":          profit_leaks,
-        "portion_drift":         portion_drift,
+        "till_price_gap":        till_price_gap,
+        "portion_drift":         till_price_gap,   # DEPRECATED alias (D15) — same rows; remove after one release
         "daypart_analysis":      daypart_analysis,
         "channel_analysis":      channel_analysis,
         "customer_intelligence": customer_intel,
@@ -171,7 +178,7 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
 
 # ── Sub-analyses ──────────────────────────────────────────────────────────────
 
-def _build_contribution_margins(items, item_profit: dict) -> list[dict]:
+def _build_contribution_margins(items, item_profit: dict, settings: Settings) -> list[dict]:
     result = []
     for item in items:
         data = item_profit.get(item.id, {})
@@ -192,34 +199,45 @@ def _build_contribution_margins(items, item_profit: dict) -> list[dict]:
             "total_profit_30d": data.get("profit", 0),
             "total_revenue_30d": data.get("revenue", 0),
             "profit_per_unit":  int(item.price - (item.cost_price or 0)),
-            "status":           _margin_status(margin_pct),
+            "status":           _margin_status(margin_pct, settings),
         })
     result.sort(key=lambda x: x["total_profit_30d"], reverse=True)
     return result
 
 
-def _detect_profit_leaks(contribution_margins: list[dict]) -> list[dict]:
+def _detect_profit_leaks(contribution_margins: list[dict], settings: Settings) -> list[dict]:
+    """A dish that keeps less than the owner's floor. The leak is what the shortfall costs in a month: the price that would
+    keep the floor (rounded up to the owner's price step), less today's price, times what was sold in 30 days. It is measured to
+    the FLOOR — the least the owner said they accept — not to the target margin they would like: a target is a wish, a floor
+    is a rule, and only a broken rule is "costing you money". `suggested_price` is still the target, as the price to aim for."""
     leaks = []
+    step = max(settings.price_step_cents, 1)
     for cm in contribution_margins:
-        if cm["margin_pct"] < CRITICAL_MARGIN_FLOOR and cm["cost_price"] > 0:
-            target_price  = int(cm["cost_price"] / (1 - HEALTHY_MARGIN_MIN / 100))
-            monthly_leak  = (target_price - cm["current_price"]) * cm["qty_30d"]
+        if cm["margin_pct"] < settings.margin_floor_pct and cm["cost_price"] > 0:
+            target_price  = int(cm["cost_price"] / (1 - settings.margin_target_pct / 100))
+            floor_price   = -(-int(cm["cost_price"] / (1 - settings.margin_floor_pct / 100)) // step) * step
+            floor_price   = max(floor_price, cm["current_price"])
+            monthly_leak  = (floor_price - cm["current_price"]) * cm["qty_30d"]
             leaks.append({
                 "item_name":          cm["item_name"],
                 "category":           cm["category"],
                 "current_margin_pct": cm["margin_pct"],
                 "food_cost_pct":      cm["food_cost_pct"],
                 "monthly_leak_cents": monthly_leak,
+                "floor_price":        floor_price,
                 "suggested_price":    target_price,
                 "severity":           "CRITICAL" if cm["margin_pct"] < 30 else "HIGH",
-                "action":             f"Increase price from KES {cm['current_price']//100:,} to KES {target_price//100:,}",
+                "action":             f"Increase price from KES {cm['current_price']//100:,} to at least KES {floor_price//100:,}",
             })
     leaks.sort(key=lambda x: x["monthly_leak_cents"], reverse=True)
     return leaks
 
 
-def _detect_portion_drift(db: Session, restaurant_id: int, item_map: dict, now: datetime) -> list[dict]:
+def _detect_till_price_gap(db: Session, restaurant_id: int, item_map: dict, now: datetime) -> list[dict]:
     """
+    Dishes the till charged for below their menu price, over the last 14 days (owner words: "sold below menu price").
+    This is a signal to check the till, not a finding about anyone. Was `_detect_portion_drift` (D15).
+
     DS-04 FIX: monthly_leak extrapolation uses * (30/14) not * 2.
     BUG-04 FIX: 14-day window uses UTC (now is already UTC from caller).
     """
@@ -256,7 +274,7 @@ def _detect_portion_drift(db: Session, restaurant_id: int, item_map: dict, now: 
                 "drift_pct":            round(drift_pct, 1),
                 "order_count":          row.cnt,
                 "estimated_monthly_leak": monthly_leak,
-                "action":               "Check POS — staff may be applying undocumented discounts",
+                "action":               "Check the till: this dish was charged below its menu price. Look at discounts, price changes and open-price items.",
             })
 
     return sorted(drift_items, key=lambda x: x["estimated_monthly_leak"], reverse=True)
@@ -297,7 +315,7 @@ def _daypart_profitability(orders: list, item_map: dict) -> list[dict]:
     ]
 
 
-def _channel_profitability(orders: list, item_map: dict) -> list[dict]:
+def _channel_profitability(orders: list, item_map: dict, settings: Settings) -> list[dict]:
     """BUG-10 FIX: uses _item_cost() instead of direct attribute access on possibly-None item."""
     channel: dict[str, dict] = defaultdict(lambda: {"revenue": 0, "cost": 0, "orders": 0})
 
@@ -307,7 +325,7 @@ def _channel_profitability(orders: list, item_map: dict) -> list[dict]:
             oi.quantity * _item_cost(item_map, oi.menu_item_id)   # BUG-10 FIX
             for oi in order.items
         )
-        commission      = (order.total or 0) * DELIVERY_COMMISSIONS.get(ch, 0)
+        commission      = (order.total or 0) * settings.commission_rate(ch)
         effective_cost  = order_cost + commission
         channel[ch]["revenue"] += order.total or 0
         channel[ch]["cost"]    += effective_cost
@@ -322,7 +340,7 @@ def _channel_profitability(orders: list, item_map: dict) -> list[dict]:
             "orders":              d["orders"],
             "margin_pct":          round(((d["revenue"] - d["cost"]) / max(d["revenue"], 1)) * 100, 1),
             "avg_order_value":     int(d["revenue"] / max(d["orders"], 1)),
-            "commission_included": ch in DELIVERY_COMMISSIONS,
+            "commission_included": settings.commission_rate(ch) > 0,
         }
         for ch, d in sorted(channel.items(), key=lambda x: x[1]["revenue"] - x[1]["cost"], reverse=True)
     ]
@@ -470,21 +488,21 @@ def _profit_forecast(orders: list, total_cost: int, total_revenue: int) -> dict:
 
 def _generate_recommendations(
     food_cost_pct, profit_leaks, daypart_analysis,
-    channel_analysis, at_risk, portion_drift, revenue_mom
+    channel_analysis, at_risk, till_price_gap, revenue_mom, settings: Settings
 ) -> list[dict]:
     recs = []
-    if food_cost_pct > HEALTHY_FOOD_COST_MAX:
+    if food_cost_pct > settings.food_cost_target_pct:
         recs.append({"type": "food_cost", "priority": "CRITICAL",
-            "message": f"Food cost at {food_cost_pct:.1f}% — above {HEALTHY_FOOD_COST_MAX}% threshold",
+            "message": f"Food cost at {food_cost_pct:.1f}% — above {settings.food_cost_target_pct:g}% threshold",
             "action": "Review portion sizes, supplier pricing, waste. Check for theft.",
             "impact": "Every 1% food cost reduction = direct profit gain"})
     for leak in profit_leaks[:3]:
         recs.append({"type": "margin_leak", "priority": leak["severity"],
             "message": f"{leak['item_name']}: margin at {leak['current_margin_pct']}% — leaking KES {leak['monthly_leak_cents']//100:,}/month",
             "action": leak["action"], "impact": f"KES {leak['monthly_leak_cents']//100:,}/month"})
-    for drift in portion_drift[:2]:
-        recs.append({"type": "portion_drift", "priority": "MEDIUM",
-            "message": f"{drift['item_name']}: prices captured {drift['drift_pct']}% below menu price",
+    for drift in till_price_gap[:2]:
+        recs.append({"type": "till_price_gap", "priority": "MEDIUM",
+            "message": f"{drift['item_name']}: sold {drift['drift_pct']}% below menu price",
             "action": drift["action"], "impact": f"KES {drift['estimated_monthly_leak']//100:,}/month"})
     if daypart_analysis:
         worst = min(daypart_analysis, key=lambda x: x["margin_pct"])
@@ -520,15 +538,18 @@ def _hour_to_daypart(hour: int) -> str:
     elif 18 <= hour < 22: return "dinner"
     else:                  return "late_night"
 
-def _margin_status(margin_pct: float) -> str:
-    if   margin_pct >= HEALTHY_MARGIN_MIN:    return "STAR"
-    elif margin_pct >= CRITICAL_MARGIN_FLOOR: return "ACCEPTABLE"
-    else:                                      return "LEAK"
+def _margin_status(margin_pct: float, settings: Settings) -> str:
+    if   margin_pct >= settings.margin_target_pct: return "STAR"
+    elif margin_pct >= settings.margin_floor_pct:  return "ACCEPTABLE"
+    else:                                          return "LEAK"
 
-def _food_cost_status(fc: float) -> str:
-    if   fc <= HEALTHY_FOOD_COST_MAX: return "HEALTHY"
-    elif fc <= 40:                    return "WARNING"
-    else:                              return "CRITICAL"
+# A food cost this many points over the owner's ceiling is "critical", not just a "warning" (it was 35 → 40).
+FOOD_COST_WARNING_BAND_PTS = 5.0
+
+def _food_cost_status(fc: float, settings: Settings) -> str:
+    if   fc <= settings.food_cost_target_pct:                              return "HEALTHY"
+    elif fc <= settings.food_cost_target_pct + FOOD_COST_WARNING_BAND_PTS: return "WARNING"
+    else:                                                                  return "CRITICAL"
 
 def _empty_response() -> dict:
     return {
@@ -539,8 +560,12 @@ def _empty_response() -> dict:
             "avg_order_value": 0, "total_items_sold": 0,
             "profit_leaks_found": 0, "total_leak_amount": 0,
             "star_items": 0, "dog_items": 0},
-        "contribution_margins": [], "profit_leaks": [], "portion_drift": [],
+        "contribution_margins": [], "profit_leaks": [], "till_price_gap": [], "portion_drift": [],
         "daypart_analysis": [], "channel_analysis": [], "customer_intelligence": {},
         "upsell_uplift": [], "profit_forecast": {}, "stars": [], "dogs": [],
         "recommendations": [],
     }
+
+
+# Deprecated name (D15), kept for one release: execution/emit_capability_manifest.py and any external caller.
+_detect_portion_drift = _detect_till_price_gap

@@ -34,16 +34,15 @@ export default function LoginPage() {
             // read from the enclosing closure: React has not committed the
             // setUser() from login()/register() by the time this line runs, so
             // `user` is still the previous value (null on a first login). That
-            // made homeFor() fall through to /dashboard for every account,
-            // including Vibanda — the generic dashboard would paint, then its
-            // layout's isVibanda() effect bounced to /vibanda. That flash is
-            // the "it shows the old dashboard first, then the new one".
+            // made homeFor() fall through to /dashboard for every account —
+            // the generic dashboard would paint, then bounce an owner to /home.
+            // That flash is the "it shows the old dashboard first, then the new one".
             const signedIn = isRegister
                 ? await register(email, password, tenantName)
                 : useEmailLogin
                     ? await login(email, password)
                     : await loginWithRestaurant(restaurantName, password);
-            router.replace(homeFor(signedIn?.tenant_name));
+            router.replace(homeFor(signedIn));
         } catch (err: unknown) {
             let message = "Authentication failed";
             if (err && typeof err === "object" && "response" in err) {

@@ -4,7 +4,6 @@ import { AlertTriangle, ShieldAlert } from "lucide-react";
 import type { VarianceReport, StockAlert } from "./types";
 
 interface StockAlertsPanelProps {
-    isDemo: boolean;
     variance: VarianceReport | null;
     alerts: StockAlert[];
 }
@@ -15,7 +14,7 @@ interface StockAlertsPanelProps {
  * null means the role has no /stock/* access, not an error) and the AI
  * "what to do" alerts list. Extracted from InventoryWorkspace.
  */
-export default function StockAlertsPanel({ isDemo, variance, alerts }: StockAlertsPanelProps) {
+export default function StockAlertsPanel({ variance, alerts }: StockAlertsPanelProps) {
     return (
         <>
             {variance !== null && variance.items?.some((i) => i.flagged) && (
@@ -39,7 +38,7 @@ export default function StockAlertsPanel({ isDemo, variance, alerts }: StockAler
                 </div>
             )}
 
-            {!isDemo && alerts.length > 0 && (
+            {alerts.length > 0 && (
                 <div className="bg-surface border border-border rounded-xl">
                     <div className="px-4 py-3 border-b border-surface-hover flex items-center gap-2">
                         <AlertTriangle className="w-3.5 h-3.5 text-warning" />

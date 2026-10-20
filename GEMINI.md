@@ -77,3 +77,13 @@ Rules:
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+
+## v2 build (LEVIII one-spine build)
+
+A multi-sprint build is in progress. **Before changing owner-facing code, read `docs/v2/SPEC.md`** (the whole job: architecture, sprint cards, evals, worked examples) and the newest entries in `docs/v2/PROGRESS.md` (what is done, what was measured, decisions made, any STOP note).
+
+- Gate: `make -C docs/v2 gate` (E1 regression + the evals in `backend/tests/evals/` + frontend checks). A sprint is done only when the gate is green, `PROGRESS.md` is updated, and the work is committed as `v2(Sx.y): <what>`.
+- Where the code disagrees with `SPEC.md` section 1, the code wins; note it in `PROGRESS.md`.
+- v2 rules that apply to every line (SPEC section 0.3): money is integer cents in the backend; owner time is Nairobi (UTC+3); every query is tenant-scoped and every new endpoint gets a tenant-isolation test; the LLM never computes a number; every number carries its data state; owner words on owner screens; one source of truth for thresholds (the settings service); signals, not verdicts.
+- Never run migrations or writes against the production `DATABASE_URL`, deploy, change provider config/secrets, force-push, or delete `directives/` as part of this build.
+- The `directives/` + `execution/` text above still describes how this repo's scripts are organised; the `graphify-out/` graph it mentions is not in the repository. `execution/codemap.py` (v2) regenerates a code map into `docs/v2/`.

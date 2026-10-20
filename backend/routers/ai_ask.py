@@ -824,6 +824,11 @@ def chat_llm(request: Request, body: ChatBody, db: Session = Depends(get_db),
                 llm_reply = narrate_owner(db, user, rid, messages, system, 550, "owner-os-chat-v1")
                 if answer_type == "restaurant_analysis":
                     llm_reply = _grounded_reply(llm_reply, context)
+                else:
+                    # General guidance is grounded too (E3): it used to reach the owner unchecked when the creative layer was off. The source
+                    # is what the model was shown, the owner's own words included, so a figure the owner gave survives and an invented one does not.
+                    source = "\n".join(m["content"] for m in messages if m["role"] == "user")
+                    llm_reply, dropped_sentences = creative.keep_grounded_sentences(llm_reply, source)
         except HTTPException as exc:
             db.rollback()
             if exc.status_code != 429:

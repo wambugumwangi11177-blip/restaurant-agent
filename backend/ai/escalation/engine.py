@@ -4,7 +4,7 @@ backend/ai/escalation/engine.py
 Manager escalation (Sprint 2). Turns a fire-and-forget alert into an active
 paging system: a severity-tagged Notification that goes unacknowledged past
 its timeout re-notifies a wider audience, and (for critical alerts only) a
-further timeout places an automated voice call.
+further timeout reminds the owner.
 
 EVENT_SEVERITY is the single source of truth for which events escalate —
 ai/orchestrator/push_notifier.py's _fan_out() looks up severity_for() and
@@ -17,8 +17,11 @@ ordered and each only fires once per notification):
 
   Level 0 -> 1  (critical: 15 min, high: 30 min unacknowledged)
       Page every active MANAGER for the restaurant: in-app/push + WhatsApp/SMS.
+      Cash and fraud alerts (ai/alert_levels.py::OWNER_ONLY_EVENTS) skip this step: the managers are
+      never told, because their own people may be the subject. The clock still moves on to level 1.
   Level 1 -> 2  (critical only: +30 more minutes, i.e. 45 min total)
-      Place an automated voice call to the owner reading the alert.
+      Remind the owner (an in-app reminder and push). Never inside the owner's quiet hours: the
+      step waits, and the first sweep after the quiet hours end sends it.
       High-severity alerts have no level 2 — they stop at "every manager knows".
 
 run_escalation_sweep() is the APScheduler job (every 5 min, main.py) that
@@ -33,7 +36,9 @@ from sqlalchemy.orm import Session
 
 import models
 from time_utils import utcnow
+from ai import alert_levels
 from ai.notify import notify_users
+from owner.settings import get_settings
 from routers.deps import get_staff_users_for_restaurant
 
 logger = logging.getLogger("ai.escalation")
@@ -60,7 +65,7 @@ def severity_for(event_type: str) -> str | None:
     return EVENT_SEVERITY.get(event_type)
 
 
-def run_escalation_sweep(db: Session) -> dict:
+def run_escalation_sweep(db: Session, now=None) -> dict:
     """
     Scan every unacknowledged severity-tagged Notification and advance its
     escalation level if it's past the relevant timeout. Never raises — one
@@ -68,9 +73,11 @@ def run_escalation_sweep(db: Session) -> dict:
     scheduled job's per-item try/except contract, e.g. main.py's variance
     check looping per-restaurant).
     """
-    now = utcnow()
+    now = now or utcnow()
     escalated_to_managers = 0
     escalated_to_call = 0
+    held_for_quiet_hours = 0
+    owner_only_not_paged = 0
 
     pending = db.query(models.Notification).filter(
         models.Notification.severity.isnot(None),
@@ -87,22 +94,28 @@ def run_escalation_sweep(db: Session) -> dict:
             if notif.escalation_level == 0:
                 timeout = LEVEL_1_TIMEOUT_MINUTES.get(severity)
                 if timeout is not None and age_minutes >= timeout:
-                    _page_managers(db, notif)
+                    if notif.event_type in alert_levels.OWNER_ONLY_EVENTS:
+                        owner_only_not_paged += 1          # cash and fraud: the managers are skipped on purpose
+                    else:
+                        _page_managers(db, notif)
+                        escalated_to_managers += 1
                     notif.escalation_level = 1
                     db.commit()
-                    escalated_to_managers += 1
             elif notif.escalation_level == 1:
                 timeout = LEVEL_2_TIMEOUT_MINUTES.get(severity)
                 if timeout is not None and age_minutes >= timeout:
-                    _call_owner(db, notif)
-                    notif.escalation_level = 2
-                    db.commit()
-                    escalated_to_call += 1
+                    if _call_owner(db, notif, now):
+                        notif.escalation_level = 2
+                        db.commit()
+                        escalated_to_call += 1
+                    else:
+                        held_for_quiet_hours += 1          # night: the reminder waits for the quiet hours to end
         except Exception as exc:
             db.rollback()
             logger.error(f"[Escalation] Failed to escalate notification {notif.id}: {exc}")
 
-    return {"escalated_to_managers": escalated_to_managers, "escalated_to_call": escalated_to_call}
+    return {"escalated_to_managers": escalated_to_managers, "escalated_to_call": escalated_to_call,
+            "held_for_quiet_hours": held_for_quiet_hours, "owner_only_not_paged": owner_only_not_paged}
 
 
 def _restaurant_for_notification(db: Session, notif: "models.Notification"):
@@ -141,13 +154,18 @@ def _page_managers(db: Session, notif: "models.Notification") -> None:
         return
 
 
-def _call_owner(db: Session, notif: "models.Notification") -> None:
+def _call_owner(db: Session, notif: "models.Notification", now) -> bool:
+    """Remind the owner. False when it is the owner's quiet hours (nothing is sent and the level does not advance); True otherwise."""
     restaurant = _restaurant_for_notification(db, notif)
     if not restaurant:
-        return
+        return True
+
+    if alert_levels.in_quiet_hours(get_settings(db, restaurant.id), now):
+        return False
 
     owners = get_staff_users_for_restaurant(db, restaurant, [models.StaffRole.OWNER])
     # The terminal escalation is an in-app reminder, not a new escalation
     # chain. No severity is assigned, preventing recursive escalation.
     notify_users(db, [owner.id for owner in owners], f"[URGENT] {notif.title}",
-                 notif.body, "owner_escalation", notif.url)
+                 notif.body, alert_levels.REMINDER_EVENT, notif.url)
+    return True

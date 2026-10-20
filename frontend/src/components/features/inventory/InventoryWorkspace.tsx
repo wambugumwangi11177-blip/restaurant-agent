@@ -48,7 +48,7 @@ export default function InventoryWorkspace() {
                 <div>
                     <h1 className="text-xl font-bold text-text">Stock</h1>
                     <p className="text-sm text-text-dim mt-0.5">
-                        {w.isDemo ? "Demo stock alerts" : `${w.items.length} item${w.items.length !== 1 ? "s" : ""} tracked from your store`}
+                        {`${w.items.length} item${w.items.length !== 1 ? "s" : ""} tracked from your store`}
                     </p>
                 </div>
                 <div className="flex gap-2">
@@ -59,13 +59,6 @@ export default function InventoryWorkspace() {
                     </button>
                 </div>
             </div>
-
-            {/* Demo Banner */}
-            {w.isDemo && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-accent/8 border border-accent/20 rounded-lg">
-                    <span className="text-[10px] text-accent">📊 Demo Mode — Showing sample data for Lavy restaurant</span>
-                </div>
-            )}
 
             <AddItemModal
                 show={w.showAddForm}
@@ -81,34 +74,30 @@ export default function InventoryWorkspace() {
             />
 
             <InventoryInsights
-                isDemo={w.isDemo}
-                demoAlerts={w.demoAlerts}
                 summary={w.summary}
                 predictionsCount={w.predictions.length}
             />
 
-            {/* Real: Stock items */}
-            {!w.isDemo && (
-                <InventoryList
-                    items={w.items}
-                    predictions={w.predictions}
-                    showReceiveForm={w.showReceiveForm}
-                    setShowReceiveForm={w.setShowReceiveForm}
-                    showAdjustForm={w.showAdjustForm}
-                    setShowAdjustForm={w.setShowAdjustForm}
-                    receiveQty={w.receiveQty}
-                    setReceiveQty={w.setReceiveQty}
-                    receiveSupplier={w.receiveSupplier}
-                    setReceiveSupplier={w.setReceiveSupplier}
-                    adjustQty={w.adjustQty}
-                    setAdjustQty={w.setAdjustQty}
-                    adjustReason={w.adjustReason}
-                    setAdjustReason={w.setAdjustReason}
-                    submitting={w.submitting}
-                    onReceive={w.handleReceive}
-                    onAdjust={w.handleAdjust}
-                />
-            )}
+            {/* Stock items */}
+            <InventoryList
+                items={w.items}
+                predictions={w.predictions}
+                showReceiveForm={w.showReceiveForm}
+                setShowReceiveForm={w.setShowReceiveForm}
+                showAdjustForm={w.showAdjustForm}
+                setShowAdjustForm={w.setShowAdjustForm}
+                receiveQty={w.receiveQty}
+                setReceiveQty={w.setReceiveQty}
+                receiveSupplier={w.receiveSupplier}
+                setReceiveSupplier={w.setReceiveSupplier}
+                adjustQty={w.adjustQty}
+                setAdjustQty={w.setAdjustQty}
+                adjustReason={w.adjustReason}
+                setAdjustReason={w.setAdjustReason}
+                submitting={w.submitting}
+                onReceive={w.handleReceive}
+                onAdjust={w.handleAdjust}
+            />
 
             {/* Store <-> kitchen transfers + physical counts. Only shown to
                 roles that can reach /stock/transfers — Waiter/Supervisor get
@@ -151,7 +140,7 @@ export default function InventoryWorkspace() {
                 />
             )}
 
-            <StockAlertsPanel isDemo={w.isDemo} variance={w.variance} alerts={w.alerts} />
+            <StockAlertsPanel variance={w.variance} alerts={w.alerts} />
         </div>
     );
 }

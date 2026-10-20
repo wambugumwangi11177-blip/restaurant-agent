@@ -295,6 +295,11 @@ def receive_purchase_order(
                 performed_by_user_id=received_by_user_id,
             ))
 
+    # D3: this is where a supplier's stored reliability is refreshed (not on every read of the analysis).
+    db.flush()
+    from ai.supply_chain.intelligence import refresh_supplier_reliability
+    refresh_supplier_reliability(db, po.supplier_id)
+
     db.commit()
     db.refresh(po)
 

@@ -1,0 +1,83 @@
+{
+ "question": "Why was Tuesday last week bad?",
+ "form": "why",
+ "topic": "why",
+ "topic_label": "Why",
+ "state": "live",
+ "as_of": "2026-10-28T10:10:00+00:00",
+ "headline": "Sales on Tuesday 20 Oct were KES 3,830, 64.6% below a usual Tuesday (KES 10,809). What the records show: it was a public holiday (Mashujaa Day); Chips ran out early (about KES 15 of sales missed).",
+ "rows": [
+  {
+   "key": "sales",
+   "label": "Sales on Tuesday 20 Oct",
+   "value": 3830.0,
+   "unit": "kes"
+  },
+  {
+   "key": "usual",
+   "label": "A usual Tuesday",
+   "value": 10808.57142857143,
+   "unit": "kes",
+   "note": "the average of the last 7 Tuesdays"
+  },
+  {
+   "key": "gap_pct",
+   "label": "Below a usual day",
+   "value": 64.56515992598467,
+   "unit": "pct"
+  }
+ ],
+ "assumptions": [
+  {
+   "text": "A usual Tuesday is the average of the 7 before it that had sales."
+  },
+  {
+   "text": "An ingredient counts as having run out when the stock ledger shows less than one serving left, no plate of the dish sold after that, and the restaurant kept taking orders for at least 60 minutes more."
+  },
+  {
+   "text": "These are what the records show, not proof of a cause, and they do not add up to the gap."
+  }
+ ],
+ "next": [
+  "Compare this week with last week",
+  "What should I do to make more money?"
+ ],
+ "day": "2026-10-20",
+ "weekday": "Tuesday",
+ "drivers": [
+  {
+   "key": "holiday",
+   "label": "Public holiday: Mashujaa Day",
+   "found": true,
+   "value": null,
+   "unit": "text",
+   "note": "Holidays change who eats out, so this was not a usual Tuesday."
+  },
+  {
+   "key": "stock_out",
+   "label": "Chips ran out",
+   "found": true,
+   "value": 15.19,
+   "unit": "kes",
+   "note": "The potatoes ran short at 6:59 pm (less than one serving left); the last Chips sold at 6:58 pm and none after, while the restaurant went on taking orders until 9:01 pm. On a day this busy that would usually have been about KES 15 of Chips.",
+   "dish": "Chips",
+   "ingredient": "Potatoes"
+  },
+  {
+   "key": "staffing",
+   "label": "Fewer staff",
+   "found": false,
+   "value": null,
+   "unit": "hours",
+   "note": "35.73 staff hours worked, in line with a usual Tuesday."
+  },
+  {
+   "key": "cancelled_sales",
+   "label": "Cancelled sales",
+   "found": false,
+   "value": null,
+   "unit": "kes",
+   "note": "1 sales cancelled, in line with a usual Tuesday (about 0)."
+  }
+ ]
+}

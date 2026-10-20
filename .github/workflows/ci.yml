@@ -26,9 +26,17 @@ jobs:
         # ships in the runtime image). Coverage is MEASURED and printed, not yet
         # gated on a threshold — we establish the real number before setting a
         # --cov-fail-under floor, so the gate reflects reality instead of a guess.
+        #
+        # pytest-timeout (also CI-only): on 19 Oct two runs of PR #24 hung with
+        # no output until GitHub cancelled them at 6 h, the second inside
+        # test_s61_mpesa_statement.py's 5 MB upload case, which passes locally
+        # in CI's order, versions and coverage. A test now gets 5 minutes; past
+        # that, every thread's stack is printed and the test fails, so a hang
+        # names its line instead of costing six hours.
+        timeout-minutes: 60
         run: |
-          pip install pytest-cov
-          pytest -v --cov=. --cov-report=term-missing --cov-report=xml
+          pip install pytest-cov pytest-timeout
+          pytest -v --timeout=300 --timeout-method=thread --cov=. --cov-report=term-missing --cov-report=xml
 
   dependency-audit:
     runs-on: ubuntu-latest
@@ -65,6 +73,14 @@ jobs:
       #     JWTs with HS256 (symmetric HMAC); the ECDSA code path is never
       #     executed. Revisit if the token algorithm ever changes.
       #
+      #   PYSEC-2026-4298 / CVE-2026-85394 (python-jose <= 3.5.0, no fix version)
+      #     HMAC init accepts a DER public key, so a holder of the service's
+      #     PUBLIC key can forge HS256 tokens "when algorithms are not explicitly
+      #     restricted". Neither holds here: auth.py signs with a symmetric
+      #     SECRET_KEY (there is no public key) and decodes with
+      #     algorithms=[ALGORITHM] ("HS256"). Revisit with the one above; the real
+      #     fix is moving auth.py to PyJWT.
+      #
       # When any of these gains a fix that fits our constraints, bump the pin and
       # delete its --ignore-vuln line. Do not add new ids without a comment.
       - name: Audit dependencies
@@ -75,7 +91,8 @@ jobs:
             --ignore-vuln PYSEC-2026-249 \
             --ignore-vuln CVE-2026-48817 \
             --ignore-vuln CVE-2026-48818 \
-            --ignore-vuln PYSEC-2026-1325
+            --ignore-vuln PYSEC-2026-1325 \
+            --ignore-vuln PYSEC-2026-4298
 
   sast:
     # Static application security testing for the Python code (complements the
@@ -125,8 +142,17 @@ jobs:
       # advisories via next-auth remain, below the gate). A NEW high/critical
       # advisory now fails CI instead of printing a warning nobody reads —
       # mirroring how pip-audit was made blocking on 2026-07-08.
+      #
+      # 2026-10-20: what ships (dependencies) is gated at high; the dev toolchain
+      # at critical. `braces` (GHSA-vfj7-8cjw-p6xm, every version, no fix) reaches
+      # us only through eslint-config-next -> fast-glob -> micromatch, which runs
+      # on our own source at lint time and is never in the built app. npm audit
+      # has no per-advisory ignore, so the split is the narrowest honest gate.
+      # Put the single high gate back once braces publishes a fix.
       - name: Audit npm dependencies
-        run: npm audit --audit-level=high
+        run: |
+          npm audit --omit=dev --audit-level=high
+          npm audit --audit-level=critical
 
       # Type errors and build breaks currently only surface on a Vercel deploy —
       # too late, and Vercel does not catch the untyped `json()` contract drifts

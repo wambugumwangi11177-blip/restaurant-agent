@@ -22,13 +22,16 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 import models
 from ai.analysis_clock import analysis_anchor
+from owner.settings import Settings, resolve
+from time_utils import eat_date
 
-HEALTHY_LABOR_PCT_MAX = 30.0   # Labor cost % of revenue target
-OVERTIME_HOURS_DAILY  = 8.0    # Hours after which overtime applies
+# The wages target (default 30% of sales — a placeholder to confirm with the first owner) and the hour after
+# which overtime applies (default 8) are the owner's settings: labour_target_pct, overtime_after_hours.
 
 
-def get_labor_intelligence(db: Session, restaurant_id: int) -> dict:
-    """Complete labor analytics for the last 30 days."""
+def get_labor_intelligence(db: Session, restaurant_id: int, settings: Settings | None = None) -> dict:
+    """Complete labor analytics for the last 30 days. `settings` defaults to the restaurant's saved thresholds."""
+    settings = resolve(db, restaurant_id, settings)
     # Anchored to the restaurant's most recent order, not wall-clock time —
     # see ai/analysis_clock.py.
     now              = analysis_anchor(db, restaurant_id)
@@ -55,10 +58,12 @@ def get_labor_intelligence(db: Session, restaurant_id: int) -> dict:
     sales_per_hour    = revenue_30d / max(total_hours, 1)
 
     # ── Overtime analysis ─────────────────────────────────────────────────────
-    overtime_shifts   = [s for s in shifts if (s.actual_hours or 0) > OVERTIME_HOURS_DAILY]
-    overtime_hours    = sum(max(0, (s.actual_hours or 0) - OVERTIME_HOURS_DAILY) for s in overtime_shifts)
-    overtime_cost     = sum(s.labor_cost or 0 for s in overtime_shifts
-                            if (s.actual_hours or 0) > OVERTIME_HOURS_DAILY)
+    overtime_shifts   = [s for s in shifts if (s.actual_hours or 0) > settings.overtime_after_hours]
+    overtime_hours    = sum(max(0, (s.actual_hours or 0) - settings.overtime_after_hours) for s in overtime_shifts)
+    # D10: the overtime hours at the shift's own hourly rate (cost ÷ hours worked), not the whole shift's cost.
+    overtime_cost     = int(round(sum(
+        (max(0, (s.actual_hours or 0) - settings.overtime_after_hours)) * ((s.labor_cost or 0) / (s.actual_hours or 1))
+        for s in overtime_shifts)))
 
     # ── Daily labor vs revenue ─────────────────────────────────────────────────
     daily_data: dict[date, dict] = defaultdict(lambda: {"labor": 0, "hours": 0, "revenue": 0})
@@ -68,18 +73,18 @@ def get_labor_intelligence(db: Session, restaurant_id: int) -> dict:
         daily_data[d]["hours"]  += s.actual_hours or s.scheduled_hours or 0
 
     # Fill in revenue per day
-    daily_orders = db.query(
-        func.date(models.Order.created_at).label("day"),
-        func.sum(models.Order.total).label("rev"),
-    ).filter(
+    # D17: bucket into the owner's (Nairobi) days in Python. `func.date(created_at)` over the naive-UTC column
+    # returns the UTC date, which puts everything sold between 00:00 and 03:00 Nairobi time on the wrong day.
+    daily_rev: dict[date, int] = defaultdict(int)
+    for created_at, total in db.query(models.Order.created_at, models.Order.total).filter(
         models.Order.restaurant_id == restaurant_id,
         models.Order.status        != models.OrderStatus.CANCELLED,
         models.Order.created_at    >= thirty_days_ago,
-    ).group_by(func.date(models.Order.created_at)).all()
+    ).all():
+        daily_rev[eat_date(created_at)] += total or 0
 
-    for row in daily_orders:
-        d = row.day if isinstance(row.day, date) else datetime.strptime(str(row.day), "%Y-%m-%d").date()
-        daily_data[d]["revenue"] = row.rev or 0
+    for d, rev in daily_rev.items():
+        daily_data[d]["revenue"] = rev
 
     daily_breakdown = sorted([
         {
@@ -98,7 +103,7 @@ def get_labor_intelligence(db: Session, restaurant_id: int) -> dict:
 
     # ── Recommendations ────────────────────────────────────────────────────────
     recommendations = _generate_recommendations(
-        labor_pct, overtime_hours, staff_metrics, daily_breakdown
+        labor_pct, overtime_hours, staff_metrics, daily_breakdown, settings
     )
 
     return {
@@ -107,7 +112,7 @@ def get_labor_intelligence(db: Session, restaurant_id: int) -> dict:
             "total_hours_30d":       round(total_hours, 1),
             "total_revenue_30d":     revenue_30d,
             "labor_pct":             round(labor_pct, 1),
-            "labor_status":          "HEALTHY" if labor_pct <= HEALTHY_LABOR_PCT_MAX else "HIGH",
+            "labor_status":          "HEALTHY" if labor_pct <= settings.labour_target_pct else "HIGH",
             "sales_per_hour":        int(sales_per_hour),
             "overtime_hours_30d":    round(overtime_hours, 1),
             "overtime_cost_30d":     overtime_cost,
@@ -162,13 +167,14 @@ def _generate_recommendations(
     overtime_hours: float,
     staff_metrics: list,
     daily_breakdown: list,
+    settings: Settings,
 ) -> list[dict]:
     recs = []
-    if labor_pct > HEALTHY_LABOR_PCT_MAX:
-        excess_pct = round(labor_pct - HEALTHY_LABOR_PCT_MAX, 1)
+    if labor_pct > settings.labour_target_pct:
+        excess_pct = round(labor_pct - settings.labour_target_pct, 1)
         recs.append({
             "priority": "HIGH",
-            "message": f"Labor cost at {labor_pct:.1f}% — {excess_pct}% above {HEALTHY_LABOR_PCT_MAX}% target",
+            "message": f"Labor cost at {labor_pct:.1f}% — {excess_pct}% above {settings.labour_target_pct:g}% target",
             "action":  "Review scheduling: cut low-traffic shifts, reduce overtime",
         })
     if overtime_hours > 20:

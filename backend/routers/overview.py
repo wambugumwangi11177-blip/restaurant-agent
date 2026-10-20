@@ -165,6 +165,8 @@ _DOMAIN_LABEL = {
     "marketing": "Growth",
     "profit": "Profit",
     "revenue": "Sales",
+    "custody": "Stock",
+    "cash": "Cash",
 }
 
 
@@ -183,7 +185,7 @@ def _card_key(agent: str, action: str) -> str:
     return f"d-{digest}"
 
 
-def _decision_cards(db: Session, rid: int, source_status: dict | None = None) -> list:
+def _decision_cards(db: Session, rid: int, source_status: dict | None = None, limit: int = 8) -> list:
     """What needs attention, from the Decision Intelligence layer.
 
     This is the point of the Home page: the owner should not have to ask. Every
@@ -200,7 +202,7 @@ def _decision_cards(db: Session, rid: int, source_status: dict | None = None) ->
     if source_status is not None:
         source_status.update(data.get("source_status", {}))
     cards = []
-    for d in data.get("decisions", [])[:8]:
+    for d in data.get("decisions", [])[:limit]:
         action = (d.get("action") or "").strip()
         if not action:
             continue
@@ -213,10 +215,15 @@ def _decision_cards(db: Session, rid: int, source_status: dict | None = None) ->
             "why": (d.get("rationale") or "").strip(),
             "what_to_do": action,
             "impact": f"About KSh {impact_cents // 100:,} a month" if impact_cents else "",
+            # The same figure as a number (cents; None = not quantified) so the owner API can rank and show it in KES.
+            "impact_cents_month": impact_cents,
             "status": "open",
             # Surfaced so the UI can show WHY this is first, not just that it is.
             "priority_score": d.get("priority_score"),
             "confidence_pct": d.get("confidence_pct"),
+            # The owner setting the number rests on ({setting, value, label}), or None.
+            "assumption": (d.get("meta") or {}).get("assumption"),
+            "kind": (d.get("meta") or {}).get("kind"),
         })
     return cards
 
@@ -243,6 +250,7 @@ def _operational_cards(db: Session, rid: int) -> list:
             "what_to_do": f"Raise today's order to restock {item.item_name}.",
             "impact": "",
             "status": "open",
+            "now": True,
         })
     pending_po = db.query(func.count(models.PurchaseOrder.id)).join(models.Restaurant).filter(
         models.Restaurant.id == rid,
@@ -258,11 +266,13 @@ def _operational_cards(db: Session, rid: int) -> list:
             "what_to_do": "Review and approve the pending purchase orders.",
             "impact": "",
             "status": "open",
+            "now": True,
         })
     return cards
 
 
-def _attention_cards(db: Session, rid: int, tenant_id: int, include_decided: bool = False, source_status: dict | None = None) -> list:
+def _attention_cards(db: Session, rid: int, tenant_id: int, include_decided: bool = False, source_status: dict | None = None,
+                     decision_limit: int = 8) -> list:
     """The Home page's "what needs your attention", operational first.
 
     Order is deliberate: what is happening now (a stockout, an unapproved
@@ -283,7 +293,7 @@ def _attention_cards(db: Session, rid: int, tenant_id: int, include_decided: boo
         card["id"] = _card_key(card["domain"], card["title"] + "|" + card.pop("entity", ""))
     cards.extend(specialist_cards)
     try:
-        ai_cards = _decision_cards(db, rid, source_status) if source_status is not None else _decision_cards(db, rid)
+        ai_cards = _decision_cards(db, rid, source_status, decision_limit)
     except Exception:  # noqa: BLE001 — Home must render even if an agent fails
         logger.exception("[overview] decision layer failed for restaurant %s", rid)
         ai_cards = []
@@ -301,6 +311,11 @@ def _attention_cards(db: Session, rid: int, tenant_id: int, include_decided: boo
             models.InventoryItem.quantity <= models.InventoryItem.low_stock_threshold,
         ).all()
     }
+    # A margin review of a dish the pricing engine already has a price for is the same problem said twice.
+    priced = " | ".join(c["title"].lower() for c in ai_cards if c["domain"] == "Pricing")
+    cards = [c for c in cards
+             if not (c["domain"] == "Profit" and c["title"].startswith("Review margin on ")
+                     and c["title"][len("Review margin on "):].lower() in priced)]
     seen = {c["id"] for c in cards}
     seen_titles = {c["title"].lower() for c in cards}
     for c in ai_cards:

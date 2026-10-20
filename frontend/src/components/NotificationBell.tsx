@@ -158,7 +158,7 @@ export default function NotificationBell({ ownerHome }: { ownerHome?: string } =
                     onClick={() => setOpen((v) => !v)}
                     aria-label="Notifications"
                     aria-expanded={open}
-                    className="relative text-[#737373] hover:text-[#e5e5e5] transition-colors"
+                    className="relative -m-2.5 p-2.5 text-[#737373] hover:text-[#e5e5e5] transition-colors"
                 >
                     <Bell className="w-5 h-5" />
                 </button>
@@ -178,7 +178,7 @@ export default function NotificationBell({ ownerHome }: { ownerHome?: string } =
                 onClick={() => setOpen((v) => !v)}
                 aria-label="Notifications"
                 aria-expanded={open}
-                className="relative text-[#737373] hover:text-[#e5e5e5] transition-colors"
+                className="relative -m-2.5 p-2.5 text-[#737373] hover:text-[#e5e5e5] transition-colors"
             >
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (

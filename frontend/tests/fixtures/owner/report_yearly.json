@@ -1,0 +1,364 @@
+{
+ "period": "yearly",
+ "range": "16 Oct 2025 – 16 Oct 2026",
+ "state": "live",
+ "as_of": "2026-10-16T09:03:00+00:00",
+ "sections": [
+  {
+   "key": "sales",
+   "title": "Sales",
+   "state": "live",
+   "as_of": "2026-10-16T09:03:00+00:00",
+   "sales": 1715550.0,
+   "orders": 1579,
+   "average_order": 1086.48,
+   "headline": "You sold KES 1,715,550 from 1579 orders, an average of KES 1,086 an order.",
+   "rows": [
+    {
+     "key": "sales",
+     "label": "Sales",
+     "value": 1715550.0,
+     "unit": "kes"
+    },
+    {
+     "key": "orders",
+     "label": "Orders",
+     "value": 1579,
+     "unit": "count"
+    },
+    {
+     "key": "average_order",
+     "label": "Average order",
+     "value": 1086.48,
+     "unit": "kes"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "Sales are paid orders that were not cancelled, by the time they were taken. This is not a payment cash-flow report."
+    }
+   ],
+   "basis": "Paid orders that were not cancelled, by the time they were taken. Not a payment cash-flow report.",
+   "window": "The last 12 months"
+  },
+  {
+   "key": "trends",
+   "title": "Trends",
+   "state": "live",
+   "as_of": "2026-10-16T09:03:00+00:00",
+   "window": "The last 12 months",
+   "headline": "Over the last 12 months you sold KES 1,715,550; the best month was Sep 2026 (KES 449,360).",
+   "rows": [
+    {
+     "key": "total",
+     "label": "Sold in the last 12 months",
+     "value": 1715550.0,
+     "unit": "kes"
+    },
+    {
+     "key": "month",
+     "label": "Nov 2025",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "0 orders"
+    },
+    {
+     "key": "month",
+     "label": "Dec 2025",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "0 orders"
+    },
+    {
+     "key": "month",
+     "label": "Jan 2026",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "0 orders"
+    },
+    {
+     "key": "month",
+     "label": "Feb 2026",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "0 orders"
+    },
+    {
+     "key": "month",
+     "label": "Mar 2026",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "0 orders"
+    },
+    {
+     "key": "month",
+     "label": "Apr 2026",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "0 orders"
+    },
+    {
+     "key": "month",
+     "label": "May 2026",
+     "value": 0.0,
+     "unit": "kes",
+     "note": "0 orders"
+    },
+    {
+     "key": "month",
+     "label": "Jun 2026",
+     "value": 171660.0,
+     "unit": "kes",
+     "note": "160 orders"
+    },
+    {
+     "key": "month",
+     "label": "Jul 2026",
+     "value": 444210.0,
+     "unit": "kes",
+     "note": "411 orders"
+    },
+    {
+     "key": "month",
+     "label": "Aug 2026",
+     "value": 437190.0,
+     "unit": "kes",
+     "note": "410 orders"
+    },
+    {
+     "key": "month",
+     "label": "Sep 2026",
+     "value": 449360.0,
+     "unit": "kes",
+     "note": "403 orders"
+    },
+    {
+     "key": "month",
+     "label": "Oct 2026 so far",
+     "value": 213130.0,
+     "unit": "kes",
+     "note": "195 orders"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "Sales are paid orders that were not cancelled, by the day they were taken, in Nairobi time."
+    }
+   ],
+   "series": [
+    {
+     "month": "2025-11",
+     "label": "Nov 2025",
+     "sales": 0.0,
+     "orders": 0,
+     "partial": false
+    },
+    {
+     "month": "2025-12",
+     "label": "Dec 2025",
+     "sales": 0.0,
+     "orders": 0,
+     "partial": false
+    },
+    {
+     "month": "2026-01",
+     "label": "Jan 2026",
+     "sales": 0.0,
+     "orders": 0,
+     "partial": false
+    },
+    {
+     "month": "2026-02",
+     "label": "Feb 2026",
+     "sales": 0.0,
+     "orders": 0,
+     "partial": false
+    },
+    {
+     "month": "2026-03",
+     "label": "Mar 2026",
+     "sales": 0.0,
+     "orders": 0,
+     "partial": false
+    },
+    {
+     "month": "2026-04",
+     "label": "Apr 2026",
+     "sales": 0.0,
+     "orders": 0,
+     "partial": false
+    },
+    {
+     "month": "2026-05",
+     "label": "May 2026",
+     "sales": 0.0,
+     "orders": 0,
+     "partial": false
+    },
+    {
+     "month": "2026-06",
+     "label": "Jun 2026",
+     "sales": 171660.0,
+     "orders": 160,
+     "partial": false
+    },
+    {
+     "month": "2026-07",
+     "label": "Jul 2026",
+     "sales": 444210.0,
+     "orders": 411,
+     "partial": false
+    },
+    {
+     "month": "2026-08",
+     "label": "Aug 2026",
+     "sales": 437190.0,
+     "orders": 410,
+     "partial": false
+    },
+    {
+     "month": "2026-09",
+     "label": "Sep 2026",
+     "sales": 449360.0,
+     "orders": 403,
+     "partial": false
+    },
+    {
+     "month": "2026-10",
+     "label": "Oct 2026",
+     "sales": 213130.0,
+     "orders": 195,
+     "partial": true
+    }
+   ]
+  },
+  {
+   "key": "pnl",
+   "title": "Profit & Loss by month",
+   "state": "as_entered",
+   "as_of": "2026-10-16T09:03:00+00:00",
+   "window": "The last 12 months",
+   "headline": "Over these months you sold KES 1,715,550 and kept KES 515,854.",
+   "rows": [
+    {
+     "key": "total_sales",
+     "label": "Sold, in total",
+     "value": 1715550.0,
+     "unit": "kes"
+    },
+    {
+     "key": "total_kept",
+     "label": "Kept, in total",
+     "value": 515854.02,
+     "unit": "kes"
+    },
+    {
+     "key": "month",
+     "label": "Jun 2026",
+     "value": 61171.35,
+     "unit": "kes",
+     "note": "sold KES 171,660 · no costs entered"
+    },
+    {
+     "key": "month",
+     "label": "Jul 2026",
+     "value": 137726.08,
+     "unit": "kes",
+     "note": "sold KES 444,210"
+    },
+    {
+     "key": "month",
+     "label": "Aug 2026",
+     "value": 139031.1,
+     "unit": "kes",
+     "note": "sold KES 437,190"
+    },
+    {
+     "key": "month",
+     "label": "Sep 2026",
+     "value": 153538.13,
+     "unit": "kes",
+     "note": "sold KES 449,360"
+    },
+    {
+     "key": "month",
+     "label": "Oct 2026 so far",
+     "value": 24387.36,
+     "unit": "kes",
+     "note": "sold KES 213,130"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "What you kept is sales less ingredients, wages and the costs you entered; a month with no costs entered counts them as nothing."
+    },
+    {
+     "text": "1 month had no costs entered, so what you kept there is too high."
+    }
+   ]
+  },
+  {
+   "key": "seasons",
+   "title": "Busy and quiet months",
+   "state": "live",
+   "as_of": "2026-10-16T09:03:00+00:00",
+   "window": "The last 12 months",
+   "headline": "Sep 2026 was your busiest whole month (KES 449,360) and Jun 2026 your quietest (KES 171,660).",
+   "rows": [
+    {
+     "key": "busy",
+     "label": "Sep 2026",
+     "value": 449360.0,
+     "unit": "kes",
+     "note": "one of your busiest months"
+    },
+    {
+     "key": "busy",
+     "label": "Jul 2026",
+     "value": 444210.0,
+     "unit": "kes",
+     "note": "one of your busiest months"
+    },
+    {
+     "key": "busy",
+     "label": "Aug 2026",
+     "value": 437190.0,
+     "unit": "kes",
+     "note": "one of your busiest months"
+    },
+    {
+     "key": "quiet",
+     "label": "Jun 2026",
+     "value": 171660.0,
+     "unit": "kes",
+     "note": "one of your quietest months"
+    },
+    {
+     "key": "quiet",
+     "label": "Aug 2026",
+     "value": 437190.0,
+     "unit": "kes",
+     "note": "one of your quietest months"
+    },
+    {
+     "key": "quiet",
+     "label": "Jul 2026",
+     "value": 444210.0,
+     "unit": "kes",
+     "note": "one of your quietest months"
+    }
+   ],
+   "assumptions": [
+    {
+     "text": "Only whole months are ranked; this month is not over."
+    }
+   ]
+  }
+ ],
+ "read": {
+  "state": "unavailable",
+  "as_of": null,
+  "reason": "LEVIII's read is optional and is left out unless every number in it is backed.",
+  "text": null
+ }
+}

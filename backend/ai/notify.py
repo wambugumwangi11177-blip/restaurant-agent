@@ -74,6 +74,8 @@ def notify_user(
     event_type: str,
     url: str | None = None,
     severity: str | None = None,
+    push: bool = True,
+    push_held: str | None = None,
 ) -> models.Notification:
     """
     Write an in-app Notification row for user_id and best-effort push it to
@@ -85,16 +87,20 @@ def notify_user(
     into the manager-escalation engine (ai/escalation/engine.py) — leave it
     None (the default) for ordinary operational notifications that shouldn't
     page anyone if left unread.
+
+    push=False writes the in-app row and sends no Web Push; push_held says why ("quiet_hours" · "daily_cap" · "today",
+    decided by ai/alert_levels.py) so the evening digest can list what did not buzz the phone.
     """
     notif = models.Notification(
         user_id=user_id, title=title, body=body, event_type=event_type, url=url,
-        severity=severity,
+        severity=severity, push_held=push_held,
     )
     db.add(notif)
     db.commit()
     db.refresh(notif)
 
-    _dispatch_push(db, user_id, title, body, url)
+    if push:
+        _dispatch_push(db, user_id, title, body, url)
     return notif
 
 

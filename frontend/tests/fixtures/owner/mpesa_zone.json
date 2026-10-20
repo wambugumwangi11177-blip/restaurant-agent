@@ -1,0 +1,37 @@
+{
+ "state": "not_from_pos",
+ "as_of": "2026-10-18T18:37:52+00:00",
+ "source": "M-Pesa statement",
+ "headline": "3 M-Pesa sales (KES 2,130) have no payment on your statement.",
+ "checked": {
+  "sales": 48,
+  "payments": 43
+ },
+ "matched": {
+  "count": 43,
+  "sales": 45,
+  "kes": 46320.0,
+  "receipt": 0,
+  "exact": 41,
+  "grouped": 2,
+  "split": 0
+ },
+ "outside_statement": {
+  "sales": 434,
+  "kes": 454160.0
+ },
+ "assumption": {
+  "setting": "mpesa_match_minutes",
+  "value": 10,
+  "label": "Minutes between a sale and its payment"
+ },
+ "sales_without_payment": {
+  "count": 3,
+  "kes": 2130.0
+ },
+ "payments_without_sale": {
+  "count": 0,
+  "kes": 0.0
+ },
+ "different_amounts": 0
+}

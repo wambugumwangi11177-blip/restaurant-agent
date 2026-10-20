@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { LEGACY_AREA } from "./src/lib/owner/blocks";
 
 // Security headers mirrored from vercel.json so they apply on EVERY host
 // (next start, Docker, any non-Vercel deploy) — previously they existed only
@@ -27,8 +28,24 @@ const SECURITY_HEADERS = [
   },
 ];
 
+// The two old owner shells (/vibanda for the Macsoft-fed restaurant, /demo for the demonstration one) are now one shell at /home,
+// /os and /reports. Every old address still works: a deep link or a bookmark lands where its content lives now.
+const LEGACY_SHELLS = ["vibanda", "demo"];
+const legacyRedirects = LEGACY_SHELLS.flatMap((shell) => [
+  { source: `/${shell}`, destination: "/home", permanent: false },
+  { source: `/${shell}/os`, destination: "/os", permanent: false },
+  { source: `/${shell}/reports`, destination: "/reports", permanent: false },
+  ...Object.entries(LEGACY_AREA).map(([slug, area]) => ({ source: `/${shell}/${slug}`, destination: `/home#area-${area}`, permanent: false })),
+  { source: `/${shell}/:other*`, destination: "/home", permanent: false },
+]);
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // `next dev` writes AGENTS.md / CLAUDE.md into the project by default; this repository keeps its agent instructions at the root.
+  agentRules: false,
+  async redirects() {
+    return legacyRedirects;
+  },
   async headers() {
     return [
       {

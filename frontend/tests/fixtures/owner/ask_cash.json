@@ -1,0 +1,57 @@
+{
+ "question": "How is my cash count looking?",
+ "form": "what",
+ "topic": "cash",
+ "topic_label": "Cash count check",
+ "state": "as_entered",
+ "as_of": "2026-10-15T20:15:00+00:00",
+ "headline": "2 of the last 27 cash counts are worth a look. Tuesday evening was short 4 of the last 4 times, about KES 491 each time.",
+ "rows": [
+  {
+   "key": "counts",
+   "label": "Counts checked",
+   "value": 27,
+   "unit": "count"
+  },
+  {
+   "key": "to_look_at",
+   "label": "Counts to look at",
+   "value": 2,
+   "unit": "count"
+  },
+  {
+   "key": "shift",
+   "label": "2026-10-13",
+   "value": -475.23,
+   "unit": "kes",
+   "note": "counted KES 5,135, expected KES 5,610"
+  },
+  {
+   "key": "shift",
+   "label": "2026-10-06",
+   "value": -519.04,
+   "unit": "kes",
+   "note": "counted KES 2,651, expected KES 3,170"
+  },
+  {
+   "key": "pattern",
+   "label": "Tuesday evening",
+   "value": 1964.57,
+   "unit": "kes",
+   "note": "short 4 of the last 4 times, about KES 491 each time"
+  }
+ ],
+ "assumptions": [
+  {
+   "text": "Cash count difference we accept: KES 200",
+   "setting": "cash_tolerance_kes",
+   "value": 200
+  },
+  {
+   "text": "A pattern is a reason to look at that shift, not a conclusion about anyone."
+  }
+ ],
+ "next": [
+  "Anything to check at the till?"
+ ]
+}

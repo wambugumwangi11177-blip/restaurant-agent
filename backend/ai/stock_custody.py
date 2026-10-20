@@ -24,13 +24,19 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 import models
+from owner.settings import Settings, resolve
 from time_utils import utcnow
 
-# 3%, the conservative end of the 2-3% industry-standard range for
-# theoretical-vs-actual usage variance (cited in the stock-loss-prevention
-# skill / directive 016) — below this, it's noise (spoilage, portion
-# variance), not a signal worth a manager's attention.
-VARIANCE_THRESHOLD = 0.03
+# The flag line is the owner's setting `missing_stock_flag_pct` (owner/settings.py). Its 3% default is the
+# conservative end of the 2-3% industry-standard range for theoretical-vs-actual usage variance (cited in the
+# stock-loss-prevention skill / directive 016) — below this it is noise (spoilage, portion variance), not a
+# signal worth a manager's attention.
+#
+# The percentage alone is not enough on a small item: two portions of tilapia a week is 0.6 kg, and a weekly 0.03 kg
+# waste write-off is 4% of it, over the line, worth KES 15, and less than any dish takes. A gap smaller than the
+# smallest portion any recipe takes of that item is rounding, not missing stock, so it is never flagged (found on the
+# real clock by the S5.2 gate; the percentage stays the owner's setting and still decides for everything bigger).
+_SERVING_SLACK = 1e-9
 
 
 @dataclass
@@ -88,8 +94,22 @@ def _actual_usage_by_item(db: Session, restaurant_id: int, since) -> dict[int, f
     return {item_id: float(total or 0) for item_id, total in rows}
 
 
+def _smallest_serving_by_item(db: Session, restaurant_id: int, item_ids) -> dict[int, float]:
+    """The smallest quantity_per_serving any recipe takes of each inventory item (items with no recipe are absent)."""
+    rows = (
+        db.query(models.MenuIngredient.inventory_item_id, func.min(models.MenuIngredient.quantity_per_serving))
+        .join(models.InventoryItem, models.InventoryItem.id == models.MenuIngredient.inventory_item_id)
+        .filter(models.InventoryItem.restaurant_id == restaurant_id,
+                models.MenuIngredient.inventory_item_id.in_(list(item_ids)),
+                models.MenuIngredient.quantity_per_serving > 0)
+        .group_by(models.MenuIngredient.inventory_item_id)
+        .all()
+    )
+    return {item_id: float(smallest) for item_id, smallest in rows}
+
+
 def compute_variance_report(
-    db: Session, restaurant_id: int, hours: int = 24
+    db: Session, restaurant_id: int, hours: int = 24, settings: Settings | None = None
 ) -> list[ItemVariance]:
     """
     Theoretical vs. actual usage per inventory item over the trailing `hours`
@@ -99,6 +119,8 @@ def compute_variance_report(
     an item nobody's recipe uses but that still moved stock isn't a variance
     question, it's a data-quality one (untracked recipe, or wrong item).
     """
+    settings = resolve(db, restaurant_id, settings)
+    threshold = settings.missing_stock_flag_pct / 100.0
     since = utcnow() - timedelta(hours=hours)
 
     theoretical = _theoretical_usage_by_item(db, restaurant_id, since)
@@ -116,6 +138,8 @@ def compute_variance_report(
         ).all()
     }
 
+    smallest_serving = _smallest_serving_by_item(db, restaurant_id, item_ids)
+
     results: list[ItemVariance] = []
     for item_id in item_ids:
         item = items_by_id.get(item_id)
@@ -132,7 +156,9 @@ def compute_variance_report(
             flagged = False
         else:
             variance_pct = abs(act - theo) / theo
-            flagged = variance_pct > VARIANCE_THRESHOLD
+            # Less than one serving off is rounding (see the note at the top): never worth a look, whatever the percentage.
+            serving = smallest_serving.get(item_id)
+            flagged = variance_pct > threshold and (serving is None or abs(act - theo) >= serving - _SERVING_SLACK)
 
         results.append(ItemVariance(
             inventory_item_id=item_id,
@@ -147,8 +173,9 @@ def compute_variance_report(
     return results
 
 
-def flagged_items(db: Session, restaurant_id: int, hours: int = 24) -> list[ItemVariance]:
-    return [r for r in compute_variance_report(db, restaurant_id, hours) if r.flagged]
+def flagged_items(db: Session, restaurant_id: int, hours: int = 24,
+                  settings: Settings | None = None) -> list[ItemVariance]:
+    return [r for r in compute_variance_report(db, restaurant_id, hours, settings) if r.flagged]
 
 
 class TransferConfirmError(Exception):
@@ -431,9 +458,9 @@ def submit_count(
 
     # Only a real gap is worth a message — not every count (most will match
     # closely), matching the "alert on the exception" philosophy used
-    # throughout this workstream. Threshold reuses VARIANCE_THRESHOLD rather
+    # throughout this workstream. Threshold reuses the owner's missing-stock setting rather
     # than inventing a second number to keep in sync.
-    if expected > 0 and abs(delta) / expected > VARIANCE_THRESHOLD:
+    if expected > 0 and abs(delta) / expected > resolve(db, restaurant_id).missing_stock_flag_pct / 100.0:
         from events.bus import emit_async, EventType
         emit_async(EventType.STOCK_COUNT_DISCREPANCY, {
             "restaurant_id": restaurant_id,

@@ -927,6 +927,9 @@ class Notification(Base):
     severity          = Column(String, nullable=True)   # "critical" | "high" | "medium" | None
     acknowledged_at   = Column(DateTime, nullable=True)
     escalation_level  = Column(Integer, default=0, nullable=False)
+    # Alert levels (ai/alert_levels.py, S5.3): why no push went out for this row — "quiet_hours" · "daily_cap" · "today".
+    # NULL = it was pushed, or the person is not under the owner policy. The row is written either way (the feed never depends on push).
+    push_held         = Column(String, nullable=True)
 
     __table_args__ = (
         Index("ix_notifications_user_unread", "user_id", "is_read"),
@@ -1485,6 +1488,199 @@ class CreativeTake(Base):
     )
 
 
+class RestaurantSettings(Base):
+    """The owner's own thresholds, one row per restaurant (docs/v2/SPEC.md §3.2, migration 051).
+
+    Every business rule the engines used to hard-code (food-cost ceiling, margin floor, cash
+    tolerance, delivery commissions, ...) lives here so it is one number, chosen by the owner,
+    shown on screen as "Based on: your floor 40%" and changeable. Typed columns, not JSON, so a
+    bad value cannot be stored and engines read plain attributes.
+
+    The DEFAULTS and the allowed ranges live in exactly one place — owner/settings.py — and the
+    service is the only write path: it always writes a complete row (so there is no NULL-means-
+    default ambiguity) and records every change in restaurant_settings_audit. No row = the owner
+    has not chosen yet; get_settings() then returns the defaults and never writes.
+
+    Money is integer cents (cash_tolerance_cents, price_step_cents) like every other money column;
+    the API converts to KES at its edge. Percentages are stored as plain percent numbers (35.0).
+    """
+    __tablename__ = "restaurant_settings"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False, unique=True)
+
+    food_cost_target_pct     = Column(Float, nullable=False)
+    prime_cost_target_pct    = Column(Float, nullable=False)
+    margin_floor_pct         = Column(Float, nullable=False)
+    margin_target_pct        = Column(Float, nullable=False)
+    popular_cutoff           = Column(Float, nullable=False)    # × the average dish's units sold
+    missing_stock_flag_pct   = Column(Float, nullable=False)
+    cash_tolerance_cents     = Column(Integer, nullable=False)
+    cash_tolerance_pct       = Column(Float, nullable=False)
+    commission_uber_eats_pct = Column(Float, nullable=False)
+    commission_glovo_pct     = Column(Float, nullable=False)
+    commission_bolt_food_pct = Column(Float, nullable=False)
+    offer_size_pct           = Column(Float, nullable=False)
+    offer_lift_pct           = Column(Float, nullable=False)
+    max_raise_pct            = Column(Float, nullable=False)
+    price_step_cents         = Column(Integer, nullable=False)
+    price_sensitivity        = Column(Float, nullable=False)
+    labour_target_pct        = Column(Float, nullable=False)
+    overtime_after_hours     = Column(Float, nullable=False)
+    urgent_alerts_per_day    = Column(Integer, nullable=False)
+    quiet_hours_start        = Column(Integer, nullable=False)  # hour of day, Nairobi time (0-23)
+    quiet_hours_end          = Column(Integer, nullable=False)
+    licence_warning_days     = Column(Integer, nullable=False)
+    # added by migration 053 (S3.3): server defaults so rows written before it read as the defaults
+    expense_spike_pct        = Column(Float, nullable=False, default=25.0, server_default="25")
+    bill_reserve_cents       = Column(Integer, nullable=False, default=0, server_default="0")
+    # added by migration 056 (S6.2)
+    mpesa_match_minutes      = Column(Integer, nullable=False, default=10, server_default="10")
+
+    # SET NULL: a deleted user must not take the settings row (or its history) with them.
+    updated_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at         = Column(DateTime, default=utcnow, nullable=False)
+    updated_at         = Column(DateTime, default=utcnow, nullable=False)
+
+
+class RestaurantSettingsAudit(Base):
+    """One row per setting changed by one save: who changed what, from what, to what, when.
+
+    Append-only from the application's point of view (owner/settings.py::update_settings).
+    old_value / new_value are the stored values as text (e.g. "35.0", "20000"); old_value is the
+    previous effective value, so the first change to a setting shows the default it replaced.
+    """
+    __tablename__ = "restaurant_settings_audit"
+
+    id                 = Column(Integer, primary_key=True, index=True)
+    restaurant_id      = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    field              = Column(String(48), nullable=False)   # the column name, e.g. margin_floor_pct
+    old_value          = Column(String(32), nullable=True)
+    new_value          = Column(String(32), nullable=False)
+    changed_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    changed_at         = Column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        Index("ix_restaurant_settings_audit_lookup", "restaurant_id", "changed_at"),
+    )
+
+
+class ExpenseCategory(Base):
+    """A line of the owner's costs ("Rent & premises", "Electricity (KPLC)", "Cooking gas" …), per restaurant.
+
+    The standard Kenyan P&L lines are created on first use (owner/money/categories.py); the owner can add their own and
+    switch any off. `pnl_line` is the section it is reported under, `is_fixed` says whether it counts towards the
+    costs that do not move with sales (what break-even is built from). Docs/v2/SPEC.md §4 S3.1, migration 052.
+    """
+    __tablename__ = "expense_categories"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    key           = Column(String(40), nullable=False)
+    name          = Column(String(80), nullable=False)
+    pnl_line      = Column(String(16), nullable=False)
+    is_fixed      = Column(Boolean, default=False, nullable=False)
+    is_standard   = Column(Boolean, default=False, nullable=False)
+    is_active     = Column(Boolean, default=True, nullable=False)
+    sort_order    = Column(Integer, default=0, nullable=False)
+    created_at    = Column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("restaurant_id", "key", name="uq_expense_categories_restaurant_key"),
+    )
+
+
+class Expense(Base):
+    """One thing the restaurant paid for. Money is integer cents; the day is a NAIROBI calendar date (`paid_on`).
+
+    Never deleted: a mistaken entry is voided (who, when, why) and drops out of every list and total, so the ledger can
+    always be audited. `bill_id` links the entry to the recurring bill it settled.
+    """
+    __tablename__ = "expenses"
+
+    id                 = Column(Integer, primary_key=True, index=True)
+    restaurant_id      = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    category_id        = Column(Integer, ForeignKey("expense_categories.id", ondelete="RESTRICT"), nullable=False)
+    amount_cents       = Column(Integer, nullable=False)
+    paid_on            = Column(Date, nullable=False)
+    method             = Column(String(8), default="cash", nullable=False)       # cash | mpesa | bank | card | other
+    supplier           = Column(String(120), default="", nullable=False)
+    note               = Column(String(500), default="", nullable=False)
+    receipt_ref        = Column(String(255), nullable=True)                      # an opaque storage key for the receipt photo
+    bill_id            = Column(Integer, ForeignKey("recurring_bills.id", ondelete="SET NULL"), nullable=True)
+    paid_by_user_id    = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at         = Column(DateTime, default=utcnow, nullable=False)
+    updated_at         = Column(DateTime, default=utcnow, nullable=False)
+    updated_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    voided_at          = Column(DateTime, nullable=True)
+    voided_by_user_id  = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    void_reason        = Column(String(200), nullable=True)
+
+    category = relationship("ExpenseCategory")
+    paid_by  = relationship("User", foreign_keys=[paid_by_user_id])
+    voided_by = relationship("User", foreign_keys=[voided_by_user_id])
+
+    __table_args__ = (
+        CheckConstraint("amount_cents > 0", name="ck_expenses_amount_pos"),
+        Index("ix_expenses_restaurant_paid_on", "restaurant_id", "paid_on"),
+        Index("ix_expenses_restaurant_category", "restaurant_id", "category_id"),
+    )
+
+
+class RecurringBill(Base):
+    """Something that falls due on a rule, not a date: rent on the 4th, KPLC on the 20th, a licence every June.
+
+    `frequency` "monthly": `due_day` is the day of the month (1-31, clamped to the month's length);
+    "weekly": `due_day` is the weekday (Monday = 0); "yearly": `due_month` + `due_day`.
+    """
+    __tablename__ = "recurring_bills"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    category_id   = Column(Integer, ForeignKey("expense_categories.id", ondelete="RESTRICT"), nullable=False)
+    name          = Column(String(120), nullable=False)
+    amount_cents  = Column(Integer, nullable=False)
+    frequency     = Column(String(8), nullable=False)
+    due_day       = Column(Integer, nullable=False)
+    due_month     = Column(Integer, nullable=True)
+    start_on      = Column(Date, nullable=False)
+    end_on        = Column(Date, nullable=True)
+    supplier      = Column(String(120), default="", nullable=False)
+    note          = Column(String(500), default="", nullable=False)
+    is_active     = Column(Boolean, default=True, nullable=False)
+    created_at    = Column(DateTime, default=utcnow, nullable=False)
+    updated_at    = Column(DateTime, default=utcnow, nullable=False)
+
+    category = relationship("ExpenseCategory")
+
+    __table_args__ = (
+        CheckConstraint("amount_cents > 0", name="ck_recurring_bills_amount_pos"),
+        Index("ix_recurring_bills_restaurant", "restaurant_id", "is_active"),
+    )
+
+
+class Licence(Base):
+    """A permit or certificate with an expiry date (single business permit, health, fire, liquor, music)."""
+    __tablename__ = "licences"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    name          = Column(String(120), nullable=False)
+    issuer        = Column(String(120), default="", nullable=False)
+    expires_on    = Column(Date, nullable=False)
+    cost_cents    = Column(Integer, nullable=True)
+    document_ref  = Column(String(255), nullable=True)
+    note          = Column(String(500), default="", nullable=False)
+    is_active     = Column(Boolean, default=True, nullable=False)
+    created_at    = Column(DateTime, default=utcnow, nullable=False)
+    updated_at    = Column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("cost_cents IS NULL OR cost_cents >= 0", name="ck_licences_cost_nonneg"),
+        Index("ix_licences_restaurant_expiry", "restaurant_id", "expires_on"),
+    )
+
+
 class CustomerFeedback(Base):
     """
     Lightweight customer rating captured over the messaging channel — a customer
@@ -1606,3 +1802,52 @@ class Region(Base):
     created_at      = Column(DateTime, default=utcnow)
 
     organization = relationship("Organization")
+
+
+class MpesaStatementUpload(Base):
+    """One M-Pesa statement file an owner uploaded (docs/v2/SPEC.md S6.1). The lines it brought are `lines`; deleting an upload undoes it.
+
+    The statement's times are Nairobi time in the file and naive UTC here, like every timestamp; money is integer cents.
+    """
+    __tablename__ = "mpesa_statement_uploads"
+
+    id                  = Column(Integer, primary_key=True, index=True)
+    restaurant_id       = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    filename            = Column(String(255), default="", nullable=False)
+    parser              = Column(String(32), nullable=False)
+    uploaded_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    uploaded_at         = Column(DateTime, default=utcnow, nullable=False)
+    line_count          = Column(Integer, default=0, nullable=False)
+    period_start        = Column(DateTime, nullable=True)
+    period_end          = Column(DateTime, nullable=True)
+
+    uploaded_by = relationship("User", foreign_keys=[uploaded_by_user_id])
+    lines       = relationship("MpesaStatementLine", cascade="all, delete-orphan", passive_deletes=True)
+
+    __table_args__ = (
+        Index("ix_mpesa_uploads_restaurant_uploaded", "restaurant_id", "uploaded_at"),
+    )
+
+
+class MpesaStatementLine(Base):
+    """One transaction on an M-Pesa statement. `receipt` is M-Pesa's own number, so uploading the same payment twice (overlapping
+    periods, or the same file again) adds nothing: it is unique per restaurant."""
+    __tablename__ = "mpesa_statement_lines"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    restaurant_id   = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    upload_id       = Column(Integer, ForeignKey("mpesa_statement_uploads.id", ondelete="CASCADE"), nullable=False)
+    receipt         = Column(String(20), nullable=False)
+    completed_at    = Column(DateTime, nullable=False)
+    paid_in_cents   = Column(Integer, default=0, nullable=False)
+    withdrawn_cents = Column(Integer, default=0, nullable=False)
+    details         = Column(String(500), default="", nullable=False)
+    status          = Column(String(20), default="Completed", nullable=False)
+    balance_cents   = Column(Integer, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("restaurant_id", "receipt", name="uq_mpesa_lines_restaurant_receipt"),
+        CheckConstraint("paid_in_cents >= 0 AND withdrawn_cents >= 0", name="ck_mpesa_lines_amounts"),
+        Index("ix_mpesa_lines_restaurant_completed", "restaurant_id", "completed_at"),
+        Index("ix_mpesa_lines_upload", "upload_id"),
+    )

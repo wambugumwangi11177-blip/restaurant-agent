@@ -9,6 +9,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { FileText, Home, MessageCircle, Settings2 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
+import BranchPicker from "@/components/owner/BranchPicker";
 import SettingsProvider from "@/components/owner/settings/SettingsProvider";
 import { useAuth } from "@/context/AuthContext";
 import { nairobiDate } from "@/lib/owner/format";
@@ -45,6 +46,7 @@ export default function OwnerShell({ children }: { children: React.ReactNode }) 
         {config.banner && (
           <p className="mb-2 inline-flex max-w-full rounded-full border border-[hsl(43_76%_57_/.45)] bg-[hsl(43_76%_57_/.12)] px-3 py-1 text-[11px] text-[var(--v-muted-foreground)]">{config.banner}</p>
         )}
+        <div><BranchPicker /></div>
         <nav aria-label="Owner pages" className="mt-3 hidden gap-1 md:flex print:hidden">
           {tabs.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} aria-current={isActive(href) ? "page" : undefined}

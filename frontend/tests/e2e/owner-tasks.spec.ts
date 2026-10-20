@@ -210,6 +210,26 @@ test.describe("the owner of a restaurant with a history", () => {
     expect(small).toEqual([]);
   });
 
+  test("both branches: the owner picks Kasarani and Home is Kasarani's, then goes back to Westlands", async ({ page }) => {
+    const picker = page.getByRole("combobox", { name: /Branch/ });
+    await expect(picker.locator("option")).toHaveText(["Demo Restaurant · Westlands", "Demo Restaurant – Kasarani"]);
+    const westlandsLeak = ((await page.locator("[data-answer=leak]").textContent()) ?? "").trim();
+    expect(westlandsLeak).toMatch(/KES [\d,]+ a month/);
+    const choose = async (label: string) => {
+      await Promise.all([page.waitForEvent("load"), picker.selectOption({ label })]);
+      await page.waitForSelector("[data-testid=sales-today]");
+      await expect(page.getByRole("combobox", { name: /Branch/ }).locator("option:checked")).toHaveText(label);
+    };
+    try {
+      await choose("Demo Restaurant – Kasarani");
+      // Kasarani pays more for ingredients (P14), so its biggest leak is not Westlands' one.
+      await expect(page.locator("[data-answer=leak]")).not.toHaveText(westlandsLeak);
+    } finally {
+      await choose("Demo Restaurant · Westlands");      // the other tests sign in as this owner and expect Westlands
+    }
+    await expect(page.locator("[data-answer=leak]")).toHaveText(westlandsLeak);
+  });
+
   test("old addresses still land on the new Home", async ({ page }) => {
     await page.goto("/vibanda/stock");
     await expect(page).toHaveURL(/\/home#area-store$/);

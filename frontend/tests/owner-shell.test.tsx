@@ -7,6 +7,7 @@ const auth = vi.hoisted(() => ({ value: { user: null as null | Record<string, un
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: nav.replace, push: vi.fn() }), usePathname: () => nav.pathname }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => auth.value }));
 vi.mock("@/components/NotificationBell", () => ({ default: () => <span data-testid="bell" /> }));
+vi.mock("@/components/owner/BranchPicker", () => ({ default: () => null }));
 
 const owner = (tenant_name: string) => ({ id: 1, email: "o@x.test", role: "admin", staff_role: "owner", tenant_name, restaurant_name: tenant_name });
 

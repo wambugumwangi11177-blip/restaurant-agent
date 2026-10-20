@@ -135,7 +135,9 @@ def test_p04_the_afternoon_is_the_weakest_hours(demo):
     weakest = min(hours, key=lambda h: h["keeps_pct"])
     best = max(hours, key=lambda h: h["keeps_pct"])
     assert weakest["hours"] == "afternoon"
-    assert best["keeps_pct"] - weakest["keeps_pct"] >= 8
+    # The demo is built relative to today, so the gap moves with the date: 5.0 to 8.0 points over 34 consecutive days (20 Oct 2026).
+    # 8 was the value seen on the day this was written, and failed most days after it; 4 asks for a clear gap, not that day's gap.
+    assert best["keeps_pct"] - weakest["keeps_pct"] >= 4
     assert by["afternoon"]["orders"] >= 40
 
 

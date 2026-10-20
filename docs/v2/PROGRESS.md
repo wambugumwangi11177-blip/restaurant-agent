@@ -21,6 +21,17 @@ Newest sprint first. Spec: [`SPEC.md`](SPEC.md). Gate: `make -C docs/v2 gate`.
 
 ## Sprint log (newest first)
 
+### CI to green, and the Railway account (20 Oct 2026) — done
+
+CI on PR #24 (`b1bb37a`) had three red jobs and nothing was merged. What each was, and what changed:
+1. **`pytest` hung for six hours, twice**, the second time inside `test_s61_mpesa_statement.py`'s 5 MB upload case. Replayed locally with CI's pinned versions (starlette 1.3.1, python-multipart 0.0.31, Python 3.12), CI's file order and `--cov`: no hang, 1835 passed up to and including that test, the rest 319 passed. The root cause is therefore not found. CI now runs `pytest-timeout` (5 min per test, thread stacks printed on expiry) and the job has a 60-minute ceiling, so if it happens again the log names the line.
+2. **The replay found a real failure the CI hang had hidden: E4 P04, the seventh date dependency of this build.** `best − weakest ≥ 8` points was the value seen on the day it was written; over 34 consecutive dates the gap is 5.0–8.0 (the afternoon is the weakest on every one, with 48+ orders). The floor is now 4, with the measured range in the test.
+3. **npm audit**: `next` 16.3.3 → **16.4.2** (the critical one) and `npm audit fix` (axios, sharp, source-map-js). What ships now has **0** advisories. Left: `braces` (no fixed version exists) via `eslint-config-next`'s lint-time toolchain only; the CI gate is now high for shipped dependencies and critical for the dev toolchain, with the reason in `ci.yml`.
+4. **pip-audit**: `python-jose` PYSEC-2026-4298 is ignored by id with its reason (needs a public key and unrestricted algorithms; `auth.py` uses a symmetric key and `algorithms=["HS256"]`). The real fix, moving to PyJWT, is noted there.
+5. **Railway**: everything the old account held is in [`RAILWAY.md`](RAILWAY.md). The database stopped together with the API on 17 Oct (likely the plan ending), which corrects `ROLLOUT.md`. A first boot on an **empty** database (what a new account gets) was rehearsed: all migrations to 056, second boot a no-op, health 200, the demo owner created and able to log in.
+
+**Checks (20 Oct, this tree).** Backend **2155 passed, 1 skipped** (1835 in CI's order with coverage + 319; includes evals **98 passed**) · `tsc` clean · vitest **215** · lint ratchet **14E/4W = baseline** · `next build` ok · E6 **33 passed, 3 skipped** · `npm audit --omit=dev --audit-level=high` 0 · `pip-audit` with the documented ignores 0.
+
 ### Production rollout rehearsal (19 Oct 2026) — done; the deploy itself is logged in `ROLLOUT.md`
 
 The owner asked for the production steps (production holds demo data only). Before merging, the exact container boot (`init_db()` then `alembic upgrade head`) was rehearsed on a scratch Postgres 16 that had been brought to production's state with the 30 Sept code. Everything is in [`ROLLOUT.md`](ROLLOUT.md); what it changed in my earlier reports:

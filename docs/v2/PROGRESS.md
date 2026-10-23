@@ -11,6 +11,8 @@ Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-sec
 
 Railway: set `OPENROUTER_API_KEY`. The model, fallback, spend cap, creative flag and WhatsApp flag can stay at the defaults above. Do not set Twilio. Staff passwords are unchanged from the previous entry.
 
+Validation (23 Oct, this tree): backend `LOG_FORMAT=plain pytest` **2223 passed, 1 skipped**. Frontend: `tsc --noEmit` clean, vitest **237 passed**, `next build` succeeded. No new migration. No production database was touched.
+
 # Eleven demo fixes — 23 October 2026
 
 Branch `dev/eleven-demo-fixes`, based on `codex/eleven-demo-readiness`. No production writes, no deploy, no provider changes.

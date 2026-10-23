@@ -121,6 +121,7 @@ Set these on the backend service. Leave Twilio unset: WhatsApp is shelved (`FEAT
 | `OPENROUTER_MODEL_LOW` | No | Same default. |
 | `OPENROUTER_MODEL_CREATIVE` | No | Same default. Used for Home's read and the report note. |
 | `OPENROUTER_FALLBACK_MODEL` | No | Defaults to `qwen/qwen3.7-flash` when the first model returns nothing usable. |
+| `OPENROUTER_REASONING` | No | Defaults to `off`. deepseek-v4-flash reasons unless this is sent, and a short budget then comes back with no answer. Set `on` only for a call that should reason. |
 | `DAILY_LLM_SPEND_CAP_USD` | No | Defaults to `1`. Raise it when the owner budget allows. |
 | `FEATURE_AI_NARRATION` | No | Defaults to true. Set `false` to stop every LLM call. |
 | `FEATURE_CREATIVE_LAYER` | No | Defaults to true. The note is written only when a provider key is set. Set `false` to keep numbers without the written note. |
@@ -128,7 +129,7 @@ Set these on the backend service. Leave Twilio unset: WhatsApp is shelved (`FEAT
 | `DEMO_RESTAURANT_OWNER_PASSWORD` | Yes, for the owner login | Plus the four staff passwords in the table above. |
 | `MENU_QUOTE_SECRET` | No | Optional separate key for scheduled-price quotes. |
 
-OpenRouter requests send `provider.data_collection = deny`. Do not switch the model variables back to a `:free` model; some of those providers train on prompts.
+OpenRouter requests send `provider.data_collection = deny` and, unless `OPENROUTER_REASONING=on`, `reasoning.enabled = false`. A reply with `content` null and `finish_reason=length` is logged and retried once; it is not shown as an empty answer. Do not switch the model variables back to a `:free` model; some of those providers train on prompts.
 
 ## Notes
 

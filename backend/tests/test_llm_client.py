@@ -26,7 +26,7 @@ def _restore_llm_client_after_env_reload():
     yield
     for name in ("ANTHROPIC_API_KEY", "GROQ_API_KEY", "OPENROUTER_API_KEY",
                  "OPENROUTER_MODEL", "OPENROUTER_MODEL_LOW", "OPENROUTER_MODEL_HIGH",
-                 "OPENROUTER_MODEL_CREATIVE", "OPENROUTER_FALLBACK_MODEL"):
+                 "OPENROUTER_MODEL_CREATIVE", "OPENROUTER_FALLBACK_MODEL", "OPENROUTER_REASONING"):
         os.environ.pop(name, None)
     _reload_llm_client()
 
@@ -92,9 +92,9 @@ def test_anthropic_preferred_when_both_keys_present(monkeypatch):
     assert llm_client._PROVIDER == "anthropic"
 
 
-def _fake_openai_response(content=None, tool_calls=None, model="llama-3.3-70b-versatile"):
+def _fake_openai_response(content=None, tool_calls=None, model="llama-3.3-70b-versatile", finish_reason="stop"):
     message = SimpleNamespace(content=content, tool_calls=tool_calls)
-    choice = SimpleNamespace(message=message)
+    choice = SimpleNamespace(message=message, finish_reason=finish_reason)
     usage = SimpleNamespace(prompt_tokens=100, completion_tokens=20)
     return SimpleNamespace(choices=[choice], model=model, usage=usage)
 
@@ -228,8 +228,10 @@ def test_openrouter_defaults_are_deepseek_with_a_qwen_fallback(monkeypatch):
     assert llm_client.model_for_tier(llm_client.TIER_CREATIVE) == "deepseek/deepseek-v4-flash"
     assert llm_client._OPENROUTER_FALLBACK_MODEL == "qwen/qwen3.7-flash"
     assert ":free" not in llm_client._OPENROUTER_MODEL
+    monkeypatch.delenv("OPENROUTER_REASONING", raising=False)
     body = llm_client._openrouter_extra(None, llm_client._OPENROUTER_MODEL)
     assert body["provider"]["data_collection"] == "deny"
+    assert body["reasoning"] == {"enabled": False}
     assert body["models"] == ["deepseek/deepseek-v4-flash", "qwen/qwen3.7-flash"]
 
 
@@ -305,4 +307,72 @@ def test_openrouter_chat_sends_data_collection_deny(monkeypatch):
     llm_client.chat_with_usage([{"role": "user", "content": "hello"}], extra_body={"provider": {"order": ["deepseek"]}})
     assert seen["extra_body"]["provider"]["data_collection"] == "deny"
     assert seen["extra_body"]["provider"]["order"] == ["deepseek"]
+    assert seen["extra_body"]["reasoning"] == {"enabled": False}
     assert "qwen/qwen3.7-flash" in seen["extra_body"]["models"]
+
+
+def test_openrouter_reasoning_can_be_turned_on(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_REASONING", "on")
+    from ai import llm_client
+    body = llm_client._openrouter_extra(None, "deepseek/deepseek-v4-flash")
+    assert body["reasoning"] == {"enabled": True}
+    monkeypatch.setenv("OPENROUTER_REASONING", "off")
+    assert llm_client._openrouter_extra(None, "deepseek/deepseek-v4-flash")["reasoning"] == {"enabled": False}
+
+
+def test_length_cutoff_with_null_content_is_logged_and_retried(monkeypatch, caplog):
+    import logging
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "fake_openrouter_key")
+    llm_client = _reload_llm_client()
+    seen = {"n": 0}
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            seen["n"] += 1
+            assert kwargs["extra_body"]["reasoning"] == {"enabled": False}
+            if seen["n"] == 1:
+                return _fake_openai_response(content=None, finish_reason="length")
+            return _fake_openai_response(content="The lunch special is worth a try.", finish_reason="stop")
+
+    class FakeChat:
+        completions = FakeCompletions()
+
+    class FakeClient:
+        chat = FakeChat()
+
+    llm_client._client = FakeClient()
+    with caplog.at_level(logging.WARNING):
+        result = llm_client.chat_with_usage([{"role": "user", "content": "ideas"}])
+    assert seen["n"] == 2
+    assert result.text == "The lunch special is worth a try."
+    assert "finish_reason=length" in caplog.text
+
+
+def test_length_cutoff_after_retry_is_not_an_empty_answer(monkeypatch, caplog):
+    import logging
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "fake_openrouter_key")
+    llm_client = _reload_llm_client()
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return _fake_openai_response(content=None, finish_reason="length")
+
+    class FakeChat:
+        completions = FakeCompletions()
+
+    class FakeClient:
+        chat = FakeChat()
+
+    llm_client._client = FakeClient()
+    with caplog.at_level(logging.WARNING):
+        try:
+            llm_client.chat_with_usage([{"role": "user", "content": "ideas"}])
+            raised = False
+        except llm_client.LLMNoAnswer:
+            raised = True
+    assert raised
+    assert "finish_reason=length after one retry" in caplog.text

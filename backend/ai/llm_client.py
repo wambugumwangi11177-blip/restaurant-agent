@@ -162,12 +162,35 @@ def _report_llm_failure(message: str, exc: BaseException | None = None) -> None:
         logger.debug("sentry capture skipped", exc_info=True)
 
 
+class LLMNoAnswer(RuntimeError):
+    """The provider spent the call and returned no answer. Not an empty reply."""
+
+
+def _reasoning_enabled() -> bool | None:
+    """OpenRouter reasoning switch. Unset matches OPENROUTER_REASONING=off.
+
+    deepseek/deepseek-v4-flash reasons by default and can spend max_tokens on
+    that trace, returning content=null and finish_reason=length. Off sends
+    reasoning.enabled=false. on/true turns it on. any other value omits the field.
+    """
+    raw = os.getenv("OPENROUTER_REASONING", "off").strip().lower()
+    if raw in {"off", "false", "0", "disabled", "no"}:
+        return False
+    if raw in {"on", "true", "1", "enabled", "yes"}:
+        return True
+    return None
+
+
 def _openrouter_extra(extra_body: dict | None, model: str) -> dict:
-    """OpenRouter request extras: deny prompt training and name a fallback model."""
+    """OpenRouter request extras: deny prompt training, skip reasoning, name a fallback."""
     body = dict(extra_body or {})
     provider = dict(body.get("provider") or {})
     provider["data_collection"] = "deny"
     body["provider"] = provider
+    if "reasoning" not in body:
+        enabled = _reasoning_enabled()
+        if enabled is not None:
+            body["reasoning"] = {"enabled": enabled}
     chain: list[str] = []
     for name in (model, *(body.get("models") or []), _OPENROUTER_FALLBACK_MODEL):
         if name and name not in chain:
@@ -175,6 +198,11 @@ def _openrouter_extra(extra_body: dict | None, model: str) -> dict:
     if len(chain) > 1:
         body["models"] = chain
     return body
+
+
+def _budget_spent_without_answer(text: str, finish_reason: str | None, tool_calls=None) -> bool:
+    """content is null and the token budget was used up. That is a failed call, not a blank answer."""
+    return not (text or "").strip() and not tool_calls and finish_reason == "length"
 
 
 def _get_client():
@@ -321,22 +349,44 @@ def chat_with_usage(
     def _openai_once():
         response = client.chat.completions.create(**kwargs)
         text = ""
-        if response.choices and response.choices[0].message is not None:
-            text = response.choices[0].message.content or ""
-        return response, text
+        finish_reason = None
+        tool_calls = None
+        if response.choices:
+            choice = response.choices[0]
+            finish_reason = getattr(choice, "finish_reason", None)
+            message = choice.message
+            if message is not None:
+                text = message.content or ""
+                tool_calls = getattr(message, "tool_calls", None)
+        return response, text, finish_reason, tool_calls
 
     try:
-        response, text = _openai_once()
+        response, text, finish_reason, tool_calls = _openai_once()
     except Exception as exc:
         _report_llm_failure(f"LLM chat failed: {exc}", exc)
         raise
-    if not text.strip():
+    if _budget_spent_without_answer(text, finish_reason, tool_calls):
+        _report_llm_failure(
+            "LLM returned content=null with finish_reason=length; the token budget was spent before an answer. Retrying once"
+        )
+        try:
+            response, text, finish_reason, tool_calls = _openai_once()
+        except Exception as exc:
+            _report_llm_failure(f"LLM length-cutoff retry failed: {exc}", exc)
+            raise
+        if _budget_spent_without_answer(text, finish_reason, tool_calls):
+            _report_llm_failure("LLM returned content=null with finish_reason=length after one retry")
+            raise LLMNoAnswer("LLM returned no answer (finish_reason=length, content is null)")
+    elif not text.strip():
         _report_llm_failure("LLM returned empty content; retrying once")
         try:
-            response, text = _openai_once()
+            response, text, finish_reason, tool_calls = _openai_once()
         except Exception as exc:
             _report_llm_failure(f"LLM empty-content retry failed: {exc}", exc)
             raise
+        if _budget_spent_without_answer(text, finish_reason, tool_calls):
+            _report_llm_failure("LLM returned content=null with finish_reason=length after one retry")
+            raise LLMNoAnswer("LLM returned no answer (finish_reason=length, content is null)")
         if not text.strip():
             _report_llm_failure("LLM returned empty content after one retry")
     return SimpleNamespace(
@@ -482,12 +532,33 @@ def chat_with_tools(
         kwargs["tools"] = _tools_to_openai_format(tools)
     if _PROVIDER == "openrouter":
         kwargs["extra_body"] = _openrouter_extra(None, kwargs["model"])
-    try:
-        response = client.chat.completions.create(**kwargs)
-    except Exception as exc:
-        _report_llm_failure(f"LLM tool call failed: {exc}", exc)
-        raise
+
+    def _create():
+        try:
+            return client.chat.completions.create(**kwargs)
+        except Exception as exc:
+            _report_llm_failure(f"LLM tool call failed: {exc}", exc)
+            raise
+
+    response = _create()
     choice = response.choices[0]
+    if _budget_spent_without_answer(
+        choice.message.content or "",
+        getattr(choice, "finish_reason", None),
+        choice.message.tool_calls,
+    ):
+        _report_llm_failure(
+            "LLM tool call returned content=null with finish_reason=length. Retrying once"
+        )
+        response = _create()
+        choice = response.choices[0]
+        if _budget_spent_without_answer(
+            choice.message.content or "",
+            getattr(choice, "finish_reason", None),
+            choice.message.tool_calls,
+        ):
+            _report_llm_failure("LLM tool call returned content=null with finish_reason=length after one retry")
+            raise LLMNoAnswer("LLM returned no answer (finish_reason=length, content is null)")
 
     content = []
     if choice.message.content:

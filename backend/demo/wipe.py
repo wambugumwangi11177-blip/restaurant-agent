@@ -49,6 +49,8 @@ WIPED: tuple[str, ...] = (
     "licences", "expenses", "recurring_bills", "expense_categories",
     # the uploaded M-Pesa statements (S6.1): lines before the uploads that own them
     "mpesa_statement_lines", "mpesa_statement_uploads",
+    # scheduled prices reference dishes, so they go before menu_items
+    "scheduled_menu_prices", "operation_entries",
     # these two are parents of children above and are removed after them
     "orders", "inventory_items", "menu_items", "suppliers",
 )

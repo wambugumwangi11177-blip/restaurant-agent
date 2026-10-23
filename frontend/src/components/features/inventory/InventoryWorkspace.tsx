@@ -124,11 +124,6 @@ export default function InventoryWorkspace() {
                     fulfillQty={w.fulfillQty}
                     setFulfillQty={w.setFulfillQty}
                     onFulfillTransfer={w.handleFulfillTransfer}
-                    confirmingId={w.confirmingId}
-                    setConfirmingId={w.setConfirmingId}
-                    confirmQty={w.confirmQty}
-                    setConfirmQty={w.setConfirmQty}
-                    onConfirmTransfer={w.handleConfirmTransfer}
                     showCountForm={w.showCountForm}
                     setShowCountForm={w.setShowCountForm}
                     countItemId={w.countItemId}

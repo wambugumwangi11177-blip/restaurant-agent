@@ -3,6 +3,8 @@ export interface MenuItem {
     name: string;
     description: string;
     price: number;
+    /** What the till charges now, when a scheduled price applies. Edits use `price` (the base). */
+    effective_price?: number | null;
     category: string;
     is_available: boolean;
     image_url?: string;

@@ -29,12 +29,6 @@ interface AdjustStockModalProps {
     setFulfillQty: (v: string) => void;
     onFulfillTransfer: (transferId: number) => void;
 
-    confirmingId: number | null;
-    setConfirmingId: (v: number | null) => void;
-    confirmQty: string;
-    setConfirmQty: (v: string) => void;
-    onConfirmTransfer: (transferId: number) => void;
-
     showCountForm: boolean;
     setShowCountForm: (v: boolean) => void;
     countItemId: string;
@@ -71,11 +65,6 @@ export default function AdjustStockModal({
     fulfillQty,
     setFulfillQty,
     onFulfillTransfer,
-    confirmingId,
-    setConfirmingId,
-    confirmQty,
-    setConfirmQty,
-    onConfirmTransfer,
     showCountForm,
     setShowCountForm,
     countItemId,
@@ -172,7 +161,7 @@ export default function AdjustStockModal({
                                                 #{t.id} · {isRequested ? "requested" : `${t.quantity}${t.unit}`} {t.from_location} → {t.to_location}
                                             </p>
                                             <p className="text-[10px] text-text-dim mt-0.5">
-                                                {isRequested ? "Waiting for the store to send it" : "Awaiting confirmation from receiver"}
+                                                {isRequested ? "Waiting for the store to send it" : "A different person in the kitchen must confirm what arrived."}
                                             </p>
                                         </div>
                                         {isRequested ? (
@@ -181,13 +170,7 @@ export default function AdjustStockModal({
                                                 className="text-[10px] px-2 py-1 rounded bg-surface-hover text-text-muted hover:text-accent transition-all">
                                                 Fulfil
                                             </button>
-                                        ) : (
-                                            <button
-                                                onClick={() => { setConfirmingId(confirmingId === t.id ? null : t.id); setConfirmQty(String(t.quantity)); }}
-                                                className="text-[10px] px-2 py-1 rounded bg-surface-hover text-text-muted hover:text-success transition-all">
-                                                Confirm receipt
-                                            </button>
-                                        )}
+                                        ) : null}
                                     </div>
                                     <AnimatePresence>
                                         {isFulfilling && (
@@ -204,25 +187,6 @@ export default function AdjustStockModal({
                                                 <button onClick={() => onFulfillTransfer(t.id)} disabled={!fulfillQty || submitting}
                                                     className="bg-accent text-black rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
                                                     {submitting ? "..." : "Send"}
-                                                </button>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                    <AnimatePresence>
-                                        {confirmingId === t.id && (
-                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                                                className="mt-2 flex gap-2 items-end">
-                                                <FormField
-                                                    label="Actual quantity received"
-                                                    placeholder="Actual quantity received"
-                                                    value={confirmQty}
-                                                    onChange={(e) => setConfirmQty(e.target.value)}
-                                                    type="number"
-                                                    className="flex-1 bg-surface-hover border border-border rounded-lg px-2 py-1.5 text-xs text-text placeholder-text-dim focus:outline-none"
-                                                />
-                                                <button onClick={() => onConfirmTransfer(t.id)} disabled={!confirmQty || submitting}
-                                                    className="bg-success text-black rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
-                                                    {submitting ? "..." : "Confirm"}
                                                 </button>
                                             </motion.div>
                                         )}

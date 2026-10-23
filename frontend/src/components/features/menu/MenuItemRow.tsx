@@ -86,6 +86,9 @@ export default function MenuItemRow({
                     <span className="text-sm font-semibold text-accent">
                         KES {(item.price / 100).toLocaleString()}
                     </span>
+                    {item.effective_price != null && item.effective_price !== item.price && (
+                        <span className="text-[10px] text-text-dim">Selling now KES {(item.effective_price / 100).toLocaleString()}</span>
+                    )}
                     <button onClick={() => openEdit(item)}
                         title="Edit — name, price, category, prep time, photo"
                         className={`text-[10px] px-2 py-1 rounded flex items-center gap-1 transition-all ${editingId === item.id ? "bg-accent/10 text-accent" : "bg-surface-hover text-text-muted hover:text-accent"}`}>

@@ -517,7 +517,8 @@ class ScheduledMenuPrice(Base):
     __tablename__ = "scheduled_menu_prices"
     id = Column(Integer, primary_key=True)
     restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
-    menu_item_id = Column(Integer, ForeignKey("menu_items.id"), nullable=False)
+    # CASCADE: a scheduled price has no meaning once the dish is gone (migration 059).
+    menu_item_id = Column(Integer, ForeignKey("menu_items.id", ondelete="CASCADE"), nullable=False)
     channel = Column(String(32), nullable=False, default="all")
     daypart = Column(String(16), nullable=False, default="all")
     price_cents = Column(Integer, nullable=False)

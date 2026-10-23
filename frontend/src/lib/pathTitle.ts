@@ -1,7 +1,7 @@
 /**
  * pathTitle — derive a browser-tab title from the current pathname using the
  * sidebar's own nav labels (single source of truth), so every page — owner
- * and every staff tier — gets "POS · Chakula"-style titles without hand
+ * and every staff tier — gets "POS · LEVIII"-style titles without hand
  * editing 60+ page files. Longest-href-prefix match wins, so nested routes
  * (/dashboard/ai/revenue) resolve to their section label ("AI").
  */

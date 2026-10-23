@@ -90,6 +90,8 @@ ROUTES = [
     ("Am I making a profit this month?", "what", "money"),
     ("Which bills are due soon?", "what", "money"),
     ("What will run out soon?", "what", "stock"),
+    ("What did I sell yesterday?", "what", "revenue"),
+    ("How much did I sell today?", "what", "revenue"),
     ("What are my best-selling dishes?", "what", "menu"),
 ]
 

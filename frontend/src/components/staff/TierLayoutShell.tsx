@@ -69,7 +69,7 @@ export default function TierLayoutShell({
     // with the same MutationObserver guard against Next.js re-asserting its
     // route metadata title after hydration.
     useEffect(() => {
-        const wanted = `${labelForPath(pathname, navItems.map((i) => ({ href: i.href, label: i.label })))} · Chakula`;
+        const wanted = `${labelForPath(pathname, navItems.map((i) => ({ href: i.href, label: i.label })))} · LEVIII`;
         const apply = () => { document.title = wanted; };
         apply();
         const titleEl = document.querySelector("title");
@@ -102,7 +102,7 @@ export default function TierLayoutShell({
                 }`}
             >
                 <div className="px-5 py-5 border-b border-[#1a1a1a] shrink-0">
-                    <h1 className="text-lg font-bold text-[#e5e5e5] tracking-tight">Chakula</h1>
+                    <h1 className="text-lg font-bold text-[#e5e5e5] tracking-tight">LEVIII</h1>
                     <p className="text-xs text-[var(--accent)] mt-0.5 truncate font-medium">{restaurantName}</p>
                     <p className="text-xs text-[#525252] truncate">{tierLabel}</p>
                 </div>

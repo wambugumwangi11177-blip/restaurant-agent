@@ -15,7 +15,7 @@ export default function LoginPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [tenantName, setTenantName] = useState("");
-    const [restaurantName, setRestaurantName] = useState("Vibanda Village");
+    const [restaurantName, setRestaurantName] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
@@ -68,7 +68,7 @@ export default function LoginPage() {
                 {/* Brand */}
                 <div className="text-center mb-10">
                     <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">
-                        Chakula
+                        LEVIII
                     </h1>
                     <p className="text-sm text-[#737373] mt-1">Restaurant Manager</p>
                 </div>
@@ -123,7 +123,7 @@ export default function LoginPage() {
                                     value={restaurantName}
                                     onChange={(e) => setRestaurantName(e.target.value)}
                                     className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[var(--accent)] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm"
-                                    placeholder="Vibanda Village"
+                                    placeholder="Restaurant name"
                                     autoComplete="organization"
                                     required
                                 />

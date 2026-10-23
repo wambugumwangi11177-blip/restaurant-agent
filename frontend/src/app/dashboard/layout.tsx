@@ -130,14 +130,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }, [user, isLoading, isStaffAccount, staffRole, router]);
 
     // Tab title mirrors the sidebar's own label for the current section —
-    // phone app-switchers and stacked tabs then say "POS · Chakula" etc.
+    // phone app-switchers and stacked tabs then say "POS · LEVIII" etc.
     // Next.js re-asserts its route metadata title after hydration and on
     // client navigations, which can overwrite a plain assignment — so watch
     // the <title> element and re-apply ours whenever it gets reset while
     // this layout is mounted.
     useEffect(() => {
         const pairs = navSections.flatMap((s) => s.items.map((i) => ({ href: i.href, label: i.label })));
-        const wanted = `${labelForPath(pathname, pairs)} · Chakula`;
+        const wanted = `${labelForPath(pathname, pairs)} · LEVIII`;
         const apply = () => { document.title = wanted; };
         apply();
         const titleEl = document.querySelector("title");
@@ -194,7 +194,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
                 {/* Brand */}
                 <div className="px-5 py-5 border-b border-[#1a1a1a] shrink-0">
-                    <h1 className="text-lg font-bold text-[#e5e5e5] tracking-tight">Chakula</h1>
+                    <h1 className="text-lg font-bold text-[#e5e5e5] tracking-tight">LEVIII</h1>
                     <p className="text-xs text-[var(--accent)] mt-0.5 truncate font-medium">{restaurantName}</p>
                     <p className="text-xs text-[#525252] truncate">{user.email}</p>
                 </div>

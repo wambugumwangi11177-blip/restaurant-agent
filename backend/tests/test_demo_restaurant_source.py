@@ -76,6 +76,41 @@ def test_startup_hook_provisions_demo_once_and_never_resets_the_password(client,
     assert me["tenant_name"] == "Demo Restaurant" and me["restaurant_name"] == "Demo Restaurant"
 
 
+def test_demo_staff_logins_use_env_passwords_and_startup_does_not_reset_them(client, db_session, monkeypatch):
+    import auth
+    import tenant_provisioning
+
+    monkeypatch.setenv("DEMO_RESTAURANT_OWNER_EMAIL", "owner@demo-restaurant.example")
+    monkeypatch.setenv("DEMO_RESTAURANT_OWNER_PASSWORD", "OwnerPass123")
+    staff = [
+        ("DEMO_RESTAURANT_MANAGER_PASSWORD", "manager@demo-restaurant.example", "ManagerPass123", models.StaffRole.MANAGER),
+        ("DEMO_RESTAURANT_STOREKEEPER_PASSWORD", "store@demo-restaurant.example", "StorePass123", models.StaffRole.STOCKKEEPER),
+        ("DEMO_RESTAURANT_KITCHEN_PASSWORD", "kitchen@demo-restaurant.example", "KitchenPass123", models.StaffRole.KITCHEN),
+        ("DEMO_RESTAURANT_ACCOUNTANT_PASSWORD", "accountant@demo-restaurant.example", "Account123", models.StaffRole.CONTROLLER),
+    ]
+    for env_name, _email, password, _role in staff:
+        monkeypatch.setenv(env_name, password)
+    tenant_provisioning.provision_demo_from_env()
+    db_session.expire_all()
+    for _env_name, email, password, role in staff:
+        user = db_session.query(models.User).filter_by(email=email).one()
+        assert user.staff_role == role and user.role == models.Role.STAFF
+        assert auth.verify_password(password, user.hashed_password)
+        login = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+        assert login.status_code == 200, login.text
+    monkeypatch.setenv("DEMO_RESTAURANT_MANAGER_PASSWORD", "ChangedPass123")
+    tenant_provisioning.provision_demo_from_env()
+    db_session.expire_all()
+    manager = db_session.query(models.User).filter_by(email="manager@demo-restaurant.example").one()
+    assert auth.verify_password("ManagerPass123", manager.hashed_password)
+    tenant = db_session.query(models.Tenant).filter_by(name="Demo Restaurant").one()
+    restaurant = db_session.query(models.Restaurant).filter_by(tenant_id=tenant.id).one()
+    tenant_provisioning.upsert_demo_staff(db_session, tenant, restaurant.id, reset_password=True)
+    db_session.commit()
+    db_session.refresh(manager)
+    assert auth.verify_password("ChangedPass123", manager.hashed_password)
+
+
 def test_demo_owner_os_analyses_recorded_data_without_reconciliation(client, db_session, scoped_owner, monkeypatch):
     from ai import llm_client
 

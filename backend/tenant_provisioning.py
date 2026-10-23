@@ -16,6 +16,7 @@ reset_password=True, which the startup hook never passes.
 """
 import logging
 import os
+import secrets
 
 from fastapi import HTTPException
 from sqlalchemy import func
@@ -28,9 +29,58 @@ logger = logging.getLogger("tenant_provisioning")
 
 DEMO_NAME = "Demo Restaurant"
 
+# Logins for the staff screens in the owner guide. Passwords are never stored
+# in the repo: each one is read from its env var, the same way the owner
+# password is. The kitchen login is the person who confirms a store issue.
+DEMO_STAFF = (
+    ("manager", "manager@demo-restaurant.example", StaffRole.MANAGER, "DEMO_RESTAURANT_MANAGER_PASSWORD"),
+    ("storekeeper", "store@demo-restaurant.example", StaffRole.STOCKKEEPER, "DEMO_RESTAURANT_STOREKEEPER_PASSWORD"),
+    ("kitchen", "kitchen@demo-restaurant.example", StaffRole.KITCHEN, "DEMO_RESTAURANT_KITCHEN_PASSWORD"),
+    ("accountant", "accountant@demo-restaurant.example", StaffRole.CONTROLLER, "DEMO_RESTAURANT_ACCOUNTANT_PASSWORD"),
+)
+
 
 class ProvisionError(Exception):
     pass
+
+
+def upsert_demo_staff(db: Session, tenant: Tenant, restaurant_id: int | None, *, reset_password: bool) -> tuple[dict, list[str]]:
+    """Create the demo staff logins. A password env var is applied on create, and on reset when re-seeding.
+
+    When the variable is unset the row is still created (handovers need a person) but its password is random
+    and is not logged. An existing password is left alone unless reset_password is set, matching the owner.
+    """
+    users: dict = {}
+    log: list[str] = []
+    for key, email, staff_role, env_name in DEMO_STAFF:
+        password = os.getenv(env_name, "")
+        user = db.query(User).filter(User.email == email).first()
+        if user and (tenant is None or user.tenant_id != tenant.id):
+            raise ProvisionError(f"{email} is already registered to another tenant.")
+        if password:
+            try:
+                auth.require_strong_password(password)
+            except HTTPException as exc:
+                raise ProvisionError(f"{env_name}: {exc.detail}") from exc
+        if user is None:
+            hashed = auth.get_password_hash(password or secrets.token_urlsafe(32))
+            user = User(tenant_id=tenant.id, email=email, hashed_password=hashed,
+                        role=Role.STAFF, staff_role=staff_role, is_active=True)
+            db.add(user)
+            db.flush()
+            log.append(f"[CREATED] {key} {email}" + ("" if password else " (set " + env_name + " to choose the login password)"))
+        else:
+            user.role, user.staff_role, user.is_active = Role.STAFF, staff_role, True
+            if password and reset_password:
+                user.hashed_password = auth.get_password_hash(password)
+                user.failed_login_attempts, user.locked_until = 0, None
+                log.append(f"[UPDATED] {key} {email} (password reset from {env_name})")
+            else:
+                log.append(f"[EXISTS]  {key} {email}" + ("" if password else " (password unchanged; " + env_name + " is unset)"))
+        if restaurant_id:
+            user.active_restaurant_id = restaurant_id
+        users[key] = user
+    return users, log
 
 
 def ensure_demo_restaurant(db: Session, owner_email: str, owner_password: str,
@@ -86,6 +136,8 @@ def ensure_demo_restaurant(db: Session, owner_email: str, owner_password: str,
         else:
             log.append(f"[EXISTS]  owner {owner_email} (password unchanged)")
     owner.active_restaurant_id = restaurant.id
+    _users, staff_log = upsert_demo_staff(db, tenant, restaurant.id, reset_password=reset_password)
+    log.extend(staff_log)
     db.commit()
     return log
 

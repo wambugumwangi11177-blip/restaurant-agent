@@ -1,4 +1,4 @@
-// Chakula Service Worker — offline caching + PWA install support
+// LEVIII Service Worker — offline caching + PWA install support
 //
 // CACHE_NAME is versioned and MUST be bumped whenever the caching rules below
 // change: `activate` deletes every cache whose key differs, so the bump is what
@@ -99,10 +99,10 @@ self.addEventListener('push', (event) => {
     try {
         data = event.data ? event.data.json() : {};
     } catch {
-        data = { title: 'Chakula', body: event.data ? event.data.text() : '' };
+        data = { title: 'LEVIII', body: event.data ? event.data.text() : '' };
     }
     event.waitUntil(
-        self.registration.showNotification(data.title || 'Chakula', {
+        self.registration.showNotification(data.title || 'LEVIII', {
             body: data.body || '',
             icon: '/icon-192.png',
             badge: '/icon-192.png',

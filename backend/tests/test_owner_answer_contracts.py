@@ -148,6 +148,46 @@ def test_slow_days_without_any_recorded_orders_is_unavailable(monkeypatch, db_se
     assert answer["finding"] == "The data needed to answer this question is unavailable."
 
 
+def test_what_did_i_sell_yesterday_is_that_days_sales_not_the_health_score(db_session):
+    """A plain sales question names the day. It must not fall through to the health score."""
+    from datetime import datetime, time, timedelta
+    import models
+    from owner import ask
+    from routers.ai_ask import _answer_revenue
+    from routers.overview import _EAT_OFFSET, _eat_now
+
+    assert ask.classify("What did I sell yesterday?") == ("what", "revenue")
+    tenant = models.Tenant(name="Sales Day")
+    db_session.add(tenant)
+    db_session.commit()
+    restaurant_row = models.Restaurant(tenant_id=tenant.id, name="Sales Day", address="Nairobi")
+    db_session.add(restaurant_row)
+    db_session.commit()
+    now = _eat_now()
+    yesterday = now.date() - timedelta(days=1)
+    yesterday_at = datetime.combine(yesterday, time(15, 0)) - _EAT_OFFSET
+    # Today's sales window ends at the current minute, so the sale has to be earlier today.
+    today_wall = now - timedelta(seconds=1)
+    if today_wall.date() != now.date():
+        today_wall = now
+    today_at = today_wall - _EAT_OFFSET
+    db_session.add(models.Order(
+        restaurant_id=restaurant_row.id, total=25_000, is_paid=True, status=models.OrderStatus.SERVED, created_at=yesterday_at,
+    ))
+    db_session.add(models.Order(
+        restaurant_id=restaurant_row.id, total=10_000, is_paid=True, status=models.OrderStatus.SERVED, created_at=today_at,
+    ))
+    db_session.commit()
+    answer = _answer_revenue(db_session, restaurant_row.id, "What did I sell yesterday?")
+    assert answer["finding"].startswith("Yesterday you sold")
+    assert "KSh 250" in answer["finding"]
+    assert "1 paid" in answer["finding"]
+    assert "health score" not in answer["finding"].lower()
+    today = _answer_revenue(db_session, restaurant_row.id, "How are my sales today?")
+    assert today["finding"].startswith("Revenue today is")
+    assert "KSh 100" in today["finding"]
+
+
 def test_ordinary_revenue_question_is_unaffected_by_the_slow_day_branch(monkeypatch, db_session, restaurant):
     from ai import revenue_forecaster
     _, r = restaurant

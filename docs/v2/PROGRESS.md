@@ -1,3 +1,16 @@
+# Eleven demo fixes — 23 October 2026
+
+Branch `dev/eleven-demo-fixes`, based on `codex/eleven-demo-readiness`. No production writes, no deploy, no provider changes.
+
+1. Kitchen handover: confirming an issue requires a different user, and that user must be kitchen staff. A storekeeper or manager confirming their own issue is rejected. Confirming 3.8 kg of a 4 kg issue stays disputed. The check lives in `confirm_transfer`, so the till and WhatsApp share it.
+2. Product name on owner screens is LEVIII. The login restaurant field is empty until the person types the restaurant they are signing into. The read-only source banner uses the signed-in restaurant's name.
+3. Demo manager, storekeeper, kitchen, and accountant logins are created from `DEMO_RESTAURANT_MANAGER_PASSWORD`, `DEMO_RESTAURANT_STOREKEEPER_PASSWORD`, `DEMO_RESTAURANT_KITCHEN_PASSWORD`, and `DEMO_RESTAURANT_ACCOUNTANT_PASSWORD`. Unset values stay random and are not logged. How to sign in is in `RUNBOOK.md`. Restaurant-name login stays owner-only; staff use email.
+4. Menu quotes are attached only when a scheduled price applies, signed with `MENU_QUOTE_SECRET` (or a derived key) and audience `leviii-menu-price`. An expired quote is re-priced to the price that applies now, including offline replay, so an order is not stuck on a 409. `price` stays the stored base; `effective_price` is what the till charges. Wipe includes `scheduled_menu_prices` and `operation_entries`. Migration 059 cascades scheduled prices when a dish is deleted; order history still blocks deletion.
+5. "What did I sell yesterday?" (and the same question for today, this week, last week, this month, last month) answers with that period's paid sales.
+6. The combo screen heading is "Best dish with a dish few people order".
+
+An expired quote is charged at the current scheduled price, or the base price when no schedule applies. That can differ from the price on the screen an hour earlier. `MENU_QUOTE_SECRET` is optional. Startup provisioning does not reset an existing staff password; a reseed does, when the env vars are set.
+
 # Eleven presentation follow-through completed locally — 23 October 2026
 
 The user’s “FINISH” instruction authorized completing the remaining demo workflows. Added forecast-led portions and raw prep through supplier-selected pending purchase drafts; shift statement matching and bounded physical count evidence; shared scheduled checkout pricing with signed one-hour quotes; price ladder, long-tail review and hide action, Star–Puzzle combo candidates; measured price-change results feeding simulations, subsequent pricing impacts and monthly reports; 30-day ABC count calendar and expanded branch control comparison. Staff entries now cover counts, waste, two-party kitchen issues and bill payments, with retry-safe journal, branch-bound device queue, stale-count rejection, ten-minute audited undo, accountant P&L/checklist and expense/receipt review. Approved scheduled discounts no longer appear as unapproved below-menu sales. Fixed ABC boundary handling so the largest spend item cannot fall into a lower band merely because it crosses 80% by itself.

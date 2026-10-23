@@ -43,10 +43,12 @@ it('connects accepted forecast portions to raw prep and retry-safe supplier draf
  expect(api.post).toHaveBeenLastCalledWith('/api/v1/owner/planning/market-drafts',expect.objectContaining({dishes:[{menu_item_id:5,portions:10}],entry_key:expect.any(String),suppliers:{7:3}}));
 });
 
-it('loads a priced Star–Puzzle candidate into the existing checker',async()=>{
+it('loads a priced best-dish combo into the existing checker',async()=>{
  api.get.mockImplementation(async(url:string)=>({data:url.endsWith('prices')?[]:{state:'live',note:'Recorded paid sales',items:[],gaps:[],tail_ingredients:0,results:[],combos:[{ids:[1,2],dishes:['Fish','Stew'],minimum_kes:1050,regular_kes:1200,floor_pct:40}]}}));
  const onCombo=vi.fn();render(<GrowthTools onCombo={onCombo}/>);
- fireEvent.click(await screen.findByRole('button',{name:'Try in combo checker'}));expect(onCombo).toHaveBeenCalledWith([1,2],1050);
+ expect(await screen.findByRole('heading',{name:'Best dish with a dish few people order'})).toBeTruthy();
+  expect(screen.queryByText(/Star[–-]Puzzle/)).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'Try in combo checker'}));expect(onCombo).toHaveBeenCalledWith([1,2],1050);
 });
 
 it('hides expected stock during a physical count and records its branch and capture time',async()=>{

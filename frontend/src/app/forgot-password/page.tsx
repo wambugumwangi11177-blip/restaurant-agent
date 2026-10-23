@@ -37,7 +37,7 @@ export default function ForgotPasswordPage() {
                 className="w-full max-w-sm"
             >
                 <div className="text-center mb-10">
-                    <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">Chakula</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">LEVIII</h1>
                     <p className="text-sm text-[#737373] mt-1">Reset your password</p>
                 </div>
 

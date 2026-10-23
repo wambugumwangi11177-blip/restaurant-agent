@@ -110,7 +110,7 @@ _ROUTING_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("profit", ("profit", "margin", "losing money", "money losing", "food cost", "cost",
                 "expense", "leak", "most profit")),
     ("revenue", ("sale", "sales", "revenue", "income", "forecast", "trending", "slow",
-                 "busiest", "how much did i make", "takings")),
+                 "busiest", "how much did i make", "takings", "sold", "sell")),
 ]
 
 
@@ -197,10 +197,41 @@ def _answer_stock(db: Session, rid: int, q: str) -> dict:
                      "narrative_allowed": bool(soon)}}
 
 
+def _sales_window(q: str):
+    """The Nairobi period a simple sales question is about. Unspecified questions stay on today."""
+    from datetime import datetime, time
+    from routers.overview import _eat_now, _eat_range, _EAT_OFFSET
+    ql = q.lower()
+    today = _eat_now().date()
+
+    def bounds(start_day, end_day, label):
+        start = datetime.combine(start_day, time.min) - _EAT_OFFSET
+        end = datetime.combine(end_day, time.min) - _EAT_OFFSET
+        return start, end, label
+
+    if "yesterday" in ql:
+        return bounds(today - timedelta(days=1), today, "yesterday")
+    if re.search(r"\blast week\b", ql):
+        this_monday = today - timedelta(days=today.weekday())
+        return bounds(this_monday - timedelta(days=7), this_monday, "last week")
+    if re.search(r"\bthis week\b", ql) or re.search(r"\bweek\b", ql):
+        monday = today - timedelta(days=today.weekday())
+        return bounds(monday, today + timedelta(days=1), "this week")
+    if re.search(r"\blast month\b", ql):
+        first = today.replace(day=1)
+        previous_end = first
+        previous_start = (first - timedelta(days=1)).replace(day=1)
+        return bounds(previous_start, previous_end, "last month")
+    if re.search(r"\bthis month\b", ql) or re.search(r"\bmonth\b", ql):
+        return bounds(today.replace(day=1), today + timedelta(days=1), "this month")
+    start, end = _eat_range("today")
+    return start, end, "today"
+
+
 def _answer_revenue(db: Session, rid: int, q: str) -> dict:
     from ai.revenue_forecaster import get_revenue_forecast
-    from routers.overview import _summarize, _eat_range  # EAT-day truth
-    start, end = _eat_range("today")
+    from routers.overview import _summarize  # EAT-day truth
+    start, end, label = _sales_window(q)
     core = _summarize(db, rid, start, end)
     try:
         fc = get_revenue_forecast(db, rid)
@@ -231,8 +262,12 @@ def _answer_revenue(db: Session, rid: int, q: str) -> dict:
                 "recommendation": "Compare the recorded pattern with your operating hours before changing staffing or promotions.",
                 "module": "revenue", "steps": steps,
                 "data": {"narrative_allowed": False, "weekly_pattern": ranking}}
-    finding = f"Revenue today is {_money(core['revenue'] * 100)} across {core['orders']} paid orders."
-    why = "Paid, non-cancelled orders created during the Nairobi calendar day so far. This is not payment cash flow."
+    if label == "today":
+        finding = f"Revenue today is {_money(core['revenue'] * 100)} across {core['orders']} paid orders."
+        why = "Paid, non-cancelled orders created during the Nairobi calendar day so far. This is not payment cash flow."
+    else:
+        finding = f"{label.capitalize()} you sold {_money(core['revenue'] * 100)} across {core['orders']} paid orders."
+        why = f"Paid, non-cancelled orders created during {label}, on Nairobi dates. This is not payment cash flow."
     # core["revenue"] is already KES (overview's _summarize converts cents→KES);
     # avg_order must stay in KES — multiplying by 100 again showed absurd figures
     # (verified in browser 2026-09-12: "KSh 199,467" instead of KSh 1,995).

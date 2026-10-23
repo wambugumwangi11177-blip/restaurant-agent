@@ -64,7 +64,9 @@ def test_scheduled_price_is_scoped_and_quote_survives_schedule_change(client,db_
     at=utcnow()
     assert prices(db_session,202,'walk_in',at)[dish.id]==45000
     assert prices(db_session,303,'walk_in',at)=={}
-    quote=quoted_menu(db_session,202,'walk_in',[dish],at)[0].price_quote
+    quoted=quoted_menu(db_session,202,'walk_in',[dish],at)[0]
+    assert quoted.price == 50000 and quoted.effective_price == 45000 and quoted.price_quote
+    quote=quoted.price_quote
     rule.price_cents=47000;db_session.commit()
     lines=[schemas.OrderItemCreate(menu_item_id=dish.id,quantity=2,price_quote=quote)]
     resolved=checkout_prices(db_session,202,'walk_in',lines,utcnow())
@@ -76,6 +78,63 @@ def test_scheduled_price_is_scoped_and_quote_survives_schedule_change(client,db_
     with pytest.raises(Exception) as exc:
         checkout_prices(db_session,202,'walk_in',[schemas.OrderItemCreate(menu_item_id=dish.id,quantity=1)],utcnow())
     assert exc.value.status_code==409
+
+
+def test_quotes_are_not_login_tokens_and_expiry_does_not_block_the_order(db_session, scoped_owner, setup_menu):
+    """A till left open past an hour, and an offline replay of that quote, still prices the order."""
+    import auth
+    from jose import JWTError
+    from domain.scheduled_prices import QUOTE_AUDIENCE, quote_key
+    user, _ = scoped_owner
+    _, dish = setup_menu
+    at = utcnow()
+    plain = quoted_menu(db_session, 202, 'walk_in', [dish], at)[0]
+    assert plain.price == dish.price and plain.effective_price == dish.price and plain.price_quote is None
+    expired = auth.jwt.encode({
+        'kind': 'menu_price', 'aud': QUOTE_AUDIENCE, 'rid': 202, 'item': dish.id, 'channel': 'walk_in',
+        'price': 1, 'exp': at - timedelta(minutes=5),
+    }, quote_key(), algorithm=auth.ALGORITHM)
+    lines = [schemas.OrderItemCreate(menu_item_id=dish.id, quantity=1, price_quote=expired)]
+    resolved = checkout_prices(db_session, 202, 'walk_in', lines, at)
+    _order, total = build_order_lines(lines, {dish.id: dish}, prices_by_id=resolved)
+    assert total == dish.price
+
+    db_session.add(models.ScheduledMenuPrice(
+        restaurant_id=202, menu_item_id=dish.id, channel='all', daypart='all', price_cents=45000,
+        starts_on=eat_date(at), explanation='Current scheduled price', created_by=user.id,
+    ))
+    db_session.commit()
+    repriced = checkout_prices(db_session, 202, 'walk_in', lines, at)
+    _order, total = build_order_lines(lines, {dish.id: dish}, prices_by_id=repriced)
+    assert total == 45000
+
+    login = auth.create_access_token({'sub': user.email, 'ver': 0})
+    forged = [schemas.OrderItemCreate(menu_item_id=dish.id, quantity=1, price_quote=login)]
+    with pytest.raises(Exception) as exc:
+        checkout_prices(db_session, 202, 'walk_in', forged, at)
+    assert exc.value.status_code == 409
+    live = quoted_menu(db_session, 202, 'walk_in', [dish], at)[0]
+    with pytest.raises(JWTError):
+        auth.jwt.decode(live.price_quote, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+
+
+def test_editing_a_discounted_dish_keeps_the_base_price(client, db_session, scoped_owner, setup_menu):
+    user, headers = scoped_owner
+    _, dish = setup_menu
+    today = eat_date(utcnow())
+    db_session.add(models.ScheduledMenuPrice(
+        restaurant_id=202, menu_item_id=dish.id, channel='walk_in', daypart='all', price_cents=45000,
+        starts_on=today, explanation='Lunch price', created_by=user.id,
+    ))
+    db_session.commit()
+    listed = client.get('/api/v1/menu/?channel=walk_in', headers=headers)
+    assert listed.status_code == 200, listed.text
+    row = next(item for item in listed.json() if item['id'] == dish.id)
+    assert row['price'] == 50000 and row['effective_price'] == 45000 and row['price_quote']
+    saved = client.put(f"/api/v1/menu/{dish.id}", headers=headers, json={'description': 'Lunch stew', 'price': row['price']})
+    assert saved.status_code == 200, saved.text
+    db_session.refresh(dish)
+    assert dish.price == 50000 and dish.description == 'Lunch stew'
 
 
 def test_daypart_surges_and_foreign_dishes_rejected(client,scoped_owner,setup_menu):
@@ -209,6 +268,20 @@ def test_migration_058_roundtrip_matches_models(tmp_path):
         for table in ('scheduled_menu_prices','operation_entries'):
             assert set(models.Base.metadata.tables[table].columns.keys())=={c['name'] for c in sa.inspect(conn).get_columns(table)}
     engine.dispose()
+
+
+def test_migration_059_cascades_scheduled_prices_without_rewriting_058():
+    import importlib.util
+    from pathlib import Path
+    path = Path(__file__).resolve().parents[1] / 'alembic/versions/059_scheduled_price_ondelete.py'
+    spec = importlib.util.spec_from_file_location('migration_059', path)
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    assert migration.revision == '059_scheduled_price_ondelete'
+    assert migration.down_revision == '058_eleven_workflows'
+    source = path.read_text()
+    assert 'ondelete="CASCADE"' in source
+    assert '058_eleven_workflows.py' not in source or 'down_revision' in source
 
 
 def test_scheduled_discount_is_not_reported_as_an_unapproved_till_gap(db_session,scoped_owner,setup_menu):

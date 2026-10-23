@@ -83,6 +83,32 @@ are usually the database (DATABASE_URL in `backend/.env`) being unreachable.
 pkill -f "uvicorn main:app"; pkill -f next-server
 ```
 
+## Demo staff logins
+
+The restaurant-name form signs in the **owner** only. Store, kitchen, manager and accountant use **Sign in with email instead**.
+
+Passwords are never written in this file or in the seed. Set them in the environment next to `DEMO_RESTAURANT_OWNER_PASSWORD`, then re-seed (a re-seed applies these passwords; a normal process start creates the accounts once and does not reset a password you already set):
+
+| Screen | Email | Env var | After login |
+| --- | --- | --- | --- |
+| Manager | `manager@demo-restaurant.example` | `DEMO_RESTAURANT_MANAGER_PASSWORD` | `/staff/manager` |
+| Storekeeper | `store@demo-restaurant.example` | `DEMO_RESTAURANT_STOREKEEPER_PASSWORD` | `/staff/stockkeeper` |
+| Kitchen / chef | `kitchen@demo-restaurant.example` | `DEMO_RESTAURANT_KITCHEN_PASSWORD` | `/staff/kitchen` |
+| Accountant | `accountant@demo-restaurant.example` | `DEMO_RESTAURANT_ACCOUNTANT_PASSWORD` | `/staff/controller` |
+
+The kitchen login is the person who confirms what arrived from the store. The storekeeper can issue stock and cannot confirm their own issue. Each password needs at least 8 characters, one letter and one number (the same rule as the owner password).
+
+```bash
+export DEMO_RESTAURANT_OWNER_PASSWORD='…'
+export DEMO_RESTAURANT_MANAGER_PASSWORD='…'
+export DEMO_RESTAURANT_STOREKEEPER_PASSWORD='…'
+export DEMO_RESTAURANT_KITCHEN_PASSWORD='…'
+export DEMO_RESTAURANT_ACCOUNTANT_PASSWORD='…'
+python execution/reseed_demo.py --yes
+```
+
+Optional `MENU_QUOTE_SECRET` signs scheduled-price quotes separately from login tokens. When it is unset, quotes use a key derived from `SECRET_KEY` that login tokens cannot verify.
+
 ## Notes
 
 - The local `.env` files (`backend/.env`, `frontend/.env.local`) are gitignored

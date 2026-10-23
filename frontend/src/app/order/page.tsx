@@ -15,11 +15,16 @@ import {
 
 interface MenuItem {
     price_quote?: string;
+    effective_price?: number | null;
     id: number;
     name: string;
     price: number;
     category: string;
     description?: string;
+}
+
+function sellingPrice(item: MenuItem): number {
+    return item.effective_price ?? item.price;
 }
 
 interface CartItem {
@@ -78,7 +83,7 @@ export default function CustomerOrderPage() {
         setCart((prev) => prev.map((c) => c.menuItem.id === itemId ? { ...c, quantity: Math.max(0, c.quantity + delta) } : c).filter((c) => c.quantity > 0));
     }, []);
 
-    const subtotal = cart.reduce((sum, c) => sum + c.menuItem.price * c.quantity, 0);
+    const subtotal = cart.reduce((sum, c) => sum + sellingPrice(c.menuItem) * c.quantity, 0);
     const itemCount = cart.reduce((sum, c) => sum + c.quantity, 0);
 
     const formatKES = (cents: number) => `KES ${(cents / 100).toLocaleString("en-KE")}`;
@@ -151,7 +156,7 @@ export default function CustomerOrderPage() {
             <header className="sticky top-0 z-40 bg-[#0a0a0a]/90 backdrop-blur-xl border-b border-[#262626]">
                 <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
                     <div>
-                        <h1 className="text-lg font-bold text-[var(--accent)]">Chakula</h1>
+                        <h1 className="text-lg font-bold text-[var(--accent)]">LEVIII</h1>
                         <p className="text-[10px] text-[#525252]">Order fresh food, delivered or pickup</p>
                     </div>
                     {step === "menu" && itemCount > 0 && (
@@ -201,7 +206,7 @@ export default function CustomerOrderPage() {
                                                 {item.description && (
                                                     <p className="text-xs text-[#525252] mt-0.5">{item.description}</p>
                                                 )}
-                                                <p className="text-sm font-semibold text-[var(--accent)] mt-1">{formatKES(item.price)}</p>
+                                                <p className="text-sm font-semibold text-[var(--accent)] mt-1">{formatKES(sellingPrice(item))}</p>
                                             </div>
                                             <div className="flex items-center gap-2 ml-4">
                                                 {inCart ? (
@@ -240,7 +245,7 @@ export default function CustomerOrderPage() {
                                     <div key={c.menuItem.id} className="px-4 py-3 flex items-center justify-between">
                                         <div>
                                             <p className="text-sm text-[#e5e5e5]">{c.quantity}× {c.menuItem.name}</p>
-                                            <p className="text-xs text-[var(--accent)]">{formatKES(c.menuItem.price * c.quantity)}</p>
+                                            <p className="text-xs text-[var(--accent)]">{formatKES(sellingPrice(c.menuItem) * c.quantity)}</p>
                                         </div>
                                         <div className="flex items-center gap-1">
                                             <button onClick={() => updateQty(c.menuItem.id, -1)}

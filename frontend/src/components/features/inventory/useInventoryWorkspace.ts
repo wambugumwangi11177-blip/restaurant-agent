@@ -31,8 +31,6 @@ export function useInventoryWorkspace() {
     const [showTransferForm, setShowTransferForm] = useState(false);
     const [transferItemId, setTransferItemId] = useState("");
     const [transferQty, setTransferQty] = useState("");
-    const [confirmingId, setConfirmingId] = useState<number | null>(null);
-    const [confirmQty, setConfirmQty] = useState("");
 
     // Kitchen requisition (pull) — directive 017
     const [showRequestForm, setShowRequestForm] = useState(false);
@@ -161,27 +159,6 @@ export function useInventoryWorkspace() {
         setSubmitting(false);
     };
 
-    const handleConfirmTransfer = async (transferId: number) => {
-        if (!confirmQty) return;
-        setSubmitting(true);
-        try {
-            const res = await api.post(`/stock/transfers/${transferId}/confirm`, {
-                confirmed_quantity: parseFloat(confirmQty),
-            });
-            showToast(
-                res.data.status === "disputed"
-                    ? "Recorded — quantity didn't match, flagged for review"
-                    : "Transfer confirmed"
-            );
-            setConfirmingId(null);
-            setConfirmQty("");
-            await fetchData();
-        } catch (err) {
-            showToast(getErrorMessage(err, "Failed to confirm"), "error");
-        }
-        setSubmitting(false);
-    };
-
     const handleRequestStock = async () => {
         if (!requestItemId) return;
         setSubmitting(true);
@@ -265,7 +242,6 @@ export function useInventoryWorkspace() {
         showTransferForm, setShowTransferForm, transferItemId, setTransferItemId,
         transferQty, setTransferQty, handleInitiateTransfer,
         fulfillingId, setFulfillingId, fulfillQty, setFulfillQty, handleFulfillTransfer,
-        confirmingId, setConfirmingId, confirmQty, setConfirmQty, handleConfirmTransfer,
         // physical count
         showCountForm, setShowCountForm, countItemId, setCountItemId,
         countQty, setCountQty, handleSubmitCount,

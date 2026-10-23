@@ -207,7 +207,7 @@ export default function NotificationBell({ ownerHome }: { ownerHome?: string } =
                             {isIOSNotStandalone ? (
                                 <p className="text-[11px] text-[#a3a3a3] leading-relaxed">
                                     To get notifications on iPhone: tap Share, then{" "}
-                                    <span className="text-[#e5e5e5]">Add to Home Screen</span>, then open Chakula from
+                                    <span className="text-[#e5e5e5]">Add to Home Screen</span>, then open LEVIII from
                                     there.
                                 </p>
                             ) : permission === "denied" ? (

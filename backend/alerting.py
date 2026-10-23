@@ -72,7 +72,7 @@ def _send_webhook_async(error_count: int, method: str, path: str, exc: Exception
         try:
             import requests
             text = (
-                f":rotating_light: Chakula: {error_count} unhandled errors in the last "
+                f":rotating_light: LEVIII: {error_count} unhandled errors in the last "
                 f"{_SPIKE_WINDOW_SECONDS}s. Latest: `{method} {path}` -> {type(exc).__name__}: {exc}"
             )
             requests.post(ALERT_WEBHOOK_URL, json={"text": text}, timeout=5)

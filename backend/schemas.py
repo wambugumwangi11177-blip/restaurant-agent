@@ -86,6 +86,9 @@ class MenuItemUpdate(StrictModel):
 class MenuItem(MenuItemBase):
     id: int
     restaurant_id: int
+    # What the till charges right now. `price` stays the stored base price so an
+    # edit cannot write a scheduled discount back onto the dish.
+    effective_price: Optional[int] = None
     price_quote: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")

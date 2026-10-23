@@ -69,6 +69,40 @@ def test_deleting_order_cascades_order_items(db_session):
     assert db_session.query(models.OrderItem).filter_by(id=oi_id).first() is None
 
 
+def test_deleting_a_dish_cascades_scheduled_prices_and_still_keeps_order_history(db_session):
+    """A dish that only has a scheduled price can be deleted. Order history still blocks deletion."""
+    import models
+    from time_utils import utcnow
+    r = _restaurant(db_session)
+    owner = models.User(tenant_id=r.tenant_id, email="owner-fk@e.com", hashed_password="x", role=models.Role.ADMIN)
+    item = models.MenuItem(restaurant_id=r.id, name="Beef stew", price=50000, category="m")
+    db_session.add_all([owner, item])
+    db_session.commit()
+    scheduled = models.ScheduledMenuPrice(
+        restaurant_id=r.id, menu_item_id=item.id, channel="all", daypart="all", price_cents=45000,
+        starts_on=utcnow().date(), explanation="Afternoon value", created_by=owner.id,
+    )
+    db_session.add(scheduled)
+    db_session.commit()
+    scheduled_id = scheduled.id
+    db_session.delete(item)
+    db_session.commit()
+    assert db_session.query(models.ScheduledMenuPrice).filter_by(id=scheduled_id).first() is None
+
+    kept = models.MenuItem(restaurant_id=r.id, name="Chips", price=100, category="m")
+    db_session.add(kept)
+    db_session.commit()
+    order = models.Order(restaurant_id=r.id, total=100, payment_method=models.PaymentMethod.CASH)
+    db_session.add(order)
+    db_session.commit()
+    db_session.add(models.OrderItem(order_id=order.id, menu_item_id=kept.id, quantity=1, unit_price=100))
+    db_session.commit()
+    db_session.delete(kept)
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+
 def test_deleting_menu_item_with_order_history_is_restricted(db_session):
     import models
     r = _restaurant(db_session)

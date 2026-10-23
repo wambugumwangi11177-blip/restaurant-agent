@@ -149,6 +149,21 @@ def test_no_real_person_or_business_is_named_except_the_one_figure_6_1_names():
 # The shape of the demo
 # ═════════════════════════════════════════════════════════════════════════════
 
+def test_demo_seed_has_store_kitchen_manager_and_accountant_logins(demo):
+    db, _summary = demo
+    expected = {
+        "manager@demo-restaurant.example": models.StaffRole.MANAGER,
+        "store@demo-restaurant.example": models.StaffRole.STOCKKEEPER,
+        "kitchen@demo-restaurant.example": models.StaffRole.KITCHEN,
+        "accountant@demo-restaurant.example": models.StaffRole.CONTROLLER,
+    }
+    branches = _branches(db)
+    for email, role in expected.items():
+        user = db.query(models.User).filter_by(email=email).one()
+        assert user.staff_role == role and user.is_active and user.role == models.Role.STAFF
+        assert user.active_restaurant_id == branches[0].id
+
+
 def test_one_tenant_two_branches_with_the_owner_login_resolving_the_first(demo):
     db, summary = demo
     tenant = db.query(models.Tenant).filter(models.Tenant.name == "Demo Restaurant").one()
@@ -317,7 +332,9 @@ def test_the_staff_logins_have_a_password_nobody_knows(demo):
     db, _ = demo
     import auth
     users = db.query(models.User).filter(models.User.email.like("%@demo-restaurant.example"), models.User.email != OWNER).all()
-    assert {u.staff_role for u in users} == {models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER, models.StaffRole.KITCHEN}
+    assert {u.staff_role for u in users} == {
+        models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER, models.StaffRole.KITCHEN, models.StaffRole.CONTROLLER,
+    }
     for u in users:
         for guess in (PASSWORD, "password", "demo", "Demo-Passw0rd!x1", u.email):
             assert not auth.verify_password(guess, u.hashed_password)

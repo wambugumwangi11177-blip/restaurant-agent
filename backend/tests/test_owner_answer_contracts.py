@@ -183,9 +183,91 @@ def test_what_did_i_sell_yesterday_is_that_days_sales_not_the_health_score(db_se
     assert "KSh 250" in answer["finding"]
     assert "1 paid" in answer["finding"]
     assert "health score" not in answer["finding"].lower()
+    from time_utils import service_sales_window
+    start, end, _service = service_sales_window()
+    expected = 0
+    if start <= yesterday_at < end:
+        expected += 250
+    if start <= today_at < end:
+        expected += 100
+    assert start <= today_at < end
     today = _answer_revenue(db_session, restaurant_row.id, "How are my sales today?")
     assert today["finding"].startswith("Revenue today is")
-    assert "KSh 100" in today["finding"]
+    assert f"KSh {expected:,}" in today["finding"]
+
+
+def _sales_pair(db_session, monkeypatch, frozen):
+    """A restaurant and the two Ask answers for 'today', with the clock frozen."""
+    import models
+    from owner.answer_why import build
+    from owner.states import OwnerContext
+    from routers.ai_ask import _answer_revenue
+    monkeypatch.setattr("time_utils.utcnow", lambda: frozen)
+    monkeypatch.setattr("routers.overview.utcnow", lambda: frozen)
+    monkeypatch.setattr("owner.states.utcnow", lambda: frozen)
+    tenant = models.Tenant(name="Service Day")
+    db_session.add(tenant)
+    db_session.commit()
+    restaurant_row = models.Restaurant(tenant_id=tenant.id, name="Service Day", address="Nairobi")
+    db_session.add(restaurant_row)
+    db_session.commit()
+    user = models.User(tenant_id=tenant.id, email=f"svc-{restaurant_row.id}@example.com",
+                       hashed_password="unused", role=models.Role.ADMIN)
+    db_session.add(user)
+    db_session.commit()
+    return restaurant_row, lambda: (
+        _answer_revenue(db_session, restaurant_row.id, "How were sales today?"),
+        build(OwnerContext(db_session, user, restaurant_row), "Why were sales down today?"),
+    )
+
+
+def test_sales_today_and_why_today_agree_before_the_morning_rollover(db_session, monkeypatch):
+    """01:30 Nairobi is still the previous service. Both answers count the same paid orders."""
+    from datetime import datetime
+    import models
+    restaurant_row, answers = _sales_pair(db_session, monkeypatch, datetime(2026, 10, 23, 22, 30))
+    def add(when, total, **extra):
+        db_session.add(models.Order(
+            restaurant_id=restaurant_row.id, total=total, is_paid=True,
+            status=models.OrderStatus.SERVED, created_at=when, **extra,
+        ))
+    add(datetime(2026, 10, 23, 19, 0), 1_634_000)          # Friday 22:00 Nairobi
+    add(datetime(2026, 10, 23, 21, 30), 20_000)            # Saturday 00:30 Nairobi, still this service
+    add(datetime(2026, 10, 22, 12, 0), 999_900)            # Thursday afternoon, a different service
+    db_session.add(models.Order(                          # unpaid, ignored by both
+        restaurant_id=restaurant_row.id, total=50_000, is_paid=False,
+        status=models.OrderStatus.READY, created_at=datetime(2026, 10, 23, 20, 0),
+    ))
+    db_session.add(models.Order(                          # cancelled, ignored by both
+        restaurant_id=restaurant_row.id, total=40_000, is_paid=True,
+        status=models.OrderStatus.CANCELLED, created_at=datetime(2026, 10, 23, 19, 30),
+    ))
+    db_session.commit()
+    what, why = answers()
+    assert "KSh 16,540" in what["finding"]
+    assert "2 paid" in what["finding"]
+    sales = next(row for row in why["rows"] if row["key"] == "sales")
+    assert sales["value"] == 16540
+
+
+def test_sales_today_after_rollover_does_not_keep_the_previous_service(db_session, monkeypatch):
+    from datetime import datetime
+    import models
+    restaurant_row, answers = _sales_pair(db_session, monkeypatch, datetime(2026, 10, 24, 12, 0))  # Saturday 15:00 Nairobi
+    db_session.add(models.Order(
+        restaurant_id=restaurant_row.id, total=1_634_000, is_paid=True,
+        status=models.OrderStatus.SERVED, created_at=datetime(2026, 10, 23, 19, 0),  # Friday 22:00
+    ))
+    db_session.add(models.Order(
+        restaurant_id=restaurant_row.id, total=10_000, is_paid=True,
+        status=models.OrderStatus.SERVED, created_at=datetime(2026, 10, 24, 7, 0),  # Saturday 10:00
+    ))
+    db_session.commit()
+    what, why = answers()
+    assert "KSh 100" in what["finding"]
+    assert "KSh 16,340" not in what["finding"]
+    sales = next(row for row in why["rows"] if row["key"] == "sales")
+    assert sales["value"] == 100
 
 
 def test_ordinary_revenue_question_is_unaffected_by_the_slow_day_branch(monkeypatch, db_session, restaurant):

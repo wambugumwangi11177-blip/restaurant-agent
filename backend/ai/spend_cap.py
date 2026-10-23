@@ -26,9 +26,8 @@ from ai.cost_model import cost_usd
 from routers.deps import get_or_create_restaurant
 from time_utils import utcnow
 
-# Generous default — this is a circuit breaker against a runaway loop or abuse,
-# not a tight budget knob; tune per-deployment via env.
-DAILY_LLM_SPEND_CAP_USD = float(os.getenv("DAILY_LLM_SPEND_CAP_USD", "20.0"))
+# Starting budget for a small owner account. Raise DAILY_LLM_SPEND_CAP_USD per deployment.
+DAILY_LLM_SPEND_CAP_USD = float(os.getenv("DAILY_LLM_SPEND_CAP_USD", "1.0"))
 
 
 def today_spend_usd(db: Session, restaurant_id: int) -> float:

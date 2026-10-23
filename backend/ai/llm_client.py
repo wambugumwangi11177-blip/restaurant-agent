@@ -12,8 +12,8 @@ Provider selection (checked in this order):
      and no ANTHROPIC_API_KEY has ever been configured. Anthropic support is
      kept as a drop-in upgrade path (uncomment in requirements.txt "when
      client has paid" — see that file's comment), not the assumed default.
-  3. Neither set -> is_available() returns False; callers degrade gracefully
-     (see ai/whatsapp/orchestrator.py's fallback message).
+  3. Neither set -> is_available() returns False; callers say AI is unavailable
+     rather than substituting a canned paragraph.
 
 Both providers are normalized to the same response shape in chat_with_tools()
 so callers never need to know which one is active: response.stop_reason
@@ -44,17 +44,14 @@ def _block_get(block, key):
 
 _ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 _GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-# OpenRouter (2026-09-12): the owner's chosen chat/report LLM gateway — one key,
-# access to every model. Takes priority over Anthropic/Groq when set. Free-tier
-# models (":free" suffix) are the default for a Kenyan SME deployment; bump the
-# env vars to move to paid frontier models without a code change.
+# OpenRouter is the owner's chat/report gateway and takes priority over Anthropic/Groq.
+# Defaults are paid-routing flash models. Do not default to ":free" models: some of
+# those providers train on prompts. data_collection is denied on every OpenRouter call.
 _OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-# Free-tier models VERIFIED working against the owner's key (2026-09-12):
-#   HIGH/MEDIUM: nvidia/nemotron-3-super-120b-a12b:free (1M-class MoE, best free quality)
-#   LOW:         nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free (small/fast narration)
-# deepseek/gemma/llama ":free" variants were 404 for this account (checked live).
-_OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-super-120b-a12b:free")
-_OPENROUTER_MODEL_LOW = os.getenv("OPENROUTER_MODEL_LOW", "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free")
+_DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash"
+_OPENROUTER_FALLBACK_MODEL = os.getenv("OPENROUTER_FALLBACK_MODEL", "qwen/qwen3.7-flash")
+_OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", _DEFAULT_OPENROUTER_MODEL)
+_OPENROUTER_MODEL_LOW = os.getenv("OPENROUTER_MODEL_LOW", _DEFAULT_OPENROUTER_MODEL)
 _HEADROOM_ENABLED = os.getenv("HEADROOM_ENABLED", "true").lower() == "true"
 _HEADROOM_PROXY_URL = os.getenv("HEADROOM_PROXY_URL", "")
 _ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
@@ -146,6 +143,38 @@ _client = None
 def is_available() -> bool:
     """Check if any LLM provider is configured (used to feature-gate callers)."""
     return _PROVIDER is not None
+
+
+def _report_llm_failure(message: str, exc: BaseException | None = None) -> None:
+    """Log an LLM failure and send it to Sentry when the SDK is configured.
+
+    capture_exception is a no-op until sentry_sdk.init has run, so tests and
+    local runs without a DSN still get the warning.
+    """
+    logger.warning("%s", message)
+    try:
+        import sentry_sdk
+        if exc is not None:
+            sentry_sdk.capture_exception(exc)
+        else:
+            sentry_sdk.capture_message(message)
+    except Exception:
+        logger.debug("sentry capture skipped", exc_info=True)
+
+
+def _openrouter_extra(extra_body: dict | None, model: str) -> dict:
+    """OpenRouter request extras: deny prompt training and name a fallback model."""
+    body = dict(extra_body or {})
+    provider = dict(body.get("provider") or {})
+    provider["data_collection"] = "deny"
+    body["provider"] = provider
+    chain: list[str] = []
+    for name in (model, *(body.get("models") or []), _OPENROUTER_FALLBACK_MODEL):
+        if name and name not in chain:
+            chain.append(name)
+    if len(chain) > 1:
+        body["models"] = chain
+    return body
 
 
 def _get_client():
@@ -244,8 +273,26 @@ def chat_with_usage(
         }
         if temperature is not None:
             kwargs["temperature"] = temperature
-        response = client.messages.create(**kwargs)
-        text = "".join(block.text for block in response.content if block.type == "text")
+
+        def _anthropic_once():
+            response = client.messages.create(**kwargs)
+            text = "".join(block.text for block in response.content if getattr(block, "type", None) == "text")
+            return response, text
+
+        try:
+            response, text = _anthropic_once()
+        except Exception as exc:
+            _report_llm_failure(f"Anthropic chat failed: {exc}", exc)
+            raise
+        if not text.strip():
+            _report_llm_failure("Anthropic returned empty content; retrying once")
+            try:
+                response, text = _anthropic_once()
+            except Exception as exc:
+                _report_llm_failure(f"Anthropic empty-content retry failed: {exc}", exc)
+                raise
+            if not text.strip():
+                _report_llm_failure("Anthropic returned empty content after one retry")
         return SimpleNamespace(
             text=text,
             model=response.model,
@@ -257,19 +304,43 @@ def chat_with_usage(
 
     # Groq / OpenAI-compatible
     openai_messages = ([{"role": "system", "content": system}] if system else []) + messages
+    resolved_model = resolved or _default_model()
     kwargs = {
-        "model": resolved or _default_model(),
+        "model": resolved_model,
         "max_tokens": max_tokens,
         "messages": openai_messages,
     }
     if temperature is not None:
         kwargs["temperature"] = temperature
-    if extra_body:
-        # Provider-specific request fields, e.g. OpenRouter's web-search plugin. Only sent when asked for.
+    if _PROVIDER == "openrouter":
+        kwargs["extra_body"] = _openrouter_extra(extra_body, resolved_model)
+    elif extra_body:
+        # Provider-specific request fields. Only sent when asked for.
         kwargs["extra_body"] = extra_body
-    response = client.chat.completions.create(**kwargs)
+
+    def _openai_once():
+        response = client.chat.completions.create(**kwargs)
+        text = ""
+        if response.choices and response.choices[0].message is not None:
+            text = response.choices[0].message.content or ""
+        return response, text
+
+    try:
+        response, text = _openai_once()
+    except Exception as exc:
+        _report_llm_failure(f"LLM chat failed: {exc}", exc)
+        raise
+    if not text.strip():
+        _report_llm_failure("LLM returned empty content; retrying once")
+        try:
+            response, text = _openai_once()
+        except Exception as exc:
+            _report_llm_failure(f"LLM empty-content retry failed: {exc}", exc)
+            raise
+        if not text.strip():
+            _report_llm_failure("LLM returned empty content after one retry")
     return SimpleNamespace(
-        text=response.choices[0].message.content or "",
+        text=text or "",
         model=response.model,
         usage=SimpleNamespace(
             input_tokens=response.usage.prompt_tokens,
@@ -409,7 +480,13 @@ def chat_with_tools(
     # provider quirks.
     if tools:
         kwargs["tools"] = _tools_to_openai_format(tools)
-    response = client.chat.completions.create(**kwargs)
+    if _PROVIDER == "openrouter":
+        kwargs["extra_body"] = _openrouter_extra(None, kwargs["model"])
+    try:
+        response = client.chat.completions.create(**kwargs)
+    except Exception as exc:
+        _report_llm_failure(f"LLM tool call failed: {exc}", exc)
+        raise
     choice = response.choices[0]
 
     content = []

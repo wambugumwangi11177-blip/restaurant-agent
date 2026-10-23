@@ -60,7 +60,12 @@ def _today_evidence(db: Session, user, rid: int, period: str) -> dict:
     are really recorded are included: overview's kitchen, waitlist, expiry and
     overtime slots are placeholders, so they are listed as not_available instead
     of being passed on as zeros the model could narrate."""
-    start, end = overview._eat_range(period)
+    if period == "today":
+        from time_utils import service_sales_window
+        start, end, service = service_sales_window()
+    else:
+        start, end = overview._eat_range(period)
+        service = None
     core = overview._summarize(db, rid, start, end)
     op_start, op_end = overview._eat_range("today")
     stock = overview._stock_card(db, rid)
@@ -80,9 +85,9 @@ def _today_evidence(db: Session, user, rid: int, period: str) -> dict:
         attention = []
 
     evidence: dict = {
-        "date": now_eat.date().isoformat(),
-        "weekday": now_eat.strftime("%A"),
-        "sales_window": _WINDOW_LABEL[period],
+        "date": (service or now_eat.date()).isoformat(),
+        "weekday": (service or now_eat.date()).strftime("%A"),
+        "sales_window": "the open service day, through now (Nairobi, rolls at 06:00)" if period == "today" else _WINDOW_LABEL[period],
         "sales": {
             "revenue_kes": round(core["revenue"]),
             "paid_orders": core["orders"],
@@ -137,7 +142,11 @@ def creative_home(
     verified, connection = _source_verified(db, user.tenant_id)
     if verified:
         # A "today" story must never be served on a later calendar day.
-        valid_since = overview._eat_range("today")[0] if period == "today" else None
+        if period == "today":
+            from time_utils import service_sales_window
+            valid_since = service_sales_window()[0]
+        else:
+            valid_since = None
         return creative.take(
             db, user, rid, surface=creative.SURFACE_HOME, period=period, mode=creative.MODE_TODAY_STORY,
             evidence=lambda: _today_evidence(db, user, rid, period), refresh=refresh, valid_since=valid_since,

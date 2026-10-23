@@ -4,6 +4,7 @@ period: daily | weekly | monthly | yearly. 422 for anything else.
 "Drafted" = markdown template + real numbers interpolated. No LLM.
 Shares _summarize() with the overview router (DRY).
 """
+import logging
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func
@@ -20,6 +21,8 @@ from ai.owner_narrative import narrate as narrate_owner
 from ai.owner_narrative import strip_reasoning_leak as _strip_reasoning_leak  # shared with ai/creative.py
 from ai import creative
 
+logger = logging.getLogger("reports")
+
 router = APIRouter(prefix="/reports", tags=["reports"])
 
 _PERIOD_SPANS = {
@@ -34,9 +37,9 @@ _EAT_OFFSET = timedelta(hours=3)
 def _range(period: str):
     now_eat = utcnow() + _EAT_OFFSET
     if period == "daily":
-        start_eat = now_eat.replace(hour=0, minute=0, second=0, microsecond=0)
-    else:
-        start_eat = now_eat - _PERIOD_SPANS[period]
+        from time_utils import service_sales_window
+        return service_sales_window()[:2]
+    start_eat = now_eat - _PERIOD_SPANS[period]
     return start_eat - _EAT_OFFSET, now_eat - _EAT_OFFSET
 
 
@@ -209,8 +212,14 @@ def _llm_narrative(period: str, label: str, core: dict, top: list, db, owner, ri
         text = narrate_owner(db, owner, rid, [{"role": "user", "content": user}],
                              system, 500, "owner-report-v2")
         return _grounded_reply(text, user)
-    except Exception:  # Budget/provider/scrubber failure keeps the deterministic report.
+    except Exception as exc:  # Budget/provider/scrubber failure keeps the deterministic report.
         db.rollback()
+        logger.warning("report narrative failed: %s", exc)
+        try:
+            import sentry_sdk
+            sentry_sdk.capture_exception(exc)
+        except Exception:
+            logger.debug("sentry capture skipped", exc_info=True)
         return None
 
 

@@ -8,13 +8,27 @@ permanent regression coverage for the same code path.
 
 import importlib
 import json
+import os
 from types import SimpleNamespace
+
+import pytest
 
 
 def _reload_llm_client():
     from ai import llm_client
     importlib.reload(llm_client)
     return llm_client
+
+
+@pytest.fixture(autouse=True)
+def _restore_llm_client_after_env_reload():
+    """Reload reads provider keys at import. Put the module back so later tests are not left with a fake key."""
+    yield
+    for name in ("ANTHROPIC_API_KEY", "GROQ_API_KEY", "OPENROUTER_API_KEY",
+                 "OPENROUTER_MODEL", "OPENROUTER_MODEL_LOW", "OPENROUTER_MODEL_HIGH",
+                 "OPENROUTER_MODEL_CREATIVE", "OPENROUTER_FALLBACK_MODEL"):
+        os.environ.pop(name, None)
+    _reload_llm_client()
 
 
 def test_no_provider_configured_is_unavailable(monkeypatch):
@@ -198,3 +212,97 @@ def test_canonical_messages_preserve_tool_call_arguments(monkeypatch):
     translated = llm_client._canonical_messages_to_openai(canonical)
     args = _json.loads(translated[1]["tool_calls"][0]["function"]["arguments"])
     assert args == {"party_size": 4, "time": "19:00"}
+
+
+def test_openrouter_defaults_are_deepseek_with_a_qwen_fallback(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "fake_openrouter_key")
+    for name in ("OPENROUTER_MODEL", "OPENROUTER_MODEL_LOW", "OPENROUTER_MODEL_HIGH",
+                 "OPENROUTER_MODEL_CREATIVE", "OPENROUTER_FALLBACK_MODEL"):
+        monkeypatch.delenv(name, raising=False)
+    llm_client = _reload_llm_client()
+    assert llm_client._OPENROUTER_MODEL == "deepseek/deepseek-v4-flash"
+    assert llm_client._OPENROUTER_MODEL_LOW == "deepseek/deepseek-v4-flash"
+    assert llm_client.model_for_tier(llm_client.TIER_HIGH) == "deepseek/deepseek-v4-flash"
+    assert llm_client.model_for_tier(llm_client.TIER_CREATIVE) == "deepseek/deepseek-v4-flash"
+    assert llm_client._OPENROUTER_FALLBACK_MODEL == "qwen/qwen3.7-flash"
+    assert ":free" not in llm_client._OPENROUTER_MODEL
+    body = llm_client._openrouter_extra(None, llm_client._OPENROUTER_MODEL)
+    assert body["provider"]["data_collection"] == "deny"
+    assert body["models"] == ["deepseek/deepseek-v4-flash", "qwen/qwen3.7-flash"]
+
+
+def test_empty_content_is_retried_once(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "fake_groq_key")
+    llm_client = _reload_llm_client()
+    seen = {"n": 0}
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            seen["n"] += 1
+            content = "" if seen["n"] == 1 else "A different take on the same figures."
+            return _fake_openai_response(content=content)
+
+    class FakeChat:
+        completions = FakeCompletions()
+
+    class FakeClient:
+        chat = FakeChat()
+
+    llm_client._client = FakeClient()
+    result = llm_client.chat_with_usage([{"role": "user", "content": "ideas"}], system="be brief")
+    assert seen["n"] == 2
+    assert result.text == "A different take on the same figures."
+
+
+def test_empty_content_after_retry_stays_empty_and_is_logged(monkeypatch, caplog):
+    import logging
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "fake_groq_key")
+    llm_client = _reload_llm_client()
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return _fake_openai_response(content="  ")
+
+    class FakeChat:
+        completions = FakeCompletions()
+
+    class FakeClient:
+        chat = FakeChat()
+
+    llm_client._client = FakeClient()
+    with caplog.at_level(logging.WARNING):
+        result = llm_client.chat_with_usage([{"role": "user", "content": "ideas"}])
+    assert result.text.strip() == ""
+    assert "empty content after one retry" in caplog.text
+
+
+def test_openrouter_chat_sends_data_collection_deny(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "fake_openrouter_key")
+    monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
+    llm_client = _reload_llm_client()
+    seen = {}
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            seen.update(kwargs)
+            return _fake_openai_response(content="Noted.")
+
+    class FakeChat:
+        completions = FakeCompletions()
+
+    class FakeClient:
+        chat = FakeChat()
+
+    llm_client._client = FakeClient()
+    llm_client.chat_with_usage([{"role": "user", "content": "hello"}], extra_body={"provider": {"order": ["deepseek"]}})
+    assert seen["extra_body"]["provider"]["data_collection"] == "deny"
+    assert seen["extra_body"]["provider"]["order"] == ["deepseek"]
+    assert "qwen/qwen3.7-flash" in seen["extra_body"]["models"]

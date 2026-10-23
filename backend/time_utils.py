@@ -32,10 +32,13 @@ Zero project imports on purpose — `models.py` imports this, and models.py sits
 near the bottom of the import graph.
 """
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 # Nairobi is UTC+3 all year (no daylight saving). The database stores naive UTC; the OWNER's day is the Nairobi day.
 EAT_OFFSET = timedelta(hours=3)
+# A service that runs past midnight is still "today" until 06:00 Nairobi. Ask, Home and the daily
+# report share this so "sales today" and a why about that service name the same paid total.
+SERVICE_ROLLOVER_HOUR = 6
 
 
 def utcnow() -> datetime:
@@ -46,6 +49,28 @@ def utcnow() -> datetime:
     Use for anything compared against, or written to, a `DateTime` column.
     """
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def service_day(utc_naive: datetime | None = None) -> date:
+    """The Nairobi service date of a naive-UTC timestamp.
+
+    Before 06:00 Nairobi the previous calendar day is still open: a Friday service
+    that is being asked about at 01:30 Saturday is Friday, not an empty Saturday.
+    """
+    moment = utcnow() if utc_naive is None else utc_naive
+    local = moment + EAT_OFFSET
+    day = local.date()
+    if local.hour < SERVICE_ROLLOVER_HOUR:
+        day -= timedelta(days=1)
+    return day
+
+
+def service_sales_window(utc_naive: datetime | None = None) -> tuple[datetime, datetime, date]:
+    """Naive-UTC [service-day midnight Nairobi, now). Does not include the rest of the day."""
+    moment = utcnow() if utc_naive is None else utc_naive
+    day = service_day(moment)
+    start = datetime.combine(day, time.min) - EAT_OFFSET
+    return start, moment, day
 
 
 def eat_date(utc_naive: datetime) -> date:

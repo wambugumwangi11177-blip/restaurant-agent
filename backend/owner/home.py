@@ -39,7 +39,8 @@ def _mpesa_summary(b: dict) -> dict:
 
 def _pulse(ctx: OwnerContext, period: str) -> dict:
     overview = _overview()
-    start, end = overview._eat_range("today")
+    from time_utils import service_sales_window
+    start, end, _service = service_sales_window(ctx.now)
     today = overview._summarize(ctx.db, ctx.rid, start, end)
     base = ctx.order_state()
     # Same weekday last week, over the same elapsed part of the day: a fair comparison at 3 pm.
@@ -162,9 +163,45 @@ def _bookings(ctx: OwnerContext, covers_today: int, days: int = 7) -> dict:
 
 
 def _read(ctx: OwnerContext) -> dict:
+    """LEVIII's read: the same grounded creative note Home can load on its own, written into the page."""
+    import logging
     import feature_flags
+    from ai import creative
     if not feature_flags.is_enabled("ai_narration"):
         return unavailable("LEVIII's read is switched off.", text=None)
+    if not creative.enabled():
+        return unavailable("LEVIII's read has not been written yet.", text=None)
+    from routers.creative import _source_verified, _system_evidence, _today_evidence
+    from time_utils import service_sales_window
+    log = logging.getLogger("owner.home")
+    try:
+        verified, connection = _source_verified(ctx.db, ctx.tenant_id)
+        if verified:
+            result = creative.take(
+                ctx.db, ctx.user, ctx.rid, surface=creative.SURFACE_HOME, period="today",
+                mode=creative.MODE_TODAY_STORY,
+                evidence=lambda: _today_evidence(ctx.db, ctx.user, ctx.rid, "today"),
+                valid_since=service_sales_window(ctx.now)[0],
+            )
+        else:
+            result = creative.take(
+                ctx.db, ctx.user, ctx.rid, surface=creative.SURFACE_HOME, period="any",
+                mode=creative.MODE_SYSTEM_STORY, evidence=lambda: _system_evidence(connection),
+            )
+    except Exception as exc:
+        ctx.db.rollback()
+        log.warning("LEVIII's read failed: %s", exc)
+        try:
+            import sentry_sdk
+            sentry_sdk.capture_exception(exc)
+        except Exception:
+            log.debug("sentry capture skipped", exc_info=True)
+        return unavailable("AI unavailable right now.", text="AI unavailable right now.")
+    text = result.get("text")
+    if text:
+        return block("live", as_of=ctx.now, text=text)
+    if result.get("reason") in (creative.REASON_PROVIDER, creative.REASON_BUDGET, creative.REASON_EVIDENCE):
+        return unavailable("AI unavailable right now.", text="AI unavailable right now.")
     return unavailable("LEVIII's read has not been written yet.", text=None)
 
 

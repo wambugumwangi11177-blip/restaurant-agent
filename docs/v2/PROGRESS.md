@@ -1,3 +1,16 @@
+# Eleven demo — AI availability, grounded notes, and one sales day — 23 October 2026
+
+Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes.
+
+7. An OS chat LLM failure is logged (`logger.warning`) and sent to Sentry. Empty model content is retried once. OS chat asks for up to 1200 tokens. When the model does not answer, the screen says "AI unavailable right now." The old fixed brainstorm sentences are gone.
+8. Precise questions (sales, profit, why, what-if, compare) stay on the deterministic forms. Open-ended advice goes to the model at temperature 0.6, with the service-day sales figures in the prompt and the recent turns, including a previous deterministic headline, so a follow-up is not a copy of the last answer.
+9. `FEATURE_CREATIVE_LAYER` defaults on. It still spends nothing until `OPENROUTER_API_KEY` is set. Reports keep their deterministic numbers and the grounded "My read" is requested whenever the key is set. Home's "LEVIII's read" uses that same grounded note. A figure that is not in the evidence is still dropped.
+10. `OPENROUTER_MODEL`, `_HIGH`, `_LOW` and `_CREATIVE` default to `deepseek/deepseek-v4-flash`, with fallback `qwen/qwen3.7-flash` (`OPENROUTER_FALLBACK_MODEL`). OpenRouter requests send `provider.data_collection = deny`. `DAILY_LLM_SPEND_CAP_USD` defaults to 1.
+11. WhatsApp/Twilio stays in the tree. `FEATURE_WHATSAPP` defaults off. The send path stays retired, and the phone scheduler jobs no-op. The demo does not need Twilio.
+12. "How were sales today?" and a why about today use one window: paid, non-cancelled orders from the Nairobi service day (the day rolls at 06:00) through now. Before 06:00, Friday night and the hour after midnight are the same total. Bookings stay on the calendar day.
+
+Railway: set `OPENROUTER_API_KEY`. The model, fallback, spend cap, creative flag and WhatsApp flag can stay at the defaults above. Do not set Twilio. Staff passwords are unchanged from the previous entry.
+
 # Eleven demo fixes — 23 October 2026
 
 Branch `dev/eleven-demo-fixes`, based on `codex/eleven-demo-readiness`. No production writes, no deploy, no provider changes.

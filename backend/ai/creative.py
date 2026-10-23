@@ -365,7 +365,12 @@ def take(db, user, rid: int, *, surface: str, period: str, mode: str,
             return _failed(surface, mode, period, previous, REASON_BUDGET)
         except Exception as exc:  # provider/scrubber failure: never surface internals
             db.rollback()
-            logger.warning("creative %s provider call failed: %s", mode, type(exc).__name__)
+            logger.warning("creative %s provider call failed: %s", mode, exc)
+            try:
+                import sentry_sdk
+                sentry_sdk.capture_exception(exc)
+            except Exception:
+                logger.debug("sentry capture skipped", exc_info=True)
             _start_cooldown(key, REASON_PROVIDER)
             return _failed(surface, mode, period, previous, REASON_PROVIDER)
 

@@ -109,6 +109,27 @@ python execution/reseed_demo.py --yes
 
 Optional `MENU_QUOTE_SECRET` signs scheduled-price quotes separately from login tokens. When it is unset, quotes use a key derived from `SECRET_KEY` that login tokens cannot verify.
 
+## Railway environment for the demo
+
+Set these on the backend service. Leave Twilio unset: WhatsApp is shelved (`FEATURE_WHATSAPP` defaults to false) and the demo does not send phone messages.
+
+| Variable | Required | What it does |
+| --- | --- | --- |
+| `OPENROUTER_API_KEY` | Yes, for any written AI | Without it, Ask still answers sales questions from the records and the writing assistant says AI is unavailable. |
+| `OPENROUTER_MODEL` | No | Defaults to `deepseek/deepseek-v4-flash`. |
+| `OPENROUTER_MODEL_HIGH` | No | Same default. |
+| `OPENROUTER_MODEL_LOW` | No | Same default. |
+| `OPENROUTER_MODEL_CREATIVE` | No | Same default. Used for Home's read and the report note. |
+| `OPENROUTER_FALLBACK_MODEL` | No | Defaults to `qwen/qwen3.7-flash` when the first model returns nothing usable. |
+| `DAILY_LLM_SPEND_CAP_USD` | No | Defaults to `1`. Raise it when the owner budget allows. |
+| `FEATURE_AI_NARRATION` | No | Defaults to true. Set `false` to stop every LLM call. |
+| `FEATURE_CREATIVE_LAYER` | No | Defaults to true. The note is written only when a provider key is set. Set `false` to keep numbers without the written note. |
+| `FEATURE_WHATSAPP` | No | Defaults to false. Do not set Twilio credentials for this demo. |
+| `DEMO_RESTAURANT_OWNER_PASSWORD` | Yes, for the owner login | Plus the four staff passwords in the table above. |
+| `MENU_QUOTE_SECRET` | No | Optional separate key for scheduled-price quotes. |
+
+OpenRouter requests send `provider.data_collection = deny`. Do not switch the model variables back to a `:free` model; some of those providers train on prompts.
+
 ## Notes
 
 - The local `.env` files (`backend/.env`, `frontend/.env.local`) are gitignored

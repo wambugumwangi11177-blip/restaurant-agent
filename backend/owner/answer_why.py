@@ -28,7 +28,7 @@ import models
 from owner.answers import assumption, clock_text, day_text, kes_text, make, nothing, pct_text, row
 from owner.money.pnl import nairobi_utc_range
 from owner.states import OwnerContext
-from time_utils import EAT_OFFSET, eat_date
+from time_utils import EAT_OFFSET, eat_date, service_day, service_sales_window
 
 WHY = SimpleNamespace(
     usual_days=7,            # the usual day = the average of this many earlier days of the same weekday …
@@ -99,7 +99,12 @@ def _day_window(day: date) -> tuple[datetime, datetime]:
 
 
 def _sales(ctx: OwnerContext, day: date) -> tuple[float, int]:
-    lo, hi = _day_window(day)
+    # The open service day uses the same window as "how were sales today?" (midnight through now,
+    # rolling at 06:00). A named earlier day stays the full Nairobi calendar day.
+    if day == service_day(ctx.now):
+        lo, hi, _day = service_sales_window(ctx.now)
+    else:
+        lo, hi = _day_window(day)
     cents, n = ctx.db.query(func.coalesce(func.sum(models.Order.total), 0), func.count(models.Order.id)).filter(
         models.Order.restaurant_id == ctx.rid, models.Order.is_paid.is_(True), models.Order.status != models.OrderStatus.CANCELLED,
         models.Order.created_at >= lo, models.Order.created_at < hi).one()
@@ -245,7 +250,10 @@ def _cancelled(ctx: OwnerContext, day: date, usual: list[date], weekday: str) ->
 
 def build(ctx: OwnerContext, question: str, *, day: date | None = None) -> dict:
     today = eat_date(ctx.now)
-    day = day or parse_day(question, today)
+    named = day
+    day = named or parse_day(question, today)
+    if named is None and re.search(r"\btoday\b", question.lower()):
+        day = service_day(ctx.now)
     weekday = day.strftime("%A")
     pretty = day_text(day)
     follow = ["Compare this week with last week", "What should I do to make more money?"]

@@ -286,8 +286,19 @@ def _start_scheduler():
         logger.warning(f"[WARN] Scheduler failed to start: {e}")
 
 
+def _whatsapp_shelved(job: str) -> bool:
+    """True when the phone agent must not run. In-app stock and reorder jobs stay."""
+    import feature_flags
+    if feature_flags.is_enabled("whatsapp"):
+        return False
+    logger.info("WhatsApp is shelved; skipping %s", job)
+    return True
+
+
 def _send_all_morning_briefings():
     """Send WhatsApp morning briefing to every active restaurant owner."""
+    if _whatsapp_shelved("morning_briefing"):
+        return
     # Was a near-exact duplicate of ai.whatsapp.brain.run_morning_briefing —
     # same DRY pattern already fixed elsewhere this session (routers/deps.py).
     # Delegates to the real implementation instead of maintaining two copies.
@@ -348,6 +359,8 @@ def _check_late_purchase_orders():
 
 
 def _run_stock_check_job():
+    if _whatsapp_shelved("stock_check"):
+        return
     try:
         from database import SessionLocal
         from ai.whatsapp.brain import run_stock_check
@@ -537,6 +550,8 @@ def _run_learning_cycle_job():
 
 
 def _run_slow_day_check_job():
+    if _whatsapp_shelved("slow_day_check"):
+        return
     try:
         from database import SessionLocal
         from ai.whatsapp.brain import run_slow_day_check
@@ -546,6 +561,8 @@ def _run_slow_day_check_job():
 
 
 def _run_reservation_reminders_job():
+    if _whatsapp_shelved("reservation_reminders"):
+        return
     try:
         from database import SessionLocal
         from ai.whatsapp.brain import run_reservation_reminders

@@ -712,8 +712,11 @@ def send_whatsapp_message(
                 _log_message(db, restaurant_id, to_number, message, message_type, "suppressed_optout")
             return {"status": "suppressed_optout", "sid": None}
 
-    # Retired compatibility entry point. No phone transport is available.
-    # Never fan customer messages into an owner's inbox (privacy boundary).
+    # Shelved. FEATURE_WHATSAPP defaults off, and even when an operator turns the
+    # flag on there is no Twilio transport here. The demo never depends on a send.
+    import feature_flags
+    if not feature_flags.is_enabled("whatsapp"):
+        return {"status": "retired", "sid": None}
     return {"status": "retired", "sid": None}
 
 

@@ -7,7 +7,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import AnswerCard from "@/components/owner/ask/AnswerCard";
 import { tenantConfig } from "@/lib/tenantConfig";
-import { ASK_FORMS, asOwnerAnswer, isGuidance, type AskForm, type OwnerAnswer } from "@/lib/owner/ask";
+import { ASK_FORMS, asOwnerAnswer, prefersChat, type AskForm, type OwnerAnswer } from "@/lib/owner/ask";
 
 /** An explanation of the software or help with an idea: the writing assistant answers these (/ai/chat). Everything about the owner's own figures is answered in the five forms (/owner/ask). */
 type ChatResponse = {
@@ -17,6 +17,7 @@ type ChatResponse = {
   answer_text?: string | null;
   answer_type?: string;
   llm_used?: boolean;
+  ai_unavailable?: boolean;
   creative?: boolean;
   consulted_modules?: string[];
   follow_up_prompts?: string[];
@@ -125,7 +126,7 @@ function OSChatInner() {
     const q = cleanHandoffText(question.trim());
     if (q.length < 3 || q.length > 500 || busyId) return;
     // Typed words about the owner's own figures go to the five forms; a request for help or an explanation goes to the writing assistant.
-    const resolved: Route = "form" in route && route.form === "auto" && isGuidance(q) ? { chat: "auto" } : route;
+    const resolved: Route = "form" in route && route.form === "auto" && prefersChat(q) ? { chat: "auto" } : route;
     const id = retryId ?? crypto.randomUUID();
     const oldIndex = retryId ? turns.findIndex((turn) => turn.id === retryId) : -1;
     followReply.current = !chatViewport.current || chatViewport.current.scrollHeight - chatViewport.current.scrollTop - chatViewport.current.clientHeight < 96;
@@ -300,7 +301,7 @@ function OSChatInner() {
                 : turn.owner ? <AnswerCard answer={turn.owner} onAsk={ask} />
                 : turn.chat ? <div className="space-y-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">{turn.chat.creative ? "Creative · AI-written · " : turn.chat.llm_used ? "AI-written · " : ""}{turn.chat.answer_type === "capability_explanation" ? "Software explanation" : turn.chat.answer_type === "general_guidance" ? "General guidance from your description" : "Restaurant analysis"}</p>
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{turn.chat.answer_text || turn.chat.llm_reply || turn.chat.grounded?.finding || "I can help explain the software or plan a next step."}</p>
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed" role={turn.chat.ai_unavailable ? "status" : undefined}>{turn.chat.ai_unavailable ? "AI unavailable right now." : (turn.chat.answer_text || turn.chat.llm_reply || turn.chat.grounded?.finding || "AI unavailable right now.")}</p>
                   {turn.chat.consulted_modules?.length ? <p className="flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--v-muted-foreground)]"><span>Drew on:</span>{turn.chat.consulted_modules.map((id) => <span key={id} className="rounded-full border border-[var(--v-border)] px-2 py-0.5 font-semibold">{MODULE_LABEL[id] ?? id}</span>)}</p> : null}
                   {turn.chat.follow_up_prompts?.length ? <div className="flex flex-wrap gap-2">{turn.chat.follow_up_prompts.map((prompt) => <button key={prompt} type="button" onClick={() => void send(prompt, { chat: "general" })} className="min-h-10 rounded-full border border-[var(--v-border)] px-3 py-1.5 text-[11px] hover:border-[var(--v-primary)]">{prompt}</button>)}</div> : null}
                   {turn.chat.proposal && <div className="space-y-2 rounded-xl border border-[hsl(43_76%_57_/.55)] bg-[hsl(42_71%_75_/.16)] p-3 text-xs"><div className="flex items-center justify-between gap-2"><p className="font-bold">{turn.chat.proposal.title}</p><span className="rounded-full bg-white/70 px-2 py-1 text-[10px] font-semibold">Proposal — not applied</span></div><p><strong>Request:</strong> {turn.chat.proposal.request}</p><p><strong>Expected result:</strong> {turn.chat.proposal.expected_result}</p><p><strong>Page:</strong> {turn.chat.proposal.affected_page}</p><details><summary className="cursor-pointer font-semibold">Design notes</summary><div className="mt-2 space-y-1"><p>{turn.chat.proposal.layout}</p><p>{turn.chat.proposal.controls}</p><p>Mobile: {turn.chat.proposal.mobile_behavior}</p></div></details></div>}

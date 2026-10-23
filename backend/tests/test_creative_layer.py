@@ -65,8 +65,7 @@ def provider(monkeypatch):
         monkeypatch.setattr(llm_client, "is_available", lambda: True)
         monkeypatch.setattr(llm_client, "model_for_tier", lambda tier: f"model-for-{tier}")
         monkeypatch.setattr(llm_client, "chat_with_usage", stub)
-        if creative_on:
-            monkeypatch.setenv("FEATURE_CREATIVE_LAYER", "true")
+        monkeypatch.setenv("FEATURE_CREATIVE_LAYER", "true" if creative_on else "false")
         return stub
     return install
 
@@ -212,6 +211,24 @@ def test_home_receiving_but_unreconciled_is_still_the_system_story(client, db_se
     assert "clean reconciliation" in stub.outbound
 
 
+def test_owner_home_read_is_the_grounded_note(client, db_session, scoped_owner, provider, source):
+    _, headers = scoped_owner
+    provider("Revenue is KSh 500 today. Try a lunch special.")
+    verify_source(db_session, source)
+    add_paid_order(db_session, total_cents=50000)
+    body = client.get("/api/v1/owner/home", headers=headers).json()
+    assert "KSh 500" in (body["read"]["text"] or "")
+    assert body["read"]["state"] == "live"
+
+
+def test_owner_home_read_stays_unwritten_when_the_creative_layer_is_off(client, scoped_owner, provider):
+    _, headers = scoped_owner
+    stub = provider("Revenue is KSh 500.", creative_on=False)
+    body = client.get("/api/v1/owner/home", headers=headers).json()
+    assert body["read"]["text"] is None
+    assert stub.calls == []
+
+
 def test_home_verified_source_tells_todays_story_from_recorded_figures(
         client, db_session, scoped_owner, provider, source):
     _, headers = scoped_owner
@@ -260,10 +277,11 @@ def test_yesterdays_story_is_never_served_as_todays(client, db_session, scoped_o
     stub = provider("Revenue is KSh 500 today.")
     verify_source(db_session, source)
     add_paid_order(db_session)
-    day_start = overview._eat_range("today")[0]
+    from time_utils import service_sales_window
+    service_start = service_sales_window()[0]
     db_session.add(models.CreativeTake(
         restaurant_id=RID, surface="home", period="today", mode="today_story",
-        text="Yesterday was lovely.", evidence_hash="0" * 64, created_at=day_start - timedelta(minutes=10)))
+        text="Yesterday was lovely.", evidence_hash="0" * 64, created_at=service_start - timedelta(minutes=10)))
     db_session.commit()
     body = client.get(f"{HOME}?period=today", headers=headers).json()
     assert body["text"] == "Revenue is KSh 500 today."
@@ -557,7 +575,8 @@ def test_os_creative_fully_invented_reply_falls_back_to_the_deterministic_text(c
     body = client.post("/api/v1/ai/chat", headers=headers, json={
         "question": "Help me reduce food waste.", "answer_mode": "general"}).json()
     assert body["llm_used"] is False and body["creative"] is False
-    assert body["answer_text"].startswith("I can help work through this")  # the deterministic fallback
+    assert body["ai_unavailable"] is True
+    assert body["answer_text"] == "AI unavailable right now."
 
 
 def test_os_creative_keeps_planned_features_deterministic(client, scoped_owner, provider):

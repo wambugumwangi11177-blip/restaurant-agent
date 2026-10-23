@@ -57,6 +57,11 @@ def _restaurant_id(db: Session, user) -> int:
 
 
 def _eat_range(period: str):
+    """Nairobi calendar window. Bookings and shifts stay on the calendar day.
+
+    Paid sales for "today" use time_utils.service_sales_window instead, so a
+    service that is still open after midnight is not reported as an empty new day.
+    """
     now_eat = _eat_now()
     if period == "today":
         start_eat = now_eat.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -470,7 +475,11 @@ _SOURCE_NOTICE = {
 def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
           db: Session = Depends(get_db), user=Depends(require_staff_role())):
     rid = _restaurant_id(db, user)
-    start, end = _eat_range(period)
+    if period == "today":
+        from time_utils import service_sales_window
+        start, end = service_sales_window()[:2]
+    else:
+        start, end = _eat_range(period)
     core = _summarize(db, rid, start, end)
     revenue_card = {
         **core,

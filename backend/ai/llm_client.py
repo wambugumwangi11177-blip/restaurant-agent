@@ -487,11 +487,14 @@ def chat_with_tools(
     max_tokens: int = 1024,
     model: str | None = None,
     tier: str | None = None,
+    temperature: float | None = None,
 ):
     """
     One turn of a tool-calling loop. Returns a response normalized to
     Anthropic's shape regardless of active provider — see module docstring.
     Model selection precedence: explicit `model` > `tier` lookup > default.
+    `temperature` is sent only when the caller sets it (the insight loop).
+    Other callers keep the provider default.
     """
     client = _get_client()
     resolved = model or model_for_tier(tier)
@@ -509,6 +512,8 @@ def chat_with_tools(
             "system": system_blocks,
             "messages": messages,
         }
+        if temperature is not None:
+            kwargs["temperature"] = temperature
         # Mirror the Groq branch: omit `tools` entirely for a no-tools turn
         # rather than sending an empty array, for the same reason.
         if cached_tools:
@@ -523,6 +528,8 @@ def chat_with_tools(
         "max_tokens": max_tokens,
         "messages": openai_messages,
     }
+    if temperature is not None:
+        kwargs["temperature"] = temperature
     # Some OpenAI-compatible APIs reject an explicit empty `tools` array (400
     # "must not be empty") rather than treating it the same as omitting the
     # param. Omit it entirely for a no-tools turn (e.g. forcing a strategist

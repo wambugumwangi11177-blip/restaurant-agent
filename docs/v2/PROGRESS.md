@@ -1,3 +1,11 @@
+# Eleven demo — insight beside the figures — 23 October 2026
+
+Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes. No new migration.
+
+13. Ask LEVIII, Home and Reports keep the figures the code computed. When the creative layer is on, a separate note is added: "LEVIII's insight, AI-written". The model may call read-only tools — sales, stock variance, cash, menu and pricing, forecasting, simulation — and the note may cite only numbers those tools returned. A figure that is not in a tool result is dropped. The same question and the same figures reuse the saved note. The daily spend cap still applies. If the model fails, the figures stay and the note says "insight unavailable"; the failure is logged. With no provider key the note is left off, so a page without a key is unchanged.
+
+No new Railway variable. The note spends tokens only when `OPENROUTER_API_KEY` is set, `FEATURE_CREATIVE_LAYER` and `FEATURE_AI_NARRATION` are on (both default on), and today's spend is under `DAILY_LLM_SPEND_CAP_USD` (default 1).
+
 # Eleven demo — AI availability, grounded notes, and one sales day — 23 October 2026
 
 Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes.

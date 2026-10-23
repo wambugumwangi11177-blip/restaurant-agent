@@ -116,7 +116,17 @@ def ask(ctx: OwnerContext, question: str, form: str | None = None, topic: str | 
         topic = form
     try:
         with ctx.db.begin_nested():
-            return _BUILDERS[form](ctx, question, topic)
+            answer = _BUILDERS[form](ctx, question, topic)
     except Exception:  # noqa: BLE001 — never substitute unrelated facts or expose internals
         logger.exception("ask LEVIII (%s/%s) failed for restaurant %s", form, topic, ctx.rid)
-        return nothing(form, topic, question, "This could not be worked out just now.", state="unavailable")
+        answer = nothing(form, topic, question, "This could not be worked out just now.", state="unavailable")
+    return _with_insight(ctx, question, answer)
+
+
+def _with_insight(ctx: OwnerContext, question: str, answer: dict) -> dict:
+    """Keep the computed card, then add a separate insight when the creative layer is on."""
+    from ai.insight import answer_figures, attach
+    insight = attach(ctx.db, ctx.user, ctx.rid, surface="ask", question=question, data=answer_figures(answer))
+    if insight is not None:
+        answer = {**answer, "insight": insight}
+    return answer

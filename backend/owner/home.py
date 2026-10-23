@@ -224,7 +224,7 @@ def compose_home(ctx: OwnerContext, period: str = "today") -> dict:
     if period not in PERIODS:
         raise ValueError(f"period must be one of {PERIODS}")
     area_blocks = {key: areas.compose_area(ctx, key) for key in areas.AREAS}
-    return {
+    payload = {
         "restaurant": {"id": ctx.rid, "name": ctx.restaurant.name},
         "period": period,
         "timezone": "Africa/Nairobi",
@@ -237,3 +237,8 @@ def compose_home(ctx: OwnerContext, period: str = "today") -> dict:
         "read": _read(ctx),
         "setup": _setup(ctx),
     }
+    from ai.insight import attach, home_figures
+    insight = attach(ctx.db, ctx.user, ctx.rid, surface="home", question=f"Home {period}", data=home_figures(payload))
+    if insight is not None:
+        payload["insight"] = insight
+    return payload

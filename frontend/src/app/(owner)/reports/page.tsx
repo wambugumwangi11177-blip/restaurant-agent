@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { OsLoading, OsError } from "@/components/os/States";
 import SourceUnavailable from "@/components/owner/SourceUnavailable";
 import CreativeNote from "@/components/owner/CreativeNote";
+import InsightNote from "@/components/owner/InsightNote";
 import StateChip from "@/components/owner/StateChip";
 import ReportSectionCard from "@/components/owner/reports/ReportSectionCard";
 import { lastMonths } from "@/lib/owner/format";
@@ -140,6 +141,7 @@ function ReportsContent() {
           <div className="space-y-3">
             {report.sections.map((s) => <ReportSectionCard key={s.key} section={s} period={report.period} />)}
           </div>
+          <InsightNote insight={report.insight} />
         </>
       )}
     </div>

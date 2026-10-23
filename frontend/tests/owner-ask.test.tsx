@@ -141,6 +141,21 @@ describe("what an owner's words are sent to", () => {
     expect(asOwnerAnswer("text")).toBeNull();
   });
 
+  it("the insight sits under the figures and stays labeled as AI-written", () => {
+    show({ ...what, insight: { label: "LEVIII's insight, AI-written", text: "Lunch was the busy service.", state: "live", note: null } });
+    expect(screen.getByText(as(what).headline)).toBeTruthy();
+    const note = screen.getByRole("region", { name: "LEVIII's insight, AI-written" });
+    expect(note.textContent).toContain("Lunch was the busy service.");
+    expect(note.textContent).not.toContain(as(what).headline);
+  });
+
+  it("a failed insight leaves the figures and says the note is unavailable", () => {
+    show({ ...what, insight: { label: "LEVIII's insight, AI-written", text: null, state: "unavailable", note: "insight unavailable" } });
+    expect(screen.getByText(as(what).headline)).toBeTruthy();
+    expect(screen.getByText(shown(what, "sales"))).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("insight unavailable");
+  });
+
   it("figures are written the way the rest of the app writes them", () => {
     expect(rowValue({ value: 1899.39, unit: "kes" })).toBe("KES 1,899");
     expect(rowValue({ value: -8.2, unit: "pct" })).toBe("-8.2%");

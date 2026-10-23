@@ -10,6 +10,7 @@ import CostingYouMoney from "@/components/owner/home/CostingYouMoney";
 import { FirstWeekBanner, lockedAreas, useFirstWeek } from "@/components/owner/home/FirstWeek";
 import HealthStrip from "@/components/owner/home/HealthStrip";
 import Pulse from "@/components/owner/home/Pulse";
+import InsightNote from "@/components/owner/InsightNote";
 import ReadNote from "@/components/owner/home/ReadNote";
 import SourceWaiting from "@/components/owner/home/SourceWaiting";
 import TargetsOnboarding from "@/components/owner/home/TargetsOnboarding";
@@ -65,6 +66,7 @@ export default function HomePage() {
           <Section id="health" eyebrow="How is each part doing?" title="Your restaurant's health"><HealthStrip health={home.health} /></Section>
           <Section id="areas" eyebrow="Open any part for the detail" title="The six areas"><AreaPanels areas={home.areas} opensOn={firstWeek.active ? lockedAreas(ageDays) : {}} /></Section>
           <Section id="coming-up" eyebrow="Before it surprises you" title="Coming up"><ComingUp data={home.coming_up} /></Section>
+          <InsightNote insight={home.insight} />
           <ReadNote read={home.read} />
         </>
       )}

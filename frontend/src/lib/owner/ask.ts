@@ -3,7 +3,7 @@
  * The sentence (`headline`) is written by code from the numbers in `rows`, `drivers` and `columns`; the screen shows both.
  */
 import { kes, pct } from "./format";
-import type { BlockState } from "./types";
+import type { BlockState, Insight } from "./types";
 
 export type AskForm = "what" | "why" | "what_if" | "what_to_do" | "compare";
 
@@ -51,6 +51,7 @@ export type OwnerAnswer = {
   state: BlockState;
   as_of: string | null;
   headline: string;
+  insight?: Insight | null;
   reason?: string;
   rows: AnswerRow[];
   assumptions: AnswerAssumption[];

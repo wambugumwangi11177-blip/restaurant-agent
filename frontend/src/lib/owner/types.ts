@@ -4,6 +4,16 @@
  */
 export type BlockState = "live" | "as_entered" | "learning" | "not_from_pos" | "stale" | "no_data" | "unavailable";
 
+/** A separate AI-written note. The figures it sits under stay the ones the code computed. */
+export type Insight = {
+  label: string;
+  text: string | null;
+  state: "live" | "unavailable";
+  as_of?: string | null;
+  note: string | null;
+  reason?: string | null;
+};
+
 export type Assumption = { setting: string; value: number; label?: string };
 
 export type Block = {
@@ -120,6 +130,8 @@ export type OwnerHome = {
   areas: Record<AreaKey, Area>;
   coming_up: ComingUp;
   read: Block & { text: string | null };
+  /** Present only when the creative layer is on. The pulse figures above it are unchanged. */
+  insight?: Insight | null;
   /** Has the owner chosen their targets, and how many Nairobi days old is the restaurant (0 = the day it joined). */
   setup: { targets_chosen: boolean; age_days: number };
 };

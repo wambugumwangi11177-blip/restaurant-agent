@@ -1,3 +1,5 @@
+> Updated follow-through: the remaining demo workflows are now implemented. See [ELEVEN_ACCEPTANCE.md](ELEVEN_ACCEPTANCE.md) for the current figure-to-feature checklist and exact validation evidence. The original walkthrough below describes the first delivery and is retained for context.
+
 # Demo review before Eleven onboarding
 
 The implementation plan is [ELEVEN_DEMO_PLAN.md](ELEVEN_DEMO_PLAN.md). Eleven has not been provisioned. This review uses only the separate local Demo Restaurant database.

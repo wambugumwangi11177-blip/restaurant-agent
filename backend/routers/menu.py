@@ -18,12 +18,15 @@ _CAN_WRITE = (models.StaffRole.MANAGER,)
 async def read_menu_items(
     skip: int = 0,
     limit: int = 100,
+    channel: models.DeliveryChannel = models.DeliveryChannel.WALK_IN,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     items = db.query(models.MenuItem).filter(models.MenuItem.restaurant_id == restaurant.id).offset(skip).limit(limit).all()
-    return items
+    from domain.scheduled_prices import quoted_menu
+    from time_utils import utcnow
+    return quoted_menu(db,restaurant.id,channel.value,items,utcnow())
 
 @router.post("/", response_model=schemas.MenuItem, status_code=201)
 async def create_menu_item(
@@ -275,5 +278,7 @@ async def get_public_menu(
         models.MenuItem.restaurant_id == restaurant_id,
         models.MenuItem.is_available == True,
     ).all()
-    return items
+    from domain.scheduled_prices import quoted_menu
+    from time_utils import utcnow
+    return quoted_menu(db,restaurant_id,'app',items,utcnow())
 

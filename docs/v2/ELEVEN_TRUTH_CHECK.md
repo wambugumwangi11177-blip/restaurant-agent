@@ -1,3 +1,5 @@
+> Historical audit dated 20 October. The 23 October follow-through implements the missing screens and Chapter 8 workflows listed below. Use [ELEVEN_ACCEPTANCE.md](ELEVEN_ACCEPTANCE.md) for current status, tested connections and real-data boundaries. The older ❌/🟡 entries are preserved as the original audit, not current claims.
+
 # "Eleven on LEVIII" against the code and the demo
 
 The guide sent to Eleven (48 pages, 67 figures, 15 Oct 2026) checked claim by claim against this branch (`ccr-fc67b65b-k9czx3`) on 20 Oct 2026. Evidence comes from reading the code, running the tests, and building the demo with the real generator (`backend/demo/generator.py`, both branches, every planted scenario) and composing each branch's Home through the owner API.

@@ -513,6 +513,35 @@ class Reservation(Base):
 # EXISTING (from previous release) — keep as-is
 # ─────────────────────────────────────────────────────────────────────────────
 
+class ScheduledMenuPrice(Base):
+    __tablename__ = "scheduled_menu_prices"
+    id = Column(Integer, primary_key=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    menu_item_id = Column(Integer, ForeignKey("menu_items.id"), nullable=False)
+    channel = Column(String(32), nullable=False, default="all")
+    daypart = Column(String(16), nullable=False, default="all")
+    price_cents = Column(Integer, nullable=False)
+    starts_on = Column(Date, nullable=False)
+    ends_on = Column(Date, nullable=True)
+    explanation = Column(String(240), nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+
+class OperationEntry(Base):
+    __tablename__ = "operation_entries"
+    id = Column(Integer, primary_key=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    entry_key = Column(String(120), nullable=False, unique=True)
+    kind = Column(String(20), nullable=False)
+    payload = Column(Text, nullable=False)
+    result = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    undone_at = Column(DateTime, nullable=True)
+
+
 class PricingRecommendation(Base):
     __tablename__ = "pricing_recommendations"
     id                      = Column(Integer, primary_key=True, index=True)

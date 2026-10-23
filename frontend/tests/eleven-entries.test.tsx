@@ -3,10 +3,10 @@ import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
 import EntryWorkspace,{cents} from '@/components/operations/EntryWorkspace';
 import PlanningWorkspace from '@/components/owner/PlanningWorkspace';
 import api from '@/lib/api';
-const account=vi.hoisted(()=>({role:'admin',staff_role:'owner',tenant_name:'Demo Restaurant'}));
+const account=vi.hoisted(()=>({role:'admin',staff_role:'owner',tenant_name:'Demo Restaurant',id:1}));
 vi.mock('@/context/AuthContext',()=>({useAuth:()=>({user:account,isLoading:false})}));
 vi.mock('@/lib/api',()=>({default:{get:vi.fn(),post:vi.fn(),put:vi.fn()}}));
-beforeEach(()=>{vi.clearAllMocks();account.role='admin';account.staff_role='owner';vi.mocked(api.get).mockImplementation(async(path)=>({data:String(path).includes('/catalog')?{stock:[],dishes:[{id:1,name:'Fish'},{id:2,name:'Stew'}]}:String(path).includes('/categories')?{categories:[{key:'gas',name:'Cooking gas'}]}:String(path).includes('/planning/stock-review')?{value_kes:0,note:'Recorded entries only',items:[],supplier_prices:[]}:String(path).includes('/planning/shifts')?{shifts:[],note:'Not inferred from a weekly total.'}:[]}) as never);});
+beforeEach(()=>{vi.clearAllMocks();account.role='admin';account.staff_role='owner';vi.mocked(api.get).mockImplementation(async(path)=>({data:String(path).includes('/catalog')?{restaurant_id:202,user_id:1,stock:[],dishes:[{id:1,name:'Fish'},{id:2,name:'Stew'}]}:String(path).includes('/categories')?{categories:[{key:'gas',name:'Cooking gas'}]}:String(path).includes('/planning/stock-review')?{value_kes:0,note:'Recorded entries only',items:[],supplier_prices:[]}:String(path).includes('/planning/menu-review')?{state:'no_data',note:'No sales yet',items:[],gaps:[],tail_ingredients:0,combos:[],results:[]}:String(path).includes('/planning/shifts')?{shifts:[],note:'Not inferred from a weekly total.'}:[]}) as never);});
 afterEach(cleanup);
 it('parses decimal shillings exactly and refuses fractional cents',()=>{expect(cents('4500.10')).toBe(450010);expect(cents('0.01')).toBe(1);expect(()=>cents('1.001')).toThrow();expect(()=>cents('-2')).toThrow();});
 it('saves an expense to the existing ledger and shows confirmation',async()=>{

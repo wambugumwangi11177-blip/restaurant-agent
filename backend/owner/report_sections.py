@@ -368,6 +368,15 @@ def decisions(ctx: OwnerContext, period: str, month: date | None) -> dict:
 
 def savings(ctx: OwnerContext, period: str, month: date | None) -> dict:
     b = areas._money_savings(ctx)
+    from owner.growth import price_results
+    results = [r for r in price_results(ctx.db,ctx.rid,ctx.now)
+               if r['revenue_change_kes'] is not None and (month is None or r['changed_at'][:7]==month.strftime('%Y-%m'))]
+    measured = [row(f"price-result-{r['id']}",f"{r['dish']}: observed revenue after {kes_text(r['old_kes'])} → {kes_text(r['new_kes'])}",
+                    r['revenue_change_kes'],'kes',r['reason']) for r in results]
+    if _empty(b) and measured:
+        return _done({'state':'as_entered','as_of':ctx.now.isoformat()},'14 days before and after each change',
+                     'Recorded revenue after approved price changes; not a causal savings claim.',measured,
+                     [assumption('Equal 14-day windows; recorded paid sales, not projected savings. Other factors may explain the change.')])
     if _empty(b):
         return _nothing(b, "Since you started", "Nothing approved yet.")
     rows = [row("captured", "Brought in by ideas you approved, a month", b["captured_kes_month"], "kes"), row("hours", "Hours saved, last 30 days", b["hours_saved_30d"], "hours"),
@@ -375,7 +384,7 @@ def savings(ctx: OwnerContext, period: str, month: date | None) -> dict:
     n = b["approved_ideas"]
     head = (f"The {'idea' if n == 1 else f'{n} ideas'} you approved {'brings' if n == 1 else 'bring'} in about {kes_text(b['captured_kes_month'])} a month "
             f"and saved about {b['hours_saved_30d']:g} hours.")
-    return _done(b, "Since you started", head, rows, [assumption("These are estimates from the ideas you approved, not money counted in the till.")])
+    return _done(b, "Since you started", head, rows+measured, [assumption("Aggregate savings are estimates; individual price-result rows are observed equal-window revenue changes, not proven causal savings.")])
 
 
 def marketing(ctx: OwnerContext, period: str, month: date | None) -> dict:

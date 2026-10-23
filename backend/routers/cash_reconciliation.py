@@ -31,6 +31,8 @@ async def submit_drawer_count(
     current_user: models.User = Depends(auth.require_staff_role(*_CAN_COUNT)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
+    if body.expected_restaurant_id is not None and body.expected_restaurant_id != restaurant.id:
+        raise HTTPException(409,'Branch changed. Return to the branch where this count was captured.')
     try:
         count = cash_engine.record_drawer_count(
             db, restaurant.id, current_user.id,

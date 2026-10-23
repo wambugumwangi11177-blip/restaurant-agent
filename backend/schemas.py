@@ -86,6 +86,7 @@ class MenuItemUpdate(StrictModel):
 class MenuItem(MenuItemBase):
     id: int
     restaurant_id: int
+    price_quote: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
@@ -95,6 +96,7 @@ class MenuItem(MenuItemBase):
 class OrderItemCreate(StrictModel):
     menu_item_id: int
     quantity: int = Field(default=1, gt=0)
+    price_quote: Optional[str] = Field(default=None,max_length=2048)
 
 class OrderCreate(StrictModel):
     items: List[OrderItemCreate]
@@ -523,6 +525,7 @@ class StockCountOut(StrictModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 class CashDrawerCountCreate(StrictModel):
+    expected_restaurant_id: Optional[int] = Field(default=None,gt=0)
     @field_validator("window_start", "window_end")
     @classmethod
     def utc_window(cls, value):

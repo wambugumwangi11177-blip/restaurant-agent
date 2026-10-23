@@ -12,6 +12,7 @@ from routers.deps import get_or_create_restaurant
 from time_utils import utcnow
 from ai.order_stock import deduct_ingredients_for_order, reverse_ingredients_for_order
 from domain.pricing import build_order_lines
+from domain.scheduled_prices import checkout_prices
 
 logger = logging.getLogger("orders.router")
 
@@ -74,7 +75,8 @@ async def create_order(
     # AUD-002: shared line-item/total builder (was duplicated inline here and
     # in create_public_order, with the copies already divergent).
     try:
-        order_items, total = build_order_lines(order.items, menu_items_by_id)
+        order_items, total = build_order_lines(order.items, menu_items_by_id,
+            prices_by_id=checkout_prices(db, restaurant.id, delivery_channel.value, order.items, utcnow()))
     except ValueError as exc:
         menu_item_id = exc.args[0].split(":", 1)[1]
         raise HTTPException(status_code=404, detail=f"Menu item {menu_item_id} not found")
@@ -449,7 +451,8 @@ async def create_public_order(
     # AUD-002: the shared line-item/total builder (was duplicated inline here,
     # already divergent from the staff path — this one filters is_available).
     try:
-        order_items, total = build_order_lines(order.items, menu_items_by_id, require_available=True)
+        order_items, total = build_order_lines(order.items, menu_items_by_id, require_available=True,
+            prices_by_id=checkout_prices(db, restaurant.id, 'app', order.items, utcnow()))
     except ValueError as exc:
         menu_item_id = exc.args[0].split(":", 1)[1]
         raise HTTPException(status_code=404, detail=f"Menu item {menu_item_id} not found or unavailable")

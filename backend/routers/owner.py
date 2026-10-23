@@ -9,11 +9,13 @@ Observer-mode deployments (read-only Macsoft) block this whole prefix, like /ove
 (observer_mode.py): these endpoints compose figures from local tables.
 """
 import json
+from datetime import date, timedelta
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, create_model
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 import models
 from auth import require_staff_role
@@ -34,6 +36,85 @@ router = APIRouter(prefix="/owner", tags=["owner"])
 _owner_only = require_staff_role(models.StaffRole.OWNER)
 
 
+@router.get('/planning/menu-review')
+def menu_review(db: Session=Depends(get_db), user=Depends(_owner_only)):
+    from owner.growth import menu_review as review
+    return review(OwnerContext(db,user,_restaurant(db,user)))
+
+
+@router.get('/planning/branches')
+def branch_review(db: Session=Depends(get_db),user=Depends(_owner_only)):
+    from owner.growth import branch_review as review
+    return review(OwnerContext(db,user,_restaurant(db,user)))
+
+
+@router.get('/planning/forecast')
+def prep_forecast(on: date, db: Session=Depends(get_db), user=Depends(_owner_only)):
+    from owner.planning import forecast_portions
+    try:
+        return forecast_portions(OwnerContext(db,user,_restaurant(db,user)),on)
+    except ValueError as exc:
+        raise HTTPException(422,str(exc)) from exc
+
+
+class PriceListIn(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    menu_item_id: int = Field(gt=0)
+    channel: Literal['all','walk_in','app','uber_eats','glovo','bolt_food'] = 'all'
+    daypart: Literal['all','breakfast','lunch','afternoon','dinner','late'] = 'all'
+    price_cents: StrictInt = Field(gt=0,le=100000000)
+    starts_on: date
+    ends_on: date | None = None
+    explanation: str = Field(min_length=5,max_length=240)
+
+
+@router.get('/planning/prices')
+def price_lists(db: Session=Depends(get_db), user=Depends(_owner_only)):
+    rid=_restaurant(db,user).id
+    return [{'id':r.id,'menu_item_id':r.menu_item_id,'channel':r.channel,'daypart':r.daypart,
+             'price_kes':r.price_cents/100,'starts_on':r.starts_on.isoformat(),
+             'ends_on':r.ends_on.isoformat() if r.ends_on else None,'explanation':r.explanation,'active':r.is_active}
+            for r in db.query(models.ScheduledMenuPrice).filter_by(restaurant_id=rid).order_by(models.ScheduledMenuPrice.id.desc()).all()]
+
+
+@router.post('/planning/prices',status_code=201)
+def create_price_list(body: PriceListIn, db: Session=Depends(get_db), user=Depends(_owner_only)):
+    from time_utils import eat_date
+    rid=_restaurant(db,user).id
+    dish=db.query(models.MenuItem).filter_by(id=body.menu_item_id,restaurant_id=rid).with_for_update().first()
+    if not dish:
+        raise HTTPException(404,'Dish not found')
+    if body.starts_on<=eat_date(utcnow()) or body.ends_on and body.ends_on<body.starts_on:
+        raise HTTPException(422,'Schedule from tomorrow or later, with an end on or after the start')
+    if body.daypart!='all' and body.price_cents>dish.price:
+        raise HTTPException(422,'Daypart prices are discounts, never surges')
+    if not body.explanation.strip():
+        raise HTTPException(422,'Explain this price to your customers')
+    existing=db.query(models.ScheduledMenuPrice).filter_by(restaurant_id=rid,menu_item_id=dish.id,
+        channel=body.channel,daypart=body.daypart,is_active=True).all()
+    if any(r.starts_on<=(body.ends_on or date.max) and (r.ends_on or date.max)>=body.starts_on for r in existing):
+        raise HTTPException(409,'An active price already covers this dish, channel and period')
+    rule=models.ScheduledMenuPrice(**body.model_dump(),restaurant_id=rid,created_by=user.id)
+    db.add(rule);db.commit()
+    return {'id':rule.id,'message':'Scheduled. Existing orders retain their recorded prices.'}
+
+
+@router.delete('/planning/prices/{rule_id}')
+def stop_price_list(rule_id:int,db:Session=Depends(get_db),user=Depends(_owner_only)):
+    rule=db.query(models.ScheduledMenuPrice).filter_by(id=rule_id,restaurant_id=_restaurant(db,user).id).first()
+    if not rule:
+        raise HTTPException(404,'Price not found')
+    # Active schedules are ended on the next Nairobi day, never changed mid-service.
+    from time_utils import eat_date
+    today=eat_date(utcnow())
+    if rule.starts_on>today:
+        rule.is_active=False
+    else:
+        rule.ends_on=min(rule.ends_on or date.max,today)
+    db.commit()
+    return {'message':'Future price cancelled or current price ends tonight.'}
+
+
 class PlannedDish(BaseModel):
     model_config = ConfigDict(extra="forbid")
     menu_item_id: int = Field(gt=0)
@@ -49,6 +130,52 @@ class ComboPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
     menu_item_ids: list[int] = Field(min_length=2, max_length=10)
     price_cents: int = Field(gt=0, le=100000000)
+
+
+class MarketDraft(PrepPlan):
+    entry_key: str = Field(min_length=8,max_length=64)
+    suppliers: dict[int,int] = Field(default_factory=dict)
+
+
+@router.post('/planning/market-drafts',status_code=201)
+def market_drafts(body:MarketDraft,db:Session=Depends(get_db),user=Depends(_owner_only)):
+    from owner.planning import prepare
+    from decimal import Decimal, ROUND_HALF_UP
+    rid=_restaurant(db,user).id
+    key=f'market:{rid}:{user.id}:{body.entry_key}'
+    payload=json.dumps(body.model_dump(exclude={'entry_key'}),sort_keys=True)
+    old=db.query(models.OperationEntry).filter_by(entry_key=key).first()
+    if old:
+        if old.payload!=payload:
+            raise HTTPException(409,'Retry key already used for another plan')
+        return json.loads(old.result)
+    try:
+        prep=prepare(OwnerContext(db,user,_restaurant(db,user)),body.dishes)
+        ids=[]
+        for row in prep['items']:
+            if row['buy']<=0:
+                continue
+            sid=body.suppliers.get(row['inventory_item_id'],row['supplier_id'])
+            supplier=db.query(models.Supplier).filter_by(id=sid,restaurant_id=rid).first()
+            if not supplier or row['cost_per_unit_cents']<=0:
+                raise ValueError(f"{row['item']}: choose a supplier and enter the unit cost first")
+            total=int((Decimal(str(row['buy']))*row['cost_per_unit_cents']).quantize(Decimal('1'),rounding=ROUND_HALF_UP))
+            po=models.PurchaseOrder(restaurant_id=rid,supplier_id=sid,inventory_item_id=row['inventory_item_id'],
+                quantity_ordered=row['buy'],unit=row['unit'],cost_per_unit=row['cost_per_unit_cents'],total_cost=total,
+                status='PENDING',notes='Owner-reviewed prep market list; approve in Purchasing before receiving.')
+            db.add(po);db.flush();ids.append(po.id)
+        result={'purchase_order_ids':ids,'message':f'{len(ids)} draft lines saved. Review by supplier in Purchasing; nothing sent.'}
+        db.add(models.OperationEntry(restaurant_id=rid,user_id=user.id,entry_key=key,kind='market',payload=payload,result=json.dumps(result)))
+        db.commit()
+        return result
+    except ValueError as exc:
+        db.rollback();raise HTTPException(422,str(exc)) from exc
+    except IntegrityError:
+        db.rollback()
+        prior=db.query(models.OperationEntry).filter_by(entry_key=key).first()
+        if prior and prior.payload==payload:
+            return json.loads(prior.result)
+        raise HTTPException(409,'Plan changed during save. Reload and review the existing drafts.')
 
 
 @router.post('/planning/prep')

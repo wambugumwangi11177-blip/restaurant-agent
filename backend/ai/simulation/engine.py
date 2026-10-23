@@ -171,7 +171,10 @@ def simulate_price_change(
     baseline = _item_baseline(db, restaurant_id, item_id)
     price_change_pct = (new_price - current_price) / current_price * 100
 
-    elasticity = _effective_elasticity(baseline["velocity_ratio"], settings.price_sensitivity)
+    from owner.growth import learned_sensitivity
+    from time_utils import utcnow
+    learned = learned_sensitivity(db, restaurant_id, item_id, utcnow())
+    elasticity = learned if learned is not None else _effective_elasticity(baseline["velocity_ratio"], settings.price_sensitivity)
     demand_change_pct = elasticity * price_change_pct
     # Demand can't go negative; a >100% projected drop is clamped to ~0 sales.
     demand_factor = max(0.0, 1.0 + demand_change_pct / 100.0)
@@ -226,6 +229,7 @@ def simulate_price_change(
             "satisfaction_pct_points": satisfaction_delta,
         },
         "elasticity_used": round(elasticity, 2),
+        "sensitivity_source": "measured approved changes" if learned is not None else "owner assumption adjusted for recent demand",
         "confidence_pct": _confidence(baseline["data_days"], price_change_pct),
         "verdict": verdict,
         "verdict_reason": reason,

@@ -9,3 +9,7 @@ Eleven remains unprovisioned. The 23 October request authorizes implementation o
 5. Test tenant/role boundaries, conversion and yield examples, input errors and screen interactions; run regression checks and production build, migrate only the local demo, and verify the running app. Record remaining real-data dependencies.
 
 Acceptance: staff entries feed the existing owner numbers; repeated in-flight submissions cannot double-post; blind counts hide expected cash; no invented numbers or unexplained aggregate-to-shift attribution; all screens reachable; Eleven's till and real statement validation remain explicit onboarding dependencies.
+
+## Completed follow-through requested by “FINISH”
+
+Implemented forecast-to-purchase drafts, statement and bounded-count shift checks, owner-set scheduled prices with quoted checkout, per-dish measured learning used in simulations/recommendations, price ladder, reviewed menu trimming, priced Star–Puzzle candidates, ABC counting calendar, branch control comparisons and observed per-change monthly results. Staff entries now include counts/waste/issues/bills, a scoped offline queue, quick audited reversals, accountant P&L/expense review and receipt access. Acceptance and exact evidence: [ELEVEN_ACCEPTANCE.md](ELEVEN_ACCEPTANCE.md). Only the actual Eleven onboarding inputs and the documented evidence/interpretation boundaries remain; Eleven is deliberately unprovisioned.

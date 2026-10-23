@@ -28,6 +28,7 @@ def build_order_lines(
     order_items: Iterable,
     menu_items_by_id: Dict[int, models.MenuItem],
     require_available: bool = False,
+    prices_by_id: dict | None = None,
 ) -> tuple[list, int]:
     """Build OrderItem rows and the integer-cents order total in one pass.
 
@@ -43,11 +44,12 @@ def build_order_lines(
             raise ValueError(f"menu_item_id:{oi.menu_item_id}")
         if require_available and not menu_item.is_available:
             raise ValueError(f"menu_item_id:{oi.menu_item_id}")
-        line_total = menu_item.price * oi.quantity
+        price = (prices_by_id or {}).get(menu_item.id, menu_item.price)
+        line_total = price * oi.quantity
         total += line_total
         order_items_out.append(models.OrderItem(
             menu_item_id=menu_item.id,
             quantity=oi.quantity,
-            unit_price=menu_item.price,
+            unit_price=price,
         ))
     return order_items_out, total

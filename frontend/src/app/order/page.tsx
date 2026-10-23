@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 interface MenuItem {
+    price_quote?: string;
     id: number;
     name: string;
     price: number;
@@ -91,7 +92,7 @@ export default function CustomerOrderPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    items: cart.map((c) => ({ menu_item_id: c.menuItem.id, quantity: c.quantity })),
+                    items: cart.map((c) => ({ menu_item_id: c.menuItem.id, quantity: c.quantity, price_quote:c.menuItem.price_quote })),
                     order_type: orderType,
                     delivery_channel: "app",
                     payment_method: "pending",

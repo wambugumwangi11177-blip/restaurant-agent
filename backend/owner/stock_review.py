@@ -10,6 +10,7 @@ from time_utils import eat_date
 
 
 def review(ctx):
+    from domain.entry_corrections import valid_count_filters, valid_movement_filters
     items = ctx.db.query(models.InventoryItem).filter_by(restaurant_id=ctx.rid).all()
     ids = [i.id for i in items]
     movements = defaultdict(list)
@@ -17,6 +18,7 @@ def review(ctx):
         models.StockMovement.inventory_item_id.in_(ids),
         models.StockMovement.created_at >= ctx.now - timedelta(days=30),
         models.StockMovement.created_at <= ctx.now,
+        *valid_movement_filters(ctx.db,ctx.rid),
     ).all():
         movements[row.inventory_item_id].append(row)
     predictions = _apply_abc_classification([
@@ -28,6 +30,7 @@ def review(ctx):
     for row in ctx.db.query(models.StockCount).filter(
         models.StockCount.restaurant_id == ctx.rid,
         models.StockCount.counted_at <= ctx.now,
+        *valid_count_filters(ctx.db,ctx.rid),
     ).all():
         counts[row.inventory_item_id].append(row.counted_at)
     predictions_by_id = {p['id']: p for p in predictions}
@@ -48,6 +51,9 @@ def review(ctx):
                      'last_count': last.isoformat() if last else None,
                      'count_every_days': interval, 'count_due': due.isoformat(),
                      'count_overdue': due <= eat_date(ctx.now)})
+        next_day=max(due,eat_date(ctx.now))
+        rows[-1]['count_calendar']=[(next_day+timedelta(days=n)).isoformat()
+            for n in range(0,30,interval) if next_day+timedelta(days=n)<eat_date(ctx.now)+timedelta(days=30)]
     purchases = defaultdict(list)
     for po in ctx.db.query(models.PurchaseOrder).filter(
         models.PurchaseOrder.restaurant_id == ctx.rid,

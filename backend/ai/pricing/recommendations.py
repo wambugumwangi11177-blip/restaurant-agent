@@ -46,12 +46,27 @@ def get_pricing_intelligence(db: Session, restaurant_id: int, settings: Settings
 
     recommendations = []
     item_analyses   = []
+    from owner.growth import price_results
+    from statistics import median
+    measured = {}
+    for observation in price_results(db,restaurant_id,utcnow()):
+        if observation['elasticity'] is not None:
+            measured.setdefault(observation['dish_id'],[]).append(observation['elasticity'])
 
     for item in items:
         vel = velocities.get(item.id)
         if vel is None:
             continue
         result = analyse_item(item, vel, on_cooldown=item.id in on_cooldown, settings=settings)
+        if result.get('type') and item.id in measured:
+            sensitivity=median(measured[item.id])
+            ratio=result['suggested_price']/max(item.price,1)
+            projected=vel.avg_daily_baseline*max(0,1+sensitivity*(ratio-1))
+            result['monthly_impact_cents']=round((projected*(result['suggested_price']-(item.cost_price or 0))-
+                vel.avg_daily_baseline*(item.price-(item.cost_price or 0)))*30)
+            result['sensitivity_source']='measured approved changes'
+            result['sensitivity_used']=sensitivity
+            result['reason']+='; impact allows for the demand response measured after your approved changes'
         item_analyses.append(result)
         if result.get("type"):
             recommendations.append(result)
@@ -290,6 +305,7 @@ def approve_recommendation(db: Session, rec_id: int, restaurant_id: int, approve
         return {"error": "Menu item not found or does not belong to this restaurant"}
 
     old_price       = item.price
+    rec.current_price = old_price
     item.price      = rec.suggested_price
     rec.status      = "APPROVED"
     rec.actioned_at = utcnow()

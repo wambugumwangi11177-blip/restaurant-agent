@@ -241,6 +241,21 @@ def _detect_till_price_gap(db: Session, restaurant_id: int, item_map: dict, now:
     DS-04 FIX: monthly_leak extrapolation uses * (30/14) not * 2.
     BUG-04 FIX: 14-day window uses UTC (now is already UTC from caller).
     """
+    approved_lines = []
+    rules = db.query(models.ScheduledMenuPrice).filter_by(restaurant_id=restaurant_id,is_active=True).all()
+    if rules:
+        from domain.scheduled_prices import daypart
+        from time_utils import eat_date
+        for line, order in db.query(models.OrderItem,models.Order).join(models.Order).filter(
+            models.Order.restaurant_id==restaurant_id,models.Order.created_at>=now-timedelta(days=14)).all():
+            for quoted_at in (order.created_at,order.created_at-timedelta(minutes=60)):
+                applicable=[r for r in rules if r.menu_item_id==line.menu_item_id and r.created_at<=quoted_at and
+                    r.starts_on<=eat_date(quoted_at) and (r.ends_on is None or r.ends_on>=eat_date(quoted_at)) and
+                    r.channel in ('all',order.delivery_channel.value if order.delivery_channel else 'walk_in') and
+                    r.daypart in ('all',daypart(quoted_at))]
+                applicable.sort(key=lambda r:(int(r.channel!='all')+int(r.daypart!='all'),r.id))
+                if applicable and line.unit_price==applicable[-1].price_cents:
+                    approved_lines.append(line.id);break
     rows = (
         db.query(
             models.OrderItem.menu_item_id,
@@ -252,6 +267,7 @@ def _detect_till_price_gap(db: Session, restaurant_id: int, item_map: dict, now:
             models.Order.restaurant_id == restaurant_id,
             models.Order.status != models.OrderStatus.CANCELLED,
             models.Order.created_at >= now - timedelta(days=14),   # UTC ✓
+            models.OrderItem.id.notin_(approved_lines),
         )
         .group_by(models.OrderItem.menu_item_id)
         .all()

@@ -29,6 +29,7 @@ import {
 } from "@/lib/offlineOrderOutbox";
 
 interface MenuItem {
+    price_quote?: string;
     id: number;
     name: string;
     price: number;
@@ -137,6 +138,7 @@ export default function POSWorkspace() {
         const payload = {
             items: cart.map((c) => ({
                 menu_item_id: c.menuItem.id,
+                price_quote: c.menuItem.price_quote,
                 quantity: c.quantity,
             })),
             order_type: orderType,
@@ -373,7 +375,7 @@ export default function POSWorkspace() {
                                     { v: "glovo", label: "Glovo" },
                                     { v: "walk_in", label: "Direct" },
                                 ].map((ch) => (
-                                    <button key={ch.v} onClick={() => setDeliveryChannel(ch.v)}
+                                    <button key={ch.v} onClick={async () => {try{const r=await api.get(`/menu/?channel=${ch.v}`);setMenuItems(r.data.filter((i:MenuItem)=>i.is_available!==false));setCart([]);setDeliveryChannel(ch.v);setOrderError('Channel changed; the cart was cleared so you can confirm the correct prices.');}catch{setOrderError('Could not load channel prices. Check your connection and retry.');}}}
                                         className={`flex-1 py-1.5 rounded-lg text-[10px] font-medium transition-all ${deliveryChannel === ch.v
                                                 ? "bg-info/10 text-info border border-info/30"
                                                 : "bg-surface-hover text-text-muted border border-transparent"

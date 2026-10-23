@@ -32,6 +32,7 @@ from ai.analysis_clock import analysis_anchor
 # ─────────────────────────────────────────────────────────────────────────────
 def get_inventory_predictions(db: Session, restaurant_id: int) -> dict:
     """Complete inventory intelligence — exhaustive analysis."""
+    from domain.entry_corrections import valid_movement_filters
     items = db.query(models.InventoryItem).filter(
         models.InventoryItem.restaurant_id == restaurant_id
     ).all()
@@ -51,6 +52,7 @@ def get_inventory_predictions(db: Session, restaurant_id: int) -> dict:
         .filter(
             models.StockMovement.inventory_item_id.in_([i.id for i in items]),
             models.StockMovement.created_at >= thirty_days_ago,
+            *valid_movement_filters(db,restaurant_id),
         )
         .all()
     )
@@ -345,14 +347,18 @@ def _apply_abc_classification(predictions):
 
     cumulative = 0
     for p in sorted_by_spend:
-        cumulative += p["monthly_spend"]
+        # The item crossing a boundary belongs to the band it fills. Otherwise
+        # one item making up 90% of spend could incorrectly be classified B.
         cum_pct = (cumulative / max(total_spend, 1)) * 100
-        if cum_pct <= 80:
+        if p['monthly_spend'] <= 0:
+            p['abc_class'] = 'C'
+        elif cum_pct < 80:
             p["abc_class"] = "A"
-        elif cum_pct <= 95:
+        elif cum_pct < 95:
             p["abc_class"] = "B"
         else:
             p["abc_class"] = "C"
+        cumulative += p["monthly_spend"]
 
     return sorted_by_spend
 

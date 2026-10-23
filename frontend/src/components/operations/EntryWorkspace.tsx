@@ -4,6 +4,9 @@ import Link from "next/link";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { homeFor, isOwnerAccount } from "@/lib/tenantHome";
+import StockEntries from './StockEntries';
+import AccountantReview from './AccountantReview';
+import { submitOrQueue } from '@/lib/entryQueue';
 
 type Stock = {id:number;name:string;unit:string;on_hand:number;par:number|null;buying_unit:string;factor:number};
 type PO = {id:number;item_name:string;supplier_name:string;quantity_ordered:number;unit:string;inventory_item_id:number;status:string;invoice_ref?:string|null};
@@ -30,6 +33,7 @@ export default function EntryWorkspace() {
  const owner=isOwnerAccount(user); const role=user?.staff_role?.toLowerCase();
  const money=owner||role==='manager'||role==='controller'; const receiving=owner||role==='manager'||role==='stockkeeper';
  const [categories,setCategories]=useState<Category[]>([]),[stock,setStock]=useState<Stock[]>([]),[orders,setOrders]=useState<PO[]>([]);
+ const [restaurantId,setRestaurantId]=useState<number|null>(null);
  const [error,setError]=useState(''),[success,setSuccess]=useState(''),[busy,setBusy]=useState(false);
  const locked=useRef(false),entryKey=useRef<string|null>(null);
  const [tab,setTab]=useState('expense'),[category,setCategory]=useState(''),[amount,setAmount]=useState(''),[method,setMethod]=useState('cash');
@@ -39,7 +43,7 @@ export default function EntryWorkspace() {
  const [itemId,setItemId]=useState(''),[buying,setBuying]=useState(''),[factor,setFactor]=useState('1');
  const allowed=money||receiving;
  const load=useCallback(async()=>{
-  const catalog=await api.get('/api/v1/owner/operations/catalog');setStock(catalog.data.stock);
+  const catalog=await api.get('/api/v1/owner/operations/catalog');setStock(catalog.data.stock);setRestaurantId(catalog.data.restaurant_id||null);
   if(money){const c=await api.get('/api/v1/owner/money/categories');setCategories(c.data.categories);}
   if(receiving){const p=await api.get('/api/v1/purchase-orders/');setOrders(p.data);}
  },[money,receiving]);
@@ -55,13 +59,18 @@ export default function EntryWorkspace() {
   entryKey.current??=crypto.randomUUID();
   try {
    if(tab==='expense') {
-    const ref=await upload(); await api.post('/api/v1/owner/money/expenses',{category,amount_kes:(cents(amount)/100).toFixed(2),method,receipt_ref:ref,entry_key:entryKey.current});
+    const ref=await upload();
+    const body={category,amount_kes:(cents(amount)/100).toFixed(2),method,receipt_ref:ref,entry_key:entryKey.current,paid_on:today(),...(restaurantId?{expected_restaurant_id:restaurantId}:{})};
+    if(!photo&&restaurantId&&user){const result=await submitOrQueue({id:entryKey.current,userId:user.id,restaurantId,url:'/api/v1/owner/money/expenses',body,label:'Expense',capturedAt:new Date().toISOString()});if(result.queued){setSuccess('Expense saved on this device, awaiting sync in the queue below. It is not in Profit & Loss yet.');entryKey.current=null;setAmount('');window.dispatchEvent(new Event('entry-queued'));return;}}
+    else await api.post('/api/v1/owner/money/expenses',body);
     setSuccess('Expense saved. It is now included in Profit & Loss.');setAmount('');
    } else if(tab==='cash') {
     const lo=new Date(`${day}T${start}:00+03:00`),hi=new Date(`${day}T${end}:00+03:00`);
     if(hi<=lo)hi.setUTCDate(hi.getUTCDate()+1);
-    const r=await api.post('/api/v1/cash-reconciliation/counts',{counted_amount_cents:cents(counted),window_start:lo.toISOString(),window_end:hi.toISOString(),entry_key:entryKey.current});
-    const gap=(r.data.counted_amount_cents-r.data.expected_amount_cents)/100;
+    const body={counted_amount_cents:cents(counted),window_start:lo.toISOString(),window_end:hi.toISOString(),entry_key:entryKey.current,...(restaurantId?{expected_restaurant_id:restaurantId}:{})};
+    const result=restaurantId&&user?await submitOrQueue({id:entryKey.current,userId:user.id,restaurantId,url:'/api/v1/cash-reconciliation/counts',body,label:'Cash count',capturedAt:new Date().toISOString()}):{queued:false,data:(await api.post('/api/v1/cash-reconciliation/counts',body)).data};
+    if(result.queued){setSuccess('Cash count saved on this device; sync it below to include it in the owner report.');entryKey.current=null;setCounted('');window.dispatchEvent(new Event('entry-queued'));return;}
+    const gap=(result.data.counted_amount_cents-result.data.expected_amount_cents)/100;
     setSuccess(`Count saved. Difference from recorded cash sales: KES ${gap.toLocaleString('en-KE')}. The owner can review it.`);setCounted('');
    } else if(tab==='delivery') {
     const ref=await upload();const r=await api.post(`/api/v1/owner/operations/deliveries/${poId}/receive`,{quantity:Number(qty),units,invoice_ref:ref});
@@ -96,5 +105,7 @@ export default function EntryWorkspace() {
    </fieldset>
   </form>}
   {receiving&&<section className="space-y-2"><h2 className="text-xl font-semibold">Recent deliveries</h2>{orders.filter(p=>p.status==='DELIVERED'||p.status==='PARTIAL').slice(0,8).map(p=><div key={p.id} className="rounded-lg border border-slate-200 p-3"><p>{p.item_name} · {p.supplier_name} · {p.status}</p>{p.invoice_ref&&<button className="min-h-11 underline" type="button" onClick={async()=>{try{const r=await api.get(`/api/v1/owner/operations/receipts/${p.invoice_ref?.split('/').pop()}`,{responseType:'blob'});const u=URL.createObjectURL(r.data);const a=document.createElement('a');a.href=u;a.download='invoice.jpg';a.click();URL.revokeObjectURL(u);}catch(e){setError(message(e));}}}>Download invoice photo</button>}</div>)}</section>}
+  <StockEntries/>
+  {money&&<AccountantReview/>}
  </div>;
 }

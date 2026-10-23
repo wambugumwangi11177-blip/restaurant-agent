@@ -77,6 +77,7 @@ def _theoretical_usage_by_item(db: Session, restaurant_id: int, since) -> dict[i
 def _actual_usage_by_item(db: Session, restaurant_id: int, since) -> dict[int, float]:
     """Sum(StockMovement.quantity) for OUT movements on this restaurant's
     inventory since `since`, grouped by inventory_item_id."""
+    from domain.entry_corrections import valid_movement_filters
     rows = (
         db.query(
             models.StockMovement.inventory_item_id,
@@ -87,6 +88,7 @@ def _actual_usage_by_item(db: Session, restaurant_id: int, since) -> dict[int, f
             models.InventoryItem.restaurant_id == restaurant_id,
             models.StockMovement.movement_type == models.StockMovementType.OUT,
             models.StockMovement.created_at >= since,
+              *valid_movement_filters(db,restaurant_id),
         )
         .group_by(models.StockMovement.inventory_item_id)
         .all()

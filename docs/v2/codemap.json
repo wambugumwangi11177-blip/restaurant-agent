@@ -1120,6 +1120,11 @@
    },
    {
     "from": "ai.inventory_predictor",
+    "lazy": true,
+    "to": "domain.entry_corrections"
+   },
+   {
+    "from": "ai.inventory_predictor",
     "lazy": false,
     "to": "models"
    },
@@ -1515,6 +1520,11 @@
    },
    {
     "from": "ai.pricing.recommendations",
+    "lazy": true,
+    "to": "owner.growth"
+   },
+   {
+    "from": "ai.pricing.recommendations",
     "lazy": false,
     "to": "owner.settings"
    },
@@ -1532,6 +1542,11 @@
     "from": "ai.profit.intelligence",
     "lazy": false,
     "to": "ai.analysis_clock"
+   },
+   {
+    "from": "ai.profit.intelligence",
+    "lazy": true,
+    "to": "domain.scheduled_prices"
    },
    {
     "from": "ai.profit.intelligence",
@@ -1725,6 +1740,11 @@
    },
    {
     "from": "ai.simulation.engine",
+    "lazy": true,
+    "to": "owner.growth"
+   },
+   {
+    "from": "ai.simulation.engine",
     "lazy": false,
     "to": "owner.settings"
    },
@@ -1772,6 +1792,11 @@
     "from": "ai.stock_custody",
     "lazy": true,
     "to": "ai.evaluation.tracker"
+   },
+   {
+    "from": "ai.stock_custody",
+    "lazy": true,
+    "to": "domain.entry_corrections"
    },
    {
     "from": "ai.stock_custody",
@@ -2074,9 +2099,34 @@
     "to": "models"
    },
    {
+    "from": "domain.entry_corrections",
+    "lazy": false,
+    "to": "models"
+   },
+   {
     "from": "domain.pricing",
     "lazy": false,
     "to": "models"
+   },
+   {
+    "from": "domain.scheduled_prices",
+    "lazy": true,
+    "to": "auth"
+   },
+   {
+    "from": "domain.scheduled_prices",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "domain.scheduled_prices",
+    "lazy": true,
+    "to": "schemas"
+   },
+   {
+    "from": "domain.scheduled_prices",
+    "lazy": false,
+    "to": "time_utils"
    },
    {
     "from": "events",
@@ -2744,6 +2794,46 @@
     "to": "routers.ai_ask"
    },
    {
+    "from": "owner.growth",
+    "lazy": true,
+    "to": "domain.entry_corrections"
+   },
+   {
+    "from": "owner.growth",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.growth",
+    "lazy": true,
+    "to": "owner.answer_compare"
+   },
+   {
+    "from": "owner.growth",
+    "lazy": true,
+    "to": "owner.areas"
+   },
+   {
+    "from": "owner.growth",
+    "lazy": true,
+    "to": "owner.menu_math"
+   },
+   {
+    "from": "owner.growth",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "owner.growth",
+    "lazy": true,
+    "to": "routers.deps"
+   },
+   {
+    "from": "owner.growth",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
     "from": "owner.health",
     "lazy": false,
     "to": "owner.money.pnl"
@@ -3000,6 +3090,11 @@
    },
    {
     "from": "owner.planning",
+    "lazy": true,
+    "to": "domain.entry_corrections"
+   },
+   {
+    "from": "owner.planning",
     "lazy": false,
     "to": "models"
    },
@@ -3017,6 +3112,11 @@
     "from": "owner.planning",
     "lazy": false,
     "to": "owner.menu_math"
+   },
+   {
+    "from": "owner.planning",
+    "lazy": true,
+    "to": "owner.mpesa_match"
    },
    {
     "from": "owner.planning",
@@ -3072,6 +3172,11 @@
     "from": "owner.report_sections",
     "lazy": false,
     "to": "owner.areas"
+   },
+   {
+    "from": "owner.report_sections",
+    "lazy": true,
+    "to": "owner.growth"
    },
    {
     "from": "owner.report_sections",
@@ -3187,6 +3292,11 @@
     "from": "owner.stock_review",
     "lazy": false,
     "to": "ai.inventory_predictor"
+   },
+   {
+    "from": "owner.stock_review",
+    "lazy": true,
+    "to": "domain.entry_corrections"
    },
    {
     "from": "owner.stock_review",
@@ -3896,6 +4006,11 @@
    {
     "from": "routers.menu",
     "lazy": true,
+    "to": "domain.scheduled_prices"
+   },
+   {
+    "from": "routers.menu",
+    "lazy": true,
     "to": "events.bus"
    },
    {
@@ -3917,6 +4032,11 @@
     "from": "routers.menu",
     "lazy": false,
     "to": "schemas"
+   },
+   {
+    "from": "routers.menu",
+    "lazy": true,
+    "to": "time_utils"
    },
    {
     "from": "routers.notifications",
@@ -3982,6 +4102,11 @@
     "from": "routers.orders",
     "lazy": false,
     "to": "domain.pricing"
+   },
+   {
+    "from": "routers.orders",
+    "lazy": false,
+    "to": "domain.scheduled_prices"
    },
    {
     "from": "routers.orders",
@@ -4077,6 +4202,11 @@
     "from": "routers.owner",
     "lazy": false,
     "to": "owner.ask"
+   },
+   {
+    "from": "routers.owner",
+    "lazy": true,
+    "to": "owner.growth"
    },
    {
     "from": "routers.owner",
@@ -4272,6 +4402,11 @@
     "from": "routers.owner_operations",
     "lazy": false,
     "to": "storage"
+   },
+   {
+    "from": "routers.owner_operations",
+    "lazy": false,
+    "to": "time_utils"
    },
    {
     "from": "routers.purchase_orders",
@@ -4871,7 +5006,7 @@
     "group": "ai",
     "id": "ai.inventory_predictor",
     "kind": "py",
-    "loc": 455,
+    "loc": 461,
     "path": "backend\\ai\\inventory_predictor.py"
    },
    {
@@ -5018,7 +5153,7 @@
     "group": "ai",
     "id": "ai.pricing.recommendations",
     "kind": "py",
-    "loc": 355,
+    "loc": 371,
     "path": "backend\\ai\\pricing\\recommendations.py"
    },
    {
@@ -5032,7 +5167,7 @@
     "group": "ai",
     "id": "ai.profit.intelligence",
     "kind": "py",
-    "loc": 572,
+    "loc": 588,
     "path": "backend\\ai\\profit\\intelligence.py"
    },
    {
@@ -5116,7 +5251,7 @@
     "group": "ai",
     "id": "ai.simulation.engine",
     "kind": "py",
-    "loc": 317,
+    "loc": 321,
     "path": "backend\\ai\\simulation\\engine.py"
    },
    {
@@ -5144,7 +5279,7 @@
     "group": "ai",
     "id": "ai.stock_custody",
     "kind": "py",
-    "loc": 475,
+    "loc": 477,
     "path": "backend\\ai\\stock_custody.py"
    },
    {
@@ -5282,10 +5417,24 @@
    },
    {
     "group": "other",
+    "id": "domain.entry_corrections",
+    "kind": "py",
+    "loc": 18,
+    "path": "backend\\domain\\entry_corrections.py"
+   },
+   {
+    "group": "other",
     "id": "domain.pricing",
     "kind": "py",
-    "loc": 54,
+    "loc": 56,
     "path": "backend\\domain\\pricing.py"
+   },
+   {
+    "group": "other",
+    "id": "domain.scheduled_prices",
+    "kind": "py",
+    "loc": 54,
+    "path": "backend\\domain\\scheduled_prices.py"
    },
    {
     "group": "other",
@@ -5424,7 +5573,7 @@
     "group": "core",
     "id": "models",
     "kind": "py",
-    "loc": 1871,
+    "loc": 1900,
     "path": "backend\\models.py"
    },
    {
@@ -5496,6 +5645,13 @@
     "kind": "py",
     "loc": 123,
     "path": "backend\\owner\\ask.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.growth",
+    "kind": "py",
+    "loc": 153,
+    "path": "backend\\owner\\growth.py"
    },
    {
     "group": "other",
@@ -5620,7 +5776,7 @@
     "group": "other",
     "id": "owner.planning",
     "kind": "py",
-    "loc": 67,
+    "loc": 144,
     "path": "backend\\owner\\planning.py"
    },
    {
@@ -5641,7 +5797,7 @@
     "group": "other",
     "id": "owner.report_sections",
     "kind": "py",
-    "loc": 497,
+    "loc": 506,
     "path": "backend\\owner\\report_sections.py"
    },
    {
@@ -5669,7 +5825,7 @@
     "group": "other",
     "id": "owner.stock_review",
     "kind": "py",
-    "loc": 77,
+    "loc": 83,
     "path": "backend\\owner\\stock_review.py"
    },
    {
@@ -5767,7 +5923,7 @@
     "group": "router",
     "id": "routers.cash_reconciliation",
     "kind": "py",
-    "loc": 76,
+    "loc": 78,
     "path": "backend\\routers\\cash_reconciliation.py"
    },
    {
@@ -5837,7 +5993,7 @@
     "group": "router",
     "id": "routers.menu",
     "kind": "py",
-    "loc": 280,
+    "loc": 285,
     "path": "backend\\routers\\menu.py"
    },
    {
@@ -5858,7 +6014,7 @@
     "group": "router",
     "id": "routers.orders",
     "kind": "py",
-    "loc": 533,
+    "loc": 536,
     "path": "backend\\routers\\orders.py"
    },
    {
@@ -5872,14 +6028,14 @@
     "group": "router",
     "id": "routers.owner",
     "kind": "py",
-    "loc": 219,
+    "loc": 346,
     "path": "backend\\routers\\owner.py"
    },
    {
     "group": "router",
     "id": "routers.owner_money",
     "kind": "py",
-    "loc": 589,
+    "loc": 592,
     "path": "backend\\routers\\owner_money.py"
    },
    {
@@ -5893,7 +6049,7 @@
     "group": "router",
     "id": "routers.owner_operations",
     "kind": "py",
-    "loc": 116,
+    "loc": 268,
     "path": "backend\\routers\\owner_operations.py"
    },
    {
@@ -5970,7 +6126,7 @@
     "group": "other",
     "id": "schemas",
     "kind": "py",
-    "loc": 848,
+    "loc": 851,
     "path": "backend\\schemas.py"
    },
    {
@@ -6734,15 +6890,45 @@
    "verb": "POST"
   },
   {
+   "func": "branch_review",
+   "module": "routers.owner",
+   "path": "/owner/planning/branches",
+   "verb": "GET"
+  },
+  {
    "func": "combo_plan",
    "module": "routers.owner",
    "path": "/owner/planning/combo",
    "verb": "POST"
   },
   {
+   "func": "create_price_list",
+   "module": "routers.owner",
+   "path": "/owner/planning/prices",
+   "verb": "POST"
+  },
+  {
    "func": "home",
    "module": "routers.owner",
    "path": "/owner/home",
+   "verb": "GET"
+  },
+  {
+   "func": "market_drafts",
+   "module": "routers.owner",
+   "path": "/owner/planning/market-drafts",
+   "verb": "POST"
+  },
+  {
+   "func": "menu_review",
+   "module": "routers.owner",
+   "path": "/owner/planning/menu-review",
+   "verb": "GET"
+  },
+  {
+   "func": "prep_forecast",
+   "module": "routers.owner",
+   "path": "/owner/planning/forecast",
    "verb": "GET"
   },
   {
@@ -6756,6 +6942,12 @@
    "module": "routers.owner",
    "path": "/owner/settings/preview",
    "verb": "POST"
+  },
+  {
+   "func": "price_lists",
+   "module": "routers.owner",
+   "path": "/owner/planning/prices",
+   "verb": "GET"
   },
   {
    "func": "read_settings",
@@ -6786,6 +6978,12 @@
    "module": "routers.owner",
    "path": "/owner/planning/stock-review",
    "verb": "GET"
+  },
+  {
+   "func": "stop_price_list",
+   "module": "routers.owner",
+   "path": "/owner/planning/prices/{rule_id}",
+   "verb": "DELETE"
   },
   {
    "func": "write_settings",
@@ -6920,6 +7118,12 @@
    "verb": "GET"
   },
   {
+   "func": "operation_history",
+   "module": "routers.owner_operations",
+   "path": "/owner/operations/entries",
+   "verb": "GET"
+  },
+  {
    "func": "read_receipt",
    "module": "routers.owner_operations",
    "path": "/owner/operations/receipts/{name}",
@@ -6932,10 +7136,22 @@
    "verb": "POST"
   },
   {
+   "func": "record_operation",
+   "module": "routers.owner_operations",
+   "path": "/owner/operations/entries",
+   "verb": "POST"
+  },
+  {
    "func": "set_units",
    "module": "routers.owner_operations",
    "path": "/owner/operations/units/{item_id}",
    "verb": "PUT"
+  },
+  {
+   "func": "undo_operation",
+   "module": "routers.owner_operations",
+   "path": "/owner/operations/entries/{entry_id}/undo",
+   "verb": "POST"
   },
   {
    "func": "upload_receipt",
@@ -7209,12 +7425,12 @@
   }
  ],
  "stats": {
-  "py_edges": 796,
-  "py_lazy_edges": 230,
-  "py_modules": 191,
-  "routes": 197,
-  "ts_edges": 605,
-  "ts_files": 268
+  "py_edges": 823,
+  "py_lazy_edges": 249,
+  "py_modules": 194,
+  "routes": 207,
+  "ts_edges": 623,
+  "ts_files": 274
  },
  "status_only": [
   [
@@ -9148,6 +9364,22 @@
     "to": "lib\\errors.ts"
    },
    {
+    "from": "components\\operations\\AccountantReview.tsx",
+    "to": "lib\\api.ts"
+   },
+   {
+    "from": "components\\operations\\AccountantReview.tsx",
+    "to": "lib\\owner\\format.ts"
+   },
+   {
+    "from": "components\\operations\\EntryWorkspace.tsx",
+    "to": "components\\operations\\AccountantReview.tsx"
+   },
+   {
+    "from": "components\\operations\\EntryWorkspace.tsx",
+    "to": "components\\operations\\StockEntries.tsx"
+   },
+   {
     "from": "components\\operations\\EntryWorkspace.tsx",
     "to": "context\\AuthContext.tsx"
    },
@@ -9157,6 +9389,26 @@
    },
    {
     "from": "components\\operations\\EntryWorkspace.tsx",
+    "to": "lib\\entryQueue.ts"
+   },
+   {
+    "from": "components\\operations\\EntryWorkspace.tsx",
+    "to": "lib\\tenantHome.ts"
+   },
+   {
+    "from": "components\\operations\\StockEntries.tsx",
+    "to": "context\\AuthContext.tsx"
+   },
+   {
+    "from": "components\\operations\\StockEntries.tsx",
+    "to": "lib\\api.ts"
+   },
+   {
+    "from": "components\\operations\\StockEntries.tsx",
+    "to": "lib\\entryQueue.ts"
+   },
+   {
+    "from": "components\\operations\\StockEntries.tsx",
     "to": "lib\\tenantHome.ts"
    },
    {
@@ -9208,8 +9460,28 @@
     "to": "lib\\api.ts"
    },
    {
+    "from": "components\\owner\\BranchReview.tsx",
+    "to": "lib\\api.ts"
+   },
+   {
+    "from": "components\\owner\\BranchReview.tsx",
+    "to": "lib\\owner\\format.ts"
+   },
+   {
     "from": "components\\owner\\CreativeNote.tsx",
     "to": "lib\\api.ts"
+   },
+   {
+    "from": "components\\owner\\ForecastPlanner.tsx",
+    "to": "lib\\api.ts"
+   },
+   {
+    "from": "components\\owner\\GrowthTools.tsx",
+    "to": "lib\\api.ts"
+   },
+   {
+    "from": "components\\owner\\GrowthTools.tsx",
+    "to": "lib\\owner\\format.ts"
    },
    {
     "from": "components\\owner\\OwnerShell.tsx",
@@ -9238,6 +9510,18 @@
    {
     "from": "components\\owner\\OwnerShell.tsx",
     "to": "lib\\tenantHome.ts"
+   },
+   {
+    "from": "components\\owner\\PlanningWorkspace.tsx",
+    "to": "components\\owner\\BranchReview.tsx"
+   },
+   {
+    "from": "components\\owner\\PlanningWorkspace.tsx",
+    "to": "components\\owner\\ForecastPlanner.tsx"
+   },
+   {
+    "from": "components\\owner\\PlanningWorkspace.tsx",
+    "to": "components\\owner\\GrowthTools.tsx"
    },
    {
     "from": "components\\owner\\PlanningWorkspace.tsx",
@@ -9742,6 +10026,10 @@
    {
     "from": "lib\\api.ts",
     "to": "lib\\tokenStore.ts"
+   },
+   {
+    "from": "lib\\entryQueue.ts",
+    "to": "lib\\api.ts"
    },
    {
     "from": "lib\\owner\\areaTypes.ts",

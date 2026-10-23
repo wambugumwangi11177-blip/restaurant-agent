@@ -1,6 +1,8 @@
 """Small staff entry tools. Every object is resolved inside the signed-in restaurant."""
 import io
 import uuid
+import json
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
 from pydantic import BaseModel, ConfigDict, Field
@@ -12,6 +14,8 @@ from auth import require_staff_role
 from database import get_db
 from routers.deps import get_or_create_restaurant
 from ai import reorder
+from time_utils import utcnow
+from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(prefix='/owner/operations', tags=['staff-entry'])
 readers = require_staff_role(models.StaffRole.OWNER, models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER)
@@ -37,7 +41,155 @@ def catalog(db: Session=Depends(get_db), user=Depends(readers)):
     rid = get_or_create_restaurant(db, user).id
     stock = db.query(models.InventoryItem).filter_by(restaurant_id=rid).order_by(models.InventoryItem.item_name).all()
     dishes = db.query(models.MenuItem).filter_by(restaurant_id=rid).order_by(models.MenuItem.name).all()
-    return {'stock':[stock_json(i) for i in stock], 'dishes':[dict(id=d.id, name=d.name) for d in dishes]}
+    return {'restaurant_id':rid,'user_id':user.id,'stock':[stock_json(i) for i in stock],
+            'suppliers':[{'id':s.id,'name':s.name} for s in db.query(models.Supplier).filter_by(restaurant_id=rid).all()],
+            'dishes':[dict(id=d.id, name=d.name) for d in dishes]}
+
+
+class OperationIn(Strict):
+    entry_key: str = Field(min_length=8,max_length=64)
+    restaurant_id: int = Field(gt=0)
+    kind: Literal['count','waste','issue','bill']
+    inventory_item_id: int | None = None
+    quantity: float = Field(default=0,ge=0,le=1000000,allow_inf_nan=False)
+    bill_id: int | None = None
+    note: str = Field(min_length=3,max_length=500)
+    method: Literal['cash','mpesa','bank','card','other'] = 'cash'
+    captured_at: datetime | None = None
+
+
+@router.post('/entries',status_code=201)
+def record_operation(body:OperationIn,db:Session=Depends(get_db),user=Depends(readers)):
+    rid=get_or_create_restaurant(db,user).id
+    if body.restaurant_id!=rid:
+        raise HTTPException(409,'Branch changed. Return to the branch where this entry was captured.')
+    owner=user.role in (models.Role.ADMIN,models.Role.SUPERADMIN) or user.staff_role==models.StaffRole.OWNER
+    if not owner and user.staff_role==models.StaffRole.CONTROLLER and body.kind!='count':
+        raise HTTPException(403,'Your role can count but cannot move stock or pay bills')
+    if not owner and user.staff_role==models.StaffRole.STOCKKEEPER and body.kind=='bill':
+        raise HTTPException(403,'A manager records bill payments')
+    key=f'ops:{rid}:{user.id}:{body.entry_key}'
+    payload=json.dumps(body.model_dump(mode='json',exclude={'entry_key'}),sort_keys=True)
+    previous=db.query(models.OperationEntry).filter_by(entry_key=key).first()
+    if previous:
+        if previous.payload!=payload:
+            raise HTTPException(409,'Retry key used for a different entry')
+        return {**json.loads(previous.result),'entry_id':previous.id,'undone':bool(previous.undone_at)}
+    now=utcnow()
+    captured=body.captured_at
+    if captured and captured.tzinfo:
+        captured=captured.astimezone(timezone.utc).replace(tzinfo=None)
+    if captured and (captured>now+timedelta(minutes=5) or captured<now-timedelta(days=7)):
+        raise HTTPException(422,'Entry capture time must be within the last seven days')
+    result={}
+    if body.kind=='bill':
+        from time_utils import eat_date
+        bill=db.query(models.RecurringBill).filter_by(id=body.bill_id,restaurant_id=rid,is_active=True).with_for_update().first()
+        if not bill:
+            raise HTTPException(404,'Active bill not found')
+        expense=models.Expense(restaurant_id=rid,category_id=bill.category_id,amount_cents=bill.amount_cents,
+            paid_on=eat_date(captured or now),method=body.method,supplier=bill.supplier,note=body.note,bill_id=bill.id,
+            paid_by_user_id=user.id,updated_by_user_id=user.id)
+        db.add(expense);db.flush();result={'expense_id':expense.id,'message':'Bill payment recorded in the ledger.'}
+    else:
+        item=item_for(db,user,body.inventory_item_id)
+        db.refresh(item,with_for_update=True)
+        before=item.quantity or 0
+        if body.kind=='count':
+            if captured and db.query(models.StockMovement).filter(models.StockMovement.inventory_item_id==item.id,
+                models.StockMovement.created_at>captured).first():
+                raise HTTPException(409,'Stock moved after this offline count. Count again before reconciling.')
+            count=models.StockCount(restaurant_id=rid,inventory_item_id=item.id,expected_quantity=before,
+                counted_quantity=body.quantity,counted_by_user_id=user.id,counted_at=captured or now,notes=body.note)
+            db.add(count);db.flush()
+            delta=body.quantity-before;item.quantity=body.quantity
+            result={'count_id':count.id,'message':'Physical count recorded. Expected quantity was hidden until saving.',
+                    'expected':before,'counted':body.quantity,'difference':delta,'item_id':item.id,'delta':delta}
+            if abs(delta)>1e-9:
+                movement=models.StockMovement(inventory_item_id=item.id,movement_type=models.StockMovementType.ADJUST if delta>0 else models.StockMovementType.OUT,
+                    quantity=abs(delta),reason='Physical count reconciliation',performed_by_user_id=user.id,created_at=now)
+                db.add(movement);db.flush();result['movement_id']=movement.id
+        elif body.kind=='waste':
+            if body.quantity<=0 or body.quantity>before:
+                raise HTTPException(422,'Waste must be positive and no more than recorded stock. Count stock first if records are wrong.')
+            item.quantity=before-body.quantity
+            movement=models.StockMovement(inventory_item_id=item.id,movement_type=models.StockMovementType.OUT,
+                quantity=body.quantity,reason=f'waste: {body.note}',performed_by_user_id=user.id,created_at=now)
+            db.add(movement);db.flush()
+            result={'message':'Waste recorded and stock updated.','item_id':item.id,'delta':-body.quantity,'movement_id':movement.id}
+        else:
+            if body.quantity<=0:
+                raise HTTPException(422,'Issue a positive quantity')
+            transfer=models.StockTransfer(restaurant_id=rid,inventory_item_id=item.id,quantity=body.quantity,unit=item.unit,
+                from_location='store',to_location='kitchen',status=models.StockTransferStatus.PENDING,
+                initiated_by_user_id=user.id,notes=body.note)
+            db.add(transfer);db.flush()
+            result={'message':'Kitchen issue saved. A different person must confirm what arrived.','transfer_id':transfer.id}
+    entry=models.OperationEntry(restaurant_id=rid,user_id=user.id,entry_key=key,kind=body.kind,payload=payload,result=json.dumps(result),created_at=now)
+    db.add(entry)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        previous=db.query(models.OperationEntry).filter_by(entry_key=key).first()
+        if not previous or previous.payload!=payload:
+            raise HTTPException(409,'Entry changed during save; reload and review')
+        return {**json.loads(previous.result),'entry_id':previous.id}
+    return {**result,'entry_id':entry.id}
+
+
+@router.get('/entries')
+def operation_history(db:Session=Depends(get_db),user=Depends(readers)):
+    rid=get_or_create_restaurant(db,user).id
+    return [{'id':e.id,'kind':e.kind,'at':e.created_at.isoformat(),'by_you':e.user_id==user.id,
+             'undone':bool(e.undone_at),'note':json.loads(e.payload).get('note',''),**json.loads(e.result)}
+            for e in db.query(models.OperationEntry).filter_by(restaurant_id=rid).order_by(models.OperationEntry.id.desc()).limit(40).all()]
+
+
+@router.post('/entries/{entry_id}/undo')
+def undo_operation(entry_id:int,db:Session=Depends(get_db),user=Depends(readers)):
+    rid=get_or_create_restaurant(db,user).id
+    entry=db.query(models.OperationEntry).filter_by(id=entry_id,restaurant_id=rid,user_id=user.id).with_for_update().first()
+    if not entry:
+        raise HTTPException(404,'Your entry was not found')
+    if entry.undone_at:
+        return {'message':'Entry already reversed; audit retained.'}
+    if utcnow()-entry.created_at>timedelta(minutes=10):
+        raise HTTPException(409,'Quick undo lasts 10 minutes. Record a correction with its reason instead.')
+    result=json.loads(entry.result)
+    if entry.kind=='bill':
+        expense=db.query(models.Expense).filter_by(id=result['expense_id'],restaurant_id=rid).first()
+        if not expense or expense.voided_at:
+            raise HTTPException(409,'Payment already changed')
+        expense.voided_at=utcnow();expense.voided_by_user_id=user.id;expense.void_reason='Quick undo of bill entry'
+    elif entry.kind=='issue':
+        transfer=db.query(models.StockTransfer).filter_by(id=result['transfer_id'],restaurant_id=rid).first()
+        if transfer.status!=models.StockTransferStatus.PENDING:
+            raise HTTPException(409,'Kitchen already processed this issue; resolve the handover instead')
+        db.delete(transfer)  # original issued quantities remain in the immutable operation journal
+    elif entry.kind in ('count','waste'):
+        item=item_for(db,user,result['item_id']);db.refresh(item,with_for_update=True)
+        later=db.query(models.StockMovement).filter(models.StockMovement.inventory_item_id==item.id,
+            models.StockMovement.created_at>entry.created_at).first()
+        if later:
+            raise HTTPException(409,'Stock moved after this entry. Record a fresh physical count instead.')
+        delta=-result['delta']
+        if item.quantity+delta<0:
+            raise HTTPException(409,'Reversal would make stock negative; record a fresh count')
+        item.quantity+=delta
+        if entry.kind=='count':
+            correction=models.StockCount(restaurant_id=rid,inventory_item_id=item.id,expected_quantity=item.quantity-delta,
+                counted_quantity=item.quantity,counted_by_user_id=user.id,notes=f'Reversal of mistaken entry {entry.id}; original physical count retained.')
+            db.add(correction);db.flush();result['reversal_count_id']=correction.id
+            entry.result=json.dumps(result)
+        reversal=models.StockMovement(inventory_item_id=item.id,movement_type=models.StockMovementType.ADJUST if delta>=0 else models.StockMovementType.OUT,
+            quantity=abs(delta),reason=f"Reversal movement #{result.get('movement_id',0)}: {entry.kind}",performed_by_user_id=user.id)
+        db.add(reversal);db.flush();result['reversal_movement_id']=reversal.id
+        entry.result=json.dumps(result)
+    else:
+        raise HTTPException(409,'This entry cannot be undone here')
+    entry.undone_at=utcnow();db.commit()
+    return {'message':'Entry reversed. Original record and correction retained for review.'}
 
 class UnitIn(Strict):
     buying_unit: str = Field(min_length=1, max_length=40)

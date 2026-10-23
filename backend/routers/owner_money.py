@@ -168,6 +168,7 @@ def update_category(category_id: int, body: CategoryPatch, db: Session = Depends
 # ── expenses ─────────────────────────────────────────────────────────────────
 
 class ExpenseIn(Strict):
+    expected_restaurant_id: Optional[int] = Field(default=None,gt=0)
     entry_key: Optional[str] = Field(default=None, min_length=8, max_length=64)
     category: str
     amount_kes: Money
@@ -239,6 +240,8 @@ def list_expenses(from_: Optional[date] = Query(None, alias="from"), to: Optiona
 @router.post("/expenses", status_code=201)
 def create_expense(body: ExpenseIn, db: Session = Depends(get_db), user: models.User = Depends(_roles)):
     rid = _restaurant(db, user).id
+    if body.expected_restaurant_id is not None and body.expected_restaurant_id != rid:
+        raise HTTPException(409,'Branch changed. Return to the branch where this entry was captured.')
     entry_key = f"{rid}:{user.id}:{body.entry_key}" if body.entry_key else None
     if entry_key:
         prior = db.query(models.Expense).filter_by(restaurant_id=rid, entry_key=entry_key).first()

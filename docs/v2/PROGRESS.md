@@ -9,7 +9,9 @@ Branch `dev/eleven-demo-fixes`, based on `codex/eleven-demo-readiness`. No produ
 5. "What did I sell yesterday?" (and the same question for today, this week, last week, this month, last month) answers with that period's paid sales.
 6. The combo screen heading is "Best dish with a dish few people order".
 
-An expired quote is charged at the current scheduled price, or the base price when no schedule applies. That can differ from the price on the screen an hour earlier. `MENU_QUOTE_SECRET` is optional. Startup provisioning does not reset an existing staff password; a reseed does, when the env vars are set.
+An expired quote is charged at the current scheduled price, or the base price when no schedule applies. That can differ from the price on the screen an hour earlier. `MENU_QUOTE_SECRET` is optional. Startup provisioning does not reset an existing staff password; a reseed does, when the env vars are set. A missing restaurant name on the overview reads "This restaurant" rather than another client's name.
+
+Validation (23 Oct, this tree): backend `LOG_FORMAT=plain pytest` **2211 passed, 1 skipped**. The one failure on the first run was the daily cash-count fixture using "two hours ago", which is yesterday between midnight and 02:00 Nairobi; the fixture now sits inside the elapsed part of today. Frontend: `tsc --noEmit` clean, vitest **236 passed**, `next build` 74 routes. Migration 059 applied on Postgres from a database stamped `058_eleven_workflows`: the menu-item foreign key is `ON DELETE CASCADE`, a second upgrade is a no-op, and deleting a dish removes its scheduled price. SQLite leaves 059 as a no-op, matching migration 028. No production database was migrated.
 
 # Eleven presentation follow-through completed locally — 23 October 2026
 

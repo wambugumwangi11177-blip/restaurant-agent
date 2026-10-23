@@ -4,6 +4,7 @@ import { Package, Truck, LifeBuoy } from "lucide-react";
 import TierLayoutShell from "@/components/staff/TierLayoutShell";
 
 const NAV = [
+    { href: "/entries", label: "Team entries", icon: Package },
     { href: "/staff/stockkeeper", label: "Stock", icon: Package },
     { href: "/staff/stockkeeper/purchasing", label: "Purchasing", icon: Truck },
     { href: "/staff/stockkeeper/support", label: "Support", icon: LifeBuoy },

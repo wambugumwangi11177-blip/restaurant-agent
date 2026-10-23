@@ -510,7 +510,9 @@ def test_migration_052_creates_exactly_the_model_columns_and_is_reversible_and_i
         assert set(TABLES) <= set(inspector.get_table_names())
         for model in (models.ExpenseCategory, models.Expense, models.RecurringBill, models.Licence):
             built = {c["name"] for c in inspector.get_columns(model.__tablename__)}
-            assert built == {c.name for c in model.__table__.columns}, model.__tablename__
+            # Migration 057 adds retry keys; historical 052 must keep its original schema.
+            later = {"entry_key"} if model is models.Expense else set()
+            assert built == {c.name for c in model.__table__.columns} - later, model.__tablename__
         _run_migration(conn, "upgrade")                                  # create_all() already ran in production: must not raise
         _run_migration(conn, "downgrade")
         assert not set(TABLES) & set(sa.inspect(conn).get_table_names())

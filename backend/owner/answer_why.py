@@ -170,7 +170,7 @@ def _stock_out(ctx: OwnerContext, day: date, usual: list[date], busy: float) -> 
             usual_units[dish] += qty
     best = None
     for dish in sorted(usual_units, key=usual_units.get, reverse=True)[:8]:                # the dishes that sell most on a usual day
-        for ing, per_serving in ctx.db.query(models.InventoryItem, models.MenuIngredient.quantity_per_serving).join(
+        for ing, per_serving in ctx.db.query(models.InventoryItem, models.MenuIngredient.raw_quantity_per_serving).join(
                 models.MenuIngredient, models.MenuIngredient.inventory_item_id == models.InventoryItem.id).filter(
                 models.MenuIngredient.menu_item_id == dish, models.MenuIngredient.is_critical.is_(True), models.InventoryItem.restaurant_id == ctx.rid):
             short_at = _ran_short_at(ctx, ing, day, per_serving or 0.0)

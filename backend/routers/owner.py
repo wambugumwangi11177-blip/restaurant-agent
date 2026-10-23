@@ -34,6 +34,47 @@ router = APIRouter(prefix="/owner", tags=["owner"])
 _owner_only = require_staff_role(models.StaffRole.OWNER)
 
 
+class PlannedDish(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    menu_item_id: int = Field(gt=0)
+    portions: int = Field(gt=0, le=10000)
+
+
+class PrepPlan(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    dishes: list[PlannedDish] = Field(min_length=1, max_length=60)
+
+
+class ComboPlan(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    menu_item_ids: list[int] = Field(min_length=2, max_length=10)
+    price_cents: int = Field(gt=0, le=100000000)
+
+
+@router.post('/planning/prep')
+def prep_plan(body: PrepPlan, db: Session=Depends(get_db), user=Depends(_owner_only)):
+    from owner.planning import prepare
+    try:
+        return prepare(OwnerContext(db, user, _restaurant(db,user)), body.dishes)
+    except ValueError as exc:
+        raise HTTPException(422,str(exc)) from exc
+
+
+@router.post('/planning/combo')
+def combo_plan(body: ComboPlan, db: Session=Depends(get_db), user=Depends(_owner_only)):
+    from owner.planning import combo
+    try:
+        return combo(OwnerContext(db,user,_restaurant(db,user)), body.menu_item_ids, body.price_cents)
+    except ValueError as exc:
+        raise HTTPException(422,str(exc)) from exc
+
+
+@router.get('/planning/shifts')
+def shift_plan(db: Session=Depends(get_db), user=Depends(_owner_only)):
+    from owner.planning import shifts
+    return shifts(OwnerContext(db,user,_restaurant(db,user)))
+
+
 def _restaurant(db: Session, user: models.User) -> models.Restaurant:
     restaurant = get_restaurant_or_none(db, user)
     if restaurant is None:

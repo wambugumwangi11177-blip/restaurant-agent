@@ -142,7 +142,7 @@ ENGINES: tuple[Engine, ...] = (
            os_topics=("money",), report_sections=("monthly.pnl", "yearly.pnl"),
            inputs=("expenses", "recurring bills", "licences"),
            settings=("food_cost_target_pct", "prime_cost_target_pct", "labour_target_pct", "commission_uber_eats_pct", "commission_glovo_pct",
-                     "commission_bolt_food_pct", "expense_spike_pct", "bill_reserve_kes", "licence_warning_days")),
+                     "commission_bolt_food_pct", "expense_spike_pct", "bill_reserve_kes", "licence_warning_days", "sales_drop_flag_pct")),
     Engine("mpesa_match", "M-Pesa statement check", "cash", "pulse",
            home_blocks=("cash.mpesa",), os_topics=("mpesa",), report_sections=("weekly.mpesa_check", "monthly.mpesa_check"),
            inputs=("your M-Pesa statement",), settings=("mpesa_match_minutes",)),

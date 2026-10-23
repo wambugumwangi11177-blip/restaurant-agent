@@ -368,7 +368,7 @@ def test_a_filename_loses_control_characters_and_is_never_empty_or_long():
 @pytest.mark.parametrize("content,status,fragment", [
     (b"", 422, "empty"), (b"name,price\nChips,300\n", 422, "does not look like an M-Pesa statement"),
     (b"x" * (MAX_BYTES + 5), 413, "larger than 5 MB"),
-])
+], ids=["empty", "wrong-format", "too-large"])
 def test_a_bad_upload_is_refused_in_words_and_stores_nothing(client, db_session, content, status, fragment):
     _t, _r, _u, h = _tenant(db_session, "a")
     res = _upload(client, h, content)

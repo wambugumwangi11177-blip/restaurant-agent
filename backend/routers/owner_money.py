@@ -15,6 +15,7 @@ from typing import Annotated, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints, field_validator, model_validator
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import models
@@ -167,6 +168,7 @@ def update_category(category_id: int, body: CategoryPatch, db: Session = Depends
 # ── expenses ─────────────────────────────────────────────────────────────────
 
 class ExpenseIn(Strict):
+    entry_key: Optional[str] = Field(default=None, min_length=8, max_length=64)
     category: str
     amount_kes: Money
     paid_on: Optional[date] = None
@@ -237,13 +239,30 @@ def list_expenses(from_: Optional[date] = Query(None, alias="from"), to: Optiona
 @router.post("/expenses", status_code=201)
 def create_expense(body: ExpenseIn, db: Session = Depends(get_db), user: models.User = Depends(_roles)):
     rid = _restaurant(db, user).id
+    entry_key = f"{rid}:{user.id}:{body.entry_key}" if body.entry_key else None
+    if entry_key:
+        prior = db.query(models.Expense).filter_by(restaurant_id=rid, entry_key=entry_key).first()
+        if prior:
+            if prior.amount_cents != _cents(body.amount_kes) or prior.category.key != body.category or prior.method != body.method:
+                raise HTTPException(409,"This retry key was used for a different expense")
+            return _expense_json(prior)
     cat = _category(db, rid, body.category)
+    if body.receipt_ref and body.entry_key:
+        from routers.owner_operations import receipt_key
+        receipt_key(body.receipt_ref, rid)
     now = utcnow()
-    e = models.Expense(restaurant_id=rid, category_id=cat.id, amount_cents=_cents(body.amount_kes),
+    e = models.Expense(entry_key=entry_key, restaurant_id=rid, category_id=cat.id, amount_cents=_cents(body.amount_kes),
                        paid_on=_date(body.paid_on or nairobi_today()), method=body.method, supplier=body.supplier, note=body.note,
                        receipt_ref=body.receipt_ref, paid_by_user_id=user.id, created_at=now, updated_at=now, updated_by_user_id=user.id)
     db.add(e)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        prior = db.query(models.Expense).filter_by(restaurant_id=rid, entry_key=entry_key).first() if entry_key else None
+        if prior and prior.amount_cents == _cents(body.amount_kes) and prior.category.key == body.category and prior.method == body.method:
+            return _expense_json(prior)
+        raise
     return _expense_json(e)
 
 

@@ -47,6 +47,7 @@ export default function OwnerShell({ children }: { children: React.ReactNode }) 
           <p className="mb-2 inline-flex max-w-full rounded-full border border-[hsl(43_76%_57_/.45)] bg-[hsl(43_76%_57_/.12)] px-3 py-1 text-[11px] text-[var(--v-muted-foreground)]">{config.banner}</p>
         )}
         <div><BranchPicker /></div>
+        <div className="flex flex-wrap gap-4 text-sm print:hidden"><Link className="inline-flex min-h-11 items-center underline" href="/entries">Team entries</Link><Link className="inline-flex min-h-11 items-center underline" href="/planning">Kitchen & money tools</Link></div>
         <nav aria-label="Owner pages" className="mt-3 hidden gap-1 md:flex print:hidden">
           {tabs.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} aria-current={isActive(href) ? "page" : undefined}

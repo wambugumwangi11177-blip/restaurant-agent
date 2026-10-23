@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum as SqEnum, DateTime, Float, Text, Date, Time, Index, UniqueConstraint, CheckConstraint, text
 from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy.ext.hybrid import hybrid_property
 import enum
 from time_utils import utcnow
 
@@ -429,6 +430,8 @@ class InventoryItem(Base):
     # it, par_level is the NEW piece: how much to restock UP TO once that
     # point is crossed. Nullable — an item with no par_level set is simply
     # never auto-drafted, not defaulted to a guessed number.
+    buying_unit = Column(String(40), nullable=False, default="", server_default="")
+    buying_unit_factor = Column(Float, nullable=False, default=1.0, server_default="1")
     par_level          = Column(Float, nullable=True)
     default_supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
 
@@ -720,7 +723,8 @@ class MenuIngredient(Base):
     Enables: "If chicken stock hits 0, which menu items are affected?"
     The orchestrator uses this for cascade impact analysis.
 
-    quantity_per_serving: how many units of the ingredient per 1 serving.
+    quantity_per_serving: usable units per serving. Divide by yield_fraction for raw stock usage;
+    yield 1 preserves recipes already entered in raw units.
     unit matches the InventoryItem.unit for that ingredient.
     """
     __tablename__ = "menu_ingredients"
@@ -731,6 +735,15 @@ class MenuIngredient(Base):
     menu_item_id        = Column(Integer, ForeignKey("menu_items.id", ondelete="CASCADE"), nullable=False)
     inventory_item_id   = Column(Integer, ForeignKey("inventory_items.id", ondelete="CASCADE"), nullable=False)
     quantity_per_serving = Column(Float, nullable=False, default=1.0)
+    yield_fraction = Column(Float, nullable=False, default=1.0, server_default="1")
+
+    @hybrid_property
+    def raw_quantity_per_serving(self):
+        return self.quantity_per_serving / (self.yield_fraction or 1.0)
+
+    @raw_quantity_per_serving.expression
+    def raw_quantity_per_serving(cls):
+        return cls.quantity_per_serving / cls.yield_fraction
     is_critical         = Column(Boolean, default=True)   # False = garnish, can be skipped
 
     menu_item       = relationship("MenuItem")
@@ -1057,6 +1070,7 @@ class Supplier(Base):
 
 
 class PurchaseOrder(Base):
+    invoice_ref = Column(String(255), nullable=True)
     """
     Records purchase orders to suppliers.
     Powers: lead time analysis, reliability scoring, cost tracking.
@@ -1200,6 +1214,7 @@ class StockCount(Base):
 
 
 class CashDrawerCount(Base):
+    entry_key = Column(String(120), unique=True, nullable=True)
     """
     Cash-drawer reconciliation (Sprint 4). Scoped honestly: there's no bank
     feed in this codebase, so a three-way till/M-Pesa/bank reconciliation
@@ -1531,6 +1546,7 @@ class RestaurantSettings(Base):
     quiet_hours_start        = Column(Integer, nullable=False)  # hour of day, Nairobi time (0-23)
     quiet_hours_end          = Column(Integer, nullable=False)
     licence_warning_days     = Column(Integer, nullable=False)
+    sales_drop_flag_pct = Column(Float, nullable=False, default=15.0, server_default="15")
     # added by migration 053 (S3.3): server defaults so rows written before it read as the defaults
     expense_spike_pct        = Column(Float, nullable=False, default=25.0, server_default="25")
     bill_reserve_cents       = Column(Integer, nullable=False, default=0, server_default="0")
@@ -1591,6 +1607,7 @@ class ExpenseCategory(Base):
 
 
 class Expense(Base):
+    entry_key = Column(String(120), unique=True, nullable=True)
     """One thing the restaurant paid for. Money is integer cents; the day is a NAIROBI calendar date (`paid_on`).
 
     Never deleted: a mistaken entry is voided (who, when, why) and drops out of every list and total, so the ledger can

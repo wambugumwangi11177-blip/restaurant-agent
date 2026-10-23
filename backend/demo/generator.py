@@ -271,7 +271,9 @@ class DemoBuilder:
             cost = round(ing.cost_cents * factor)
             item = models.InventoryItem(restaurant_id=rid, item_name=ing.name, unit=ing.unit, quantity=round(par * 0.92, 2),
                                         cost_per_unit_cents=cost, low_stock_threshold=math.ceil(reorder * 0.6), par_level=round(par, 1),
-                                        expiry_days=ing.shelf_days, default_supplier_id=b.suppliers[ing.supplier].id)
+                                        expiry_days=ing.shelf_days, default_supplier_id=b.suppliers[ing.supplier].id,
+                                        buying_unit="crate" if ing.key == "beer" else "",
+                                        buying_unit_factor=24 if ing.key == "beer" else 1)
             db.add(item)
             b.inv[ing.key] = item
             b.reorder[ing.key] = (reorder, par)
@@ -288,8 +290,11 @@ class DemoBuilder:
         db.flush()
         for dish in cat.MENU:
             for k, q in dish.recipe.items():
+                # Catalogue quantities are raw. Show usable beef + 80% yield without changing stock usage or costs.
+                usable_yield = 0.8 if dish.name == "Beef stew" and k == "beef" else 1.0
                 db.add(models.MenuIngredient(menu_item_id=b.menu[dish.name].id, inventory_item_id=b.inv[k].id,
-                                             quantity_per_serving=q, is_critical=k not in ("lemons", "lettuce", "cheese")))
+                                             quantity_per_serving=q * usable_yield, yield_fraction=usable_yield,
+                                             is_critical=k not in ("lemons", "lettuce", "cheese")))
         for i, (name, title, rate, _shifts) in enumerate(cat.STAFF):
             m = models.StaffMember(restaurant_id=rid, name=name, role_title=title, hourly_rate=rate, is_active=True)
             db.add(m)

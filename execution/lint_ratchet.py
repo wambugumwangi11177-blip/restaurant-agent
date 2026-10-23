@@ -17,6 +17,7 @@ import json
 import os
 import subprocess
 import sys
+import shutil
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND = os.path.join(ROOT, "frontend")
@@ -25,8 +26,8 @@ BASELINE = os.path.join(ROOT, "docs", "v2", "eslint-baseline.json")
 
 def run_eslint() -> dict[str, list[int]]:
     proc = subprocess.run(
-        ["npx", "eslint", "-f", "json"], cwd=FRONTEND,
-        capture_output=True, text=True,
+        [shutil.which("npx.cmd" if os.name == "nt" else "npx") or "npx", "eslint", "-f", "json"], cwd=FRONTEND,
+        capture_output=True, text=True, encoding="utf-8",
     )
     # eslint exits 1 when it finds errors; that is expected here. Anything
     # without JSON on stdout is a real failure (crash, missing config).
@@ -39,7 +40,7 @@ def run_eslint() -> dict[str, list[int]]:
     for entry in report:
         errors, warnings = entry["errorCount"], entry["warningCount"]
         if errors or warnings:
-            rel = os.path.relpath(entry["filePath"], FRONTEND)
+            rel = os.path.relpath(entry["filePath"], FRONTEND).replace(os.sep, "/")
             found[rel] = [errors, warnings]
     return found
 

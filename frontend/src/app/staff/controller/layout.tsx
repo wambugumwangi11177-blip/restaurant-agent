@@ -4,6 +4,7 @@ import { DollarSign, ShoppingBag, ShieldAlert, Truck, Clock, Brain, Cpu, LifeBuo
 import TierLayoutShell from "@/components/staff/TierLayoutShell";
 
 const NAV = [
+    { href: "/entries", label: "Team entries", icon: DollarSign },
     { href: "/staff/controller", label: "Variance", icon: ShieldAlert },
     { href: "/staff/controller/sales", label: "Sales", icon: DollarSign },
     { href: "/staff/controller/orders", label: "Orders", icon: ShoppingBag },

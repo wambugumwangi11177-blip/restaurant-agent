@@ -474,6 +474,7 @@ def resolve_ts(src_file: str, spec: str, files: set[str]) -> str | None:
         base = os.path.normpath(os.path.join(os.path.dirname(src_file), spec))
     else:
         return None
+    base = os.path.normpath(base)  # @/ imports contain forward slashes on Windows too.
     for cand in (base, base + ".ts", base + ".tsx", os.path.join(base, "index.ts"), os.path.join(base, "index.tsx")):
         if cand in files:
             return cand
@@ -497,7 +498,7 @@ def build_typescript() -> dict:
 def expand_entries(ts: dict, entries: list[str]) -> list[str]:
     """Entries may be globs like app/dashboard/**/page.tsx (relative to frontend/src)."""
     import fnmatch
-    rel = {os.path.relpath(f, FRONTEND_SRC): f for f in ts["files"]}
+    rel = {os.path.relpath(f, FRONTEND_SRC).replace(os.sep, "/"): f for f in ts["files"]}
     out = []
     for e in entries:
         pattern = e.replace("[", "[[]") if "*" not in e else e
@@ -551,7 +552,7 @@ def surface_calls(ts: dict, routes: list[dict], entries: list[str]) -> list[dict
     compiled = [(route_regex(r["path"]), r) for r in routes]
     hits: dict = {}
     for f in sorted(files):
-        rel = os.path.relpath(f, FRONTEND_SRC)
+        rel = os.path.relpath(f, FRONTEND_SRC).replace(os.sep, "/")
         for lit in ts["strings"].get(f, ()):
             norm = normalise_call(lit)
             if not norm.startswith("/") or norm == "/":

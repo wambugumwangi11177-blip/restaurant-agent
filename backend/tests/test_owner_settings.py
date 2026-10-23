@@ -337,7 +337,7 @@ def test_migration_051_creates_exactly_the_model_columns_and_is_reversible_and_i
         assert {"restaurant_settings", "restaurant_settings_audit"} <= set(inspector.get_table_names())
         for model in (models.RestaurantSettings, models.RestaurantSettingsAudit):
             built = {c["name"] for c in inspector.get_columns(model.__tablename__)}
-            later = {"expense_spike_pct", "bill_reserve_cents", "mpesa_match_minutes"}      # added to this table later: 053 (S3.3), 056 (S6.2)
+            later = {"expense_spike_pct", "bill_reserve_cents", "mpesa_match_minutes", "sales_drop_flag_pct"}      # added to this table later: 053 (S3.3), 056 (S6.2)
             assert built == {c.name for c in model.__table__.columns} - (later if model is models.RestaurantSettings else set()), model.__tablename__
         unique = [u["column_names"] for u in inspector.get_unique_constraints("restaurant_settings")]
         indexes = inspector.get_indexes("restaurant_settings")

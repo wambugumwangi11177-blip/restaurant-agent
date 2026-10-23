@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, EmailStr, AfterValidator
+from pydantic import BaseModel, ConfigDict, Field, EmailStr, AfterValidator, field_validator
 from typing import Optional, List, Annotated
 from datetime import datetime, date, time
 import email_validator
@@ -470,15 +470,25 @@ class StockTransferFulfill(StrictModel):
 # RECIPES (directive 017) — what a menu item's dish is made of
 # ──────────────────────────────────────────────
 class MenuIngredientCreate(StrictModel):
+    yield_fraction: float = Field(default=1.0, gt=0, le=1, allow_inf_nan=False)
     inventory_item_id: int
-    quantity_per_serving: float = Field(gt=0)
+    quantity_per_serving: float = Field(gt=0, allow_inf_nan=False)
     is_critical: bool = True
 
 class MenuIngredientUpdate(StrictModel):
-    quantity_per_serving: Optional[float] = Field(default=None, gt=0)
+    @field_validator("yield_fraction", "quantity_per_serving", "is_critical")
+    @classmethod
+    def no_null(cls, value):
+        if value is None:
+            raise ValueError("Recipe values cannot be null")
+        return value
+
+    yield_fraction: Optional[float] = Field(default=None, gt=0, le=1, allow_inf_nan=False)
+    quantity_per_serving: Optional[float] = Field(default=None, gt=0, allow_inf_nan=False)
     is_critical: Optional[bool] = None
 
 class MenuIngredientOut(StrictModel):
+    yield_fraction: float = 1.0
     id: int
     menu_item_id: int
     inventory_item_id: int
@@ -513,7 +523,14 @@ class StockCountOut(StrictModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 class CashDrawerCountCreate(StrictModel):
-    counted_amount_cents: int
+    @field_validator("window_start", "window_end")
+    @classmethod
+    def utc_window(cls, value):
+        from datetime import timezone
+        return value.astimezone(timezone.utc).replace(tzinfo=None) if value.tzinfo else value
+
+    entry_key: Optional[str] = Field(default=None, min_length=8, max_length=64)
+    counted_amount_cents: int = Field(ge=0, le=10000000000)
     window_start: datetime
     window_end: datetime
     labor_shift_id: Optional[int] = None
@@ -570,6 +587,7 @@ class InventoryReorderSettingsUpdate(StrictModel):
     default_supplier_id: Optional[int] = None
 
 class PurchaseOrderOut(StrictModel):
+    invoice_ref: Optional[str] = None
     id: int
     restaurant_id: int
     supplier_id: int

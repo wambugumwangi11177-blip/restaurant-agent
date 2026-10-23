@@ -121,7 +121,7 @@ def build_graph(db: Session, restaurant_id: int) -> Graph:
         dst = node_key("menu_item", link.menu_item_id)
         g.add_edge(src, "used_in", dst, {
             "is_critical": bool(link.is_critical),
-            "quantity_per_serving": link.quantity_per_serving,
+            "quantity_per_serving": link.raw_quantity_per_serving,
         })
 
     # ── supplier ──supplies──▶ ingredient  (from purchase-order history) ──────

@@ -173,7 +173,7 @@ def test_each_branch_has_a_full_menu_with_recipes_and_honest_costs(demo):
             recipe = db.query(models.MenuIngredient).filter(models.MenuIngredient.menu_item_id == item.id).all()
             assert recipe, f"{item.name} has no recipe"
             assert {m.inventory_item_id for m in recipe} <= set(inv)                          # recipes never cross branches
-            assert item.cost_price == round(sum(m.quantity_per_serving * inv[m.inventory_item_id].cost_per_unit_cents for m in recipe)), item.name
+            assert item.cost_price == round(sum(m.raw_quantity_per_serving * inv[m.inventory_item_id].cost_per_unit_cents for m in recipe)), item.name
         chicken = next(i for i in items if i.name == "Quarter chicken")
         assert (chicken.price, chicken.cost_price) == (40_000, 26_000)
 
@@ -246,11 +246,12 @@ def test_stock_is_never_negative_and_matches_the_books(demo):
         assert inv.low_stock_threshold < inv.par_level
 
 
-def test_baseline_waste_is_inside_the_missing_stock_line(demo):
+def test_baseline_waste_is_inside_the_missing_stock_line(demo, monkeypatch):
     """The baseline kitchen wastes a little; nothing is flagged as missing stock until P5 plants it."""
     from ai.stock_custody import compute_variance_report
     db, _ = demo
     import ai.stock_custody as sc
+    monkeypatch.setattr(sc, "utcnow", lambda: NOW)
     for r in _branches(db):
         rows = compute_variance_report(db, r.id, hours=24 * 7)
         assert rows

@@ -61,6 +61,7 @@ class Settings:
     quiet_hours_start: int = 22
     quiet_hours_end: int = 7
     licence_warning_days: int = 14
+    sales_drop_flag_pct: float = 15.0
     # Money (S3.3)
     expense_spike_pct: float = 25.0          # a cost this far above its usual (3-month average) is flagged
     bill_reserve_cents: int = 0              # cash the owner keeps aside for bills: the bill radar's opening position
@@ -174,6 +175,8 @@ FIELDS: list[FieldSpec] = [
     _f("mpesa_match_minutes", "Money", "Minutes between a sale and its M-Pesa payment",
        "How many minutes apart can a sale and its M-Pesa payment be and still count as the same one?", "minutes", 2, 60, 1, kind="int",
        hint="We match a payment on your statement to the sale with the same amount that is closest in time."),
+    _f("sales_drop_flag_pct", "Costs and margins", "Sales decline we flag",
+       "How far can sales fall against the previous seven complete days before the health tile turns red?", "%", 1, 100, 1),
 ]
 BY_KEY = {f.key: f for f in FIELDS}
 BY_ATTR = {f.attr: f for f in FIELDS}

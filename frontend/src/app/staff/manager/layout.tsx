@@ -7,6 +7,7 @@ import {
 import TierLayoutShell from "@/components/staff/TierLayoutShell";
 
 const NAV = [
+    { href: "/entries", label: "Team entries", icon: CreditCard },
     { href: "/staff/manager/pos", label: "POS", icon: CreditCard },
     { href: "/staff/manager/orders", label: "Orders", icon: ShoppingBag },
     { href: "/staff/manager/kitchen", label: "Kitchen", icon: ChefHat },

@@ -86,7 +86,7 @@ export type RankedCard = Pick<DecisionCard, "id" | "domain" | "sentence" | "kes_
 export type CostingYouMoney = Block & { cards: DecisionCard[]; ranked: RankedCard[]; more: number; ranking: string };
 
 export type HealthStatus = "good" | "watch" | "bad" | "unknown";
-export type HealthTile = { area: AreaKey; title: string; number: number | null; unit: string; word: string; status: HealthStatus; label: string };
+export type HealthTile = Partial<Block> & { area: AreaKey; title: string; number: number | null; unit: string; word: string; status: HealthStatus; label: string };
 export type Health = Block & { tiles: HealthTile[] };
 
 export const AREA_KEYS = ["money", "sales_dishes", "store", "cash", "staff", "permits"] as const;

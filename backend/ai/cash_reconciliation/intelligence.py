@@ -27,6 +27,7 @@ from datetime import timedelta
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 import models
 from time_utils import utcnow
@@ -90,6 +91,7 @@ def record_drawer_count(
     labor_shift_id: int | None = None,
     notes: str = "",
     settings: Settings | None = None,
+    entry_key: str | None = None,
 ) -> models.CashDrawerCount:
     """
     Record a physical drawer count and compute variance against expected
@@ -103,9 +105,16 @@ def record_drawer_count(
     if window_end <= window_start:
         raise DrawerCountError("window_end must be after window_start")
 
+    if entry_key:
+        prior = db.query(models.CashDrawerCount).filter_by(restaurant_id=restaurant_id, entry_key=entry_key).first()
+        if prior:
+            if (prior.counted_amount_cents, prior.window_start, prior.window_end) != (counted_amount_cents, window_start, window_end):
+                raise DrawerCountError("This retry key was used for a different count")
+            return prior
     expected = expected_cash_amount_cents(db, restaurant_id, window_start, window_end)
 
     count = models.CashDrawerCount(
+        entry_key=entry_key,
         restaurant_id=restaurant_id,
         labor_shift_id=labor_shift_id,
         window_start=window_start,
@@ -116,7 +125,14 @@ def record_drawer_count(
         notes=notes,
     )
     db.add(count)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        prior = db.query(models.CashDrawerCount).filter_by(restaurant_id=restaurant_id, entry_key=entry_key).first() if entry_key else None
+        if prior and (prior.counted_amount_cents, prior.window_start, prior.window_end) == (counted_amount_cents, window_start, window_end):
+            return prior
+        raise
     db.refresh(count)
 
     from ai.evaluation.tracker import write_audit_log

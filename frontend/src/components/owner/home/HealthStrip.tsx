@@ -1,6 +1,7 @@
 "use client";
 import { kes } from "@/lib/owner/format";
 import type { Health, HealthStatus } from "@/lib/owner/types";
+import StateChip from "@/components/owner/StateChip";
 
 const DOT: Record<HealthStatus, string> = {
   good: "bg-[var(--v-good)]", watch: "bg-[var(--v-warn)]", bad: "bg-[var(--v-destructive)]", unknown: "bg-[var(--v-border)]",
@@ -8,7 +9,7 @@ const DOT: Record<HealthStatus, string> = {
 
 function value(number: number | null, unit: string): string {
   if (number == null) return "Not set up";
-  return unit === "KES" ? kes(number) : unit === "%" ? `${Number(number.toFixed(1))}%` : String(number);
+  return unit === "KES" ? kes(number) : unit === "%" ? `${Number(number.toFixed(1))}%` : unit === "days" ? `${number} days` : String(number);
 }
 
 /** Six tiles, one per area: one number, one word, one colour. A tile jumps to its panel below. */
@@ -25,6 +26,7 @@ export default function HealthStrip({ health }: { health: Health }) {
             <p className="font-display mt-2 text-xl font-semibold tracking-[-0.03em]">{value(t.number, t.unit)}</p>
             {t.number != null && <p className="mt-0.5 text-[11px] font-semibold">{t.word}</p>}
             <p className="mt-0.5 text-[10px] leading-snug text-[var(--v-muted-foreground)]">{t.label}</p>
+            {t.state && <StateChip block={{...t, state:t.state}} className="mt-1" />}
           </a>
         </li>
       ))}

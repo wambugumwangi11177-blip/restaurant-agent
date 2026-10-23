@@ -139,11 +139,12 @@ def _delivery_decisions(db: Session, restaurant_id: int, gaps: list[dict], setti
         out.append(Decision(
             agent="pricing_intelligence",
             category="pricing",
-            action=f"Raise {gap['item_name']} on {platform} to KES {int(gap['recommended_delivery_price']) // 100:,} "
+            action=f"Consider a separate delivery price for {gap['item_name']} on {platform}: KES {int(gap['recommended_delivery_price']) // 100:,} "
                    f"(from KES {int(gap['current_price']) // 100:,})",
             rationale=f"{platform} takes {gap['commission_pct']}%, so a {gap['item_name']} sold there keeps "
                       f"KES {int(gap['delivery_keeps_cents']) // 100:,} instead of KES {int(gap['dine_in_keeps_cents']) // 100:,} "
-                      f"in the restaurant; {units} sold through {platform} in the last 30 days.",
+                      f"in the restaurant; {units} sold through {platform} in the last 30 days. "
+                      "This is a channel-price option, not an ordinary price raise. Demand may fall; compare it with leaving the dish off delivery.",
             confidence_pct=70,
             risk=3,
             difficulty=2,

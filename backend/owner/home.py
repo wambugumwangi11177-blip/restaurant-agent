@@ -118,10 +118,8 @@ def _costing_you_money(ctx: OwnerContext) -> dict:
 
 
 def _health(ctx: OwnerContext, area_blocks: dict) -> dict:
-    tiles = [{"area": key, "title": area["title"], **area["summary"]} for key, area in area_blocks.items()]
-    known = any(t["number"] is not None for t in tiles)
-    return block("live" if known else "no_data", as_of=ctx.now, tiles=tiles,
-                 reason=None if known else "The tiles fill in as sales and costs are recorded.")
+    from owner.health import compose
+    return compose(ctx, area_blocks)
 
 
 def _coming_up(ctx: OwnerContext) -> dict:

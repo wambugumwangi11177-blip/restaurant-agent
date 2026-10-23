@@ -37,6 +37,7 @@ async def submit_drawer_count(
             counted_amount_cents=body.counted_amount_cents,
             window_start=body.window_start, window_end=body.window_end,
             labor_shift_id=body.labor_shift_id, notes=body.notes,
+            entry_key=f"{restaurant.id}:{current_user.id}:{body.entry_key}" if body.entry_key else None,
         )
     except cash_engine.DrawerCountError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

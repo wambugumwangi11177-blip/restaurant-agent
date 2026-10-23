@@ -187,6 +187,7 @@ def _licences(ctx: OwnerContext) -> list[dict]:
     for l in rows:
         days_left, status = licence_status(l.expires_on, today, warn)
         out.append({"name": l.name, "issuer": l.issuer, "expires_on": l.expires_on.isoformat(), "days_left": days_left, "status": status,
+                    "entered_up_to": eat_date(l.updated_at or l.created_at).isoformat(),
                     "word": {"expired": "Expired", "expiring": "Expires soon", "ok": "Fine"}[status]})
     return out
 
@@ -195,7 +196,7 @@ def licences_block(ctx: OwnerContext) -> dict:
     items = _licences(ctx)
     if not items:
         return no_data("No licences entered yet.")
-    return block("as_entered", as_of=ctx.now, items=items, assumption=assume("licence_warning_days", ctx.settings.licence_warning_days, label="Licence warning (days)"))
+    return block("as_entered", as_of=ctx.now, items=items, entered_up_to=max(i["entered_up_to"] for i in items), assumption=assume("licence_warning_days", ctx.settings.licence_warning_days, label="Licence warning (days)"))
 
 
 def licences_due_block(ctx: OwnerContext) -> dict:

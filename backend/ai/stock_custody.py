@@ -59,7 +59,7 @@ def _theoretical_usage_by_item(db: Session, restaurant_id: int, since) -> dict[i
     rows = (
         db.query(
             models.MenuIngredient.inventory_item_id,
-            func.sum(models.OrderItem.quantity * models.MenuIngredient.quantity_per_serving),
+            func.sum(models.OrderItem.quantity * models.MenuIngredient.raw_quantity_per_serving),
         )
         .join(models.OrderItem, models.OrderItem.menu_item_id == models.MenuIngredient.menu_item_id)
         .join(models.Order, models.Order.id == models.OrderItem.order_id)
@@ -97,11 +97,11 @@ def _actual_usage_by_item(db: Session, restaurant_id: int, since) -> dict[int, f
 def _smallest_serving_by_item(db: Session, restaurant_id: int, item_ids) -> dict[int, float]:
     """The smallest quantity_per_serving any recipe takes of each inventory item (items with no recipe are absent)."""
     rows = (
-        db.query(models.MenuIngredient.inventory_item_id, func.min(models.MenuIngredient.quantity_per_serving))
+        db.query(models.MenuIngredient.inventory_item_id, func.min(models.MenuIngredient.raw_quantity_per_serving))
         .join(models.InventoryItem, models.InventoryItem.id == models.MenuIngredient.inventory_item_id)
         .filter(models.InventoryItem.restaurant_id == restaurant_id,
                 models.MenuIngredient.inventory_item_id.in_(list(item_ids)),
-                models.MenuIngredient.quantity_per_serving > 0)
+                models.MenuIngredient.raw_quantity_per_serving > 0)
         .group_by(models.MenuIngredient.inventory_item_id)
         .all()
     )

@@ -78,7 +78,7 @@ def deduct_ingredients_for_order(db: Session, order: models.Order, performed_by_
             continue
 
         for ingredient in ingredients:
-            qty = ingredient.quantity_per_serving * oi.quantity
+            qty = ingredient.raw_quantity_per_serving * oi.quantity
             item = inventory_items_by_id.get(ingredient.inventory_item_id)
             if not item:
                 continue   # Recipe references a since-deleted inventory item — nothing to deduct from.
@@ -172,7 +172,7 @@ def reverse_ingredients_for_order(db: Session, order: models.Order, performed_by
     for oi in order.items:
         ingredients = ingredients_by_menu_item.get(oi.menu_item_id, [])
         for ingredient in ingredients:
-            qty = ingredient.quantity_per_serving * oi.quantity
+            qty = ingredient.raw_quantity_per_serving * oi.quantity
             item = inventory_items_by_id.get(ingredient.inventory_item_id)
             if not item:
                 continue

@@ -36,6 +36,7 @@ def _po_out(po: models.PurchaseOrder, db: Session) -> dict:
     item = db.query(models.InventoryItem).filter(models.InventoryItem.id == po.inventory_item_id).first() if po.inventory_item_id else None
     return {
         "id": po.id,
+        "invoice_ref": po.invoice_ref,
         "restaurant_id": po.restaurant_id,
         "supplier_id": po.supplier_id,
         "inventory_item_id": po.inventory_item_id,

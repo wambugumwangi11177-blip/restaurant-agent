@@ -132,6 +132,7 @@ def _ingredient_out(row: models.MenuIngredient, item: models.InventoryItem | Non
         "menu_item_id": row.menu_item_id,
         "inventory_item_id": row.inventory_item_id,
         "quantity_per_serving": row.quantity_per_serving,
+        "yield_fraction": row.yield_fraction,
         "is_critical": row.is_critical,
         "item_name": item.item_name if item else None,
         "unit": item.unit if item else None,
@@ -197,6 +198,7 @@ async def add_ingredient(
         menu_item_id=item_id,
         inventory_item_id=body.inventory_item_id,
         quantity_per_serving=body.quantity_per_serving,
+        yield_fraction=body.yield_fraction,
         is_critical=body.is_critical,
     )
     db.add(row)

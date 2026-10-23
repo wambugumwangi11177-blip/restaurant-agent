@@ -751,7 +751,7 @@ def _get_affected_menu_items(db: Session, inventory_item_id: int) -> list[dict]:
                 "name":        item.name,
                 "category":    item.category,
                 "is_critical": link.is_critical,
-                "qty_per_serving": link.quantity_per_serving,
+                "qty_per_serving": link.raw_quantity_per_serving,
             })
     return result
 

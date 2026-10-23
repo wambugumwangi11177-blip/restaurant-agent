@@ -163,8 +163,10 @@ def test_what_did_i_sell_yesterday_is_that_days_sales_not_the_health_score(db_se
     restaurant_row = models.Restaurant(tenant_id=tenant.id, name="Sales Day", address="Nairobi")
     db_session.add(restaurant_row)
     db_session.commit()
+    from time_utils import service_day
     now = _eat_now()
-    yesterday = now.date() - timedelta(days=1)
+    # "Yesterday" is the day before the open service day (06:00 Nairobi rollover), not the calendar day.
+    yesterday = service_day() - timedelta(days=1)
     yesterday_at = datetime.combine(yesterday, time(15, 0)) - _EAT_OFFSET
     # Today's sales window ends at the current minute, so the sale has to be earlier today.
     today_wall = now - timedelta(seconds=1)
@@ -299,3 +301,23 @@ def test_slow_days_answer_runs_against_the_real_forecaster(db_session, restauran
     assert all(row["total_orders"] > 0 for row in ranking)
     assert answer["finding"].startswith(ranking[0]["day"] + " is the slowest recorded day")
     assert answer["steps"] and answer["steps"][0]["action"].startswith(ranking[0]["day"])
+
+
+def test_yesterday_before_the_morning_rollover_is_the_day_before_the_open_service(db_session, monkeypatch):
+    """01:30 Saturday Nairobi: today is Friday's service, so yesterday is Thursday. The two must not overlap."""
+    from datetime import datetime
+    import models
+    from owner.answer_why import build
+    from owner.states import OwnerContext
+    from routers.ai_ask import _answer_revenue
+    restaurant_row, answers = _sales_pair(db_session, monkeypatch, datetime(2026, 10, 23, 22, 30))
+    for when, total in ((datetime(2026, 10, 23, 19, 0), 1_634_000),   # Friday 22:00 Nairobi, the open service
+                        (datetime(2026, 10, 22, 12, 0), 999_900)):    # Thursday 15:00 Nairobi
+        db_session.add(models.Order(restaurant_id=restaurant_row.id, total=total, is_paid=True,
+                                    status=models.OrderStatus.SERVED, created_at=when))
+    db_session.commit()
+    what = _answer_revenue(db_session, restaurant_row.id, "What did I sell yesterday?")
+    assert "KSh 9,999" in what["finding"] and "1 paid" in what["finding"], what["finding"]
+    user = db_session.query(models.User).filter_by(tenant_id=restaurant_row.tenant_id).first()
+    why = build(OwnerContext(db_session, user, restaurant_row), "Why were sales down yesterday?")
+    assert why["day"] == "2026-10-22"

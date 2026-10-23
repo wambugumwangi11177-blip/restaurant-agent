@@ -208,11 +208,21 @@ def keep_grounded_sentences(text: str | None, grounding_source: str) -> tuple[st
     return result, dropped
 
 
+_MD_EMPHASIS = re.compile(r"(\*\*|__)(?=\S)(.+?)(?<=\S)\1", re.S)
+_MD_HEADING = re.compile(r"^[ \t]{0,3}#{1,6}[ \t]+", re.M)
+
+
+def strip_markdown_emphasis(text: str) -> str:
+    """The owner screens show plain text (whitespace-pre-wrap), so a model's **bold** or '## heading' would reach the
+    owner as literal asterisks and hashes. Keep the words, drop the markup."""
+    return _MD_HEADING.sub("", _MD_EMPHASIS.sub(r"\2", text))
+
+
 def finish_text(raw: str | None, grounding_source: str) -> tuple[str | None, int]:
     """Model output -> owner-safe text: strip leaked reasoning (the narrow,
-    voice-preserving filter), then drop every sentence the grounding source
-    cannot back. Shared by take() and the OS chat."""
-    return keep_grounded_sentences(strip_creative_leak(raw or ""), grounding_source)
+    voice-preserving filter) and markdown emphasis, then drop every sentence the
+    grounding source cannot back. Shared by take() and the OS chat."""
+    return keep_grounded_sentences(strip_markdown_emphasis(strip_creative_leak(raw or "")), grounding_source)
 
 
 # ── Cache, locking and failure state ─────────────────────────────────────────

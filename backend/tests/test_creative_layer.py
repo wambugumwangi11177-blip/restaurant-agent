@@ -726,3 +726,9 @@ def test_report_take_keeps_its_assertion_when_the_voice_says_well(client, db_ses
     add_paid_order(db_session)
     body = client.get("/api/v1/reports/daily/creative", headers=headers).json()
     assert body["text"] == take
+
+
+def test_finish_text_drops_markdown_emphasis_the_owner_screen_would_show_raw():
+    from ai.creative import finish_text
+    text, _dropped = finish_text("## Idea\nPush **Nyama choma** tonight.", "Nyama choma")
+    assert text is not None and "**" not in text and "#" not in text and "Nyama choma" in text

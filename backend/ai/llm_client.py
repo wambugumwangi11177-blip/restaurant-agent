@@ -219,8 +219,8 @@ def _get_client():
             max_retries=_LLM_MAX_RETRIES,
             default_headers={
                 # OpenRouter attribution headers (recommended by their docs).
-                "HTTP-Referer": "https://vibanda.restaurant-os.app",
-                "X-Title": "Vibanda Restaurant OS",
+                "HTTP-Referer": "https://leviii.restaurant-os.app",
+                "X-Title": "LEVIII Restaurant Manager",
             },
         )
     elif _PROVIDER == "anthropic":

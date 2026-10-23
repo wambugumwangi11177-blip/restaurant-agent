@@ -28,7 +28,7 @@ import models
 from owner.answers import assumption, clock_text, day_text, kes_text, make, nothing, pct_text, row
 from owner.money.pnl import nairobi_utc_range
 from owner.states import OwnerContext
-from time_utils import EAT_OFFSET, eat_date, service_day, service_sales_window
+from time_utils import EAT_OFFSET, service_day, service_sales_window
 
 WHY = SimpleNamespace(
     usual_days=7,            # the usual day = the average of this many earlier days of the same weekday …
@@ -249,7 +249,8 @@ def _cancelled(ctx: OwnerContext, day: date, usual: list[date], weekday: str) ->
 # ── the answer ───────────────────────────────────────────────────────────────
 
 def build(ctx: OwnerContext, question: str, *, day: date | None = None) -> dict:
-    today = eat_date(ctx.now)
+    # The open service day: before 06:00 Nairobi "yesterday" is the day before the service still running.
+    today = service_day(ctx.now)
     named = day
     day = named or parse_day(question, today)
     if named is None and re.search(r"\btoday\b", question.lower()):

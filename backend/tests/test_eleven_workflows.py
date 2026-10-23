@@ -311,3 +311,18 @@ def test_bill_payment_retry_and_undo_keep_the_ledger_consistent(client,db_sessio
     expense=db_session.get(models.Expense,eid);assert expense.amount_cents==450000 and expense.method=='bank'
     assert client.post(f"/api/v1/owner/operations/entries/{r.json()['entry_id']}/undo",headers=h).status_code==200
     db_session.refresh(expense);assert expense.voided_at is not None and expense.voided_by_user_id==user.id
+
+
+def test_deleting_a_dish_removes_its_scheduled_prices_even_without_fk_enforcement(client, db_session, scoped_owner, setup_menu):
+    user, headers = scoped_owner
+    _, dish = setup_menu
+    db_session.add(models.ScheduledMenuPrice(
+        restaurant_id=202, menu_item_id=dish.id, channel='walk_in', daypart='all', price_cents=45000,
+        starts_on=eat_date(utcnow()), explanation='Lunch price', created_by=user.id,
+    ))
+    db_session.commit()
+    dish_id = dish.id
+    gone = client.delete(f"/api/v1/menu/{dish_id}", headers=headers)
+    assert gone.status_code == 200, gone.text
+    db_session.expire_all()
+    assert db_session.query(models.ScheduledMenuPrice).filter_by(menu_item_id=dish_id).count() == 0

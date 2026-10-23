@@ -89,7 +89,9 @@ def _label(period: str) -> str:
     """Owner-facing date range for a report period, in Nairobi time."""
     now_eat = utcnow() + _EAT_OFFSET
     if period == "daily":
-        return now_eat.strftime("%d %b %Y")
+        # The daily figures are the open service day (rolls over at 06:00), so name that day, not the calendar one.
+        from time_utils import service_day
+        return service_day().strftime("%d %b %Y")
     if period == "weekly":
         return f"{(now_eat - timedelta(days=7)).strftime('%d %b')} – {now_eat.strftime('%d %b %Y')}"
     if period == "monthly":

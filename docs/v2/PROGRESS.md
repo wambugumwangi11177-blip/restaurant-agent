@@ -6,6 +6,8 @@ Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-sec
 
 No new Railway variable. The note spends tokens only when `OPENROUTER_API_KEY` is set, `FEATURE_CREATIVE_LAYER` and `FEATURE_AI_NARRATION` are on (both default on), and today's spend is under `DAILY_LLM_SPEND_CAP_USD` (default 1).
 
+Validation (23 Oct, this tree): backend `LOG_FORMAT=plain pytest` **2231 passed, 1 skipped**. Frontend: `tsc --noEmit` clean, vitest **239 passed**, `next build` succeeded (74 routes). No new migration. No production database was touched.
+
 # Eleven demo — AI availability, grounded notes, and one sales day — 23 October 2026
 
 Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes.

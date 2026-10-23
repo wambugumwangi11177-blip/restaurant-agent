@@ -75,6 +75,12 @@ def shift_plan(db: Session=Depends(get_db), user=Depends(_owner_only)):
     return shifts(OwnerContext(db,user,_restaurant(db,user)))
 
 
+@router.get('/planning/stock-review')
+def stock_review(db: Session=Depends(get_db), user=Depends(_owner_only)):
+    from owner.stock_review import review
+    return review(OwnerContext(db,user,_restaurant(db,user)))
+
+
 def _restaurant(db: Session, user: models.User) -> models.Restaurant:
     restaurant = get_restaurant_or_none(db, user)
     if restaurant is None:

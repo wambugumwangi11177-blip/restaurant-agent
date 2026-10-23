@@ -1,3 +1,13 @@
+# Presentation follow-through — stock operations, 23 October 2026
+
+The latest user request asks for the PDF promises to work in the software. Added a live stock review to `/planning`: book stock valuation with integer-cent rounding, waste by item, slow/fast movement, ABC-based next-count dates from physical count history, and supplier price comparisons from same-unit delivered purchases. The service is owner-only and selected-branch scoped. Existing inventory intelligence computes consumption/ABC; review uses the actual current 30-day window rather than silently moving back to the latest sale. Valuation explicitly excludes missing costs and floors negative stock to zero while displaying the problem. Supplier comparisons require two deliveries in the last 90 days. This is a suggested counting schedule, not a reminder service or completed count.
+
+Fixed shared inventory waste maths for fractional quantities: 0.2 kg waste / 0.5 kg stock out is 40%, not 20%. Tests cover exact valuation, fractional waste, absent cost, negative stock, tenant scope, missing history and unit-isolated supplier comparisons. The UI links back to the existing inventory workspace for entry.
+
+Validation: readiness plus first stock tests 20 passed; final stock/evidence tests 7 passed; all 227 frontend tests passed; TypeScript and 74-route production build passed. Restarted local backend/frontend. Authenticated demo stock review returns 35 items and 22 supplier comparisons; `/planning` HTTP 200. No browser visual validation is claimed. ESLint ratchet passed at the existing 14 errors / 4 warnings, with no new findings. Code map regenerated. No Eleven tenant or remote database changed.
+
+Remaining PDF work is explicit: fully attributed shift reconciliation, forecast-driven prep and supplier order workflow, stored branch/channel/daypart prices, learned dish elasticity, price ladder, long-tail review, per-change realised monthly results, and complete staff/offline/undo workflows. Actual Eleven POS and statement compatibility require real samples. The request is not represented as fully finished merely because these stock screens exist.
+
 # Eleven demo readiness — 23 October 2026
 
 Plan: [ELEVEN_DEMO_PLAN.md](ELEVEN_DEMO_PLAN.md). User authorized building and validating the presentation gaps before provisioning Eleven. This supersedes the original P7 deferral for this local readiness work. Files: owner health and operations/planning services, staff entry UI, recipe/receiving models and additive migration 057. Tests: role/tenant isolation, retry keys, receipt boundaries, yield/unit regression and planning calculations; existing evals and frontend gates. No production writes, deployments or Eleven provisioning.

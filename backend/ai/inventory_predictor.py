@@ -221,7 +221,7 @@ def _analyze_single_item(item, movements, now, thirty_days_ago, seven_days_ago):
     # ── Waste Analysis ──
     waste_movements = [m for m in outs if m.reason and "waste" in m.reason.lower()]
     total_waste = sum(m.quantity for m in waste_movements)
-    waste_pct = round((total_waste / max(total_out_30d, 1)) * 100, 1)
+    waste_pct = round((total_waste / total_out_30d) * 100, 1) if total_out_30d > 0 else 0
 
     # ── Procurement Cost ──
     monthly_spend = total_in_30d * (item.cost_per_unit or 0)

@@ -21,7 +21,7 @@ The implementation plan is [ELEVEN_DEMO_PLAN.md](ELEVEN_DEMO_PLAN.md). Eleven ha
 - Test a real Eleven M-Pesa statement export against the parser, rather than assuming the illustrative CSV format is correct.
 - Collect branch names, owner/staff roles, menu, recipes with raw/usable quantities and yield, buying units, suppliers, opening counts, bills, licences and opening finance records.
 - Walk through the entry screens with the people doing the work. Browser automation was unavailable in this chat; component tests and HTTP checks do not establish real-phone usability.
-- Chapter 8's learned price sensitivity, channel/daypart price lists, price ladder, long-tail menu trimming and ABC count calendar remain roadmap. No claim is made that this local readiness work implements them.
+- Chapter 8's learned price sensitivity, channel/daypart price lists, price ladder, long-tail menu trimming remain pending. ABC-based suggested next-count dates are now available in Planning; automatic reminders are not implemented.
 - Nothing here deploys to production, changes provider credentials, sends purchasing orders, or creates Eleven's live tenant.
 
 ## Reproducing checks on Windows
@@ -31,3 +31,7 @@ The implementation plan is [ELEVEN_DEMO_PLAN.md](ELEVEN_DEMO_PLAN.md). Eleven ha
 Frontend: `npm test`, `npx tsc --noEmit`, `python execution/lint_ratchet.py`, and a production build with `NEXT_PUBLIC_API_URL=http://localhost:8000`.
 
 Migration 057 was applied only to the local demo. A database copy passed downgrade to 056 then upgrade to 057 with all 3,225 orders preserved. PostgreSQL upgrade SQL was generated offline without contacting a database.
+
+## Stock review added after the walkthrough
+
+Planning now includes stock value, per-item recorded waste percentage, movement speed, suggested ABC next-count dates and same-unit supplier price history. The live demo branch has 35 stock items and 22 supplier comparisons. Values use saved unit costs, not historical FIFO valuation; negative stock and unknown costs are explicit. Waste uses recorded stock out and is not an independent physical loss measurement.

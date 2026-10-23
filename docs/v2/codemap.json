@@ -3184,6 +3184,26 @@
     "to": "time_utils"
    },
    {
+    "from": "owner.stock_review",
+    "lazy": false,
+    "to": "ai.inventory_predictor"
+   },
+   {
+    "from": "owner.stock_review",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.stock_review",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "owner.stock_review",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
     "from": "parsers.mpesa_csv",
     "lazy": false,
     "to": "time_utils"
@@ -4092,6 +4112,11 @@
     "from": "routers.owner",
     "lazy": false,
     "to": "owner.states"
+   },
+   {
+    "from": "routers.owner",
+    "lazy": true,
+    "to": "owner.stock_review"
    },
    {
     "from": "routers.owner",
@@ -5642,6 +5667,13 @@
    },
    {
     "group": "other",
+    "id": "owner.stock_review",
+    "kind": "py",
+    "loc": 77,
+    "path": "backend\\owner\\stock_review.py"
+   },
+   {
+    "group": "other",
     "id": "parsers",
     "kind": "py",
     "loc": 2,
@@ -5840,7 +5872,7 @@
     "group": "router",
     "id": "routers.owner",
     "kind": "py",
-    "loc": 213,
+    "loc": 219,
     "path": "backend\\routers\\owner.py"
    },
    {
@@ -6750,6 +6782,12 @@
    "verb": "GET"
   },
   {
+   "func": "stock_review",
+   "module": "routers.owner",
+   "path": "/owner/planning/stock-review",
+   "verb": "GET"
+  },
+  {
    "func": "write_settings",
    "module": "routers.owner",
    "path": "/owner/settings",
@@ -7171,12 +7209,12 @@
   }
  ],
  "stats": {
-  "py_edges": 791,
-  "py_lazy_edges": 229,
-  "py_modules": 190,
-  "routes": 196,
-  "ts_edges": 602,
-  "ts_files": 267
+  "py_edges": 796,
+  "py_lazy_edges": 230,
+  "py_modules": 191,
+  "routes": 197,
+  "ts_edges": 605,
+  "ts_files": 268
  },
  "status_only": [
   [
@@ -9203,6 +9241,10 @@
    },
    {
     "from": "components\\owner\\PlanningWorkspace.tsx",
+    "to": "components\\owner\\StockReview.tsx"
+   },
+   {
+    "from": "components\\owner\\PlanningWorkspace.tsx",
     "to": "lib\\api.ts"
    },
    {
@@ -9220,6 +9262,14 @@
    {
     "from": "components\\owner\\StateChip.tsx",
     "to": "lib\\owner\\types.ts"
+   },
+   {
+    "from": "components\\owner\\StockReview.tsx",
+    "to": "lib\\api.ts"
+   },
+   {
+    "from": "components\\owner\\StockReview.tsx",
+    "to": "lib\\owner\\format.ts"
    },
    {
     "from": "components\\owner\\areas\\CashArea.tsx",

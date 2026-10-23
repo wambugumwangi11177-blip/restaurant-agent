@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { kes } from '@/lib/owner/format';
+import StockReview from './StockReview';
 
 type Dish={id:number;name:string};
 type Ingredient={id:number;item_name:string;unit:string;quantity_per_serving:number;yield_fraction:number};
@@ -37,5 +38,6 @@ export default function PlanningWorkspace(){
   </section>
   <section className="space-y-4 rounded-xl border border-[var(--v-border)] p-4"><h2 className="text-xl font-semibold">Combo checker</h2><form className="space-y-3" onSubmit={e=>{e.preventDefault();run(async()=>{const [whole,part='']=price.split('.');const priceCents=Number(whole)*100+Number(part.padEnd(2,'0'));setCombo((await api.post('/api/v1/owner/planning/combo',{menu_item_ids:[Number(first),Number(second)],price_cents:priceCents})).data);});}}>{[[first,setFirst,'First dish'],[second,setSecond,'Second dish']].map(([v,set,label])=><label className="block" key={String(label)}>{String(label)}<select className={field} required value={v as string} onChange={e=>{(set as (v:string)=>void)(e.target.value);setCombo(null);}}><option value="">Choose dish</option>{dishes.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label>)}<label className="block">Combo price (KES)<input className={field} inputMode="decimal" pattern="[0-9]+(\.[0-9]{1,2})?" required value={price} onChange={e=>{setPrice(e.target.value);setCombo(null);}}/></label><button className={button} disabled={busy}>Check combo</button></form>{combo&&<div role="status"><p>Separately: {kes(combo.regular_kes)} · Combo: {kes(combo.combo_kes)} · Ingredients: {kes(combo.cost_kes)}</p><p>Keeps {combo.margin_pct}% · Your floor {combo.floor_pct}% · {combo.above_floor?'Above floor':'Below floor'}</p><p className="text-sm">{combo.note}</p></div>}</section>
   <section className="space-y-3 rounded-xl border border-[var(--v-border)] p-4"><h2 className="text-xl font-semibold">Shift report</h2><p className="text-sm">{shifts?.note}</p>{shifts?.shifts.length===0&&<p>No drawer counts recorded. Close a shift in Team entries first.</p>}<div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{['Nairobi shift','Cash expected','Counted','Gap','M-Pesa sales','Cancelled','Stock gap'].map(x=><th className="p-2" key={x}>{x}</th>)}</tr></thead><tbody>{shifts?.shifts.map(s=><tr key={s.id}><th className="p-2">{s.from.replace('T',' ')} – {s.to.slice(11,16)}</th><td className="p-2">{kes(s.expected_kes)}</td><td className="p-2">{kes(s.counted_kes)}</td><td className="p-2">{kes(s.gap_kes)}</td><td className="p-2">{kes(s.mpesa_sales_kes)}</td><td className="p-2">{s.cancelled_sales}</td><td className="p-2">Not attributable</td></tr>)}</tbody></table></div><Link href="/home#area-cash" className="inline-flex min-h-11 items-center underline">Statement exceptions and cash detail →</Link></section>
+  <StockReview/>
  </div>;
 }

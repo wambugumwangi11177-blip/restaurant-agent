@@ -232,11 +232,17 @@ def test_a_cash_check_is_cut_to_the_period_it_is_in(db_session):
     g = gr.build_skeleton(db_session)
     owner_id = g.owner.id
     now = utcnow()
+    # The daily window is midnight-to-now in Nairobi. Two hours ago is yesterday
+    # between midnight and 02:00 Nairobi, so the "today" count has to sit inside
+    # the part of today that has already happened.
+    today_start = (now + timedelta(hours=3)).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=3)
+    elapsed = now - today_start
+    today_at = today_start + elapsed / 2 if elapsed > timedelta(0) else today_start
 
     def count(at, expected, counted):
         db_session.add(models.CashDrawerCount(restaurant_id=g.rid, window_start=at, window_end=at + timedelta(hours=8), expected_amount_cents=expected,
                                               counted_amount_cents=counted, counted_by_user_id=owner_id, counted_at=at + timedelta(hours=8)))
-    count(now - timedelta(hours=2), 100_000, 100_000)                              # today
+    count(today_at, 100_000, 100_000)                                              # today
     count(now - timedelta(days=3, hours=1), 100_000, 60_000)                       # three days ago: KES 400 short
     count(now - timedelta(days=20), 100_000, 100_000)                              # this month, not this week (or last month: either way not in 7 days)
     db_session.commit()

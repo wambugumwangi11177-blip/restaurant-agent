@@ -501,7 +501,7 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
         },
         "greeting_date": _eat_now().date().isoformat(),
         "restaurant_name": db.query(models.Restaurant.name).filter(
-            models.Restaurant.id == rid).scalar() or "Vibanda Village",
+            models.Restaurant.id == rid).scalar() or "This restaurant",
         "period": period,
         "revenue_basis": "paid_non_cancelled_orders_by_creation_time",
         "unavailable_metrics": ["pace_projection", "kitchen", "delayed_orders",

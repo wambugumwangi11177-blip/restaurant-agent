@@ -287,7 +287,10 @@ class DemoBuilder:
                                              quantity_per_serving=q * usable_yield, yield_fraction=usable_yield,
                                              is_critical=k not in ("lemons", "lettuce", "cheese")))
         for i, (name, title, rate, _shifts) in enumerate(cat.STAFF):
-            m = models.StaffMember(restaurant_id=rid, name=name, role_title=title, hourly_rate=rate, is_active=True)
+            # Link the first branch's roster to its demo login identities for delegation.
+            login_key = {0: "manager", 1: "kitchen", 6: "accountant", 7: "storekeeper"}.get(i) if b.index == 0 else None
+            m = models.StaffMember(restaurant_id=rid, name=name, role_title=title, hourly_rate=rate, is_active=True,
+                                  user_id=self.users[login_key].id if login_key else None)
             db.add(m)
             b.staff.append((m, rate, i))
         db.flush()
@@ -472,7 +475,7 @@ class DemoBuilder:
                 day_used[k] = day_used.get(k, 0.0) + q
                 b.min_stock[k] = min(b.min_stock[k], inv.quantity)
                 db.add(models.StockMovement(inventory_item_id=inv.id, movement_type=models.StockMovementType.OUT, quantity=q,
-                                            reason=f"Order #{order.id}", created_at=order.created_at + timedelta(minutes=1),
+                                            reason=f"Order #{order.id}", created_at=order.created_at,
                                             performed_by_user_id=manager.id))
             self._count("stock_movements", len(used))
             if order.status == models.OrderStatus.SERVED and order.customer_phone and feedback_rng.random() < 0.10:

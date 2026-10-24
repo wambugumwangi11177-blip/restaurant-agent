@@ -1,4 +1,3 @@
-import ChartEmpty from "./ChartEmpty";
 
 type Gap = { item: string; unit: string; store: number; kitchen: number };
 

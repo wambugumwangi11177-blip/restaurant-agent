@@ -26,3 +26,12 @@ regexes = [
     '''(?i)example[_-]?(key|token|secret)''',
     '''xxxx+''',
 ]
+
+# Prompt-version identifier passed beside OS_CHAT_MAX_TOKENS, not a credential.
+# Exact secret match also covers the introducing commit during history scans.
+[[rules]]
+id = "generic-api-key"
+[[rules.allowlists]]
+description = "Owner OS creative prompt version"
+regexTarget = "secret"
+regexes = ['^owner-os-creative-v1$']

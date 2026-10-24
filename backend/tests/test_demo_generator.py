@@ -162,6 +162,8 @@ def test_demo_seed_has_store_kitchen_manager_and_accountant_logins(demo):
         user = db.query(models.User).filter_by(email=email).one()
         assert user.staff_role == role and user.is_active and user.role == models.Role.STAFF
         assert user.active_restaurant_id == branches[0].id
+        roster = db.query(models.StaffMember).filter_by(user_id=user.id).all()
+        assert len(roster) == 1 and roster[0].restaurant_id == branches[0].id
 
 
 def test_one_tenant_two_branches_with_the_owner_login_resolving_the_first(demo):
@@ -481,7 +483,7 @@ def test_every_table_that_hangs_off_a_restaurant_is_wiped_or_deliberately_kept()
     assert not (set(WIPED) & set(KEPT))
     children = {name for name, t in tables.items() if name not in scoped and name != "restaurants"
                 and any(fk.column.table.name in scoped for c in t.c for fk in c.foreign_keys)}
-    handled = {"order_items", "prep_times", "stock_movements", "menu_ingredients", "workflow_steps", "owner_os_messages"} | set(KEPT_CHILDREN)
+    handled = {"order_items", "prep_times", "stock_movements", "menu_ingredients", "workflow_steps", "owner_os_messages", "team_workflow_events"} | set(KEPT_CHILDREN)
     assert children <= handled | {"prep_times"}, f"child tables with no wipe decision: {children - handled}"
     assert all(KEPT.values()) and all(KEPT_CHILDREN.values()), "every kept table needs a written reason"
 
@@ -674,3 +676,13 @@ def test_the_demo_statement_starts_at_a_nairobi_midnight_whatever_the_hour():
         assert until == now - timedelta(minutes=45)
         starts.add(since)
     assert len(starts) == 2                       # one start before Nairobi midnight (21:00 UTC), the next day's after
+
+
+def test_demo_recipe_deductions_share_the_sale_timestamp(demo):
+    """A trailing-window boundary must include both a sale and its synthetic deduction."""
+    db, _ = demo
+    orders = {o.id: o.created_at for o in db.query(models.Order).all()}
+    movements = db.query(models.StockMovement).filter(models.StockMovement.reason.like("Order #%")).all()
+    assert movements
+    for movement in movements:
+        assert movement.created_at == orders[int(movement.reason.removeprefix("Order #"))]

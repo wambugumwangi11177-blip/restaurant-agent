@@ -97,6 +97,7 @@ export default function TierLayoutShell({
     return (
         <div className="min-h-screen flex">
             <SkipLink />
+            <Link href="/team-work" className="fixed bottom-3 right-3 z-40 rounded-lg bg-amber-300 px-4 py-3 text-sm font-semibold text-black">My tasks & requests</Link>
             <aside
                 className={`fixed inset-y-0 left-0 z-50 w-56 bg-[#0f0f0f] border-r border-[#1a1a1a] transform transition-transform duration-200 lg:translate-x-0 flex flex-col ${
                     sidebarOpen ? "translate-x-0" : "-translate-x-full"

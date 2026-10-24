@@ -315,6 +315,11 @@
     "status": "infrastructure"
    },
    {
+    "module": "ai.insight",
+    "note": "AI-written insight beside deterministic answers; calls read-only tools and writes no figure of its own",
+    "status": "infrastructure"
+   },
+   {
     "module": "ai.inventory_predictor",
     "note": "inventory",
     "status": "engine"
@@ -677,10 +682,10 @@
    "reports": "wired"
   },
   "simulator": {
-   "home": "not_shown",
+   "home": "wired",
    "old_dash": "wired",
    "os": "wired",
-   "reports": "not_shown"
+   "reports": "wired"
   },
   "strategist": {
    "home": "not_shown",
@@ -1091,6 +1096,11 @@
    {
     "from": "ai.home_specialists",
     "lazy": true,
+    "to": "ai.creative"
+   },
+   {
+    "from": "ai.home_specialists",
+    "lazy": true,
     "to": "ai.fraud.detection"
    },
    {
@@ -1112,6 +1122,81 @@
     "from": "ai.home_specialists",
     "lazy": false,
     "to": "models"
+   },
+   {
+    "from": "ai.insight",
+    "lazy": false,
+    "to": "ai.cost_model"
+   },
+   {
+    "from": "ai.insight",
+    "lazy": false,
+    "to": "ai.creative"
+   },
+   {
+    "from": "ai.insight",
+    "lazy": false,
+    "to": "ai.llm_client"
+   },
+   {
+    "from": "ai.insight",
+    "lazy": true,
+    "to": "ai.menu_engineer"
+   },
+   {
+    "from": "ai.insight",
+    "lazy": false,
+    "to": "ai.pii_scrub"
+   },
+   {
+    "from": "ai.insight",
+    "lazy": false,
+    "to": "ai.reasoning.grounding"
+   },
+   {
+    "from": "ai.insight",
+    "lazy": true,
+    "to": "ai.revenue_forecaster"
+   },
+   {
+    "from": "ai.insight",
+    "lazy": true,
+    "to": "ai.simulation.engine"
+   },
+   {
+    "from": "ai.insight",
+    "lazy": false,
+    "to": "ai.spend_cap"
+   },
+   {
+    "from": "ai.insight",
+    "lazy": true,
+    "to": "ai.stock_custody"
+   },
+   {
+    "from": "ai.insight",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "ai.insight",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "ai.insight",
+    "lazy": true,
+    "to": "routers.ai_ask"
+   },
+   {
+    "from": "ai.insight",
+    "lazy": true,
+    "to": "routers.overview"
+   },
+   {
+    "from": "ai.insight",
+    "lazy": false,
+    "to": "time_utils"
    },
    {
     "from": "ai.inventory_predictor",
@@ -1875,6 +1960,11 @@
    },
    {
     "from": "ai.whatsapp.brain",
+    "lazy": true,
+    "to": "feature_flags"
+   },
+   {
+    "from": "ai.whatsapp.brain",
     "lazy": false,
     "to": "models"
    },
@@ -2037,11 +2127,6 @@
     "from": "demo.generator",
     "lazy": true,
     "to": "ai.simulation.signals"
-   },
-   {
-    "from": "demo.generator",
-    "lazy": false,
-    "to": "auth"
    },
    {
     "from": "demo.generator",
@@ -2401,6 +2486,11 @@
    {
     "from": "main",
     "lazy": false,
+    "to": "routers.owner_setup"
+   },
+   {
+    "from": "main",
+    "lazy": false,
     "to": "routers.purchase_orders"
    },
    {
@@ -2442,6 +2532,11 @@
     "from": "main",
     "lazy": false,
     "to": "routers.tables"
+   },
+   {
+    "from": "main",
+    "lazy": false,
+    "to": "routers.team_workflows"
    },
    {
     "from": "main",
@@ -2701,6 +2796,11 @@
    {
     "from": "owner.areas",
     "lazy": true,
+    "to": "owner.figures"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
     "to": "owner.money.breakeven"
    },
    {
@@ -2736,6 +2836,11 @@
    {
     "from": "owner.areas",
     "lazy": true,
+    "to": "owner.planning"
+   },
+   {
+    "from": "owner.areas",
+    "lazy": true,
     "to": "owner.settings"
    },
    {
@@ -2752,6 +2857,11 @@
     "from": "owner.areas",
     "lazy": false,
     "to": "time_utils"
+   },
+   {
+    "from": "owner.ask",
+    "lazy": true,
+    "to": "ai.insight"
    },
    {
     "from": "owner.ask",
@@ -2792,6 +2902,36 @@
     "from": "owner.ask",
     "lazy": true,
     "to": "routers.ai_ask"
+   },
+   {
+    "from": "owner.figures",
+    "lazy": true,
+    "to": "ai.alert_levels"
+   },
+   {
+    "from": "owner.figures",
+    "lazy": true,
+    "to": "ai.cash_reconciliation.intelligence"
+   },
+   {
+    "from": "owner.figures",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "owner.figures",
+    "lazy": true,
+    "to": "owner.menu_math"
+   },
+   {
+    "from": "owner.figures",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "owner.figures",
+    "lazy": false,
+    "to": "time_utils"
    },
    {
     "from": "owner.growth",
@@ -2866,6 +3006,21 @@
    {
     "from": "owner.home",
     "lazy": true,
+    "to": "ai.creative"
+   },
+   {
+    "from": "owner.home",
+    "lazy": true,
+    "to": "ai.decisions.ranking"
+   },
+   {
+    "from": "owner.home",
+    "lazy": true,
+    "to": "ai.insight"
+   },
+   {
+    "from": "owner.home",
+    "lazy": true,
     "to": "feature_flags"
    },
    {
@@ -2881,12 +3036,22 @@
    {
     "from": "owner.home",
     "lazy": true,
+    "to": "owner.figures"
+   },
+   {
+    "from": "owner.home",
+    "lazy": true,
     "to": "owner.health"
    },
    {
     "from": "owner.home",
     "lazy": false,
     "to": "owner.states"
+   },
+   {
+    "from": "owner.home",
+    "lazy": true,
+    "to": "routers.creative"
    },
    {
     "from": "owner.home",
@@ -2917,6 +3082,11 @@
     "from": "owner.money.breakeven",
     "lazy": false,
     "to": "owner.settings"
+   },
+   {
+    "from": "owner.money.breakeven",
+    "lazy": true,
+    "to": "time_utils"
    },
    {
     "from": "owner.money.categories",
@@ -3212,6 +3382,11 @@
     "from": "owner.report_sections",
     "lazy": false,
     "to": "time_utils"
+   },
+   {
+    "from": "owner.reports",
+    "lazy": true,
+    "to": "ai.insight"
    },
    {
     "from": "owner.reports",
@@ -3814,6 +3989,11 @@
     "to": "routers.overview"
    },
    {
+    "from": "routers.creative",
+    "lazy": true,
+    "to": "time_utils"
+   },
+   {
     "from": "routers.deps",
     "lazy": false,
     "to": "models"
@@ -4130,6 +4310,11 @@
    },
    {
     "from": "routers.orders",
+    "lazy": true,
+    "to": "sales_day"
+   },
+   {
+    "from": "routers.orders",
     "lazy": false,
     "to": "schemas"
    },
@@ -4409,6 +4594,26 @@
     "to": "time_utils"
    },
    {
+    "from": "routers.owner_setup",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.owner_setup",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.owner_setup",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.owner_setup",
+    "lazy": false,
+    "to": "routers.team_workflows"
+   },
+   {
     "from": "routers.purchase_orders",
     "lazy": false,
     "to": "ai.reorder"
@@ -4537,6 +4742,11 @@
     "from": "routers.reservations",
     "lazy": false,
     "to": "schemas"
+   },
+   {
+    "from": "routers.reservations",
+    "lazy": true,
+    "to": "time_utils"
    },
    {
     "from": "routers.restaurants",
@@ -4734,6 +4944,31 @@
     "to": "schemas"
    },
    {
+    "from": "routers.team_workflows",
+    "lazy": false,
+    "to": "auth"
+   },
+   {
+    "from": "routers.team_workflows",
+    "lazy": false,
+    "to": "database"
+   },
+   {
+    "from": "routers.team_workflows",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "routers.team_workflows",
+    "lazy": false,
+    "to": "routers.deps"
+   },
+   {
+    "from": "routers.team_workflows",
+    "lazy": false,
+    "to": "time_utils"
+   },
+   {
     "from": "routers.webhooks",
     "lazy": false,
     "to": "database"
@@ -4757,6 +4992,21 @@
     "from": "routers.webhooks",
     "lazy": false,
     "to": "rate_limit"
+   },
+   {
+    "from": "sales_day",
+    "lazy": false,
+    "to": "models"
+   },
+   {
+    "from": "sales_day",
+    "lazy": false,
+    "to": "owner.states"
+   },
+   {
+    "from": "sales_day",
+    "lazy": false,
+    "to": "time_utils"
    },
    {
     "from": "seed_generators",
@@ -4825,1358 +5075,1393 @@
     "id": "ai",
     "kind": "py",
     "loc": 6,
-    "path": "backend\\ai\\__init__.py"
+    "path": "backend/ai/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.alert_levels",
     "kind": "py",
     "loc": 212,
-    "path": "backend\\ai\\alert_levels.py"
+    "path": "backend/ai/alert_levels.py"
    },
    {
     "group": "ai",
     "id": "ai.analysis_clock",
     "kind": "py",
     "loc": 123,
-    "path": "backend\\ai\\analysis_clock.py"
+    "path": "backend/ai/analysis_clock.py"
    },
    {
     "group": "ai",
     "id": "ai.cash_reconciliation",
     "kind": "py",
     "loc": 1,
-    "path": "backend\\ai\\cash_reconciliation\\__init__.py"
+    "path": "backend/ai/cash_reconciliation/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.cash_reconciliation.intelligence",
     "kind": "py",
     "loc": 255,
-    "path": "backend\\ai\\cash_reconciliation\\intelligence.py"
+    "path": "backend/ai/cash_reconciliation/intelligence.py"
    },
    {
     "group": "ai",
     "id": "ai.cost_model",
     "kind": "py",
     "loc": 68,
-    "path": "backend\\ai\\cost_model.py"
+    "path": "backend/ai/cost_model.py"
    },
    {
     "group": "ai",
     "id": "ai.creative",
     "kind": "py",
-    "loc": 396,
-    "path": "backend\\ai\\creative.py"
+    "loc": 461,
+    "path": "backend/ai/creative.py"
    },
    {
     "group": "ai",
     "id": "ai.data_quality",
     "kind": "py",
     "loc": 168,
-    "path": "backend\\ai\\data_quality.py"
+    "path": "backend/ai/data_quality.py"
    },
    {
     "group": "ai",
     "id": "ai.decisions",
     "kind": "py",
     "loc": 90,
-    "path": "backend\\ai\\decisions\\__init__.py"
+    "path": "backend/ai/decisions/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.decisions.adapters",
     "kind": "py",
     "loc": 430,
-    "path": "backend\\ai\\decisions\\adapters.py"
+    "path": "backend/ai/decisions/adapters.py"
    },
    {
     "group": "ai",
     "id": "ai.decisions.model",
     "kind": "py",
     "loc": 87,
-    "path": "backend\\ai\\decisions\\model.py"
+    "path": "backend/ai/decisions/model.py"
    },
    {
     "group": "ai",
     "id": "ai.decisions.ranking",
     "kind": "py",
-    "loc": 119,
-    "path": "backend\\ai\\decisions\\ranking.py"
+    "loc": 135,
+    "path": "backend/ai/decisions/ranking.py"
    },
    {
     "group": "ai",
     "id": "ai.enterprise",
     "kind": "py",
     "loc": 17,
-    "path": "backend\\ai\\enterprise\\__init__.py"
+    "path": "backend/ai/enterprise/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.enterprise.audit_center",
     "kind": "py",
     "loc": 83,
-    "path": "backend\\ai\\enterprise\\audit_center.py"
+    "path": "backend/ai/enterprise/audit_center.py"
    },
    {
     "group": "ai",
     "id": "ai.enterprise.benchmarking",
     "kind": "py",
     "loc": 111,
-    "path": "backend\\ai\\enterprise\\benchmarking.py"
+    "path": "backend/ai/enterprise/benchmarking.py"
    },
    {
     "group": "ai",
     "id": "ai.escalation",
     "kind": "py",
     "loc": 1,
-    "path": "backend\\ai\\escalation\\__init__.py"
+    "path": "backend/ai/escalation/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.escalation.engine",
     "kind": "py",
     "loc": 172,
-    "path": "backend\\ai\\escalation\\engine.py"
+    "path": "backend/ai/escalation/engine.py"
    },
    {
     "group": "ai",
     "id": "ai.evaluation.feedback",
     "kind": "py",
     "loc": 160,
-    "path": "backend\\ai\\evaluation\\feedback.py"
+    "path": "backend/ai/evaluation/feedback.py"
    },
    {
     "group": "ai",
     "id": "ai.evaluation.learning",
     "kind": "py",
     "loc": 137,
-    "path": "backend\\ai\\evaluation\\learning.py"
+    "path": "backend/ai/evaluation/learning.py"
    },
    {
     "group": "ai",
     "id": "ai.evaluation.tracker",
     "kind": "py",
     "loc": 570,
-    "path": "backend\\ai\\evaluation\\tracker.py"
+    "path": "backend/ai/evaluation/tracker.py"
    },
    {
     "group": "ai",
     "id": "ai.fraud",
     "kind": "py",
     "loc": 1,
-    "path": "backend\\ai\\fraud\\__init__.py"
+    "path": "backend/ai/fraud/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.fraud.detection",
     "kind": "py",
     "loc": 296,
-    "path": "backend\\ai\\fraud\\detection.py"
+    "path": "backend/ai/fraud/detection.py"
    },
    {
     "group": "ai",
     "id": "ai.graph",
     "kind": "py",
     "loc": 25,
-    "path": "backend\\ai\\graph\\__init__.py"
+    "path": "backend/ai/graph/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.graph.build",
     "kind": "py",
     "loc": 154,
-    "path": "backend\\ai\\graph\\build.py"
+    "path": "backend/ai/graph/build.py"
    },
    {
     "group": "ai",
     "id": "ai.graph.traverse",
     "kind": "py",
     "loc": 121,
-    "path": "backend\\ai\\graph\\traverse.py"
+    "path": "backend/ai/graph/traverse.py"
    },
    {
     "group": "ai",
     "id": "ai.home_specialists",
     "kind": "py",
-    "loc": 87,
-    "path": "backend\\ai\\home_specialists.py"
+    "loc": 89,
+    "path": "backend/ai/home_specialists.py"
+   },
+   {
+    "group": "ai",
+    "id": "ai.insight",
+    "kind": "py",
+    "loc": 591,
+    "path": "backend/ai/insight.py"
    },
    {
     "group": "ai",
     "id": "ai.inventory_predictor",
     "kind": "py",
     "loc": 461,
-    "path": "backend\\ai\\inventory_predictor.py"
+    "path": "backend/ai/inventory_predictor.py"
    },
    {
     "group": "ai",
     "id": "ai.kds_intelligence",
     "kind": "py",
     "loc": 356,
-    "path": "backend\\ai\\kds_intelligence.py"
+    "path": "backend/ai/kds_intelligence.py"
    },
    {
     "group": "ai",
     "id": "ai.labor.intelligence",
     "kind": "py",
     "loc": 213,
-    "path": "backend\\ai\\labor\\intelligence.py"
+    "path": "backend/ai/labor/intelligence.py"
    },
    {
     "group": "ai",
     "id": "ai.llm_client",
     "kind": "py",
-    "loc": 447,
-    "path": "backend\\ai\\llm_client.py"
+    "loc": 606,
+    "path": "backend/ai/llm_client.py"
    },
    {
     "group": "ai",
     "id": "ai.marketing",
     "kind": "py",
     "loc": 17,
-    "path": "backend\\ai\\marketing\\__init__.py"
+    "path": "backend/ai/marketing/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.marketing.insights",
     "kind": "py",
     "loc": 250,
-    "path": "backend\\ai\\marketing\\insights.py"
+    "path": "backend/ai/marketing/insights.py"
    },
    {
     "group": "ai",
     "id": "ai.memory.store",
     "kind": "py",
     "loc": 295,
-    "path": "backend\\ai\\memory\\store.py"
+    "path": "backend/ai/memory/store.py"
    },
    {
     "group": "ai",
     "id": "ai.menu_engineer",
     "kind": "py",
     "loc": 558,
-    "path": "backend\\ai\\menu_engineer.py"
+    "path": "backend/ai/menu_engineer.py"
    },
    {
     "group": "ai",
     "id": "ai.notify",
     "kind": "py",
     "loc": 174,
-    "path": "backend\\ai\\notify.py"
+    "path": "backend/ai/notify.py"
    },
    {
     "group": "ai",
     "id": "ai.ops_manager",
     "kind": "py",
     "loc": 423,
-    "path": "backend\\ai\\ops_manager.py"
+    "path": "backend/ai/ops_manager.py"
    },
    {
     "group": "ai",
     "id": "ai.orchestrator.executive",
     "kind": "py",
     "loc": 787,
-    "path": "backend\\ai\\orchestrator\\executive.py"
+    "path": "backend/ai/orchestrator/executive.py"
    },
    {
     "group": "ai",
     "id": "ai.orchestrator.push_notifier",
     "kind": "py",
     "loc": 1208,
-    "path": "backend\\ai\\orchestrator\\push_notifier.py"
+    "path": "backend/ai/orchestrator/push_notifier.py"
    },
    {
     "group": "ai",
     "id": "ai.orchestrator.strategist",
     "kind": "py",
     "loc": 569,
-    "path": "backend\\ai\\orchestrator\\strategist.py"
+    "path": "backend/ai/orchestrator/strategist.py"
    },
    {
     "group": "ai",
     "id": "ai.order_stock",
     "kind": "py",
     "loc": 188,
-    "path": "backend\\ai\\order_stock.py"
+    "path": "backend/ai/order_stock.py"
    },
    {
     "group": "ai",
     "id": "ai.owner_narrative",
     "kind": "py",
     "loc": 137,
-    "path": "backend\\ai\\owner_narrative.py"
+    "path": "backend/ai/owner_narrative.py"
    },
    {
     "group": "ai",
     "id": "ai.pii_scrub",
     "kind": "py",
     "loc": 124,
-    "path": "backend\\ai\\pii_scrub.py"
+    "path": "backend/ai/pii_scrub.py"
    },
    {
     "group": "ai",
     "id": "ai.plugins",
     "kind": "py",
     "loc": 14,
-    "path": "backend\\ai\\plugins\\__init__.py"
+    "path": "backend/ai/plugins/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.plugins.examples",
     "kind": "py",
     "loc": 46,
-    "path": "backend\\ai\\plugins\\examples.py"
+    "path": "backend/ai/plugins/examples.py"
    },
    {
     "group": "ai",
     "id": "ai.plugins.sdk",
     "kind": "py",
     "loc": 212,
-    "path": "backend\\ai\\plugins\\sdk.py"
+    "path": "backend/ai/plugins/sdk.py"
    },
    {
     "group": "ai",
     "id": "ai.pricing",
     "kind": "py",
     "loc": 24,
-    "path": "backend\\ai\\pricing\\__init__.py"
+    "path": "backend/ai/pricing/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.pricing.analysis",
     "kind": "py",
     "loc": 395,
-    "path": "backend\\ai\\pricing\\analysis.py"
+    "path": "backend/ai/pricing/analysis.py"
    },
    {
     "group": "ai",
     "id": "ai.pricing.recommendations",
     "kind": "py",
     "loc": 371,
-    "path": "backend\\ai\\pricing\\recommendations.py"
+    "path": "backend/ai/pricing/recommendations.py"
    },
    {
     "group": "ai",
     "id": "ai.profit",
     "kind": "py",
     "loc": 5,
-    "path": "backend\\ai\\profit\\__init__.py"
+    "path": "backend/ai/profit/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.profit.intelligence",
     "kind": "py",
     "loc": 588,
-    "path": "backend\\ai\\profit\\intelligence.py"
+    "path": "backend/ai/profit/intelligence.py"
    },
    {
     "group": "ai",
     "id": "ai.reasoning",
     "kind": "py",
     "loc": 27,
-    "path": "backend\\ai\\reasoning\\__init__.py"
+    "path": "backend/ai/reasoning/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.reasoning.grounding",
     "kind": "py",
-    "loc": 308,
-    "path": "backend\\ai\\reasoning\\grounding.py"
+    "loc": 429,
+    "path": "backend/ai/reasoning/grounding.py"
    },
    {
     "group": "ai",
     "id": "ai.reasoning.narrator",
     "kind": "py",
-    "loc": 471,
-    "path": "backend\\ai\\reasoning\\narrator.py"
+    "loc": 529,
+    "path": "backend/ai/reasoning/narrator.py"
    },
    {
     "group": "ai",
     "id": "ai.reorder",
     "kind": "py",
     "loc": 325,
-    "path": "backend\\ai\\reorder.py"
+    "path": "backend/ai/reorder.py"
    },
    {
     "group": "ai",
     "id": "ai.reservation_optimizer",
     "kind": "py",
-    "loc": 688,
-    "path": "backend\\ai\\reservation_optimizer.py"
+    "loc": 699,
+    "path": "backend/ai/reservation_optimizer.py"
    },
    {
     "group": "ai",
     "id": "ai.revenue_forecaster",
     "kind": "py",
     "loc": 406,
-    "path": "backend\\ai\\revenue_forecaster.py"
+    "path": "backend/ai/revenue_forecaster.py"
    },
    {
     "group": "ai",
     "id": "ai.roi",
     "kind": "py",
     "loc": 1,
-    "path": "backend\\ai\\roi\\__init__.py"
+    "path": "backend/ai/roi/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.roi.savings",
     "kind": "py",
-    "loc": 389,
-    "path": "backend\\ai\\roi\\savings.py"
+    "loc": 419,
+    "path": "backend/ai/roi/savings.py"
    },
    {
     "group": "ai",
     "id": "ai.routing",
     "kind": "py",
     "loc": 10,
-    "path": "backend\\ai\\routing\\__init__.py"
+    "path": "backend/ai/routing/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.routing.router",
     "kind": "py",
     "loc": 109,
-    "path": "backend\\ai\\routing\\router.py"
+    "path": "backend/ai/routing/router.py"
    },
    {
     "group": "ai",
     "id": "ai.simulation",
     "kind": "py",
     "loc": 83,
-    "path": "backend\\ai\\simulation\\__init__.py"
+    "path": "backend/ai/simulation/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.simulation.engine",
     "kind": "py",
     "loc": 321,
-    "path": "backend\\ai\\simulation\\engine.py"
+    "path": "backend/ai/simulation/engine.py"
    },
    {
     "group": "ai",
     "id": "ai.simulation.signals",
     "kind": "py",
     "loc": 158,
-    "path": "backend\\ai\\simulation\\signals.py"
+    "path": "backend/ai/simulation/signals.py"
    },
    {
     "group": "ai",
     "id": "ai.simulation.twin",
     "kind": "py",
     "loc": 121,
-    "path": "backend\\ai\\simulation\\twin.py"
+    "path": "backend/ai/simulation/twin.py"
    },
    {
     "group": "ai",
     "id": "ai.spend_cap",
     "kind": "py",
-    "loc": 69,
-    "path": "backend\\ai\\spend_cap.py"
+    "loc": 68,
+    "path": "backend/ai/spend_cap.py"
    },
    {
     "group": "ai",
     "id": "ai.stock_custody",
     "kind": "py",
-    "loc": 477,
-    "path": "backend\\ai\\stock_custody.py"
+    "loc": 490,
+    "path": "backend/ai/stock_custody.py"
    },
    {
     "group": "ai",
     "id": "ai.supply_chain.intelligence",
     "kind": "py",
     "loc": 282,
-    "path": "backend\\ai\\supply_chain\\intelligence.py"
+    "path": "backend/ai/supply_chain/intelligence.py"
    },
    {
     "group": "ai",
     "id": "ai.whatsapp",
     "kind": "py",
     "loc": 45,
-    "path": "backend\\ai\\whatsapp\\__init__.py"
+    "path": "backend/ai/whatsapp/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.whatsapp.brain",
     "kind": "py",
-    "loc": 1358,
-    "path": "backend\\ai\\whatsapp\\brain.py"
+    "loc": 1361,
+    "path": "backend/ai/whatsapp/brain.py"
    },
    {
     "group": "ai",
     "id": "ai.whatsapp.conversation",
     "kind": "py",
     "loc": 56,
-    "path": "backend\\ai\\whatsapp\\conversation.py"
+    "path": "backend/ai/whatsapp/conversation.py"
    },
    {
     "group": "ai",
     "id": "ai.whatsapp.optout",
     "kind": "py",
     "loc": 90,
-    "path": "backend\\ai\\whatsapp\\optout.py"
+    "path": "backend/ai/whatsapp/optout.py"
    },
    {
     "group": "ai",
     "id": "ai.whatsapp.orchestrator",
     "kind": "py",
     "loc": 214,
-    "path": "backend\\ai\\whatsapp\\orchestrator.py"
+    "path": "backend/ai/whatsapp/orchestrator.py"
    },
    {
     "group": "ai",
     "id": "ai.workflows",
     "kind": "py",
     "loc": 13,
-    "path": "backend\\ai\\workflows\\__init__.py"
+    "path": "backend/ai/workflows/__init__.py"
    },
    {
     "group": "ai",
     "id": "ai.workflows.engine",
     "kind": "py",
     "loc": 294,
-    "path": "backend\\ai\\workflows\\engine.py"
+    "path": "backend/ai/workflows/engine.py"
    },
    {
     "group": "ai",
     "id": "ai.workflows.templates",
     "kind": "py",
     "loc": 150,
-    "path": "backend\\ai\\workflows\\templates.py"
+    "path": "backend/ai/workflows/templates.py"
    },
    {
     "group": "other",
     "id": "alerting",
     "kind": "py",
     "loc": 85,
-    "path": "backend\\alerting.py"
+    "path": "backend/alerting.py"
    },
    {
     "group": "core",
     "id": "auth",
     "kind": "py",
     "loc": 317,
-    "path": "backend\\auth.py"
+    "path": "backend/auth.py"
    },
    {
     "group": "core",
     "id": "database",
     "kind": "py",
     "loc": 58,
-    "path": "backend\\database.py"
+    "path": "backend/database.py"
    },
    {
     "group": "demo",
     "id": "demo",
     "kind": "py",
     "loc": 2,
-    "path": "backend\\demo\\__init__.py"
+    "path": "backend/demo/__init__.py"
    },
    {
     "group": "demo",
     "id": "demo.catalog",
     "kind": "py",
     "loc": 210,
-    "path": "backend\\demo\\catalog.py"
+    "path": "backend/demo/catalog.py"
    },
    {
     "group": "demo",
     "id": "demo.generator",
     "kind": "py",
-    "loc": 987,
-    "path": "backend\\demo\\generator.py"
+    "loc": 981,
+    "path": "backend/demo/generator.py"
    },
    {
     "group": "demo",
     "id": "demo.safety",
     "kind": "py",
     "loc": 75,
-    "path": "backend\\demo\\safety.py"
+    "path": "backend/demo/safety.py"
    },
    {
     "group": "demo",
     "id": "demo.wipe",
     "kind": "py",
-    "loc": 108,
-    "path": "backend\\demo\\wipe.py"
+    "loc": 111,
+    "path": "backend/demo/wipe.py"
    },
    {
     "group": "other",
     "id": "dev_snapshot",
     "kind": "py",
     "loc": 88,
-    "path": "backend\\dev_snapshot.py"
+    "path": "backend/dev_snapshot.py"
    },
    {
     "group": "other",
     "id": "domain",
     "kind": "py",
     "loc": 1,
-    "path": "backend\\domain\\__init__.py"
+    "path": "backend/domain/__init__.py"
    },
    {
     "group": "other",
     "id": "domain.entry_corrections",
     "kind": "py",
     "loc": 18,
-    "path": "backend\\domain\\entry_corrections.py"
+    "path": "backend/domain/entry_corrections.py"
    },
    {
     "group": "other",
     "id": "domain.pricing",
     "kind": "py",
     "loc": 56,
-    "path": "backend\\domain\\pricing.py"
+    "path": "backend/domain/pricing.py"
    },
    {
     "group": "other",
     "id": "domain.scheduled_prices",
     "kind": "py",
-    "loc": 54,
-    "path": "backend\\domain\\scheduled_prices.py"
+    "loc": 116,
+    "path": "backend/domain/scheduled_prices.py"
    },
    {
     "group": "other",
     "id": "email_utils",
     "kind": "py",
     "loc": 65,
-    "path": "backend\\email_utils.py"
+    "path": "backend/email_utils.py"
    },
    {
     "group": "other",
     "id": "events",
     "kind": "py",
     "loc": 7,
-    "path": "backend\\events\\__init__.py"
+    "path": "backend/events/__init__.py"
    },
    {
     "group": "other",
     "id": "events.bus",
     "kind": "py",
     "loc": 372,
-    "path": "backend\\events\\bus.py"
+    "path": "backend/events/bus.py"
    },
    {
     "group": "other",
     "id": "feature_flags",
     "kind": "py",
-    "loc": 80,
-    "path": "backend\\feature_flags.py"
+    "loc": 84,
+    "path": "backend/feature_flags.py"
    },
    {
     "group": "integration",
     "id": "integration",
     "kind": "py",
     "loc": 1,
-    "path": "backend\\integration\\__init__.py"
+    "path": "backend/integration/__init__.py"
    },
    {
     "group": "integration",
     "id": "integration.export_probe",
     "kind": "py",
     "loc": 102,
-    "path": "backend\\integration\\export_probe.py"
+    "path": "backend/integration/export_probe.py"
    },
    {
     "group": "integration",
     "id": "integration.ingest",
     "kind": "py",
     "loc": 98,
-    "path": "backend\\integration\\ingest.py"
+    "path": "backend/integration/ingest.py"
    },
    {
     "group": "integration",
     "id": "integration.metrics",
     "kind": "py",
     "loc": 41,
-    "path": "backend\\integration\\metrics.py"
+    "path": "backend/integration/metrics.py"
    },
    {
     "group": "integration",
     "id": "integration.models",
     "kind": "py",
     "loc": 82,
-    "path": "backend\\integration\\models.py"
+    "path": "backend/integration/models.py"
    },
    {
     "group": "integration",
     "id": "integration.reconcile",
     "kind": "py",
     "loc": 65,
-    "path": "backend\\integration\\reconcile.py"
+    "path": "backend/integration/reconcile.py"
    },
    {
     "group": "integration",
     "id": "integration.source_client",
     "kind": "py",
     "loc": 63,
-    "path": "backend\\integration\\source_client.py"
+    "path": "backend/integration/source_client.py"
    },
    {
     "group": "integration",
     "id": "integration.source_contract",
     "kind": "py",
     "loc": 73,
-    "path": "backend\\integration\\source_contract.py"
+    "path": "backend/integration/source_contract.py"
    },
    {
     "group": "other",
     "id": "logging_config",
     "kind": "py",
     "loc": 84,
-    "path": "backend\\logging_config.py"
+    "path": "backend/logging_config.py"
    },
    {
     "group": "other",
     "id": "main",
     "kind": "py",
-    "loc": 689,
-    "path": "backend\\main.py"
+    "loc": 706,
+    "path": "backend/main.py"
    },
    {
     "group": "other",
     "id": "metrics",
     "kind": "py",
     "loc": 59,
-    "path": "backend\\metrics.py"
+    "path": "backend/metrics.py"
    },
    {
     "group": "other",
     "id": "middleware.body_limit",
     "kind": "py",
     "loc": 84,
-    "path": "backend\\middleware\\body_limit.py"
+    "path": "backend/middleware/body_limit.py"
    },
    {
     "group": "other",
     "id": "middleware.correlation",
     "kind": "py",
     "loc": 32,
-    "path": "backend\\middleware\\correlation.py"
+    "path": "backend/middleware/correlation.py"
    },
    {
     "group": "other",
     "id": "middleware.security_headers",
     "kind": "py",
     "loc": 28,
-    "path": "backend\\middleware\\security_headers.py"
+    "path": "backend/middleware/security_headers.py"
    },
    {
     "group": "other",
     "id": "middleware.timing",
     "kind": "py",
     "loc": 28,
-    "path": "backend\\middleware\\timing.py"
+    "path": "backend/middleware/timing.py"
    },
    {
     "group": "core",
     "id": "models",
     "kind": "py",
-    "loc": 1900,
-    "path": "backend\\models.py"
+    "loc": 1929,
+    "path": "backend/models.py"
    },
    {
     "group": "integration",
     "id": "observer_mode",
     "kind": "py",
     "loc": 50,
-    "path": "backend\\observer_mode.py"
+    "path": "backend/observer_mode.py"
    },
    {
     "group": "other",
     "id": "owner",
     "kind": "py",
     "loc": 7,
-    "path": "backend\\owner\\__init__.py"
+    "path": "backend/owner/__init__.py"
    },
    {
     "group": "other",
     "id": "owner.answer_compare",
     "kind": "py",
     "loc": 146,
-    "path": "backend\\owner\\answer_compare.py"
+    "path": "backend/owner/answer_compare.py"
    },
    {
     "group": "other",
     "id": "owner.answer_todo",
     "kind": "py",
     "loc": 72,
-    "path": "backend\\owner\\answer_todo.py"
+    "path": "backend/owner/answer_todo.py"
    },
    {
     "group": "other",
     "id": "owner.answer_what",
     "kind": "py",
     "loc": 238,
-    "path": "backend\\owner\\answer_what.py"
+    "path": "backend/owner/answer_what.py"
    },
    {
     "group": "other",
     "id": "owner.answer_whatif",
     "kind": "py",
     "loc": 131,
-    "path": "backend\\owner\\answer_whatif.py"
+    "path": "backend/owner/answer_whatif.py"
    },
    {
     "group": "other",
     "id": "owner.answer_why",
     "kind": "py",
-    "loc": 296,
-    "path": "backend\\owner\\answer_why.py"
+    "loc": 307,
+    "path": "backend/owner/answer_why.py"
    },
    {
     "group": "other",
     "id": "owner.answers",
     "kind": "py",
     "loc": 145,
-    "path": "backend\\owner\\answers.py"
+    "path": "backend/owner/answers.py"
    },
    {
     "group": "other",
     "id": "owner.areas",
     "kind": "py",
-    "loc": 698,
-    "path": "backend\\owner\\areas.py"
+    "loc": 758,
+    "path": "backend/owner/areas.py"
    },
    {
     "group": "other",
     "id": "owner.ask",
     "kind": "py",
-    "loc": 123,
-    "path": "backend\\owner\\ask.py"
+    "loc": 133,
+    "path": "backend/owner/ask.py"
+   },
+   {
+    "group": "other",
+    "id": "owner.figures",
+    "kind": "py",
+    "loc": 394,
+    "path": "backend/owner/figures.py"
    },
    {
     "group": "other",
     "id": "owner.growth",
     "kind": "py",
     "loc": 153,
-    "path": "backend\\owner\\growth.py"
+    "path": "backend/owner/growth.py"
    },
    {
     "group": "other",
     "id": "owner.health",
     "kind": "py",
-    "loc": 67,
-    "path": "backend\\owner\\health.py"
+    "loc": 72,
+    "path": "backend/owner/health.py"
    },
    {
     "group": "other",
     "id": "owner.home",
     "kind": "py",
-    "loc": 203,
-    "path": "backend\\owner\\home.py"
+    "loc": 275,
+    "path": "backend/owner/home.py"
    },
    {
     "group": "other",
     "id": "owner.kitchen",
     "kind": "py",
     "loc": 48,
-    "path": "backend\\owner\\kitchen.py"
+    "path": "backend/owner/kitchen.py"
    },
    {
     "group": "other",
     "id": "owner.menu_math",
     "kind": "py",
     "loc": 65,
-    "path": "backend\\owner\\menu_math.py"
+    "path": "backend/owner/menu_math.py"
    },
    {
     "group": "other",
     "id": "owner.money",
     "kind": "py",
     "loc": 3,
-    "path": "backend\\owner\\money\\__init__.py"
+    "path": "backend/owner/money/__init__.py"
    },
    {
     "group": "other",
     "id": "owner.money.bills",
     "kind": "py",
     "loc": 70,
-    "path": "backend\\owner\\money\\bills.py"
+    "path": "backend/owner/money/bills.py"
    },
    {
     "group": "other",
     "id": "owner.money.breakeven",
     "kind": "py",
-    "loc": 90,
-    "path": "backend\\owner\\money\\breakeven.py"
+    "loc": 112,
+    "path": "backend/owner/money/breakeven.py"
    },
    {
     "group": "other",
     "id": "owner.money.categories",
     "kind": "py",
     "loc": 72,
-    "path": "backend\\owner\\money\\categories.py"
+    "path": "backend/owner/money/categories.py"
    },
    {
     "group": "other",
     "id": "owner.money.export",
     "kind": "py",
     "loc": 368,
-    "path": "backend\\owner\\money\\export.py"
+    "path": "backend/owner/money/export.py"
    },
    {
     "group": "other",
     "id": "owner.money.ledger",
     "kind": "py",
     "loc": 75,
-    "path": "backend\\owner\\money\\ledger.py"
+    "path": "backend/owner/money/ledger.py"
    },
    {
     "group": "other",
     "id": "owner.money.licences",
     "kind": "py",
     "loc": 13,
-    "path": "backend\\owner\\money\\licences.py"
+    "path": "backend/owner/money/licences.py"
    },
    {
     "group": "other",
     "id": "owner.money.pnl",
     "kind": "py",
     "loc": 217,
-    "path": "backend\\owner\\money\\pnl.py"
+    "path": "backend/owner/money/pnl.py"
    },
    {
     "group": "other",
     "id": "owner.money.radar",
     "kind": "py",
     "loc": 118,
-    "path": "backend\\owner\\money\\radar.py"
+    "path": "backend/owner/money/radar.py"
    },
    {
     "group": "other",
     "id": "owner.money.spikes",
     "kind": "py",
     "loc": 79,
-    "path": "backend\\owner\\money\\spikes.py"
+    "path": "backend/owner/money/spikes.py"
    },
    {
     "group": "other",
     "id": "owner.money.view",
     "kind": "py",
     "loc": 99,
-    "path": "backend\\owner\\money\\view.py"
+    "path": "backend/owner/money/view.py"
    },
    {
     "group": "other",
     "id": "owner.mpesa_match",
     "kind": "py",
     "loc": 228,
-    "path": "backend\\owner\\mpesa_match.py"
+    "path": "backend/owner/mpesa_match.py"
    },
    {
     "group": "other",
     "id": "owner.mpesa_statement",
     "kind": "py",
     "loc": 80,
-    "path": "backend\\owner\\mpesa_statement.py"
+    "path": "backend/owner/mpesa_statement.py"
    },
    {
     "group": "other",
     "id": "owner.planning",
     "kind": "py",
-    "loc": 144,
-    "path": "backend\\owner\\planning.py"
+    "loc": 156,
+    "path": "backend/owner/planning.py"
    },
    {
     "group": "other",
     "id": "owner.preview",
     "kind": "py",
     "loc": 68,
-    "path": "backend\\owner\\preview.py"
+    "path": "backend/owner/preview.py"
    },
    {
     "group": "other",
     "id": "owner.registry",
     "kind": "py",
     "loc": 180,
-    "path": "backend\\owner\\registry.py"
+    "path": "backend/owner/registry.py"
    },
    {
     "group": "other",
     "id": "owner.report_sections",
     "kind": "py",
-    "loc": 506,
-    "path": "backend\\owner\\report_sections.py"
+    "loc": 515,
+    "path": "backend/owner/report_sections.py"
    },
    {
     "group": "other",
     "id": "owner.reports",
     "kind": "py",
-    "loc": 143,
-    "path": "backend\\owner\\reports.py"
+    "loc": 156,
+    "path": "backend/owner/reports.py"
    },
    {
     "group": "other",
     "id": "owner.settings",
     "kind": "py",
     "loc": 329,
-    "path": "backend\\owner\\settings.py"
+    "path": "backend/owner/settings.py"
    },
    {
     "group": "other",
     "id": "owner.states",
     "kind": "py",
     "loc": 149,
-    "path": "backend\\owner\\states.py"
+    "path": "backend/owner/states.py"
    },
    {
     "group": "other",
     "id": "owner.stock_review",
     "kind": "py",
     "loc": 83,
-    "path": "backend\\owner\\stock_review.py"
+    "path": "backend/owner/stock_review.py"
    },
    {
     "group": "other",
     "id": "parsers",
     "kind": "py",
     "loc": 2,
-    "path": "backend\\parsers\\__init__.py"
+    "path": "backend/parsers/__init__.py"
    },
    {
     "group": "other",
     "id": "parsers.mpesa_csv",
     "kind": "py",
     "loc": 231,
-    "path": "backend\\parsers\\mpesa_csv.py"
+    "path": "backend/parsers/mpesa_csv.py"
    },
    {
     "group": "other",
     "id": "payments",
     "kind": "py",
     "loc": 1,
-    "path": "backend\\payments\\__init__.py"
+    "path": "backend/payments/__init__.py"
    },
    {
     "group": "other",
     "id": "phone_utils",
     "kind": "py",
     "loc": 54,
-    "path": "backend\\phone_utils.py"
+    "path": "backend/phone_utils.py"
    },
    {
     "group": "other",
     "id": "populate_production",
     "kind": "py",
     "loc": 185,
-    "path": "backend\\populate_production.py"
+    "path": "backend/populate_production.py"
    },
    {
     "group": "other",
     "id": "rate_limit",
     "kind": "py",
     "loc": 109,
-    "path": "backend\\rate_limit.py"
+    "path": "backend/rate_limit.py"
    },
    {
     "group": "other",
     "id": "reporting",
     "kind": "py",
     "loc": 41,
-    "path": "backend\\reporting.py"
+    "path": "backend/reporting.py"
    },
    {
     "group": "router",
     "id": "routers.ai",
     "kind": "py",
     "loc": 775,
-    "path": "backend\\routers\\ai.py"
+    "path": "backend/routers/ai.py"
    },
    {
     "group": "router",
     "id": "routers.ai_ask",
     "kind": "py",
-    "loc": 1023,
-    "path": "backend\\routers\\ai_ask.py"
+    "loc": 1098,
+    "path": "backend/routers/ai_ask.py"
    },
    {
     "group": "router",
     "id": "routers.analytics",
     "kind": "py",
     "loc": 135,
-    "path": "backend\\routers\\analytics.py"
+    "path": "backend/routers/analytics.py"
    },
    {
     "group": "router",
     "id": "routers.attendance",
     "kind": "py",
     "loc": 214,
-    "path": "backend\\routers\\attendance.py"
+    "path": "backend/routers/attendance.py"
    },
    {
     "group": "router",
     "id": "routers.auth",
     "kind": "py",
     "loc": 788,
-    "path": "backend\\routers\\auth.py"
+    "path": "backend/routers/auth.py"
    },
    {
     "group": "router",
     "id": "routers.billing",
     "kind": "py",
     "loc": 70,
-    "path": "backend\\routers\\billing.py"
+    "path": "backend/routers/billing.py"
    },
    {
     "group": "router",
     "id": "routers.cash_reconciliation",
     "kind": "py",
     "loc": 78,
-    "path": "backend\\routers\\cash_reconciliation.py"
+    "path": "backend/routers/cash_reconciliation.py"
    },
    {
     "group": "router",
     "id": "routers.creative",
     "kind": "py",
-    "loc": 149,
-    "path": "backend\\routers\\creative.py"
+    "loc": 151,
+    "path": "backend/routers/creative.py"
    },
    {
     "group": "router",
     "id": "routers.deps",
     "kind": "py",
     "loc": 94,
-    "path": "backend\\routers\\deps.py"
+    "path": "backend/routers/deps.py"
    },
    {
     "group": "router",
     "id": "routers.enterprise",
     "kind": "py",
     "loc": 75,
-    "path": "backend\\routers\\enterprise.py"
+    "path": "backend/routers/enterprise.py"
    },
    {
     "group": "router",
     "id": "routers.events",
     "kind": "py",
     "loc": 91,
-    "path": "backend\\routers\\events.py"
+    "path": "backend/routers/events.py"
    },
    {
     "group": "router",
     "id": "routers.export",
     "kind": "py",
     "loc": 294,
-    "path": "backend\\routers\\export.py"
+    "path": "backend/routers/export.py"
    },
    {
     "group": "router",
     "id": "routers.flags",
     "kind": "py",
     "loc": 32,
-    "path": "backend\\routers\\flags.py"
+    "path": "backend/routers/flags.py"
    },
    {
     "group": "router",
     "id": "routers.fraud",
     "kind": "py",
     "loc": 73,
-    "path": "backend\\routers\\fraud.py"
+    "path": "backend/routers/fraud.py"
    },
    {
     "group": "router",
     "id": "routers.health",
     "kind": "py",
     "loc": 42,
-    "path": "backend\\routers\\health.py"
+    "path": "backend/routers/health.py"
    },
    {
     "group": "router",
     "id": "routers.inventory",
     "kind": "py",
     "loc": 232,
-    "path": "backend\\routers\\inventory.py"
+    "path": "backend/routers/inventory.py"
    },
    {
     "group": "router",
     "id": "routers.menu",
     "kind": "py",
-    "loc": 285,
-    "path": "backend\\routers\\menu.py"
+    "loc": 291,
+    "path": "backend/routers/menu.py"
    },
    {
     "group": "router",
     "id": "routers.notifications",
     "kind": "py",
     "loc": 173,
-    "path": "backend\\routers\\notifications.py"
+    "path": "backend/routers/notifications.py"
    },
    {
     "group": "router",
     "id": "routers.observer",
     "kind": "py",
     "loc": 37,
-    "path": "backend\\routers\\observer.py"
+    "path": "backend/routers/observer.py"
    },
    {
     "group": "router",
     "id": "routers.orders",
     "kind": "py",
-    "loc": 536,
-    "path": "backend\\routers\\orders.py"
+    "loc": 552,
+    "path": "backend/routers/orders.py"
    },
    {
     "group": "router",
     "id": "routers.overview",
     "kind": "py",
-    "loc": 551,
-    "path": "backend\\routers\\overview.py"
+    "loc": 563,
+    "path": "backend/routers/overview.py"
    },
    {
     "group": "router",
     "id": "routers.owner",
     "kind": "py",
-    "loc": 346,
-    "path": "backend\\routers\\owner.py"
+    "loc": 370,
+    "path": "backend/routers/owner.py"
    },
    {
     "group": "router",
     "id": "routers.owner_money",
     "kind": "py",
-    "loc": 592,
-    "path": "backend\\routers\\owner_money.py"
+    "loc": 593,
+    "path": "backend/routers/owner_money.py"
    },
    {
     "group": "router",
     "id": "routers.owner_mpesa",
     "kind": "py",
     "loc": 77,
-    "path": "backend\\routers\\owner_mpesa.py"
+    "path": "backend/routers/owner_mpesa.py"
    },
    {
     "group": "router",
     "id": "routers.owner_operations",
     "kind": "py",
-    "loc": 268,
-    "path": "backend\\routers\\owner_operations.py"
+    "loc": 287,
+    "path": "backend/routers/owner_operations.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.owner_setup",
+    "kind": "py",
+    "loc": 72,
+    "path": "backend/routers/owner_setup.py"
    },
    {
     "group": "router",
     "id": "routers.purchase_orders",
     "kind": "py",
     "loc": 107,
-    "path": "backend\\routers\\purchase_orders.py"
+    "path": "backend/routers/purchase_orders.py"
    },
    {
     "group": "router",
     "id": "routers.reports",
     "kind": "py",
-    "loc": 223,
-    "path": "backend\\routers\\reports.py"
+    "loc": 242,
+    "path": "backend/routers/reports.py"
    },
    {
     "group": "router",
     "id": "routers.reservations",
     "kind": "py",
-    "loc": 407,
-    "path": "backend\\routers\\reservations.py"
+    "loc": 412,
+    "path": "backend/routers/reservations.py"
    },
    {
     "group": "router",
     "id": "routers.restaurants",
     "kind": "py",
     "loc": 82,
-    "path": "backend\\routers\\restaurants.py"
+    "path": "backend/routers/restaurants.py"
    },
    {
     "group": "router",
     "id": "routers.staff",
     "kind": "py",
     "loc": 516,
-    "path": "backend\\routers\\staff.py"
+    "path": "backend/routers/staff.py"
    },
    {
     "group": "router",
     "id": "routers.stock_custody",
     "kind": "py",
-    "loc": 226,
-    "path": "backend\\routers\\stock_custody.py"
+    "loc": 229,
+    "path": "backend/routers/stock_custody.py"
    },
    {
     "group": "router",
     "id": "routers.suppliers",
     "kind": "py",
     "loc": 126,
-    "path": "backend\\routers\\suppliers.py"
+    "path": "backend/routers/suppliers.py"
    },
    {
     "group": "router",
     "id": "routers.support",
     "kind": "py",
     "loc": 239,
-    "path": "backend\\routers\\support.py"
+    "path": "backend/routers/support.py"
    },
    {
     "group": "router",
     "id": "routers.tables",
     "kind": "py",
     "loc": 146,
-    "path": "backend\\routers\\tables.py"
+    "path": "backend/routers/tables.py"
+   },
+   {
+    "group": "router",
+    "id": "routers.team_workflows",
+    "kind": "py",
+    "loc": 224,
+    "path": "backend/routers/team_workflows.py"
    },
    {
     "group": "router",
     "id": "routers.webhooks",
     "kind": "py",
     "loc": 346,
-    "path": "backend\\routers\\webhooks.py"
+    "path": "backend/routers/webhooks.py"
+   },
+   {
+    "group": "other",
+    "id": "sales_day",
+    "kind": "py",
+    "loc": 130,
+    "path": "backend/sales_day.py"
    },
    {
     "group": "other",
     "id": "schemas",
     "kind": "py",
-    "loc": 851,
-    "path": "backend\\schemas.py"
+    "loc": 854,
+    "path": "backend/schemas.py"
    },
    {
     "group": "other",
     "id": "seed_generators",
     "kind": "py",
     "loc": 172,
-    "path": "backend\\seed_generators.py"
+    "path": "backend/seed_generators.py"
    },
    {
     "group": "other",
     "id": "seed_recipes",
     "kind": "py",
     "loc": 119,
-    "path": "backend\\seed_recipes.py"
+    "path": "backend/seed_recipes.py"
    },
    {
     "group": "other",
     "id": "seed_vibanda",
     "kind": "py",
     "loc": 72,
-    "path": "backend\\seed_vibanda.py"
+    "path": "backend/seed_vibanda.py"
    },
    {
     "group": "other",
     "id": "startup_checks",
     "kind": "py",
     "loc": 119,
-    "path": "backend\\startup_checks.py"
+    "path": "backend/startup_checks.py"
    },
    {
     "group": "other",
     "id": "storage",
     "kind": "py",
     "loc": 75,
-    "path": "backend\\storage.py"
+    "path": "backend/storage.py"
    },
    {
     "group": "other",
     "id": "tenant_provisioning",
     "kind": "py",
-    "loc": 112,
-    "path": "backend\\tenant_provisioning.py"
+    "loc": 173,
+    "path": "backend/tenant_provisioning.py"
    },
    {
     "group": "core",
     "id": "time_utils",
     "kind": "py",
-    "loc": 70,
-    "path": "backend\\time_utils.py"
+    "loc": 188,
+    "path": "backend/time_utils.py"
    }
   ]
  },
@@ -6814,55 +7099,55 @@
   {
    "func": "active_orders",
    "module": "routers.orders",
-   "path": "/orders/active",
+   "path": "/sales/active",
    "verb": "GET"
   },
   {
    "func": "create_order",
    "module": "routers.orders",
-   "path": "/orders/",
+   "path": "/sales/",
    "verb": "POST"
   },
   {
    "func": "create_public_order",
    "module": "routers.orders",
-   "path": "/orders/public",
+   "path": "/sales/public",
    "verb": "POST"
   },
   {
    "func": "list_kitchen_incidents",
    "module": "routers.orders",
-   "path": "/orders/incidents",
+   "path": "/sales/incidents",
    "verb": "GET"
   },
   {
    "func": "list_orders",
    "module": "routers.orders",
-   "path": "/orders/",
+   "path": "/sales/",
    "verb": "GET"
   },
   {
    "func": "log_kitchen_incident",
    "module": "routers.orders",
-   "path": "/orders/incidents",
+   "path": "/sales/incidents",
    "verb": "POST"
   },
   {
    "func": "update_order_details",
    "module": "routers.orders",
-   "path": "/orders/{order_id}/details",
+   "path": "/sales/{order_id}/details",
    "verb": "POST"
   },
   {
    "func": "update_order_payment",
    "module": "routers.orders",
-   "path": "/orders/{order_id}/payment",
+   "path": "/sales/{order_id}/payment",
    "verb": "POST"
   },
   {
    "func": "update_order_status",
    "module": "routers.orders",
-   "path": "/orders/{order_id}/status",
+   "path": "/sales/{order_id}/status",
    "verb": "POST"
   },
   {
@@ -6914,6 +7199,12 @@
    "verb": "GET"
   },
   {
+   "func": "home_notes",
+   "module": "routers.owner",
+   "path": "/owner/home/notes",
+   "verb": "GET"
+  },
+  {
    "func": "market_drafts",
    "module": "routers.owner",
    "path": "/owner/planning/market-drafts",
@@ -6959,6 +7250,12 @@
    "func": "report",
    "module": "routers.owner",
    "path": "/owner/report/{period}",
+   "verb": "GET"
+  },
+  {
+   "func": "report_notes",
+   "module": "routers.owner",
+   "path": "/owner/report/{period}/notes",
    "verb": "GET"
   },
   {
@@ -7158,6 +7455,18 @@
    "module": "routers.owner_operations",
    "path": "/owner/operations/receipts",
    "verb": "POST"
+  },
+  {
+   "func": "review",
+   "module": "routers.owner_setup",
+   "path": "/owner/setup/{step}/review",
+   "verb": "POST"
+  },
+  {
+   "func": "status",
+   "module": "routers.owner_setup",
+   "path": "/owner/setup",
+   "verb": "GET"
   },
   {
    "func": "approve_purchase_order",
@@ -7412,6 +7721,42 @@
    "verb": "POST"
   },
   {
+   "func": "activity",
+   "module": "routers.team_workflows",
+   "path": "/team-work/activity",
+   "verb": "GET"
+  },
+  {
+   "func": "create",
+   "module": "routers.team_workflows",
+   "path": "/team-work",
+   "verb": "POST"
+  },
+  {
+   "func": "listing",
+   "module": "routers.team_workflows",
+   "path": "/team-work",
+   "verb": "GET"
+  },
+  {
+   "func": "options",
+   "module": "routers.team_workflows",
+   "path": "/team-work/options",
+   "verb": "GET"
+  },
+  {
+   "func": "people",
+   "module": "routers.team_workflows",
+   "path": "/team-work/people",
+   "verb": "GET"
+  },
+  {
+   "func": "transition",
+   "module": "routers.team_workflows",
+   "path": "/team-work/{workflow_id}/transition",
+   "verb": "POST"
+  },
+  {
    "func": "macsoft_status",
    "module": "routers.webhooks",
    "path": "/webhooks/macsoft/status",
@@ -7425,12 +7770,12 @@
   }
  ],
  "stats": {
-  "py_edges": 823,
-  "py_lazy_edges": 249,
-  "py_modules": 194,
-  "routes": 207,
-  "ts_edges": 623,
-  "ts_files": 274
+  "py_edges": 872,
+  "py_lazy_edges": 273,
+  "py_modules": 199,
+  "routes": 217,
+  "ts_edges": 698,
+  "ts_files": 293
  },
  "status_only": [
   [
@@ -7446,10 +7791,21 @@
   "home": {
    "api_calls": [
     "GET /owner/home -> routers.owner.home",
+    "GET /owner/home/notes -> routers.owner.home_notes",
     "POST /owner/settings/preview -> routers.owner.preview_settings",
     "GET /owner/settings -> routers.owner.read_settings",
+    "GET /owner/settings/history -> routers.owner.settings_history",
     "PUT /owner/settings -> routers.owner.write_settings",
+    "POST /owner/money/bills -> routers.owner_money.create_bill",
+    "POST /owner/money/categories -> routers.owner_money.create_category",
+    "POST /owner/money/licences -> routers.owner_money.create_licence",
     "GET /owner/money/pnl/export -> routers.owner_money.export_profit_and_loss",
+    "GET /owner/money/bills -> routers.owner_money.list_bills",
+    "GET /owner/money/categories -> routers.owner_money.list_categories",
+    "GET /owner/money/licences -> routers.owner_money.list_licences",
+    "POST /owner/money/bills/{bill_id}/pay -> routers.owner_money.pay_bill",
+    "PATCH /owner/money/categories/{category_id} -> routers.owner_money.update_category",
+    "PATCH /owner/money/licences/{licence_id} -> routers.owner_money.update_licence",
     "DELETE /owner/mpesa/statements/{upload_id} -> routers.owner_mpesa.delete_statement",
     "GET /owner/mpesa/statements -> routers.owner_mpesa.list_statements",
     "POST /owner/mpesa/statement -> routers.owner_mpesa.upload_statement",
@@ -7460,7 +7816,7 @@
    "entries": [
     "app/(owner)/home/page.tsx"
    ],
-   "frontend_files": 52,
+   "frontend_files": 68,
    "label": "Home",
    "parallel_backends": []
   },
@@ -7492,8 +7848,10 @@
     "GET /fraud/report -> routers.fraud.fraud_report",
     "POST /inventory/{item_id}/adjust -> routers.inventory.adjust_stock",
     "POST /inventory/ -> routers.inventory.create_inventory_item",
+    "DELETE /inventory/{item_id} -> routers.inventory.delete_inventory_item",
     "GET /inventory/ -> routers.inventory.get_inventory",
     "POST /inventory/{item_id}/receive -> routers.inventory.receive_stock",
+    "PUT /inventory/{item_id} -> routers.inventory.update_inventory_item",
     "PUT /inventory/{item_id}/reorder-settings -> routers.inventory.update_reorder_settings",
     "POST /menu/{item_id}/ingredients -> routers.menu.add_ingredient",
     "POST /menu/ -> routers.menu.create_menu_item",
@@ -7503,14 +7861,6 @@
     "GET /menu/ -> routers.menu.read_menu_items",
     "PUT /menu/{item_id}/ingredients/{ingredient_id} -> routers.menu.update_ingredient",
     "PUT /menu/{item_id} -> routers.menu.update_menu_item",
-    "GET /orders/active -> routers.orders.active_orders",
-    "POST /orders/ -> routers.orders.create_order",
-    "GET /orders/incidents -> routers.orders.list_kitchen_incidents",
-    "GET /orders/ -> routers.orders.list_orders",
-    "POST /orders/incidents -> routers.orders.log_kitchen_incident",
-    "POST /orders/{order_id}/details -> routers.orders.update_order_details",
-    "POST /orders/{order_id}/payment -> routers.orders.update_order_payment",
-    "POST /orders/{order_id}/status -> routers.orders.update_order_status",
     "POST /purchase-orders/{po_id}/approve -> routers.purchase_orders.approve_purchase_order",
     "GET /purchase-orders/ -> routers.purchase_orders.list_purchase_orders",
     "POST /purchase-orders/{po_id}/receive -> routers.purchase_orders.receive_purchase_order",
@@ -7526,7 +7876,6 @@
     "POST /staff/{staff_id}/impersonate -> routers.staff.impersonate_staff",
     "GET /staff/ -> routers.staff.list_staff",
     "PUT /staff/{staff_id} -> routers.staff.update_staff",
-    "POST /stock/transfers/{transfer_id}/confirm -> routers.stock_custody.confirm_transfer",
     "POST /stock/transfers/{transfer_id}/fulfil -> routers.stock_custody.fulfil_transfer",
     "POST /stock/transfers -> routers.stock_custody.initiate_transfer",
     "GET /stock/counts -> routers.stock_custody.list_stock_counts",
@@ -7544,13 +7893,15 @@
     "GET /support/tickets -> routers.support.list_tickets",
     "POST /support/tickets/{ticket_id}/status -> routers.support.update_status",
     "POST /tables/ -> routers.tables.create_table",
+    "DELETE /tables/{table_id} -> routers.tables.delete_table",
     "GET /tables/ -> routers.tables.list_tables",
+    "PUT /tables/{table_id} -> routers.tables.update_table",
     "POST /tables/{table_id}/status -> routers.tables.update_table_status"
    ],
    "entries": [
     "app/dashboard/**/page.tsx"
    ],
-   "frontend_files": 117,
+   "frontend_files": 123,
    "label": "Old dash",
    "parallel_backends": []
   },
@@ -7572,18 +7923,26 @@
    "entries": [
     "app/(owner)/os/page.tsx"
    ],
-   "frontend_files": 17,
+   "frontend_files": 19,
    "label": "OS",
    "parallel_backends": []
   },
   "reports": {
    "api_calls": [
     "GET /overview/today -> routers.overview.today",
+    "GET /owner/home -> routers.owner.home",
     "POST /owner/settings/preview -> routers.owner.preview_settings",
     "GET /owner/settings -> routers.owner.read_settings",
     "GET /owner/report/{period} -> routers.owner.report",
+    "GET /owner/report/{period}/notes -> routers.owner.report_notes",
     "PUT /owner/settings -> routers.owner.write_settings",
+    "POST /owner/money/bills -> routers.owner_money.create_bill",
+    "POST /owner/money/categories -> routers.owner_money.create_category",
     "GET /owner/money/pnl/export -> routers.owner_money.export_profit_and_loss",
+    "GET /owner/money/bills -> routers.owner_money.list_bills",
+    "GET /owner/money/categories -> routers.owner_money.list_categories",
+    "POST /owner/money/bills/{bill_id}/pay -> routers.owner_money.pay_bill",
+    "PATCH /owner/money/categories/{category_id} -> routers.owner_money.update_category",
     "GET /reports/{period}/creative -> routers.reports.report_creative",
     "POST /staff/end-impersonation -> routers.staff.end_impersonation",
     "POST /staff/{staff_id}/impersonate -> routers.staff.impersonate_staff",
@@ -7592,7 +7951,7 @@
    "entries": [
     "app/(owner)/reports/page.tsx"
    ],
-   "frontend_files": 33,
+   "frontend_files": 37,
    "label": "Reports",
    "parallel_backends": []
   }
@@ -7600,2496 +7959,2796 @@
  "typescript": {
   "edges": [
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "components\\os\\States.tsx"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/os/States.tsx"
    },
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "components\\owner\\Section.tsx"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/InsightNote.tsx"
    },
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "components\\owner\\home\\AnswersStrip.tsx"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/Section.tsx"
    },
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "components\\owner\\home\\AreaPanels.tsx"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/explain/HowItWorks.tsx"
    },
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "components\\owner\\home\\ComingUp.tsx"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/AnswersStrip.tsx"
    },
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "components\\owner\\home\\CostingYouMoney.tsx"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/AreaPanels.tsx"
    },
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "components\\owner\\home\\FirstWeek.tsx"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/ComingUp.tsx"
    },
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "components\\owner\\home\\HealthStrip.tsx"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/CostingYouMoney.tsx"
    },
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "components\\owner\\home\\Pulse.tsx"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/FirstWeek.tsx"
    },
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "components\\owner\\home\\ReadNote.tsx"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/HealthStrip.tsx"
    },
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "components\\owner\\home\\SourceWaiting.tsx"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/Pulse.tsx"
    },
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "components\\owner\\home\\TargetsOnboarding.tsx"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/ReadNote.tsx"
    },
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/SourceWaiting.tsx"
    },
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "components/owner/home/TargetsOnboarding.tsx"
    },
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "lib\\owner\\useOwnerHome.ts"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "app\\(owner)\\home\\page.tsx",
-    "to": "lib\\tenantConfig.ts"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "app\\(owner)\\layout.tsx",
-    "to": "components\\owner\\OwnerShell.tsx"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "app\\(owner)\\os\\page.tsx",
-    "to": "components\\owner\\ask\\AnswerCard.tsx"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "lib/owner/useOwnerHome.ts"
    },
    {
-    "from": "app\\(owner)\\os\\page.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "app/(owner)/home/page.tsx",
+    "to": "lib/tenantConfig.ts"
    },
    {
-    "from": "app\\(owner)\\os\\page.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/(owner)/layout.tsx",
+    "to": "components/owner/OwnerShell.tsx"
    },
    {
-    "from": "app\\(owner)\\os\\page.tsx",
-    "to": "lib\\owner\\ask.ts"
+    "from": "app/(owner)/os/page.tsx",
+    "to": "components/owner/ask/AnswerCard.tsx"
    },
    {
-    "from": "app\\(owner)\\os\\page.tsx",
-    "to": "lib\\tenantConfig.ts"
+    "from": "app/(owner)/os/page.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "app\\(owner)\\planning\\page.tsx",
-    "to": "components\\owner\\PlanningWorkspace.tsx"
+    "from": "app/(owner)/os/page.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "app\\(owner)\\reports\\page.tsx",
-    "to": "components\\os\\States.tsx"
+    "from": "app/(owner)/os/page.tsx",
+    "to": "lib/owner/ask.ts"
    },
    {
-    "from": "app\\(owner)\\reports\\page.tsx",
-    "to": "components\\owner\\CreativeNote.tsx"
+    "from": "app/(owner)/os/page.tsx",
+    "to": "lib/tenantConfig.ts"
    },
    {
-    "from": "app\\(owner)\\reports\\page.tsx",
-    "to": "components\\owner\\SourceUnavailable.tsx"
+    "from": "app/(owner)/planning/page.tsx",
+    "to": "components/owner/PlanningWorkspace.tsx"
    },
    {
-    "from": "app\\(owner)\\reports\\page.tsx",
-    "to": "components\\owner\\StateChip.tsx"
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "components/os/States.tsx"
    },
    {
-    "from": "app\\(owner)\\reports\\page.tsx",
-    "to": "components\\owner\\reports\\ReportSectionCard.tsx"
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "components/owner/CreativeNote.tsx"
    },
    {
-    "from": "app\\(owner)\\reports\\page.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "components/owner/InsightNote.tsx"
    },
    {
-    "from": "app\\(owner)\\reports\\page.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "components/owner/SourceUnavailable.tsx"
    },
    {
-    "from": "app\\(owner)\\reports\\page.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "components/owner/StateChip.tsx"
    },
    {
-    "from": "app\\(owner)\\reports\\page.tsx",
-    "to": "lib\\owner\\reportTypes.ts"
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "components/owner/reports/ReportSectionCard.tsx"
    },
    {
-    "from": "app\\(owner)\\reports\\page.tsx",
-    "to": "lib\\tenantConfig.ts"
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "app\\dashboard\\ai-ops\\page.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "app\\dashboard\\ai-ops\\page.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "app\\dashboard\\ai-ops\\page.tsx",
-    "to": "lib\\errors.ts"
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "lib/owner/reportTypes.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\[module]\\page.tsx",
-    "to": "app\\dashboard\\ai\\_full\\registry.tsx"
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\CashSection.tsx",
-    "to": "components\\ai\\ModuleShell.tsx"
+    "from": "app/(owner)/reports/page.tsx",
+    "to": "lib/tenantConfig.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\CashSection.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/(owner)/setup/page.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\CashSection.tsx",
-    "to": "lib\\format.ts"
+    "from": "app/(owner)/setup/page.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\DataQualitySection.tsx",
-    "to": "components\\ai\\MiniStat.tsx"
+    "from": "app/dashboard/ai-ops/page.tsx",
+    "to": "app/dashboard/roi/_components/RoiBreakdown.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\DataQualitySection.tsx",
-    "to": "components\\ai\\ModuleShell.tsx"
+    "from": "app/dashboard/ai-ops/page.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\DataQualitySection.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai-ops/page.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\DecisionsSection.tsx",
-    "to": "components\\ai\\DecisionCard.tsx"
+    "from": "app/dashboard/ai-ops/page.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\DecisionsSection.tsx",
-    "to": "components\\ai\\MiniStat.tsx"
+    "from": "app/dashboard/ai-ops/page.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\DecisionsSection.tsx",
-    "to": "components\\ai\\ModuleShell.tsx"
+    "from": "app/dashboard/ai/[module]/page.tsx",
+    "to": "app/dashboard/ai/_full/registry.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\DecisionsSection.tsx",
-    "to": "components\\ai\\NarrativeBlock.tsx"
+    "from": "app/dashboard/ai/_components/CashSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\DecisionsSection.tsx",
-    "to": "lib\\format.ts"
+    "from": "app/dashboard/ai/_components/CashSection.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\DecisionsSection.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_components/CashSection.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\FraudSection.tsx",
-    "to": "components\\ai\\ModuleShell.tsx"
+    "from": "app/dashboard/ai/_components/DataQualitySection.tsx",
+    "to": "components/ai/MiniStat.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\FraudSection.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_components/DataQualitySection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\GraphImpactSection.tsx",
-    "to": "components\\ai\\ModuleShell.tsx"
+    "from": "app/dashboard/ai/_components/DataQualitySection.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\GraphImpactSection.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/dashboard/ai/_components/DecisionsSection.tsx",
+    "to": "components/ai/DecisionCard.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\GraphImpactSection.tsx",
-    "to": "lib\\format.ts"
+    "from": "app/dashboard/ai/_components/DecisionsSection.tsx",
+    "to": "components/ai/MiniStat.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\HealthBoostSection.tsx",
-    "to": "app\\dashboard\\ai\\_components\\healthAdvice.ts"
+    "from": "app/dashboard/ai/_components/DecisionsSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "app\\dashboard\\ai\\_components\\CashSection.tsx"
+    "from": "app/dashboard/ai/_components/DecisionsSection.tsx",
+    "to": "components/ai/NarrativeBlock.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "app\\dashboard\\ai\\_components\\DataQualitySection.tsx"
+    "from": "app/dashboard/ai/_components/DecisionsSection.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "app\\dashboard\\ai\\_components\\DecisionsSection.tsx"
+    "from": "app/dashboard/ai/_components/DecisionsSection.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "app\\dashboard\\ai\\_components\\FraudSection.tsx"
+    "from": "app/dashboard/ai/_components/FraudSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "app\\dashboard\\ai\\_components\\GraphImpactSection.tsx"
+    "from": "app/dashboard/ai/_components/FraudSection.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "app\\dashboard\\ai\\_components\\HealthBoostSection.tsx"
+    "from": "app/dashboard/ai/_components/GraphImpactSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "app\\dashboard\\ai\\_components\\InventoryPredictionsSection.tsx"
+    "from": "app/dashboard/ai/_components/GraphImpactSection.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "app\\dashboard\\ai\\_components\\KdsSection.tsx"
+    "from": "app/dashboard/ai/_components/GraphImpactSection.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "app\\dashboard\\ai\\_components\\LaborSection.tsx"
+    "from": "app/dashboard/ai/_components/HealthBoostSection.tsx",
+    "to": "app/dashboard/ai/_components/healthAdvice.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "app\\dashboard\\ai\\_components\\MenuEngineeringSection.tsx"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/CashSection.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "app\\dashboard\\ai\\_components\\PricingSection.tsx"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/DataQualitySection.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "app\\dashboard\\ai\\_components\\ProfitSection.tsx"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/DecisionsSection.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "app\\dashboard\\ai\\_components\\RevenueForecastSection.tsx"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/FraudSection.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "app\\dashboard\\ai\\_components\\SupplyChainSection.tsx"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/GraphImpactSection.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "app\\dashboard\\ai\\_components\\overview\\taxonomy.ts"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/HealthBoostSection.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "app\\dashboard\\ai\\_components\\overview\\types.ts"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/InventoryPredictionsSection.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "components\\ai\\DigitalTwin.tsx"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/KdsSection.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "components\\ai\\InsightCard.tsx"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/LaborSection.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "components\\ai\\StrategyAgent.tsx"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/MenuEngineeringSection.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "components\\ai\\WhatIfSimulator.tsx"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/PricingSection.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx",
-    "to": "components\\ui\\SectionCard.tsx"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/ProfitSection.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InventoryPredictionsSection.tsx",
-    "to": "components\\ai\\MiniStat.tsx"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/RevenueForecastSection.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InventoryPredictionsSection.tsx",
-    "to": "components\\ai\\ModuleShell.tsx"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/SupplyChainSection.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InventoryPredictionsSection.tsx",
-    "to": "lib\\format.ts"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/overview/taxonomy.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\InventoryPredictionsSection.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "app/dashboard/ai/_components/overview/types.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\KdsSection.tsx",
-    "to": "components\\ai\\MiniStat.tsx"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "components/ai/DigitalTwin.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\KdsSection.tsx",
-    "to": "components\\ai\\ModuleShell.tsx"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "components/ai/InsightCard.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\KdsSection.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "components/ai/StrategyAgent.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\LaborSection.tsx",
-    "to": "components\\ai\\MiniStat.tsx"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "components/ai/WhatIfSimulator.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\LaborSection.tsx",
-    "to": "components\\ai\\ModuleShell.tsx"
+    "from": "app/dashboard/ai/_components/InsightsPanel.tsx",
+    "to": "components/ui/SectionCard.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\LaborSection.tsx",
-    "to": "lib\\format.ts"
+    "from": "app/dashboard/ai/_components/InventoryPredictionsSection.tsx",
+    "to": "components/ai/MiniStat.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\LaborSection.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_components/InventoryPredictionsSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\MenuEngineeringSection.tsx",
-    "to": "app\\dashboard\\ai\\_components\\constants.ts"
+    "from": "app/dashboard/ai/_components/InventoryPredictionsSection.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\MenuEngineeringSection.tsx",
-    "to": "components\\ai\\ModuleShell.tsx"
+    "from": "app/dashboard/ai/_components/InventoryPredictionsSection.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\MenuEngineeringSection.tsx",
-    "to": "components\\ai\\NarrativeBlock.tsx"
+    "from": "app/dashboard/ai/_components/KdsSection.tsx",
+    "to": "components/ai/MiniStat.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\MenuEngineeringSection.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_components/KdsSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\PricingSection.tsx",
-    "to": "components\\ai\\ExplainButton.tsx"
+    "from": "app/dashboard/ai/_components/KdsSection.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\PricingSection.tsx",
-    "to": "components\\ai\\MiniStat.tsx"
+    "from": "app/dashboard/ai/_components/LaborSection.tsx",
+    "to": "components/ai/MiniStat.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\PricingSection.tsx",
-    "to": "components\\ai\\ModuleShell.tsx"
+    "from": "app/dashboard/ai/_components/LaborSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\PricingSection.tsx",
-    "to": "components\\ai\\NarrativeBlock.tsx"
+    "from": "app/dashboard/ai/_components/LaborSection.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\PricingSection.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/dashboard/ai/_components/LaborSection.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\PricingSection.tsx",
-    "to": "lib\\errors.ts"
+    "from": "app/dashboard/ai/_components/MenuEngineeringSection.tsx",
+    "to": "app/dashboard/ai/_components/constants.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\PricingSection.tsx",
-    "to": "lib\\format.ts"
+    "from": "app/dashboard/ai/_components/MenuEngineeringSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\PricingSection.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_components/MenuEngineeringSection.tsx",
+    "to": "components/ai/NarrativeBlock.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\ProfitSection.tsx",
-    "to": "components\\ai\\ExplainButton.tsx"
+    "from": "app/dashboard/ai/_components/MenuEngineeringSection.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\ProfitSection.tsx",
-    "to": "components\\ai\\MiniStat.tsx"
+    "from": "app/dashboard/ai/_components/PricingSection.tsx",
+    "to": "components/ai/ExplainButton.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\ProfitSection.tsx",
-    "to": "components\\ai\\ModuleShell.tsx"
+    "from": "app/dashboard/ai/_components/PricingSection.tsx",
+    "to": "components/ai/MiniStat.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\ProfitSection.tsx",
-    "to": "components\\ai\\NarrativeBlock.tsx"
+    "from": "app/dashboard/ai/_components/PricingSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\ProfitSection.tsx",
-    "to": "lib\\format.ts"
+    "from": "app/dashboard/ai/_components/PricingSection.tsx",
+    "to": "components/ai/NarrativeBlock.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\ProfitSection.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_components/PricingSection.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\RevenueForecastSection.tsx",
-    "to": "components\\ai\\MiniStat.tsx"
+    "from": "app/dashboard/ai/_components/PricingSection.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\RevenueForecastSection.tsx",
-    "to": "components\\ai\\ModuleShell.tsx"
+    "from": "app/dashboard/ai/_components/PricingSection.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\RevenueForecastSection.tsx",
-    "to": "lib\\format.ts"
+    "from": "app/dashboard/ai/_components/PricingSection.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\RevenueForecastSection.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_components/ProfitSection.tsx",
+    "to": "components/ai/ExplainButton.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\SupplyChainSection.tsx",
-    "to": "components\\ai\\MiniStat.tsx"
+    "from": "app/dashboard/ai/_components/ProfitSection.tsx",
+    "to": "components/ai/MiniStat.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\SupplyChainSection.tsx",
-    "to": "components\\ai\\ModuleShell.tsx"
+    "from": "app/dashboard/ai/_components/ProfitSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\SupplyChainSection.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_components/ProfitSection.tsx",
+    "to": "components/ai/NarrativeBlock.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\overview\\AttentionHero.tsx",
-    "to": "app\\dashboard\\ai\\_components\\overview\\actions.ts"
+    "from": "app/dashboard/ai/_components/ProfitSection.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\overview\\AttentionHero.tsx",
-    "to": "app\\dashboard\\ai\\_components\\overview\\taxonomy.ts"
+    "from": "app/dashboard/ai/_components/ProfitSection.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\overview\\AttentionHero.tsx",
-    "to": "components\\ai\\ExplainButton.tsx"
+    "from": "app/dashboard/ai/_components/RevenueForecastSection.tsx",
+    "to": "components/ai/MiniStat.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\overview\\AttentionHero.tsx",
-    "to": "components\\ui\\SectionCard.tsx"
+    "from": "app/dashboard/ai/_components/RevenueForecastSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\overview\\BusinessHealth.tsx",
-    "to": "app\\dashboard\\ai\\_components\\healthAdvice.ts"
+    "from": "app/dashboard/ai/_components/RevenueForecastSection.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\overview\\BusinessHealth.tsx",
-    "to": "app\\dashboard\\ai\\_components\\overview\\types.ts"
+    "from": "app/dashboard/ai/_components/RevenueForecastSection.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\overview\\BusinessHealth.tsx",
-    "to": "components\\ai\\HowItWorks.tsx"
+    "from": "app/dashboard/ai/_components/SupplyChainSection.tsx",
+    "to": "components/ai/MiniStat.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\overview\\PerformanceSection.tsx",
-    "to": "components\\ai\\Sparkline.tsx"
+    "from": "app/dashboard/ai/_components/SupplyChainSection.tsx",
+    "to": "components/ai/ModuleShell.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\overview\\PerformanceSection.tsx",
-    "to": "components\\ui\\SectionCard.tsx"
+    "from": "app/dashboard/ai/_components/SupplyChainSection.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\overview\\PerformanceSection.tsx",
-    "to": "lib\\format.ts"
+    "from": "app/dashboard/ai/_components/overview/AttentionHero.tsx",
+    "to": "app/dashboard/ai/_components/overview/actions.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\overview\\PerformanceSection.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_components/overview/AttentionHero.tsx",
+    "to": "app/dashboard/ai/_components/overview/taxonomy.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\overview\\TodayStats.tsx",
-    "to": "app\\dashboard\\ai\\_components\\overview\\types.ts"
+    "from": "app/dashboard/ai/_components/overview/AttentionHero.tsx",
+    "to": "components/ai/ExplainButton.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\overview\\TodayStats.tsx",
-    "to": "components\\ui\\StatCard.tsx"
+    "from": "app/dashboard/ai/_components/overview/AttentionHero.tsx",
+    "to": "components/ui/SectionCard.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\overview\\TodayStats.tsx",
-    "to": "lib\\format.ts"
+    "from": "app/dashboard/ai/_components/overview/BusinessHealth.tsx",
+    "to": "app/dashboard/ai/_components/healthAdvice.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_components\\overview\\actions.ts",
-    "to": "app\\dashboard\\ai\\_components\\overview\\taxonomy.ts"
+    "from": "app/dashboard/ai/_components/overview/BusinessHealth.tsx",
+    "to": "app/dashboard/ai/_components/overview/types.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\DecisionsFull.tsx",
-    "to": "app\\dashboard\\ai\\_full\\shared.tsx"
+    "from": "app/dashboard/ai/_components/overview/BusinessHealth.tsx",
+    "to": "components/ai/HowItWorks.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\DecisionsFull.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_components/overview/OverviewHeader.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\FraudFull.tsx",
-    "to": "app\\dashboard\\ai\\_full\\shared.tsx"
+    "from": "app/dashboard/ai/_components/overview/PerformanceSection.tsx",
+    "to": "components/ai/Sparkline.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\FraudFull.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_components/overview/PerformanceSection.tsx",
+    "to": "components/ui/SectionCard.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\InventoryFull.tsx",
-    "to": "app\\dashboard\\ai\\_full\\shared.tsx"
+    "from": "app/dashboard/ai/_components/overview/PerformanceSection.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\InventoryFull.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_components/overview/PerformanceSection.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\KitchenFull.tsx",
-    "to": "app\\dashboard\\ai\\_full\\shared.tsx"
+    "from": "app/dashboard/ai/_components/overview/TodayStats.tsx",
+    "to": "app/dashboard/ai/_components/overview/types.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\KitchenFull.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_components/overview/TodayStats.tsx",
+    "to": "components/ui/StatCard.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\LaborFull.tsx",
-    "to": "app\\dashboard\\ai\\_full\\shared.tsx"
+    "from": "app/dashboard/ai/_components/overview/TodayStats.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\LaborFull.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_components/overview/actions.ts",
+    "to": "app/dashboard/ai/_components/overview/taxonomy.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\MenuFull.tsx",
-    "to": "app\\dashboard\\ai\\_full\\shared.tsx"
+    "from": "app/dashboard/ai/_full/DecisionsFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\MenuFull.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_full/DecisionsFull.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\PricingFull.tsx",
-    "to": "app\\dashboard\\ai\\_full\\shared.tsx"
+    "from": "app/dashboard/ai/_full/FraudFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\PricingFull.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_full/FraudFull.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\ProfitFull.tsx",
-    "to": "app\\dashboard\\ai\\_full\\shared.tsx"
+    "from": "app/dashboard/ai/_full/InventoryFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\ProfitFull.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_full/InventoryFull.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\ReservationsFull.tsx",
-    "to": "app\\dashboard\\ai\\_full\\shared.tsx"
+    "from": "app/dashboard/ai/_full/KitchenFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\ReservationsFull.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_full/KitchenFull.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\RevenueFull.tsx",
-    "to": "app\\dashboard\\ai\\_full\\shared.tsx"
+    "from": "app/dashboard/ai/_full/LaborFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\RevenueFull.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_full/LaborFull.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\SuppliersFull.tsx",
-    "to": "app\\dashboard\\ai\\_full\\shared.tsx"
+    "from": "app/dashboard/ai/_full/MenuFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\SuppliersFull.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "app/dashboard/ai/_full/MenuFull.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\registry.tsx",
-    "to": "app\\dashboard\\ai\\_full\\DecisionsFull.tsx"
+    "from": "app/dashboard/ai/_full/PricingFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\registry.tsx",
-    "to": "app\\dashboard\\ai\\_full\\FraudFull.tsx"
+    "from": "app/dashboard/ai/_full/PricingFull.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\registry.tsx",
-    "to": "app\\dashboard\\ai\\_full\\InventoryFull.tsx"
+    "from": "app/dashboard/ai/_full/ProfitFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\registry.tsx",
-    "to": "app\\dashboard\\ai\\_full\\KitchenFull.tsx"
+    "from": "app/dashboard/ai/_full/ProfitFull.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\registry.tsx",
-    "to": "app\\dashboard\\ai\\_full\\LaborFull.tsx"
+    "from": "app/dashboard/ai/_full/ReservationsFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\registry.tsx",
-    "to": "app\\dashboard\\ai\\_full\\MenuFull.tsx"
+    "from": "app/dashboard/ai/_full/ReservationsFull.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\registry.tsx",
-    "to": "app\\dashboard\\ai\\_full\\PricingFull.tsx"
+    "from": "app/dashboard/ai/_full/RevenueFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\registry.tsx",
-    "to": "app\\dashboard\\ai\\_full\\ProfitFull.tsx"
+    "from": "app/dashboard/ai/_full/RevenueFull.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\registry.tsx",
-    "to": "app\\dashboard\\ai\\_full\\ReservationsFull.tsx"
+    "from": "app/dashboard/ai/_full/SuppliersFull.tsx",
+    "to": "app/dashboard/ai/_full/shared.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\registry.tsx",
-    "to": "app\\dashboard\\ai\\_full\\RevenueFull.tsx"
+    "from": "app/dashboard/ai/_full/SuppliersFull.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\registry.tsx",
-    "to": "app\\dashboard\\ai\\_full\\SuppliersFull.tsx"
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/DecisionsFull.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\_full\\shared.tsx",
-    "to": "lib\\format.ts"
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/FraudFull.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\page.tsx",
-    "to": "app\\dashboard\\ai\\_components\\AiTabs.tsx"
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/InventoryFull.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\page.tsx",
-    "to": "app\\dashboard\\ai\\_components\\InsightsPanel.tsx"
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/KitchenFull.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\page.tsx",
-    "to": "app\\dashboard\\ai\\_components\\overview\\AttentionHero.tsx"
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/LaborFull.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\page.tsx",
-    "to": "app\\dashboard\\ai\\_components\\overview\\BusinessHealth.tsx"
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/MenuFull.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\page.tsx",
-    "to": "app\\dashboard\\ai\\_components\\overview\\OverviewHeader.tsx"
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/PricingFull.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\page.tsx",
-    "to": "app\\dashboard\\ai\\_components\\overview\\PerformanceSection.tsx"
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/ProfitFull.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\page.tsx",
-    "to": "app\\dashboard\\ai\\_components\\overview\\TodayStats.tsx"
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/ReservationsFull.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\page.tsx",
-    "to": "app\\dashboard\\ai\\_components\\overview\\taxonomy.ts"
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/RevenueFull.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\page.tsx",
-    "to": "app\\dashboard\\ai\\_components\\overview\\types.ts"
+    "from": "app/dashboard/ai/_full/registry.tsx",
+    "to": "app/dashboard/ai/_full/SuppliersFull.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\page.tsx",
-    "to": "components\\ui\\EmptyState.tsx"
+    "from": "app/dashboard/ai/_full/shared.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "app\\dashboard\\ai\\page.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/AiTabs.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\page.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/InsightsPanel.tsx"
    },
    {
-    "from": "app\\dashboard\\ai\\page.tsx",
-    "to": "lib\\errors.ts"
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/overview/AttentionHero.tsx"
    },
    {
-    "from": "app\\dashboard\\error.tsx",
-    "to": "components\\ui\\Button.tsx"
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/overview/BusinessHealth.tsx"
    },
    {
-    "from": "app\\dashboard\\inventory\\page.tsx",
-    "to": "components\\features\\inventory\\InventoryWorkspace.tsx"
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/overview/OverviewHeader.tsx"
    },
    {
-    "from": "app\\dashboard\\kitchen\\page.tsx",
-    "to": "components\\features\\kitchen\\KDSBoard.tsx"
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/overview/PerformanceSection.tsx"
    },
    {
-    "from": "app\\dashboard\\layout.tsx",
-    "to": "components\\NotificationBell.tsx"
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/overview/TodayStats.tsx"
    },
    {
-    "from": "app\\dashboard\\layout.tsx",
-    "to": "components\\PinSetupModal.tsx"
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/overview/taxonomy.ts"
    },
    {
-    "from": "app\\dashboard\\layout.tsx",
-    "to": "components\\QuickSwitchModal.tsx"
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "app/dashboard/ai/_components/overview/types.ts"
    },
    {
-    "from": "app\\dashboard\\layout.tsx",
-    "to": "components\\RestaurantSwitcher.tsx"
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "components/ui/EmptyState.tsx"
    },
    {
-    "from": "app\\dashboard\\layout.tsx",
-    "to": "components\\VerifyEmailBanner.tsx"
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "app\\dashboard\\layout.tsx",
-    "to": "components\\staff\\AttendanceWidget.tsx"
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "app\\dashboard\\layout.tsx",
-    "to": "components\\ui\\PageLoader.tsx"
+    "from": "app/dashboard/ai/page.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "app\\dashboard\\layout.tsx",
-    "to": "components\\ui\\SkipLink.tsx"
+    "from": "app/dashboard/error.tsx",
+    "to": "components/ui/Button.tsx"
    },
    {
-    "from": "app\\dashboard\\layout.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "app/dashboard/inventory/page.tsx",
+    "to": "components/features/inventory/InventoryWorkspace.tsx"
    },
    {
-    "from": "app\\dashboard\\layout.tsx",
-    "to": "lib\\pathTitle.ts"
+    "from": "app/dashboard/kitchen/page.tsx",
+    "to": "components/features/kitchen/KDSBoard.tsx"
    },
    {
-    "from": "app\\dashboard\\layout.tsx",
-    "to": "lib\\permissions.ts"
+    "from": "app/dashboard/layout.tsx",
+    "to": "components/NotificationBell.tsx"
    },
    {
-    "from": "app\\dashboard\\layout.tsx",
-    "to": "lib\\tenantHome.ts"
+    "from": "app/dashboard/layout.tsx",
+    "to": "components/PinSetupModal.tsx"
    },
    {
-    "from": "app\\dashboard\\marketing\\page.tsx",
-    "to": "app\\dashboard\\marketing\\_components\\CampaignForm.tsx"
+    "from": "app/dashboard/layout.tsx",
+    "to": "components/QuickSwitchModal.tsx"
    },
    {
-    "from": "app\\dashboard\\marketing\\page.tsx",
-    "to": "components\\ai\\HowItWorks.tsx"
+    "from": "app/dashboard/layout.tsx",
+    "to": "components/RestaurantSwitcher.tsx"
    },
    {
-    "from": "app\\dashboard\\marketing\\page.tsx",
-    "to": "components\\ai\\NarrativeBlock.tsx"
+    "from": "app/dashboard/layout.tsx",
+    "to": "components/VerifyEmailBanner.tsx"
    },
    {
-    "from": "app\\dashboard\\marketing\\page.tsx",
-    "to": "components\\ui\\EmptyState.tsx"
+    "from": "app/dashboard/layout.tsx",
+    "to": "components/staff/AttendanceWidget.tsx"
    },
    {
-    "from": "app\\dashboard\\marketing\\page.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "app/dashboard/layout.tsx",
+    "to": "components/ui/PageLoader.tsx"
    },
    {
-    "from": "app\\dashboard\\marketing\\page.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/dashboard/layout.tsx",
+    "to": "components/ui/SkipLink.tsx"
    },
    {
-    "from": "app\\dashboard\\marketing\\page.tsx",
-    "to": "lib\\errors.ts"
+    "from": "app/dashboard/layout.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "app\\dashboard\\marketing\\page.tsx",
-    "to": "lib\\format.ts"
+    "from": "app/dashboard/layout.tsx",
+    "to": "lib/navActive.ts"
    },
    {
-    "from": "app\\dashboard\\menu\\page.tsx",
-    "to": "components\\features\\menu\\MenuEditor.tsx"
+    "from": "app/dashboard/layout.tsx",
+    "to": "lib/pathTitle.ts"
    },
    {
-    "from": "app\\dashboard\\orders\\page.tsx",
-    "to": "components\\features\\orders\\OrderList.tsx"
+    "from": "app/dashboard/layout.tsx",
+    "to": "lib/permissions.ts"
    },
    {
-    "from": "app\\dashboard\\page.tsx",
-    "to": "app\\dashboard\\_components\\SystemStatus.tsx"
+    "from": "app/dashboard/layout.tsx",
+    "to": "lib/tenantHome.ts"
    },
    {
-    "from": "app\\dashboard\\page.tsx",
-    "to": "components\\ui\\StatCard.tsx"
+    "from": "app/dashboard/marketing/page.tsx",
+    "to": "app/dashboard/marketing/_components/CampaignForm.tsx"
    },
    {
-    "from": "app\\dashboard\\page.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "app/dashboard/marketing/page.tsx",
+    "to": "components/ai/HowItWorks.tsx"
    },
    {
-    "from": "app\\dashboard\\page.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/dashboard/marketing/page.tsx",
+    "to": "components/ai/NarrativeBlock.tsx"
    },
    {
-    "from": "app\\dashboard\\page.tsx",
-    "to": "lib\\emptiness.ts"
+    "from": "app/dashboard/marketing/page.tsx",
+    "to": "components/ui/EmptyState.tsx"
    },
    {
-    "from": "app\\dashboard\\pos\\page.tsx",
-    "to": "components\\features\\pos\\POSWorkspace.tsx"
+    "from": "app/dashboard/marketing/page.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "app\\dashboard\\purchasing\\page.tsx",
-    "to": "components\\features\\purchasing\\PurchasingWorkspace.tsx"
+    "from": "app/dashboard/marketing/page.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "app\\dashboard\\reservations\\page.tsx",
-    "to": "components\\features\\reservations\\ReservationsWorkspace.tsx"
+    "from": "app/dashboard/marketing/page.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "app\\dashboard\\roi\\page.tsx",
-    "to": "app\\dashboard\\roi\\_components\\RoiBreakdown.tsx"
+    "from": "app/dashboard/marketing/page.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "app\\dashboard\\roi\\page.tsx",
-    "to": "app\\dashboard\\roi\\_components\\TrendChip.tsx"
+    "from": "app/dashboard/menu/page.tsx",
+    "to": "components/features/menu/MenuEditor.tsx"
    },
    {
-    "from": "app\\dashboard\\roi\\page.tsx",
-    "to": "components\\ai\\HowItWorks.tsx"
+    "from": "app/dashboard/orders/page.tsx",
+    "to": "components/features/orders/OrderList.tsx"
    },
    {
-    "from": "app\\dashboard\\roi\\page.tsx",
-    "to": "components\\ai\\NarrativeBlock.tsx"
+    "from": "app/dashboard/page.tsx",
+    "to": "app/dashboard/_components/SystemStatus.tsx"
    },
    {
-    "from": "app\\dashboard\\roi\\page.tsx",
-    "to": "components\\ui\\EmptyState.tsx"
+    "from": "app/dashboard/page.tsx",
+    "to": "components/ui/StatCard.tsx"
    },
    {
-    "from": "app\\dashboard\\roi\\page.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "app/dashboard/page.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "app\\dashboard\\roi\\page.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/dashboard/page.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "app\\dashboard\\roi\\page.tsx",
-    "to": "lib\\errors.ts"
+    "from": "app/dashboard/page.tsx",
+    "to": "lib/emptiness.ts"
    },
    {
-    "from": "app\\dashboard\\roi\\page.tsx",
-    "to": "lib\\format.ts"
+    "from": "app/dashboard/pos/page.tsx",
+    "to": "components/features/pos/POSWorkspace.tsx"
    },
    {
-    "from": "app\\dashboard\\sales\\page.tsx",
-    "to": "components\\features\\sales\\SalesView.tsx"
+    "from": "app/dashboard/purchasing/page.tsx",
+    "to": "components/features/purchasing/PurchasingWorkspace.tsx"
    },
    {
-    "from": "app\\dashboard\\staff\\page.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "app/dashboard/reservations/page.tsx",
+    "to": "components/features/reservations/ReservationsWorkspace.tsx"
    },
    {
-    "from": "app\\dashboard\\staff\\page.tsx",
-    "to": "components\\ui\\Toast.tsx"
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "app/dashboard/roi/_components/RoiBreakdown.tsx"
    },
    {
-    "from": "app\\dashboard\\staff\\page.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "app/dashboard/roi/_components/TrendChip.tsx"
    },
    {
-    "from": "app\\dashboard\\staff\\page.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "components/ai/HowItWorks.tsx"
    },
    {
-    "from": "app\\dashboard\\staff\\page.tsx",
-    "to": "lib\\errors.ts"
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "components/ai/NarrativeBlock.tsx"
    },
    {
-    "from": "app\\dashboard\\staff\\page.tsx",
-    "to": "lib\\permissions.ts"
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "components/ui/EmptyState.tsx"
    },
    {
-    "from": "app\\dashboard\\support\\page.tsx",
-    "to": "components\\features\\support\\SupportView.tsx"
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "app\\entries\\page.tsx",
-    "to": "components\\operations\\EntryWorkspace.tsx"
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "app\\forgot-password\\page.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "app\\layout.tsx",
-    "to": "app\\providers.tsx"
+    "from": "app/dashboard/roi/page.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "app\\login\\page.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "app/dashboard/sales/page.tsx",
+    "to": "components/features/sales/SalesView.tsx"
    },
    {
-    "from": "app\\login\\page.tsx",
-    "to": "lib\\tenantHome.ts"
+    "from": "app/dashboard/staff/page.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "app\\page.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "app/dashboard/staff/page.tsx",
+    "to": "components/ui/Toast.tsx"
    },
    {
-    "from": "app\\page.tsx",
-    "to": "lib\\tenantHome.ts"
+    "from": "app/dashboard/staff/page.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "app\\providers.tsx",
-    "to": "components\\ImpersonationBanner.tsx"
+    "from": "app/dashboard/staff/page.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "app\\providers.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "app/dashboard/staff/page.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "app\\reset-password\\page.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/dashboard/staff/page.tsx",
+    "to": "lib/permissions.ts"
    },
    {
-    "from": "app\\staff\\controller\\ai-ops\\page.tsx",
-    "to": "app\\dashboard\\ai-ops\\page.tsx"
+    "from": "app/dashboard/support/page.tsx",
+    "to": "components/features/support/SupportView.tsx"
    },
    {
-    "from": "app\\staff\\controller\\ai\\page.tsx",
-    "to": "app\\dashboard\\ai\\page.tsx"
+    "from": "app/entries/page.tsx",
+    "to": "components/operations/EntryWorkspace.tsx"
    },
    {
-    "from": "app\\staff\\controller\\layout.tsx",
-    "to": "components\\staff\\TierLayoutShell.tsx"
+    "from": "app/forgot-password/page.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "app\\staff\\controller\\orders\\page.tsx",
-    "to": "components\\features\\orders\\OrderList.tsx"
+    "from": "app/layout.tsx",
+    "to": "app/providers.tsx"
    },
    {
-    "from": "app\\staff\\controller\\page.tsx",
-    "to": "components\\features\\inventory\\VarianceReportPanel.tsx"
+    "from": "app/login/page.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "app\\staff\\controller\\purchasing\\page.tsx",
-    "to": "components\\features\\purchasing\\PurchasingWorkspace.tsx"
+    "from": "app/login/page.tsx",
+    "to": "lib/tenantHome.ts"
    },
    {
-    "from": "app\\staff\\controller\\roi\\page.tsx",
-    "to": "app\\dashboard\\roi\\page.tsx"
+    "from": "app/page.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "app\\staff\\controller\\sales\\page.tsx",
-    "to": "components\\features\\sales\\SalesView.tsx"
+    "from": "app/page.tsx",
+    "to": "lib/tenantHome.ts"
    },
    {
-    "from": "app\\staff\\controller\\support\\page.tsx",
-    "to": "components\\features\\support\\SupportView.tsx"
+    "from": "app/providers.tsx",
+    "to": "components/ImpersonationBanner.tsx"
    },
    {
-    "from": "app\\staff\\kitchen\\layout.tsx",
-    "to": "components\\staff\\TierLayoutShell.tsx"
+    "from": "app/providers.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "app\\staff\\kitchen\\menu\\page.tsx",
-    "to": "components\\features\\menu\\MenuReadView.tsx"
+    "from": "app/reset-password/page.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "app\\staff\\kitchen\\orders\\page.tsx",
-    "to": "components\\features\\orders\\OrderList.tsx"
+    "from": "app/staff/controller/ai-ops/page.tsx",
+    "to": "app/dashboard/ai-ops/page.tsx"
    },
    {
-    "from": "app\\staff\\kitchen\\page.tsx",
-    "to": "components\\features\\kitchen\\KDSBoard.tsx"
+    "from": "app/staff/controller/ai/page.tsx",
+    "to": "app/dashboard/ai/page.tsx"
    },
    {
-    "from": "app\\staff\\kitchen\\stock\\page.tsx",
-    "to": "components\\features\\inventory\\KitchenStockPanel.tsx"
+    "from": "app/staff/controller/layout.tsx",
+    "to": "components/staff/TierLayoutShell.tsx"
    },
    {
-    "from": "app\\staff\\kitchen\\support\\page.tsx",
-    "to": "components\\features\\support\\SupportView.tsx"
+    "from": "app/staff/controller/orders/page.tsx",
+    "to": "components/features/orders/OrderList.tsx"
    },
    {
-    "from": "app\\staff\\layout.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "app/staff/controller/page.tsx",
+    "to": "components/features/inventory/VarianceReportPanel.tsx"
    },
    {
-    "from": "app\\staff\\layout.tsx",
-    "to": "lib\\permissions.ts"
+    "from": "app/staff/controller/purchasing/page.tsx",
+    "to": "components/features/purchasing/PurchasingWorkspace.tsx"
    },
    {
-    "from": "app\\staff\\manager\\ai-ops\\page.tsx",
-    "to": "app\\dashboard\\ai-ops\\page.tsx"
+    "from": "app/staff/controller/roi/page.tsx",
+    "to": "app/dashboard/roi/page.tsx"
    },
    {
-    "from": "app\\staff\\manager\\ai\\page.tsx",
-    "to": "app\\dashboard\\ai\\page.tsx"
+    "from": "app/staff/controller/sales/page.tsx",
+    "to": "components/features/sales/SalesView.tsx"
    },
    {
-    "from": "app\\staff\\manager\\inventory\\page.tsx",
-    "to": "components\\features\\inventory\\InventoryWorkspace.tsx"
+    "from": "app/staff/controller/support/page.tsx",
+    "to": "components/features/support/SupportView.tsx"
    },
    {
-    "from": "app\\staff\\manager\\kitchen\\page.tsx",
-    "to": "components\\features\\kitchen\\KDSBoard.tsx"
+    "from": "app/staff/kitchen/layout.tsx",
+    "to": "components/staff/TierLayoutShell.tsx"
    },
    {
-    "from": "app\\staff\\manager\\layout.tsx",
-    "to": "components\\staff\\TierLayoutShell.tsx"
+    "from": "app/staff/kitchen/menu/page.tsx",
+    "to": "components/features/menu/MenuReadView.tsx"
    },
    {
-    "from": "app\\staff\\manager\\marketing\\page.tsx",
-    "to": "app\\dashboard\\marketing\\page.tsx"
+    "from": "app/staff/kitchen/orders/page.tsx",
+    "to": "components/features/orders/OrderList.tsx"
    },
    {
-    "from": "app\\staff\\manager\\menu\\page.tsx",
-    "to": "components\\features\\menu\\MenuEditor.tsx"
+    "from": "app/staff/kitchen/page.tsx",
+    "to": "components/features/kitchen/KDSBoard.tsx"
    },
    {
-    "from": "app\\staff\\manager\\orders\\page.tsx",
-    "to": "components\\features\\orders\\OrderList.tsx"
+    "from": "app/staff/kitchen/stock/page.tsx",
+    "to": "components/features/inventory/KitchenStockPanel.tsx"
    },
    {
-    "from": "app\\staff\\manager\\page.tsx",
-    "to": "components\\features\\pos\\POSWorkspace.tsx"
+    "from": "app/staff/kitchen/support/page.tsx",
+    "to": "components/features/support/SupportView.tsx"
    },
    {
-    "from": "app\\staff\\manager\\pos\\page.tsx",
-    "to": "components\\features\\pos\\POSWorkspace.tsx"
+    "from": "app/staff/layout.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "app\\staff\\manager\\purchasing\\page.tsx",
-    "to": "components\\features\\purchasing\\PurchasingWorkspace.tsx"
+    "from": "app/staff/layout.tsx",
+    "to": "lib/permissions.ts"
    },
    {
-    "from": "app\\staff\\manager\\reservations\\page.tsx",
-    "to": "components\\features\\reservations\\ReservationsWorkspace.tsx"
+    "from": "app/staff/manager/ai-ops/page.tsx",
+    "to": "app/dashboard/ai-ops/page.tsx"
    },
    {
-    "from": "app\\staff\\manager\\roi\\page.tsx",
-    "to": "app\\dashboard\\roi\\page.tsx"
+    "from": "app/staff/manager/ai/page.tsx",
+    "to": "app/dashboard/ai/page.tsx"
    },
    {
-    "from": "app\\staff\\manager\\sales\\page.tsx",
-    "to": "components\\features\\sales\\SalesView.tsx"
+    "from": "app/staff/manager/inventory/page.tsx",
+    "to": "components/features/inventory/InventoryWorkspace.tsx"
    },
    {
-    "from": "app\\staff\\manager\\staff\\page.tsx",
-    "to": "app\\dashboard\\staff\\page.tsx"
+    "from": "app/staff/manager/kitchen/page.tsx",
+    "to": "components/features/kitchen/KDSBoard.tsx"
    },
    {
-    "from": "app\\staff\\manager\\support\\page.tsx",
-    "to": "components\\features\\support\\SupportView.tsx"
+    "from": "app/staff/manager/layout.tsx",
+    "to": "components/staff/TierLayoutShell.tsx"
    },
    {
-    "from": "app\\staff\\stockkeeper\\layout.tsx",
-    "to": "components\\staff\\TierLayoutShell.tsx"
+    "from": "app/staff/manager/marketing/page.tsx",
+    "to": "app/dashboard/marketing/page.tsx"
    },
    {
-    "from": "app\\staff\\stockkeeper\\page.tsx",
-    "to": "components\\features\\inventory\\InventoryWorkspace.tsx"
+    "from": "app/staff/manager/menu/page.tsx",
+    "to": "components/features/menu/MenuEditor.tsx"
    },
    {
-    "from": "app\\staff\\stockkeeper\\purchasing\\page.tsx",
-    "to": "components\\features\\purchasing\\PurchasingWorkspace.tsx"
+    "from": "app/staff/manager/orders/page.tsx",
+    "to": "components/features/orders/OrderList.tsx"
    },
    {
-    "from": "app\\staff\\stockkeeper\\support\\page.tsx",
-    "to": "components\\features\\support\\SupportView.tsx"
+    "from": "app/staff/manager/page.tsx",
+    "to": "components/features/pos/POSWorkspace.tsx"
    },
    {
-    "from": "app\\staff\\supervisor\\kitchen\\page.tsx",
-    "to": "components\\features\\kitchen\\KDSBoard.tsx"
+    "from": "app/staff/manager/pos/page.tsx",
+    "to": "components/features/pos/POSWorkspace.tsx"
    },
    {
-    "from": "app\\staff\\supervisor\\layout.tsx",
-    "to": "components\\staff\\TierLayoutShell.tsx"
+    "from": "app/staff/manager/purchasing/page.tsx",
+    "to": "components/features/purchasing/PurchasingWorkspace.tsx"
    },
    {
-    "from": "app\\staff\\supervisor\\menu\\page.tsx",
-    "to": "components\\features\\menu\\MenuReadView.tsx"
+    "from": "app/staff/manager/reservations/page.tsx",
+    "to": "components/features/reservations/ReservationsWorkspace.tsx"
    },
    {
-    "from": "app\\staff\\supervisor\\orders\\page.tsx",
-    "to": "components\\features\\orders\\OrderList.tsx"
+    "from": "app/staff/manager/roi/page.tsx",
+    "to": "app/dashboard/roi/page.tsx"
    },
    {
-    "from": "app\\staff\\supervisor\\page.tsx",
-    "to": "components\\features\\pos\\POSWorkspace.tsx"
+    "from": "app/staff/manager/sales/page.tsx",
+    "to": "components/features/sales/SalesView.tsx"
    },
    {
-    "from": "app\\staff\\supervisor\\purchasing\\page.tsx",
-    "to": "components\\features\\purchasing\\PurchasingWorkspace.tsx"
+    "from": "app/staff/manager/staff/page.tsx",
+    "to": "app/dashboard/staff/page.tsx"
    },
    {
-    "from": "app\\staff\\supervisor\\reservations\\page.tsx",
-    "to": "components\\features\\reservations\\ReservationsWorkspace.tsx"
+    "from": "app/staff/manager/support/page.tsx",
+    "to": "components/features/support/SupportView.tsx"
    },
    {
-    "from": "app\\staff\\supervisor\\sales\\page.tsx",
-    "to": "components\\features\\sales\\SalesView.tsx"
+    "from": "app/staff/stockkeeper/layout.tsx",
+    "to": "components/staff/TierLayoutShell.tsx"
    },
    {
-    "from": "app\\staff\\supervisor\\support\\page.tsx",
-    "to": "components\\features\\support\\SupportView.tsx"
+    "from": "app/staff/stockkeeper/page.tsx",
+    "to": "components/features/inventory/InventoryWorkspace.tsx"
    },
    {
-    "from": "app\\staff\\waiter\\kitchen\\page.tsx",
-    "to": "components\\features\\kitchen\\KDSBoard.tsx"
+    "from": "app/staff/stockkeeper/purchasing/page.tsx",
+    "to": "components/features/purchasing/PurchasingWorkspace.tsx"
    },
    {
-    "from": "app\\staff\\waiter\\layout.tsx",
-    "to": "components\\staff\\TierLayoutShell.tsx"
+    "from": "app/staff/stockkeeper/support/page.tsx",
+    "to": "components/features/support/SupportView.tsx"
    },
    {
-    "from": "app\\staff\\waiter\\menu\\page.tsx",
-    "to": "components\\features\\menu\\MenuReadView.tsx"
+    "from": "app/staff/supervisor/kitchen/page.tsx",
+    "to": "components/features/kitchen/KDSBoard.tsx"
    },
    {
-    "from": "app\\staff\\waiter\\orders\\page.tsx",
-    "to": "components\\features\\orders\\OrderList.tsx"
+    "from": "app/staff/supervisor/layout.tsx",
+    "to": "components/staff/TierLayoutShell.tsx"
    },
    {
-    "from": "app\\staff\\waiter\\page.tsx",
-    "to": "components\\features\\pos\\POSWorkspace.tsx"
+    "from": "app/staff/supervisor/menu/page.tsx",
+    "to": "components/features/menu/MenuReadView.tsx"
    },
    {
-    "from": "app\\staff\\waiter\\reservations\\page.tsx",
-    "to": "components\\features\\reservations\\ReservationsWorkspace.tsx"
+    "from": "app/staff/supervisor/orders/page.tsx",
+    "to": "components/features/orders/OrderList.tsx"
    },
    {
-    "from": "app\\staff\\waiter\\support\\page.tsx",
-    "to": "components\\features\\support\\SupportView.tsx"
+    "from": "app/staff/supervisor/page.tsx",
+    "to": "components/features/pos/POSWorkspace.tsx"
    },
    {
-    "from": "app\\verify-email\\page.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/staff/supervisor/purchasing/page.tsx",
+    "to": "components/features/purchasing/PurchasingWorkspace.tsx"
    },
    {
-    "from": "app\\verify-email\\page.tsx",
-    "to": "lib\\errors.ts"
+    "from": "app/staff/supervisor/reservations/page.tsx",
+    "to": "components/features/reservations/ReservationsWorkspace.tsx"
    },
    {
-    "from": "components\\ImpersonationBanner.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "app/staff/supervisor/sales/page.tsx",
+    "to": "components/features/sales/SalesView.tsx"
    },
    {
-    "from": "components\\NotificationBell.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/staff/supervisor/support/page.tsx",
+    "to": "components/features/support/SupportView.tsx"
    },
    {
-    "from": "components\\NotificationBell.tsx",
-    "to": "lib\\directSource.ts"
+    "from": "app/staff/waiter/kitchen/page.tsx",
+    "to": "components/features/kitchen/KDSBoard.tsx"
    },
    {
-    "from": "components\\NotificationBell.tsx",
-    "to": "lib\\useNotifications.ts"
+    "from": "app/staff/waiter/layout.tsx",
+    "to": "components/staff/TierLayoutShell.tsx"
    },
    {
-    "from": "components\\NotificationBell.tsx",
-    "to": "lib\\vibandaSource.ts"
+    "from": "app/staff/waiter/menu/page.tsx",
+    "to": "components/features/menu/MenuReadView.tsx"
    },
    {
-    "from": "components\\PinSetupModal.tsx",
-    "to": "components\\ui\\Button.tsx"
+    "from": "app/staff/waiter/orders/page.tsx",
+    "to": "components/features/orders/OrderList.tsx"
    },
    {
-    "from": "components\\PinSetupModal.tsx",
-    "to": "components\\ui\\Modal.tsx"
+    "from": "app/staff/waiter/page.tsx",
+    "to": "components/features/pos/POSWorkspace.tsx"
    },
    {
-    "from": "components\\PinSetupModal.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/staff/waiter/reservations/page.tsx",
+    "to": "components/features/reservations/ReservationsWorkspace.tsx"
    },
    {
-    "from": "components\\PinSetupModal.tsx",
-    "to": "lib\\errors.ts"
+    "from": "app/staff/waiter/support/page.tsx",
+    "to": "components/features/support/SupportView.tsx"
    },
    {
-    "from": "components\\QuickSwitchModal.tsx",
-    "to": "components\\ui\\Button.tsx"
+    "from": "app/team-work/page.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "components\\QuickSwitchModal.tsx",
-    "to": "components\\ui\\Modal.tsx"
+    "from": "app/team-work/page.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\QuickSwitchModal.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "app/team-work/page.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\QuickSwitchModal.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/team-work/page.tsx",
+    "to": "lib/tenantHome.ts"
    },
    {
-    "from": "components\\QuickSwitchModal.tsx",
-    "to": "lib\\errors.ts"
+    "from": "app/verify-email/page.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\RestaurantSwitcher.tsx",
-    "to": "lib\\api.ts"
+    "from": "app/verify-email/page.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\VerifyEmailBanner.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "components/ImpersonationBanner.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "components\\VerifyEmailBanner.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/NotificationBell.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\ai\\DecisionCard.tsx",
-    "to": "components\\ai\\ExplainButton.tsx"
+    "from": "components/NotificationBell.tsx",
+    "to": "lib/directSource.ts"
    },
    {
-    "from": "components\\ai\\DecisionCard.tsx",
-    "to": "lib\\format.ts"
+    "from": "components/NotificationBell.tsx",
+    "to": "lib/useNotifications.ts"
    },
    {
-    "from": "components\\ai\\DigitalTwin.tsx",
-    "to": "components\\ai\\MiniStat.tsx"
+    "from": "components/NotificationBell.tsx",
+    "to": "lib/vibandaSource.ts"
    },
    {
-    "from": "components\\ai\\DigitalTwin.tsx",
-    "to": "components\\ai\\ModuleShell.tsx"
+    "from": "components/PinSetupModal.tsx",
+    "to": "components/ui/Button.tsx"
    },
    {
-    "from": "components\\ai\\DigitalTwin.tsx",
-    "to": "lib\\format.ts"
+    "from": "components/PinSetupModal.tsx",
+    "to": "components/ui/Modal.tsx"
    },
    {
-    "from": "components\\ai\\DigitalTwin.tsx",
-    "to": "lib\\useAiModule.ts"
+    "from": "components/PinSetupModal.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\ai\\ExplainButton.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/PinSetupModal.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\ai\\InsightCard.tsx",
-    "to": "app\\dashboard\\ai\\_components\\overview\\taxonomy.ts"
+    "from": "components/QuickSwitchModal.tsx",
+    "to": "components/ui/Button.tsx"
    },
    {
-    "from": "components\\ai\\InsightCard.tsx",
-    "to": "components\\ai\\ExplainButton.tsx"
+    "from": "components/QuickSwitchModal.tsx",
+    "to": "components/ui/Modal.tsx"
    },
    {
-    "from": "components\\ai\\ModuleShell.tsx",
-    "to": "components\\ai\\HowItWorks.tsx"
+    "from": "components/QuickSwitchModal.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "components\\ai\\StrategyAgent.tsx",
-    "to": "components\\ai\\HowItWorks.tsx"
+    "from": "components/QuickSwitchModal.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\ai\\StrategyAgent.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/QuickSwitchModal.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\ai\\StrategyAgent.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/RestaurantSwitcher.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\ai\\StrategyAgent.tsx",
-    "to": "lib\\errors.ts"
+    "from": "components/VerifyEmailBanner.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "components\\ai\\WhatIfSimulator.tsx",
-    "to": "components\\ai\\HowItWorks.tsx"
+    "from": "components/VerifyEmailBanner.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\ai\\WhatIfSimulator.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/ai/DecisionCard.tsx",
+    "to": "components/ai/ExplainButton.tsx"
    },
    {
-    "from": "components\\ai\\WhatIfSimulator.tsx",
-    "to": "lib\\errors.ts"
+    "from": "components/ai/DecisionCard.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "components\\ai\\WhatIfSimulator.tsx",
-    "to": "lib\\format.ts"
+    "from": "components/ai/DigitalTwin.tsx",
+    "to": "components/ai/MiniStat.tsx"
    },
    {
-    "from": "components\\charts\\BandForecast.tsx",
-    "to": "components\\charts\\ChartEmpty.tsx"
+    "from": "components/ai/DigitalTwin.tsx",
+    "to": "components/ai/ModuleShell.tsx"
    },
    {
-    "from": "components\\charts\\BandForecast.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/ai/DigitalTwin.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "components\\charts\\Bars.tsx",
-    "to": "components\\charts\\ChartEmpty.tsx"
+    "from": "components/ai/DigitalTwin.tsx",
+    "to": "lib/useAiModule.ts"
    },
    {
-    "from": "components\\charts\\BreakEvenClock.tsx",
-    "to": "components\\charts\\ChartEmpty.tsx"
+    "from": "components/ai/ExplainButton.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\charts\\BreakEvenClock.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/ai/InsightCard.tsx",
+    "to": "app/dashboard/ai/_components/overview/taxonomy.ts"
    },
    {
-    "from": "components\\charts\\CashRunway.tsx",
-    "to": "components\\charts\\ChartEmpty.tsx"
+    "from": "components/ai/InsightCard.tsx",
+    "to": "components/ai/ExplainButton.tsx"
    },
    {
-    "from": "components\\charts\\CashRunway.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/ai/ModuleShell.tsx",
+    "to": "components/ai/HowItWorks.tsx"
    },
    {
-    "from": "components\\charts\\ChartEmpty.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/ai/StrategyAgent.tsx",
+    "to": "components/ai/HowItWorks.tsx"
    },
    {
-    "from": "components\\charts\\Dial.tsx",
-    "to": "components\\charts\\ChartEmpty.tsx"
+    "from": "components/ai/StrategyAgent.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\charts\\HBars.tsx",
-    "to": "components\\charts\\ChartEmpty.tsx"
+    "from": "components/ai/StrategyAgent.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\charts\\HeatGrid.tsx",
-    "to": "components\\charts\\ChartEmpty.tsx"
+    "from": "components/ai/StrategyAgent.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\charts\\Quadrant.tsx",
-    "to": "components\\charts\\ChartEmpty.tsx"
+    "from": "components/ai/WhatIfSimulator.tsx",
+    "to": "components/ai/HowItWorks.tsx"
    },
    {
-    "from": "components\\charts\\ShiftTable.tsx",
-    "to": "components\\charts\\ChartEmpty.tsx"
+    "from": "components/ai/WhatIfSimulator.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\charts\\ShiftTable.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/ai/WhatIfSimulator.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\charts\\StackedBar.tsx",
-    "to": "components\\charts\\ChartEmpty.tsx"
+    "from": "components/ai/WhatIfSimulator.tsx",
+    "to": "lib/format.ts"
    },
    {
-    "from": "components\\charts\\Waterfall.tsx",
-    "to": "components\\charts\\ChartEmpty.tsx"
+    "from": "components/charts/BandForecast.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\inventory\\AddItemModal.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/charts/BandForecast.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\features\\inventory\\AdjustStockModal.tsx",
-    "to": "components\\features\\inventory\\types.ts"
+    "from": "components/charts/Bars.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\inventory\\AdjustStockModal.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/charts/BreakEvenClock.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\inventory\\InventoryInsights.tsx",
-    "to": "components\\features\\inventory\\types.ts"
+    "from": "components/charts/BreakEvenClock.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\features\\inventory\\InventoryList.tsx",
-    "to": "components\\features\\inventory\\types.ts"
+    "from": "components/charts/BreakEvenLine.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\inventory\\InventoryList.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/charts/BreakEvenLine.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\features\\inventory\\InventoryWorkspace.tsx",
-    "to": "components\\features\\inventory\\AddItemModal.tsx"
+    "from": "components/charts/CashRunway.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\inventory\\InventoryWorkspace.tsx",
-    "to": "components\\features\\inventory\\AdjustStockModal.tsx"
+    "from": "components/charts/CashRunway.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\features\\inventory\\InventoryWorkspace.tsx",
-    "to": "components\\features\\inventory\\InventoryInsights.tsx"
+    "from": "components/charts/ChartEmpty.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "components\\features\\inventory\\InventoryWorkspace.tsx",
-    "to": "components\\features\\inventory\\InventoryList.tsx"
+    "from": "components/charts/Dial.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\inventory\\InventoryWorkspace.tsx",
-    "to": "components\\features\\inventory\\StockAlertsPanel.tsx"
+    "from": "components/charts/HBars.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\inventory\\InventoryWorkspace.tsx",
-    "to": "components\\features\\inventory\\useInventoryWorkspace.ts"
+    "from": "components/charts/HeatGrid.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\inventory\\KitchenStockPanel.tsx",
-    "to": "components\\features\\inventory\\types.ts"
+    "from": "components/charts/MissingFormula.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\inventory\\KitchenStockPanel.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/charts/MissingFormula.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\features\\inventory\\KitchenStockPanel.tsx",
-    "to": "components\\ui\\Toast.tsx"
+    "from": "components/charts/Quadrant.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\inventory\\KitchenStockPanel.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/charts/ShiftTable.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\inventory\\KitchenStockPanel.tsx",
-    "to": "lib\\errors.ts"
+    "from": "components/charts/ShiftTable.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\features\\inventory\\StockAlertsPanel.tsx",
-    "to": "components\\features\\inventory\\types.ts"
+    "from": "components/charts/ShortCount.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\inventory\\VarianceReportPanel.tsx",
-    "to": "components\\features\\inventory\\types.ts"
+    "from": "components/charts/ShortCount.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\features\\inventory\\VarianceReportPanel.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/charts/ShortCount.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "components\\features\\inventory\\useInventoryWorkspace.ts",
-    "to": "components\\features\\inventory\\types.ts"
+    "from": "components/charts/StackedBar.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\inventory\\useInventoryWorkspace.ts",
-    "to": "components\\ui\\Toast.tsx"
+    "from": "components/charts/StockHistory.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\inventory\\useInventoryWorkspace.ts",
-    "to": "lib\\api.ts"
+    "from": "components/charts/StockHistory.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "components\\features\\inventory\\useInventoryWorkspace.ts",
-    "to": "lib\\errors.ts"
+    "from": "components/charts/StockLevel.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\kitchen\\KDSBoard.tsx",
-    "to": "components\\features\\kitchen\\KDSColumn.tsx"
+    "from": "components/charts/TenderMix.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\kitchen\\KDSBoard.tsx",
-    "to": "components\\ui\\Toast.tsx"
+    "from": "components/charts/TenderMix.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\features\\kitchen\\KDSBoard.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/charts/ThreeWayMatch.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\kitchen\\KDSBoard.tsx",
-    "to": "lib\\errors.ts"
+    "from": "components/charts/ThreeWayMatch.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\features\\kitchen\\KDSColumn.tsx",
-    "to": "components\\features\\kitchen\\KDSBoard.tsx"
+    "from": "components/charts/ToleranceCurve.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\kitchen\\KDSColumn.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/charts/ToleranceCurve.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\features\\menu\\AddMenuItemForm.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/charts/Waterfall.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "components\\features\\menu\\AddMenuItemForm.tsx",
-    "to": "components\\ui\\Toast.tsx"
+    "from": "components/features/inventory/AddItemModal.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\features\\menu\\AddMenuItemForm.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/inventory/AdjustStockModal.tsx",
+    "to": "components/features/inventory/types.ts"
    },
    {
-    "from": "components\\features\\menu\\AddMenuItemForm.tsx",
-    "to": "lib\\errors.ts"
+    "from": "components/features/inventory/AdjustStockModal.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\features\\menu\\MenuEditor.tsx",
-    "to": "components\\features\\menu\\AddMenuItemForm.tsx"
+    "from": "components/features/inventory/InventoryInsights.tsx",
+    "to": "components/features/inventory/types.ts"
    },
    {
-    "from": "components\\features\\menu\\MenuEditor.tsx",
-    "to": "components\\features\\menu\\MenuInsightsPanel.tsx"
+    "from": "components/features/inventory/InventoryList.tsx",
+    "to": "components/features/inventory/types.ts"
    },
    {
-    "from": "components\\features\\menu\\MenuEditor.tsx",
-    "to": "components\\features\\menu\\MenuItemRow.tsx"
+    "from": "components/features/inventory/InventoryList.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\features\\menu\\MenuEditor.tsx",
-    "to": "components\\features\\menu\\types.ts"
+    "from": "components/features/inventory/InventoryWorkspace.tsx",
+    "to": "components/features/inventory/AddItemModal.tsx"
    },
    {
-    "from": "components\\features\\menu\\MenuEditor.tsx",
-    "to": "components\\ui\\Toast.tsx"
+    "from": "components/features/inventory/InventoryWorkspace.tsx",
+    "to": "components/features/inventory/AdjustStockModal.tsx"
    },
    {
-    "from": "components\\features\\menu\\MenuEditor.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/inventory/InventoryWorkspace.tsx",
+    "to": "components/features/inventory/InventoryInsights.tsx"
    },
    {
-    "from": "components\\features\\menu\\MenuEditor.tsx",
-    "to": "lib\\errors.ts"
+    "from": "components/features/inventory/InventoryWorkspace.tsx",
+    "to": "components/features/inventory/InventoryList.tsx"
    },
    {
-    "from": "components\\features\\menu\\MenuInsightsPanel.tsx",
-    "to": "components\\features\\menu\\types.ts"
+    "from": "components/features/inventory/InventoryWorkspace.tsx",
+    "to": "components/features/inventory/StockAlertsPanel.tsx"
    },
    {
-    "from": "components\\features\\menu\\MenuItemRow.tsx",
-    "to": "components\\features\\menu\\types.ts"
+    "from": "components/features/inventory/InventoryWorkspace.tsx",
+    "to": "components/features/inventory/useInventoryWorkspace.ts"
    },
    {
-    "from": "components\\features\\menu\\MenuItemRow.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/features/inventory/InventoryWorkspace.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "components\\features\\menu\\MenuReadView.tsx",
-    "to": "components\\features\\menu\\types.ts"
+    "from": "components/features/inventory/InventoryWorkspace.tsx",
+    "to": "lib/tenantHome.ts"
    },
    {
-    "from": "components\\features\\menu\\MenuReadView.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/inventory/KitchenStockPanel.tsx",
+    "to": "components/features/inventory/types.ts"
    },
    {
-    "from": "components\\features\\orders\\OrderInsightsPanel.tsx",
-    "to": "components\\features\\orders\\types.ts"
+    "from": "components/features/inventory/KitchenStockPanel.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\features\\orders\\OrderList.tsx",
-    "to": "components\\features\\orders\\OrderInsightsPanel.tsx"
+    "from": "components/features/inventory/KitchenStockPanel.tsx",
+    "to": "components/ui/Toast.tsx"
    },
    {
-    "from": "components\\features\\orders\\OrderList.tsx",
-    "to": "components\\features\\orders\\types.ts"
+    "from": "components/features/inventory/KitchenStockPanel.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\features\\orders\\OrderList.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/features/inventory/KitchenStockPanel.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\features\\orders\\OrderList.tsx",
-    "to": "components\\ui\\Toast.tsx"
+    "from": "components/features/inventory/StockAlertsPanel.tsx",
+    "to": "components/features/inventory/types.ts"
    },
    {
-    "from": "components\\features\\orders\\OrderList.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/inventory/VarianceReportPanel.tsx",
+    "to": "components/features/inventory/types.ts"
    },
    {
-    "from": "components\\features\\orders\\OrderList.tsx",
-    "to": "lib\\errors.ts"
+    "from": "components/features/inventory/VarianceReportPanel.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\features\\pos\\POSWorkspace.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/features/inventory/useInventoryWorkspace.ts",
+    "to": "components/features/inventory/types.ts"
    },
    {
-    "from": "components\\features\\pos\\POSWorkspace.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/inventory/useInventoryWorkspace.ts",
+    "to": "components/ui/Toast.tsx"
    },
    {
-    "from": "components\\features\\pos\\POSWorkspace.tsx",
-    "to": "lib\\errors.ts"
+    "from": "components/features/inventory/useInventoryWorkspace.ts",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\features\\pos\\POSWorkspace.tsx",
-    "to": "lib\\offlineOrderOutbox.ts"
+    "from": "components/features/inventory/useInventoryWorkspace.ts",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\features\\purchasing\\PurchaseOrdersPanel.tsx",
-    "to": "components\\features\\purchasing\\types.ts"
+    "from": "components/features/kitchen/KDSBoard.tsx",
+    "to": "components/features/kitchen/KDSColumn.tsx"
    },
    {
-    "from": "components\\features\\purchasing\\PurchaseOrdersPanel.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/features/kitchen/KDSBoard.tsx",
+    "to": "components/ui/Toast.tsx"
    },
    {
-    "from": "components\\features\\purchasing\\PurchaseOrdersPanel.tsx",
-    "to": "components\\ui\\Toast.tsx"
+    "from": "components/features/kitchen/KDSBoard.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\features\\purchasing\\PurchaseOrdersPanel.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/kitchen/KDSBoard.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\features\\purchasing\\PurchaseOrdersPanel.tsx",
-    "to": "lib\\errors.ts"
+    "from": "components/features/kitchen/KDSColumn.tsx",
+    "to": "components/features/kitchen/KDSBoard.tsx"
    },
    {
-    "from": "components\\features\\purchasing\\PurchasingWorkspace.tsx",
-    "to": "components\\features\\purchasing\\PurchaseOrdersPanel.tsx"
+    "from": "components/features/kitchen/KDSColumn.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\features\\purchasing\\PurchasingWorkspace.tsx",
-    "to": "components\\features\\purchasing\\ReorderSettingsPanel.tsx"
+    "from": "components/features/menu/AddMenuItemForm.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\features\\purchasing\\PurchasingWorkspace.tsx",
-    "to": "components\\features\\purchasing\\SupplierPanel.tsx"
+    "from": "components/features/menu/AddMenuItemForm.tsx",
+    "to": "components/ui/Toast.tsx"
    },
    {
-    "from": "components\\features\\purchasing\\PurchasingWorkspace.tsx",
-    "to": "components\\features\\purchasing\\types.ts"
+    "from": "components/features/menu/AddMenuItemForm.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\features\\purchasing\\PurchasingWorkspace.tsx",
-    "to": "components\\ui\\Toast.tsx"
+    "from": "components/features/menu/AddMenuItemForm.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\features\\purchasing\\PurchasingWorkspace.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/menu/MenuEditor.tsx",
+    "to": "components/features/menu/AddMenuItemForm.tsx"
    },
    {
-    "from": "components\\features\\purchasing\\PurchasingWorkspace.tsx",
-    "to": "lib\\errors.ts"
+    "from": "components/features/menu/MenuEditor.tsx",
+    "to": "components/features/menu/MenuInsightsPanel.tsx"
    },
    {
-    "from": "components\\features\\purchasing\\ReorderSettingsPanel.tsx",
-    "to": "components\\features\\purchasing\\types.ts"
+    "from": "components/features/menu/MenuEditor.tsx",
+    "to": "components/features/menu/MenuItemRow.tsx"
    },
    {
-    "from": "components\\features\\purchasing\\ReorderSettingsPanel.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/features/menu/MenuEditor.tsx",
+    "to": "components/features/menu/types.ts"
    },
    {
-    "from": "components\\features\\purchasing\\ReorderSettingsPanel.tsx",
-    "to": "components\\ui\\Toast.tsx"
+    "from": "components/features/menu/MenuEditor.tsx",
+    "to": "components/ui/Toast.tsx"
    },
    {
-    "from": "components\\features\\purchasing\\ReorderSettingsPanel.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/menu/MenuEditor.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\features\\purchasing\\ReorderSettingsPanel.tsx",
-    "to": "lib\\errors.ts"
+    "from": "components/features/menu/MenuEditor.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\features\\purchasing\\SupplierPanel.tsx",
-    "to": "components\\features\\purchasing\\types.ts"
+    "from": "components/features/menu/MenuInsightsPanel.tsx",
+    "to": "components/features/menu/types.ts"
    },
    {
-    "from": "components\\features\\purchasing\\SupplierPanel.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/features/menu/MenuItemRow.tsx",
+    "to": "components/features/menu/types.ts"
    },
    {
-    "from": "components\\features\\purchasing\\SupplierPanel.tsx",
-    "to": "components\\ui\\Toast.tsx"
+    "from": "components/features/menu/MenuItemRow.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\features\\purchasing\\SupplierPanel.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/menu/MenuReadView.tsx",
+    "to": "components/features/menu/types.ts"
    },
    {
-    "from": "components\\features\\purchasing\\SupplierPanel.tsx",
-    "to": "lib\\errors.ts"
+    "from": "components/features/menu/MenuReadView.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\features\\reservations\\ReservationForm.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/features/orders/OrderInsightsPanel.tsx",
+    "to": "components/features/orders/types.ts"
    },
    {
-    "from": "components\\features\\reservations\\ReservationList.tsx",
-    "to": "components\\features\\reservations\\types.ts"
+    "from": "components/features/orders/OrderList.tsx",
+    "to": "components/features/orders/OrderInsightsPanel.tsx"
    },
    {
-    "from": "components\\features\\reservations\\ReservationList.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/features/orders/OrderList.tsx",
+    "to": "components/features/orders/types.ts"
    },
    {
-    "from": "components\\features\\reservations\\ReservationsWorkspace.tsx",
-    "to": "components\\features\\reservations\\ReservationForm.tsx"
+    "from": "components/features/orders/OrderList.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\features\\reservations\\ReservationsWorkspace.tsx",
-    "to": "components\\features\\reservations\\ReservationList.tsx"
+    "from": "components/features/orders/OrderList.tsx",
+    "to": "components/ui/Toast.tsx"
    },
    {
-    "from": "components\\features\\reservations\\ReservationsWorkspace.tsx",
-    "to": "components\\features\\reservations\\TablesPanel.tsx"
+    "from": "components/features/orders/OrderList.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "components\\features\\reservations\\ReservationsWorkspace.tsx",
-    "to": "components\\features\\reservations\\types.ts"
+    "from": "components/features/orders/OrderList.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\features\\reservations\\ReservationsWorkspace.tsx",
-    "to": "components\\ui\\Toast.tsx"
+    "from": "components/features/orders/OrderList.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\features\\reservations\\ReservationsWorkspace.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/orders/OrderList.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\features\\reservations\\ReservationsWorkspace.tsx",
-    "to": "lib\\errors.ts"
+    "from": "components/features/orders/OrderList.tsx",
+    "to": "lib/permissions.ts"
    },
    {
-    "from": "components\\features\\reservations\\TablesPanel.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/features/orders/OrderList.tsx",
+    "to": "lib/tenantHome.ts"
    },
    {
-    "from": "components\\features\\sales\\SalesView.tsx",
-    "to": "components\\features\\sales\\ChannelRow.tsx"
+    "from": "components/features/pos/POSWorkspace.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\features\\sales\\SalesView.tsx",
-    "to": "components\\features\\sales\\PaymentRow.tsx"
+    "from": "components/features/pos/POSWorkspace.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\features\\sales\\SalesView.tsx",
-    "to": "components\\ui\\StatCard.tsx"
+    "from": "components/features/pos/POSWorkspace.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\features\\sales\\SalesView.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/pos/POSWorkspace.tsx",
+    "to": "lib/menuQuote.ts"
    },
    {
-    "from": "components\\features\\sales\\SalesView.tsx",
-    "to": "lib\\emptiness.ts"
+    "from": "components/features/pos/POSWorkspace.tsx",
+    "to": "lib/offlineOrderOutbox.ts"
    },
    {
-    "from": "components\\features\\support\\SupportView.tsx",
-    "to": "components\\ui\\FormField.tsx"
+    "from": "components/features/purchasing/PurchaseOrdersPanel.tsx",
+    "to": "components/features/purchasing/types.ts"
    },
    {
-    "from": "components\\features\\support\\SupportView.tsx",
-    "to": "components\\ui\\Toast.tsx"
+    "from": "components/features/purchasing/PurchaseOrdersPanel.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\features\\support\\SupportView.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "components/features/purchasing/PurchaseOrdersPanel.tsx",
+    "to": "components/ui/Toast.tsx"
    },
    {
-    "from": "components\\features\\support\\SupportView.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/purchasing/PurchaseOrdersPanel.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\features\\support\\SupportView.tsx",
-    "to": "lib\\errors.ts"
+    "from": "components/features/purchasing/PurchaseOrdersPanel.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\operations\\AccountantReview.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/purchasing/PurchasingWorkspace.tsx",
+    "to": "components/features/purchasing/PurchaseOrdersPanel.tsx"
    },
    {
-    "from": "components\\operations\\AccountantReview.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/features/purchasing/PurchasingWorkspace.tsx",
+    "to": "components/features/purchasing/ReorderSettingsPanel.tsx"
    },
    {
-    "from": "components\\operations\\EntryWorkspace.tsx",
-    "to": "components\\operations\\AccountantReview.tsx"
+    "from": "components/features/purchasing/PurchasingWorkspace.tsx",
+    "to": "components/features/purchasing/SupplierPanel.tsx"
    },
    {
-    "from": "components\\operations\\EntryWorkspace.tsx",
-    "to": "components\\operations\\StockEntries.tsx"
+    "from": "components/features/purchasing/PurchasingWorkspace.tsx",
+    "to": "components/features/purchasing/types.ts"
    },
    {
-    "from": "components\\operations\\EntryWorkspace.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "components/features/purchasing/PurchasingWorkspace.tsx",
+    "to": "components/ui/Toast.tsx"
    },
    {
-    "from": "components\\operations\\EntryWorkspace.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/purchasing/PurchasingWorkspace.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "components\\operations\\EntryWorkspace.tsx",
-    "to": "lib\\entryQueue.ts"
+    "from": "components/features/purchasing/PurchasingWorkspace.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\operations\\EntryWorkspace.tsx",
-    "to": "lib\\tenantHome.ts"
+    "from": "components/features/purchasing/PurchasingWorkspace.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\operations\\StockEntries.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "components/features/purchasing/ReorderSettingsPanel.tsx",
+    "to": "components/features/purchasing/types.ts"
    },
    {
-    "from": "components\\operations\\StockEntries.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/purchasing/ReorderSettingsPanel.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\operations\\StockEntries.tsx",
-    "to": "lib\\entryQueue.ts"
+    "from": "components/features/purchasing/ReorderSettingsPanel.tsx",
+    "to": "components/ui/Toast.tsx"
    },
    {
-    "from": "components\\operations\\StockEntries.tsx",
-    "to": "lib\\tenantHome.ts"
+    "from": "components/features/purchasing/ReorderSettingsPanel.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\AnswerParts.tsx",
-    "to": "components\\owner\\settings\\SettingsProvider.tsx"
+    "from": "components/features/purchasing/ReorderSettingsPanel.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\owner\\AnswerParts.tsx",
-    "to": "lib\\owner\\ask.ts"
+    "from": "components/features/purchasing/SupplierPanel.tsx",
+    "to": "components/features/purchasing/types.ts"
    },
    {
-    "from": "components\\owner\\AreaBody.tsx",
-    "to": "components\\owner\\StateChip.tsx"
+    "from": "components/features/purchasing/SupplierPanel.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\owner\\AreaBody.tsx",
-    "to": "components\\owner\\areas\\CashArea.tsx"
+    "from": "components/features/purchasing/SupplierPanel.tsx",
+    "to": "components/ui/Toast.tsx"
    },
    {
-    "from": "components\\owner\\AreaBody.tsx",
-    "to": "components\\owner\\areas\\MoneyArea.tsx"
+    "from": "components/features/purchasing/SupplierPanel.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\AreaBody.tsx",
-    "to": "components\\owner\\areas\\PermitsArea.tsx"
+    "from": "components/features/purchasing/SupplierPanel.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\owner\\AreaBody.tsx",
-    "to": "components\\owner\\areas\\SalesArea.tsx"
+    "from": "components/features/reservations/ReservationForm.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\owner\\AreaBody.tsx",
-    "to": "components\\owner\\areas\\StaffArea.tsx"
+    "from": "components/features/reservations/ReservationList.tsx",
+    "to": "components/features/reservations/types.ts"
    },
    {
-    "from": "components\\owner\\AreaBody.tsx",
-    "to": "components\\owner\\areas\\StoreArea.tsx"
+    "from": "components/features/reservations/ReservationList.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\owner\\AreaBody.tsx",
-    "to": "lib\\owner\\blocks.ts"
+    "from": "components/features/reservations/ReservationsWorkspace.tsx",
+    "to": "components/features/reservations/ReservationForm.tsx"
    },
    {
-    "from": "components\\owner\\AreaBody.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/features/reservations/ReservationsWorkspace.tsx",
+    "to": "components/features/reservations/ReservationList.tsx"
    },
    {
-    "from": "components\\owner\\BranchPicker.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/reservations/ReservationsWorkspace.tsx",
+    "to": "components/features/reservations/TablesPanel.tsx"
    },
    {
-    "from": "components\\owner\\BranchReview.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/reservations/ReservationsWorkspace.tsx",
+    "to": "components/features/reservations/types.ts"
    },
    {
-    "from": "components\\owner\\BranchReview.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/features/reservations/ReservationsWorkspace.tsx",
+    "to": "components/ui/Toast.tsx"
    },
    {
-    "from": "components\\owner\\CreativeNote.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/reservations/ReservationsWorkspace.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\ForecastPlanner.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/reservations/ReservationsWorkspace.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\owner\\GrowthTools.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/features/reservations/TablesPanel.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\owner\\GrowthTools.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/features/sales/SalesView.tsx",
+    "to": "components/charts/Bars.tsx"
    },
    {
-    "from": "components\\owner\\OwnerShell.tsx",
-    "to": "components\\NotificationBell.tsx"
+    "from": "components/features/sales/SalesView.tsx",
+    "to": "components/features/sales/ChannelRow.tsx"
    },
    {
-    "from": "components\\owner\\OwnerShell.tsx",
-    "to": "components\\owner\\BranchPicker.tsx"
+    "from": "components/features/sales/SalesView.tsx",
+    "to": "components/features/sales/PaymentRow.tsx"
    },
    {
-    "from": "components\\owner\\OwnerShell.tsx",
-    "to": "components\\owner\\settings\\SettingsProvider.tsx"
+    "from": "components/features/sales/SalesView.tsx",
+    "to": "components/ui/StatCard.tsx"
    },
    {
-    "from": "components\\owner\\OwnerShell.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "components/features/sales/SalesView.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\OwnerShell.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/features/sales/SalesView.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\owner\\OwnerShell.tsx",
-    "to": "lib\\tenantConfig.ts"
+    "from": "components/features/support/SupportView.tsx",
+    "to": "components/ui/FormField.tsx"
    },
    {
-    "from": "components\\owner\\OwnerShell.tsx",
-    "to": "lib\\tenantHome.ts"
+    "from": "components/features/support/SupportView.tsx",
+    "to": "components/ui/Toast.tsx"
    },
    {
-    "from": "components\\owner\\PlanningWorkspace.tsx",
-    "to": "components\\owner\\BranchReview.tsx"
+    "from": "components/features/support/SupportView.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "components\\owner\\PlanningWorkspace.tsx",
-    "to": "components\\owner\\ForecastPlanner.tsx"
+    "from": "components/features/support/SupportView.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\PlanningWorkspace.tsx",
-    "to": "components\\owner\\GrowthTools.tsx"
+    "from": "components/features/support/SupportView.tsx",
+    "to": "lib/errors.ts"
    },
    {
-    "from": "components\\owner\\PlanningWorkspace.tsx",
-    "to": "components\\owner\\StockReview.tsx"
+    "from": "components/operations/AccountantReview.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\PlanningWorkspace.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/operations/AccountantReview.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\owner\\PlanningWorkspace.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/operations/EntryWorkspace.tsx",
+    "to": "components/operations/AccountantReview.tsx"
    },
    {
-    "from": "components\\owner\\SourceUnavailable.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/operations/EntryWorkspace.tsx",
+    "to": "components/operations/StockEntries.tsx"
    },
    {
-    "from": "components\\owner\\StateChip.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/operations/EntryWorkspace.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "components\\owner\\StateChip.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/operations/EntryWorkspace.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\StockReview.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/operations/EntryWorkspace.tsx",
+    "to": "lib/entryQueue.ts"
    },
    {
-    "from": "components\\owner\\StockReview.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/operations/EntryWorkspace.tsx",
+    "to": "lib/tenantHome.ts"
    },
    {
-    "from": "components\\owner\\areas\\CashArea.tsx",
-    "to": "components\\charts\\HeatGrid.tsx"
+    "from": "components/operations/StockEntries.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "components\\owner\\areas\\CashArea.tsx",
-    "to": "components\\charts\\ShiftTable.tsx"
+    "from": "components/operations/StockEntries.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\areas\\CashArea.tsx",
-    "to": "components\\owner\\areas\\MpesaUpload.tsx"
+    "from": "components/operations/StockEntries.tsx",
+    "to": "lib/entryQueue.ts"
    },
    {
-    "from": "components\\owner\\areas\\CashArea.tsx",
-    "to": "components\\owner\\areas\\ui.tsx"
+    "from": "components/operations/StockEntries.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\owner\\areas\\CashArea.tsx",
-    "to": "lib\\owner\\areaTypes.ts"
+    "from": "components/operations/StockEntries.tsx",
+    "to": "lib/tenantHome.ts"
    },
    {
-    "from": "components\\owner\\areas\\CashArea.tsx",
-    "to": "lib\\owner\\blocks.ts"
+    "from": "components/owner/AnswerParts.tsx",
+    "to": "components/owner/settings/SettingsProvider.tsx"
    },
    {
-    "from": "components\\owner\\areas\\CashArea.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/AnswerParts.tsx",
+    "to": "lib/owner/ask.ts"
    },
    {
-    "from": "components\\owner\\areas\\CashArea.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/AreaBody.tsx",
+    "to": "components/owner/StateChip.tsx"
    },
    {
-    "from": "components\\owner\\areas\\MoneyArea.tsx",
-    "to": "components\\charts\\BreakEvenClock.tsx"
+    "from": "components/owner/AreaBody.tsx",
+    "to": "components/owner/areas/CashArea.tsx"
    },
    {
-    "from": "components\\owner\\areas\\MoneyArea.tsx",
-    "to": "components\\charts\\CashRunway.tsx"
+    "from": "components/owner/AreaBody.tsx",
+    "to": "components/owner/areas/MoneyArea.tsx"
    },
    {
-    "from": "components\\owner\\areas\\MoneyArea.tsx",
-    "to": "components\\charts\\Dial.tsx"
+    "from": "components/owner/AreaBody.tsx",
+    "to": "components/owner/areas/PermitsArea.tsx"
    },
    {
-    "from": "components\\owner\\areas\\MoneyArea.tsx",
-    "to": "components\\charts\\StackedBar.tsx"
+    "from": "components/owner/AreaBody.tsx",
+    "to": "components/owner/areas/SalesArea.tsx"
    },
    {
-    "from": "components\\owner\\areas\\MoneyArea.tsx",
-    "to": "components\\charts\\Waterfall.tsx"
+    "from": "components/owner/AreaBody.tsx",
+    "to": "components/owner/areas/StaffArea.tsx"
    },
    {
-    "from": "components\\owner\\areas\\MoneyArea.tsx",
-    "to": "components\\owner\\areas\\ui.tsx"
+    "from": "components/owner/AreaBody.tsx",
+    "to": "components/owner/areas/StoreArea.tsx"
    },
    {
-    "from": "components\\owner\\areas\\MoneyArea.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/owner/AreaBody.tsx",
+    "to": "lib/owner/blocks.ts"
    },
    {
-    "from": "components\\owner\\areas\\MoneyArea.tsx",
-    "to": "lib\\owner\\areaTypes.ts"
+    "from": "components/owner/AreaBody.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "components\\owner\\areas\\MoneyArea.tsx",
-    "to": "lib\\owner\\blocks.ts"
+    "from": "components/owner/BranchPicker.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\areas\\MoneyArea.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/BranchReview.tsx",
+    "to": "components/charts/Bars.tsx"
    },
    {
-    "from": "components\\owner\\areas\\MoneyArea.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/BranchReview.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\areas\\MpesaUpload.tsx",
-    "to": "components\\owner\\areas\\ui.tsx"
+    "from": "components/owner/BranchReview.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\owner\\areas\\MpesaUpload.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/owner/CreativeNote.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\areas\\MpesaUpload.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/CreativeNote.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\owner\\areas\\MpesaUpload.tsx",
-    "to": "lib\\owner\\useOwnerHome.ts"
+    "from": "components/owner/ForecastPlanner.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\areas\\PermitsArea.tsx",
-    "to": "components\\owner\\areas\\ui.tsx"
+    "from": "components/owner/GrowthTools.tsx",
+    "to": "components/charts/Bars.tsx"
    },
    {
-    "from": "components\\owner\\areas\\PermitsArea.tsx",
-    "to": "components\\owner\\settings\\SettingsProvider.tsx"
+    "from": "components/owner/GrowthTools.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\areas\\PermitsArea.tsx",
-    "to": "lib\\owner\\areaTypes.ts"
+    "from": "components/owner/GrowthTools.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\owner\\areas\\PermitsArea.tsx",
-    "to": "lib\\owner\\blocks.ts"
+    "from": "components/owner/InsightNote.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "components\\owner\\areas\\PermitsArea.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/OwnerShell.tsx",
+    "to": "components/NotificationBell.tsx"
    },
    {
-    "from": "components\\owner\\areas\\PermitsArea.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/OwnerShell.tsx",
+    "to": "components/owner/BranchPicker.tsx"
    },
    {
-    "from": "components\\owner\\areas\\SalesArea.tsx",
-    "to": "components\\charts\\BandForecast.tsx"
+    "from": "components/owner/OwnerShell.tsx",
+    "to": "components/owner/settings/SettingsProvider.tsx"
    },
    {
-    "from": "components\\owner\\areas\\SalesArea.tsx",
-    "to": "components\\charts\\Bars.tsx"
+    "from": "components/owner/OwnerShell.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "components\\owner\\areas\\SalesArea.tsx",
-    "to": "components\\charts\\HBars.tsx"
+    "from": "components/owner/OwnerShell.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\owner\\areas\\SalesArea.tsx",
-    "to": "components\\charts\\Quadrant.tsx"
+    "from": "components/owner/OwnerShell.tsx",
+    "to": "lib/tenantConfig.ts"
    },
    {
-    "from": "components\\owner\\areas\\SalesArea.tsx",
-    "to": "components\\owner\\areas\\ui.tsx"
+    "from": "components/owner/OwnerShell.tsx",
+    "to": "lib/tenantHome.ts"
    },
    {
-    "from": "components\\owner\\areas\\SalesArea.tsx",
-    "to": "lib\\owner\\areaTypes.ts"
+    "from": "components/owner/PlanningWorkspace.tsx",
+    "to": "components/owner/BranchReview.tsx"
    },
    {
-    "from": "components\\owner\\areas\\SalesArea.tsx",
-    "to": "lib\\owner\\blocks.ts"
+    "from": "components/owner/PlanningWorkspace.tsx",
+    "to": "components/owner/ForecastPlanner.tsx"
    },
    {
-    "from": "components\\owner\\areas\\SalesArea.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/PlanningWorkspace.tsx",
+    "to": "components/owner/GrowthTools.tsx"
    },
    {
-    "from": "components\\owner\\areas\\SalesArea.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/PlanningWorkspace.tsx",
+    "to": "components/owner/StockReview.tsx"
    },
    {
-    "from": "components\\owner\\areas\\StaffArea.tsx",
-    "to": "components\\charts\\Dial.tsx"
+    "from": "components/owner/PlanningWorkspace.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\areas\\StaffArea.tsx",
-    "to": "components\\charts\\HBars.tsx"
+    "from": "components/owner/PlanningWorkspace.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\owner\\areas\\StaffArea.tsx",
-    "to": "components\\owner\\areas\\ui.tsx"
+    "from": "components/owner/SourceUnavailable.tsx",
+    "to": "context/AuthContext.tsx"
    },
    {
-    "from": "components\\owner\\areas\\StaffArea.tsx",
-    "to": "lib\\owner\\areaTypes.ts"
+    "from": "components/owner/SourceUnavailable.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\areas\\StaffArea.tsx",
-    "to": "lib\\owner\\blocks.ts"
+    "from": "components/owner/StateChip.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\owner\\areas\\StaffArea.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/StateChip.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "components\\owner\\areas\\StaffArea.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/StockReview.tsx",
+    "to": "components/charts/Bars.tsx"
    },
    {
-    "from": "components\\owner\\areas\\StoreArea.tsx",
-    "to": "components\\charts\\HBars.tsx"
+    "from": "components/owner/StockReview.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\areas\\StoreArea.tsx",
-    "to": "components\\owner\\areas\\ui.tsx"
+    "from": "components/owner/StockReview.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\owner\\areas\\StoreArea.tsx",
-    "to": "lib\\owner\\areaTypes.ts"
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "components/charts/CheckMatrix.tsx"
    },
    {
-    "from": "components\\owner\\areas\\StoreArea.tsx",
-    "to": "lib\\owner\\blocks.ts"
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "components/charts/HBars.tsx"
    },
    {
-    "from": "components\\owner\\areas\\StoreArea.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "components/charts/HeatGrid.tsx"
    },
    {
-    "from": "components\\owner\\areas\\StoreArea.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "components/charts/ShiftTable.tsx"
    },
    {
-    "from": "components\\owner\\areas\\ui.tsx",
-    "to": "components\\charts\\ChartEmpty.tsx"
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "components/charts/ShortCount.tsx"
    },
    {
-    "from": "components\\owner\\areas\\ui.tsx",
-    "to": "components\\owner\\StateChip.tsx"
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "components/charts/TenderMix.tsx"
    },
    {
-    "from": "components\\owner\\areas\\ui.tsx",
-    "to": "components\\owner\\settings\\AssumptionChip.tsx"
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "components/charts/ThreeWayMatch.tsx"
    },
    {
-    "from": "components\\owner\\areas\\ui.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "components/charts/ToleranceCurve.tsx"
    },
    {
-    "from": "components\\owner\\ask\\AnswerCard.tsx",
-    "to": "components\\owner\\AnswerParts.tsx"
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "components/owner/areas/MpesaUpload.tsx"
    },
    {
-    "from": "components\\owner\\ask\\AnswerCard.tsx",
-    "to": "components\\owner\\StateChip.tsx"
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "components/owner/areas/ui.tsx"
    },
    {
-    "from": "components\\owner\\ask\\AnswerCard.tsx",
-    "to": "lib\\owner\\ask.ts"
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "lib/owner/areaTypes.ts"
    },
    {
-    "from": "components\\owner\\ask\\AnswerCard.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "lib/owner/blocks.ts"
    },
    {
-    "from": "components\\owner\\home\\AnswersStrip.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\owner\\home\\AnswersStrip.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/areas/CashArea.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "components\\owner\\home\\AreaPanels.tsx",
-    "to": "components\\owner\\AreaBody.tsx"
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "components/charts/BreakEvenClock.tsx"
    },
    {
-    "from": "components\\owner\\home\\AreaPanels.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "components/charts/BreakEvenLine.tsx"
    },
    {
-    "from": "components\\owner\\home\\AreaPanels.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "components/charts/CashRunway.tsx"
    },
    {
-    "from": "components\\owner\\home\\ComingUp.tsx",
-    "to": "components\\owner\\StateChip.tsx"
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "components/charts/Dial.tsx"
    },
    {
-    "from": "components\\owner\\home\\ComingUp.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "components/charts/StackedBar.tsx"
    },
    {
-    "from": "components\\owner\\home\\ComingUp.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "components/charts/Waterfall.tsx"
    },
    {
-    "from": "components\\owner\\home\\CostingYouMoney.tsx",
-    "to": "components\\owner\\settings\\AssumptionChip.tsx"
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "components/owner/areas/ui.tsx"
    },
    {
-    "from": "components\\owner\\home\\CostingYouMoney.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\home\\CostingYouMoney.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "lib/owner/areaTypes.ts"
    },
    {
-    "from": "components\\owner\\home\\CostingYouMoney.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "lib/owner/blocks.ts"
    },
    {
-    "from": "components\\owner\\home\\FirstWeek.tsx",
-    "to": "lib\\owner\\storage.ts"
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\owner\\home\\FirstWeek.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "components\\owner\\home\\HealthStrip.tsx",
-    "to": "components\\owner\\StateChip.tsx"
+    "from": "components/owner/areas/MoneyArea.tsx",
+    "to": "lib/owner/useOwnerHome.ts"
    },
    {
-    "from": "components\\owner\\home\\HealthStrip.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/areas/MpesaUpload.tsx",
+    "to": "components/owner/areas/ui.tsx"
    },
    {
-    "from": "components\\owner\\home\\HealthStrip.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/areas/MpesaUpload.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\home\\Pulse.tsx",
-    "to": "components\\charts\\Bars.tsx"
+    "from": "components/owner/areas/MpesaUpload.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\owner\\home\\Pulse.tsx",
-    "to": "components\\owner\\StateChip.tsx"
+    "from": "components/owner/areas/MpesaUpload.tsx",
+    "to": "lib/owner/useOwnerHome.ts"
    },
    {
-    "from": "components\\owner\\home\\Pulse.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/areas/PermitsArea.tsx",
+    "to": "components/owner/areas/ui.tsx"
    },
    {
-    "from": "components\\owner\\home\\Pulse.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/areas/PermitsArea.tsx",
+    "to": "components/owner/settings/SettingsProvider.tsx"
    },
    {
-    "from": "components\\owner\\home\\ReadNote.tsx",
-    "to": "components\\owner\\StateChip.tsx"
+    "from": "components/owner/areas/PermitsArea.tsx",
+    "to": "lib/api.ts"
    },
    {
-    "from": "components\\owner\\home\\ReadNote.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/areas/PermitsArea.tsx",
+    "to": "lib/owner/areaTypes.ts"
    },
    {
-    "from": "components\\owner\\home\\SourceWaiting.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/areas/PermitsArea.tsx",
+    "to": "lib/owner/blocks.ts"
    },
    {
-    "from": "components\\owner\\home\\SourceWaiting.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/areas/PermitsArea.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\owner\\home\\TargetsOnboarding.tsx",
-    "to": "components\\owner\\settings\\SettingsProvider.tsx"
+    "from": "components/owner/areas/PermitsArea.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "components\\owner\\home\\TargetsOnboarding.tsx",
-    "to": "lib\\owner\\settings.ts"
+    "from": "components/owner/areas/PermitsArea.tsx",
+    "to": "lib/owner/useOwnerHome.ts"
    },
    {
-    "from": "components\\owner\\home\\TargetsOnboarding.tsx",
-    "to": "lib\\owner\\storage.ts"
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "components/charts/BandForecast.tsx"
    },
    {
-    "from": "components\\owner\\reports\\ReportSectionCard.tsx",
-    "to": "components\\charts\\Bars.tsx"
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "components/charts/Bars.tsx"
    },
    {
-    "from": "components\\owner\\reports\\ReportSectionCard.tsx",
-    "to": "components\\owner\\AnswerParts.tsx"
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "components/charts/HBars.tsx"
    },
    {
-    "from": "components\\owner\\reports\\ReportSectionCard.tsx",
-    "to": "components\\owner\\StateChip.tsx"
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "components/charts/Quadrant.tsx"
    },
    {
-    "from": "components\\owner\\reports\\ReportSectionCard.tsx",
-    "to": "components\\owner\\areas\\MoneyArea.tsx"
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "components/owner/areas/ui.tsx"
    },
    {
-    "from": "components\\owner\\reports\\ReportSectionCard.tsx",
-    "to": "lib\\owner\\areaTypes.ts"
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "lib/menuMath.ts"
    },
    {
-    "from": "components\\owner\\reports\\ReportSectionCard.tsx",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "lib/owner/areaTypes.ts"
    },
    {
-    "from": "components\\owner\\reports\\ReportSectionCard.tsx",
-    "to": "lib\\owner\\reportTypes.ts"
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "lib/owner/blocks.ts"
    },
    {
-    "from": "components\\owner\\settings\\AssumptionChip.tsx",
-    "to": "components\\owner\\settings\\SettingsProvider.tsx"
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\owner\\settings\\AssumptionChip.tsx",
-    "to": "lib\\owner\\settings.ts"
+    "from": "components/owner/areas/SalesArea.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "components\\owner\\settings\\AssumptionChip.tsx",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/areas/StaffArea.tsx",
+    "to": "components/charts/Dial.tsx"
    },
    {
-    "from": "components\\owner\\settings\\SettingsProvider.tsx",
-    "to": "components\\owner\\settings\\SettingsSheet.tsx"
+    "from": "components/owner/areas/StaffArea.tsx",
+    "to": "components/charts/HBars.tsx"
    },
    {
-    "from": "components\\owner\\settings\\SettingsProvider.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/owner/areas/StaffArea.tsx",
+    "to": "components/owner/areas/ui.tsx"
    },
    {
-    "from": "components\\owner\\settings\\SettingsProvider.tsx",
-    "to": "lib\\owner\\settings.ts"
+    "from": "components/owner/areas/StaffArea.tsx",
+    "to": "lib/owner/areaTypes.ts"
    },
    {
-    "from": "components\\owner\\settings\\SettingsSheet.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/owner/areas/StaffArea.tsx",
+    "to": "lib/owner/blocks.ts"
    },
    {
-    "from": "components\\owner\\settings\\SettingsSheet.tsx",
-    "to": "lib\\owner\\settings.ts"
+    "from": "components/owner/areas/StaffArea.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\staff\\AttendanceWidget.tsx",
-    "to": "components\\ui\\Toast.tsx"
+    "from": "components/owner/areas/StaffArea.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "components\\staff\\AttendanceWidget.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "components/charts/CustodyZones.tsx"
    },
    {
-    "from": "components\\staff\\AttendanceWidget.tsx",
-    "to": "lib\\errors.ts"
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "components/charts/HBars.tsx"
    },
    {
-    "from": "components\\staff\\TierLayoutShell.tsx",
-    "to": "components\\NotificationBell.tsx"
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "components/charts/MissingFormula.tsx"
    },
    {
-    "from": "components\\staff\\TierLayoutShell.tsx",
-    "to": "components\\PinSetupModal.tsx"
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "components/charts/StockFlow.tsx"
    },
    {
-    "from": "components\\staff\\TierLayoutShell.tsx",
-    "to": "components\\QuickSwitchModal.tsx"
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "components/charts/StockHistory.tsx"
    },
    {
-    "from": "components\\staff\\TierLayoutShell.tsx",
-    "to": "components\\staff\\AttendanceWidget.tsx"
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "components/charts/StockLevel.tsx"
    },
    {
-    "from": "components\\staff\\TierLayoutShell.tsx",
-    "to": "components\\ui\\PageLoader.tsx"
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "components/owner/areas/ui.tsx"
    },
    {
-    "from": "components\\staff\\TierLayoutShell.tsx",
-    "to": "components\\ui\\SkipLink.tsx"
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "lib/owner/areaTypes.ts"
    },
    {
-    "from": "components\\staff\\TierLayoutShell.tsx",
-    "to": "context\\AuthContext.tsx"
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "lib/owner/blocks.ts"
    },
    {
-    "from": "components\\staff\\TierLayoutShell.tsx",
-    "to": "lib\\pathTitle.ts"
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "components\\staff\\TierLayoutShell.tsx",
-    "to": "lib\\permissions.ts"
+    "from": "components/owner/areas/StoreArea.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "context\\AuthContext.tsx",
-    "to": "lib\\api.ts"
+    "from": "components/owner/areas/ui.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "context\\AuthContext.tsx",
-    "to": "lib\\offlineOrderOutbox.ts"
+    "from": "components/owner/areas/ui.tsx",
+    "to": "components/owner/StateChip.tsx"
    },
    {
-    "from": "context\\AuthContext.tsx",
-    "to": "lib\\tokenStore.ts"
+    "from": "components/owner/areas/ui.tsx",
+    "to": "components/owner/settings/AssumptionChip.tsx"
    },
    {
-    "from": "lib\\api.ts",
-    "to": "lib\\tokenStore.ts"
+    "from": "components/owner/areas/ui.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "lib\\entryQueue.ts",
-    "to": "lib\\api.ts"
+    "from": "components/owner/ask/AnswerCard.tsx",
+    "to": "components/owner/AnswerParts.tsx"
    },
    {
-    "from": "lib\\owner\\areaTypes.ts",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/ask/AnswerCard.tsx",
+    "to": "components/owner/InsightNote.tsx"
    },
    {
-    "from": "lib\\owner\\ask.ts",
-    "to": "lib\\owner\\format.ts"
+    "from": "components/owner/ask/AnswerCard.tsx",
+    "to": "components/owner/StateChip.tsx"
    },
    {
-    "from": "lib\\owner\\ask.ts",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/ask/AnswerCard.tsx",
+    "to": "lib/owner/ask.ts"
    },
    {
-    "from": "lib\\owner\\blocks.ts",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/ask/AnswerCard.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "lib\\owner\\format.ts",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/explain/GuideFigures.tsx",
+    "to": "components/charts/ChartEmpty.tsx"
    },
    {
-    "from": "lib\\owner\\reportTypes.ts",
-    "to": "lib\\owner\\ask.ts"
+    "from": "components/owner/explain/GuideFigures.tsx",
+    "to": "components/charts/ShortCount.tsx"
    },
    {
-    "from": "lib\\owner\\reportTypes.ts",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/explain/GuideFigures.tsx",
+    "to": "components/charts/StockHistory.tsx"
    },
    {
-    "from": "lib\\owner\\useOwnerHome.ts",
-    "to": "components\\owner\\settings\\SettingsProvider.tsx"
+    "from": "components/owner/explain/GuideFigures.tsx",
+    "to": "components/charts/ThreeWayMatch.tsx"
    },
    {
-    "from": "lib\\owner\\useOwnerHome.ts",
-    "to": "lib\\api.ts"
+    "from": "components/owner/explain/GuideFigures.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "lib\\owner\\useOwnerHome.ts",
-    "to": "lib\\owner\\types.ts"
+    "from": "components/owner/explain/GuideFigures.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "lib\\tenantConfig.ts",
-    "to": "lib\\tenantHome.ts"
+    "from": "components/owner/explain/HowItWorks.tsx",
+    "to": "components/owner/explain/GuideFigures.tsx"
    },
    {
-    "from": "lib\\tenantHome.ts",
-    "to": "lib\\permissions.ts"
+    "from": "components/owner/explain/HowItWorks.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "lib\\useAiModule.ts",
-    "to": "lib\\api.ts"
+    "from": "components/owner/explain/HowItWorks.tsx",
+    "to": "lib/owner/types.ts"
    },
    {
-    "from": "lib\\useAiModule.ts",
-    "to": "lib\\errors.ts"
+    "from": "components/owner/home/AnswersStrip.tsx",
+    "to": "lib/owner/format.ts"
    },
    {
-    "from": "lib\\useNotifications.ts",
-    "to": "lib\\api.ts"
+    "from": "components/owner/home/AnswersStrip.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/AreaPanels.tsx",
+    "to": "components/owner/AreaBody.tsx"
+   },
+   {
+    "from": "components/owner/home/AreaPanels.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/home/AreaPanels.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/ComingUp.tsx",
+    "to": "components/owner/StateChip.tsx"
+   },
+   {
+    "from": "components/owner/home/ComingUp.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/home/ComingUp.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/CostingYouMoney.tsx",
+    "to": "components/owner/settings/AssumptionChip.tsx"
+   },
+   {
+    "from": "components/owner/home/CostingYouMoney.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/owner/home/CostingYouMoney.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/home/CostingYouMoney.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/FirstWeek.tsx",
+    "to": "lib/owner/storage.ts"
+   },
+   {
+    "from": "components/owner/home/FirstWeek.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/HealthStrip.tsx",
+    "to": "components/owner/StateChip.tsx"
+   },
+   {
+    "from": "components/owner/home/HealthStrip.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/home/HealthStrip.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/Pulse.tsx",
+    "to": "components/charts/Bars.tsx"
+   },
+   {
+    "from": "components/owner/home/Pulse.tsx",
+    "to": "components/owner/StateChip.tsx"
+   },
+   {
+    "from": "components/owner/home/Pulse.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/home/Pulse.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/ReadNote.tsx",
+    "to": "components/owner/StateChip.tsx"
+   },
+   {
+    "from": "components/owner/home/ReadNote.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/SourceWaiting.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/home/SourceWaiting.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/home/TargetsOnboarding.tsx",
+    "to": "components/owner/settings/SettingsProvider.tsx"
+   },
+   {
+    "from": "components/owner/home/TargetsOnboarding.tsx",
+    "to": "lib/owner/settings.ts"
+   },
+   {
+    "from": "components/owner/home/TargetsOnboarding.tsx",
+    "to": "lib/owner/storage.ts"
+   },
+   {
+    "from": "components/owner/reports/ReportSectionCard.tsx",
+    "to": "components/charts/Bars.tsx"
+   },
+   {
+    "from": "components/owner/reports/ReportSectionCard.tsx",
+    "to": "components/owner/AnswerParts.tsx"
+   },
+   {
+    "from": "components/owner/reports/ReportSectionCard.tsx",
+    "to": "components/owner/StateChip.tsx"
+   },
+   {
+    "from": "components/owner/reports/ReportSectionCard.tsx",
+    "to": "components/owner/areas/MoneyArea.tsx"
+   },
+   {
+    "from": "components/owner/reports/ReportSectionCard.tsx",
+    "to": "lib/owner/areaTypes.ts"
+   },
+   {
+    "from": "components/owner/reports/ReportSectionCard.tsx",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "components/owner/reports/ReportSectionCard.tsx",
+    "to": "lib/owner/reportTypes.ts"
+   },
+   {
+    "from": "components/owner/settings/AssumptionChip.tsx",
+    "to": "components/owner/settings/SettingsProvider.tsx"
+   },
+   {
+    "from": "components/owner/settings/AssumptionChip.tsx",
+    "to": "lib/owner/settings.ts"
+   },
+   {
+    "from": "components/owner/settings/AssumptionChip.tsx",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "components/owner/settings/SettingsProvider.tsx",
+    "to": "components/owner/settings/SettingsSheet.tsx"
+   },
+   {
+    "from": "components/owner/settings/SettingsProvider.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/owner/settings/SettingsProvider.tsx",
+    "to": "lib/owner/settings.ts"
+   },
+   {
+    "from": "components/owner/settings/SettingsSheet.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/owner/settings/SettingsSheet.tsx",
+    "to": "lib/owner/settings.ts"
+   },
+   {
+    "from": "components/staff/AttendanceWidget.tsx",
+    "to": "components/ui/Toast.tsx"
+   },
+   {
+    "from": "components/staff/AttendanceWidget.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "components/staff/AttendanceWidget.tsx",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "components/NotificationBell.tsx"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "components/PinSetupModal.tsx"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "components/QuickSwitchModal.tsx"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "components/staff/AttendanceWidget.tsx"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "components/ui/PageLoader.tsx"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "components/ui/SkipLink.tsx"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "context/AuthContext.tsx"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "lib/navActive.ts"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "lib/pathTitle.ts"
+   },
+   {
+    "from": "components/staff/TierLayoutShell.tsx",
+    "to": "lib/permissions.ts"
+   },
+   {
+    "from": "context/AuthContext.tsx",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "context/AuthContext.tsx",
+    "to": "lib/offlineOrderOutbox.ts"
+   },
+   {
+    "from": "context/AuthContext.tsx",
+    "to": "lib/tokenStore.ts"
+   },
+   {
+    "from": "lib/api.ts",
+    "to": "lib/tokenStore.ts"
+   },
+   {
+    "from": "lib/entryQueue.ts",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "lib/offlineOrderOutbox.ts",
+    "to": "lib/menuQuote.ts"
+   },
+   {
+    "from": "lib/owner/areaTypes.ts",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "lib/owner/ask.ts",
+    "to": "lib/owner/format.ts"
+   },
+   {
+    "from": "lib/owner/ask.ts",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "lib/owner/blocks.ts",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "lib/owner/format.ts",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "lib/owner/reportTypes.ts",
+    "to": "lib/owner/ask.ts"
+   },
+   {
+    "from": "lib/owner/reportTypes.ts",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "lib/owner/useOwnerHome.ts",
+    "to": "components/owner/settings/SettingsProvider.tsx"
+   },
+   {
+    "from": "lib/owner/useOwnerHome.ts",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "lib/owner/useOwnerHome.ts",
+    "to": "lib/owner/types.ts"
+   },
+   {
+    "from": "lib/tenantConfig.ts",
+    "to": "lib/tenantHome.ts"
+   },
+   {
+    "from": "lib/tenantHome.ts",
+    "to": "lib/permissions.ts"
+   },
+   {
+    "from": "lib/useAiModule.ts",
+    "to": "lib/api.ts"
+   },
+   {
+    "from": "lib/useAiModule.ts",
+    "to": "lib/errors.ts"
+   },
+   {
+    "from": "lib/useNotifications.ts",
+    "to": "lib/api.ts"
    }
   ]
  }

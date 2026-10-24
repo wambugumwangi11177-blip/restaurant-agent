@@ -1,0 +1,71 @@
+name: Device packages (internal acceptance)
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: 'Existing public HTTPS app origin, e.g. https://your-real-host (no path)'
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  desktop:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: packaging
+    env:
+      LEVIII_APP_URL: ${{ inputs.app_url }}
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: packaging/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm audit --audit-level=high
+      - run: npm run configure
+      - run: npm run desktop:pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LEVIII-desktop-unsigned-${{ matrix.os }}
+          path: packaging/dist/
+          retention-days: 7
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packaging
+    env:
+      LEVIII_APP_URL: ${{ inputs.app_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: packaging/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npm test
+      - run: npm audit --audit-level=high
+      - run: npm run configure
+      - run: npm run android:init
+      - run: npm run android:sync
+      - run: ./gradlew assembleDebug
+        working-directory: packaging/android/android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LEVIII-android-debug-internal-only
+          path: packaging/android/android/app/build/outputs/apk/debug/*.apk
+          retention-days: 7

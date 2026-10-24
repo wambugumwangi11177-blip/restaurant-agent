@@ -7,7 +7,7 @@ import { canRead, type StaffTier } from "@/lib/permissions";
 import { isOwnerAccount } from "@/lib/tenantHome";
 import { kes } from "@/lib/owner/format";
 import { motion, AnimatePresence } from "framer-motion";
-import { ShoppingBag, Banknote, Smartphone, CreditCard, Ban } from "lucide-react";
+import { ShoppingBag, Banknote, CreditCard, Ban } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import FormField from "@/components/ui/FormField";
 import OrderInsightsPanel from "./OrderInsightsPanel";

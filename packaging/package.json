@@ -1,0 +1,62 @@
+{
+  "name": "leviii-packaging",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LEVIII Android and desktop distribution",
+  "author": "LEVIII",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "configure": "node configure.cjs",
+    "test": "node --test tests.cjs",
+    "desktop:pack": "electron-builder --dir",
+    "desktop:release": "electron-builder",
+    "android:init": "cd android && cap add android",
+    "android:sync": "cd android && cap sync android"
+  },
+  "build": {
+    "appId": "com.leviii.restaurant",
+    "productName": "LEVIII",
+    "files": [
+      "desktop/**/*",
+      "app-config.json",
+      "url-policy.cjs",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Office"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.business"
+    }
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/cli": "^8.0.0",
+    "electron": "^42.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "workspaces": [
+    "android"
+  ],
+  "overrides": {
+    "xcode": {
+      "uuid": "^11.1.1"
+    }
+  }
+}

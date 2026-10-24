@@ -10,7 +10,7 @@ _OPERATIONAL = (
     "/orders", "/inventory", "/menu", "/reservations", "/tables", "/attendance",
     "/suppliers", "/purchase-orders", "/stock", "/staff", "/cash-reconciliation",
     "/billing", "/events", "/notifications", "/support", "/webhooks", "/ai",
-    "/fraud", "/enterprise", "/data", "/overview",
+    "/fraud", "/enterprise", "/data", "/overview", "/team-work",
 )
 _LOCAL_FACT_ENDPOINTS = ("/overview", "/reports", "/ai", "/data", "/owner")
 

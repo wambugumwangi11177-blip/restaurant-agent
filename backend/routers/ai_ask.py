@@ -229,35 +229,26 @@ def _answer_stock(db: Session, rid: int, q: str) -> dict:
 
 def _sales_window(q: str):
     """The Nairobi period a simple sales question is about. Unspecified questions stay on the open service day."""
-    from datetime import datetime, time
-    from routers.overview import _EAT_OFFSET
-    from time_utils import service_day, service_sales_window
+    from time_utils import trading_window
     ql = q.lower()
-    # The open service day, not the calendar day: between midnight and 06:00 Nairobi "today" is still the
-    # service that started yesterday, so "yesterday" must be the day before it (otherwise the two overlap).
-    today = service_day()
-
-    def bounds(start_day, end_day, label):
-        start = datetime.combine(start_day, time.min) - _EAT_OFFSET
-        end = datetime.combine(end_day, time.min) - _EAT_OFFSET
-        return start, end, label
-
+    # trading_window is the one sales window. Before 06:00 Nairobi "yesterday" is the day
+    # before the service still open, and this week / this month run through now.
     if "yesterday" in ql:
-        return bounds(today - timedelta(days=1), today, "yesterday")
+        start, end, _day = trading_window("yesterday")
+        return start, end, "yesterday"
     if re.search(r"\blast week\b", ql):
-        this_monday = today - timedelta(days=today.weekday())
-        return bounds(this_monday - timedelta(days=7), this_monday, "last week")
+        start, end, _day = trading_window("last week")
+        return start, end, "last week"
     if re.search(r"\bthis week\b", ql) or re.search(r"\bweek\b", ql):
-        monday = today - timedelta(days=today.weekday())
-        return bounds(monday, today + timedelta(days=1), "this week")
+        start, end, _day = trading_window("this week")
+        return start, end, "this week"
     if re.search(r"\blast month\b", ql):
-        first = today.replace(day=1)
-        previous_end = first
-        previous_start = (first - timedelta(days=1)).replace(day=1)
-        return bounds(previous_start, previous_end, "last month")
+        start, end, _day = trading_window("last month")
+        return start, end, "last month"
     if re.search(r"\bthis month\b", ql) or re.search(r"\bmonth\b", ql):
-        return bounds(today.replace(day=1), today + timedelta(days=1), "this month")
-    start, end, _service = service_sales_window()
+        start, end, _day = trading_window("this month")
+        return start, end, "this month"
+    start, end, _day = trading_window("today")
     return start, end, "today"
 
 
@@ -343,7 +334,10 @@ def _answer_bookings(db: Session, rid: int, q: str) -> dict:
               "why": r.get("detail", "") if isinstance(r, dict) else ""}
              for r in recs[:4]]
     return {
-        "finding": f"Recorded reservation no-show rate: {rate}% across {no_show['total_reservations']} reservations.",
+        "finding": (
+            f"Recorded reservation no-show rate: {rate}% across {no_show['total_reservations']} reservations"
+            f" ({no_show.get('period') or 'all recorded reservations, not one day'})."
+        ),
         "why": "Based on recorded reservation history, not today's expected arrivals. Revenue loss uses estimated spend per guest.",
         "impact": f"Estimated historical no-show revenue: {_money(lost)}" if lost is not None else "Not available",
         "recommendation": steps[0]["action"] if steps else "Review the recorded no-shows before changing booking policies.",

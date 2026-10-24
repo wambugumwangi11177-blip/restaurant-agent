@@ -39,14 +39,14 @@ def _mpesa_summary(b: dict) -> dict:
 
 def _pulse(ctx: OwnerContext, period: str) -> dict:
     overview = _overview()
-    from time_utils import service_sales_window
+    from time_utils import service_sales_window, trading_window
     start, end, _service = service_sales_window(ctx.now)
     today = overview._summarize(ctx.db, ctx.rid, start, end)
     base = ctx.order_state()
     # Same weekday last week, over the same elapsed part of the day: a fair comparison at 3 pm.
     last_week = overview._summarize(ctx.db, ctx.rid, start - timedelta(days=7), end - timedelta(days=7))
     vs = round((today["revenue"] - last_week["revenue"]) / last_week["revenue"] * 100, 1) if last_week["revenue"] else None
-    win_start, win_end = overview._eat_range(period)
+    win_start, win_end, _anchor = trading_window(period, ctx.now)
     window = overview._summarize(ctx.db, ctx.rid, win_start, win_end)
     shifts = ctx.cached("cash_shifts", lambda: areas._shifts(ctx))
     if shifts["state"] in ("no_data", "unavailable"):
@@ -62,7 +62,7 @@ def _pulse(ctx: OwnerContext, period: str) -> dict:
             "vs_same_weekday_pct": vs,
             "vs_same_weekday_state": "live" if vs is not None else "learning",
             "sales_in_period": window["revenue"], "orders_in_period": window["orders"],
-            "trend_7d": [{"date": d["date"], "sales": d["revenue"], "orders": d["orders"]} for d in overview._performance(ctx.db, ctx.rid)["revenue_trend"]],
+            "trend_7d": [{"date": d["date"], "sales": d["revenue"], "orders": d["orders"]} for d in overview._performance(ctx.db, ctx.rid, ctx.now)["revenue_trend"]],
             "breakeven_at": ctx.safe("home.breakeven", lambda: areas.breakeven_summary(ctx)),
             "money_match": {"cash": cash, "mpesa": _mpesa_summary(areas._mpesa(ctx))},
             "freshness": {"latest_sale_at": freshness["latest_order_at"], "data_age_days": freshness["data_age_days"],

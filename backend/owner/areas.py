@@ -119,11 +119,12 @@ def _hhmm(utc_naive) -> str:
 def breakeven_summary(ctx: OwnerContext) -> dict:
     """"Costs covered": today's break-even sales and where today's sales are against it (Home's pulse chip and money.breakeven)."""
     from owner.money.breakeven import break_even, todays_progress
-    today = eat_date(ctx.now)
+    from time_utils import trading_day
+    today = trading_day(ctx.now)
     be = ctx.cached("break_even", lambda: break_even(ctx.db, ctx.rid, today, ctx.settings))
     if be is None:
         return no_data("Costs covered needs your costs and some sales: enter your costs to see when today's sales cover them.")
-    progress = todays_progress(ctx.db, ctx.rid, be["break_even_cents"], today)
+    progress = todays_progress(ctx.db, ctx.rid, be["break_even_cents"], today, ctx.now)
     base = ctx.order_state()
     basis = be["basis"]
     return {**(base if base["state"] != "no_data" else block("live", as_of=ctx.now)),
@@ -256,7 +257,7 @@ def money_area(ctx: OwnerContext) -> tuple[dict, dict]:
 
 def _seven_day(ctx: OwnerContext) -> dict:
     overview = _overview_core(ctx)
-    trend = overview._performance(ctx.db, ctx.rid)["revenue_trend"]
+    trend = overview._performance(ctx.db, ctx.rid, ctx.now)["revenue_trend"]
     total = sum(d["revenue"] for d in trend)
     return {**ctx.order_state(), "days": [{"date": d["date"], "sales": d["revenue"], "orders": d["orders"]} for d in trend],
             "total": round(total, 2)}

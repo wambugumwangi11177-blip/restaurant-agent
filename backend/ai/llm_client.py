@@ -209,6 +209,10 @@ def _get_client():
     global _client
     if _client is not None:
         return _client
+    # Pytest sets this for the duration of a test. A key left in the environment
+    # must not build a live client: the suite stubs or injects a fake instead.
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        raise AssertionError("tests must not call a real LLM")
 
     if _PROVIDER == "openrouter":
         from openai import OpenAI

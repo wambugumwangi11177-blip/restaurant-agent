@@ -20,7 +20,8 @@
 
 import { isStaleMenuQuote } from "@/lib/menuQuote";
 
-// Keep the original database name so orders queued before a rename still replay.
+// IndexedDB is keyed by this name. Renaming it opens an empty database and
+// leaves orders already queued under chakula-offline stranded, so they never replay.
 const DB_NAME = "chakula-offline";
 const DB_VERSION = 1;
 const STORE_NAME = "pending-orders";

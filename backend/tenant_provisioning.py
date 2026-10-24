@@ -72,9 +72,18 @@ def upsert_demo_staff(db: Session, tenant: Tenant, restaurant_id: int | None, *,
         else:
             user.role, user.staff_role, user.is_active = Role.STAFF, staff_role, True
             if password and reset_password:
-                user.hashed_password = auth.get_password_hash(password)
-                user.failed_login_attempts, user.locked_until = 0, None
-                log.append(f"[UPDATED] {key} {email} (password reset from {env_name})")
+                try:
+                    unchanged = auth.verify_password(password, user.hashed_password)
+                except Exception:
+                    unchanged = False
+                # bcrypt uses a new salt on every hash, so re-hashing the same password
+                # looks like a change. Leave it when it already matches.
+                if unchanged:
+                    log.append(f"[EXISTS]  {key} {email} (password unchanged)")
+                else:
+                    user.hashed_password = auth.get_password_hash(password)
+                    user.failed_login_attempts, user.locked_until = 0, None
+                    log.append(f"[UPDATED] {key} {email} (password reset from {env_name})")
             else:
                 log.append(f"[EXISTS]  {key} {email}" + ("" if password else " (password unchanged; " + env_name + " is unset)"))
         if restaurant_id:

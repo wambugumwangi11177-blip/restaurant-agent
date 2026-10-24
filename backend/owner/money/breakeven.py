@@ -75,9 +75,20 @@ def break_even(db: Session, restaurant_id: int, today: date, settings: Settings 
                       "labour_fixed_cents": p["labour_fixed_cents"]}}
 
 
-def todays_progress(db: Session, restaurant_id: int, break_even_cents: int, today: date) -> dict:
-    """Today's paid sales against the break-even: the running total, when it crossed (a naive-UTC datetime) or what is still to go."""
-    lo, hi = nairobi_utc_range(today, today)
+def todays_progress(db: Session, restaurant_id: int, break_even_cents: int, today: date, moment: datetime | None = None) -> dict:
+    """Today's paid sales against the break-even: the running total, when it crossed (a naive-UTC datetime) or what is still to go.
+
+    When `moment` is the open trading day, the window is that service through the moment (rolls at 06:00).
+    A completed day, or a call with no moment, stays the full Nairobi calendar day.
+    """
+    if moment is not None:
+        from time_utils import trading_day, trading_window
+        if trading_day(moment) == today:
+            lo, hi, _day = trading_window("today", moment)
+        else:
+            lo, hi = nairobi_utc_range(today, today)
+    else:
+        lo, hi = nairobi_utc_range(today, today)
     rows = db.query(models.Order.created_at, models.Order.total).filter(
         models.Order.restaurant_id == restaurant_id, models.Order.is_paid.is_(True), models.Order.status != models.OrderStatus.CANCELLED,
         models.Order.created_at >= lo, models.Order.created_at < hi).order_by(models.Order.created_at, models.Order.id).all()

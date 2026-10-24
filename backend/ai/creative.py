@@ -113,7 +113,8 @@ _VOICE_RULES = (
     "(3) State as fact only what the evidence shows. Phrase your own suggestions as ideas to test "
     "(for example 'an idea to test: ...'), never as findings. "
     "(4) Never claim an action was taken, and never describe a planned or unavailable feature as live. "
-    "(5) Output only the finished text: no preamble, no planning, no headings, no notes about the task."
+    "(5) Output only the finished text: no preamble, no planning, no headings, no notes about the task. "
+    "(6) A figure belongs to the period named beside it. Never call a count one day unless that period is one day."
 )
 
 _MODE_INSTRUCTIONS = {
@@ -210,6 +211,17 @@ def keep_grounded_sentences(text: str | None, grounding_source: str) -> tuple[st
 
 _MD_EMPHASIS = re.compile(r"(\*\*|__)(?=\S)(.+?)(?<=\S)\1", re.S)
 _MD_HEADING = re.compile(r"^[ \t]{0,3}#{1,6}[ \t]+", re.M)
+
+
+_PORTION_COUNT = re.compile(r"\s*\(\d+\)\s*$")
+
+
+def clean_dish_name(name: str | None) -> str:
+    """A portion count on a catalog name, such as 'Samosa (2)', is not part of the dish the owner hears.
+
+    A real qualifier stays: 'Nyama choma (goat)'. Used only where a name is handed to a model.
+    """
+    return _PORTION_COUNT.sub("", str(name or "")).strip()
 
 
 def strip_markdown_emphasis(text: str) -> str:

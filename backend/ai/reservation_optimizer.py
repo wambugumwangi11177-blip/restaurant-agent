@@ -155,7 +155,18 @@ def get_reservation_insights(db: Session, restaurant_id: int) -> dict:
         ) if without_deposit else 0,
     }
 
+    dates = [r.reservation_date for r in reservations if r.reservation_date]
+    if not dates:
+        reservation_period = "all recorded reservations, not one service day"
+    else:
+        first, last = min(dates), max(dates)
+        reservation_period = (
+            f"recorded reservations on {first.isoformat()}"
+            if first == last
+            else f"all recorded reservations from {first.isoformat()} to {last.isoformat()}, not one day"
+        )
     no_show_analysis = {
+        "period": reservation_period,
         "total_reservations": total,
         "no_shows": len(no_shows),
         "no_show_rate": no_show_rate,

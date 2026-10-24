@@ -73,6 +73,71 @@ import pytest
 # across tests carries no cross-test contamination risk).
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification-only")
 
+# Provider keys are read at import, and database.py / auth.py call load_dotenv on
+# backend/.env, which would put a real OPENROUTER_API_KEY back into the process.
+# Strip them on every dotenv load, before any test module imports the app.
+_PROVIDER_KEYS = (
+    "OPENROUTER_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GROQ_API_KEY",
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "MISTRAL_API_KEY",
+    "TOGETHER_API_KEY",
+    "COHERE_API_KEY",
+    "FIREWORKS_API_KEY",
+    "XAI_API_KEY",
+    "AZURE_OPENAI_API_KEY",
+)
+
+
+def _strip_provider_keys() -> None:
+    for key in _PROVIDER_KEYS:
+        os.environ.pop(key, None)
+
+
+def _install_dotenv_guard() -> None:
+    import dotenv
+    if getattr(dotenv.load_dotenv, "_leviii_strips_provider_keys", False):
+        return
+    real = dotenv.load_dotenv
+
+    def load_dotenv(*args, **kwargs):
+        loaded = real(*args, **kwargs)
+        _strip_provider_keys()
+        return loaded
+
+    load_dotenv._leviii_strips_provider_keys = True  # type: ignore[attr-defined]
+    dotenv.load_dotenv = load_dotenv
+
+
+def _stub_llm_client() -> None:
+    """No test reaches a paid provider. A test that needs a model monkeypatches the client after this."""
+    _strip_provider_keys()
+    import ai.llm_client as llm_client
+    importlib.reload(llm_client)
+    llm_client._client = None
+
+    def _refuse(*_args, **_kwargs):
+        raise AssertionError("tests must not call a real LLM")
+
+    llm_client.chat_with_usage = _refuse
+    llm_client.chat_with_tools = _refuse
+    llm_client._get_client = _refuse
+
+
+_strip_provider_keys()
+_install_dotenv_guard()
+
+
+@pytest.fixture(autouse=True)
+def _no_live_llm(monkeypatch):
+    for key in _PROVIDER_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    _stub_llm_client()
+    yield
+
 
 @pytest.fixture
 def db_env(tmp_path, monkeypatch):
@@ -126,8 +191,7 @@ def db_env(tmp_path, monkeypatch):
     except Exception:
         pass
     try:
-        import ai.llm_client as llm_client
-        llm_client._client = None
+        _stub_llm_client()
     except Exception:
         pass
 

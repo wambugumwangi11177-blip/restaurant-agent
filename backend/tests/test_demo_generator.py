@@ -372,6 +372,22 @@ def test_same_seed_same_rows_and_a_reseed_neither_duplicates_nor_drifts(db_sessi
     assert db_session.query(models.RestaurantSettings).count() == 2
 
 
+def test_reseed_keeps_the_hash_when_the_env_password_is_unchanged(db_session, monkeypatch):
+    """A staff password from the environment must not rotate on reseed: bcrypt salts a new hash every time."""
+    monkeypatch.setenv("DEMO_RESTAURANT_MANAGER_PASSWORD", "Manager-pass-1")
+    for name in ("DEMO_RESTAURANT_STOREKEEPER_PASSWORD", "DEMO_RESTAURANT_KITCHEN_PASSWORD", "DEMO_RESTAURANT_ACCOUNTANT_PASSWORD"):
+        monkeypatch.delenv(name, raising=False)
+    from tenant_provisioning import ensure_demo_restaurant, upsert_demo_staff
+    ensure_demo_restaurant(db_session, OWNER, PASSWORD)
+    manager = db_session.query(models.User).filter_by(email="manager@demo-restaurant.example").one()
+    first = manager.hashed_password
+    tenant = db_session.query(models.Tenant).one()
+    upsert_demo_staff(db_session, tenant, manager.active_restaurant_id, reset_password=True)
+    assert manager.hashed_password == first
+    import auth
+    assert auth.verify_password("Manager-pass-1", manager.hashed_password)
+
+
 def test_a_different_seed_gives_different_rows(db_session):
     build(db_session, OWNER, PASSWORD, now=NOW, seed=1)
     a = fingerprint(db_session)

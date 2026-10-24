@@ -1,3 +1,15 @@
+# Eleven demo — one trading day, no live model in tests — 23 October 2026
+
+Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes. No new migration.
+
+Local verification of items 1–11 and 13 passed. The follow-ups:
+
+A. The verified local fix (service-day yesterday, daily report label, remaining LEVIII branding, dish delete clears scheduled prices, markdown stripped from AI notes) is on this branch.
+B. Sales "today", "yesterday" and the other sales periods go through one helper, `time_utils.trading_window`. Before 06:00 Nairobi, Home's break-even chip, `sales_in_period` and the last bar of `trend_7d` use that same open service as Overview, the daily report and Ask. Bookings and shifts stay on the calendar day. Checked at 01:30 and 14:00.
+C. Pytest strips provider keys (including after `load_dotenv` reads `backend/.env`) and refuses a live client. A test that needs a model stubs it.
+D. Reseeding demo staff does not re-hash a password that already matches the env value, so the determinism check does not depend on whether those passwords are set locally.
+E. A no-show count given to the narrator names the span it was counted over. Dish names sent to a model drop a trailing portion count (`Samosa (2)`); a qualifier such as `(goat)` stays. The offline queue is still stored as `chakula-offline`.
+
 # Eleven demo — insight beside the figures — 23 October 2026
 
 Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes. No new migration.

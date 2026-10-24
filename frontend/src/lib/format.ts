@@ -32,7 +32,14 @@ export function greetingFor(hour: number): string {
   if (hour < 17) return "Good afternoon";
   return "Good evening";
 }
-export const greetingNow = () => greetingFor(new Date().getHours());
+export const greetingNow = () => greetingFor(Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Nairobi", hour: "2-digit", hourCycle: "h23" }).format(new Date())));
 
 export const fmtDate = () =>
-  new Date().toLocaleDateString("en-KE", { weekday: "long", day: "numeric", month: "long" });
+  new Date().toLocaleDateString("en-KE", { timeZone: "Africa/Nairobi", weekday: "long", day: "numeric", month: "long" });
+
+/** A clock the owner can trust: Nairobi, not the browser's zone. */
+export function nairobiClock(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-KE", {
+    timeZone: "Africa/Nairobi", hour: "numeric", minute: "2-digit", hour12: true,
+  }).format(now).replace(/\s?(am|pm)/i, (m) => ` ${m.trim().toLowerCase()}`);
+}

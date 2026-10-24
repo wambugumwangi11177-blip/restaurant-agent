@@ -15,16 +15,18 @@ interface PurchaseOrdersPanelProps {
     setSubmitting: (v: boolean) => void;
     showToast: (message: string, type?: ToastType) => void;
     fetchAll: () => Promise<void>;
+    /** Accountants review purchasing. They do not receive stock. */
+    canRecordDelivery?: boolean;
 }
 
-export default function PurchaseOrdersPanel({ orders, submitting, setSubmitting, showToast, fetchAll }: PurchaseOrdersPanelProps) {
+export default function PurchaseOrdersPanel({ orders, submitting, setSubmitting, showToast, fetchAll, canRecordDelivery = true }: PurchaseOrdersPanelProps) {
     const [receivingId, setReceivingId] = useState<number | null>(null);
     const [receiveQty, setReceiveQty] = useState("");
 
     const handleApprove = async (poId: number) => {
         setSubmitting(true);
         try {
-            await api.post(`/purchase-orders/${poId}/approve`);
+            await api.post(`/api/v1/purchase-orders/${poId}/approve`);
             showToast("Approved and sent to supplier");
             await fetchAll();
         } catch (err) {
@@ -37,7 +39,7 @@ export default function PurchaseOrdersPanel({ orders, submitting, setSubmitting,
         if (!receiveQty) return;
         setSubmitting(true);
         try {
-            const res = await api.post(`/purchase-orders/${poId}/receive`, {
+            const res = await api.post(`/api/v1/purchase-orders/${poId}/receive`, {
                 quantity_received: parseFloat(receiveQty),
             });
             showToast(
@@ -99,11 +101,13 @@ export default function PurchaseOrdersPanel({ orders, submitting, setSubmitting,
                                     <p className="text-sm text-text">
                                         #{po.id} · {po.quantity_ordered}{po.unit} {po.item_name} from {po.supplier_name}
                                     </p>
+                                    {canRecordDelivery ? (
                                     <button
-                                        onClick={() => { setReceivingId(receivingId === po.id ? null : po.id); setReceiveQty(String(po.quantity_ordered)); }}
+                                        onClick={() => { setReceivingId(receivingId === po.id ? null : po.id); setReceiveQty(""); }}
                                         className="text-[10px] px-2 py-1 rounded bg-surface-hover text-text-muted hover:text-success transition-all">
                                         Record delivery
                                     </button>
+                                    ) : <span className="text-[10px] text-text-dim">Waiting for the store</span>}
                                 </div>
                                 <AnimatePresence>
                                     {receivingId === po.id && (

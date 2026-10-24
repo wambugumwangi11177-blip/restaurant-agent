@@ -141,9 +141,17 @@ def record_operation(body:OperationIn,db:Session=Depends(get_db),user=Depends(re
 @router.get('/entries')
 def operation_history(db:Session=Depends(get_db),user=Depends(readers)):
     rid=get_or_create_restaurant(db,user).id
-    return [{'id':e.id,'kind':e.kind,'at':e.created_at.isoformat(),'by_you':e.user_id==user.id,
-             'undone':bool(e.undone_at),'note':json.loads(e.payload).get('note',''),**json.loads(e.result)}
-            for e in db.query(models.OperationEntry).filter_by(restaurant_id=rid).order_by(models.OperationEntry.id.desc()).limit(40).all()]
+    rows=db.query(models.OperationEntry).filter_by(restaurant_id=rid).order_by(models.OperationEntry.id.desc()).limit(40).all()
+    names={i.id:i.item_name for i in db.query(models.InventoryItem).filter_by(restaurant_id=rid).all()}
+    out=[]
+    for e in rows:
+        payload=json.loads(e.payload)
+        item_id=payload.get('inventory_item_id')
+        out.append({'id':e.id,'kind':e.kind,'at':e.created_at.isoformat(),'by_you':e.user_id==user.id,
+                    'undone':bool(e.undone_at),'note':payload.get('note',''),
+                    'item_name':names.get(item_id) or '','quantity':payload.get('quantity'),'unit':'',
+                    **json.loads(e.result)})
+    return out
 
 
 @router.post('/entries/{entry_id}/undo')

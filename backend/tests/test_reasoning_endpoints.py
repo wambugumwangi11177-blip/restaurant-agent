@@ -129,7 +129,8 @@ def test_grounding_guard_redacts_hallucinated_figure_over_http(client, db_sessio
     assert n["verified"] is False
     assert "987654%" in n["ungrounded_numbers"]
     assert "987654%" not in n["headline"]
-    assert "[unverified]" in n["headline"]
+    assert "[unverified]" not in n["headline"]
+    assert "figures removed" not in n["headline"].lower()
 
 
 def test_narrate_false_skips_llm(client, db_session, monkeypatch):

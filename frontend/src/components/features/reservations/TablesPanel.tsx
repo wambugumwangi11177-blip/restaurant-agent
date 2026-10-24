@@ -21,6 +21,8 @@ interface TablesPanelProps {
     submitting: boolean;
     onAddTable: () => void;
     onTableStatus: (tableId: number, status: string) => void;
+    onTableSave?: (tableId: number, capacity: number) => void;
+    onTableDelete?: (tableId: number) => void;
 }
 
 const TABLE_STATUS_STYLES: Record<string, string> = {
@@ -47,6 +49,8 @@ export default function TablesPanel({
     submitting,
     onAddTable,
     onTableStatus,
+    onTableSave,
+    onTableDelete,
 }: TablesPanelProps) {
     return (
         <AnimatePresence>
@@ -103,6 +107,8 @@ export default function TablesPanel({
                                                 <Brush className="w-2.5 h-2.5 inline" />
                                             </button>
                                         )}
+                                        {onTableSave && <button type="button" className="text-[9px] px-1.5 py-0.5 rounded bg-surface-hover text-text-muted" onClick={() => { const next = window.prompt("Seats", String(t.capacity)); if (next) onTableSave(t.id, Number(next)); }}>Seats</button>}
+                                        {onTableDelete && <button type="button" className="text-[9px] px-1.5 py-0.5 rounded bg-surface-hover text-text-muted" onClick={() => onTableDelete(t.id)}>Remove</button>}
                                     </div>
                                 </div>
                             ))}

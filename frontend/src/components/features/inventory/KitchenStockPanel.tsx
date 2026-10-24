@@ -29,19 +29,20 @@ export default function KitchenStockPanel() {
     const [requestItemId, setRequestItemId] = useState("");
     const [confirmingId, setConfirmingId] = useState<number | null>(null);
     const [confirmQty, setConfirmQty] = useState("");
+    const [results, setResults] = useState<{ id: number; name: string; status: string; counted: string }[]>([]);
 
     const [submitting, setSubmitting] = useState(false);
     const { showToast, toastNode } = useToast();
 
     const fetchData = async () => {
         const [invRes, transfersRes] = await Promise.all([
-            api.get("/inventory/").catch(() => ({ data: [] })),
-            api.get("/stock/transfers").catch(() => ({ data: [] })),
+            api.get("/api/v1/inventory/").catch(() => ({ data: [] })),
+            api.get("/api/v1/stock/transfers").catch(() => ({ data: [] })),
         ]);
         setItems(Array.isArray(invRes.data) ? invRes.data : []);
         setTransfers(
             Array.isArray(transfersRes.data)
-                ? (transfersRes.data as StockTransfer[]).filter((t) => t.status === "requested" || t.status === "pending")
+                ? (transfersRes.data as StockTransfer[]).filter((t) => t.status === "requested" || t.status === "pending" || t.status === "disputed")
                 : []
         );
         setLoading(false);
@@ -53,7 +54,7 @@ export default function KitchenStockPanel() {
         if (!requestItemId) return;
         setSubmitting(true);
         try {
-            await api.post("/stock/transfers/request", {
+            await api.post("/api/v1/stock/transfers/request", {
                 inventory_item_id: parseInt(requestItemId),
             });
             showToast("Request sent to the store");
@@ -70,14 +71,14 @@ export default function KitchenStockPanel() {
         if (!confirmQty) return;
         setSubmitting(true);
         try {
-            const res = await api.post(`/stock/transfers/${transferId}/confirm`, {
+            const res = await api.post(`/api/v1/stock/transfers/${transferId}/confirm`, {
                 confirmed_quantity: parseFloat(confirmQty),
             });
-            showToast(
-                res.data.status === "disputed"
-                    ? "Quantity doesn't match what was sent — flagged for review"
-                    : "Transfer confirmed"
-            );
+            const counted = confirmQty;
+            const status = res.data.status === "disputed" ? "disputed" : "confirmed";
+            const named = items.find((i) => i.id === transfers.find((t) => t.id === transferId)?.inventory_item_id)?.item_name || "This item";
+            setResults((prev) => [{ id: transferId, name: named, status, counted }, ...prev.filter((r) => r.id !== transferId)]);
+            showToast(status === "disputed" ? `${named} disputed — the manager can see it` : `${named} confirmed`);
             setConfirmingId(null);
             setConfirmQty("");
             await fetchData();
@@ -141,6 +142,24 @@ export default function KitchenStockPanel() {
                 </AnimatePresence>
             </div>
 
+            {results.length > 0 && (
+                <div className="bg-surface border border-border rounded-xl" role="status">
+                    <div className="px-4 py-3 border-b border-surface-hover">
+                        <p className="text-xs font-semibold text-text">What you just counted</p>
+                    </div>
+                    <ul className="divide-y divide-surface-hover">
+                        {results.map((r) => (
+                            <li key={r.id} className="px-4 py-3 text-sm text-text">
+                                <b>{r.name}</b> · you counted {r.counted}
+                                <span className={`ml-2 text-xs font-semibold ${r.status === "disputed" ? "text-danger" : "text-success"}`}>
+                                    {r.status === "disputed" ? "Disputed — sent to the manager" : "Confirmed"}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
             {/* Pending requests / awaiting confirmation */}
             <div className="bg-surface border border-border rounded-xl">
                 <div className="px-4 py-3 border-b border-surface-hover">
@@ -152,22 +171,24 @@ export default function KitchenStockPanel() {
                     ) : (
                         transfers.map((t) => {
                             const isRequested = t.status === "requested";
+                            const name = items.find((i) => i.id === t.inventory_item_id)?.item_name || "Item";
+                            const disputed = t.status === "disputed";
                             return (
                                 <div key={t.id} className="px-4 py-3">
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex items-center justify-between gap-3">
                                         <div>
                                             <p className="text-sm text-text">
-                                                #{t.id} · {isRequested ? "requested" : `${t.quantity}${t.unit}`} {t.from_location} → {t.to_location}
+                                                {name}{isRequested ? "" : ` · sent ${t.quantity} ${t.unit}`}
                                             </p>
                                             <p className="text-[10px] text-text-dim mt-0.5">
-                                                {isRequested ? "Waiting for the store to send it" : "Ready to collect — confirm what actually arrived"}
+                                                {isRequested ? "Waiting for the store to send it" : disputed ? "Disputed — the manager has this to look at" : "Count what arrived. The expected amount is not filled in."}
                                             </p>
                                         </div>
-                                        {!isRequested && (
+                                        {!isRequested && !disputed && (
                                             <button
-                                                onClick={() => { setConfirmingId(confirmingId === t.id ? null : t.id); setConfirmQty(String(t.quantity)); }}
+                                                onClick={() => { setConfirmingId(confirmingId === t.id ? null : t.id); setConfirmQty(""); }}
                                                 className="text-[10px] px-2 py-1 rounded bg-surface-hover text-text-muted hover:text-success transition-all">
-                                                Confirm receipt
+                                                Count it
                                             </button>
                                         )}
                                     </div>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { ShieldAlert } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
+import { useAuth } from "@/context/AuthContext";
 import { isHttpStatus } from "@/lib/errors";
 import PurchaseOrdersPanel from "./PurchaseOrdersPanel";
 import ReorderSettingsPanel from "./ReorderSettingsPanel";
@@ -24,6 +25,8 @@ import type { PurchasingItem, Supplier, PurchaseOrder } from "./types";
  * calls back into fetchAll()/showToast() here to keep data + toast in sync.
  */
 export default function PurchasingWorkspace() {
+    const { user } = useAuth();
+    const canRecordDelivery = (user?.staff_role || "").toLowerCase() !== "controller";
     const [suppliers, setSuppliers] = useState<Supplier[] | null>(null);
     const [items, setItems] = useState<PurchasingItem[]>([]);
     const [orders, setOrders] = useState<PurchaseOrder[] | null>(null);
@@ -35,9 +38,9 @@ export default function PurchasingWorkspace() {
     const fetchAll = async () => {
         try {
             const [suppliersRes, itemsRes, ordersRes] = await Promise.all([
-                api.get("/suppliers/"),
-                api.get("/inventory/"),
-                api.get("/purchase-orders/"),
+                api.get("/api/v1/suppliers/"),
+                api.get("/api/v1/inventory/"),
+                api.get("/api/v1/purchase-orders/"),
             ]);
             setSuppliers(suppliersRes.data);
             setItems(Array.isArray(itemsRes.data) ? itemsRes.data : []);
@@ -66,7 +69,7 @@ export default function PurchasingWorkspace() {
             <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-3 text-center">
                 <ShieldAlert className="w-8 h-8 text-text-dim" />
                 <p className="text-sm text-text-muted">
-                    Purchasing is only available to Owners, Managers, Controllers, Supervisors, and Stockkeepers.
+                    Purchasing is only available to Owners, Managers, Accountants, Supervisors, and Storekeepers.
                 </p>
             </div>
         );
@@ -89,6 +92,7 @@ export default function PurchasingWorkspace() {
                 setSubmitting={setSubmitting}
                 showToast={showToast}
                 fetchAll={fetchAll}
+                canRecordDelivery={canRecordDelivery}
             />
 
             <ReorderSettingsPanel

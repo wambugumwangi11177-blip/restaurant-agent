@@ -43,8 +43,13 @@ async def get_reservations(
     if date_filter:
         q = q.filter(models.Reservation.reservation_date == date_filter)
 
+    from sqlalchemy import case
+    from time_utils import eat_date, utcnow
+    today = eat_date(utcnow())
+    upcoming = case((models.Reservation.reservation_date >= today, 0), else_=1)
     reservations = q.order_by(
-        models.Reservation.reservation_date.desc(),
+        upcoming,
+        models.Reservation.reservation_date.asc(),
         models.Reservation.reservation_time.asc(),
     ).limit(200).all()
 

@@ -59,7 +59,7 @@ def test_report_discards_invented_narrative_figures(monkeypatch):
 
 def test_report_keeps_grounded_narrative(monkeypatch):
     assert _narrative(monkeypatch, lambda *a, **k: "Revenue is KSh 500.",
-                      revenue=500, orders=2) == "Revenue is KSh 500."
+                      revenue=500, orders=2) == "Revenue is KES 500."
 
 
 def test_empty_report_does_not_request_speculative_narrative(monkeypatch):
@@ -67,3 +67,10 @@ def test_empty_report_does_not_request_speculative_narrative(monkeypatch):
         raise AssertionError("Empty records do not prove absent customer activity")
 
     assert _narrative(monkeypatch, forbidden, revenue=0, orders=0) is None
+
+
+def test_a_count_of_handovers_pluralises_the_noun_not_the_verb():
+    from owner.report_sections import _check_phrase
+    assert _check_phrase("handover", 2) == "2 handovers that don't match"
+    assert _check_phrase("handover", 1) == "1 handover that doesn't match"
+    assert _check_phrase("missing_stock", 2) == "2 items used more than your sales explain"

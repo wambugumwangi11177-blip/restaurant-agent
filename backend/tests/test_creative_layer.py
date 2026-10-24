@@ -90,7 +90,7 @@ EVIDENCE = json.dumps({"revenue_kes": 500, "orders": 12, "average_order_kes": 42
 def test_invented_figure_drops_only_its_sentence():
     text, dropped = creative.keep_grounded_sentences(
         "Revenue reached KSh 500. Try a 25% discount. Keep the grill warm.", EVIDENCE)
-    assert text == "Revenue reached KSh 500. Keep the grill warm."
+    assert text == "Revenue reached KES 500. Keep the grill warm."
     assert dropped == 1
 
 
@@ -111,7 +111,7 @@ def test_half_dropped_is_kept_more_than_half_is_not():
 def test_bullets_and_lines_survive_filtering():
     text, dropped = creative.keep_grounded_sentences(
         "- Revenue reached KSh 500.\n- Try a 25% discount.\n\n- Keep the grill warm.", EVIDENCE)
-    assert text == "- Revenue reached KSh 500.\n\n- Keep the grill warm."
+    assert text == "- Revenue reached KES 500.\n\n- Keep the grill warm."
     assert dropped == 1
 
 
@@ -124,7 +124,7 @@ def test_empty_and_overlong_text():
 def test_owner_words_count_as_grounding():
     source = EVIDENCE + "\nOur rent is KSh 80,000 a month"
     text, dropped = creative.keep_grounded_sentences("You said KSh 80,000 is the rent.", source)
-    assert text == "You said KSh 80,000 is the rent." and dropped == 0
+    assert text == "You said KES 80,000 is the rent." and dropped == 0
 
 
 def test_reasoning_blocks_are_stripped():
@@ -217,7 +217,7 @@ def test_owner_home_read_is_the_grounded_note(client, db_session, scoped_owner, 
     verify_source(db_session, source)
     add_paid_order(db_session, total_cents=50000)
     body = client.get("/api/v1/owner/home", headers=headers).json()
-    assert "KSh 500" in (body["read"]["text"] or "")
+    assert "KES 500" in (body["read"]["text"] or "")
     assert body["read"]["state"] == "live"
 
 
@@ -239,7 +239,7 @@ def test_home_verified_source_tells_todays_story_from_recorded_figures(
     assert response.status_code == 200, response.text
     body = response.json()
     assert (body["mode"], body["period"]) == ("today_story", "today")
-    assert body["text"] == "Revenue is KSh 500 today. Try a lunch special."
+    assert body["text"] == "Revenue is KES 500 today. Try a lunch special."
     (messages, _), = stub.calls
     evidence = messages[0]["content"]
     assert '"revenue_kes": 500' in evidence and '"paid_orders": 1' in evidence
@@ -284,7 +284,7 @@ def test_yesterdays_story_is_never_served_as_todays(client, db_session, scoped_o
         text="Yesterday was lovely.", evidence_hash="0" * 64, created_at=service_start - timedelta(minutes=10)))
     db_session.commit()
     body = client.get(f"{HOME}?period=today", headers=headers).json()
-    assert body["text"] == "Revenue is KSh 500 today."
+    assert body["text"] == "Revenue is KES 500 today."
     assert len(stub.calls) == 1
     assert db_session.query(models.CreativeTake).count() == 2  # yesterday's row stays as history
 
@@ -554,7 +554,7 @@ def test_os_creative_makes_one_call_over_several_modules(client, db_session, sco
     assert body["creative"] is True and body["llm_used"] is True
     assert body["consulted_modules"] == ["revenue", "menu"]
     # Owner-supplied and evidence figures survive; the invented 25% does not.
-    assert body["answer_text"] == "You mentioned KSh 80,000 in rent. Revenue is KSh 500. Keep the grill warm."
+    assert body["answer_text"] == "You mentioned KES 80,000 in rent. Revenue is KES 500. Keep the grill warm."
     assert body["dropped_sentences"] == 1
     assert db_session.query(models.TokenUsage).one().prompt_version == "owner-os-creative-v1"
 

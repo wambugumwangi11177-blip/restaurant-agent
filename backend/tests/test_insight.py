@@ -115,7 +115,7 @@ def test_ask_insight_calls_sales_and_drops_an_unbacked_figure(db_session, monkey
     assert answer["headline"].startswith("Revenue today is")
     assert answer["insight"]["label"] == insight.LABEL
     assert answer["insight"]["state"] == "live"
-    assert "KSh 500" in answer["insight"]["text"]
+    assert "KES 500" in answer["insight"]["text"]
     assert "999,999" not in answer["insight"]["text"]
     assert answer["insight"]["text"] != answer["headline"]
     results = _tool_results(calls[1])
@@ -183,8 +183,8 @@ def test_home_and_report_keep_their_figures(db_session, monkeypatch):
     home = compose_home(ctx, "today")
     assert home["pulse"]["sales_today"] == 500.0
     assert home["pulse"]["orders_today"] == 1
-    assert home["insight"]["text"] == "Paid sales are KSh 500."
-    assert "Paid sales are KSh 500." not in str(home["pulse"])
+    assert home["insight"]["text"] == "Paid sales are KES 500."
+    assert "Paid sales are KES 500." not in str(home["pulse"])
 
     report = compose_report(ctx, "daily")
     sales = next(section for section in report["sections"] if section["key"] == "sales")

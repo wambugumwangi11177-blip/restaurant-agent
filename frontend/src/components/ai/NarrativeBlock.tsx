@@ -13,7 +13,7 @@
  */
 
 import { useState } from "react";
-import { Sparkles, ShieldCheck, ShieldAlert, ChevronDown } from "lucide-react";
+import { Sparkles, ShieldCheck, ChevronDown } from "lucide-react";
 
 export interface Narrative {
     headline: string;
@@ -27,7 +27,9 @@ export interface Narrative {
 export function NarrativeBlock({ n }: { n?: Narrative }) {
     const [showTrust, setShowTrust] = useState(false);
     if (!n || (!n.headline && (!n.priorities || n.priorities.length === 0))) return null;
-    const redacted = n.ungrounded_numbers?.length || 0;
+    const headline = (n.headline || "").replace(/\[unverified\]/gi, "").replace(/\bfigures removed\b/gi, "").trim();
+    const priorities = (n.priorities || []).map((p) => p.replace(/\[unverified\]/gi, "").trim()).filter((p) => p && !/figures removed/i.test(p));
+    if (!headline && priorities.length === 0) return null;
     return (
         <div className="mb-4 rounded-lg border border-[var(--accent)]/25 bg-[var(--accent)]/[0.04] p-4">
             <div className="flex items-start justify-between gap-3 mb-2">
@@ -35,27 +37,20 @@ export function NarrativeBlock({ n }: { n?: Narrative }) {
                     <Sparkles className="w-4 h-4 text-[var(--accent)]" />
                     <span className="text-xs font-semibold uppercase tracking-wide text-[var(--accent)]">AI reading</span>
                 </div>
-                {n.verified ? (
+                {n.verified && (
                     <span
-                        className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded px-1.5 py-0.5 whitespace-nowrap"
+                        className="flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-500/10 border border-emerald-500/20 rounded px-1.5 py-0.5 whitespace-nowrap"
                         title="Every figure cited was checked against your real numbers"
                     >
                         <ShieldCheck className="w-3 h-3" /> Figures checked
                     </span>
-                ) : (
-                    <span
-                        className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-1.5 py-0.5 whitespace-nowrap"
-                        title={`Unverified figure(s) removed: ${n.ungrounded_numbers.join(", ")}`}
-                    >
-                        <ShieldAlert className="w-3 h-3" /> {redacted} figure{redacted === 1 ? "" : "s"} removed
-                    </span>
                 )}
             </div>
-            {n.headline && <p className="text-sm text-[#e5e5e5] leading-snug">{n.headline}</p>}
-            {n.priorities && n.priorities.length > 0 && (
+            {headline && <p className="text-sm text-text leading-snug">{headline}</p>}
+            {priorities.length > 0 && (
                 <ul className="mt-2 space-y-1">
-                    {n.priorities.map((p, i) => (
-                        <li key={i} className="text-xs text-[#a3a3a3] flex gap-2">
+                    {priorities.map((p, i) => (
+                        <li key={i} className="text-xs text-text-muted flex gap-2">
                             <span className="text-[var(--accent)] flex-shrink-0">•</span>
                             <span>{p}</span>
                         </li>
@@ -88,10 +83,6 @@ export function NarrativeBlock({ n }: { n?: Narrative }) {
                     <p className="text-[11px] text-[#737373] leading-snug flex gap-1.5">
                         <ShieldCheck className="w-3 h-3 flex-shrink-0 mt-0.5 text-emerald-400" />
                         <span><span className="text-[#e5e5e5] font-medium">Figures checked</span> — every number the AI wrote was found in your real data.</span>
-                    </p>
-                    <p className="text-[11px] text-[#737373] leading-snug flex gap-1.5">
-                        <ShieldAlert className="w-3 h-3 flex-shrink-0 mt-0.5 text-amber-400" />
-                        <span><span className="text-[#e5e5e5] font-medium">Figures removed</span> — a number couldn&apos;t be matched to your data, so it was taken out before you saw it.</span>
                     </p>
                 </div>
             )}

@@ -52,17 +52,17 @@ export default function DashboardPage() {
     } | null>(null);
 
     useEffect(() => {
-        api.get("/ai/dashboard")
+        api.get("/api/v1/ai/dashboard")
             .then((r) => setData(r.data))
             .catch(() => { })
             .finally(() => setLoading(false));
-        api.get("/ai/trust-stats")
+        api.get("/api/v1/ai/trust-stats")
             .then((r) => setTrustStats(r.data))
             .catch(() => { });
         // "What your AI did" launchpad — narrate=false keeps it cheap and instant.
         Promise.all([
-            api.get("/ai/roi?narrate=false").catch(() => null),
-            api.get("/ai/marketing?narrate=false").catch(() => null),
+            api.get("/api/v1/ai/roi?narrate=false").catch(() => null),
+            api.get("/api/v1/ai/marketing?narrate=false").catch(() => null),
         ]).then(([roi, mkt]) => {
             const rd = roi?.data;
             const md = mkt?.data;
@@ -84,7 +84,7 @@ export default function DashboardPage() {
     }, []);
 
     const getGreeting = () => {
-        const h = new Date().getHours();
+        const h = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Nairobi", hour: "2-digit", hourCycle: "h23" }).format(new Date()));
         if (h < 12) return "Good morning";
         if (h < 17) return "Good afternoon";
         return "Good evening";

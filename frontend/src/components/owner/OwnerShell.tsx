@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { FileText, Home, MessageCircle, Settings2 } from "lucide-react";
+import { FileText, Home, LogOut, MessageCircle, Settings2 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import BranchPicker from "@/components/owner/BranchPicker";
 import SettingsProvider from "@/components/owner/settings/SettingsProvider";
@@ -25,7 +25,7 @@ export const TABS = [
 export default function OwnerShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const owner = isOwnerAccount(user);
   useEffect(() => {
     if (isLoading) return;
@@ -47,7 +47,14 @@ export default function OwnerShell({ children }: { children: React.ReactNode }) 
           <p className="mb-2 inline-flex max-w-full rounded-full border border-[hsl(43_76%_57_/.45)] bg-[hsl(43_76%_57_/.12)] px-3 py-1 text-[11px] text-[var(--v-muted-foreground)]">{config.banner}</p>
         )}
         <div><BranchPicker /></div>
-        <div className="flex flex-wrap gap-4 text-sm print:hidden"><Link className="inline-flex min-h-11 items-center underline" href="/entries">Team entries</Link><Link className="inline-flex min-h-11 items-center underline" href="/planning">Kitchen & money tools</Link></div>
+        <div className="flex flex-wrap items-center gap-4 text-sm print:hidden">
+          <Link className="inline-flex min-h-11 items-center underline" href="/entries">Team entries</Link>
+          <Link className="inline-flex min-h-11 items-center underline" href="/planning">Kitchen & money tools</Link>
+          <Link className="inline-flex min-h-11 items-center underline" href="/home#how">How LEVIII works</Link>
+          <button type="button" onClick={() => { logout(); router.push("/login"); }} className="inline-flex min-h-11 items-center gap-1.5 font-semibold">
+            <LogOut size={15} aria-hidden /> Log out
+          </button>
+        </div>
         <nav aria-label="Owner pages" className="mt-3 hidden gap-1 md:flex print:hidden">
           {tabs.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} aria-current={isActive(href) ? "page" : undefined}

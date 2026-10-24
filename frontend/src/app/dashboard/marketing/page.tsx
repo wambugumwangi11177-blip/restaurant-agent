@@ -18,7 +18,7 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { formatKES } from "@/lib/format";
+import { formatKES, nairobiClock } from "@/lib/format";
 import { HowItWorks } from "@/components/ai/HowItWorks";
 import { NarrativeBlock, type Narrative } from "@/components/ai/NarrativeBlock";
 import {
@@ -132,7 +132,7 @@ export default function MarketingPage() {
         setLoading(true);
         setError("");
         try {
-            const res = await api.get("/ai/marketing");
+            const res = await api.get("/api/v1/ai/marketing");
             setData(res.data);
             setLastUpdated(new Date());
         } catch (e) {
@@ -196,7 +196,7 @@ export default function MarketingPage() {
                 </div>
                 <button onClick={fetchData} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface border border-border text-text-muted hover:text-text text-sm transition-colors">
                     <RefreshCw className="w-3.5 h-3.5" />
-                    <span>{lastUpdated ? lastUpdated.toLocaleTimeString() : "Refresh"}</span>
+                    <span>{lastUpdated ? nairobiClock(lastUpdated) : "Refresh"}</span>
                 </button>
             </div>
 

@@ -17,7 +17,7 @@ const NAV = [
 
 export default function ControllerLayout({ children }: { children: React.ReactNode }) {
     return (
-        <TierLayoutShell tier="controller" tierLabel="Controller" navItems={NAV}>
+        <TierLayoutShell tier="controller" tierLabel="Accountant" navItems={NAV}>
             {children}
         </TierLayoutShell>
     );

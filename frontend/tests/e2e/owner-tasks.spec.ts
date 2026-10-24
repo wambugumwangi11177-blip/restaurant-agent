@@ -244,7 +244,7 @@ test.describe("the owner of a brand-new restaurant", () => {
     const problems = watch(page);
     await signIn(page, "New Kitchen");
     await expect(page.getByRole("heading", { name: "Set your targets" })).toBeVisible();
-    await expect(page.getByText(/day 1 of 6/)).toBeVisible();
+    await expect(page.getByText(/day 1 of 7/)).toBeVisible();
     for (const answer of ["cash", "leak", "bill"] as const) await expect(page.locator(`[data-answer=${answer}]`)).toBeVisible();
     await expect(page.locator("[data-answer=bill]")).toContainText(/No bills/);
     await expect(page.getByRole("region", { name: /My Money, opens on day 2/ })).toBeVisible();

@@ -48,7 +48,8 @@ def test_invented_percentage_is_redacted_and_reported():
     assert out["verified"] is False
     assert "23%" in out["ungrounded_numbers"]
     assert "23%" not in out["headline"]
-    assert grounding._REDACTION in out["headline"]
+    assert grounding._REDACTION not in out["headline"]
+    assert out["headline"] == ""
 
 
 def test_rounded_figure_grounds_against_source():
@@ -137,7 +138,8 @@ def test_wrong_negative_is_still_redacted():
     out = _verify_neg("Revenue down 23% this month.")
     assert out["verified"] is False
     assert "23%" in out["ungrounded_numbers"]
-    assert grounding._REDACTION in out["headline"]
+    assert grounding._REDACTION not in out["headline"]
+    assert "23%" not in out["headline"]
 
 
 def test_wrong_explicit_negative_is_still_redacted():
@@ -230,19 +232,20 @@ def test_explicit_count_field_still_grounds():
 def test_redact_free_text_keeps_grounded_and_redacts_invented():
     grounded = grounding.collect_payload_numbers("Today: KES 25,000 across 40 orders")
     clean, ungrounded = grounding.redact_free_text(
-        "You made KES 25,000 today, up 99% on yesterday.", grounded
+        "You made KES 25,000 today. Up 99% on yesterday.", grounded
     )
     assert "KES 25,000" in clean
     assert "99%" not in clean
     assert "99%" in ungrounded
-    assert grounding._REDACTION in clean
+    assert grounding._REDACTION not in clean
 
 
 def test_redact_free_text_with_no_grounding_redacts_all_figures():
     # Model answered without calling a tool: any cited figure is ungrounded.
     clean, ungrounded = grounding.redact_free_text("Revenue was KES 88,000.", set())
     assert "88,000" not in clean
-    assert grounding._REDACTION in clean
+    assert grounding._REDACTION not in clean
+    assert clean == ""
 
 
 def test_redact_free_text_leaves_qualitative_text_untouched():

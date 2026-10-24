@@ -17,7 +17,7 @@ export default function VarianceReportPanel() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.get("/stock/variance-report").then((res) => setVariance(res.data)).catch(() => setVariance(null)).finally(() => setLoading(false));
+        api.get("/api/v1/stock/variance-report").then((res) => setVariance(res.data)).catch(() => setVariance(null)).finally(() => setLoading(false));
     }, []);
 
     if (loading) {

@@ -466,7 +466,7 @@ _SYSTEM = (
     "Use only figures that appear in tool results. Never calculate, round differently or invent a number. "
     "Every figure names the period it belongs to. Do not call a figure one day unless its period says it is one day. "
     "State as fact only what a tool result shows. Phrase your own suggestion as 'an idea to test'. "
-    "Currency is KSh. Write 40-90 words of prose. No heading, no preamble, no list of the rules."
+    "Currency is KES, never KSh or dollars. Write 40-90 words of prose. No heading, no preamble, no list of the rules."
 )
 
 

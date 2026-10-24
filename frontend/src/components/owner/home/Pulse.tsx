@@ -39,7 +39,7 @@ export default function Pulse({ pulse, period }: { pulse: PulseData; period: Own
       </div>
 
       <div className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-5">
-        <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)]">The last 7 days</p>
+        <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)]">Each day</p>
         <Bars bars={bars} label="Sales for each of the last 7 days" format={kesShort} state={pulse.trend_7d.some((d) => d.sales > 0) ? undefined : "no_data"} reason="No sales recorded in the last 7 days." />
       </div>
 

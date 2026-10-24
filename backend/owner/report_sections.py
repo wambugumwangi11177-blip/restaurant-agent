@@ -52,6 +52,16 @@ def _month_end(first: date) -> date:
     return (first.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
 
 
+def _check_phrase(key: str, n: int) -> str:
+    """Count plus the thing, with a real plural. '2 handover that doesn't matchs' was the old bug."""
+    if key == "handover":
+        return f"{n} handover that doesn't match" if n == 1 else f"{n} handovers that don't match"
+    if key == "missing_stock":
+        return f"{n} item used more than your sales explain" if n == 1 else f"{n} items used more than your sales explain"
+    words = {"unusual_cancelling": "unusual cancelling", "unusual_refunds": "unusual refunds", "late_night": "late-night activity"}
+    return f"{n} {words.get(key, key)}"
+
+
 def _window_text(period: str, month: date | None, today: date) -> str:
     if period == "daily":
         return "Today"
@@ -122,12 +132,10 @@ def things_to_check(ctx: OwnerContext, period: str, month: date | None) -> dict:
     anchor = fraud if not _empty(fraud) else missing if not _empty(missing) else handovers
     if _empty(anchor) and not rows:
         return _nothing(anchor, window, "Nothing is recorded yet to check.")
-    words = {"unusual_cancelling": "unusual cancelling", "unusual_refunds": "unusual refunds", "late_night": "late-night activity",
-             "missing_stock": "item used more than your sales explain", "handover": "handover that doesn't match"}
     kinds: dict[str, int] = {}
     for r in rows:
         kinds[r["key"]] = kinds.get(r["key"], 0) + 1
-    head = (f"{_plural(len(rows), 'thing')} to check: " + "; ".join(f"{n} {words[k]}" + ("s" if n != 1 and k in ("missing_stock", "handover") else "") for k, n in kinds.items()) + "."
+    head = (f"{_plural(len(rows), 'thing')} to check: " + "; ".join(_check_phrase(k, n) for k, n in kinds.items()) + "."
             if rows else "Nothing to check: no unusual cancelling, no missing stock, no handover that doesn't match.")
     return _done(anchor, window, head, rows, [assumption("These are things to check, not conclusions about anyone.")])
 

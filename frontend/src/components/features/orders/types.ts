@@ -22,6 +22,7 @@ export interface OrderForecastDay {
     predicted?: number;
     amount?: number;
     day_name?: string;
+    date?: string;
 }
 
 export interface OrderAnomaly {

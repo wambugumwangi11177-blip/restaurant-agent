@@ -27,7 +27,7 @@ export default function MenuReadView() {
     const [ingredientsByItem, setIngredientsByItem] = useState<Record<number, RecipeIngredient[]>>({});
 
     useEffect(() => {
-        api.get("/menu/").then((res) => setItems(res.data || [])).finally(() => setLoading(false));
+        api.get("/api/v1/menu/").then((res) => setItems(res.data || [])).finally(() => setLoading(false));
     }, []);
 
     const toggle = async (itemId: number) => {
@@ -38,7 +38,7 @@ export default function MenuReadView() {
         setOpenId(itemId);
         if (!ingredientsByItem[itemId]) {
             try {
-                const res = await api.get(`/menu/${itemId}/ingredients`);
+                const res = await api.get(`/api/v1/menu/${itemId}/ingredients`);
                 setIngredientsByItem((prev) => ({ ...prev, [itemId]: res.data }));
             } catch {
                 setIngredientsByItem((prev) => ({ ...prev, [itemId]: [] }));

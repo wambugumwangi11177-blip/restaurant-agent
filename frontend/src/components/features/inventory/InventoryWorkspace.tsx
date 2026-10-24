@@ -1,6 +1,8 @@
 "use client";
 
 import { Plus } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { isOwnerAccount } from "@/lib/tenantHome";
 import { useInventoryWorkspace } from "./useInventoryWorkspace";
 import AddItemModal from "./AddItemModal";
 import InventoryList from "./InventoryList";
@@ -28,6 +30,8 @@ import StockAlertsPanel from "./StockAlertsPanel";
  */
 export default function InventoryWorkspace() {
     const w = useInventoryWorkspace();
+    const { user } = useAuth();
+    const canStructure = isOwnerAccount(user) || user?.staff_role === "manager";
 
     if (w.loading) {
         return (
@@ -97,6 +101,8 @@ export default function InventoryWorkspace() {
                 submitting={w.submitting}
                 onReceive={w.handleReceive}
                 onAdjust={w.handleAdjust}
+                onRename={canStructure ? w.handleRenameItem : undefined}
+                onDelete={canStructure ? w.handleDeleteItem : undefined}
             />
 
             {/* Store <-> kitchen transfers + physical counts. Only shown to

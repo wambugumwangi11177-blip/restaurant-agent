@@ -152,16 +152,19 @@ export default function AdjustStockModal({
                     ) : (
                         transfers.map((t) => {
                             const isRequested = t.status === "requested";
+                            const disputed = t.status === "disputed";
                             const isFulfilling = fulfillingId === t.id;
+                            const name = items.find((i) => i.id === t.inventory_item_id)?.item_name || "Item";
                             return (
                                 <div key={t.id} className="px-4 py-3">
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex items-center justify-between gap-3">
                                         <div>
                                             <p className="text-sm text-text">
-                                                #{t.id} · {isRequested ? "requested" : `${t.quantity}${t.unit}`} {t.from_location} → {t.to_location}
+                                                {name}{isRequested ? " · requested" : ` · ${t.quantity} ${t.unit}`}
+                                                {disputed && <span className="ml-2 text-xs font-semibold text-danger">Disputed</span>}
                                             </p>
                                             <p className="text-[10px] text-text-dim mt-0.5">
-                                                {isRequested ? "Waiting for the store to send it" : "A different person in the kitchen must confirm what arrived."}
+                                                {isRequested ? "Waiting for the store to send it" : disputed ? `Kitchen counted ${t.confirmed_quantity ?? "a different amount"} ${t.unit}. Look at this handover.` : "A different person in the kitchen must confirm what arrived."}
                                             </p>
                                         </div>
                                         {isRequested ? (

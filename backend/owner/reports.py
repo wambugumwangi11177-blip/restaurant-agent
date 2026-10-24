@@ -57,8 +57,10 @@ def _sales(ctx: OwnerContext, period: str, month: date | None = None) -> dict:
     if not core["orders"]:
         return no_data("No sales recorded in this period.", sales=0.0, orders=0)
     average = round(core["revenue"] / core["orders"], 2)
-    return {**base, "sales": core["revenue"], "orders": core["orders"], "average_order": average,
-            "headline": f"You sold {kes_text(core['revenue'])} from {core['orders']} orders, an average of {kes_text(average)} an order.",
+    orders = core["orders"]
+    order_word = "order" if orders == 1 else "orders"
+    return {**base, "sales": core["revenue"], "orders": orders, "average_order": average,
+            "headline": f"You sold {kes_text(core['revenue'])} from {orders:,} {order_word}, an average of {kes_text(average)} an order.",
             "rows": [row("sales", "Sales", core["revenue"], "kes"), row("orders", "Orders", core["orders"], "count"), row("average_order", "Average order", average, "kes")],
             "assumptions": [assumption("Sales are paid orders that were not cancelled, by the time they were taken. This is not a payment cash-flow report.")],
             "basis": "Paid orders that were not cancelled, by the time they were taken. Not a payment cash-flow report."}

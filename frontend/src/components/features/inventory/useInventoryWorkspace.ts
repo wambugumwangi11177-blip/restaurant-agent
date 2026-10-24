@@ -61,18 +61,16 @@ export function useInventoryWorkspace() {
 
     const fetchData = async () => {
         const [invRes, aiRes, transfersRes, varianceRes] = await Promise.all([
-            api.get("/inventory/").catch(() => ({ data: [] })),
-            api.get("/ai/inventory-predictions").catch(() => ({ data: null })),
-            api.get("/stock/transfers").catch(() => null),
-            api.get("/stock/variance-report").catch(() => null),
+            api.get("/api/v1/inventory/").catch(() => ({ data: [] })),
+            api.get("/api/v1/ai/inventory-predictions").catch(() => ({ data: null })),
+            api.get("/api/v1/stock/transfers").catch(() => null),
+            api.get("/api/v1/stock/variance-report").catch(() => null),
         ]);
         setItems(Array.isArray(invRes.data) ? invRes.data : []);
         setAiData(aiRes.data);
-        // Only the still-actionable statuses belong in this compact panel —
-        // confirmed/disputed history isn't shown here.
         setTransfers(
             transfersRes
-                ? (transfersRes.data as StockTransfer[]).filter((t) => t.status === "requested" || t.status === "pending")
+                ? (transfersRes.data as StockTransfer[]).filter((t) => t.status === "requested" || t.status === "pending" || t.status === "disputed")
                 : null
         );
         setVariance(varianceRes ? varianceRes.data : null);
@@ -85,7 +83,7 @@ export function useInventoryWorkspace() {
         if (!newName) return;
         setSubmitting(true);
         try {
-            await api.post("/inventory/", {
+            await api.post("/api/v1/inventory/", {
                 item_name: newName,
                 quantity: parseFloat(newQty) || 0,
                 unit: newUnit,
@@ -106,7 +104,7 @@ export function useInventoryWorkspace() {
         if (!receiveQty) return;
         setSubmitting(true);
         try {
-            const res = await api.post(`/inventory/${itemId}/receive`, {
+            const res = await api.post(`/api/v1/inventory/${itemId}/receive`, {
                 quantity: parseFloat(receiveQty),
                 cost_per_unit: receiveCost ? parseFloat(receiveCost) : null,
                 supplier: receiveSupplier,
@@ -125,7 +123,7 @@ export function useInventoryWorkspace() {
         if (!adjustQty) return;
         setSubmitting(true);
         try {
-            const res = await api.post(`/inventory/${itemId}/adjust`, {
+            const res = await api.post(`/api/v1/inventory/${itemId}/adjust`, {
                 quantity: -Math.abs(parseFloat(adjustQty)),
                 reason: adjustReason,
             });
@@ -143,7 +141,7 @@ export function useInventoryWorkspace() {
         if (!transferItemId || !transferQty) return;
         setSubmitting(true);
         try {
-            await api.post("/stock/transfers", {
+            await api.post("/api/v1/stock/transfers", {
                 inventory_item_id: parseInt(transferItemId),
                 quantity: parseFloat(transferQty),
                 from_location: "store",
@@ -163,7 +161,7 @@ export function useInventoryWorkspace() {
         if (!requestItemId) return;
         setSubmitting(true);
         try {
-            await api.post("/stock/transfers/request", {
+            await api.post("/api/v1/stock/transfers/request", {
                 inventory_item_id: parseInt(requestItemId),
                 from_location: "store",
                 to_location: "kitchen",
@@ -182,7 +180,7 @@ export function useInventoryWorkspace() {
         if (!fulfillQty) return;
         setSubmitting(true);
         try {
-            await api.post(`/stock/transfers/${transferId}/fulfil`, {
+            await api.post(`/api/v1/stock/transfers/${transferId}/fulfil`, {
                 quantity: parseFloat(fulfillQty),
             });
             showToast("Marked as sent — awaiting confirmation");
@@ -199,7 +197,7 @@ export function useInventoryWorkspace() {
         if (!countItemId || !countQty) return;
         setSubmitting(true);
         try {
-            const res = await api.post("/stock/counts", {
+            const res = await api.post("/api/v1/stock/counts", {
                 inventory_item_id: parseInt(countItemId),
                 counted_quantity: parseFloat(countQty),
             });
@@ -210,6 +208,33 @@ export function useInventoryWorkspace() {
             await fetchData();
         } catch (err) {
             showToast(getErrorMessage(err, "Failed to record count"), "error");
+        }
+        setSubmitting(false);
+    };
+
+    const handleRenameItem = async (itemId: number, itemName: string) => {
+        const next = window.prompt("Item name", itemName);
+        if (!next || next === itemName) return;
+        setSubmitting(true);
+        try {
+            await api.put(`/api/v1/inventory/${itemId}`, { item_name: next });
+            showToast("Item renamed");
+            await fetchData();
+        } catch (err) {
+            showToast(getErrorMessage(err, "Could not rename this item"), "error");
+        }
+        setSubmitting(false);
+    };
+
+    const handleDeleteItem = async (itemId: number, itemName: string) => {
+        if (!window.confirm(`Remove ${itemName}? Items with a stock history stay.`)) return;
+        setSubmitting(true);
+        try {
+            await api.delete(`/api/v1/inventory/${itemId}`);
+            showToast("Item removed");
+            await fetchData();
+        } catch (err) {
+            showToast(getErrorMessage(err, "Could not remove this item"), "error");
         }
         setSubmitting(false);
     };
@@ -234,7 +259,7 @@ export function useInventoryWorkspace() {
         showAdjustForm, setShowAdjustForm,
         receiveQty, setReceiveQty, receiveSupplier, setReceiveSupplier,
         adjustQty, setAdjustQty, adjustReason, setAdjustReason,
-        handleReceive, handleAdjust,
+        handleReceive, handleAdjust, handleRenameItem, handleDeleteItem,
         // transfers
         transfers,
         showRequestForm, setShowRequestForm, requestItemId, setRequestItemId,

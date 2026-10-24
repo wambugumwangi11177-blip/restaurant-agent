@@ -1,8 +1,8 @@
 {
-    "name": "LEVIII — Restaurant Manager",
+    "name": "LEVIII",
     "short_name": "LEVIII",
-    "description": "Restaurant management for ordering, POS, kitchen display, inventory & analytics",
-    "start_url": "/dashboard",
+    "description": "LEVIII for the restaurant owner and the team",
+    "start_url": "/",
     "display": "standalone",
     "background_color": "#0a0a0a",
     "theme_color": "#0a0a0a",

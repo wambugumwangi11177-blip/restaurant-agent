@@ -26,7 +26,7 @@ import type { Order, OrderAiData } from "./types";
  * The trends/forecast/anomalies card is extracted into OrderInsightsPanel
  * (pure display) to keep this file focused on data fetching + order actions.
  */
-export default function OrderList() {
+export default function OrderList({ showSales = true }: { showSales?: boolean }) {
     const [orders, setOrders] = useState<Order[]>([]);
     const [aiData, setAiData] = useState<OrderAiData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -39,8 +39,8 @@ export default function OrderList() {
 
     const fetchData = () => {
         Promise.all([
-            api.get("/orders/").catch(() => ({ data: [] })),
-            api.get("/ai/revenue-forecast").catch(() => ({ data: null })),
+            api.get("/api/v1/orders/").catch(() => ({ data: [] })),
+            api.get("/api/v1/ai/revenue-forecast").catch(() => ({ data: null })),
         ]).then(([ordersRes, aiRes]) => {
             setOrders(Array.isArray(ordersRes.data) ? ordersRes.data : []);
             setAiData(aiRes.data);
@@ -53,7 +53,7 @@ export default function OrderList() {
     const handleRecordPayment = async (orderId: number) => {
         setSubmitting(true);
         try {
-            await api.post(`/orders/${orderId}/payment`, { payment_method: payMethod, is_paid: true });
+            await api.post(`/api/v1/orders/${orderId}/payment`, { payment_method: payMethod, is_paid: true });
             showToast("Payment recorded");
             setPayingId(null);
             fetchData();
@@ -69,11 +69,11 @@ export default function OrderList() {
             if (cancelReason.trim()) {
                 const order = orders.find((o) => o.id === orderId);
                 const note = `Cancelled: ${cancelReason.trim()}`;
-                await api.post(`/orders/${orderId}/details`, {
+                await api.post(`/api/v1/orders/${orderId}/details`, {
                     notes: order?.notes ? `${order.notes} | ${note}` : note,
                 });
             }
-            await api.post(`/orders/${orderId}/status`, { status: "cancelled" });
+            await api.post(`/api/v1/orders/${orderId}/status`, { status: "cancelled" });
             showToast("Order cancelled");
             setCancellingId(null);
             setCancelReason("");
@@ -115,11 +115,13 @@ export default function OrderList() {
             </div>
 
             {/* Today at a glance */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className={`grid grid-cols-1 gap-3 ${showSales ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+                {showSales && (
                 <div className="bg-surface border border-border rounded-xl p-4">
                     <p className="text-xs text-text-dim">Today&apos;s Sales</p>
                     <p className="text-lg font-bold text-success mt-1">{formatKES(todayRevenue)}</p>
                 </div>
+                )}
                 <div className="bg-surface border border-border rounded-xl p-4">
                     <p className="text-xs text-text-dim">Orders</p>
                     <p className="text-lg font-bold text-text mt-1">{todayOrders.length}</p>
@@ -130,7 +132,7 @@ export default function OrderList() {
                 </div>
             </div>
 
-            <OrderInsightsPanel trends={trends} forecast={forecast} anomalies={anomalies} />
+            {showSales && <OrderInsightsPanel trends={trends} forecast={forecast} anomalies={anomalies} />}
 
             {/* Order List */}
             <div className="bg-surface border border-border rounded-xl">

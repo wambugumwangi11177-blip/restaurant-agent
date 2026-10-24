@@ -32,7 +32,9 @@ export interface MenuAiItem {
 }
 
 export interface MenuAiMatrixItem extends MenuAiItem {
-    item_id: number;
+    item_id?: number;
+    /** The menu-engineering payload names the dish `id`. Older callers used `item_id`. */
+    id?: number;
 }
 
 export interface MenuAiData {

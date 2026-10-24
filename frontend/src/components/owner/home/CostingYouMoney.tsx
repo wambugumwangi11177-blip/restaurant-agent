@@ -56,6 +56,31 @@ function MoreRow({ row }: { row: RankedCard }) {
   );
 }
 
+function ScoreBars({ score }: { score: NonNullable<DecisionCard["score"]> }) {
+  const parts = [
+    { key: "money", label: "Money", value: score.money, weight: 45 },
+    { key: "sure", label: "How sure", value: score.sure, weight: 25 },
+    { key: "safe", label: "How safe", value: score.safe, weight: 15 },
+    { key: "easy", label: "How easy", value: score.easy, weight: 15 },
+  ];
+  return (
+    <div className="mt-3" aria-label={`Score ${score.total}`}>
+      <p className="text-[11px] font-bold">Score {score.total} <span className="font-semibold text-[var(--v-muted-foreground)]">· money 45, how sure 25, how safe 15, how easy 15</span></p>
+      <ul className="mt-1.5 space-y-1">
+        {parts.map((p) => (
+          <li key={p.key} className="grid grid-cols-[4.5rem_1fr_2rem] items-center gap-2 text-[10px]">
+            <span className="text-[var(--v-muted-foreground)]">{p.label}</span>
+            <span className="h-1.5 overflow-hidden rounded-full bg-[var(--v-muted)]" aria-hidden>
+              <span className="block h-full rounded-full bg-[var(--v-primary)]" style={{ width: `${Math.min(100, (p.value / p.weight) * 100)}%` }} />
+            </span>
+            <span className="text-right tabular-nums">{p.value}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function Card({ card, onDone }: { card: DecisionCard; onDone: () => void }) {
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -81,17 +106,18 @@ function Card({ card, onDone }: { card: DecisionCard; onDone: () => void }) {
       <h3 className="mt-2 text-sm font-bold leading-snug">{card.sentence}</h3>
       {card.assumption && <AssumptionChip assumption={card.assumption} className="mt-1" />}
       {card.action && card.action !== card.sentence && <p className="mt-2 text-xs leading-relaxed">{card.action}</p>}
-      {card.why && (
+      {card.score && <ScoreBars score={card.score} />}
+      {(card.why || card.score) && (
         <details className="mt-2">
-          <summary className="flex min-h-10 cursor-pointer items-center text-[11px] font-semibold text-[var(--v-muted-foreground)]">Why</summary>
-          <p className="mt-1 text-xs leading-relaxed text-[var(--v-muted-foreground)]">{card.why}</p>
+          <summary className="flex min-h-10 cursor-pointer items-center text-[11px] font-semibold text-[var(--v-muted-foreground)]">See details</summary>
+          {card.why && <p className="mt-1 text-xs leading-relaxed text-[var(--v-muted-foreground)]">{card.why}</p>}
         </details>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {card.decision && (
           <>
-            <button disabled={saving} onClick={() => decide("approved")} className="min-h-10 rounded-lg bg-[var(--v-primary)] px-3 text-[11px] font-bold text-[var(--v-primary-foreground)]">Acknowledge</button>
-            <button disabled={saving} onClick={() => decide("later")} className="min-h-10 rounded-lg border border-[var(--v-border)] px-3 text-[11px] font-bold">Remind me in 24h</button>
+            <button disabled={saving} onClick={() => decide("approved")} className="min-h-10 rounded-lg bg-[var(--v-primary)] px-3 text-[11px] font-bold text-[var(--v-primary-foreground)]">Approve</button>
+            <button disabled={saving} onClick={() => decide("later")} className="min-h-10 rounded-lg border border-[var(--v-border)] px-3 text-[11px] font-bold">Later</button>
             <button disabled={saving} onClick={() => decide("rejected")} className="min-h-10 rounded-lg border border-[var(--v-border)] px-3 text-[11px] font-bold">Dismiss</button>
           </>
         )}

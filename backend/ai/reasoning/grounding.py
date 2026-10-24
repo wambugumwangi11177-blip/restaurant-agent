@@ -78,7 +78,10 @@ _FRACTION_MAX = 1.5
 # Keys are matched on these stems.
 _PCT_KEY_RE = re.compile(r"pct|percent|margin|rate|share|ratio", re.IGNORECASE)
 
+# Kept so older tests can name the marker. Owner-facing text never contains it:
+# a sentence with a figure we cannot trace is dropped whole.
 _REDACTION = "[unverified]"
+_SENTENCE_RE = re.compile(r"[^.!?\n]+[.!?]?")
 
 # Matches: 1,234.56  |  1234  |  25%  |  KES 9,000  |  $12.50  |  -15% — capturing
 # the numeric core and any %/currency context so we can decide if it's "checkable".
@@ -228,11 +231,13 @@ def _is_grounded(value: float, has_pct: bool, has_cur: bool,
     return False
 
 
-def _redact_text(text: str, all_nums: set, pct_nums: set, ungrounded_out: list) -> str:
-    if not text:
-        return text
+def _ungrounded_in(sentence: str, all_nums: set, pct_nums: set) -> list:
+    """Checkable figures in one sentence that are not in the payload. Dollars are never KES."""
+    found: list = []
+    if re.search(r"\$|\bUSD\b", sentence, re.IGNORECASE):
+        found.append("$")
 
-    def repl(m: re.Match) -> str:
+    def see(m: re.Match) -> str:
         num_str = m.group("num")
         has_pct = bool(m.group("pct"))
         has_cur = bool(m.group("cur"))
@@ -241,16 +246,33 @@ def _redact_text(text: str, all_nums: set, pct_nums: set, ungrounded_out: list) 
             value = float(num_str.replace(",", ""))
         except ValueError:
             return m.group(0)
-        # abs(), not the raw value: a bare "-500" is a large figure worth
-        # policing, but `-500 < 10` would have waved it straight through.
         if not checkable and abs(value) < _MIN_CHECKABLE_MAGNITUDE:
-            return m.group(0)  # bare small integer — not policed
+            return m.group(0)
         if _is_grounded(value, has_pct, has_cur, all_nums, pct_nums):
-            return m.group(0)  # correct figure — leave it
-        ungrounded_out.append(m.group(0).strip())
-        return _REDACTION
+            return m.group(0)
+        found.append(m.group(0).strip())
+        return m.group(0)
 
-    return _NUMBER_RE.sub(repl, text)
+    _NUMBER_RE.sub(see, sentence)
+    return found
+
+
+def _redact_text(text: str, all_nums: set, pct_nums: set, ungrounded_out: list) -> str:
+    """Drop any sentence that cites a figure we cannot trace. Never leave a marker in its place."""
+    if not text:
+        return text
+    text = re.sub(r"\bKSh\b|\bKsh\b", "KES", text)
+    kept = []
+    for sentence in _SENTENCE_RE.findall(text):
+        piece = sentence.strip()
+        if not piece:
+            continue
+        bad = _ungrounded_in(piece, all_nums, pct_nums)
+        if bad:
+            ungrounded_out.extend(bad)
+            continue
+        kept.append(piece)
+    return " ".join(kept)
 
 
 def redact_free_text(text: str, grounded_numbers: set) -> tuple:
@@ -279,7 +301,8 @@ def verify(narrative: dict, payload) -> dict:
       verified           : True when no ungrounded numbers were found
       ungrounded_numbers : the offending figures (as written by the model)
 
-    Never raises and never drops the qualitative content — only the false digits.
+    Never raises. A sentence that cites a figure we cannot trace is dropped whole,
+    so the owner never sees a marker where a number used to be.
     """
     all_nums, pct_nums = _collect_typed(payload)
     ungrounded: list = []

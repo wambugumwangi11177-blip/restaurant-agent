@@ -1,8 +1,9 @@
 import { expect, it } from "vitest";
 import nextConfig from "../next.config";
 import { LEGACY_AREA } from "@/lib/owner/blocks";
-import { VIBANDA_AREA_SECTIONS } from "@/lib/vibandaAreas";
 import { AREA_KEYS } from "@/lib/owner/types";
+
+const VIBANDA_SLUGS = ["revenue", "orders", "kitchen", "stock", "bookings", "team", "menu", "finance", "expenses", "suppliers", "purchasing", "cash-reconciliation", "pos", "marketing", "risk", "notifications", "intelligence", "data-trust", "audit", "settings"];
 
 async function redirects() {
   const list = await nextConfig.redirects!();
@@ -22,7 +23,7 @@ it("the old owner addresses all land on the new shell, for both old shells", asy
 });
 
 it("every page of the old Vibanda shell has a home on a panel, and every panel it points at exists", () => {
-  const slugs = VIBANDA_AREA_SECTIONS.flatMap((s) => s.areas.map(([, , slug]) => slug));
+  const slugs = VIBANDA_SLUGS;
   expect(slugs.filter((slug) => !(slug in LEGACY_AREA))).toEqual([]);
   for (const area of Object.values(LEGACY_AREA)) expect(AREA_KEYS).toContain(area);
 });

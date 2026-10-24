@@ -5,6 +5,7 @@ period: daily | weekly | monthly | yearly. 422 for anything else.
 Shares _summarize() with the overview router (DRY).
 """
 import logging
+import re
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func
@@ -63,15 +64,15 @@ def _draft(period: str, range_label: str, core: dict, top: list) -> str:
         f"# {period.capitalize()} report — {range_label}",
         "",
         "## Overview",
-        f"- Revenue: **KSh {core['revenue']:,.0f}**",
+        f"- Revenue: **KES {core['revenue']:,.0f}**",
         f"- Orders: **{core['orders']}**",
-        f"- Average order: **KSh {core['revenue'] / core['orders']:,.0f}**" if core["orders"] else "- No orders in this period.",
+        f"- Average order: **KES {core['revenue'] / core['orders']:,.0f}**" if core["orders"] else "- No orders in this period.",
         "",
         "## Top selling items",
     ]
     if top:
         for t in top:
-            lines.append(f"- {t['name']} — {t['qty']} sold (KSh {t['sales_kes']:,.0f})")
+            lines.append(f"- {t['name']} — {t['qty']} sold (KES {t['sales_kes']:,.0f})")
     else:
         lines.append("- No item-level sales recorded in this period.")
     lines += [
@@ -190,7 +191,7 @@ def _llm_narrative(period: str, label: str, core: dict, top: list, db, owner, ri
         return None
     from ai.creative import clean_dish_name
     tops = "\n".join(
-        f"- {clean_dish_name(t['name'])}: {t['qty']} sold, {t['sales_kes']:.0f} KSh, period {label}"
+        f"- {clean_dish_name(t['name'])}: {t['qty']} sold, {t['sales_kes']:.0f} KES, period {label}"
         for t in top
     ) or "- none recorded"
     system = (
@@ -200,16 +201,16 @@ def _llm_narrative(period: str, label: str, core: dict, top: list, db, owner, ri
         "round differently. Write in clear, warm, direct English (the owner's "
         "tone). Structure: a 2-sentence overview, then 2-3 short bullet "
         "observations (what stands out), then one actionable recommendation. "
-        "Keep it under 180 words. Currency is KSh. "
+        "Keep it under 180 words. Currency is KES, never KSh or dollars. "
         "IMPORTANT: Output ONLY the finished report text. Do NOT write any "
         "planning, reasoning, meta-commentary or notes about the task — the "
         "first character of your answer is the first character of the report."
     )
     user = (
         f"Draft the {period} report ({label}). Every figure below is for this period only: {label}.\n"
-        f"Revenue: KSh {core['revenue']:,.0f} (period {label})\n"
+        f"Revenue: KES {core['revenue']:,.0f} (period {label})\n"
         f"Orders: {core['orders']} (period {label})\n"
-        + (f"Average order: KSh {core['revenue'] / core['orders']:,.0f} (period {label})\n" if core["orders"] else "Average order: n/a (no orders)\n")
+        + (f"Average order: KES {core['revenue'] / core['orders']:,.0f} (period {label})\n" if core["orders"] else "Average order: n/a (no orders)\n")
     )
     user += f"Top items:\n{tops}"
     try:
@@ -232,4 +233,7 @@ def _grounded_reply(text: str, evidence: str) -> str | None:
     from ai.reasoning.grounding import verify
     cleaned = _strip_reasoning_leak(text)
     checked = verify({"headline": cleaned}, evidence)
-    return cleaned if cleaned and checked["verified"] else None
+    if not cleaned or not checked["verified"]:
+        return None
+    # The owner reads KES. Keep the model's sentences and structure; only the currency word changes.
+    return re.sub(r"\bKSh\b|\bKsh\b", "KES", cleaned)

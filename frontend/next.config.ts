@@ -39,12 +39,23 @@ const legacyRedirects = LEGACY_SHELLS.flatMap((shell) => [
   { source: `/${shell}/:other*`, destination: "/home", permanent: false },
 ]);
 
+const LEGACY_PAGES = [
+  { source: "/settings", destination: "/home#area-permits" },
+  { source: "/menu", destination: "/home#area-sales_dishes" },
+  { source: "/stock", destination: "/home#area-store" },
+  { source: "/cash", destination: "/home#area-cash" },
+  { source: "/handovers", destination: "/home#area-store" },
+  { source: "/kitchen", destination: "/staff/kitchen" },
+  { source: "/dashboard/stock", destination: "/dashboard/inventory" },
+  { source: "/dashboard/bookings", destination: "/dashboard/reservations" },
+].map((r) => ({ ...r, permanent: false }));
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   // `next dev` writes AGENTS.md / CLAUDE.md into the project by default; this repository keeps its agent instructions at the root.
   agentRules: false,
   async redirects() {
-    return legacyRedirects;
+    return [...legacyRedirects, ...LEGACY_PAGES];
   },
   async headers() {
     return [

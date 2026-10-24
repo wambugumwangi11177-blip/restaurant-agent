@@ -18,6 +18,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Cpu, RefreshCw, AlertTriangle, ShieldCheck, Activity, Gauge } from "lucide-react";
 import { getErrorMessage, isHttpStatus } from "@/lib/errors";
+import { nairobiClock } from "@/lib/format";
 
 interface UsageData {
     window_days: number;
@@ -70,7 +71,7 @@ export default function AiOpsPage() {
         setError("");
         setForbidden(false);
         try {
-            const res = await api.get("/ai/usage?days=30");
+            const res = await api.get("/api/v1/ai/usage?days=30");
             setData(res.data);
             setLastUpdated(new Date());
         } catch (e) {
@@ -121,7 +122,6 @@ export default function AiOpsPage() {
     const d = data!;
     const totalTokens = (d.llm?.input_tokens || 0) + (d.llm?.output_tokens || 0);
     const groundedPct = d.grounding?.grounded_pct ?? d.grounding?.grounding_enabled;
-    const models = Object.entries(d.llm?.by_model || {});
     const maxRuns = Math.max(1, ...(d.agents || []).map((a) => a.runs));
 
     return (
@@ -133,7 +133,7 @@ export default function AiOpsPage() {
                 </div>
                 <button onClick={fetchData} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#141414] border border-[#262626] text-[#737373] hover:text-[#e5e5e5] text-sm transition-colors">
                     <RefreshCw className="w-3.5 h-3.5" />
-                    <span>{lastUpdated ? lastUpdated.toLocaleTimeString() : "Refresh"}</span>
+                    <span>{lastUpdated ? nairobiClock(lastUpdated) : "Refresh"}</span>
                 </button>
             </div>
 
@@ -153,7 +153,7 @@ export default function AiOpsPage() {
                     <Stat label="AI calls" value={fmt(d.llm?.calls)} />
                     <Stat label="Input tokens" value={fmt(d.llm?.input_tokens)} />
                     <Stat label="Output tokens" value={fmt(d.llm?.output_tokens)} />
-                    <Stat label="Figures verified" value={typeof groundedPct === "number" ? `${groundedPct}%` : groundedPct ? "On" : "—"} tone="ok" />
+                    <Stat label="AI calls checked" value={typeof groundedPct === "number" && groundedPct > 0 ? `${groundedPct}%` : "On"} tone="ok" />
                 </div>
                 {d.economics && (
                     <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-4 mt-3 flex items-center justify-between flex-wrap gap-2">
@@ -164,20 +164,6 @@ export default function AiOpsPage() {
                             <span className="text-emerald-400 font-medium">{kes(d.economics.profit_generated_cents)}</span>
                         </div>
                         <p className="text-[10px] text-[#525252]">Profit = approved pricing recommendations.</p>
-                    </div>
-                )}
-                {models.length > 0 && (
-                    <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5 mt-3">
-                        <p className="text-xs font-semibold text-[#737373] mb-3">By model</p>
-                        <div className="space-y-2">
-                            {models.map(([model, m]) => (
-                                <div key={model} className="flex items-center justify-between text-sm py-1.5 border-b border-[#1a1a1a] last:border-0">
-                                    <span className="text-[#e5e5e5] truncate">{model}</span>
-                                    <span className="text-[#525252] text-xs whitespace-nowrap">{fmt(m.calls)} calls · {fmt(m.input_tokens + m.output_tokens)} tokens</span>
-                                </div>
-                            ))}
-                        </div>
-                        <p className="text-[11px] text-[#525252] mt-3">Total {fmt(totalTokens)} tokens across {fmt(d.llm?.calls)} calls.</p>
                     </div>
                 )}
             </div>

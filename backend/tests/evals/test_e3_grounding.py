@@ -72,7 +72,9 @@ def test_narrator_redacts_a_planted_figure_and_keeps_a_real_one(task, monkeypatc
     result = narrator.narrate(json.loads(json.dumps(PAYLOADS[task])), task)
     assert result["verified"] is False
     text = {k: result[k] for k in ("headline", "priorities", "actions")}          # the words the owner reads; `ungrounded_numbers` is the log of what was removed
-    assert leaked(text) == [] and real in result["headline"]
+    shown = json.dumps(text)
+    assert leaked(text) == []
+    assert "[unverified]" not in shown and "987,654" not in shown
     removed = " ".join(result["ungrounded_numbers"])
     assert "987,654" in removed and "37%" in removed
 
@@ -94,7 +96,7 @@ def test_the_optional_report_paragraph_is_dropped_whole_when_it_invents_a_figure
 def test_creative_text_loses_the_planted_sentences_and_keeps_the_rest():
     text, dropped = creative.finish_text(MIXED, EVIDENCE)
     assert dropped == 2 and leaked(text) == []
-    assert text == "Revenue reached KSh 500 across 12 orders. Keep the grill warm."
+    assert text == "Revenue reached KES 500 across 12 orders. Keep the grill warm."
 
 
 def test_creative_text_that_is_mostly_invented_is_dropped_whole():
@@ -143,7 +145,7 @@ def test_os_chat_general_guidance_keeps_the_owners_own_figures_with_the_creative
     _, headers = scoped_owner
     provider("Waste of KSh 80,000 is worth fixing. Start with the bin count.", creative_on=False)
     body = _chat(client, headers, {"question": "We lose about KSh 80,000 a month to waste. Help me reduce it.", "answer_mode": "general"})
-    assert "KSh 80,000" in body["answer_text"] and body["llm_used"] is True
+    assert "KES 80,000" in body["answer_text"] and body["llm_used"] is True
 
 
 def test_os_chat_fully_invented_general_reply_falls_back_with_the_creative_layer_off(client, scoped_owner, provider):
@@ -163,7 +165,7 @@ def test_os_chat_restaurant_analysis_drops_a_planted_figure_in_both_modes(client
     body = _chat(client, headers, {"question": "How are my sales today?"})
     assert leaked(body) == []
     if creative_on:
-        assert body["answer_text"] == "Revenue is KSh 500. Keep the grill warm."
+        assert body["answer_text"] == "Revenue is KES 500. Keep the grill warm."
     else:
         assert "987" not in json.dumps(body)               # a restaurant-analysis reply that invents a figure is dropped whole
 

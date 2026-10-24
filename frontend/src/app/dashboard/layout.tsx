@@ -15,6 +15,7 @@ import SkipLink from "@/components/ui/SkipLink";
 import { tierHome, StaffTier } from "@/lib/permissions";
 import { isDemoRestaurant, isVibanda } from "@/lib/tenantHome";
 import { labelForPath } from "@/lib/pathTitle";
+import { activeHref } from "@/lib/navActive";
 import {
     Home,
     UtensilsCrossed,
@@ -209,7 +210,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             </p>
                             <div className="space-y-0.5">
                                 {section.items.map((item) => {
-                                    const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                                    const isActive = activeHref(pathname, navSections.flatMap((s) => s.items.map((i) => i.href))) === item.href;
                                     return (
                                         <Link
                                             key={item.href}

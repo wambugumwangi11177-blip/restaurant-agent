@@ -95,11 +95,11 @@ it("any card can be acknowledged; a failed save keeps the card and says so, a go
   const first = data.costing_you_money.cards[0];
   const card = () => screen.getByText(first.sentence).closest("article")!;
   await screen.findByText(first.sentence);
-  fireEvent.click(within(card()).getByRole("button", { name: "Acknowledge" }));
+  fireEvent.click(within(card()).getByRole("button", { name: "Approve" }));
   expect((await screen.findByRole("alert")).textContent).toMatch(/could not be saved/);
   expect(screen.getByText(first.sentence)).toBeTruthy();
   vi.mocked(api.post).mockResolvedValueOnce({ data: {} } as never);
-  fireEvent.click(within(card()).getByRole("button", { name: "Acknowledge" }));
+  fireEvent.click(within(card()).getByRole("button", { name: "Approve" }));
   await waitFor(() => expect(screen.queryByText(first.sentence)).toBeNull());
   expect(api.post).toHaveBeenLastCalledWith(`/api/v1/overview/attention/${encodeURIComponent(first.id)}/decision`, { decision: "approved" });
 });
@@ -139,9 +139,9 @@ it("Zone 4 shows bills with the shortfall, licences, deliveries and the bookings
 it("the period buttons ask for that period", async () => {
   render(<HomePage />);
   await screen.findByTestId("sales-today");
-  fireEvent.click(screen.getByRole("button", { name: "7 days" }));
+  fireEvent.click(screen.getByRole("button", { name: "Last 7 days" }));
   await waitFor(() => expect(api.get).toHaveBeenLastCalledWith("/api/v1/owner/home", expect.objectContaining({ params: { period: "7d" } })));
-  expect(screen.getByRole("button", { name: "7 days" }).getAttribute("aria-pressed")).toBe("true");
+  expect(screen.getByRole("button", { name: "Last 7 days" }).getAttribute("aria-pressed")).toBe("true");
 });
 
 it("old figures say they are old", async () => {

@@ -81,7 +81,7 @@ export default function SupportView() {
 
     const fetchTickets = async () => {
         try {
-            const res = await api.get("/support/tickets");
+            const res = await api.get("/api/v1/support/tickets");
             setTickets(Array.isArray(res.data) ? res.data : []);
         } catch {
             // Leave the previous list in place rather than clearing on a
@@ -94,7 +94,7 @@ export default function SupportView() {
 
     const openTicket = async (id: number) => {
         try {
-            const res = await api.get(`/support/tickets/${id}`);
+            const res = await api.get(`/api/v1/support/tickets/${id}`);
             setSelected(res.data);
         } catch (err) {
             showToast(getErrorMessage(err, "Couldn't open ticket"), "error");
@@ -105,7 +105,7 @@ export default function SupportView() {
         if (!subject.trim() || !message.trim()) return;
         setSubmitting(true);
         try {
-            await api.post("/support/tickets", { subject, message });
+            await api.post("/api/v1/support/tickets", { subject, message });
             showToast("Ticket created");
             setSubject(""); setMessage(""); setShowNewForm(false);
             await fetchTickets();
@@ -119,7 +119,7 @@ export default function SupportView() {
         if (!selected || !reply.trim()) return;
         setSubmitting(true);
         try {
-            const res = await api.post(`/support/tickets/${selected.id}/messages`, { body: reply });
+            const res = await api.post(`/api/v1/support/tickets/${selected.id}/messages`, { body: reply });
             setSelected(res.data);
             setReply("");
             await fetchTickets();
@@ -133,7 +133,7 @@ export default function SupportView() {
         if (!selected) return;
         setSubmitting(true);
         try {
-            await api.post(`/support/tickets/${selected.id}/status`, { status });
+            await api.post(`/api/v1/support/tickets/${selected.id}/status`, { status });
             await openTicket(selected.id);
             await fetchTickets();
             showToast(`Marked ${statusLabel(status)}`);

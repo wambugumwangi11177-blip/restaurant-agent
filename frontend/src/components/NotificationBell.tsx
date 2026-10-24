@@ -63,7 +63,7 @@ function edgeClass(eventType: string): string {
 export default function NotificationBell({ ownerHome }: { ownerHome?: string } = {}) {
     const {
         notifications, unreadCount, permission, subscribed, isIOSNotStandalone, stale,
-        markRead, markAllRead, subscribeToPush,
+        markRead, acknowledge, markAllRead, subscribeToPush, unsubscribeFromPush,
     } = useNotifications();
     const [open, setOpen] = useState(false);
     const [sourceVerified, setSourceVerified] = useState(!ownerHome);
@@ -122,25 +122,23 @@ export default function NotificationBell({ ownerHome }: { ownerHome?: string } =
                 <ul>
                     {items.map((n) => (
                         <li key={n.id}>
-                            <button
-                                onClick={() => handleClick(n)}
+                            <div
                                 className={`w-full text-left px-3 py-2.5 border-b border-l-2 border-r-0 border-t-0 ${edgeClass(
                                     n.event_type
-                                )} border-b-[#1a1a1a] hover:bg-[#151515] transition-colors ${
-                                    n.is_read ? "" : "bg-[#111]"
-                                }`}
+                                )} border-b-[#1a1a1a] ${n.is_read ? "" : "bg-[#111]"}`}
                             >
                                 <div className="flex items-start gap-2">
                                     {!n.is_read && (
                                         <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                                     )}
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-medium text-[#e5e5e5] truncate">{n.title}</p>
+                                        <button type="button" onClick={() => handleClick(n)} className="text-left"><p className="text-xs font-medium text-[#e5e5e5] truncate">{n.title}</p></button>
                                         <p className="text-[11px] text-[#737373] line-clamp-2 mt-0.5">{n.body}</p>
                                         <p className="text-[10px] text-[#525252] mt-1">{timeAgo(n.created_at)}</p>
+                                        <button type="button" className="mt-1 text-[10px] font-semibold text-[#e5e5e5]" onClick={(e) => { e.stopPropagation(); void acknowledge(n.id); }}>I'm on it</button>
                                     </div>
                                 </div>
-                            </button>
+                            </div>
                         </li>
                     ))}
                 </ul>
@@ -236,6 +234,9 @@ export default function NotificationBell({ ownerHome }: { ownerHome?: string } =
                         </ul>
                     )}
 
+                    {subscribed && (
+                        <button type="button" onClick={() => void unsubscribeFromPush()} className="w-full border-t border-[#1a1a1a] px-3 py-2 text-[11px] text-[#a3a3a3]">Stop notifications on this device</button>
+                    )}
                     {stale && (
                         <p className="px-3 py-2 text-[10px] text-[#525252] border-t border-[#1a1a1a] sticky bottom-0 bg-[#0f0f0f]">
                             Refreshed a while ago — check your connection for the latest.

@@ -31,7 +31,7 @@ it("choosing the other branch selects it on the server and reloads every block f
   render(<BranchPicker />);
   fireEvent.change(await screen.findByRole("combobox", { name: /Branch/ }), { target: { value: "1" } });
   await waitFor(() => expect(reload).toHaveBeenCalled());
-  expect(api.post).toHaveBeenCalledWith("/restaurants/select", { restaurant_id: 1 });
+  expect(api.post).toHaveBeenCalledWith("/api/v1/restaurants/select", { restaurant_id: 1 });
 });
 
 it("one branch, or a list the user may not read, shows nothing", async () => {

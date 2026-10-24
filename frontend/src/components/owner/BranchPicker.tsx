@@ -27,7 +27,7 @@ export default function BranchPicker() {
   const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
-    api.get("/restaurants/").then((res) => setBranches(res.data)).catch(() => setBranches([]));
+    api.get("/api/v1/restaurants/").then((res) => setBranches(res.data)).catch(() => setBranches([]));
   }, []);
 
   if (branches.length <= 1) return null;
@@ -37,7 +37,7 @@ export default function BranchPicker() {
     if (id === active.id) return;
     setSwitching(true);
     try {
-      await api.post("/restaurants/select", { restaurant_id: id });
+      await api.post("/api/v1/restaurants/select", { restaurant_id: id });
       window.location.reload();     // every block on the page was composed for the old branch
     } catch {
       setSwitching(false);

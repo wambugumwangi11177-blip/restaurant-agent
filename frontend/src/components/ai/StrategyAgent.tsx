@@ -46,7 +46,7 @@ export function StrategyAgent() {
         setError("");
         setResult(null);
         try {
-            const res = await api.post("/ai/strategy", { goal: g });
+            const res = await api.post("/api/v1/ai/strategy", { goal: g });
             if (res.data?.available === false) setError(res.data.error || "Strategy unavailable.");
             else setResult(res.data);
         } catch (e) {

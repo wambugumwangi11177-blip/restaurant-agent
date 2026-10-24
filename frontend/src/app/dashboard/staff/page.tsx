@@ -24,8 +24,8 @@ interface StaffMember {
 const STAFF_ROLES = [
     { value: "manager", label: "Manager" },
     { value: "supervisor", label: "Supervisor" },
-    { value: "controller", label: "Controller" },
-    { value: "stockkeeper", label: "Stockkeeper" },
+    { value: "controller", label: "Accountant" },
+    { value: "stockkeeper", label: "Storekeeper" },
     { value: "kitchen", label: "Kitchen" },
     { value: "waiter", label: "Waiter" },
 ];
@@ -60,7 +60,7 @@ export default function StaffPage() {
 
     const fetchStaff = async () => {
         try {
-            const res = await api.get("/staff/");
+            const res = await api.get("/api/v1/staff/");
             setStaff(Array.isArray(res.data) ? res.data : []);
             setForbidden(false);
         } catch (err) {
@@ -80,7 +80,7 @@ export default function StaffPage() {
         if (!name) return;
         setSubmitting(true);
         try {
-            await api.post("/staff/", {
+            await api.post("/api/v1/staff/", {
                 name,
                 role_title: roleTitle,
                 phone: phone || null,
@@ -103,7 +103,7 @@ export default function StaffPage() {
     const handleToggleActive = async (member: StaffMember) => {
         setSubmitting(true);
         try {
-            await api.put(`/staff/${member.id}`, { is_active: !member.is_active });
+            await api.put(`/api/v1/staff/${member.id}`, { is_active: !member.is_active });
             showToast(member.is_active ? `${member.name} deactivated — login revoked` : `${member.name} reactivated`);
             await fetchStaff();
         } catch (err) {
@@ -126,7 +126,7 @@ export default function StaffPage() {
     const handleAssignRole = async (memberId: number) => {
         setSubmitting(true);
         try {
-            await api.post(`/staff/${memberId}/assign-role`, { staff_role: assignRole });
+            await api.post(`/api/v1/staff/${memberId}/assign-role`, { staff_role: assignRole });
             showToast("Role updated");
             setAssigningId(null);
             await fetchStaff();

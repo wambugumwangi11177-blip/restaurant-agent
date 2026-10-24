@@ -28,7 +28,7 @@ export default function GraphImpactSection() {
     const [error, setError] = useState("");
 
     useEffect(() => {
-        api.get("/inventory/").then(res => {
+        api.get("/api/v1/inventory/").then(res => {
             const list: InventoryItem[] = (res.data ?? []).map((i: InventoryItem) => ({ id: i.id, item_name: i.item_name, unit: i.unit }));
             setItems(list);
             if (list.length) setSelected(list[0].id);
@@ -39,7 +39,7 @@ export default function GraphImpactSection() {
         if (selected == null) return;
         setLoading(true);
         setError("");
-        api.get(`/ai/graph/impact`, { params: { entity: "ingredient", id: selected } })
+        api.get(`/api/v1/ai/graph/impact`, { params: { entity: "ingredient", id: selected } })
             .then(res => setImpact(res.data))
             .catch(() => setError("Impact lookup failed"))
             .finally(() => setLoading(false));

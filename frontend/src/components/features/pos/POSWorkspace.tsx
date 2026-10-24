@@ -76,20 +76,20 @@ export default function POSWorkspace() {
 
     const refreshQuotes = useCallback(async (payload: Record<string, unknown>) => {
         const channel = String(payload.delivery_channel || "walk_in");
-        const res = await api.get(`/menu/?channel=${channel}`);
+        const res = await api.get(`/api/v1/menu/?channel=${channel}`);
         const menu = (Array.isArray(res.data) ? res.data : []).filter((i: MenuItem) => i.is_available !== false);
         setMenuItems(menu);
         return repriceOrderPayload(payload, menu);
     }, []);
 
     const syncPendingOrders = useCallback(async () => {
-        const result = await replayPendingOrders((payload) => api.post("/orders/", payload), refreshQuotes);
+        const result = await replayPendingOrders((payload) => api.post("/api/v1/orders/", payload), refreshQuotes);
         refreshPendingCount();
         return result;
     }, [refreshPendingCount, refreshQuotes]);
 
     useEffect(() => {
-        api.get("/menu/").then((res) => {
+        api.get("/api/v1/menu/").then((res) => {
             setMenuItems(res.data.filter((i: MenuItem) => i.is_available !== false));
             setLoading(false);
         }).catch(() => setLoading(false));
@@ -168,7 +168,7 @@ export default function POSWorkspace() {
             setPaymentMethod("pending");
         };
         const send = async (body: Record<string, unknown>) => {
-            const res = await api.post("/orders/", body);
+            const res = await api.post("/api/v1/orders/", body);
             setLastOrderId(res.data.id);
             setShowSuccess(true);
             resetForm();
@@ -409,7 +409,7 @@ export default function POSWorkspace() {
                                     { v: "glovo", label: "Glovo" },
                                     { v: "walk_in", label: "Direct" },
                                 ].map((ch) => (
-                                    <button key={ch.v} onClick={async () => {try{const r=await api.get(`/menu/?channel=${ch.v}`);setMenuItems(r.data.filter((i:MenuItem)=>i.is_available!==false));setCart([]);setDeliveryChannel(ch.v);setOrderError('Channel changed; the cart was cleared so you can confirm the correct prices.');}catch{setOrderError('Could not load channel prices. Check your connection and retry.');}}}
+                                    <button key={ch.v} onClick={async () => {try{const r=await api.get(`/api/v1/menu/?channel=${ch.v}`);setMenuItems(r.data.filter((i:MenuItem)=>i.is_available!==false));setCart([]);setDeliveryChannel(ch.v);setOrderError('Channel changed; the cart was cleared so you can confirm the correct prices.');}catch{setOrderError('Could not load channel prices. Check your connection and retry.');}}}
                                         className={`flex-1 py-1.5 rounded-lg text-[10px] font-medium transition-all ${deliveryChannel === ch.v
                                                 ? "bg-info/10 text-info border border-info/30"
                                                 : "bg-surface-hover text-text-muted border border-transparent"

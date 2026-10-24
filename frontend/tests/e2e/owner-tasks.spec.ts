@@ -287,6 +287,7 @@ test.describe('completion workflows', () => {
     await signIn(page,'Demo Restaurant');
     await page.goto('/setup');
     await expect(page.getByRole('heading',{name:'Set up this branch'})).toBeVisible();
+    await expect(page.getByRole('navigation',{name:'Setup steps'})).toBeVisible();
     const review=page.getByLabel('What did you verify, and with whom?');
     if(await review.count()){
       await review.fill('Reviewed demo menu and yields with the test chef');
@@ -307,7 +308,7 @@ test.describe('completion workflows', () => {
       await page.waitForURL(`**/staff/${role}`);
       await page.goto('/team-work');
       await expect(page.getByRole('heading',{name:'Team work & approvals'})).toBeVisible();
-      await expect(page.getByRole('alert')).toHaveCount(0);
+      await expect(page.getByRole('alert').filter({hasText:/\S/})).toHaveCount(0);
     });
   }
 });

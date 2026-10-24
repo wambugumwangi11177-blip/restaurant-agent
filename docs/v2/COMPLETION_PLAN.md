@@ -2,6 +2,23 @@
 
 Prepared 24 October 2026. Execution authorized by the user in this chat. No production deployment or production-data changes have been performed. Baseline: dev/eleven-demo-fixes at 654d116; readiness at 09cd227; PR #25 open. Recheck remote heads before implementation.
 
+## Execution status — completion candidate
+
+| Phase | Delivered in this candidate | Still required |
+|---|---|---|
+| 0: Baseline | Isolated branch from pushed demo fixes; preserved ancestry and original checkout | Each developer must account for any unpushed work on their own machine |
+| 1: Quality | Dependency updates, narrow secret-scan false-positive rule, lint regression fixes, phone tap targets; local gate evidence in PROGRESS.md | Candidate CI, PostgreSQL rehearsal and controlled live-AI acceptance |
+| 2A–B: Approvals and work | Expense-void proposals, independent owner approval/rejection, stale-data and duplicate protection; delegated tasks, due dates and private workflow activity | Other correction types and a unified feed of older audit events are not included |
+| 2C: Shared tablets | Existing PIN setup, quick switch and server attempt limits retained | Dedicated idle-lock behavior and physical shared-tablet acceptance remain open |
+| 2D: Spoilage | Branch-scoped requests with reason, independent approval, atomic stock write-off and retained event history | Approval write-offs do not yet use the quick-undo journal; correction/disposition and accounting policy need completion before claiming the full workflow |
+| 2E: Setup | Resumable owner review checklist linked to existing menu/team/stock/money/target/source tools | A new import-preview engine is not included; real source validation and first-workflow sign-off remain open |
+| 2F: Packages | Capacitor Android, sandboxed Electron desktop, build workflow and iPhone PWA install guidance | Real URL, signed artifacts, physical-device acceptance and update ownership |
+| 3: Eleven data | Sam consultation and read-only source acceptance brief | Engine/schema/sample/access, connector implementation, imports and real-day reconciliation |
+| 4: Operations | Candidate/migration/release checklist and additive workflow migration | Hosting configuration, PostgreSQL/restore rehearsal, staging and approved production rollout |
+| 5: Pilot | Explicit acceptance and handover gates | Real trading-cycle observation, fixes and owner/accountant sign-off |
+
+These are explicit remaining tasks, not completed phases. Package source and demo acceptance do not certify a production release. See RELEASE_CHECKLIST.md and SAM_READ_ONLY_INTEGRATION.md for the next concrete inputs.
+
 ## Objective and evidence
 Finish the existing demo, complete the deferred staff/product workflows, onboard Eleven with verified real inputs, and operate a reliable release. Completion means working end-to-end flows with evidence, not just implemented screens.
 
@@ -90,7 +107,7 @@ Developer B: browser acceptance, role screens, feed/delegation UI, tablet experi
 Joint checkpoints: API/data contract before each feature; review each other's changes; one shared integration branch; one release owner. Work may run concurrently only where contracts and file ownership are clear.
 
 ## Decisions and dependencies
-Resolve when needed: whether installed mobile/desktop packages are required for first launch; shared-device usage; proposal approval rights; spoilage accounting/approval; actual POS/source capability; hosting access and domain; guide-versus-product definitions (variance denominator, rounding and evidence limits). No secret values belong in the plan.
+Confirmed: Android and desktop packages plus iOS PWA are required for first launch. Resolve when needed: shared-device usage; proposal approval rights; spoilage accounting/approval; actual POS/source capability; hosting access and domain; guide-versus-product definitions (variance denominator, rounding and evidence limits). No secret values belong in the plan.
 
 ## Definition of finished
 For every in-scope item: implemented on the agreed branch, reviewed, pushed, tests/CI passing, end-to-end acceptance evidenced, documented and deployed where required. Real-data inputs are reconciled; missing external inputs are explicit blockers rather than claimed completion. A release and Phase 2 feature completion can be separate milestones.

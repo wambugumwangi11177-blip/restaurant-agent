@@ -162,6 +162,8 @@ def test_demo_seed_has_store_kitchen_manager_and_accountant_logins(demo):
         user = db.query(models.User).filter_by(email=email).one()
         assert user.staff_role == role and user.is_active and user.role == models.Role.STAFF
         assert user.active_restaurant_id == branches[0].id
+        roster = db.query(models.StaffMember).filter_by(user_id=user.id).all()
+        assert len(roster) == 1 and roster[0].restaurant_id == branches[0].id
 
 
 def test_one_tenant_two_branches_with_the_owner_login_resolving_the_first(demo):

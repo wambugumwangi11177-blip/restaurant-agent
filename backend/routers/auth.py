@@ -261,7 +261,7 @@ async def register(request: Request, user_data: UserCreate, db: Session = Depend
     email_utils.send_email(
         new_user.email,
         "Verify your email",
-        f"Welcome to Chakula! Verify your email address here:\n"
+        f"Welcome to LEVIII! Verify your email address here:\n"
         f"{FRONTEND_BASE_URL}/verify-email?token={verify_token}\n\n"
         f"This link expires in {EMAIL_VERIFY_TOKEN_EXPIRE_HOURS} hours.",
     )

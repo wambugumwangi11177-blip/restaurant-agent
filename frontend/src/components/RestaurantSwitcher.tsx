@@ -25,7 +25,7 @@ export default function RestaurantSwitcher() {
     const [switching, setSwitching] = useState(false);
 
     useEffect(() => {
-        api.get("/restaurants/").then((res) => {
+        api.get("/api/v1/restaurants/").then((res) => {
             setRestaurants(res.data);
         }).catch(() => {
             // 403 for non-Owner accounts, or the route simply not mattering
@@ -41,7 +41,7 @@ export default function RestaurantSwitcher() {
         if (restaurantId === active?.id) return;
         setSwitching(true);
         try {
-            await api.post("/restaurants/select", { restaurant_id: restaurantId });
+            await api.post("/api/v1/restaurants/select", { restaurant_id: restaurantId });
             // Full reload rather than local state — every dashboard section
             // fetches its own data scoped to "the" restaurant server-side;
             // a reload is the simplest way to guarantee everything (menu,

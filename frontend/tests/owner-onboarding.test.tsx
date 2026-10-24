@@ -25,13 +25,13 @@ afterEach(cleanup);
 // ── the first-week rule ──────────────────────────────────────────────────────
 
 it("one more panel opens every day, in the order a new restaurant has something to say, and all of them after the week", () => {
-  expect([...unlockedAreas(0)]).toEqual(["permits"]);
-  expect([...unlockedAreas(1)]).toEqual(["permits", "money"]);
-  expect([...unlockedAreas(4)]).toEqual(["permits", "money", "store", "sales_dishes", "cash"]);
+  expect([...unlockedAreas(0)]).toEqual(["sales_dishes"]);
+  expect([...unlockedAreas(1)]).toEqual(["sales_dishes", "cash"]);
+  expect([...unlockedAreas(4)]).toEqual(["sales_dishes", "cash", "money", "store", "staff"]);
   expect(unlockedAreas(5).size).toBe(6);
   expect(unlockedAreas(400).size).toBe(6);
   expect(unlockedAreas(-3).size).toBe(1);
-  expect(lockedAreas(1)).toEqual({ store: 3, sales_dishes: 4, cash: 5, staff: 6 });
+  expect(lockedAreas(1)).toEqual({ money: 3, store: 4, staff: 5, permits: 6 });
   expect(lockedAreas(5)).toEqual({});
   expect(FIRST_WEEK_ORDER).toHaveLength(6);
 });
@@ -109,20 +109,20 @@ it("a brand-new restaurant's Home asks for its targets and opens one panel", asy
   serve({ ...(structuredClone(fresh) as unknown as OwnerHome) });
   render(<SettingsProvider><HomePage /></SettingsProvider>);
   expect(await screen.findByRole("heading", { name: "Set your targets" })).toBeTruthy();
-  expect(screen.getByText(/day 1 of 6/)).toBeTruthy();
-  expect(screen.getByRole("button", { name: /Permits & Settings/ })).toBeTruthy();
-  for (const name of ["My Money", "Sales & Dishes", "Store & Suppliers", "Cash Check", "Staff"]) expect(screen.queryByRole("button", { name: new RegExp(name) })).toBeNull();
-  expect(screen.getByRole("region", { name: "My Money, opens on day 2" }).textContent).toContain("Opens on day 2 of your first week");
+  expect(screen.getByText(/day 1 of 7/)).toBeTruthy();
+  expect(screen.getByRole("button", { name: /Sales & Dishes/ })).toBeTruthy();
+  for (const name of ["My Money", "Permits & Settings", "Store & Suppliers", "Cash Check", "Staff"]) expect(screen.queryByRole("button", { name: new RegExp(`^${name}`) })).toBeNull();
+  expect(screen.getByRole("region", { name: "Cash Check, opens on day 2" }).textContent).toContain("Opens on day 2 of your first week");
 });
 
 it("on day 2 two panels are open and the rest say when they open; a locked panel cannot be opened by a link", async () => {
   window.location.hash = "#area-cash";
   serve(homeAt(1));
   render(<SettingsProvider><HomePage /></SettingsProvider>);
-  expect(await screen.findByText(/day 2 of 6/)).toBeTruthy();
-  expect(screen.getAllByRole("button", { name: /Permits & Settings|My Money/ })).toHaveLength(2);
-  expect(screen.getByRole("region", { name: "Cash Check, opens on day 5" })).toBeTruthy();
-  expect(screen.queryByRole("region", { name: "Cash Check" })).toBeNull();
+  expect(await screen.findByText(/day 2 of 7/)).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: /Sales & Dishes|Cash Check/ })).toHaveLength(2);
+  expect(screen.getByRole("region", { name: "My Money, opens on day 3" })).toBeTruthy();
+  expect(screen.queryByRole("region", { name: "My Money" })).toBeNull();
 });
 
 it("'Open everything now' opens all six, removes the banner, and is remembered", async () => {
@@ -139,7 +139,7 @@ it("'Open everything now' opens all six, removes the banner, and is remembered",
 });
 
 it("after the first week, and for an established restaurant, nothing is locked and there is no banner", async () => {
-  for (const age of [5, 400]) {
+  for (const age of [7, 400]) {
     serve(homeAt(age));
     const { unmount } = render(<SettingsProvider><HomePage /></SettingsProvider>);
     await screen.findByTestId("sales-today");

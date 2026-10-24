@@ -36,7 +36,7 @@ function VerifyEmailContent() {
                 className="w-full max-w-sm"
             >
                 <div className="text-center mb-10">
-                    <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">Chakula</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">LEVIII</h1>
                 </div>
 
                 <div className="bg-[#141414] border border-[#262626] rounded-xl p-6 text-center space-y-3">

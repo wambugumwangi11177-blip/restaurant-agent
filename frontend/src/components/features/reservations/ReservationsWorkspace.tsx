@@ -57,9 +57,9 @@ export default function ReservationsWorkspace() {
 
     const fetchData = async () => {
         const [resRes, aiRes, tablesRes] = await Promise.all([
-            api.get("/reservations/").catch(() => ({ data: [] })),
-            api.get("/ai/reservation-insights").catch(() => ({ data: null })),
-            api.get("/tables/").catch(() => ({ data: [] })),
+            api.get("/api/v1/reservations/").catch(() => ({ data: [] })),
+            api.get("/api/v1/ai/reservation-insights").catch(() => ({ data: null })),
+            api.get("/api/v1/tables/").catch(() => ({ data: [] })),
         ]);
         setReservations(Array.isArray(resRes.data) ? resRes.data : []);
         setAiData(aiRes.data);
@@ -73,7 +73,7 @@ export default function ReservationsWorkspace() {
     // affect availability change, for the New Booking form.
     useEffect(() => {
         if (!showForm || !reservationDate || !reservationTime || !partySize) { setSuggestedTables(null); return; }
-        api.get("/reservations/available-tables", {
+        api.get("/api/v1/reservations/available-tables", {
             params: { party_size: parseInt(partySize) || 1, reservation_date: reservationDate, reservation_time: reservationTime },
         }).then((res) => setSuggestedTables(res.data)).catch(() => setSuggestedTables(null));
     }, [showForm, reservationDate, reservationTime, partySize]);
@@ -84,7 +84,7 @@ export default function ReservationsWorkspace() {
             setEditSuggestedTables(null);
             return;
         }
-        api.get("/reservations/available-tables", {
+        api.get("/api/v1/reservations/available-tables", {
             params: {
                 party_size: parseInt(editForm.party_size) || 1,
                 reservation_date: editForm.reservation_date,
@@ -103,7 +103,7 @@ export default function ReservationsWorkspace() {
         if (!customerName || !reservationDate || !reservationTime) return;
         setSubmitting(true);
         try {
-            await api.post("/reservations/", {
+            await api.post("/api/v1/reservations/", {
                 customer_name: customerName,
                 customer_phone: customerPhone,
                 party_size: parseInt(partySize) || 2,
@@ -125,7 +125,7 @@ export default function ReservationsWorkspace() {
     const handleStatusChange = async (id: number, status: string) => {
         setSubmitting(true);
         try {
-            await api.post(`/reservations/${id}/status`, { status });
+            await api.post(`/api/v1/reservations/${id}/status`, { status });
             await fetchData();
         } catch (err) {
             showToast(getErrorMessage(err, "Failed to update booking"), "error");
@@ -148,7 +148,7 @@ export default function ReservationsWorkspace() {
     const handleSaveEdit = async (id: number) => {
         setSubmitting(true);
         try {
-            await api.put(`/reservations/${id}`, {
+            await api.put(`/api/v1/reservations/${id}`, {
                 party_size: editForm.party_size ? parseInt(editForm.party_size) : undefined,
                 reservation_date: editForm.reservation_date || undefined,
                 reservation_time: editForm.reservation_time || undefined,
@@ -168,7 +168,7 @@ export default function ReservationsWorkspace() {
         if (!newTableNumber) return;
         setSubmitting(true);
         try {
-            await api.post("/tables/", {
+            await api.post("/api/v1/tables/", {
                 table_number: parseInt(newTableNumber),
                 capacity: parseInt(newTableCapacity) || 4,
             });
@@ -181,10 +181,34 @@ export default function ReservationsWorkspace() {
         setSubmitting(false);
     };
 
+    const handleTableSave = async (tableId: number, capacity: number) => {
+        setSubmitting(true);
+        try {
+            await api.put(`/api/v1/tables/${tableId}`, { capacity });
+            showToast("Table updated");
+            await fetchData();
+        } catch (err) {
+            showToast(getErrorMessage(err, "Could not update this table"), "error");
+        }
+        setSubmitting(false);
+    };
+
+    const handleTableDelete = async (tableId: number) => {
+        setSubmitting(true);
+        try {
+            await api.delete(`/api/v1/tables/${tableId}`);
+            showToast("Table removed");
+            await fetchData();
+        } catch (err) {
+            showToast(getErrorMessage(err, "Could not remove this table"), "error");
+        }
+        setSubmitting(false);
+    };
+
     const handleTableStatus = async (tableId: number, status: string) => {
         setSubmitting(true);
         try {
-            await api.post(`/tables/${tableId}/status`, { status });
+            await api.post(`/api/v1/tables/${tableId}/status`, { status });
             await fetchData();
         } catch (err) {
             showToast(getErrorMessage(err, "Failed to update table"), "error");
@@ -241,6 +265,8 @@ export default function ReservationsWorkspace() {
                 submitting={submitting}
                 onAddTable={handleAddTable}
                 onTableStatus={handleTableStatus}
+                onTableSave={handleTableSave}
+                onTableDelete={handleTableDelete}
             />
 
             <ReservationForm

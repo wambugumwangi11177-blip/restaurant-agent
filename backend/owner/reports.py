@@ -57,8 +57,10 @@ def _sales(ctx: OwnerContext, period: str, month: date | None = None) -> dict:
     if not core["orders"]:
         return no_data("No sales recorded in this period.", sales=0.0, orders=0)
     average = round(core["revenue"] / core["orders"], 2)
-    return {**base, "sales": core["revenue"], "orders": core["orders"], "average_order": average,
-            "headline": f"You sold {kes_text(core['revenue'])} from {core['orders']} orders, an average of {kes_text(average)} an order.",
+    orders = core["orders"]
+    order_word = "order" if orders == 1 else "orders"
+    return {**base, "sales": core["revenue"], "orders": orders, "average_order": average,
+            "headline": f"You sold {kes_text(core['revenue'])} from {orders:,} {order_word}, an average of {kes_text(average)} an order.",
             "rows": [row("sales", "Sales", core["revenue"], "kes"), row("orders", "Orders", core["orders"], "count"), row("average_order", "Average order", average, "kes")],
             "assumptions": [assumption("Sales are paid orders that were not cancelled, by the time they were taken. This is not a payment cash-flow report.")],
             "basis": "Paid orders that were not cancelled, by the time they were taken. Not a payment cash-flow report."}
@@ -130,13 +132,24 @@ def compose_report(ctx: OwnerContext, period: str, month: date | None = None) ->
             body = ctx.safe(f"report.{key}", lambda k=key: BUILDERS[k][0](ctx, period, month))
         else:
             body = unavailable("This section is not available yet.", planned=True)
-        body.setdefault("window", rs._window_text(period, month, eat_date(ctx.now)))
+        body.setdefault("window", rs._window_text(period, month, eat_date(ctx.now), ctx.now))
         body.setdefault("rows", [])
         body.setdefault("assumptions", [])
         sections.append({"key": key, "title": title, **body})
     live = [s for s in sections if s["state"] in ("live", "stale", "learning", "as_entered") and not s.get("info")]
     from owner.money.view import period_label
-    label = reports._label(period) if month is None else period_label("month", month, month, month == today_first)
+    label = reports._label(period, ctx.now) if month is None else period_label("month", month, month, month == today_first)
     return {"period": period, "range": label, **({"month": month.strftime("%Y-%m")} if month else {}), "state": live[0]["state"] if live else "no_data",
             "as_of": next((s.get("as_of") for s in live if s.get("as_of")), None), "sections": sections,
             "read": unavailable("LEVIII's read is optional and is left out unless every number in it is backed.", text=None)}
+
+
+def compose_report_notes(ctx: OwnerContext, period: str, month: date | None = None) -> dict:
+    """The insight for a report that was already returned. The report itself never waits on this."""
+    from ai.insight import attach, report_figures
+    payload = compose_report(ctx, period, month)
+    insight = attach(
+        ctx.db, ctx.user, ctx.rid, surface="reports",
+        question=f"Report {period} {payload.get('range')}", data=report_figures(payload),
+    )
+    return {"insight": insight} if insight is not None else {}

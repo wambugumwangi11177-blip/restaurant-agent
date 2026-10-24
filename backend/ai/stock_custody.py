@@ -185,6 +185,10 @@ class TransferConfirmError(Exception):
     the inbound WhatsApp/SMS handler) each translate this into their own error
     surface (HTTPException vs a plain-text reply)."""
 
+    def __init__(self, message: str, status_code: int = 400):
+        super().__init__(message)
+        self.status_code = status_code
+
 
 def confirm_transfer(
     db: Session,
@@ -214,6 +218,15 @@ def confirm_transfer(
         raise TransferConfirmError(f"Transfer already {transfer.status.value}")
     if confirmed_quantity < 0:
         raise TransferConfirmError("confirmed_quantity cannot be negative")
+    # The store and the kitchen are different people. The person who issued
+    # the stock cannot confirm what arrived, and only the kitchen can.
+    if transfer.initiated_by_user_id is None:
+        raise TransferConfirmError("This issue has no sender yet")
+    if confirming_user_id == transfer.initiated_by_user_id:
+        raise TransferConfirmError("A different person must confirm what arrived in the kitchen")
+    confirmer = db.query(models.User).filter(models.User.id == confirming_user_id).first()
+    if confirmer is None or confirmer.staff_role != models.StaffRole.KITCHEN:
+        raise TransferConfirmError("The kitchen must confirm what arrived", 403)
 
     transfer.confirmed_by_user_id = confirming_user_id
     transfer.confirmed_at = utcnow()

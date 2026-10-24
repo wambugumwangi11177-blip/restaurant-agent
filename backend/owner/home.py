@@ -39,13 +39,14 @@ def _mpesa_summary(b: dict) -> dict:
 
 def _pulse(ctx: OwnerContext, period: str) -> dict:
     overview = _overview()
-    start, end = overview._eat_range("today")
+    from time_utils import service_sales_window, trading_window
+    start, end, _service = service_sales_window(ctx.now)
     today = overview._summarize(ctx.db, ctx.rid, start, end)
     base = ctx.order_state()
     # Same weekday last week, over the same elapsed part of the day: a fair comparison at 3 pm.
     last_week = overview._summarize(ctx.db, ctx.rid, start - timedelta(days=7), end - timedelta(days=7))
     vs = round((today["revenue"] - last_week["revenue"]) / last_week["revenue"] * 100, 1) if last_week["revenue"] else None
-    win_start, win_end = overview._eat_range(period)
+    win_start, win_end, _anchor = trading_window(period, ctx.now)
     window = overview._summarize(ctx.db, ctx.rid, win_start, win_end)
     shifts = ctx.cached("cash_shifts", lambda: areas._shifts(ctx))
     if shifts["state"] in ("no_data", "unavailable"):
@@ -61,7 +62,7 @@ def _pulse(ctx: OwnerContext, period: str) -> dict:
             "vs_same_weekday_pct": vs,
             "vs_same_weekday_state": "live" if vs is not None else "learning",
             "sales_in_period": window["revenue"], "orders_in_period": window["orders"],
-            "trend_7d": [{"date": d["date"], "sales": d["revenue"], "orders": d["orders"]} for d in overview._performance(ctx.db, ctx.rid)["revenue_trend"]],
+            "trend_7d": [{"date": d["date"], "sales": d["revenue"], "orders": d["orders"]} for d in overview._performance(ctx.db, ctx.rid, ctx.now)["revenue_trend"]],
             "breakeven_at": ctx.safe("home.breakeven", lambda: areas.breakeven_summary(ctx)),
             "money_match": {"cash": cash, "mpesa": _mpesa_summary(areas._mpesa(ctx))},
             "freshness": {"latest_sale_at": freshness["latest_order_at"], "data_age_days": freshness["data_age_days"],
@@ -91,9 +92,14 @@ def _rank(cards: list[dict]) -> list[dict]:
 
 
 def _card(c: dict) -> dict:
-    return {"id": c["id"], "domain": c["domain"], "sentence": c["title"], "kes_month": kes(c.get("impact_cents_month") or None),
+    from ai.decisions.ranking import score_parts
+    score = score_parts(c.get("impact_cents_month"), c.get("confidence_pct"), c.get("risk"), c.get("difficulty"))
+    card = {"id": c["id"], "domain": c["domain"], "sentence": c["title"], "kes_month": kes(c.get("impact_cents_month") or None),
             "action": c.get("what_to_do", ""), "why": c.get("why", ""), "assumption": c.get("assumption"),
             "decision": {"options": DECISION_OPTIONS}, "tier": "now" if c.get("now") else ("loss" if c.get("kind") == "loss" else "idea")}
+    if score:
+        card["score"] = score
+    return card
 
 
 def ranked_cards(ctx: OwnerContext) -> list[dict]:
@@ -133,7 +139,7 @@ def _coming_up(ctx: OwnerContext) -> dict:
         "bills": ctx.safe("coming_up.bills", lambda: areas.bills_due_block(ctx)),
         "licences": ctx.safe("coming_up.licences", lambda: areas.licences_due_block(ctx)),
         "deliveries": block("as_entered" if deliveries else "no_data", as_of=ctx.now, reason=None if deliveries else "No deliveries expected.",
-                            items=[{"item": d.inventory_item.item_name if d.inventory_item else "", "supplier": d.supplier.name if d.supplier else "",
+                            items=[{"item": (d.inventory_item.item_name if d.inventory_item else "") or (d.notes or "Delivery"), "supplier": d.supplier.name if d.supplier else "",
                                     "expected_at": iso(d.expected_at), "status": d.status} for d in deliveries]),
         "bookings": _bookings(ctx, bookings["covers_today"]),
     }
@@ -162,9 +168,45 @@ def _bookings(ctx: OwnerContext, covers_today: int, days: int = 7) -> dict:
 
 
 def _read(ctx: OwnerContext) -> dict:
+    """LEVIII's read: the same grounded creative note Home can load on its own, written into the page."""
+    import logging
     import feature_flags
+    from ai import creative
     if not feature_flags.is_enabled("ai_narration"):
         return unavailable("LEVIII's read is switched off.", text=None)
+    if not creative.enabled():
+        return unavailable("LEVIII's read has not been written yet.", text=None)
+    from routers.creative import _source_verified, _system_evidence, _today_evidence
+    from time_utils import service_sales_window
+    log = logging.getLogger("owner.home")
+    try:
+        verified, connection = _source_verified(ctx.db, ctx.tenant_id)
+        if verified:
+            result = creative.take(
+                ctx.db, ctx.user, ctx.rid, surface=creative.SURFACE_HOME, period="today",
+                mode=creative.MODE_TODAY_STORY,
+                evidence=lambda: _today_evidence(ctx.db, ctx.user, ctx.rid, "today"),
+                valid_since=service_sales_window(ctx.now)[0],
+            )
+        else:
+            result = creative.take(
+                ctx.db, ctx.user, ctx.rid, surface=creative.SURFACE_HOME, period="any",
+                mode=creative.MODE_SYSTEM_STORY, evidence=lambda: _system_evidence(connection),
+            )
+    except Exception as exc:
+        ctx.db.rollback()
+        log.warning("LEVIII's read failed: %s", exc)
+        try:
+            import sentry_sdk
+            sentry_sdk.capture_exception(exc)
+        except Exception:
+            log.debug("sentry capture skipped", exc_info=True)
+        return unavailable("AI unavailable right now.", text="AI unavailable right now.")
+    text = result.get("text")
+    if text:
+        return block("live", as_of=ctx.now, text=text)
+    if result.get("reason") in (creative.REASON_PROVIDER, creative.REASON_BUDGET, creative.REASON_EVIDENCE):
+        return unavailable("AI unavailable right now.", text="AI unavailable right now.")
     return unavailable("LEVIII's read has not been written yet.", text=None)
 
 
@@ -184,12 +226,17 @@ def _setup(ctx: OwnerContext) -> dict:
 
 
 def compose_home(ctx: OwnerContext, period: str = "today") -> dict:
+    """Numbers only. LEVIII's note and the insight load from compose_home_notes so this response never waits on a model."""
     if period not in PERIODS:
         raise ValueError(f"period must be one of {PERIODS}")
+    from owner import figures
     area_blocks = {key: areas.compose_area(ctx, key) for key in areas.AREAS}
+    drawn = ctx.safe("home.figures", lambda: figures.compose(ctx, area_blocks))
+    from time_utils import service_caption
     return {
         "restaurant": {"id": ctx.rid, "name": ctx.restaurant.name},
         "period": period,
+        "service_caption": service_caption(ctx.now),
         "timezone": "Africa/Nairobi",
         "generated_at": iso(ctx.now),
         "pulse": ctx.safe("home.pulse", lambda: _pulse(ctx, period)),
@@ -197,6 +244,31 @@ def compose_home(ctx: OwnerContext, period: str = "today") -> dict:
         "health": _health(ctx, area_blocks),
         "areas": area_blocks,
         "coming_up": ctx.safe("home.coming_up", lambda: _coming_up(ctx)),
-        "read": _read(ctx),
+        "figures": drawn,
+        "read": unavailable("The note loads on its own, after the numbers.", text=None),
         "setup": _setup(ctx),
     }
+
+
+def compose_home_notes(ctx: OwnerContext, period: str = "today") -> dict:
+    """LEVIII's read and the insight. Separate from the numbers so Home can paint first."""
+    if period not in PERIODS:
+        raise ValueError(f"period must be one of {PERIODS}")
+    from ai.insight import attach, home_figures
+    overview = _overview()
+    from time_utils import service_sales_window, trading_window
+    start, end, _service = service_sales_window(ctx.now)
+    today = overview._summarize(ctx.db, ctx.rid, start, end)
+    last_week = overview._summarize(ctx.db, ctx.rid, start - timedelta(days=7), end - timedelta(days=7))
+    vs = round((today["revenue"] - last_week["revenue"]) / last_week["revenue"] * 100, 1) if last_week["revenue"] else None
+    win_start, win_end, _anchor = trading_window(period, ctx.now)
+    window = overview._summarize(ctx.db, ctx.rid, win_start, win_end)
+    slim = {"period": period, "pulse": {
+        "sales_today": today["revenue"], "orders_today": today["orders"], "vs_same_weekday_pct": vs,
+        "sales_in_period": window["revenue"], "orders_in_period": window["orders"],
+    }}
+    insight = attach(ctx.db, ctx.user, ctx.rid, surface="home", question=f"Home {period}", data=home_figures(slim))
+    notes = {"read": _read(ctx)}
+    if insight is not None:
+        notes["insight"] = insight
+    return notes

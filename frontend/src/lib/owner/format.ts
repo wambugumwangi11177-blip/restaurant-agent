@@ -66,9 +66,40 @@ export function greeting(now: Date = new Date()): string {
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 }
 
-/** "Thursday 15 October" in Nairobi. */
+/** "Thursday 15 October" in Nairobi — the calendar date, not the open service. */
 export function nairobiDate(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-KE", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" }).format(now);
+}
+
+const SERVICE_ROLLOVER_HOUR = 6;
+
+function nairobiYmd(now: Date): { year: number; month: number; day: number; hour: number } {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23",
+  }).formatToParts(now);
+  const num = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  return { year: num("year"), month: num("month"), day: num("day"), hour: num("hour") };
+}
+
+/**
+ * The trading day the open-service figures belong to.
+ * Before 06:00 Nairobi: "Fri 23 Oct service, still open". After: "Sat 24 Oct service".
+ */
+export function serviceCaption(now: Date = new Date()): string {
+  const p = nairobiYmd(now);
+  let year = p.year;
+  let month = p.month;
+  let day = p.day;
+  const stillOpen = p.hour < SERVICE_ROLLOVER_HOUR;
+  if (stillOpen) {
+    const prev = new Date(Date.UTC(year, month - 1, day) - 86_400_000);
+    year = prev.getUTCFullYear();
+    month = prev.getUTCMonth() + 1;
+    day = prev.getUTCDate();
+  }
+  const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const name = `${weekday(iso)} ${shortDay(iso)} service`;
+  return stillOpen ? `${name}, still open` : name;
 }
 
 /** "3:40 pm" in Nairobi. */

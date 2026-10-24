@@ -12,6 +12,7 @@ import PageLoader from "@/components/ui/PageLoader";
 import SkipLink from "@/components/ui/SkipLink";
 import { LogOut, Repeat, Menu as MenuIcon, X, type LucideIcon } from "lucide-react";
 import { tierHome, StaffTier } from "@/lib/permissions";
+import { activeHref } from "@/lib/navActive";
 import { labelForPath } from "@/lib/pathTitle";
 
 export interface TierNavItem {
@@ -69,7 +70,7 @@ export default function TierLayoutShell({
     // with the same MutationObserver guard against Next.js re-asserting its
     // route metadata title after hydration.
     useEffect(() => {
-        const wanted = `${labelForPath(pathname, navItems.map((i) => ({ href: i.href, label: i.label })))} · Chakula`;
+        const wanted = `${labelForPath(pathname, navItems.map((i) => ({ href: i.href, label: i.label })))} · LEVIII`;
         const apply = () => { document.title = wanted; };
         apply();
         const titleEl = document.querySelector("title");
@@ -102,14 +103,14 @@ export default function TierLayoutShell({
                 }`}
             >
                 <div className="px-5 py-5 border-b border-[#1a1a1a] shrink-0">
-                    <h1 className="text-lg font-bold text-[#e5e5e5] tracking-tight">Chakula</h1>
+                    <h1 className="text-lg font-bold text-[#e5e5e5] tracking-tight">LEVIII</h1>
                     <p className="text-xs text-[var(--accent)] mt-0.5 truncate font-medium">{restaurantName}</p>
-                    <p className="text-xs text-[#525252] truncate">{tierLabel}</p>
+                    <p className="text-xs text-[#a3a3a3] truncate">{tierLabel}</p>
                 </div>
 
                 <nav className="flex-1 overflow-y-auto p-3 pb-6 space-y-0.5" aria-label="Main navigation">
                     {navItems.map((item) => {
-                        const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                        const isActive = activeHref(pathname, navItems.map((n) => n.href)) === item.href;
                         return (
                             <Link
                                 key={item.href}
@@ -173,14 +174,14 @@ export default function TierLayoutShell({
                     >
                         {sidebarOpen ? <X className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
                     </button>
-                    <div className="flex items-center gap-4">
+                    <div className="ml-auto flex items-center gap-4">
                         <AttendanceWidget />
                         <NotificationBell />
-                        <div className="text-xs text-[#525252]">{tierLabel}</div>
+                        <div className="text-xs text-[#a3a3a3]">{tierLabel}</div>
                     </div>
                 </header>
 
-                <div className="p-5 max-w-6xl">{children}</div>
+                <div className="w-full p-4 sm:p-6">{children}</div>
             </main>
         </div>
     );

@@ -72,7 +72,7 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
 
     const fetchOrders = useCallback(async () => {
         try {
-            const res = await api.get("/orders/active");
+            const res = await api.get("/api/v1/orders/active");
             setOrders(res.data);
         } catch {
             // Silently retry
@@ -90,7 +90,7 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
     const moveOrder = async (orderId: number, newStatus: string) => {
         setUpdating(orderId);
         try {
-            await api.post(`/orders/${orderId}/status`, { status: newStatus });
+            await api.post(`/api/v1/orders/${orderId}/status`, { status: newStatus });
             await fetchOrders();
         } catch (err) {
             showToast(getErrorMessage(err, "Failed to update order"), "error");
@@ -104,11 +104,11 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
             if (rejectReason.trim()) {
                 const order = orders.find((o) => o.id === orderId);
                 const note = `Rejected: ${rejectReason.trim()}`;
-                await api.post(`/orders/${orderId}/details`, {
+                await api.post(`/api/v1/orders/${orderId}/details`, {
                     notes: order?.notes ? `${order.notes} | ${note}` : note,
                 });
             }
-            await api.post(`/orders/${orderId}/status`, { status: "cancelled" });
+            await api.post(`/api/v1/orders/${orderId}/status`, { status: "cancelled" });
             setRejectingId(null);
             setRejectReason("");
             await fetchOrders();
@@ -124,7 +124,7 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
         try {
             const order = orders.find((o) => o.id === orderId);
             const combined = order?.notes ? `${order.notes} | ${noteText.trim()}` : noteText.trim();
-            await api.post(`/orders/${orderId}/details`, { notes: combined });
+            await api.post(`/api/v1/orders/${orderId}/details`, { notes: combined });
             setNotingId(null);
             setNoteText("");
             await fetchOrders();
@@ -137,7 +137,7 @@ export default function KDSBoard({ readOnly = false }: { readOnly?: boolean }) {
     const logIncident = async (orderId: number) => {
         setUpdating(orderId);
         try {
-            await api.post("/orders/incidents", {
+            await api.post("/api/v1/orders/incidents", {
                 order_id: orderId,
                 incident_type: incidentType,
                 reason: incidentReason,

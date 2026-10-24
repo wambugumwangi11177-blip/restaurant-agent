@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import AnswerCard from "@/components/owner/ask/AnswerCard";
-import { asOwnerAnswer, isGuidance, rowValue, type OwnerAnswer } from "@/lib/owner/ask";
+import { asOwnerAnswer, isGuidance, prefersChat, rowValue, type OwnerAnswer } from "@/lib/owner/ask";
 import what from "./fixtures/owner/ask_what.json";
 import why from "./fixtures/owner/ask_why.json";
 import whatIf from "./fixtures/owner/ask_what_if.json";
@@ -125,11 +125,35 @@ describe("what an owner's words are sent to", () => {
       "What if I raise the price of Chips to 350?", "Compare my branches", "Who should I win back?"]) expect(isGuidance(q), q).toBe(false);
   });
 
+  it("open-ended advice goes to the writing assistant and precise figures stay on the forms", () => {
+    for (const q of ["Any advice on a weekend special?", "What do you think we should try?", "I'm stuck on the lunch menu", "Help me think about a promotion"]) {
+      expect(prefersChat(q), q).toBe(true);
+    }
+    for (const q of ["How were sales today?", "Am I making a profit this month?", "What should I do to make more money?",
+      "How can I find KES 20,000 more a month?", "Why was Tuesday bad?", "What if I raise the price of Chips to 350?",
+      "Compare my branches", "Who should I win back?"]) expect(prefersChat(q), q).toBe(false);
+  });
+
   it("a saved message is one of our answers only if it has a form, a sentence and rows", () => {
     expect(asOwnerAnswer(what)?.form).toBe("what");
     expect(asOwnerAnswer({ module: "ops", answer_text: "x" })).toBeNull();
     expect(asOwnerAnswer(null)).toBeNull();
     expect(asOwnerAnswer("text")).toBeNull();
+  });
+
+  it("the insight sits under the figures and stays labeled as AI-written", () => {
+    show({ ...what, insight: { label: "LEVIII's insight, AI-written", text: "Lunch was the busy service.", state: "live", note: null } });
+    expect(screen.getByText(as(what).headline)).toBeTruthy();
+    const note = screen.getByRole("region", { name: "LEVIII's insight, AI-written" });
+    expect(note.textContent).toContain("Lunch was the busy service.");
+    expect(note.textContent).not.toContain(as(what).headline);
+  });
+
+  it("a failed insight leaves the figures and says the note is unavailable", () => {
+    show({ ...what, insight: { label: "LEVIII's insight, AI-written", text: null, state: "unavailable", note: "insight unavailable" } });
+    expect(screen.getByText(as(what).headline)).toBeTruthy();
+    expect(screen.getByText(shown(what, "sales"))).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("insight unavailable");
   });
 
   it("figures are written the way the rest of the app writes them", () => {

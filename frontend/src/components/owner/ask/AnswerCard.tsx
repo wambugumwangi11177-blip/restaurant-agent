@@ -4,6 +4,7 @@
  * the figures below it; under it the figures themselves, what the answer rests on, and the questions that naturally come next.
  */
 import type { ReactNode } from "react";
+import InsightNote from "@/components/owner/InsightNote";
 import StateChip from "@/components/owner/StateChip";
 import { Assumptions, LABEL, Rows } from "@/components/owner/AnswerParts";
 import { kes, pct } from "@/lib/owner/format";
@@ -116,6 +117,7 @@ export default function AnswerCard({ answer, onAsk }: { answer: OwnerAnswer; onA
       </div>
       <p className="text-sm leading-relaxed">{answer.headline}</p>
       {body}
+      <InsightNote insight={answer.insight} />
       <Assumptions items={answer.assumptions} />
       {answer.next.length > 0 && (
         <div className="flex flex-wrap gap-2" aria-label="Ask next">

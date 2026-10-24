@@ -8,10 +8,12 @@ import { useAuth } from "@/context/AuthContext";
 import { OsLoading, OsError } from "@/components/os/States";
 import SourceUnavailable from "@/components/owner/SourceUnavailable";
 import CreativeNote from "@/components/owner/CreativeNote";
+import InsightNote from "@/components/owner/InsightNote";
 import StateChip from "@/components/owner/StateChip";
 import ReportSectionCard from "@/components/owner/reports/ReportSectionCard";
 import { lastMonths } from "@/lib/owner/format";
 import { tenantConfig } from "@/lib/tenantConfig";
+import type { Insight } from "@/lib/owner/types";
 import type { OwnerReport, ReportPeriod } from "@/lib/owner/reportTypes";
 
 const observerMode = process.env.NEXT_PUBLIC_OBSERVER_MODE === "true";
@@ -25,7 +27,7 @@ type SourceConnection = {
 };
 
 const TABS: { id: ReportPeriod; label: string; hint: string }[] = [
-  { id: "daily", label: "Daily", hint: "Did today go to plan?" },
+  { id: "daily", label: "Daily", hint: "The open service" },
   { id: "weekly", label: "Weekly", hint: "How did the week perform?" },
   { id: "monthly", label: "Monthly", hint: "The full Profit & Loss" },
   { id: "yearly", label: "Yearly", hint: "The trends" },
@@ -59,6 +61,7 @@ function ReportsContent() {
   const [period, setPeriod] = useState<ReportPeriod>("daily");
   const [month, setMonth] = useState<string | null>(null);        // null: the month so far
   const [report, setReport] = useState<OwnerReport | null>(null);
+  const [insight, setInsight] = useState<Insight | null>(null);
   const [err, setErr] = useState(false);
   const [connection, setConnection] = useState<SourceConnection | null>(null);
   const requestId = useRef(0);
@@ -76,9 +79,15 @@ function ReportsContent() {
 
   const load = useCallback((p: ReportPeriod, m: string | null) => {
     const id = ++requestId.current;
-    setErr(false); setReport(null);
+    setErr(false); setReport(null); setInsight(null);
     api.get<OwnerReport>(`/api/v1/owner/report/${p}`, { params: p === "monthly" && m ? { month: m } : undefined })
-      .then((r) => { if (id === requestId.current) setReport(r.data); })
+      .then((r) => {
+        if (id !== requestId.current) return;
+        setReport(r.data);
+        api.get<{ insight?: Insight | null }>(`/api/v1/owner/report/${p}/notes`, { params: p === "monthly" && m ? { month: m } : undefined })
+          .then((note) => { if (id === requestId.current) setInsight(note.data?.insight ?? null); })
+          .catch(() => { /* The report is already on screen. A missing note does not fail it. */ });
+      })
       .catch(() => { if (id === requestId.current) setErr(true); });
   }, []);
   useEffect(() => {
@@ -140,6 +149,7 @@ function ReportsContent() {
           <div className="space-y-3">
             {report.sections.map((s) => <ReportSectionCard key={s.key} section={s} period={report.period} />)}
           </div>
+          <InsightNote insight={insight} />
         </>
       )}
     </div>

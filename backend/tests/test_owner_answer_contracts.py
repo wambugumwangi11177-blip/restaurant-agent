@@ -110,7 +110,7 @@ def test_slow_days_answer_is_specific_and_grounded(monkeypatch, db_session, rest
     })
     answer = _answer_revenue(db_session, r.id, "Which days are slow?")
     assert answer["finding"].startswith("Monday is the slowest recorded day")
-    assert "KSh 120" in answer["finding"]          # cents -> KES, not KSh 12,000
+    assert "KES 120" in answer["finding"]          # cents -> KES, not KES 12,000
     assert answer["data"]["narrative_allowed"] is False
     assert "Friday" in answer["steps"][1]["action"]
 
@@ -148,6 +148,130 @@ def test_slow_days_without_any_recorded_orders_is_unavailable(monkeypatch, db_se
     assert answer["finding"] == "The data needed to answer this question is unavailable."
 
 
+def test_what_did_i_sell_yesterday_is_that_days_sales_not_the_health_score(db_session):
+    """A plain sales question names the day. It must not fall through to the health score."""
+    from datetime import datetime, time, timedelta
+    import models
+    from owner import ask
+    from routers.ai_ask import _answer_revenue
+    from routers.overview import _EAT_OFFSET, _eat_now
+
+    assert ask.classify("What did I sell yesterday?") == ("what", "revenue")
+    tenant = models.Tenant(name="Sales Day")
+    db_session.add(tenant)
+    db_session.commit()
+    restaurant_row = models.Restaurant(tenant_id=tenant.id, name="Sales Day", address="Nairobi")
+    db_session.add(restaurant_row)
+    db_session.commit()
+    from time_utils import service_day
+    now = _eat_now()
+    # "Yesterday" is the day before the open service day (06:00 Nairobi rollover), not the calendar day.
+    yesterday = service_day() - timedelta(days=1)
+    yesterday_at = datetime.combine(yesterday, time(15, 0)) - _EAT_OFFSET
+    # Today's sales window ends at the current minute, so the sale has to be earlier today.
+    today_wall = now - timedelta(seconds=1)
+    if today_wall.date() != now.date():
+        today_wall = now
+    today_at = today_wall - _EAT_OFFSET
+    db_session.add(models.Order(
+        restaurant_id=restaurant_row.id, total=25_000, is_paid=True, status=models.OrderStatus.SERVED, created_at=yesterday_at,
+    ))
+    db_session.add(models.Order(
+        restaurant_id=restaurant_row.id, total=10_000, is_paid=True, status=models.OrderStatus.SERVED, created_at=today_at,
+    ))
+    db_session.commit()
+    answer = _answer_revenue(db_session, restaurant_row.id, "What did I sell yesterday?")
+    assert answer["finding"].startswith("Yesterday you sold")
+    assert "KES 250" in answer["finding"]
+    assert "1 paid" in answer["finding"]
+    assert "health score" not in answer["finding"].lower()
+    from time_utils import service_sales_window
+    start, end, _service = service_sales_window()
+    expected = 0
+    if start <= yesterday_at < end:
+        expected += 250
+    if start <= today_at < end:
+        expected += 100
+    assert start <= today_at < end
+    today = _answer_revenue(db_session, restaurant_row.id, "How are my sales today?")
+    assert today["finding"].startswith("Revenue today is")
+    assert f"KES {expected:,}" in today["finding"]
+
+
+def _sales_pair(db_session, monkeypatch, frozen):
+    """A restaurant and the two Ask answers for 'today', with the clock frozen."""
+    import models
+    from owner.answer_why import build
+    from owner.states import OwnerContext
+    from routers.ai_ask import _answer_revenue
+    monkeypatch.setattr("time_utils.utcnow", lambda: frozen)
+    monkeypatch.setattr("routers.overview.utcnow", lambda: frozen)
+    monkeypatch.setattr("owner.states.utcnow", lambda: frozen)
+    tenant = models.Tenant(name="Service Day")
+    db_session.add(tenant)
+    db_session.commit()
+    restaurant_row = models.Restaurant(tenant_id=tenant.id, name="Service Day", address="Nairobi")
+    db_session.add(restaurant_row)
+    db_session.commit()
+    user = models.User(tenant_id=tenant.id, email=f"svc-{restaurant_row.id}@example.com",
+                       hashed_password="unused", role=models.Role.ADMIN)
+    db_session.add(user)
+    db_session.commit()
+    return restaurant_row, lambda: (
+        _answer_revenue(db_session, restaurant_row.id, "How were sales today?"),
+        build(OwnerContext(db_session, user, restaurant_row), "Why were sales down today?"),
+    )
+
+
+def test_sales_today_and_why_today_agree_before_the_morning_rollover(db_session, monkeypatch):
+    """01:30 Nairobi is still the previous service. Both answers count the same paid orders."""
+    from datetime import datetime
+    import models
+    restaurant_row, answers = _sales_pair(db_session, monkeypatch, datetime(2026, 10, 23, 22, 30))
+    def add(when, total, **extra):
+        db_session.add(models.Order(
+            restaurant_id=restaurant_row.id, total=total, is_paid=True,
+            status=models.OrderStatus.SERVED, created_at=when, **extra,
+        ))
+    add(datetime(2026, 10, 23, 19, 0), 1_634_000)          # Friday 22:00 Nairobi
+    add(datetime(2026, 10, 23, 21, 30), 20_000)            # Saturday 00:30 Nairobi, still this service
+    add(datetime(2026, 10, 22, 12, 0), 999_900)            # Thursday afternoon, a different service
+    db_session.add(models.Order(                          # unpaid, ignored by both
+        restaurant_id=restaurant_row.id, total=50_000, is_paid=False,
+        status=models.OrderStatus.READY, created_at=datetime(2026, 10, 23, 20, 0),
+    ))
+    db_session.add(models.Order(                          # cancelled, ignored by both
+        restaurant_id=restaurant_row.id, total=40_000, is_paid=True,
+        status=models.OrderStatus.CANCELLED, created_at=datetime(2026, 10, 23, 19, 30),
+    ))
+    db_session.commit()
+    what, why = answers()
+    assert "KES 16,540" in what["finding"]
+    assert "2 paid" in what["finding"]
+    sales = next(row for row in why["rows"] if row["key"] == "sales")
+    assert sales["value"] == 16540
+
+
+def test_sales_today_after_rollover_does_not_keep_the_previous_service(db_session, monkeypatch):
+    from datetime import datetime
+    import models
+    restaurant_row, answers = _sales_pair(db_session, monkeypatch, datetime(2026, 10, 24, 12, 0))  # Saturday 15:00 Nairobi
+    db_session.add(models.Order(
+        restaurant_id=restaurant_row.id, total=1_634_000, is_paid=True,
+        status=models.OrderStatus.SERVED, created_at=datetime(2026, 10, 23, 19, 0),  # Friday 22:00
+    ))
+    db_session.add(models.Order(
+        restaurant_id=restaurant_row.id, total=10_000, is_paid=True,
+        status=models.OrderStatus.SERVED, created_at=datetime(2026, 10, 24, 7, 0),  # Saturday 10:00
+    ))
+    db_session.commit()
+    what, why = answers()
+    assert "KES 100" in what["finding"]
+    assert "KES 16,340" not in what["finding"]
+    sales = next(row for row in why["rows"] if row["key"] == "sales")
+    assert sales["value"] == 100
+
+
 def test_ordinary_revenue_question_is_unaffected_by_the_slow_day_branch(monkeypatch, db_session, restaurant):
     from ai import revenue_forecaster
     _, r = restaurant
@@ -177,3 +301,23 @@ def test_slow_days_answer_runs_against_the_real_forecaster(db_session, restauran
     assert all(row["total_orders"] > 0 for row in ranking)
     assert answer["finding"].startswith(ranking[0]["day"] + " is the slowest recorded day")
     assert answer["steps"] and answer["steps"][0]["action"].startswith(ranking[0]["day"])
+
+
+def test_yesterday_before_the_morning_rollover_is_the_day_before_the_open_service(db_session, monkeypatch):
+    """01:30 Saturday Nairobi: today is Friday's service, so yesterday is Thursday. The two must not overlap."""
+    from datetime import datetime
+    import models
+    from owner.answer_why import build
+    from owner.states import OwnerContext
+    from routers.ai_ask import _answer_revenue
+    restaurant_row, answers = _sales_pair(db_session, monkeypatch, datetime(2026, 10, 23, 22, 30))
+    for when, total in ((datetime(2026, 10, 23, 19, 0), 1_634_000),   # Friday 22:00 Nairobi, the open service
+                        (datetime(2026, 10, 22, 12, 0), 999_900)):    # Thursday 15:00 Nairobi
+        db_session.add(models.Order(restaurant_id=restaurant_row.id, total=total, is_paid=True,
+                                    status=models.OrderStatus.SERVED, created_at=when))
+    db_session.commit()
+    what = _answer_revenue(db_session, restaurant_row.id, "What did I sell yesterday?")
+    assert "KES 9,999" in what["finding"] and "1 paid" in what["finding"], what["finding"]
+    user = db_session.query(models.User).filter_by(tenant_id=restaurant_row.tenant_id).first()
+    why = build(OwnerContext(db_session, user, restaurant_row), "Why were sales down yesterday?")
+    assert why["day"] == "2026-10-22"

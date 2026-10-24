@@ -69,7 +69,7 @@ it("My Money: two dials against the owner's own targets, costs covered, the cash
   open("money");
   const dials = within(panel("Ingredients and wages")).getAllByRole("img");
   expect(dials.map((d) => d.getAttribute("aria-label"))).toEqual([
-    "Out of every KES 100, ingredients: 29.3%, Fine. Your target is 35%.", "Out of every KES 100, wages: 28.2%, Fine. Your target is 32%."]);
+    "Overall, last 30 days: out of every KES 100, ingredients: 29.3%, Fine. Your target is 35%.", "Out of every KES 100, wages: 28.2%, Fine. Your target is 32%."]);
   expect(within(panel("Costs covered")).getByText("Covered at 12:31 pm")).toBeTruthy();
   const bills = panel("Bills coming up");
   expect(within(bills).getByText(/You will be KES 19,406 short on 18 Oct, when Rent falls due\./)).toBeTruthy();
@@ -124,8 +124,8 @@ it("Sales & Dishes: the 30-day outlook is a range, win-back counts the regulars,
 it("Store & Suppliers: the item that went missing is named with how much, how far off, and what it is worth", () => {
   open("store");
   const missing = panel("Missing stock");
-  expect(within(missing).getByText("Beef")).toBeTruthy();
-  expect(within(missing).getByText("34.2% off")).toBeTruthy();
+  expect(within(missing).getAllByText("Beef").length).toBeGreaterThan(0);
+  expect(within(missing).getByText("34.2% off, last 7 days")).toBeTruthy();
   expect(missing.textContent).toMatch(/Used 9.91 kg; your sales explain 7.38 kg\. That is 2.53 kg more, worth KES 2,021\./);
   expect(within(missing).getByText(/not a finding about anyone/)).toBeTruthy();
   expect(within(panel("Store-to-kitchen handovers")).getByText(/the store said 4 kg, the kitchen counted 3.8 kg/)).toBeTruthy();

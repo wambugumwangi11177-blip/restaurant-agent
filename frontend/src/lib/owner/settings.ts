@@ -34,6 +34,7 @@ export function formatSetting(field: Pick<SettingField, "unit">, value: number):
   if (!unit) return String(n);
   if (unit === "%") return `${n}%`;
   if (unit === "KES") return `KES ${n.toLocaleString("en-KE")}`;
+  if (unit === "× average") return `${Math.round(n * 100)}% of an average dish`;
   return `${n} ${unit}`;
 }
 

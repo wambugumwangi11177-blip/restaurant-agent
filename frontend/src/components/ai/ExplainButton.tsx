@@ -20,7 +20,7 @@ export function ExplainButton({ item, label }: { item: object; label?: string })
         if (state === "loading") return;
         setState("loading");
         try {
-            const res = await api.post("/ai/explain", { item, label });
+            const res = await api.post("/api/v1/ai/explain", { item, label });
             if (res.data?.available && res.data.explanation) {
                 const n = res.data.explanation;
                 const extra = (n.actions || []).slice(0, 1).map((a: { action?: string }) => a.action).join(" ");

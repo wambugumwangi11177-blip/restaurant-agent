@@ -6,9 +6,10 @@
  * greeted by time of day, with AI invisible in the framing.
  */
 import { RefreshCw } from "lucide-react";
+import { nairobiClock } from "@/lib/format";
 
 function greeting(): string {
-    const h = new Date().getHours();
+    const h = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Nairobi", hour: "2-digit", hourCycle: "h23" }).format(new Date()));
     if (h < 12) return "Good morning";
     if (h < 17) return "Good afternoon";
     return "Good evening";
@@ -34,7 +35,7 @@ export default function OverviewHeader({
                 className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface border border-border text-text-muted hover:text-text text-sm transition-colors"
             >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>{lastUpdated ? lastUpdated.toLocaleTimeString() : "Refresh"}</span>
+                <span>{lastUpdated ? nairobiClock(lastUpdated) : "Refresh"}</span>
             </button>
         </div>
     );

@@ -27,13 +27,6 @@ from routers import ai_ask, overview
 
 router = APIRouter(prefix="/ai/creative", tags=["ai"])
 
-_WINDOW_LABEL = {
-    "1h": "the last hour",
-    "today": "today so far (Nairobi time)",
-    "7d": "the last 7 days",
-    "30d": "the last 30 days",
-}
-
 _CONNECTION_IN_WORDS = {
     "receiving": ("MacSoft has started delivering records, but the delivery has not passed a clean "
                   "reconciliation, so restaurant figures are not yet treated as verified."),
@@ -60,7 +53,8 @@ def _today_evidence(db: Session, user, rid: int, period: str) -> dict:
     are really recorded are included: overview's kitchen, waitlist, expiry and
     overtime slots are placeholders, so they are listed as not_available instead
     of being passed on as zeros the model could narrate."""
-    start, end = overview._eat_range(period)
+    from time_utils import period_label, trading_window
+    start, end, service = trading_window(period)
     core = overview._summarize(db, rid, start, end)
     op_start, op_end = overview._eat_range("today")
     stock = overview._stock_card(db, rid)
@@ -75,22 +69,26 @@ def _today_evidence(db: Session, user, rid: int, period: str) -> dict:
         # transaction and take the metering write down with it.
         with db.begin_nested():
             cards = overview._attention_cards(db, rid, user.tenant_id)
-        attention = [{"area": c["domain"], "title": c["title"]} for c in cards[:3]]
+        attention = [{"area": c["domain"], "title": creative.clean_dish_name(c["title"]),
+                      "why": c.get("why") or "", "period": c.get("period") or "see why"} for c in cards[:3]]
     except Exception:
         attention = []
 
     evidence: dict = {
-        "date": now_eat.date().isoformat(),
-        "weekday": now_eat.strftime("%A"),
-        "sales_window": _WINDOW_LABEL[period],
+        "date": (service or now_eat.date()).isoformat(),
+        "weekday": (service or now_eat.date()).strftime("%A"),
+        "sales_window": period_label(period),
         "sales": {
+            "period": period_label(period),
             "revenue_kes": round(core["revenue"]),
             "paid_orders": core["orders"],
             "average_order_kes": round(core["revenue"] / core["orders"]) if core["orders"] else None,
         },
         "today_operations": {
+            "period": "the Nairobi calendar day (bookings and shifts; not the sales service day)",
             "recorded_stock_items": stock["recorded_items"],
-            "low_stock_items": [{"name": i["name"], "quantity_left": i["qty"]} for i in stock["low_stock"][:3]],
+            "low_stock_items": [{"name": creative.clean_dish_name(i["name"]), "quantity_left": i["qty"],
+                                 "period": "quantity on hand now"} for i in stock["low_stock"][:3]],
             "low_stock_count": len(stock["low_stock"]),
             "confirmed_booking_covers": bookings["covers_today"],
             "shifts_scheduled": staff["scheduled"],
@@ -137,7 +135,11 @@ def creative_home(
     verified, connection = _source_verified(db, user.tenant_id)
     if verified:
         # A "today" story must never be served on a later calendar day.
-        valid_since = overview._eat_range("today")[0] if period == "today" else None
+        if period == "today":
+            from time_utils import service_sales_window
+            valid_since = service_sales_window()[0]
+        else:
+            valid_since = None
         return creative.take(
             db, user, rid, surface=creative.SURFACE_HOME, period=period, mode=creative.MODE_TODAY_STORY,
             evidence=lambda: _today_evidence(db, user, rid, period), refresh=refresh, valid_since=valid_since,

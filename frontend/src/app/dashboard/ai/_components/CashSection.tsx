@@ -22,7 +22,7 @@ export default function CashSection() {
 
     const fetchReport = useCallback(() => {
         setLoading(true);
-        api.get("/cash-reconciliation/report", { params: { hours: 24 } })
+        api.get("/api/v1/cash-reconciliation/report", { params: { hours: 24 } })
             .then(res => setReport(res.data))
             .catch(() => setError("Could not load reconciliation report"))
             .finally(() => setLoading(false));
@@ -38,7 +38,7 @@ export default function CashSection() {
         try {
             const now = new Date();
             const start = new Date(now.getTime() - 24 * 3600 * 1000);
-            await api.post("/cash-reconciliation/counts", {
+            await api.post("/api/v1/cash-reconciliation/counts", {
                 counted_amount_cents: Math.round(kes * 100),
                 window_start: start.toISOString(),
                 window_end: now.toISOString(),

@@ -26,7 +26,7 @@ export default function AddMenuItemForm({ onAdded, onClose, showToast }: AddMenu
         e.preventDefault();
         setSaving(true);
         try {
-            await api.post("/menu/", {
+            await api.post("/api/v1/menu/", {
                 name: form.name,
                 price: Math.round(parseFloat(form.price) * 100),
                 category: form.category,

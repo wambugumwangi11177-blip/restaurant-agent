@@ -273,8 +273,15 @@ def _context(db: Session, user: models.User) -> OwnerContext:
 @router.get("/home")
 def home(period: str = Query("today", pattern="^(today|7d|30d)$"), db: Session = Depends(get_db),
          user: models.User = Depends(_owner_only)):
-    """Home in one call: pulse, costing-you-money, health tiles, the six areas, coming up, LEVIII's read."""
+    """Home in one call: pulse, costing-you-money, health tiles, the six areas, coming up. The note is /home/notes."""
     return owner_home.compose_home(_context(db, user), period)
+
+
+@router.get("/home/notes")
+def home_notes(period: str = Query("today", pattern="^(today|7d|30d)$"), db: Session = Depends(get_db),
+               user: models.User = Depends(_owner_only)):
+    """LEVIII's read and the insight. Home does not wait on this."""
+    return owner_home.compose_home_notes(_context(db, user), period)
 
 
 @router.get("/area/{key}")
@@ -301,6 +308,23 @@ def report(period: str, month: Optional[str] = Query(None, description="monthly 
         except ValueError as e:
             raise HTTPException(422, str(e)) from None
     return owner_reports.compose_report(_context(db, user), period, first)
+
+
+@router.get("/report/{period}/notes")
+def report_notes(period: str, month: Optional[str] = Query(None), db: Session = Depends(get_db),
+                 user: models.User = Depends(_owner_only)):
+    """The report insight, after the report itself. A month applies only to the monthly report."""
+    if period not in owner_reports.PERIODS:
+        raise HTTPException(404, "Unknown report")
+    first = None
+    if month is not None:
+        if period != "monthly":
+            raise HTTPException(422, "A month can only be chosen for the monthly report")
+        try:
+            first = parse_month(month)
+        except ValueError as e:
+            raise HTTPException(422, str(e)) from None
+    return owner_reports.compose_report_notes(_context(db, user), period, first)
 
 
 class AskBody(BaseModel):

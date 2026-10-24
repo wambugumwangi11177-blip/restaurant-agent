@@ -35,7 +35,7 @@ export default function ProfitFull() {
         <div>
             <StatGrid stats={[
                 { label: "Gross Margin", value: `${s.gross_margin_pct ?? 0}%`, tone: (s.gross_margin_pct ?? 0) >= 55 ? "ok" : "warn" },
-                { label: "Food Cost", value: `${s.food_cost_pct ?? 0}%`, tone: (s.food_cost_pct ?? 0) <= 35 ? "ok" : "warn" },
+                { label: "Overall food cost, last 30 days", value: `${s.food_cost_pct ?? 0}%`, tone: (s.food_cost_pct ?? 0) <= 35 ? "ok" : "warn" },
                 { label: "Profit Leaks", value: String(s.profit_leaks_found ?? 0), tone: (s.profit_leaks_found ?? 0) > 0 ? "warn" : "ok" },
                 { label: "Leak Amount", value: money(s.total_leak_amount) },
             ]} />

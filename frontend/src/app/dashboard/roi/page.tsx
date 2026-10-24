@@ -22,7 +22,7 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { formatKES } from "@/lib/format";
+import { formatKES, nairobiClock } from "@/lib/format";
 import { HowItWorks } from "@/components/ai/HowItWorks";
 import { NarrativeBlock, type Narrative } from "@/components/ai/NarrativeBlock";
 import { Clock, TrendingUp, Target, RefreshCw, AlertTriangle, Zap, ChefHat, Scale, CalendarClock } from "lucide-react";
@@ -70,6 +70,8 @@ interface RoiData {
         ai_cost_cents: number;
         value_delivered_cents: number;
         roi_multiple: number | null;
+        roi_note?: string;
+        roi_capped?: boolean;
     };
     projection?: {
         annual_hours_saved: number;
@@ -101,15 +103,18 @@ export default function RoiDashboard() {
     const restaurantName = user?.restaurant_name || "Your Restaurant";
 
     const fetchData = async () => {
-        setLoading(true);
         setError("");
+        if (!data) setLoading(true);
         try {
-            const res = await api.get("/ai/roi");
+            const res = await api.get("/api/v1/ai/roi", { params: { narrate: false } });
             setData(res.data);
             setLastUpdated(new Date());
+            setLoading(false);
+            api.get("/api/v1/ai/roi", { params: { narrate: true }, timeout: 60000 })
+                .then((note) => { setData(note.data); setLastUpdated(new Date()); })
+                .catch(() => { /* numbers stay up; the note can fail on its own */ });
         } catch (e) {
             setError(getErrorMessage(e, "Could not load ROI data"));
-        } finally {
             setLoading(false);
         }
     };
@@ -198,7 +203,7 @@ export default function RoiDashboard() {
                     className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface border border-border text-text-muted hover:text-text text-sm transition-colors"
                 >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    <span>{lastUpdated ? lastUpdated.toLocaleTimeString() : "Refresh"}</span>
+                    <span>{lastUpdated ? nairobiClock(lastUpdated) : "Refresh"}</span>
                 </button>
             </div>
 
@@ -298,7 +303,7 @@ export default function RoiDashboard() {
             {/* Net ROI — the "is it worth what it costs?" answer. Only shown once
                 there's metered AI spend to divide by; otherwise it would be a
                 divide-by-zero dressed up as a number. */}
-            {econ && econ.roi_multiple !== null && econ.roi_multiple !== undefined && (
+            {econ && (econ.roi_multiple != null || econ.roi_note) && (
                 <div className="rounded-xl border border-[var(--accent)]/30 bg-gradient-to-br from-[var(--accent)]/[0.07] to-transparent p-5">
                     <div className="flex items-center gap-2 text-[var(--accent)] mb-2">
                         <Scale className="w-4 h-4" />
@@ -306,16 +311,13 @@ export default function RoiDashboard() {
                     </div>
                     <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
                         <p className="text-3xl font-black text-text">
-                            {econ.roi_multiple}× <span className="text-base font-bold text-text-muted">return</span>
-                        </p>
-                        <p className="text-[#a3a3a3] text-sm mb-1">
-                            Every <span className="text-text font-medium">{formatKES(100)}</span> spent on AI returned{" "}
-                            <span className="text-emerald-400 font-medium">{formatKES(Math.round(econ.roi_multiple * 100))}</span> in value.
+                            {econ.roi_multiple == null ? "Not a multiple" : `${econ.roi_multiple}×`}
+                            {econ.roi_capped && <span className="text-base font-bold text-text-muted"> capped</span>}
                         </p>
                     </div>
                     <p className="text-[11px] text-text-dim mt-2">
-                        {formatKES(econ.value_delivered_cents)} value delivered (time saved + profit captured) vs{" "}
-                        {formatKES(econ.ai_cost_cents)} in AI cost, last {days} days. Opportunities not yet captured are excluded — this counts only real money.
+                        {formatKES(econ.value_delivered_cents)} is staff time plus captured profit, against{" "}
+                        {formatKES(econ.ai_cost_cents)} of model spend, last {days} days. {econ.roi_note || "This is not cash in the till."}
                     </p>
                     <HowItWorks id="roi_net" />
                 </div>

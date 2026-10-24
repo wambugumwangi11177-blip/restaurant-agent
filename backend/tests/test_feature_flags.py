@@ -10,8 +10,12 @@ from ai.reasoning import narrator
 def test_registered_default_when_env_unset(monkeypatch):
     monkeypatch.delenv("FEATURE_AI_NARRATION", raising=False)
     monkeypatch.delenv("FEATURE_CONVERSATION_MEMORY", raising=False)
+    monkeypatch.delenv("FEATURE_CREATIVE_LAYER", raising=False)
+    monkeypatch.delenv("FEATURE_WHATSAPP", raising=False)
     assert feature_flags.is_enabled("ai_narration") is True          # default on
     assert feature_flags.is_enabled("conversation_memory") is False   # default off
+    assert feature_flags.is_enabled("creative_layer") is True         # on once a provider key exists
+    assert feature_flags.is_enabled("whatsapp") is False              # shelved; the demo does not send
 
 
 def test_env_override_truthy_and_falsy(monkeypatch):

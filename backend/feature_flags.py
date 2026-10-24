@@ -47,9 +47,13 @@ _FLAGS: dict[str, tuple[bool, str]] = {
     "autonomous_strategist": (False, "Weekly unattended strategist review, pushed via WhatsApp/in-app; spends LLM tokens."),
     # Third bounded LLM role (ADR 0007): warm, temperature > 0 writing on Home, OS
     # and Reports. It only ever renders figures already in the evidence it was
-    # given, but it spends tokens on page load, so it defaults OFF and is also
-    # gated by ai_narration + a configured provider.
-    "creative_layer": (False, "Creative (stochastic) LLM layer on Home, OS and Reports; spends LLM tokens."),
+    # given. On by default so a configured provider writes the note; it still
+    # spends nothing until ai_narration is on and a provider key is set.
+    # FEATURE_CREATIVE_LAYER=false turns the notes off without stopping other narration.
+    "creative_layer": (True, "Creative (stochastic) LLM layer on Home, OS and Reports; spends LLM tokens when a provider key is set."),
+    # WhatsApp / Twilio is shelved until several clients need it. The code stays;
+    # nothing in the demo sends a phone message while this is off.
+    "whatsapp": (False, "Outbound WhatsApp/Twilio agent. Off: the demo does not send phone messages."),
 }
 
 _TRUTHY = {"1", "true", "yes", "on"}

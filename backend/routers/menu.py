@@ -110,6 +110,12 @@ async def delete_menu_item(
     if not db_item:
         raise HTTPException(status_code=404, detail="Menu item not found")
 
+    # Scheduled prices mean nothing without the dish (migration 059 cascades on Postgres). Deleting them here as
+    # well keeps SQLite, which does not enforce foreign keys by default, from leaving orphan price rows.
+    db.query(models.ScheduledMenuPrice).filter(
+        models.ScheduledMenuPrice.menu_item_id == db_item.id,
+        models.ScheduledMenuPrice.restaurant_id == restaurant.id,
+    ).delete(synchronize_session=False)
     db.delete(db_item)
     try:
         db.commit()

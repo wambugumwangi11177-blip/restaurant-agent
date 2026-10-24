@@ -65,8 +65,7 @@ def provider(monkeypatch):
         monkeypatch.setattr(llm_client, "is_available", lambda: True)
         monkeypatch.setattr(llm_client, "model_for_tier", lambda tier: f"model-for-{tier}")
         monkeypatch.setattr(llm_client, "chat_with_usage", stub)
-        if creative_on:
-            monkeypatch.setenv("FEATURE_CREATIVE_LAYER", "true")
+        monkeypatch.setenv("FEATURE_CREATIVE_LAYER", "true" if creative_on else "false")
         return stub
     return install
 
@@ -91,28 +90,28 @@ EVIDENCE = json.dumps({"revenue_kes": 500, "orders": 12, "average_order_kes": 42
 def test_invented_figure_drops_only_its_sentence():
     text, dropped = creative.keep_grounded_sentences(
         "Revenue reached KSh 500. Try a 25% discount. Keep the grill warm.", EVIDENCE)
-    assert text == "Revenue reached KSh 500. Keep the grill warm."
+    assert text == "Revenue reached KES 500. Keep the grill warm."
     assert dropped == 1
 
 
-def test_mostly_invented_text_is_discarded():
+def test_one_grounded_sentence_is_kept():
     text, dropped = creative.keep_grounded_sentences(
         "Revenue hit KSh 9,999. Orders reached 77. Sales rose 31%. Keep the grill warm.", EVIDENCE)
-    assert text is None
+    assert text == "Keep the grill warm."
     assert dropped == 3
 
 
-def test_half_dropped_is_kept_more_than_half_is_not():
+def test_a_single_grounded_sentence_survives_several_invented_ones():
     two_of_four, _ = creative.keep_grounded_sentences("KSh 500 today. KSh 777 more. Warm day. Fresh air.", EVIDENCE)
     assert two_of_four is not None
     one_of_three, _ = creative.keep_grounded_sentences("KSh 777 more. KSh 888 less. Warm day.", EVIDENCE)
-    assert one_of_three is None
+    assert one_of_three == "Warm day."
 
 
 def test_bullets_and_lines_survive_filtering():
     text, dropped = creative.keep_grounded_sentences(
         "- Revenue reached KSh 500.\n- Try a 25% discount.\n\n- Keep the grill warm.", EVIDENCE)
-    assert text == "- Revenue reached KSh 500.\n\n- Keep the grill warm."
+    assert text == "- Revenue reached KES 500.\n\n- Keep the grill warm."
     assert dropped == 1
 
 
@@ -125,7 +124,7 @@ def test_empty_and_overlong_text():
 def test_owner_words_count_as_grounding():
     source = EVIDENCE + "\nOur rent is KSh 80,000 a month"
     text, dropped = creative.keep_grounded_sentences("You said KSh 80,000 is the rent.", source)
-    assert text == "You said KSh 80,000 is the rent." and dropped == 0
+    assert text == "You said KES 80,000 is the rent." and dropped == 0
 
 
 def test_reasoning_blocks_are_stripped():
@@ -212,6 +211,26 @@ def test_home_receiving_but_unreconciled_is_still_the_system_story(client, db_se
     assert "clean reconciliation" in stub.outbound
 
 
+def test_owner_home_read_is_the_grounded_note(client, db_session, scoped_owner, provider, source):
+    _, headers = scoped_owner
+    provider("Revenue is KSh 500 today. Try a lunch special.")
+    verify_source(db_session, source)
+    add_paid_order(db_session, total_cents=50000)
+    numbers = client.get("/api/v1/owner/home", headers=headers).json()
+    assert numbers["read"]["text"] is None
+    body = client.get("/api/v1/owner/home/notes", headers=headers).json()
+    assert "KES 500" in (body["read"]["text"] or "")
+    assert body["read"]["state"] == "live"
+
+
+def test_owner_home_read_stays_unwritten_when_the_creative_layer_is_off(client, scoped_owner, provider):
+    _, headers = scoped_owner
+    stub = provider("Revenue is KSh 500.", creative_on=False)
+    body = client.get("/api/v1/owner/home", headers=headers).json()
+    assert body["read"]["text"] is None
+    assert stub.calls == []
+
+
 def test_home_verified_source_tells_todays_story_from_recorded_figures(
         client, db_session, scoped_owner, provider, source):
     _, headers = scoped_owner
@@ -222,7 +241,7 @@ def test_home_verified_source_tells_todays_story_from_recorded_figures(
     assert response.status_code == 200, response.text
     body = response.json()
     assert (body["mode"], body["period"]) == ("today_story", "today")
-    assert body["text"] == "Revenue is KSh 500 today. Try a lunch special."
+    assert body["text"] == "Revenue is KES 500 today. Try a lunch special."
     (messages, _), = stub.calls
     evidence = messages[0]["content"]
     assert '"revenue_kes": 500' in evidence and '"paid_orders": 1' in evidence
@@ -260,13 +279,14 @@ def test_yesterdays_story_is_never_served_as_todays(client, db_session, scoped_o
     stub = provider("Revenue is KSh 500 today.")
     verify_source(db_session, source)
     add_paid_order(db_session)
-    day_start = overview._eat_range("today")[0]
+    from time_utils import service_sales_window
+    service_start = service_sales_window()[0]
     db_session.add(models.CreativeTake(
         restaurant_id=RID, surface="home", period="today", mode="today_story",
-        text="Yesterday was lovely.", evidence_hash="0" * 64, created_at=day_start - timedelta(minutes=10)))
+        text="Yesterday was lovely.", evidence_hash="0" * 64, created_at=service_start - timedelta(minutes=10)))
     db_session.commit()
     body = client.get(f"{HOME}?period=today", headers=headers).json()
-    assert body["text"] == "Revenue is KSh 500 today."
+    assert body["text"] == "Revenue is KES 500 today."
     assert len(stub.calls) == 1
     assert db_session.query(models.CreativeTake).count() == 2  # yesterday's row stays as history
 
@@ -349,13 +369,29 @@ def test_budget_reached_is_a_soft_failure_not_a_429(client, scoped_owner, provid
     assert not stub.calls
 
 
+def test_an_ungrounded_take_retries_once_and_keeps_the_grounded_rewrite(client, db_session, scoped_owner, provider):
+    _, headers = scoped_owner
+    stub = provider(
+        "Sales will hit $5,000. Margin is 64%. The target is $4,900.",
+        "Keep the grill warm. An idea to test: feature the dish the evidence names.",
+    )
+    body = client.get(HOME, headers=headers).json()
+    assert body["text"] == "Keep the grill warm. An idea to test: feature the dish the evidence names."
+    assert len(stub.calls) == 2
+    retry = json.dumps(stub.calls[1][0])
+    assert "64%" in retry and "$" in retry
+    assert "Allowed figures" in json.dumps(stub.calls[0][0])
+    assert db_session.query(models.TokenUsage).count() == 2
+
+
 def test_ungrounded_output_is_discarded_but_the_spend_is_metered(client, db_session, scoped_owner, provider):
     _, headers = scoped_owner
-    provider("Sales hit KSh 9,999. Orders reached 77. Growth was 31%.")
+    stub = provider("Sales hit KSh 9,999. Orders reached 77. Growth was 31%.")
     body = client.get(HOME, headers=headers).json()
     assert body["text"] is None and body["reason"] == "ungrounded"
     assert db_session.query(models.CreativeTake).count() == 0
-    assert db_session.query(models.TokenUsage).count() == 1
+    assert len(stub.calls) == 2
+    assert db_session.query(models.TokenUsage).count() == 2
 
 
 def test_leaked_reasoning_never_reaches_the_owner(client, scoped_owner, provider):
@@ -488,7 +524,7 @@ def test_report_take_carries_report_figures_and_related_findings(client, db_sess
     assert body.status_code == 200, body.text
     assert body.json()["mode"] == "report_take" and body.json()["text"].startswith("My read:")
     (messages, kwargs), = stub.calls
-    evidence = json.loads(messages[0]["content"].split("\n", 1)[1])
+    evidence, _end = json.JSONDecoder().raw_decode(messages[0]["content"].split("\n", 1)[1])
     assert evidence["report"]["revenue_kes"] == 500 and evidence["report"]["paid_orders"] == 1
     assert "30-day analysis window" in evidence["related"]["basis"]
     assert list(evidence["related"]["findings"]) == ["menu"]  # profit said "unavailable": contributes nothing
@@ -536,7 +572,7 @@ def test_os_creative_makes_one_call_over_several_modules(client, db_session, sco
     assert body["creative"] is True and body["llm_used"] is True
     assert body["consulted_modules"] == ["revenue", "menu"]
     # Owner-supplied and evidence figures survive; the invented 25% does not.
-    assert body["answer_text"] == "You mentioned KSh 80,000 in rent. Revenue is KSh 500. Keep the grill warm."
+    assert body["answer_text"] == "You mentioned KES 80,000 in rent. Revenue is KES 500. Keep the grill warm."
     assert body["dropped_sentences"] == 1
     assert db_session.query(models.TokenUsage).one().prompt_version == "owner-os-creative-v1"
 
@@ -557,7 +593,8 @@ def test_os_creative_fully_invented_reply_falls_back_to_the_deterministic_text(c
     body = client.post("/api/v1/ai/chat", headers=headers, json={
         "question": "Help me reduce food waste.", "answer_mode": "general"}).json()
     assert body["llm_used"] is False and body["creative"] is False
-    assert body["answer_text"].startswith("I can help work through this")  # the deterministic fallback
+    assert body["ai_unavailable"] is True
+    assert body["answer_text"] == "AI unavailable right now."
 
 
 def test_os_creative_keeps_planned_features_deterministic(client, scoped_owner, provider):
@@ -707,3 +744,9 @@ def test_report_take_keeps_its_assertion_when_the_voice_says_well(client, db_ses
     add_paid_order(db_session)
     body = client.get("/api/v1/reports/daily/creative", headers=headers).json()
     assert body["text"] == take
+
+
+def test_finish_text_drops_markdown_emphasis_the_owner_screen_would_show_raw():
+    from ai.creative import finish_text
+    text, _dropped = finish_text("## Idea\nPush **Nyama choma** tonight.", "Nyama choma")
+    assert text is not None and "**" not in text and "#" not in text and "Nyama choma" in text

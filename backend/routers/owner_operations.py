@@ -87,10 +87,11 @@ def record_operation(body:OperationIn,db:Session=Depends(get_db),user=Depends(re
         bill=db.query(models.RecurringBill).filter_by(id=body.bill_id,restaurant_id=rid,is_active=True).with_for_update().first()
         if not bill:
             raise HTTPException(404,'Active bill not found')
+        paid_note=(body.note or '').strip() or f'Paid {bill.name}'
         expense=models.Expense(restaurant_id=rid,category_id=bill.category_id,amount_cents=bill.amount_cents,
-            paid_on=eat_date(captured or now),method=body.method,supplier=bill.supplier,note=body.note,bill_id=bill.id,
+            paid_on=eat_date(captured or now),method=body.method,supplier=bill.supplier,note=paid_note,bill_id=bill.id,
             paid_by_user_id=user.id,updated_by_user_id=user.id)
-        db.add(expense);db.flush();result={'expense_id':expense.id,'message':'Bill payment recorded in the ledger.'}
+        db.add(expense);db.flush();result={'expense_id':expense.id,'bill_name':bill.name,'message':f'{bill.name} recorded in the ledger.'}
     else:
         item=item_for(db,user,body.inventory_item_id)
         db.refresh(item,with_for_update=True)
@@ -141,9 +142,27 @@ def record_operation(body:OperationIn,db:Session=Depends(get_db),user=Depends(re
 @router.get('/entries')
 def operation_history(db:Session=Depends(get_db),user=Depends(readers)):
     rid=get_or_create_restaurant(db,user).id
-    return [{'id':e.id,'kind':e.kind,'at':e.created_at.isoformat(),'by_you':e.user_id==user.id,
-             'undone':bool(e.undone_at),'note':json.loads(e.payload).get('note',''),**json.loads(e.result)}
-            for e in db.query(models.OperationEntry).filter_by(restaurant_id=rid).order_by(models.OperationEntry.id.desc()).limit(40).all()]
+    rows=db.query(models.OperationEntry).filter_by(restaurant_id=rid).order_by(models.OperationEntry.id.desc()).limit(40).all()
+    names={i.id:i.item_name for i in db.query(models.InventoryItem).filter_by(restaurant_id=rid).all()}
+    bills={b.id:b.name for b in db.query(models.RecurringBill).filter_by(restaurant_id=rid).all()}
+    out=[]
+    for e in rows:
+        payload=json.loads(e.payload)
+        item_id=payload.get('inventory_item_id')
+        result=json.loads(e.result)
+        if e.kind=='bill':
+            item_name=result.get('bill_name') or bills.get(payload.get('bill_id')) or (payload.get('note') or '').strip() or 'Bill'
+            quantity=None
+            note=payload.get('note') or item_name
+        else:
+            item_name=names.get(item_id) or ''
+            quantity=payload.get('quantity')
+            note=payload.get('note','')
+        out.append({'id':e.id,'kind':e.kind,'at':e.created_at.isoformat(),'by_you':e.user_id==user.id,
+                    'undone':bool(e.undone_at),'note':note,
+                    'item_name':item_name,'quantity':quantity,'unit':'',
+                    **result})
+    return out
 
 
 @router.post('/entries/{entry_id}/undo')

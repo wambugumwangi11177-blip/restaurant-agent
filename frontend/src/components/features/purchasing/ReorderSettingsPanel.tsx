@@ -34,7 +34,7 @@ export default function ReorderSettingsPanel({ items, suppliers, submitting, set
     const handleSaveSettings = async (itemId: number) => {
         setSubmitting(true);
         try {
-            await api.put(`/inventory/${itemId}/reorder-settings`, {
+            await api.put(`/api/v1/inventory/${itemId}/reorder-settings`, {
                 par_level: parLevel ? parseFloat(parLevel) : null,
                 default_supplier_id: defaultSupplierId ? parseInt(defaultSupplierId) : null,
             });

@@ -28,7 +28,7 @@ export default function AttendanceWidget() {
 
     const fetchStatus = async () => {
         try {
-            const res = await api.get("/attendance/status");
+            const res = await api.get("/api/v1/attendance/status");
             setStatus(res.data);
             setLinked(true);
         } catch (err) {
@@ -54,7 +54,7 @@ export default function AttendanceWidget() {
         setLoading(true);
         try {
             const { lat, lng } = await getLocation();
-            await api.post("/attendance/clock-in", { lat, lng });
+            await api.post("/api/v1/attendance/clock-in", { lat, lng });
             await fetchStatus();
         } catch (err) {
             showToast(getErrorMessage(err, "Clock-in failed"), "error");
@@ -66,7 +66,7 @@ export default function AttendanceWidget() {
         setLoading(true);
         try {
             const { lat, lng } = await getLocation();
-            await api.post("/attendance/clock-out", { lat, lng });
+            await api.post("/api/v1/attendance/clock-out", { lat, lng });
             await fetchStatus();
         } catch (err) {
             showToast(getErrorMessage(err, "Clock-out failed"), "error");

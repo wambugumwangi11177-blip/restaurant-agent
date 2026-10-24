@@ -61,7 +61,7 @@ export function useNotifications() {
 
     const fetchNotifications = useCallback(async () => {
         try {
-            const res = await api.get("/notifications/", { params: { limit: 50 } });
+            const res = await api.get("/api/v1/notifications/", { params: { limit: 50 } });
             setNotifications(res.data.items || []);
             setUnreadCount(res.data.unread_count || 0);
             consecutiveFailures.current = 0;
@@ -91,9 +91,34 @@ export function useNotifications() {
         setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
         setUnreadCount((c) => Math.max(0, c - 1));
         try {
-            await api.post(`/notifications/${id}/read`);
+            await api.post(`/api/v1/notifications/${id}/read`);
         } catch {
             // Feed will self-correct on the next poll if this failed silently.
+        }
+    }, []);
+
+    const acknowledge = useCallback(async (id: number) => {
+        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
+        try {
+            await api.post(`/api/v1/notifications/${id}/acknowledge`);
+        } catch {
+            // The next poll shows whether the acknowledgement landed.
+        }
+    }, []);
+
+    const unsubscribeFromPush = useCallback(async () => {
+        try {
+            if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+                const registration = await navigator.serviceWorker.ready;
+                const sub = await registration.pushManager.getSubscription();
+                if (sub) {
+                    await api.post("/api/v1/notifications/unsubscribe", { endpoint: sub.endpoint });
+                    await sub.unsubscribe();
+                }
+            }
+            setSubscribed(false);
+        } catch {
+            // Leave the button available so the owner can try again.
         }
     }, []);
 
@@ -101,7 +126,7 @@ export function useNotifications() {
         setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
         setUnreadCount(0);
         try {
-            await api.post("/notifications/read-all");
+            await api.post("/api/v1/notifications/read-all");
         } catch {
             // Same self-correcting posture as markRead.
         }
@@ -136,7 +161,7 @@ export function useNotifications() {
                 });
             }
             const json = sub.toJSON();
-            await api.post("/notifications/subscribe", {
+            await api.post("/api/v1/notifications/subscribe", {
                 endpoint: json.endpoint,
                 p256dh: json.keys?.p256dh,
                 auth: json.keys?.auth,
@@ -157,8 +182,10 @@ export function useNotifications() {
         isIOSNotStandalone,
         stale,
         markRead,
+        acknowledge,
         markAllRead,
         subscribeToPush,
+        unsubscribeFromPush,
         refresh: fetchNotifications,
     };
 }

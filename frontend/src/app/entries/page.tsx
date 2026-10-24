@@ -1,2 +1,2 @@
 import EntryWorkspace from '@/components/operations/EntryWorkspace';
-export default function EntriesPage(){return <main className="min-h-screen bg-slate-50 py-4"><EntryWorkspace/></main>;}
+export default function EntriesPage(){return <main className="min-h-screen bg-[#0c0c0c] px-4 py-6 text-[#f4f4f5] sm:px-6" style={{["--v-bg" as string]:"#0c0c0c",["--v-foreground" as string]:"#f4f4f5",["--v-card" as string]:"#161616",["--v-border" as string]:"#3a3a3a",["--v-primary" as string]:"#e0b15a",["--v-primary-foreground" as string]:"#0c0c0c",["--v-muted" as string]:"#222",["--v-muted-foreground" as string]:"#a1a1aa"}}><EntryWorkspace/></main>;}

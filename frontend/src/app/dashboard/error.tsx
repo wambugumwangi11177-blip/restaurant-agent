@@ -33,7 +33,7 @@ export default function DashboardError({
                     Something went wrong on this page
                 </h1>
                 <p className="text-sm text-[var(--text-dim)]">
-                    The rest of Chakula is still working — try again, or head back to
+                    The rest of LEVIII is still working — try again, or head back to
                     the dashboard home.
                 </p>
                 <div className="flex flex-wrap gap-3 justify-center pt-2">

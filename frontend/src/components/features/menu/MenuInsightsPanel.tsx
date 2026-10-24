@@ -52,7 +52,7 @@ export default function MenuInsightsPanel({ summary, recommendations }: MenuInsi
                 )}
                 {summary.avg_food_cost_pct > 0 && (
                     <span className="text-[10px] px-2 py-1 rounded-full bg-text-muted/10 text-text-muted">
-                        Food costs around {summary.avg_food_cost_pct.toFixed(0)}% of your prices
+                        Average across dishes: ingredients are about {summary.avg_food_cost_pct.toFixed(0)}% of each price. Not weighted by what sold, and not the overall food cost on Home.
                     </span>
                 )}
             </div>

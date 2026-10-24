@@ -18,9 +18,17 @@
  * without either depending on the other's lifecycle.
  */
 
+import { isStaleMenuQuote } from "@/lib/menuQuote";
+
+// IndexedDB is keyed by this name. Renaming it opens an empty database and
+// leaves orders already queued under chakula-offline stranded, so they never replay.
 const DB_NAME = "chakula-offline";
 const DB_VERSION = 1;
 const STORE_NAME = "pending-orders";
+
+export type RepriceOrder = (payload: Record<string, unknown>) => Promise<Record<string, unknown>>;
+
+const memory = new Map<string, PendingOrder>();
 
 export interface PendingOrder {
     localId: string;
@@ -30,9 +38,13 @@ export interface PendingOrder {
     lastError?: string;
 }
 
+function useMemory(): boolean {
+    return typeof indexedDB === "undefined";
+}
+
 function openDB(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
-        if (typeof indexedDB === "undefined") {
+        if (useMemory()) {
             reject(new Error("IndexedDB not available in this environment"));
             return;
         }
@@ -59,6 +71,16 @@ export function isNetworkFailure(err: unknown): boolean {
 }
 
 export async function queueOrder(payload: Record<string, unknown>): Promise<PendingOrder> {
+    if (useMemory()) {
+        const order: PendingOrder = {
+            localId: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            payload,
+            createdAt: Date.now(),
+            attempts: 0,
+        };
+        memory.set(order.localId, order);
+        return order;
+    }
     const db = await openDB();
     const order: PendingOrder = {
         localId: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
@@ -77,6 +99,7 @@ export async function queueOrder(payload: Record<string, unknown>): Promise<Pend
 }
 
 export async function getPendingOrders(): Promise<PendingOrder[]> {
+    if (useMemory()) return [...memory.values()].sort((a, b) => a.createdAt - b.createdAt);
     const db = await openDB();
     const orders = await new Promise<PendingOrder[]>((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, "readonly");
@@ -88,7 +111,32 @@ export async function getPendingOrders(): Promise<PendingOrder[]> {
     return orders.sort((a, b) => a.createdAt - b.createdAt);
 }
 
+async function replacePendingOrder(localId: string, payload: Record<string, unknown>): Promise<void> {
+    if (useMemory()) {
+        const existing = memory.get(localId);
+        if (existing) memory.set(localId, { ...existing, payload });
+        return;
+    }
+    const db = await openDB();
+    await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.get(localId);
+        req.onsuccess = () => {
+            const existing = req.result as PendingOrder | undefined;
+            if (existing) store.put({ ...existing, payload });
+        };
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+}
+
 export async function removePendingOrder(localId: string): Promise<void> {
+    if (useMemory()) {
+        memory.delete(localId);
+        return;
+    }
     const db = await openDB();
     await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, "readwrite");
@@ -102,6 +150,10 @@ export async function removePendingOrder(localId: string): Promise<void> {
 /** Drop every queued order (logout on a shared device — queued payloads carry
  * customer names/phones and must not survive into the next user's session). */
 export async function clearPendingOrders(): Promise<void> {
+    if (useMemory()) {
+        memory.clear();
+        return;
+    }
     const db = await openDB();
     await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, "readwrite");
@@ -113,6 +165,11 @@ export async function clearPendingOrders(): Promise<void> {
 }
 
 async function markAttempt(localId: string, error: string): Promise<void> {
+    if (useMemory()) {
+        const existing = memory.get(localId);
+        if (existing) memory.set(localId, { ...existing, attempts: existing.attempts + 1, lastError: error });
+        return;
+    }
     const db = await openDB();
     await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, "readwrite");
@@ -147,19 +204,21 @@ async function markAttempt(localId: string, error: string): Promise<void> {
 let replayInFlight = false;
 
 export async function replayPendingOrders(
-    submit: (payload: Record<string, unknown>) => Promise<unknown>
+    submit: (payload: Record<string, unknown>) => Promise<unknown>,
+    reprice?: RepriceOrder,
 ): Promise<{ delivered: number; remaining: number }> {
     if (replayInFlight) return { delivered: 0, remaining: (await getPendingOrders()).length };
     replayInFlight = true;
     try {
-        return await _replayLocked(submit);
+        return await _replayLocked(submit, reprice);
     } finally {
         replayInFlight = false;
     }
 }
 
 async function _replayLocked(
-    submit: (payload: Record<string, unknown>) => Promise<unknown>
+    submit: (payload: Record<string, unknown>) => Promise<unknown>,
+    reprice?: RepriceOrder,
 ): Promise<{ delivered: number; remaining: number }> {
     const pending = await getPendingOrders();
     let delivered = 0;
@@ -173,6 +232,23 @@ async function _replayLocked(
             if (isNetworkFailure(err)) {
                 await markAttempt(order.localId, "network unavailable");
                 break; // still offline — stop, don't burn through the rest
+            }
+            if (reprice && isStaleMenuQuote(err)) {
+                try {
+                    const fresh = await reprice(order.payload);
+                    await replacePendingOrder(order.localId, fresh);
+                    await submit(fresh);
+                    await removePendingOrder(order.localId);
+                    delivered += 1;
+                    continue;
+                } catch (retryErr) {
+                    if (isNetworkFailure(retryErr)) {
+                        await markAttempt(order.localId, "network unavailable");
+                        break;
+                    }
+                    await markAttempt(order.localId, retryErr instanceof Error ? retryErr.message : String(retryErr));
+                    continue;
+                }
             }
             await markAttempt(order.localId, err instanceof Error ? err.message : String(err));
             // Non-network failure on this one order — keep going with the rest.

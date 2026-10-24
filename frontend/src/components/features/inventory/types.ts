@@ -9,9 +9,11 @@ export interface InventoryItem {
 
 export interface StockTransfer {
     id: number;
+    inventory_item_id?: number;
     from_location: string;
     to_location: string;
-    quantity: number;
+    quantity: number | null;
+    confirmed_quantity?: number | null;
     unit: string;
     status: string;
 }
@@ -34,6 +36,7 @@ export interface InventoryPrediction {
 
 export interface VarianceReport {
     threshold: number;
+    window_hours?: number;
     items: VarianceItem[];
 }
 

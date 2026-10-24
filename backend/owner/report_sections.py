@@ -12,7 +12,7 @@ in an honest "could not be read".
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import models
 from owner import areas
@@ -52,9 +52,20 @@ def _month_end(first: date) -> date:
     return (first.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
 
 
-def _window_text(period: str, month: date | None, today: date) -> str:
+def _check_phrase(key: str, n: int) -> str:
+    """Count plus the thing, with a real plural. '2 handover that doesn't matchs' was the old bug."""
+    if key == "handover":
+        return f"{n} handover that doesn't match" if n == 1 else f"{n} handovers that don't match"
+    if key == "missing_stock":
+        return f"{n} item used more than your sales explain" if n == 1 else f"{n} items used more than your sales explain"
+    words = {"unusual_cancelling": "unusual cancelling", "unusual_refunds": "unusual refunds", "late_night": "late-night activity"}
+    return f"{n} {words.get(key, key)}"
+
+
+def _window_text(period: str, month: date | None, today: date, now: datetime | None = None) -> str:
     if period == "daily":
-        return "Today"
+        from time_utils import service_caption
+        return service_caption(now)
     if period == "weekly":
         return "The last 7 days"
     if period == "monthly" and month is not None:
@@ -69,7 +80,7 @@ def cash_check(ctx: OwnerContext, period: str, month: date | None) -> dict:
     from owner import reports
     from ai.cash_reconciliation.intelligence import drawer_tolerance_cents
     lo, hi = reports._window(period, month)
-    window = _window_text(period, month, eat_date(ctx.now))
+    window = _window_text(period, month, eat_date(ctx.now), ctx.now)
     counts = ctx.db.query(models.CashDrawerCount).filter(
         models.CashDrawerCount.restaurant_id == ctx.rid, models.CashDrawerCount.window_start >= lo, models.CashDrawerCount.window_start < hi
     ).order_by(models.CashDrawerCount.window_start.desc()).all()
@@ -79,7 +90,7 @@ def cash_check(ctx: OwnerContext, period: str, month: date | None) -> dict:
     if base["state"] == "no_data":
         return _nothing(base, window, "No cash counts entered yet.")
     if not counts:
-        said = f"No cash count has been entered {'today' if period == 'daily' else 'in this period'}."
+        said = f"No cash count has been entered for {window}." if period == "daily" else "No cash count has been entered in this period."
         return _nothing(no_data(said), window, said)
     s = ctx.settings
     rows, looked = [], 0
@@ -122,12 +133,10 @@ def things_to_check(ctx: OwnerContext, period: str, month: date | None) -> dict:
     anchor = fraud if not _empty(fraud) else missing if not _empty(missing) else handovers
     if _empty(anchor) and not rows:
         return _nothing(anchor, window, "Nothing is recorded yet to check.")
-    words = {"unusual_cancelling": "unusual cancelling", "unusual_refunds": "unusual refunds", "late_night": "late-night activity",
-             "missing_stock": "item used more than your sales explain", "handover": "handover that doesn't match"}
     kinds: dict[str, int] = {}
     for r in rows:
         kinds[r["key"]] = kinds.get(r["key"], 0) + 1
-    head = (f"{_plural(len(rows), 'thing')} to check: " + "; ".join(f"{n} {words[k]}" + ("s" if n != 1 and k in ("missing_stock", "handover") else "") for k, n in kinds.items()) + "."
+    head = (f"{_plural(len(rows), 'thing')} to check: " + "; ".join(_check_phrase(k, n) for k, n in kinds.items()) + "."
             if rows else "Nothing to check: no unusual cancelling, no missing stock, no handover that doesn't match.")
     return _done(anchor, window, head, rows, [assumption("These are things to check, not conclusions about anyone.")])
 

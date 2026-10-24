@@ -4,6 +4,16 @@
  */
 export type BlockState = "live" | "as_entered" | "learning" | "not_from_pos" | "stale" | "no_data" | "unavailable";
 
+/** A separate AI-written note. The figures it sits under stay the ones the code computed. */
+export type Insight = {
+  label: string;
+  text: string | null;
+  state: "live" | "unavailable";
+  as_of?: string | null;
+  note: string | null;
+  reason?: string | null;
+};
+
 export type Assumption = { setting: string; value: number; label?: string };
 
 export type Block = {
@@ -79,6 +89,8 @@ export type DecisionCard = {
   assumption: Assumption | null;
   decision: { options: string[] } | null;
   tier: CardTier;
+  /** 45 / 25 / 15 / 15 points. Present when the card has a confidence, a risk and a difficulty. */
+  score?: { total: number; money: number; sure: number; safe: number; easy: number };
 };
 
 export type RankedCard = Pick<DecisionCard, "id" | "domain" | "sentence" | "kes_month" | "tier">;
@@ -86,7 +98,7 @@ export type RankedCard = Pick<DecisionCard, "id" | "domain" | "sentence" | "kes_
 export type CostingYouMoney = Block & { cards: DecisionCard[]; ranked: RankedCard[]; more: number; ranking: string };
 
 export type HealthStatus = "good" | "watch" | "bad" | "unknown";
-export type HealthTile = Partial<Block> & { area: AreaKey; title: string; number: number | null; unit: string; word: string; status: HealthStatus; label: string };
+export type HealthTile = Partial<Block> & { area: AreaKey; title: string; number: number | null; unit: string; word: string; status: HealthStatus; label: string; rule?: string };
 export type Health = Block & { tiles: HealthTile[] };
 
 export const AREA_KEYS = ["money", "sales_dishes", "store", "cash", "staff", "permits"] as const;
@@ -112,6 +124,8 @@ export type ComingUp = {
 export type OwnerHome = {
   restaurant: { id: number; name: string };
   period: "today" | "7d" | "30d";
+  /** Trading day the open-service figures belong to, e.g. "Fri 23 Oct service, still open". */
+  service_caption?: string;
   timezone: string;
   generated_at: string;
   pulse: Pulse;
@@ -119,7 +133,10 @@ export type OwnerHome = {
   health: Health;
   areas: Record<AreaKey, Area>;
   coming_up: ComingUp;
+  figures?: Record<string, Block & Record<string, unknown>>;
   read: Block & { text: string | null };
+  /** Present only when the creative layer is on. The pulse figures above it are unchanged. */
+  insight?: Insight | null;
   /** Has the owner chosen their targets, and how many Nairobi days old is the restaurant (0 = the day it joined). */
   setup: { targets_chosen: boolean; age_days: number };
 };

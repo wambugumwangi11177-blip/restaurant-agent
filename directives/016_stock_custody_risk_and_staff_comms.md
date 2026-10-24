@@ -172,6 +172,10 @@ directive assumes 015's RBAC is landing in the same change.
 - Confirm the staff-command webhook branch only fires for a signature-valid
   request — no new bypass of `validate_twilio_request`.
 
+## Learned (Eleven demo, 2026-10)
+
+Confirming a store-to-kitchen issue is kitchen-only, and the confirmer must be a different user from the issuer. A manager or storekeeper confirming — including confirming their own issue — is rejected. A smaller count than was issued (4 kg sent, 3.8 kg counted) stays a dispute and does not move stock. The check lives in `confirm_transfer`, so the dashboard and the WhatsApp `CONFIRM` command share it.
+
 ## When you're done
 
 If the variance threshold, alert cadence, or staff-command vocabulary changes

@@ -178,7 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const currentToken = getAccessToken();
     if (currentToken) setAccessToken(currentToken); // setAccessToken writes both slots; stash then overwrite below
 
-    const res = await api.post(`/staff/${staffId}/impersonate`);
+    const res = await api.post(`/api/v1/staff/${staffId}/impersonate`);
     const impToken = res.data.access_token;
     setAccessToken(impToken);
     setToken(impToken);
@@ -192,7 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // network hiccup shouldn't be able to strand them in the target's account.
   const endImpersonation = async (): Promise<void> => {
     try {
-      await api.post("/staff/end-impersonation");
+      await api.post("/api/v1/staff/end-impersonation");
     } catch {
       // Session may have already expired server-side — restoring the
       // Owner's own token below is what actually matters here.

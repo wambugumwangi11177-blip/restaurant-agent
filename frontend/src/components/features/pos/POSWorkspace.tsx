@@ -27,9 +27,11 @@ import {
     isNetworkFailure,
     getPendingOrders,
 } from "@/lib/offlineOrderOutbox";
+import { isStaleMenuQuote, repriceOrderPayload, sellingPrice } from "@/lib/menuQuote";
 
 interface MenuItem {
     price_quote?: string;
+    effective_price?: number | null;
     id: number;
     name: string;
     price: number;
@@ -72,14 +74,22 @@ export default function POSWorkspace() {
         getPendingOrders().then((orders) => setPendingOfflineCount(orders.length)).catch(() => {});
     }, []);
 
+    const refreshQuotes = useCallback(async (payload: Record<string, unknown>) => {
+        const channel = String(payload.delivery_channel || "walk_in");
+        const res = await api.get(`/api/v1/menu/?channel=${channel}`);
+        const menu = (Array.isArray(res.data) ? res.data : []).filter((i: MenuItem) => i.is_available !== false);
+        setMenuItems(menu);
+        return repriceOrderPayload(payload, menu);
+    }, []);
+
     const syncPendingOrders = useCallback(async () => {
-        const result = await replayPendingOrders((payload) => api.post("/orders/", payload));
+        const result = await replayPendingOrders((payload) => api.post("/api/v1/orders/", payload), refreshQuotes);
         refreshPendingCount();
         return result;
-    }, [refreshPendingCount]);
+    }, [refreshPendingCount, refreshQuotes]);
 
     useEffect(() => {
-        api.get("/menu/").then((res) => {
+        api.get("/api/v1/menu/").then((res) => {
             setMenuItems(res.data.filter((i: MenuItem) => i.is_available !== false));
             setLoading(false);
         }).catch(() => setLoading(false));
@@ -128,7 +138,7 @@ export default function POSWorkspace() {
         setCart((prev) => prev.filter((c) => c.menuItem.id !== itemId));
     }, []);
 
-    const subtotal = cart.reduce((sum, c) => sum + c.menuItem.price * c.quantity, 0);
+    const subtotal = cart.reduce((sum, c) => sum + sellingPrice(c.menuItem) * c.quantity, 0);
     const itemCount = cart.reduce((sum, c) => sum + c.quantity, 0);
 
     const handleSubmit = async () => {
@@ -157,14 +167,38 @@ export default function POSWorkspace() {
             setNotes("");
             setPaymentMethod("pending");
         };
-        try {
-            const res = await api.post("/orders/", payload);
+        const send = async (body: Record<string, unknown>) => {
+            const res = await api.post("/api/v1/orders/", body);
             setLastOrderId(res.data.id);
             setShowSuccess(true);
             resetForm();
             setTimeout(() => setShowSuccess(false), 3000);
+        };
+        try {
+            await send(payload);
         } catch (err) {
-            if (isNetworkFailure(err)) {
+            if (isStaleMenuQuote(err)) {
+                let fresh: Record<string, unknown> = payload;
+                try {
+                    fresh = await refreshQuotes(payload);
+                    setCart((prev) => prev.map((c) => {
+                        const updated = (fresh.items as { menu_item_id: number; price_quote?: string }[])
+                            .find((line) => line.menu_item_id === c.menuItem.id);
+                        return updated ? { ...c, menuItem: { ...c.menuItem, price_quote: updated.price_quote } } : c;
+                    }));
+                    await send(fresh);
+                } catch (retryErr) {
+                    if (isNetworkFailure(retryErr)) {
+                        await queueOrder(fresh);
+                        refreshPendingCount();
+                        resetForm();
+                        setShowQueuedOffline(true);
+                        setTimeout(() => setShowQueuedOffline(false), 4000);
+                    } else {
+                        setOrderError(getErrorMessage(retryErr, "Order failed — please try again."));
+                    }
+                }
+            } else if (isNetworkFailure(err)) {
                 // Audit remediation, Tier 4 item 10: no connectivity — queue
                 // instead of dropping the order. The cart still clears (the
                 // order IS captured, just not yet delivered), matching the
@@ -295,7 +329,7 @@ export default function POSWorkspace() {
                                         </span>
                                     )}
                                     <p className="text-sm font-medium text-text truncate">{item.name}</p>
-                                    <p className="text-xs text-accent mt-1">{formatKES(item.price)}</p>
+                                    <p className="text-xs text-accent mt-1">{formatKES(sellingPrice(item))}</p>
                                     <p className="text-[10px] text-text-dim mt-0.5">{item.category}</p>
                                 </motion.button>
                             );
@@ -321,7 +355,7 @@ export default function POSWorkspace() {
                                 <div key={c.menuItem.id} className="flex items-center gap-2 py-1.5">
                                     <div className="flex-1 min-w-0">
                                         <p className="text-xs text-text truncate">{c.menuItem.name}</p>
-                                        <p className="text-[10px] text-accent">{formatKES(c.menuItem.price * c.quantity)}</p>
+                                        <p className="text-[10px] text-accent">{formatKES(sellingPrice(c.menuItem) * c.quantity)}</p>
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <button onClick={() => updateQty(c.menuItem.id, -1)}
@@ -375,7 +409,7 @@ export default function POSWorkspace() {
                                     { v: "glovo", label: "Glovo" },
                                     { v: "walk_in", label: "Direct" },
                                 ].map((ch) => (
-                                    <button key={ch.v} onClick={async () => {try{const r=await api.get(`/menu/?channel=${ch.v}`);setMenuItems(r.data.filter((i:MenuItem)=>i.is_available!==false));setCart([]);setDeliveryChannel(ch.v);setOrderError('Channel changed; the cart was cleared so you can confirm the correct prices.');}catch{setOrderError('Could not load channel prices. Check your connection and retry.');}}}
+                                    <button key={ch.v} onClick={async () => {try{const r=await api.get(`/api/v1/menu/?channel=${ch.v}`);setMenuItems(r.data.filter((i:MenuItem)=>i.is_available!==false));setCart([]);setDeliveryChannel(ch.v);setOrderError('Channel changed; the cart was cleared so you can confirm the correct prices.');}catch{setOrderError('Could not load channel prices. Check your connection and retry.');}}}
                                         className={`flex-1 py-1.5 rounded-lg text-[10px] font-medium transition-all ${deliveryChannel === ch.v
                                                 ? "bg-info/10 text-info border border-info/30"
                                                 : "bg-surface-hover text-text-muted border border-transparent"

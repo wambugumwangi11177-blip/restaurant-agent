@@ -59,6 +59,14 @@ def test_today_spend_usd_sums_only_todays_rows_for_this_restaurant(db_session):
     assert round(spent, 2) == 1.0
 
 
+def test_daily_spend_cap_defaults_to_one_dollar(monkeypatch):
+    monkeypatch.delenv("DAILY_LLM_SPEND_CAP_USD", raising=False)
+    import importlib
+    import ai.spend_cap as spend_cap
+    importlib.reload(spend_cap)
+    assert spend_cap.DAILY_LLM_SPEND_CAP_USD == 1.0
+
+
 def test_check_spend_cap_passes_when_under_cap(db_session, monkeypatch):
     monkeypatch.setenv("DAILY_LLM_SPEND_CAP_USD", "20.0")
     import ai.spend_cap as spend_cap

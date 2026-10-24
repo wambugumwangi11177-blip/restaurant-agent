@@ -108,6 +108,7 @@ INFRASTRUCTURE = {
     # S1.4 — the former candidates, each resolved (see backend/owner/registry.py::NOT_ENGINES):
     "ai.ops_manager": "resolved: 'restaurant health' = the Home health tiles' rule set, not a separate figure",
     "ai.creative": "resolved: 'LEVIII's read' = optional AI note (text only; every number must be backed)",
+    "ai.insight": "AI-written insight beside deterministic answers; calls read-only tools and writes no figure of its own",
     "ai.home_specialists": "glue that turns engine output into Home cards; the engines it calls are registered",
     "ai.graph": "knowledge-graph impact analysis, a strategist tool; shows no figure",
     "ai.enterprise": "multi-branch compare (OS 'compare' form, S5.1); registered with that form when it lands",

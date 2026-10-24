@@ -360,12 +360,42 @@ def get_roi_savings(db: Session, restaurant_id: int) -> dict:
         _swallow("ai_cost", exc)
 
     value_delivered_cents = money_saved_from_time_cents + monthly_impact_cents
+    # A few cents of tokens against a large staff-time estimate produces a multiple
+    # like 2334.8×. That is the division, and it is not cash returned. Below KES 50
+    # of model spend the ratio is not shown. Above 50× it is capped and the note says so.
+    raw_multiple = (value_delivered_cents / ai_cost_cents) if ai_cost_cents > 0 else None
+    multiple_cap = 50.0
+    min_cost_cents = 5_000
+    if raw_multiple is None:
+        shown_multiple = None
+        roi_note = "No model spend is recorded yet, so there is no return to divide."
+        capped = False
+    elif ai_cost_cents < min_cost_cents:
+        shown_multiple = None
+        roi_note = (
+            "Model spend over the last 30 days is too small to turn into a multiple. "
+            "The value beside it is staff time plus captured profit, not cash returned."
+        )
+        capped = False
+    elif raw_multiple > multiple_cap:
+        shown_multiple = multiple_cap
+        roi_note = (
+            f"The raw ratio is {raw_multiple:.1f} times because staff-time estimates are large next to a small model bill. "
+            f"Shown capped at {multiple_cap:.0f} times. This is not cash in the till."
+        )
+        capped = True
+    else:
+        shown_multiple = round(raw_multiple, 1)
+        roi_note = "Staff time plus captured profit, divided by model spend. Not cash in the till."
+        capped = False
     economics = {
         "ai_cost_cents": ai_cost_cents,
         "value_delivered_cents": value_delivered_cents,
-        # "Every KES 1 spent on AI returned KES X." None when there's no metered
-        # AI spend yet (can't divide by zero — the frontend shows this honestly).
-        "roi_multiple": round(value_delivered_cents / ai_cost_cents, 1) if ai_cost_cents > 0 else None,
+        # None when there's no meaningful metered spend (can't divide by a tiny bill).
+        "roi_multiple": shown_multiple,
+        "roi_multiple_raw": None if raw_multiple is None else round(raw_multiple, 1),
+        "roi_capped": capped,
+        "roi_note": roi_note,
     }
 
     # ── 6. ANNUAL RUN-RATE (at the current pace) ─────────────────────────────

@@ -3,6 +3,8 @@ export interface MenuItem {
     name: string;
     description: string;
     price: number;
+    /** What the till charges now, when a scheduled price applies. Edits use `price` (the base). */
+    effective_price?: number | null;
     category: string;
     is_available: boolean;
     image_url?: string;
@@ -30,7 +32,9 @@ export interface MenuAiItem {
 }
 
 export interface MenuAiMatrixItem extends MenuAiItem {
-    item_id: number;
+    item_id?: number;
+    /** The menu-engineering payload names the dish `id`. Older callers used `item_id`. */
+    id?: number;
 }
 
 export interface MenuAiData {

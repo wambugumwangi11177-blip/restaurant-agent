@@ -191,6 +191,99 @@ def test_mismatched_transfer_disputes_without_writing_movements(client, db_sessi
     assert after_movements == before_movements
 
 
+def test_storekeeper_cannot_confirm_the_issue_they_sent(client, db_session, transfer_setup):
+    """Eleven: the storekeeper and the accountant were issuing and confirming together.
+    The person who sends the stock cannot also confirm it."""
+    _restaurant, item, sender_token, _receiver_token = transfer_setup
+    issued = client.post(
+        "/stock/transfers",
+        json={"inventory_item_id": item.id, "quantity": 4.0, "unit": "kg", "from_location": "store", "to_location": "kitchen"},
+        headers={"Authorization": f"Bearer {sender_token}"},
+    )
+    assert issued.status_code == 201, issued.text
+    confirmed = client.post(
+        f"/stock/transfers/{issued.json()['id']}/confirm",
+        json={"confirmed_quantity": 4.0},
+        headers={"Authorization": f"Bearer {sender_token}"},
+    )
+    assert confirmed.status_code == 403, confirmed.text
+    assert client.get("/stock/transfers", headers={"Authorization": f"Bearer {sender_token}"}).status_code == 200
+
+
+def test_manager_and_owner_cannot_confirm_in_place_of_the_kitchen(client, db_session, transfer_setup):
+    restaurant, item, sender_token, _receiver_token = transfer_setup
+    issued = client.post(
+        "/stock/transfers",
+        json={"inventory_item_id": item.id, "quantity": 4.0, "unit": "kg"},
+        headers={"Authorization": f"Bearer {sender_token}"},
+    )
+    transfer_id = issued.json()["id"]
+    manager = models.User(
+        tenant_id=restaurant.tenant_id, email="mgr-confirm@e.com", hashed_password=auth.get_password_hash("x"),
+        role=models.Role.STAFF, staff_role=models.StaffRole.MANAGER, token_version=0,
+    )
+    owner = models.User(
+        tenant_id=restaurant.tenant_id, email="owner-confirm@e.com", hashed_password=auth.get_password_hash("x"),
+        role=models.Role.ADMIN, staff_role=models.StaffRole.OWNER, token_version=0,
+    )
+    db_session.add_all([manager, owner])
+    db_session.commit()
+    manager_token = auth.create_access_token({"sub": manager.email, "ver": 0})
+    manager_denied = client.post(
+        f"/stock/transfers/{transfer_id}/confirm",
+        json={"confirmed_quantity": 4.0},
+        headers={"Authorization": f"Bearer {manager_token}"},
+    )
+    assert manager_denied.status_code == 403, manager_denied.text
+    owner_token = auth.create_access_token({"sub": owner.email, "ver": 0})
+    owner_denied = client.post(
+        f"/stock/transfers/{transfer_id}/confirm",
+        json={"confirmed_quantity": 4.0},
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert owner_denied.status_code == 403, owner_denied.text
+    assert "kitchen" in owner_denied.json()["detail"].lower()
+
+
+def test_kitchen_confirming_less_than_issued_marks_the_handover_disputed(client, db_session, transfer_setup):
+    """4 kg issued, 3.8 kg counted in the kitchen: disputed, and stock is not moved."""
+    _restaurant, item, sender_token, receiver_token = transfer_setup
+    item.item_name = "Beef"
+    db_session.commit()
+    issued = client.post(
+        "/stock/transfers",
+        json={"inventory_item_id": item.id, "quantity": 4.0, "unit": "kg", "from_location": "store", "to_location": "kitchen"},
+        headers={"Authorization": f"Bearer {sender_token}"},
+    )
+    assert issued.status_code == 201, issued.text
+    before = db_session.query(models.StockMovement).filter(models.StockMovement.inventory_item_id == item.id).count()
+    confirmed = client.post(
+        f"/stock/transfers/{issued.json()['id']}/confirm",
+        json={"confirmed_quantity": 3.8},
+        headers={"Authorization": f"Bearer {receiver_token}"},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["status"] == "disputed"
+    assert confirmed.json()["confirmed_quantity"] == 3.8
+    after = db_session.query(models.StockMovement).filter(models.StockMovement.inventory_item_id == item.id).count()
+    assert after == before
+
+
+def test_the_kitchen_user_who_issued_cannot_confirm_that_same_issue(db_session, transfer_setup):
+    from ai.stock_custody import TransferConfirmError, confirm_transfer
+    restaurant, item, _sender_token, _receiver_token = transfer_setup
+    kitchen = db_session.query(models.User).filter_by(email="receiver@e.com").one()
+    transfer = models.StockTransfer(
+        restaurant_id=restaurant.id, inventory_item_id=item.id, quantity=4.0, unit="kg",
+        from_location="store", to_location="kitchen", status=models.StockTransferStatus.PENDING,
+        initiated_by_user_id=kitchen.id,
+    )
+    db_session.add(transfer)
+    db_session.commit()
+    with pytest.raises(TransferConfirmError, match="different person"):
+        confirm_transfer(db_session, transfer.id, restaurant.id, kitchen.id, 4.0)
+
+
 def test_transfer_cannot_be_confirmed_twice(client, db_session, transfer_setup):
     restaurant, item, sender_token, receiver_token = transfer_setup
     r = client.post("/stock/transfers", json={"inventory_item_id": item.id, "quantity": 5.0},

@@ -83,6 +83,54 @@ are usually the database (DATABASE_URL in `backend/.env`) being unreachable.
 pkill -f "uvicorn main:app"; pkill -f next-server
 ```
 
+## Demo staff logins
+
+The restaurant-name form signs in the **owner** only. Store, kitchen, manager and accountant use **Sign in with email instead**.
+
+Passwords are never written in this file or in the seed. Set them in the environment next to `DEMO_RESTAURANT_OWNER_PASSWORD`, then re-seed (a re-seed applies these passwords; a normal process start creates the accounts once and does not reset a password you already set):
+
+| Screen | Email | Env var | After login |
+| --- | --- | --- | --- |
+| Manager | `manager@demo-restaurant.example` | `DEMO_RESTAURANT_MANAGER_PASSWORD` | `/staff/manager` |
+| Storekeeper | `store@demo-restaurant.example` | `DEMO_RESTAURANT_STOREKEEPER_PASSWORD` | `/staff/stockkeeper` |
+| Kitchen / chef | `kitchen@demo-restaurant.example` | `DEMO_RESTAURANT_KITCHEN_PASSWORD` | `/staff/kitchen` |
+| Accountant | `accountant@demo-restaurant.example` | `DEMO_RESTAURANT_ACCOUNTANT_PASSWORD` | `/staff/controller` |
+
+The kitchen login is the person who confirms what arrived from the store. The storekeeper can issue stock and cannot confirm their own issue. Each password needs at least 8 characters, one letter and one number (the same rule as the owner password).
+
+```bash
+export DEMO_RESTAURANT_OWNER_PASSWORD='…'
+export DEMO_RESTAURANT_MANAGER_PASSWORD='…'
+export DEMO_RESTAURANT_STOREKEEPER_PASSWORD='…'
+export DEMO_RESTAURANT_KITCHEN_PASSWORD='…'
+export DEMO_RESTAURANT_ACCOUNTANT_PASSWORD='…'
+python execution/reseed_demo.py --yes
+```
+
+Optional `MENU_QUOTE_SECRET` signs scheduled-price quotes separately from login tokens. When it is unset, quotes use a key derived from `SECRET_KEY` that login tokens cannot verify.
+
+## Railway environment for the demo
+
+Set these on the backend service. Leave Twilio unset: WhatsApp is shelved (`FEATURE_WHATSAPP` defaults to false) and the demo does not send phone messages.
+
+| Variable | Required | What it does |
+| --- | --- | --- |
+| `OPENROUTER_API_KEY` | Yes, for any written AI | Without it, Ask still answers sales questions from the records and the writing assistant says AI is unavailable. |
+| `OPENROUTER_MODEL` | No | Defaults to `deepseek/deepseek-v4-flash`. |
+| `OPENROUTER_MODEL_HIGH` | No | Same default. |
+| `OPENROUTER_MODEL_LOW` | No | Same default. |
+| `OPENROUTER_MODEL_CREATIVE` | No | Same default. Used for Home's read and the report note. |
+| `OPENROUTER_FALLBACK_MODEL` | No | Defaults to `qwen/qwen3.7-flash` when the first model returns nothing usable. |
+| `OPENROUTER_REASONING` | No | Defaults to `off`. deepseek-v4-flash reasons unless this is sent, and a short budget then comes back with no answer. Set `on` only for a call that should reason. |
+| `DAILY_LLM_SPEND_CAP_USD` | No | Defaults to `1`. Raise it when the owner budget allows. |
+| `FEATURE_AI_NARRATION` | No | Defaults to true. Set `false` to stop every LLM call. |
+| `FEATURE_CREATIVE_LAYER` | No | Defaults to true. The note is written only when a provider key is set. Set `false` to keep numbers without the written note. |
+| `FEATURE_WHATSAPP` | No | Defaults to false. Do not set Twilio credentials for this demo. |
+| `DEMO_RESTAURANT_OWNER_PASSWORD` | Yes, for the owner login | Plus the four staff passwords in the table above. |
+| `MENU_QUOTE_SECRET` | No | Optional separate key for scheduled-price quotes. |
+
+OpenRouter requests send `provider.data_collection = deny` and, unless `OPENROUTER_REASONING=on`, `reasoning.enabled = false`. A reply with `content` null and `finish_reason=length` is logged and retried once; it is not shown as an empty answer. Do not switch the model variables back to a `:free` model; some of those providers train on prompts.
+
 ## Notes
 
 - The local `.env` files (`backend/.env`, `frontend/.env.local`) are gitignored

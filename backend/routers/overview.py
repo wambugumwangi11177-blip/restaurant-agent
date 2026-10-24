@@ -16,7 +16,7 @@ Model-name findings (Task 2, verified against backend/models.py):
 import hashlib
 import logging
 
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from pydantic import BaseModel
@@ -57,6 +57,11 @@ def _restaurant_id(db: Session, user) -> int:
 
 
 def _eat_range(period: str):
+    """Nairobi calendar window. Bookings and shifts stay on the calendar day.
+
+    Paid sales use time_utils.trading_window, so a service that is still open
+    after midnight is not reported as an empty new day.
+    """
     now_eat = _eat_now()
     if period == "today":
         start_eat = now_eat.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -221,6 +226,8 @@ def _decision_cards(db: Session, rid: int, source_status: dict | None = None, li
             # Surfaced so the UI can show WHY this is first, not just that it is.
             "priority_score": d.get("priority_score"),
             "confidence_pct": d.get("confidence_pct"),
+            "risk": d.get("risk"),
+            "difficulty": d.get("difficulty"),
             # The owner setting the number rests on ({setting, value, label}), or None.
             "assumption": (d.get("meta") or {}).get("assumption"),
             "kind": (d.get("meta") or {}).get("kind"),
@@ -362,14 +369,17 @@ def _pulse(db: Session, rid: int, core: dict, stock: dict, bookings: dict) -> li
     return pulse
 
 
-def _performance(db: Session, rid: int) -> dict:
+def _performance(db: Session, rid: int, moment: datetime | None = None) -> dict:
+    """Seven trading days. The last bar is the open service through `moment`, not the calendar day."""
+    from time_utils import EAT_OFFSET, trading_day, utcnow as trading_now
+    moment = trading_now() if moment is None else moment
+    anchor = trading_day(moment)
     trend = []
-    now_eat = _eat_now()
     for back in range(6, -1, -1):
-        day = (now_eat - timedelta(days=back)).date()
+        day = anchor - timedelta(days=back)
         s = day.strftime("%Y-%m-%d")
-        start_utc = now_eat.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=back) - _EAT_OFFSET
-        end_utc = start_utc + timedelta(days=1)
+        start_utc = datetime.combine(day, time.min) - EAT_OFFSET
+        end_utc = moment if back == 0 else start_utc + timedelta(days=1)
         rev, cnt = db.query(
             func.coalesce(func.sum(models.Order.total), 0),
             func.count(models.Order.id),
@@ -470,7 +480,8 @@ _SOURCE_NOTICE = {
 def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
           db: Session = Depends(get_db), user=Depends(require_staff_role())):
     rid = _restaurant_id(db, user)
-    start, end = _eat_range(period)
+    from time_utils import trading_window
+    start, end, _anchor = trading_window(period)
     core = _summarize(db, rid, start, end)
     revenue_card = {
         **core,
@@ -481,6 +492,7 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
     stock = _stock_card(db, rid)
     operational_start, operational_end = _eat_range("today")
     bookings = _bookings_card(db, rid, operational_start, operational_end)
+    sales_today_start, sales_today_end, _sales_day = trading_window("today")
     source_status = {}
     attention = _attention_cards(db, rid, user.tenant_id, source_status=source_status)
     connection = _source_connection(db, user.tenant_id)
@@ -501,7 +513,7 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
         },
         "greeting_date": _eat_now().date().isoformat(),
         "restaurant_name": db.query(models.Restaurant.name).filter(
-            models.Restaurant.id == rid).scalar() or "Vibanda Village",
+            models.Restaurant.id == rid).scalar() or "This restaurant",
         "period": period,
         "revenue_basis": "paid_non_cancelled_orders_by_creation_time",
         "unavailable_metrics": ["pace_projection", "kitchen", "delayed_orders",
@@ -513,7 +525,7 @@ def today(period: str = Query("today", pattern="^(1h|today|7d|30d)$"),
         "bookings": bookings,
         "staff": _staff_card(db, rid, operational_start, operational_end),
         "attention": attention,
-        "pulse": _pulse(db, rid, _summarize(db, rid, operational_start, operational_end), stock, bookings),
+        "pulse": _pulse(db, rid, _summarize(db, rid, sales_today_start, sales_today_end), stock, bookings),
         "performance": _performance(db, rid),
     }
 

@@ -17,7 +17,7 @@ interface EditForm {
 interface MenuItemRowProps {
     item: MenuItem;
     idx: number;
-    aiItem: MenuAiItem;
+    aiItem?: MenuAiItem;
     classColor: (c: string) => string;
     classLabel: (c: string) => string;
     editingId: number | null;
@@ -79,13 +79,16 @@ export default function MenuItemRow({
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    {aiItem?.margin_pct !== undefined && (
+                    {aiItem?.margin_pct != null && aiItem.classification !== "" && (
                         <span className={`text-[10px] ${aiItem.margin_pct >= 60 ? "text-success" : aiItem.margin_pct >= 30 ? "text-text-muted" : "text-danger"
                             }`}>{aiItem.margin_pct.toFixed(0)}% profit</span>
                     )}
                     <span className="text-sm font-semibold text-accent">
                         KES {(item.price / 100).toLocaleString()}
                     </span>
+                    {item.effective_price != null && item.effective_price !== item.price && (
+                        <span className="text-[10px] text-text-dim">Selling now KES {(item.effective_price / 100).toLocaleString()}</span>
+                    )}
                     <button onClick={() => openEdit(item)}
                         title="Edit — name, price, category, prep time, photo"
                         className={`text-[10px] px-2 py-1 rounded flex items-center gap-1 transition-all ${editingId === item.id ? "bg-accent/10 text-accent" : "bg-surface-hover text-text-muted hover:text-accent"}`}>

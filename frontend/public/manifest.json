@@ -1,8 +1,8 @@
 {
-    "name": "Chakula — Restaurant Manager",
-    "short_name": "Chakula",
-    "description": "Restaurant management for ordering, POS, kitchen display, inventory & analytics",
-    "start_url": "/dashboard",
+    "name": "LEVIII",
+    "short_name": "LEVIII",
+    "description": "LEVIII for the restaurant owner and the team",
+    "start_url": "/",
     "display": "standalone",
     "background_color": "#0a0a0a",
     "theme_color": "#0a0a0a",

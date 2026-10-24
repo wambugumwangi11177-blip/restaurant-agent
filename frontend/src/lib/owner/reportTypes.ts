@@ -1,6 +1,6 @@
 /** GET /owner/report/{period}: the sections of a report (backend/owner/reports.py, owner/report_sections.py). */
 import type { AnswerAssumption, AnswerRow } from "./ask";
-import type { Block, BlockState } from "./types";
+import type { Block, BlockState, Insight } from "./types";
 
 export type ReportPeriod = "daily" | "weekly" | "monthly" | "yearly";
 
@@ -28,4 +28,6 @@ export type OwnerReport = {
   as_of: string | null;
   sections: ReportSection[];
   read: Block & { text: string | null };
+  /** Present only when the creative layer is on. The section figures above it are unchanged. */
+  insight?: Insight | null;
 };

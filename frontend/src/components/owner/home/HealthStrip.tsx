@@ -26,6 +26,12 @@ export default function HealthStrip({ health }: { health: Health }) {
             <p className="font-display mt-2 text-xl font-semibold tracking-[-0.03em]">{value(t.number, t.unit)}</p>
             {t.number != null && <p className="mt-0.5 text-[11px] font-semibold">{t.word}</p>}
             <p className="mt-0.5 text-[10px] leading-snug text-[var(--v-muted-foreground)]">{t.label}</p>
+            {t.rule && (
+              <details className="mt-1">
+                <summary className="cursor-pointer text-[10px] font-semibold text-[var(--v-primary)]">Why?</summary>
+                <p className="mt-0.5 text-[10px] leading-snug text-[var(--v-muted-foreground)]">{t.rule}</p>
+              </details>
+            )}
             {t.state && <StateChip block={{...t, state:t.state}} className="mt-1" />}
           </a>
         </li>

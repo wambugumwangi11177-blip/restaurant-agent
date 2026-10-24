@@ -39,6 +39,43 @@
   font-family: var(--font-space-grotesk), "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
 }
 
+:root {
+  --bg: #0c0c0c;
+  --surface: #161616;
+  --surface-hover: #222222;
+  --border: #3a3a3a;
+  --accent: #e0b15a;
+  --accent-hover: #f0c56e;
+  --text: #f4f4f5;
+  --text-muted: #d4d4d8;
+  --text-dim: #a1a1aa;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #60a5fa;
+  --chart-bar: #e0b15a;
+  --chart-line: #60a5fa;
+  --chart-cost: #fbbf24;
+}
+
+.vibanda-theme {
+  --bg: var(--v-bg);
+  --surface: var(--v-card);
+  --surface-hover: var(--v-muted);
+  --border: var(--v-border);
+  --accent: var(--v-primary);
+  --accent-hover: var(--v-primary);
+  --text: var(--v-foreground);
+  --text-muted: var(--v-muted-foreground);
+  --text-dim: var(--v-muted-foreground);
+  --success: var(--v-good);
+  --warning: var(--v-warn);
+  --danger: var(--v-destructive);
+  --chart-bar: hsl(201 47% 29%);
+  --chart-line: hsl(201 47% 40%);
+  --chart-cost: hsl(38 80% 44%);
+}
+
 @theme {
   --color-bg: var(--bg);
   --color-surface: var(--surface);

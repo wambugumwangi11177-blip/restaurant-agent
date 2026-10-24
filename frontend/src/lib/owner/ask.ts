@@ -3,7 +3,7 @@
  * The sentence (`headline`) is written by code from the numbers in `rows`, `drivers` and `columns`; the screen shows both.
  */
 import { kes, pct } from "./format";
-import type { BlockState } from "./types";
+import type { BlockState, Insight } from "./types";
 
 export type AskForm = "what" | "why" | "what_if" | "what_to_do" | "compare";
 
@@ -51,6 +51,7 @@ export type OwnerAnswer = {
   state: BlockState;
   as_of: string | null;
   headline: string;
+  insight?: Insight | null;
   reason?: string;
   rows: AnswerRow[];
   assumptions: AnswerAssumption[];
@@ -104,6 +105,29 @@ const GUIDANCE = [
 export function isGuidance(question: string): boolean {
   const q = question.toLowerCase();
   return GUIDANCE.some((re) => re.test(q));
+}
+
+// Precise data questions stay on the five forms. Open-ended advice does not.
+const PRECISE = [
+  /\b(sales|revenue|profit|orders|cash|mpesa|m-pesa|stock|supplier|guest|price|priced|sold|sell)\b/,
+  /\b(why|what if|compare)\b/,
+  /\bwhat should i do\b/,
+  /\bhow (?:can|do|could|should) i\b/,
+  /\bkes\b|\bksh\b/,
+  /\bwho should i\b/,
+];
+const OPEN_ENDED = [
+  /\badvice\b/, /\brecommend/, /\bwhat do you think\b/, /\bhow would you\b/, /\bcome up with\b/,
+  /\bi(?:'m| am) stuck\b/, /\bhelp me think\b/, /\bwhat are (?:some|a few) (?:ways|ideas|options)\b/,
+  /\bshould we\b/, /\bideas\b/,
+];
+
+/** Typed text that should go to the writing assistant. Precise sales and number questions stay deterministic. */
+export function prefersChat(question: string): boolean {
+  if (isGuidance(question)) return true;
+  const q = question.toLowerCase();
+  if (PRECISE.some((re) => re.test(q))) return false;
+  return OPEN_ENDED.some((re) => re.test(q));
 }
 
 /** A saved assistant message that is one of our answers (it has a form), as opposed to an older chat reply. */

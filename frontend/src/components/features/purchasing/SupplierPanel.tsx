@@ -30,7 +30,7 @@ export default function SupplierPanel({ suppliers, submitting, setSubmitting, sh
         if (!supplierName) return;
         setSubmitting(true);
         try {
-            await api.post("/suppliers/", {
+            await api.post("/api/v1/suppliers/", {
                 name: supplierName,
                 contact_phone: supplierPhone || "",
                 avg_lead_days: parseFloat(supplierLeadDays) || 1,
@@ -59,7 +59,7 @@ export default function SupplierPanel({ suppliers, submitting, setSubmitting, sh
     const handleSaveSupplier = async (supplierId: number) => {
         setSubmitting(true);
         try {
-            await api.put(`/suppliers/${supplierId}`, {
+            await api.put(`/api/v1/suppliers/${supplierId}`, {
                 name: editSupplier.name,
                 contact_phone: editSupplier.contact_phone,
                 avg_lead_days: editSupplier.avg_lead_days ? parseFloat(editSupplier.avg_lead_days) : undefined,

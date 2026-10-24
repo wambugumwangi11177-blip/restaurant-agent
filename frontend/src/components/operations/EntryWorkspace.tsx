@@ -11,8 +11,8 @@ import { submitOrQueue } from '@/lib/entryQueue';
 type Stock = {id:number;name:string;unit:string;on_hand:number;par:number|null;buying_unit:string;factor:number};
 type PO = {id:number;item_name:string;supplier_name:string;quantity_ordered:number;unit:string;inventory_item_id:number;status:string;invoice_ref?:string|null};
 type Category = {key:string;name:string};
-const field="block min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900";
-const button="min-h-11 rounded-lg bg-teal-800 px-4 py-2 font-semibold text-white disabled:opacity-50";
+const field="block min-h-11 w-full rounded-lg border border-[var(--v-border)] bg-[var(--v-card)] px-3 py-2 text-[var(--v-foreground)]";
+const button="min-h-11 rounded-lg bg-[var(--v-primary)] px-4 py-2 font-semibold text-[var(--v-primary-foreground)] disabled:opacity-50";
 function message(e:unknown) { const x=e as {response?:{data?:{detail?:unknown}}}; return typeof x.response?.data?.detail==='string'?x.response.data.detail:'Could not save. Check the fields and connection, then retry.'; }
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Nairobi',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 export function cents(value:string):number { if(!/^\d+(\.\d{1,2})?$/.test(value)) throw new Error('Enter shillings with at most two decimal places'); const [whole,part='']=value.split('.'); return Number(whole)*100+Number(part.padEnd(2,'0')); }
@@ -87,12 +87,12 @@ export default function EntryWorkspace() {
  if(!allowed)return <p role="alert">Your role cannot record these entries.</p>;
  const current=money?tab:tab==='expense'?'delivery':tab;
  const selected=orders.find(p=>p.id===Number(poId)); const inv=stock.find(i=>i.id===selected?.inventory_item_id);
- return <div className="mx-auto max-w-2xl space-y-5 p-4 text-slate-900">
-  <Link href={homeFor(user)} className="inline-flex min-h-11 items-center text-teal-800">← Back to your workspace</Link>
+ return <div className="w-full space-y-5 p-4 text-[var(--v-foreground)]">
+  <Link href={homeFor(user)} className="inline-flex min-h-11 items-center text-[var(--v-primary)]">← Back to your workspace</Link>
   <h1 className="text-3xl font-semibold">Team entries</h1><p>Record what actually happened. Amounts are in KES; times are Nairobi time.</p>
-  {user.tenant_name==='Demo Restaurant'&&<p className="rounded-lg bg-amber-100 p-3">Illustrative demo — entries change the demo only.</p>}
+  {user.tenant_name==='Demo Restaurant'&&<p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-amber-200">Illustrative demo — entries change the demo only.</p>}
   <nav aria-label="Entry types" className="flex flex-wrap gap-2">{[...(money?['expense',...(role!=='controller'?['cash']:[]),'export']:[]),...(receiving?['delivery']:[]),...(owner||role==='manager'?['units']:[])].map(t=><button type="button" key={t} disabled={busy} aria-pressed={current===t} className={button} onClick={()=>{setTab(t);entryKey.current=null;setError('');setSuccess('');setPhoto(null);}}>{({expense:'Expense',cash:'Close shift',export:'Accountant export',delivery:'Receive delivery',units:'Buying units'} as Record<string,string>)[t]}</button>)}</nav>
-  {error&&<p role="alert" className="rounded-lg bg-red-100 p-3">{error}</p>}{success&&<p role="status" className="rounded-lg bg-green-100 p-3">{success}</p>}
+  {error&&<p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-red-200">{error}</p>}{success&&<p role="status" className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-emerald-200">{success}</p>}
   {current==='export'?<section className="space-y-4"><label>Month<input aria-label="Export month" className={field} type="month" max={today().slice(0,7)} value={month} onChange={e=>setMonth(e.target.value)}/></label><div className="flex gap-3">{['xlsx','pdf'].map(f=><button type="button" className={button} disabled={busy} key={f} onClick={()=>download(f)}>Download {f.toUpperCase()}</button>)}</div><p>Exports include the recorded costs and their completeness labels.</p></section>:
   <form onSubmit={save} className="space-y-4" onChange={()=>{if(!busy)entryKey.current=null;}}>
    <fieldset disabled={busy} className="space-y-4">
@@ -104,7 +104,7 @@ export default function EntryWorkspace() {
    <button className={button} disabled={busy} type="submit">{busy?'Saving…':current==='cash'?'Save blind count':current==='delivery'?'Save delivery':current==='units'?'Save conversion':'Save expense'}</button>
    </fieldset>
   </form>}
-  {receiving&&<section className="space-y-2"><h2 className="text-xl font-semibold">Recent deliveries</h2>{orders.filter(p=>p.status==='DELIVERED'||p.status==='PARTIAL').slice(0,8).map(p=><div key={p.id} className="rounded-lg border border-slate-200 p-3"><p>{p.item_name} · {p.supplier_name} · {p.status}</p>{p.invoice_ref&&<button className="min-h-11 underline" type="button" onClick={async()=>{try{const r=await api.get(`/api/v1/owner/operations/receipts/${p.invoice_ref?.split('/').pop()}`,{responseType:'blob'});const u=URL.createObjectURL(r.data);const a=document.createElement('a');a.href=u;a.download='invoice.jpg';a.click();URL.revokeObjectURL(u);}catch(e){setError(message(e));}}}>Download invoice photo</button>}</div>)}</section>}
+  {receiving&&<section className="space-y-2"><h2 className="text-xl font-semibold">Recent deliveries</h2>{orders.filter(p=>p.status==='DELIVERED'||p.status==='PARTIAL').slice(0,8).map(p=><div key={p.id} className="rounded-lg border border-[var(--v-border)] p-3"><p>{p.item_name} · {p.supplier_name} · {p.status}</p>{p.invoice_ref&&<button className="min-h-11 underline" type="button" onClick={async()=>{try{const r=await api.get(`/api/v1/owner/operations/receipts/${p.invoice_ref?.split('/').pop()}`,{responseType:'blob'});const u=URL.createObjectURL(r.data);const a=document.createElement('a');a.href=u;a.download='invoice.jpg';a.click();URL.revokeObjectURL(u);}catch(e){setError(message(e));}}}>Download invoice photo</button>}</div>)}</section>}
   <StockEntries/>
   {money&&<AccountantReview/>}
  </div>;

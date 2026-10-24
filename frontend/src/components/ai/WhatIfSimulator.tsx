@@ -58,7 +58,7 @@ export function WhatIfSimulator() {
     const [error, setError] = useState("");
 
     useEffect(() => {
-        api.get("/menu").then((r) => {
+        api.get("/api/v1/menu").then((r) => {
             const list: MenuItem[] = r.data || [];
             setItems(list);
             if (list.length) {
@@ -82,7 +82,7 @@ export function WhatIfSimulator() {
         setLoading(true);
         setError("");
         try {
-            const res = await api.post("/ai/simulate", {
+            const res = await api.post("/api/v1/ai/simulate", {
                 change: { type: "price_change", item_id: itemId, new_price: Math.round(Number(newPrice)) },
             });
             if (res.data?.available === false) setError(res.data.error || "Simulation unavailable.");

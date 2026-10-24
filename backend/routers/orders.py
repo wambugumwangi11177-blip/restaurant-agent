@@ -17,6 +17,11 @@ from domain.scheduled_prices import checkout_prices
 logger = logging.getLogger("orders.router")
 
 router = APIRouter(prefix="/orders", tags=["orders"])
+sales_router = APIRouter(prefix="/sales", tags=["sales"])
+
+# Sales is read for Manager, Supervisor and Controller (the accountant). Owner
+# passes as ADMIN. Waiter, kitchen and stockkeeper do not see the sales total.
+_CAN_READ_SALES = (models.StaffRole.MANAGER, models.StaffRole.SUPERVISOR, models.StaffRole.CONTROLLER)
 
 # Directive 015's permission matrix for `orders`: RW = Owner, Manager,
 # Supervisor, Waiter; R = Controller, Kitchen; nothing for Stockkeeper. Owner
@@ -113,6 +118,17 @@ async def create_order(
         logger.error(f"Ingredient deduction failed for order {db_order.id}: {exc}")
 
     return _order_to_dict(db_order)
+
+
+@sales_router.get("/today")
+def sales_today(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_READ_SALES)),
+):
+    """The open service day's sales, counted in the database. Not a sum of GET /orders/."""
+    from sales_day import trading_day_sales
+    restaurant = get_or_create_restaurant(db, current_user)
+    return trading_day_sales(db, restaurant.id)
 
 
 @router.get("/", response_model=List[schemas.OrderOut])

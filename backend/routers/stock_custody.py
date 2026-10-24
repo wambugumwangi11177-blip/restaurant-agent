@@ -7,10 +7,10 @@ Two-party transfer flow, deliberately not a single StockMovement row:
 
   1. POST /stock/transfers          — sender (Stockkeeper/Manager/Owner)
      declares what they're sending.
-  2. POST /stock/transfers/{id}/confirm — receiver (Kitchen/Manager/Owner)
-     independently reports what actually arrived. A mismatch is the signal
+  2. POST /stock/transfers/{id}/confirm — the kitchen (a different person
+     from the issuer) reports what actually arrived. A mismatch is the signal
      (see ai/stock_custody.py's docstring) — it can't be self-certified by
-     the sender alone.
+     the sender, a manager, or the storekeeper.
 
 On a matching confirm, the underlying StockMovement OUT/IN pair is written
 so depletion-prediction code (which reads StockMovement, not this table)
@@ -34,7 +34,10 @@ router = APIRouter(prefix="/stock", tags=["stock-custody"])
 # Directive 015's matrix: inventory write access is Owner/Manager/Stockkeeper;
 # Kitchen has read + the ability to confirm what arrives at their own station.
 _CAN_INITIATE = (models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER)
-_CAN_CONFIRM = (models.StaffRole.MANAGER, models.StaffRole.KITCHEN, models.StaffRole.STOCKKEEPER)
+# Seeing a handover and confirming it are different. The store and a manager
+# can watch the list; only the kitchen confirms what arrived.
+_CAN_VIEW_TRANSFERS = (models.StaffRole.MANAGER, models.StaffRole.KITCHEN, models.StaffRole.STOCKKEEPER)
+_CAN_CONFIRM = (models.StaffRole.KITCHEN,)
 _CAN_READ_VARIANCE = (models.StaffRole.MANAGER, models.StaffRole.CONTROLLER)
 # Directive 017: the kitchen is the one asking (a "pull"), the storekeeper is
 # the one fulfilling — distinct from _CAN_INITIATE's push-side roles.
@@ -101,7 +104,7 @@ async def confirm_transfer(
             body.confirmed_quantity, body.notes,
         )
     except variance_engine.TransferConfirmError as exc:
-        status_code = 404 if str(exc) == "Transfer not found" else 400
+        status_code = exc.status_code if str(exc) != "Transfer not found" else 404
         raise HTTPException(status_code=status_code, detail=str(exc))
 
 
@@ -148,7 +151,7 @@ async def fulfil_transfer(
 async def list_transfers(
     status: str | None = None,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_staff_role(*_CAN_CONFIRM)),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_VIEW_TRANSFERS)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     q = db.query(models.StockTransfer).filter(

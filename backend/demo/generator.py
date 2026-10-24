@@ -21,24 +21,18 @@ from __future__ import annotations
 
 import math
 import random
-import secrets
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 
-import auth
 import models
 from demo import catalog as cat
 from demo.wipe import wipe_demo
-from tenant_provisioning import DEMO_NAME, ensure_demo_restaurant
+from tenant_provisioning import DEMO_NAME, ensure_demo_restaurant, upsert_demo_staff
 from time_utils import EAT_OFFSET, eat_date, utcnow
 
 DEFAULT_SEED = 20261015
 DEFAULT_DAYS = 120
-STAFF_EMAILS = {
-    "manager": ("manager@demo-restaurant.example", models.StaffRole.MANAGER),
-    "storekeeper": ("store@demo-restaurant.example", models.StaffRole.STOCKKEEPER),
-    "kitchen": ("kitchen@demo-restaurant.example", models.StaffRole.KITCHEN),
-}
+# Emails and roles live in tenant_provisioning.DEMO_STAFF (manager, storekeeper, kitchen, accountant).
 WEEKLY_ORDERS = cat.WEEKLY_SALES_TARGET_CENTS / cat.average_order_cents()
 PROTEINS_HANDED_OVER = ("chicken", "beef", "beef_mince", "goat", "tilapia", "rice")
 TABLE_CAPACITIES = (2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 8, 8, 10)
@@ -235,16 +229,13 @@ class DemoBuilder:
             self.branches.append(BranchState(spec=spec, index=index, restaurant=r))
 
     def _users(self, tenant: models.Tenant) -> None:
-        """Staff logins for the demo's store, kitchen and floor. They get a random password nobody knows: the demo
-        is explored from the owner's login; these rows exist so counts and handovers have a person on them."""
-        for key, (email, staff_role) in STAFF_EMAILS.items():
-            user = self.db.query(models.User).filter(models.User.email == email).first()
-            if user is None:
-                user = models.User(tenant_id=tenant.id, email=email, role=models.Role.STAFF, staff_role=staff_role,
-                                   hashed_password=auth.get_password_hash(secrets.token_urlsafe(32)), is_active=True)
-                self.db.add(user)
-                self.db.flush()
-            self.users[key] = user
+        """Staff logins for the guide's store, kitchen, manager and accountant screens.
+
+        ensure_demo_restaurant already created the rows. Re-seeding applies the password env vars when they
+        are set, so a demo that was first created with a random password can be given a known one.
+        """
+        restaurant_id = self.branches[0].restaurant.id if self.branches else None
+        self.users, _log = upsert_demo_staff(self.db, tenant, restaurant_id, reset_password=True)
 
     def _setup_branch(self, b: BranchState) -> None:
         db, rid, spec = self.db, b.restaurant.id, b.spec

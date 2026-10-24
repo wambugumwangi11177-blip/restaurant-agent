@@ -1,3 +1,113 @@
+# Eleven demo — click-through leftovers — 24 October 2026
+
+Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes. No new migration. No browser click-through in this pass.
+
+1. The accountant Orders page reads `GET /api/v1/sales/today` when the role can read sales (manager, supervisor, accountant, and the owner). The card shows that endpoint's `revenue_kes` and `orders`, with the same `window_label` as Sales. Waiter and kitchen do not call it and do not show a zero sales card. The order list itself is still the page of orders.
+
+2. Open-service labels name the trading day. Before 06:00 Nairobi the caption is "Fri 23 Oct service, still open"; after the rollover it is "Sat 24 Oct service". Home's header, the pulse, the "Covered at" line, the daily report range, and each daily report section use that caption. The period control says "Open service". The cash tender window uses the same caption. A daily report with no count that day says "No cash count has been entered for {caption}."
+
+3. The model is given an Allowed figures list, money already written as KES, plus the dish and item names in the data. The voice rules say to copy only that list, never invent a percentage or a target, write KES never $, and a promotion (including a weekend promotion) must name a dish that appears in the data. The ROI speech payload is KES phrases and hours; it does not send token dollars or the raw multiple. On a rejected reply the narrator, the creative take, and the insight writer retry once and name the offending figures. If the retry is still mixed, sentences with a figure the evidence cannot back are dropped and any grounded sentence is kept. A decimal such as 3.8 is one number. A list marker and a bare integer under 10 do not fail the sentence. `tests/test_grounding_retry.py` stubs a model that emits `$5,000` and `64%`.
+
+4. Overall food cost on Home and on the Manager AI tile is the same 30-day sales-weighted figure, labelled "Overall, last 30 days". A leak line is labelled as that dish. The menu average says it is unweighted and is not the Home figure. The Manager average order is labelled "last 30 days". The health tile says "Kept after this week's costs" (or "More went out than came in").
+
+5. Chart bars use `--chart-bar` (gold on the dark staff shell, teal on the owner theme) and skip crowded labels. The three-way match is a small triangle with the labels in a row underneath. A short count with no money in the drawer is an example, captioned as an example (Till KES 12,000, Counted KES 10,460). Price what-if bars scale with the amount. Portion movement has axes. Pareto has bars and a cumulative line. The ABC calendar is a grid with weekday and short dates. The price decision, why-tree, and alert pyramid are drawn. The break-even chart is the cumulative sales line against the costs line. Empty cash windows ("last 7 days", "last 14 days of sales", "last 28 days" with nothing to show) do not print an empty caption. Kitchen menu and kitchen stock type is larger. Team entries uses the dark staff shell.
+
+6. The ROI page paints the numbers from `narrate=false` and fills the note afterwards. A multiple is omitted when model spend is under KES 50, and capped at 50× with a note when the raw ratio is larger. That ratio is staff time plus captured profit divided by model spend, not cash in the till. AI Ops shows "Inventory analysis runs" rather than `inventory_predictor`.
+
+7. The notification panel sits in the header group (`ml-auto`) and stays on screen (`z-[80]`, capped to the viewport). The licence list loads `GET /api/v1/owner/money/licences` on open and on `OWNER_DATA_CHANGED`, sorted by `expires_on`. Paying a bill with an empty note records "Paid {bill name}", and the ledger row uses that name with no quantity.
+
+8. `python execution/reseed_demo.py` already wipes the Demo Restaurant's business rows before it regenerates them (`backend/demo/wipe.py`: orders, stock, shifts, bookings, counts, licences, expenses, bills, operation entries, creative takes). It does not touch another tenant, and it keeps the audit log, impersonation sessions, support tickets, and token-usage rows. No extra wipe was added.
+
+Validation (24 Oct, this tree, no provider keys): backend `LOG_FORMAT=plain pytest` **2254 passed, 1 skipped**. Frontend: `tsc --noEmit` clean, vitest **248 passed**, `next build` succeeded (74 routes). No new migration. No production database was touched. No browser click-through in this pass.
+
+# Eleven demo — Phase 1 leftovers — 24 October 2026
+
+Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes. No new migration.
+
+1. Owner Home and Reports return the numbers without waiting on a model. `GET /api/v1/owner/home` and `GET /api/v1/owner/report/{period}` no longer call the insight layer. The note is a second request: `GET /api/v1/owner/home/notes` and `GET /api/v1/owner/report/{period}/notes`. A failed note leaves the numbers on screen. Cash shifts are computed once per request, and the per-count order queries are one cancelled query and one M-Pesa query for the whole window. `tests/test_home_speed.py` builds 220 paid orders and 30 drawer counts, warms `compose_home`, and checks the next call finishes in under 1 second with no `insight` key. The golden-restaurant ceiling in `test_home_on_the_golden_restaurant_is_fast_enough_to_use` stays at 20 seconds.
+
+2. Each cash figure names its window. Tender mix is today. Cash counts and the area summary ("Counts and sales to look at") are the last 14 days. Cancelled sales are the last 7 days. A price under the menu is the last 14 days of sales, and the dishes stay on the block while the restaurant is still inside those 14 days. Repeating patterns are the last 28 days. The two beef-variance percentages both use the last 7 days: Home already did, and the staff variance panel now requests `hours=168`. The backend default for that endpoint stays 24 hours.
+
+3. The remaining guide pictures are on the home payload (`figures`) and on the cash and store areas, so `/owner/area/{key}` matches the block Home embeds. Card settlement has no table in this app, so the card corner is card sales in the count against "Settlement not recorded". A short count draws the till against the count. Stock history is the on-hand line for 14 days. Follow-a-shilling traces the latest paid order in 14 days, and the statement line when that M-Pesa receipt is on file. The price decision, elasticity slope, price ladder, Pareto cumulative line, ABC count calendar, yesterday's why-tree, the alert pyramid, and the four door cards each have a payload, an empty reason, and a test.
+
+4. A licence with an id can be edited (`PATCH /api/v1/owner/money/licences/{id}`). An upcoming bill with an id can be marked paid (`POST /api/v1/owner/money/bills/{id}/pay`, method cash). Both refresh the owner screens after a save.
+
+5. Deterministic Ask headlines use KES. The creative tests that feed a model sentence containing KSh are unchanged; the insight layer still rewrites that to KES before it is shown.
+
+6. Staff Sales reads `GET /api/v1/sales/today`. The total, the payment mix, the channels, the hours, and the top dishes are counted in the database for the open Nairobi service day (rolls at 06:00). Manager, supervisor, and accountant can read it. The owner can read it as an admin. A waiter receives 403. `GET /api/v1/overview/today` stays closed to those staff roles. `GET /api/v1/orders/` is still capped at 200 rows; the sales screen does not sum that list. The test inserts 201 paid orders today plus one order from last year: the order page is 200 rows and the sales total is 201 orders and KES 201. A manager of another restaurant sees 0.
+
+Where this disagrees with a settlement figure in the guide: the card leg's right side is empty on purpose. `startup_checks.py` records that external card settlement is retired, so the screen does not invent a settlement amount.
+
+Validation (24 Oct, this tree, no provider keys): backend `LOG_FORMAT=plain pytest` **2248 passed, 1 skipped**. Frontend: `tsc --noEmit` clean, vitest **247 passed**, `next build` succeeded (74 routes). No new migration. No production database was touched. No browser click-through in this pass.
+
+# Eleven demo — Phase 1 polish — 24 October 2026
+
+Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes. No new migration. Phase 2 (accountant proposals, activity feed, delegation, PIN tablet, spoilage workflow, onboarding wizard, Capacitor/Tauri) is not in this change.
+
+Click-through fixes: staff Sales shows shillings on the same trading day as Home; a kitchen count starts blank, names the item, and a dispute is visible to the manager; AI notes are KES and drop a sentence that invents a figure, with no `[unverified]` marker and no model name; the owner can sign out; unknown pages use a branded 404; old dashboard paths redirect; staff pages use the owner contrast tokens and the full width; the menu profit uses the dish id; the screens say Storekeeper and Accountant while the stored keys stay `stockkeeper` and `controller`; the sidebar highlights one item; kitchen orders hide sales; the accountant does not record a delivery; period buttons say Today, Last 7 days, Last 30 days. A handover count says "2 handovers that don't match". Sales headlines group the order count. Refresh clocks on Overview, AI Ops, Growth, and ROI use Nairobi.
+
+Figures now drawn from the home payload: tender mix, three-way match, the trick a short count catches, the tolerance curve, and the check matrix (4.1–4.5); stock flow, the reorder line, the missing-stock formula, and the store/kitchen zones (3.2–3.4, 3.6); a break-even line beside the clock (6.1); a prime-cost dial and the three "out of every KES 100" formulas (2.3, 2.4); score bars and Approve / Later / Dismiss (5.6, 9.4); a what-if slider on the first price idea (2.5); a "How LEVIII works" section for figures A, B, 1, 5, and 9. Price, delivery, growth, stock, and branch screens use the same bar charts, with the raw table behind "Show numbers". Licences and recurring bills (including rent) can be added from the owner screens. The first week opens sales, then the cash check, money, the store, staff, and permits. That order follows the guide's "today's sales, then the money match". The PDF is not in the repo, so the day names are that reading.
+
+Frontend API calls start at `/api/v1`. Removed `frontend/src/components/charts/Sparkline.tsx`, `frontend/src/lib/vibandaAreas.ts`, and `frontend/src/lib/retry.ts`. The sparkline under `components/ai` stays.
+
+The leftovers named in this pass (card leg, short-count bars, stock history, one traced order, the price and stock pictures, licence edit, bill pay, window labels, Ask KES) are finished in the entry above. First-load skeletons are unchanged. `owner/area/{key}` remains the deep link beside Home.
+
+Validation (24 Oct, this tree, no provider keys): backend `LOG_FORMAT=plain pytest` **2242 passed, 1 skipped**. Frontend: `tsc --noEmit` clean, vitest **245 passed**, `next build` succeeded (74 routes). No new migration. No production database was touched.
+
+# Eleven demo — one trading day, no live model in tests — 23 October 2026
+
+Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes. No new migration.
+
+Local verification of items 1–11 and 13 passed. The follow-ups:
+
+A. The verified local fix (service-day yesterday, daily report label, remaining LEVIII branding, dish delete clears scheduled prices, markdown stripped from AI notes) is on this branch.
+B. Sales "today", "yesterday" and the other sales periods go through one helper, `time_utils.trading_window`. Before 06:00 Nairobi, Home's break-even chip, `sales_in_period` and the last bar of `trend_7d` use that same open service as Overview, the daily report and Ask. Bookings and shifts stay on the calendar day. Checked at 01:30 and 14:00.
+C. Pytest strips provider keys (including after `load_dotenv` reads `backend/.env`) and refuses a live client. A test that needs a model stubs it.
+D. Reseeding demo staff does not re-hash a password that already matches the env value, so the determinism check does not depend on whether those passwords are set locally.
+E. A no-show count given to the narrator names the span it was counted over. Dish names sent to a model drop a trailing portion count (`Samosa (2)`); a qualifier such as `(goat)` stays. The offline queue is still stored as `chakula-offline`.
+
+Validation (23 Oct, this tree, no provider keys in the environment): backend `LOG_FORMAT=plain pytest` **2241 passed, 1 skipped**. Frontend: `tsc --noEmit` clean, vitest **239 passed**, `next build` succeeded (74 routes). No new migration. No production database was touched.
+
+# Eleven demo — insight beside the figures — 23 October 2026
+
+Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes. No new migration.
+
+13. Ask LEVIII, Home and Reports keep the figures the code computed. When the creative layer is on, a separate note is added: "LEVIII's insight, AI-written". The model may call read-only tools — sales, stock variance, cash, menu and pricing, forecasting, simulation — and the note may cite only numbers those tools returned. A figure that is not in a tool result is dropped. The same question and the same figures reuse the saved note. The daily spend cap still applies. If the model fails, the figures stay and the note says "insight unavailable"; the failure is logged. With no provider key the note is left off, so a page without a key is unchanged.
+
+No new Railway variable. The note spends tokens only when `OPENROUTER_API_KEY` is set, `FEATURE_CREATIVE_LAYER` and `FEATURE_AI_NARRATION` are on (both default on), and today's spend is under `DAILY_LLM_SPEND_CAP_USD` (default 1).
+
+Validation (23 Oct, this tree): backend `LOG_FORMAT=plain pytest` **2231 passed, 1 skipped**. Frontend: `tsc --noEmit` clean, vitest **239 passed**, `next build` succeeded (74 routes). No new migration. No production database was touched.
+
+# Eleven demo — AI availability, grounded notes, and one sales day — 23 October 2026
+
+Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes.
+
+7. An OS chat LLM failure is logged (`logger.warning`) and sent to Sentry. Empty model content is retried once. OS chat asks for up to 1200 tokens. When the model does not answer, the screen says "AI unavailable right now." The old fixed brainstorm sentences are gone.
+8. Precise questions (sales, profit, why, what-if, compare) stay on the deterministic forms. Open-ended advice goes to the model at temperature 0.6, with the service-day sales figures in the prompt and the recent turns, including a previous deterministic headline, so a follow-up is not a copy of the last answer.
+9. `FEATURE_CREATIVE_LAYER` defaults on. It still spends nothing until `OPENROUTER_API_KEY` is set. Reports keep their deterministic numbers and the grounded "My read" is requested whenever the key is set. Home's "LEVIII's read" uses that same grounded note. A figure that is not in the evidence is still dropped.
+10. `OPENROUTER_MODEL`, `_HIGH`, `_LOW` and `_CREATIVE` default to `deepseek/deepseek-v4-flash`, with fallback `qwen/qwen3.7-flash` (`OPENROUTER_FALLBACK_MODEL`). OpenRouter requests send `provider.data_collection = deny` and `reasoning.enabled = false` (`OPENROUTER_REASONING=off`; set `on` to allow reasoning). deepseek-v4-flash otherwise spends `max_tokens` on a reasoning trace and returns `content=null` with `finish_reason=length`. That cutoff is logged and retried once, then raised, so it is not stored as an empty answer. `DAILY_LLM_SPEND_CAP_USD` defaults to 1.
+11. WhatsApp/Twilio stays in the tree. `FEATURE_WHATSAPP` defaults off. The send path stays retired, and the phone scheduler jobs no-op. The demo does not need Twilio.
+12. "How were sales today?" and a why about today use one window: paid, non-cancelled orders from the Nairobi service day (the day rolls at 06:00) through now. Before 06:00, Friday night and the hour after midnight are the same total. Bookings stay on the calendar day.
+
+Railway: set `OPENROUTER_API_KEY`. The model, fallback, spend cap, creative flag and WhatsApp flag can stay at the defaults above. Do not set Twilio. Staff passwords are unchanged from the previous entry.
+
+Validation (23 Oct, this tree): backend `LOG_FORMAT=plain pytest` **2223 passed, 1 skipped**. Frontend: `tsc --noEmit` clean, vitest **237 passed**, `next build` succeeded. No new migration. No production database was touched.
+
+# Eleven demo fixes — 23 October 2026
+
+Branch `dev/eleven-demo-fixes`, based on `codex/eleven-demo-readiness`. No production writes, no deploy, no provider changes.
+
+1. Kitchen handover: confirming an issue requires a different user, and that user must be kitchen staff. A storekeeper or manager confirming their own issue is rejected. Confirming 3.8 kg of a 4 kg issue stays disputed. The check lives in `confirm_transfer`, so the till and WhatsApp share it.
+2. Product name on owner screens is LEVIII. The login restaurant field is empty until the person types the restaurant they are signing into. The read-only source banner uses the signed-in restaurant's name.
+3. Demo manager, storekeeper, kitchen, and accountant logins are created from `DEMO_RESTAURANT_MANAGER_PASSWORD`, `DEMO_RESTAURANT_STOREKEEPER_PASSWORD`, `DEMO_RESTAURANT_KITCHEN_PASSWORD`, and `DEMO_RESTAURANT_ACCOUNTANT_PASSWORD`. Unset values stay random and are not logged. How to sign in is in `RUNBOOK.md`. Restaurant-name login stays owner-only; staff use email.
+4. Menu quotes are attached only when a scheduled price applies, signed with `MENU_QUOTE_SECRET` (or a derived key) and audience `leviii-menu-price`. An expired quote is re-priced to the price that applies now, including offline replay, so an order is not stuck on a 409. `price` stays the stored base; `effective_price` is what the till charges. Wipe includes `scheduled_menu_prices` and `operation_entries`. Migration 059 cascades scheduled prices when a dish is deleted; order history still blocks deletion.
+5. "What did I sell yesterday?" (and the same question for today, this week, last week, this month, last month) answers with that period's paid sales.
+6. The combo screen heading is "Best dish with a dish few people order".
+
+An expired quote is charged at the current scheduled price, or the base price when no schedule applies. That can differ from the price on the screen an hour earlier. `MENU_QUOTE_SECRET` is optional. Startup provisioning does not reset an existing staff password; a reseed does, when the env vars are set. A missing restaurant name on the overview reads "This restaurant" rather than another client's name.
+
+Validation (23 Oct, this tree): backend `LOG_FORMAT=plain pytest` **2211 passed, 1 skipped**. The one failure on the first run was the daily cash-count fixture using "two hours ago", which is yesterday between midnight and 02:00 Nairobi; the fixture now sits inside the elapsed part of today. Frontend: `tsc --noEmit` clean, vitest **236 passed**, `next build` 74 routes. Migration 059 applied on Postgres from a database stamped `058_eleven_workflows`: the menu-item foreign key is `ON DELETE CASCADE`, a second upgrade is a no-op, and deleting a dish removes its scheduled price. SQLite leaves 059 as a no-op, matching migration 028. No production database was migrated.
+
 # Eleven presentation follow-through completed locally — 23 October 2026
 
 The user’s “FINISH” instruction authorized completing the remaining demo workflows. Added forecast-led portions and raw prep through supplier-selected pending purchase drafts; shift statement matching and bounded physical count evidence; shared scheduled checkout pricing with signed one-hour quotes; price ladder, long-tail review and hide action, Star–Puzzle combo candidates; measured price-change results feeding simulations, subsequent pricing impacts and monthly reports; 30-day ABC count calendar and expanded branch control comparison. Staff entries now cover counts, waste, two-party kitchen issues and bill payments, with retry-safe journal, branch-bound device queue, stale-count rejection, ten-minute audited undo, accountant P&L/checklist and expense/receipt review. Approved scheduled discounts no longer appear as unapproved below-menu sales. Fixed ABC boundary handling so the largest spend item cannot fall into a lower band merely because it crosses 80% by itself.

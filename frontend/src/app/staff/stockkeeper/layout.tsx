@@ -12,7 +12,7 @@ const NAV = [
 
 export default function StockkeeperLayout({ children }: { children: React.ReactNode }) {
     return (
-        <TierLayoutShell tier="stockkeeper" tierLabel="Stockkeeper" navItems={NAV}>
+        <TierLayoutShell tier="stockkeeper" tierLabel="Storekeeper" navItems={NAV}>
             {children}
         </TierLayoutShell>
     );

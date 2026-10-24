@@ -45,9 +45,9 @@ export default function MenuEditor() {
 
     useEffect(() => {
         Promise.all([
-            api.get("/menu/").catch(() => ({ data: [] })),
-            api.get("/ai/menu-engineering").catch(() => ({ data: null })),
-            api.get("/inventory/").catch(() => ({ data: [] })),
+            api.get("/api/v1/menu/").catch(() => ({ data: [] })),
+            api.get("/api/v1/ai/menu-engineering").catch(() => ({ data: null })),
+            api.get("/api/v1/inventory/").catch(() => ({ data: [] })),
         ]).then(([menuRes, aiRes, invRes]) => {
             setItems(menuRes.data || []);
             setAiData(aiRes.data);
@@ -58,7 +58,7 @@ export default function MenuEditor() {
 
     const fetchIngredients = async (itemId: number) => {
         try {
-            const res = await api.get(`/menu/${itemId}/ingredients`);
+            const res = await api.get(`/api/v1/menu/${itemId}/ingredients`);
             setIngredientsByItem((prev) => ({ ...prev, [itemId]: res.data }));
         } catch { }
     };
@@ -77,7 +77,7 @@ export default function MenuEditor() {
         if (!newIngredientId || !newIngredientQty) return;
         setRecipeSaving(true);
         try {
-            await api.post(`/menu/${itemId}/ingredients`, {
+            await api.post(`/api/v1/menu/${itemId}/ingredients`, {
                 inventory_item_id: parseInt(newIngredientId),
                 quantity_per_serving: parseFloat(newIngredientQty),
             });
@@ -91,7 +91,7 @@ export default function MenuEditor() {
 
     const handleRemoveIngredient = async (itemId: number, ingredientId: number) => {
         try {
-            await api.delete(`/menu/${itemId}/ingredients/${ingredientId}`);
+            await api.delete(`/api/v1/menu/${itemId}/ingredients/${ingredientId}`);
             await fetchIngredients(itemId);
         } catch (err) {
             showToast(getErrorMessage(err, "Failed to remove ingredient"), "error");
@@ -99,12 +99,12 @@ export default function MenuEditor() {
     };
 
     const fetchMenu = () => {
-        api.get("/menu/").then((r) => setItems(r.data)).catch(() => { });
+        api.get("/api/v1/menu/").then((r) => setItems(r.data)).catch(() => { });
     };
 
     const toggleAvailability = async (item: MenuItem) => {
         try {
-            await api.put(`/menu/${item.id}`, { is_available: !item.is_available });
+            await api.put(`/api/v1/menu/${item.id}`, { is_available: !item.is_available });
             fetchMenu();
         } catch (err) {
             showToast(getErrorMessage(err, "Failed to update availability"), "error");
@@ -127,7 +127,7 @@ export default function MenuEditor() {
     const handleSaveEdit = async (itemId: number) => {
         setEditSaving(true);
         try {
-            await api.put(`/menu/${itemId}`, {
+            await api.put(`/api/v1/menu/${itemId}`, {
                 name: editForm.name,
                 price: Math.round(parseFloat(editForm.price) * 100),
                 category: editForm.category,
@@ -224,8 +224,7 @@ export default function MenuEditor() {
                             <h3 className="text-xs font-semibold text-text-dim uppercase tracking-wider mb-2 px-1">{cat}</h3>
                             <div className="space-y-1">
                                 {items.filter((i) => i.category === cat).map((item, idx) => {
-                                    const aiItem = matrix.find((m) => m.item_id === item.id)
-                                        ?? { item_id: item.id, classification: "", margin_pct: 0 };
+                                    const aiItem = matrix.find((m) => m.id === item.id || m.item_id === item.id);
                                     return (
                                         <MenuItemRow
                                             key={item.id}

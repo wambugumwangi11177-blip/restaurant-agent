@@ -9,6 +9,10 @@ interface RoiBreakdownItem {
     total_minutes: number;
 }
 
+export function agentLabel(id: string): string {
+    return CATEGORY_LABELS[id] || id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
     morning_briefing: "Morning briefings sent",
     reservation_reminder: "Reservation reminders sent",

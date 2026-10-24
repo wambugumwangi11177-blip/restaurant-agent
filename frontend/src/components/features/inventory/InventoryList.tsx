@@ -5,6 +5,13 @@ import { Minus, TruckIcon } from "lucide-react";
 import FormField from "@/components/ui/FormField";
 import type { InventoryItem, InventoryPrediction } from "./types";
 
+function stockQty(quantity: number, unit: string): string {
+    const rounded = Math.round(quantity * 100) / 100;
+    const text = Number.isInteger(rounded) ? String(rounded) : String(rounded);
+    if (unit === "piece" || unit === "pieces") return `${text} ${rounded === 1 ? "piece" : "pieces"}`;
+    return `${text} ${unit}`;
+}
+
 const priorityLabel = (c: string) => {
     const map: Record<string, string> = { A: "High use", B: "Medium", C: "Low use" };
     return map[c] || c;
@@ -36,6 +43,8 @@ interface InventoryListProps {
     submitting: boolean;
     onReceive: (itemId: number) => void;
     onAdjust: (itemId: number) => void;
+    onRename?: (itemId: number, name: string) => void;
+    onDelete?: (itemId: number, name: string) => void;
 }
 
 /**
@@ -61,6 +70,8 @@ export default function InventoryList({
     submitting,
     onReceive,
     onAdjust,
+    onRename,
+    onDelete,
 }: InventoryListProps) {
     const getPrediction = (name: string) => predictions.find((p) =>
         p.item_name?.toLowerCase() === name?.toLowerCase()
@@ -98,7 +109,7 @@ export default function InventoryList({
                                             </div>
                                             <div className="flex items-center gap-3 mt-0.5">
                                                 <span className={`text-xs ${isLow ? "text-warning" : "text-text-muted"}`}>
-                                                    {item.quantity} {item.unit}
+                                                    {stockQty(item.quantity, item.unit)}
                                                 </span>
                                                 {pred?.days_until_stockout != null && pred.days_until_stockout <= 14 && (
                                                     <span className="text-[10px] text-warning">
@@ -124,6 +135,8 @@ export default function InventoryList({
                                             <Minus className="w-3 h-3 inline mr-0.5" />
                                             Adjust
                                         </button>
+                                        {onRename && <button type="button" onClick={() => onRename(item.id, item.item_name)} className="text-[10px] px-2 py-1 rounded bg-surface-hover text-text-muted">Rename</button>}
+                                        {onDelete && <button type="button" onClick={() => onDelete(item.id, item.item_name)} className="text-[10px] px-2 py-1 rounded bg-surface-hover text-text-muted">Remove</button>}
                                     </div>
                                 </div>
 

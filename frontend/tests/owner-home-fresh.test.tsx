@@ -23,7 +23,7 @@ it("a tile with no number says 'Not set up' once, not twice", async () => {
   render(<HomePage />);
   const strip = (await screen.findByRole("heading", { name: "Your restaurant's health" })).closest("section")!;
   for (const tile of within(strip).getAllByRole("link")) expect(within(tile).getAllByText("Not set up")).toHaveLength(1);
-  expect(screen.getByRole("button", { name: /Permits & Settings/ }).textContent).not.toMatch(/Not set up.*Not set up/);
+  expect(screen.getByRole("button", { name: /Sales & Dishes/ }).textContent).not.toMatch(/Not set up.*Not set up/);
 });
 
 it("every one of the six panels opens on an empty restaurant, gives a reason, and draws no chart", async () => {

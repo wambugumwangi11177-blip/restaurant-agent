@@ -1,11 +1,13 @@
 "use client";
 import Link from "next/link";
+import { useState } from "react";
 import Bars from "@/components/charts/Bars";
 import BandForecast from "@/components/charts/BandForecast";
 import HBars from "@/components/charts/HBars";
 import Quadrant from "@/components/charts/Quadrant";
 import { BLOCK_TITLES } from "@/lib/owner/blocks";
 import { kes, kesShort, plural, shortDay, weekday } from "@/lib/owner/format";
+import { monthGainCents } from "@/lib/menuMath";
 import type { DeliveryBlock, DishesByKesBlock, ForecastBlock, InfoBlock, MatrixBlock, OutlookBlock, PriceIdeasBlock, SevenDayBlock, WinBackBlock } from "@/lib/owner/areaTypes";
 import type { Area } from "@/lib/owner/types";
 import { BlockFrame, Empty, Grid, Note, Pill, Stat } from "./ui";
@@ -31,7 +33,7 @@ export default function SalesArea({ area }: { area: Area }) {
       <div className="grid gap-3 md:grid-cols-3">
         <Outlook block={b.outlook as OutlookBlock} />
         <WinBack block={b.win_back as WinBackBlock} />
-        <WhatIf block={b.simulator as InfoBlock} />
+        <WhatIf block={b.simulator as InfoBlock} idea={(b.price_ideas as PriceIdeasBlock).ideas?.[0]} />
       </div>
     </div>
   );
@@ -93,6 +95,10 @@ function PriceIdeas({ block }: { block: PriceIdeasBlock }) {
             <li key={`${i.id}-${i.dish}`} className="text-xs">
               <div className="flex flex-wrap items-center justify-between gap-2"><b>{i.dish}</b><Pill tone={i.kind === "Priced too low" ? "bad" : "quiet"}>{i.kind}</Pill></div>
               <p className="mt-0.5">{kes(i.from)} → <b>{kes(i.to)}</b> · about {kes(i.month_gain)} a month</p>
+              <Bars label={`${i.dish} price now and the price that keeps your target`} height={88} bars={[
+                { key: "now", label: "Now", value: i.from, title: `Now ${kes(i.from)}` },
+                { key: "to", label: "Target", value: i.to, highlight: true, title: `Target ${kes(i.to)}` },
+              ]} />
               <p className="mt-0.5 text-[11px] text-[var(--v-muted-foreground)]">{i.why}</p>
             </li>
           ))}
@@ -118,6 +124,7 @@ function Delivery({ block }: { block: DeliveryBlock }) {
       {block.delivery_gaps.length > 0 && (
         <div className="mt-4">
           <p className="mb-1.5 text-[11px] font-bold">Dishes that lose too much to a delivery app</p>
+          <HBars label="Less kept per plate than in the restaurant" rows={block.delivery_gaps.slice(0, GAPS_SHOWN).map((g) => ({ key: `${g.channel}-${g.dish}`, label: g.dish, value: Math.max(g.keeps_dine_in - g.keeps, 0), valueLabel: kes(g.keeps_dine_in - g.keeps), note: `${g.channel} keeps ${kes(g.keeps)}` }))} />
           <ul className="divide-y divide-[var(--v-border)] text-xs">
             {block.delivery_gaps.slice(0, GAPS_SHOWN).map((g) => (
               <li key={`${g.channel}-${g.dish}`} className="py-1.5">
@@ -151,10 +158,38 @@ function WinBack({ block }: { block: WinBackBlock }) {
   );
 }
 
-function WhatIf({ block }: { block: InfoBlock }) {
+function WhatIf({ block, idea }: { block: InfoBlock; idea?: PriceIdeasBlock["ideas"][number] }) {
+  const [price, setPrice] = useState(idea?.to ?? 0);
+  const plates = idea && idea.to !== idea.from ? Math.round((idea.month_gain * 100) / ((idea.to - idea.from) * 100)) : 0;
+  const gain = idea ? monthGainCents(Math.round(idea.from * 100), Math.round(price * 100), plates) / 100 : 0;
   return (
     <BlockFrame title={T.simulator} block={block} quiet>{() => (<>
       <p className="text-xs leading-relaxed">{block.how}</p>
+      {!idea ? <p className="mt-2 text-xs text-[var(--v-muted-foreground)]">When a dish has a price idea, you can slide the price and see the month change with no guesswork.</p> : (
+        <div className="mt-3">
+          <p className="text-xs font-semibold">{idea.dish}</p>
+          <label className="mt-1 block text-[11px] text-[var(--v-muted-foreground)]">New price {kes(price)}
+            <input className="mt-1 w-full" type="range" min={Math.max(1, Math.round(idea.from * 0.5))} max={Math.max(idea.to, idea.from) * 1.5} value={price} onChange={(e) => setPrice(Number(e.target.value))} />
+          </label>
+          <ul className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+            <li><span className="block text-[var(--v-muted-foreground)]">Before</span><b>{kes(idea.from)}</b></li>
+            <li><span className="block text-[var(--v-muted-foreground)]">After</span><b>{kes(price)}</b></li>
+            <li><span className="block text-[var(--v-muted-foreground)]">Change a month</span><b>{kes(gain)}</b></li>
+          </ul>
+          <div className="mt-3 flex h-24 items-end gap-6" aria-label="Before and after">
+            {[{ key: "before", label: "Before", value: idea.from }, { key: "after", label: "After", value: price }].map((bar) => {
+              const top = Math.max(idea.from, price, 1);
+              return (
+                <div key={bar.key} className="flex w-16 flex-col items-center justify-end">
+                  <span className="mb-1 text-[11px]">{kes(bar.value)}</span>
+                  <div className="w-10 rounded-t bg-[var(--chart-bar,#e0b15a)]" style={{ height: `${Math.max(8, (bar.value / top) * 72)}px` }} />
+                  <span className="mt-1 text-[11px]">{bar.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <Link href="/os?q=What%20if%20I%20raise%20the%20price%20of%20my%20best%20seller%3F" className="mt-3 inline-flex min-h-10 items-center text-[11px] font-bold text-[var(--v-primary)]">Try it →</Link>
     </>)}</BlockFrame>
   );

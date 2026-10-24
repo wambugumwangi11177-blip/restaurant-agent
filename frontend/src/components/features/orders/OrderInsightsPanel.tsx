@@ -70,17 +70,18 @@ export default function OrderInsightsPanel({ trends, forecast, anomalies }: Orde
                 {forecast.length > 0 && (
                     <div>
                         <p className="text-[10px] text-text-dim mb-2">Expected sales this coming week</p>
-                        <div className="flex gap-1 items-end h-14">
+                        <div className="flex gap-1 items-end h-16">
                             {forecast.map((f, i: number) => {
                                 const max = Math.max(...forecast.map((ff) => ff.predicted || ff.amount || 0));
                                 const val = f.predicted || f.amount || 0;
                                 const pct = max > 0 ? (val / max) * 100 : 0;
+                                const name = (f.day_name || f.date || "").toString();
                                 return (
-                                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                                        <div className="w-full rounded-sm relative overflow-hidden" style={{ height: `${Math.max(pct, 8)}%` }}>
-                                            <div className="absolute inset-0 bg-accent/30 rounded-sm" />
+                                    <div key={i} className="flex-1 flex flex-col items-center gap-1 h-full">
+                                        <div className="flex h-10 w-full items-end">
+                                            <div className="w-full rounded-sm bg-accent/30" style={{ height: `${Math.max(pct, 8)}%` }} />
                                         </div>
-                                        <span className="text-[8px] text-text-dim">{f.day_name?.slice(0, 3) || `Day ${i + 1}`}</span>
+                                        <span className="text-[8px] text-text-dim">{(name || `Day ${i + 1}`).slice(0, 3)}</span>
                                     </div>
                                 );
                             })}

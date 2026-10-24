@@ -51,7 +51,7 @@ export default function AiDashboard() {
         setLoading(true);
         setError("");
         try {
-            const res = await api.get("/ai/dashboard");
+            const res = await api.get("/api/v1/ai/dashboard");
             setData(res.data);
             setLastUpdated(new Date());
         } catch (e) {

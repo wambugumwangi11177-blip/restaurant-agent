@@ -88,13 +88,17 @@ def _money_cost_dials(ctx: OwnerContext) -> dict:
     profit, labor = _profit(ctx)["summary"], _labor(ctx)["summary"]
     food = profit.get("food_cost_pct") or 0.0
     wages = labor.get("labor_pct") if labor.get("labor_status") != "NO_DATA" else None
+    prime = None if wages is None else round(float(food) + float(wages), 1)
     return {**base,
             "food_cost_pct": food, "food_cost_target_pct": s.food_cost_target_pct,
             "food_cost_word": {"HEALTHY": "Fine", "WARNING": "Watch", "CRITICAL": "High"}.get(profit.get("food_cost_status"), "Not set up"),
             "wages_pct": wages, "wages_target_pct": s.labour_target_pct,
             "wages_word": None if wages is None else ("Fine" if wages <= s.labour_target_pct else "High"),
+            "prime_cost_pct": prime, "prime_cost_target_pct": s.prime_cost_target_pct,
+            "prime_cost_word": None if prime is None else ("Fine" if prime <= s.prime_cost_target_pct else "High"),
             "assumptions": [assume("food_cost_target_pct", s.food_cost_target_pct, label="Ingredient cost target"),
-                            assume("labour_target_pct", s.labour_target_pct, label="Wages target")],
+                            assume("labour_target_pct", s.labour_target_pct, label="Wages target"),
+                            assume("prime_cost_target_pct", s.prime_cost_target_pct, label="Ingredients + wages target")],
             "assumption": assume("food_cost_target_pct", s.food_cost_target_pct, label="Ingredient cost target")}
 
 
@@ -119,11 +123,12 @@ def _hhmm(utc_naive) -> str:
 def breakeven_summary(ctx: OwnerContext) -> dict:
     """"Costs covered": today's break-even sales and where today's sales are against it (Home's pulse chip and money.breakeven)."""
     from owner.money.breakeven import break_even, todays_progress
-    today = eat_date(ctx.now)
+    from time_utils import trading_day
+    today = trading_day(ctx.now)
     be = ctx.cached("break_even", lambda: break_even(ctx.db, ctx.rid, today, ctx.settings))
     if be is None:
         return no_data("Costs covered needs your costs and some sales: enter your costs to see when today's sales cover them.")
-    progress = todays_progress(ctx.db, ctx.rid, be["break_even_cents"], today)
+    progress = todays_progress(ctx.db, ctx.rid, be["break_even_cents"], today, ctx.now)
     base = ctx.order_state()
     basis = be["basis"]
     return {**(base if base["state"] != "no_data" else block("live", as_of=ctx.now)),
@@ -131,6 +136,7 @@ def breakeven_summary(ctx: OwnerContext) -> dict:
             "to_go_kes": kes(progress["to_go_cents"]), "covered": progress["crossed_at"] is not None,
             "crossed_at": _hhmm(progress["crossed_at"]) if progress["crossed_at"] else None,
             "fixed_per_day_kes": kes(be["fixed_per_day_cents"]), "food_cost_pct": be["food_cost_pct"],
+            "curve": [{"at": _hhmm(p["at"]), "sales_kes": kes(p["sales_cents"])} for p in progress.get("points", [])],
             "built_from": {"label": basis["label"], "period": basis["kind"], "days": basis["days"], "fixed_costs_kes": kes(basis["fixed_costs_cents"]),
                            "wages_kes": kes(basis["labour_fixed_cents"]), "lines": [{"name": l["name"], "kes": kes(l["amount_cents"])} for l in basis["fixed_lines"]]},
             "note": "Gas, packaging and other costs that move with sales are not counted, so the real figure is a little higher.",
@@ -151,7 +157,7 @@ def bills_block(ctx: OwnerContext) -> dict:
         return no_data("Needs about two weeks of sales before we can forecast whether they will cover your bills.")
     s = ctx.settings
     return block("as_entered", as_of=ctx.now,
-                 upcoming=[{"name": u["name"], "due_on": u["due_on"], "days_away": u["days_away"], "amount_kes": kes(u["amount_cents"]),
+                 upcoming=[{"id": u.get("bill_id"), "name": u["name"], "due_on": u["due_on"], "days_away": u["days_away"], "amount_kes": kes(u["amount_cents"]),
                             "short": u["balance_after_cents"] < 0} for u in r["upcoming"]],
                  shortfalls=[{"date": x["date"], "short_by_kes": kes(x["short_by_cents"]), "bills": x["bills"], "bills_kes": kes(x["bills_cents"])} for x in r["shortfalls"]],
                  lowest={"date": r["lowest"]["date"], "balance_kes": kes(r["lowest"]["balance_cents"])},
@@ -186,7 +192,7 @@ def _licences(ctx: OwnerContext) -> list[dict]:
     out = []
     for l in rows:
         days_left, status = licence_status(l.expires_on, today, warn)
-        out.append({"name": l.name, "issuer": l.issuer, "expires_on": l.expires_on.isoformat(), "days_left": days_left, "status": status,
+        out.append({"id": l.id, "name": l.name, "issuer": l.issuer, "expires_on": l.expires_on.isoformat(), "days_left": days_left, "status": status,
                     "entered_up_to": eat_date(l.updated_at or l.created_at).isoformat(),
                     "word": {"expired": "Expired", "expiring": "Expires soon", "ok": "Fine"}[status]})
     return out
@@ -256,7 +262,7 @@ def money_area(ctx: OwnerContext) -> tuple[dict, dict]:
 
 def _seven_day(ctx: OwnerContext) -> dict:
     overview = _overview_core(ctx)
-    trend = overview._performance(ctx.db, ctx.rid)["revenue_trend"]
+    trend = overview._performance(ctx.db, ctx.rid, ctx.now)["revenue_trend"]
     total = sum(d["revenue"] for d in trend)
     return {**ctx.order_state(), "days": [{"date": d["date"], "sales": d["revenue"], "orders": d["orders"]} for d in trend],
             "total": round(total, 2)}
@@ -438,11 +444,13 @@ def _reorder(ctx: OwnerContext) -> dict:
         models.InventoryItem.restaurant_id == ctx.rid).order_by(models.StockMovement.created_at.desc()).first()
     return {**ctx.entered_state(latest[0] if latest else None, empty="Stock levels recorded, no movements yet."),
             "tracked": len(preds["predictions"]),
-            "least_cover": [{"item": p["name"], "unit": p["unit"], "left": p["current_stock"], "days_left": p.get("days_until_depletion")}
+            "least_cover": [{"item": p["name"], "unit": p["unit"], "left": p["current_stock"], "days_left": p.get("days_until_depletion"),
+                              "reorder_point": p.get("reorder_point"), "par": p.get("low_stock_threshold")}
                             for p in sorted((p for p in preds["predictions"] if p.get("days_until_depletion") is not None),
                                             key=lambda p: p["days_until_depletion"])[:5]],
             "time_to_reorder": [{"item": p["name"], "unit": p["unit"], "left": p["current_stock"], "status": p["status"],
-                                 "days_left": p.get("days_until_depletion")} for p in items[:10]],
+                                 "days_left": p.get("days_until_depletion"), "reorder_point": p.get("reorder_point"),
+                                 "par": p.get("low_stock_threshold")} for p in items[:10]],
             "drafts": [{"item": c.item_name, "unit": c.unit, "order": c.adjusted_quantity, "supplier": c.supplier_name} for c in drafts[:10]]}
 
 
@@ -484,6 +492,32 @@ def store_area(ctx: OwnerContext) -> tuple[dict, dict]:
 # Cash Check
 # ═════════════════════════════════════════════════════════════════════════════
 
+def _today_tenders(ctx: OwnerContext) -> list[dict]:
+    """Paid sales in the open trading day, split by how the guest paid. The same paid orders Home's sales use."""
+    from time_utils import trading_window
+    lo, hi, _day = trading_window("today", ctx.now)
+    grouped = ctx.db.query(models.Order.payment_method, func.sum(models.Order.total)).filter(
+        models.Order.restaurant_id == ctx.rid, models.Order.is_paid.is_(True),
+        models.Order.status != models.OrderStatus.CANCELLED,
+        models.Order.created_at >= lo, models.Order.created_at < hi).group_by(models.Order.payment_method).all()
+    labels = {"cash": "Cash", "mpesa": "M-Pesa", "card": "Card"}
+    out = []
+    for method, total in grouped:
+        key = method.value if hasattr(method, "value") else str(method or "")
+        if key not in labels:
+            continue
+        out.append({"key": key, "label": labels[key], "kes": kes(int(total or 0))})
+    order = {"cash": 0, "mpesa": 1, "card": 2}
+    out.sort(key=lambda row: order[row["key"]])
+    return out
+
+
+def _shift_extras(ctx: OwnerContext) -> dict[int, dict]:
+    """The full shift columns (M-Pesa gap, cancelled, stock gap) from the same report /planning used to draw."""
+    from owner.planning import shifts as planning_shifts
+    return {row["id"]: row for row in planning_shifts(ctx).get("shifts") or []}
+
+
 def _shifts(ctx: OwnerContext) -> dict:
     from ai.cash_reconciliation.intelligence import drawer_tolerance_cents
     rows = ctx.db.query(models.CashDrawerCount).filter(
@@ -492,16 +526,26 @@ def _shifts(ctx: OwnerContext) -> dict:
     latest = ctx.db.query(models.CashDrawerCount.counted_at).filter(models.CashDrawerCount.restaurant_id == ctx.rid).order_by(
         models.CashDrawerCount.counted_at.desc()).first()
     base = ctx.entered_state(latest[0] if latest else None, empty="No cash counts entered yet.")
-    if base["state"] == "no_data":
-        return base
     s = ctx.settings
-    return {**base, "shifts": [{"from": r.window_start.isoformat(), "expected": kes(r.expected_amount_cents), "counted": kes(r.counted_amount_cents),
-                                "gap": kes(r.counted_amount_cents - r.expected_amount_cents),
-                                "check": abs(r.counted_amount_cents - r.expected_amount_cents) > drawer_tolerance_cents(r.expected_amount_cents, s)}
-                               for r in rows],
-            "assumptions": [assume("cash_tolerance_kes", s.cash_tolerance_cents // 100, label="Cash count difference we accept"),
-                            assume("cash_tolerance_pct", s.cash_tolerance_pct, label="…or this share of takings")],
-            "assumption": assume("cash_tolerance_kes", s.cash_tolerance_cents // 100, label="Cash count difference we accept")}
+    extras = _shift_extras(ctx) if rows else {}
+    tenders = _today_tenders(ctx)
+    tolerance = {"kes": s.cash_tolerance_cents // 100, "pct": s.cash_tolerance_pct}
+    assumptions = [assume("cash_tolerance_kes", s.cash_tolerance_cents // 100, label="Cash count difference we accept"),
+                   assume("cash_tolerance_pct", s.cash_tolerance_pct, label="…or this share of takings")]
+    if base["state"] == "no_data":
+        return {**base, "window": "last 14 days", "shifts": [], "tenders": tenders, "tolerance": tolerance,
+                "assumptions": assumptions, "assumption": assumptions[0]}
+    shifts = []
+    for r in rows:
+        gap_cents = r.counted_amount_cents - r.expected_amount_cents
+        check = abs(gap_cents) > drawer_tolerance_cents(r.expected_amount_cents, s)
+        extra = extras.get(r.id, {})
+        shifts.append({"from": r.window_start.isoformat(), "expected": kes(r.expected_amount_cents), "counted": kes(r.counted_amount_cents),
+                       "gap": kes(gap_cents), "check": check,
+                       "mpesa_gap": extra.get("mpesa_unmatched_kes"), "cancelled": extra.get("cancelled_sales"),
+                       "stock_gap": extra.get("stock_gap"), "signal": "Look at this" if check else "Matches"})
+    return {**base, "window": "last 14 days", "shifts": shifts, "tenders": tenders, "tolerance": tolerance,
+            "assumptions": assumptions, "assumption": assumptions[0]}
 
 
 def _cancelled_sales(ctx: OwnerContext) -> dict:
@@ -513,7 +557,7 @@ def _cancelled_sales(ctx: OwnerContext) -> dict:
     cancelled = ctx.db.query(models.Order.id).filter(
         models.Order.restaurant_id == ctx.rid, models.Order.status == models.OrderStatus.CANCELLED,
         models.Order.created_at >= ctx.now - timedelta(days=7)).count()
-    return {**base, "cancelled_last_7_days": cancelled, "unusual_cancelling": len(report.void_spikes), "unusual_refunds": len(report.refund_velocity),
+    return {**base, "window": "last 7 days", "cancelled_last_7_days": cancelled, "unusual_cancelling": len(report.void_spikes), "unusual_refunds": len(report.refund_velocity),
             "late_night_activity": len(report.off_hours), "to_check": len(report.void_spikes) + len(report.refund_velocity) + len(report.off_hours),
             "note": "These are things to check, not conclusions about anyone."}
 
@@ -523,8 +567,12 @@ def _below_menu_price(ctx: OwnerContext) -> dict:
     base = ctx.order_state(needs_days=14)
     if base["state"] == "no_data":
         return base
-    return {**base, "dishes": [{"dish": g["item_name"], "menu_price": kes(g["menu_price"]), "charged": kes(g["avg_captured_price"]),
-                                "below_pct": g["drift_pct"], "month_loss": kes(g["estimated_monthly_leak"])} for g in gaps[:5]]}
+    dishes = [{"dish": g["item_name"], "menu_price": kes(g["menu_price"]), "charged": kes(g["avg_captured_price"]),
+               "below_pct": g["drift_pct"], "month_loss": kes(g["estimated_monthly_leak"])} for g in gaps[:5]]
+    if base["state"] == "learning":
+        return {**base, "window": "last 14 days", "dishes": dishes,
+                "reason": "Needs 14 days of sales before a price under the menu can be judged. Window: last 14 days."}
+    return {**base, "window": "last 14 days", "dishes": dishes}
 
 
 PATTERN_DAYS = 28
@@ -536,13 +584,14 @@ def _patterns(ctx: OwnerContext) -> dict:
     from ai.cash_reconciliation.intelligence import recurring_drawer_gaps
     first = ctx.db.query(func.min(models.CashDrawerCount.counted_at)).filter(models.CashDrawerCount.restaurant_id == ctx.rid).scalar()
     if first is None:
-        return no_data("Needs four weeks of cash counts to spot a repeating pattern.")
+        return no_data("Needs four weeks of cash counts to spot a repeating pattern. Window: last 28 days.", window="last 28 days")
     day = (ctx.now - first).days + 1
     if day < PATTERN_DAYS:
-        return block("learning", as_of=ctx.now, day=day, of=PATTERN_DAYS, reason="Needs four weeks of cash counts to spot a repeating pattern.")
+        return block("learning", as_of=ctx.now, day=day, of=PATTERN_DAYS, window="last 28 days",
+                     reason="Needs four weeks of cash counts to spot a repeating pattern. Window: last 28 days.")
     found = recurring_drawer_gaps(ctx.db, ctx.rid, ctx.settings)
     s = ctx.settings
-    return block("live", as_of=ctx.now,
+    return block("live", as_of=ctx.now, window="last 28 days",
                  patterns=[{"when": p.when, "weekday": p.weekday, "shift": p.shift, "times_short": p.times_short, "of_last": p.of_last, "short_each": kes(p.average_short_cents),
                             "total": kes(p.total_short_cents)} for p in found],
                  reason=None if found else "No shift has come up short again and again in the last four weeks.",
@@ -557,7 +606,7 @@ def _mpesa(ctx: OwnerContext) -> dict:
 
 
 def cash_area(ctx: OwnerContext) -> tuple[dict, dict]:
-    shifts = ctx.safe("cash.shifts", lambda: _shifts(ctx))
+    shifts = ctx.safe("cash.shifts", lambda: ctx.cached("cash_shifts", lambda: _shifts(ctx)))
     cancelled = ctx.safe("cash.cancelled", lambda: _cancelled_sales(ctx))
     below = ctx.safe("cash.below_menu_price", lambda: _below_menu_price(ctx))
     mpesa = _mpesa(ctx)
@@ -568,11 +617,11 @@ def cash_area(ctx: OwnerContext) -> tuple[dict, dict]:
                                                                    or mpesa["different_amounts"]) else 0
     flagged = sum(1 for s in shifts.get("shifts", []) if s["check"]) + (cancelled.get("to_check", 0) if cancelled["state"] == "live" else 0) + gap
     if shifts["state"] in ("no_data", "unavailable") and cancelled["state"] in ("no_data", "unavailable"):
-        head = summary(None, _STATUS_WORD["unknown"], "unknown", label="Counts and sales to look at")
+        head = summary(None, _STATUS_WORD["unknown"], "unknown", label="Counts and sales to look at, last 14 days")
     elif flagged:
-        head = summary(flagged, "Things to check", "bad", label="Counts and sales to look at")
+        head = summary(flagged, "Things to check", "bad", label="Counts and sales to look at, last 14 days")
     else:
-        head = summary(0, "Balanced", "good", label="Counts and sales to look at")
+        head = summary(0, "Balanced", "good", label="Counts and sales to look at, last 14 days")
     return head, blocks
 
 
@@ -694,4 +743,15 @@ def compose_area(ctx: OwnerContext, key: str) -> dict:
     area_state = ("live" if "live" in worst else "as_entered" if "as_entered" in worst else "learning" if "learning" in worst
                   else "stale" if "stale" in worst else "no_data" if "no_data" in worst else "unavailable")
     as_of = next((b.get("as_of") for b in measured if b.get("as_of")), None)
+    _attach_figures(ctx, key, blocks)
     return {"key": key, "title": AREA_TITLES[key], "state": area_state, "as_of": as_of, "summary": head, "blocks": blocks}
+
+
+def _attach_figures(ctx: OwnerContext, key: str, blocks: dict) -> None:
+    """The same chart series on Home and on the area page. Cached per request."""
+    from owner import figures
+    if key == "cash" and isinstance(blocks.get("shifts"), dict):
+        blocks["shifts"]["three_way"] = ctx.safe("figure.three_way", lambda: figures.three_way(ctx))
+        blocks["shifts"]["short_count"] = ctx.safe("figure.short_count", lambda: figures.short_count(ctx))
+    if key == "store" and isinstance(blocks.get("reorder"), dict):
+        blocks["reorder"]["history"] = ctx.safe("figure.stock_history", lambda: figures.stock_history(ctx))

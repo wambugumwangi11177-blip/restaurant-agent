@@ -19,8 +19,9 @@ def collect(db, rid):
     def profit():
         from ai.profit.intelligence import get_profit_intelligence
         data = get_profit_intelligence(db, rid)
+        from ai.creative import clean_dish_name
         for leak in data.get('profit_leaks', [])[:4]:
-            add('Profit', f"Review margin on {leak['item_name']}",
+            add('Profit', f"Review margin on {clean_dish_name(leak['item_name'])}",
                 f"It keeps {leak['current_margin_pct']:g}% of its price, under the lowest share you said you accept. "
                 'The figure is what the gap to your floor costs in a month at the prices and sales recorded; it is not verified recoverable profit.',
                 leak['action'], f"About KSh {leak['monthly_leak_cents'] / 100:,.0f} a month to your floor",
@@ -42,8 +43,9 @@ def collect(db, rid):
         data = get_reservation_insights(db, rid)
         analysis = data.get('no_show_analysis', {})
         if analysis.get('no_shows'):
-            add('Bookings', f"Review {analysis['no_shows']} recorded no-shows",
-                f"{analysis['no_show_rate']}% of {analysis['total_reservations']} recorded reservations. Historical records, not today's arrivals.",
+            period = analysis.get('period') or 'all recorded reservations, not one day'
+            add('Bookings', f"Review {analysis['no_shows']} recorded no-shows ({period})",
+                f"{analysis['no_show_rate']}% of {analysis['total_reservations']} recorded reservations. {period}. Not today's arrivals.",
                 'Review booking confirmations and cancellation records before changing deposit policies.')
         return bool(analysis.get('total_reservations'))
 

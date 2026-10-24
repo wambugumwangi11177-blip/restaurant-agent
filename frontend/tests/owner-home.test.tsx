@@ -27,8 +27,9 @@ it("Zone 1 shows today's sales, the comparison, costs covered and the money chec
   expect((await screen.findByTestId("sales-today")).textContent).toBe("KES 22,290");
   expect(screen.getByText("13 paid orders")).toBeTruthy();
   expect(screen.getByText("+14.8%")).toBeTruthy();
-  expect(screen.getByText("Covered at 12:31 pm")).toBeTruthy();
-  expect(screen.getByText("KES 22,290 of KES 4,946 a day")).toBeTruthy();
+  expect(screen.getByText("Covered at 12:31 pm · Thu 15 Oct service")).toBeTruthy();
+  expect(screen.getByText("KES 22,290 of KES 4,946 this service has to cover")).toBeTruthy();
+  expect(screen.getAllByText("Thu 15 Oct service").length).toBeGreaterThan(0);
   expect(screen.getByText(/27 shifts checked · 2 to look at/)).toBeTruthy();
   expect(screen.getByText((fixture as unknown as OwnerHome).pulse.money_match.mpesa.headline!)).toBeTruthy();
   expect(screen.getByRole("img", { name: "Sales for each of the last 7 days" })).toBeTruthy();
@@ -95,11 +96,11 @@ it("any card can be acknowledged; a failed save keeps the card and says so, a go
   const first = data.costing_you_money.cards[0];
   const card = () => screen.getByText(first.sentence).closest("article")!;
   await screen.findByText(first.sentence);
-  fireEvent.click(within(card()).getByRole("button", { name: "Acknowledge" }));
+  fireEvent.click(within(card()).getByRole("button", { name: "Approve" }));
   expect((await screen.findByRole("alert")).textContent).toMatch(/could not be saved/);
   expect(screen.getByText(first.sentence)).toBeTruthy();
   vi.mocked(api.post).mockResolvedValueOnce({ data: {} } as never);
-  fireEvent.click(within(card()).getByRole("button", { name: "Acknowledge" }));
+  fireEvent.click(within(card()).getByRole("button", { name: "Approve" }));
   await waitFor(() => expect(screen.queryByText(first.sentence)).toBeNull());
   expect(api.post).toHaveBeenLastCalledWith(`/api/v1/overview/attention/${encodeURIComponent(first.id)}/decision`, { decision: "approved" });
 });
@@ -139,9 +140,9 @@ it("Zone 4 shows bills with the shortfall, licences, deliveries and the bookings
 it("the period buttons ask for that period", async () => {
   render(<HomePage />);
   await screen.findByTestId("sales-today");
-  fireEvent.click(screen.getByRole("button", { name: "7 days" }));
-  await waitFor(() => expect(api.get).toHaveBeenLastCalledWith("/api/v1/owner/home", expect.objectContaining({ params: { period: "7d" } })));
-  expect(screen.getByRole("button", { name: "7 days" }).getAttribute("aria-pressed")).toBe("true");
+  fireEvent.click(screen.getByRole("button", { name: "Last 7 days" }));
+  await waitFor(() => expect(api.get).toHaveBeenCalledWith("/api/v1/owner/home", expect.objectContaining({ params: { period: "7d" } })));
+  expect(screen.getByRole("button", { name: "Last 7 days" }).getAttribute("aria-pressed")).toBe("true");
 });
 
 it("old figures say they are old", async () => {

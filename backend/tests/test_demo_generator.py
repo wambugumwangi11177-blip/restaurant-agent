@@ -149,6 +149,21 @@ def test_no_real_person_or_business_is_named_except_the_one_figure_6_1_names():
 # The shape of the demo
 # ═════════════════════════════════════════════════════════════════════════════
 
+def test_demo_seed_has_store_kitchen_manager_and_accountant_logins(demo):
+    db, _summary = demo
+    expected = {
+        "manager@demo-restaurant.example": models.StaffRole.MANAGER,
+        "store@demo-restaurant.example": models.StaffRole.STOCKKEEPER,
+        "kitchen@demo-restaurant.example": models.StaffRole.KITCHEN,
+        "accountant@demo-restaurant.example": models.StaffRole.CONTROLLER,
+    }
+    branches = _branches(db)
+    for email, role in expected.items():
+        user = db.query(models.User).filter_by(email=email).one()
+        assert user.staff_role == role and user.is_active and user.role == models.Role.STAFF
+        assert user.active_restaurant_id == branches[0].id
+
+
 def test_one_tenant_two_branches_with_the_owner_login_resolving_the_first(demo):
     db, summary = demo
     tenant = db.query(models.Tenant).filter(models.Tenant.name == "Demo Restaurant").one()
@@ -317,7 +332,9 @@ def test_the_staff_logins_have_a_password_nobody_knows(demo):
     db, _ = demo
     import auth
     users = db.query(models.User).filter(models.User.email.like("%@demo-restaurant.example"), models.User.email != OWNER).all()
-    assert {u.staff_role for u in users} == {models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER, models.StaffRole.KITCHEN}
+    assert {u.staff_role for u in users} == {
+        models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER, models.StaffRole.KITCHEN, models.StaffRole.CONTROLLER,
+    }
     for u in users:
         for guess in (PASSWORD, "password", "demo", "Demo-Passw0rd!x1", u.email):
             assert not auth.verify_password(guess, u.hashed_password)
@@ -353,6 +370,22 @@ def test_same_seed_same_rows_and_a_reseed_neither_duplicates_nor_drifts(db_sessi
     assert db_session.query(models.Order).count() == first.counts["orders"]
     assert db_session.query(models.Organization).count() == 1 and db_session.query(models.Region).count() == 1
     assert db_session.query(models.RestaurantSettings).count() == 2
+
+
+def test_reseed_keeps_the_hash_when_the_env_password_is_unchanged(db_session, monkeypatch):
+    """A staff password from the environment must not rotate on reseed: bcrypt salts a new hash every time."""
+    monkeypatch.setenv("DEMO_RESTAURANT_MANAGER_PASSWORD", "Manager-pass-1")
+    for name in ("DEMO_RESTAURANT_STOREKEEPER_PASSWORD", "DEMO_RESTAURANT_KITCHEN_PASSWORD", "DEMO_RESTAURANT_ACCOUNTANT_PASSWORD"):
+        monkeypatch.delenv(name, raising=False)
+    from tenant_provisioning import ensure_demo_restaurant, upsert_demo_staff
+    ensure_demo_restaurant(db_session, OWNER, PASSWORD)
+    manager = db_session.query(models.User).filter_by(email="manager@demo-restaurant.example").one()
+    first = manager.hashed_password
+    tenant = db_session.query(models.Tenant).one()
+    upsert_demo_staff(db_session, tenant, manager.active_restaurant_id, reset_password=True)
+    assert manager.hashed_password == first
+    import auth
+    assert auth.verify_password("Manager-pass-1", manager.hashed_password)
 
 
 def test_a_different_seed_gives_different_rows(db_session):

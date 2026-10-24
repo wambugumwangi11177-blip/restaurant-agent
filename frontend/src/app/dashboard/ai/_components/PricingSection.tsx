@@ -46,7 +46,7 @@ export default function PricingSection() {
         setActioningId(rec.id);
         setNotice(null);
         try {
-            const res = await api.post(`/ai/pricing/${rec.id}/${action}`);
+            const res = await api.post(`/api/v1/ai/pricing/${rec.id}/${action}`);
             if (res.data?.error) {
                 setNotice({ kind: "err", text: res.data.error });
             } else {

@@ -214,6 +214,96 @@ def test_ai_budget_limit_keeps_general_guidance(client, scoped_owner, monkeypatc
     assert response.json()["llm_used"] is False
 
 
+def test_os_chat_is_warm_and_grounded_in_todays_figures(client, scoped_owner, monkeypatch):
+    from ai import llm_client
+    from routers import ai_ask
+
+    _, headers = scoped_owner
+    monkeypatch.setenv("FEATURE_CREATIVE_LAYER", "false")
+    monkeypatch.setattr(llm_client, "is_available", lambda: True)
+    seen = {}
+
+    def capture(db, user, rid, messages, system, max_tokens, version, temperature=0, tier="medium"):
+        seen["max_tokens"] = max_tokens
+        seen["temperature"] = temperature
+        seen["system"] = system
+        seen["messages"] = messages
+        return "Try one small weekend special and watch which plates move."
+
+    monkeypatch.setattr(ai_ask, "narrate_owner", capture)
+    response = client.post("/api/v1/ai/chat", headers=headers, json={
+        "question": "Any advice on a weekend special?", "answer_mode": "general",
+    })
+    assert response.status_code == 200, response.text
+    assert seen["max_tokens"] == 1200
+    assert seen["temperature"] == 0.6
+    assert "do not repeat" in seen["system"].lower()
+    assert any("sales_kes" in message["content"] for message in seen["messages"])
+    assert response.json()["llm_used"] is True
+    assert response.json()["ai_unavailable"] is False
+
+
+def test_os_chat_logs_a_provider_failure_and_says_ai_is_unavailable(client, scoped_owner, monkeypatch, caplog):
+    import logging
+    from ai import llm_client
+    from routers import ai_ask
+
+    _, headers = scoped_owner
+    monkeypatch.setenv("FEATURE_CREATIVE_LAYER", "false")
+    monkeypatch.setattr(llm_client, "is_available", lambda: True)
+    captured = {}
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("provider down")
+
+    def capture(exc, message=None):
+        captured["exc"] = exc
+        captured["message"] = message
+
+    monkeypatch.setattr(ai_ask, "narrate_owner", boom)
+    monkeypatch.setattr(ai_ask, "_capture_llm_failure", capture)
+    with caplog.at_level(logging.WARNING):
+        response = client.post("/api/v1/ai/chat", headers=headers, json={
+            "question": "Help me reduce food waste.", "answer_mode": "general",
+        })
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["ai_unavailable"] is True
+    assert body["answer_text"] == "AI unavailable right now."
+    assert body["llm_used"] is False
+    assert "provider down" in caplog.text
+    assert isinstance(captured["exc"], RuntimeError)
+
+
+def test_chat_follow_up_includes_the_deterministic_headline(client, scoped_owner, monkeypatch):
+    from ai import llm_client
+    from routers import ai_ask
+
+    _, headers = scoped_owner
+    monkeypatch.setenv("FEATURE_CREATIVE_LAYER", "false")
+    monkeypatch.setattr(llm_client, "is_available", lambda: False)
+    created = client.post("/api/v1/ai/os/conversations", headers=headers, json={"title": "Sales"})
+    conversation_id = created.json()["id"]
+    asked = client.post("/api/v1/owner/ask", headers=headers, json={
+        "question": "How were sales today?", "conversation_id": conversation_id,
+    })
+    assert asked.status_code == 200, asked.text
+    headline = asked.json()["headline"]
+    seen = {}
+
+    def capture(db, user, rid, messages, *args):
+        seen["messages"] = messages
+        return "Look at the paid orders already in front of you and pick one dish to watch."
+
+    monkeypatch.setattr(llm_client, "is_available", lambda: True)
+    monkeypatch.setattr(ai_ask, "narrate_owner", capture)
+    follow = client.post("/api/v1/ai/chat", headers=headers, json={
+        "question": "What should we try next?", "answer_mode": "general", "conversation_id": conversation_id,
+    })
+    assert follow.status_code == 200, follow.text
+    assert any(headline in message["content"] for message in seen["messages"] if message["role"] == "assistant")
+
+
 def test_owner_os_migration_is_safe_after_model_create_all():
     engine = create_engine("sqlite:///:memory:")
     models.Base.metadata.create_all(engine)

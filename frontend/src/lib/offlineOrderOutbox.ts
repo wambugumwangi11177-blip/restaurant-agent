@@ -38,13 +38,13 @@ export interface PendingOrder {
     lastError?: string;
 }
 
-function useMemory(): boolean {
+function needsMemoryFallback(): boolean {
     return typeof indexedDB === "undefined";
 }
 
 function openDB(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
-        if (useMemory()) {
+        if (needsMemoryFallback()) {
             reject(new Error("IndexedDB not available in this environment"));
             return;
         }
@@ -71,7 +71,7 @@ export function isNetworkFailure(err: unknown): boolean {
 }
 
 export async function queueOrder(payload: Record<string, unknown>): Promise<PendingOrder> {
-    if (useMemory()) {
+    if (needsMemoryFallback()) {
         const order: PendingOrder = {
             localId: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
             payload,
@@ -99,7 +99,7 @@ export async function queueOrder(payload: Record<string, unknown>): Promise<Pend
 }
 
 export async function getPendingOrders(): Promise<PendingOrder[]> {
-    if (useMemory()) return [...memory.values()].sort((a, b) => a.createdAt - b.createdAt);
+    if (needsMemoryFallback()) return [...memory.values()].sort((a, b) => a.createdAt - b.createdAt);
     const db = await openDB();
     const orders = await new Promise<PendingOrder[]>((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, "readonly");
@@ -112,7 +112,7 @@ export async function getPendingOrders(): Promise<PendingOrder[]> {
 }
 
 async function replacePendingOrder(localId: string, payload: Record<string, unknown>): Promise<void> {
-    if (useMemory()) {
+    if (needsMemoryFallback()) {
         const existing = memory.get(localId);
         if (existing) memory.set(localId, { ...existing, payload });
         return;
@@ -133,7 +133,7 @@ async function replacePendingOrder(localId: string, payload: Record<string, unkn
 }
 
 export async function removePendingOrder(localId: string): Promise<void> {
-    if (useMemory()) {
+    if (needsMemoryFallback()) {
         memory.delete(localId);
         return;
     }
@@ -150,7 +150,7 @@ export async function removePendingOrder(localId: string): Promise<void> {
 /** Drop every queued order (logout on a shared device — queued payloads carry
  * customer names/phones and must not survive into the next user's session). */
 export async function clearPendingOrders(): Promise<void> {
-    if (useMemory()) {
+    if (needsMemoryFallback()) {
         memory.clear();
         return;
     }
@@ -165,7 +165,7 @@ export async function clearPendingOrders(): Promise<void> {
 }
 
 async function markAttempt(localId: string, error: string): Promise<void> {
-    if (useMemory()) {
+    if (needsMemoryFallback()) {
         const existing = memory.get(localId);
         if (existing) memory.set(localId, { ...existing, attempts: existing.attempts + 1, lastError: error });
         return;

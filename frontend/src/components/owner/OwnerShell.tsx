@@ -49,6 +49,9 @@ export default function OwnerShell({ children }: { children: React.ReactNode }) 
         <div><BranchPicker /></div>
         <div className="flex flex-wrap items-center gap-4 text-sm print:hidden">
           <Link className="inline-flex min-h-11 items-center underline" href="/entries">Team entries</Link>
+          <Link className="inline-flex min-h-11 items-center underline" href="/install">Install LEVIII</Link>
+          <Link className="inline-flex min-h-11 items-center underline" href="/setup">Set up this branch</Link>
+          <Link className="inline-flex min-h-11 items-center underline" href="/team-work">Team work & approvals</Link>
           <Link className="inline-flex min-h-11 items-center underline" href="/planning">Kitchen & money tools</Link>
           <Link className="inline-flex min-h-11 items-center underline" href="/home#how">How LEVIII works</Link>
           <button type="button" onClick={() => { logout(); router.push("/login"); }} className="inline-flex min-h-11 items-center gap-1.5 font-semibold">

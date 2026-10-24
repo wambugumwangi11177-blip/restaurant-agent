@@ -162,6 +162,8 @@ def test_demo_seed_has_store_kitchen_manager_and_accountant_logins(demo):
         user = db.query(models.User).filter_by(email=email).one()
         assert user.staff_role == role and user.is_active and user.role == models.Role.STAFF
         assert user.active_restaurant_id == branches[0].id
+        roster = db.query(models.StaffMember).filter_by(user_id=user.id).all()
+        assert len(roster) == 1 and roster[0].restaurant_id == branches[0].id
 
 
 def test_one_tenant_two_branches_with_the_owner_login_resolving_the_first(demo):
@@ -481,7 +483,7 @@ def test_every_table_that_hangs_off_a_restaurant_is_wiped_or_deliberately_kept()
     assert not (set(WIPED) & set(KEPT))
     children = {name for name, t in tables.items() if name not in scoped and name != "restaurants"
                 and any(fk.column.table.name in scoped for c in t.c for fk in c.foreign_keys)}
-    handled = {"order_items", "prep_times", "stock_movements", "menu_ingredients", "workflow_steps", "owner_os_messages"} | set(KEPT_CHILDREN)
+    handled = {"order_items", "prep_times", "stock_movements", "menu_ingredients", "workflow_steps", "owner_os_messages", "team_workflow_events"} | set(KEPT_CHILDREN)
     assert children <= handled | {"prep_times"}, f"child tables with no wipe decision: {children - handled}"
     assert all(KEPT.values()) and all(KEPT_CHILDREN.values()), "every kept table needs a written reason"
 

@@ -75,3 +75,19 @@ def test_postgres_owner_migration_and_concurrent_retry(pg):
     assert all(r['status'] == 'later' for r in results)
     with Session() as db:
         assert db.query(models.AttentionDecision).filter_by(restaurant_id=user.active_restaurant_id, card_key=key).count() == 1
+
+
+def test_team_workflow_migration_on_postgres(pg):
+    """The new release migration must work after init_db and on an existing database."""
+    path = Path(__file__).parents[1] / 'alembic/versions/060_team_workflows.py'
+    spec = importlib.util.spec_from_file_location('team_release_migration', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with pg.begin() as conn:
+        with Operations.context(MigrationContext.configure(conn)):
+            module.upgrade()  # tables already created by init_db
+            module.downgrade()
+            assert 'team_workflows' not in inspect(conn).get_table_names()
+            module.upgrade()  # older schema upgrade
+            assert 'team_workflow_events' in inspect(conn).get_table_names()
+            assert any(i['name'] == 'ix_team_workflows_restaurant_id' for i in inspect(conn).get_indexes('team_workflows'))

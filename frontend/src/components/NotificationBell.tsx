@@ -135,7 +135,7 @@ export default function NotificationBell({ ownerHome }: { ownerHome?: string } =
                                         <button type="button" onClick={() => handleClick(n)} className="text-left"><p className="text-xs font-medium text-[#e5e5e5] truncate">{n.title}</p></button>
                                         <p className="text-[11px] text-[#737373] line-clamp-2 mt-0.5">{n.body}</p>
                                         <p className="text-[10px] text-[#525252] mt-1">{timeAgo(n.created_at)}</p>
-                                        <button type="button" className="mt-1 text-[10px] font-semibold text-[#e5e5e5]" onClick={(e) => { e.stopPropagation(); void acknowledge(n.id); }}>I'm on it</button>
+                                        <button type="button" className="mt-1 text-[10px] font-semibold text-[#e5e5e5]" onClick={(e) => { e.stopPropagation(); void acknowledge(n.id); }}>I&apos;m on it</button>
                                     </div>
                                 </div>
                             </div>

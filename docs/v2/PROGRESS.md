@@ -1,8 +1,21 @@
-# Completion sprint — 24 October 2026 (in progress)
+# Completion candidate — 24 October 2026
 
-Authorized: execute the consolidated completion plan. Work on `codex/eleven-completion`, based on pushed `dev/eleven-demo-fixes` at `654d116`. The original cloud checkout stays unchanged. Other developers' unpushed local work is not accessible here.
+Review: PR #26, `codex/eleven-completion`, based on pushed `dev/eleven-demo-fixes` at `654d116`. Original checkout preserved. Other developers' unpushed local work is not accessible here. No production deployment, migration, source connection or messages to Sam.
 
-First gate: fix the CI dependency blockers (follow-redirects, Pillow) and the exact prompt-version Gitleaks false positive; rerun audits and the v2 gate. Then deliver deferred workflows with scoped APIs, UI, isolation tests and migrations tested only on disposable databases. The completion plan is in `COMPLETION_PLAN.md`. Real POS samples, Eleven provisioning and real-device acceptance remain external dependencies. No production writes or live provider calls.
+Delivered: branch-scoped tasks and due dates, private workflow events, accountant expense-void proposals, independently approved spoilage requests, exactly-once effects and stale-record guards. Added resumable owner setup reviews, install guidance, Capacitor Android and sandboxed Electron Windows/macOS/Linux packaging, plus an internal-artifact GitHub workflow. iPhone/iPad use the PWA. Migration 060 adds workflow and event tables; it is additive on upgrade but its downgrade removes workflow audit records.
+
+Quality: updated Pillow and vulnerable npm dependencies; narrowly allowlisted the literal prompt version reported as a secret; repaired lint regressions and small phone tap targets. Linked demo roster records to their actual login identities so demo delegation has eligible assignees. No known source connector was fabricated.
+
+Validation:
+- Backend: **2166 passed, 1 skipped**; separate grounded eval suite **98 passed**. Local PostgreSQL checks are skipped without a disposable PostgreSQL URL.
+- Frontend: **251 passed**, TypeScript and production build pass. Lint ratchet passes with the existing **14 errors / 4 warnings** baseline; this is not a claim of zero lint debt.
+- Packaging: two URL/navigation policy tests pass; npm audit has zero vulnerabilities. Android project generation and synchronization pass. Linux unpacked desktop build succeeds against a reserved test URL; no signed artifacts or real-device acceptance.
+- Frontend npm audit has zero vulnerabilities; Python audit passes with the repository's existing explicit advisory exceptions. Committed-change Gitleaks scan passes.
+- Browser acceptance: **35 existing owner journeys passed**, three desktop-only tap checks skipped by design; **12 new workflow/setup/staff-role checks passed** after repairing demo roster links and test synchronization. Screenshots inspected at phone width.
+- Demo generator suite after roster repair: **47 passed**. A subsequent CI run exposed the old synthetic one-minute delay between sales and recipe deductions: a rolling-window boundary could include the deduction without its sale. Deductions now share their sale timestamp, with a regression test; the affected suite is rerun below.
+- GitHub run **40088150228**: frontend, dependency audit, SAST, Gitleaks, container scan, PostgreSQL migration/concurrency and synthetic backup/restore jobs pass. Its full pytest job had **2263 passed, 2 skipped, one failed** on that demo timing assertion. Final code is pushed for CI to verify the fix; do not treat the earlier run as green.
+
+COMPLETION_PLAN.md contains an honest phase-by-phase status matrix, including remaining shared-tablet idle lock, write-off correction/disposition, broader import onboarding, real integration and signed-device work. RELEASE_CHECKLIST.md identifies production gates; SAM_READ_ONLY_INTEGRATION.md is a consultation brief, not a connected POS. Public HTTPS origin, signing material, Sam's source contract, actual Eleven inputs and operational acceptance remain required.
 
 # Eleven demo — click-through leftovers — 24 October 2026
 

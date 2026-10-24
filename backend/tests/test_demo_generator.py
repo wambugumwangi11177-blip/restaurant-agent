@@ -676,3 +676,13 @@ def test_the_demo_statement_starts_at_a_nairobi_midnight_whatever_the_hour():
         assert until == now - timedelta(minutes=45)
         starts.add(since)
     assert len(starts) == 2                       # one start before Nairobi midnight (21:00 UTC), the next day's after
+
+
+def test_demo_recipe_deductions_share_the_sale_timestamp(demo):
+    """A trailing-window boundary must include both a sale and its synthetic deduction."""
+    db, _ = demo
+    orders = {o.id: o.created_at for o in db.query(models.Order).all()}
+    movements = db.query(models.StockMovement).filter(models.StockMovement.reason.like("Order #%")).all()
+    assert movements
+    for movement in movements:
+        assert movement.created_at == orders[int(movement.reason.removeprefix("Order #"))]

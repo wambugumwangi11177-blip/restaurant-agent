@@ -475,7 +475,7 @@ class DemoBuilder:
                 day_used[k] = day_used.get(k, 0.0) + q
                 b.min_stock[k] = min(b.min_stock[k], inv.quantity)
                 db.add(models.StockMovement(inventory_item_id=inv.id, movement_type=models.StockMovementType.OUT, quantity=q,
-                                            reason=f"Order #{order.id}", created_at=order.created_at + timedelta(minutes=1),
+                                            reason=f"Order #{order.id}", created_at=order.created_at,
                                             performed_by_user_id=manager.id))
             self._count("stock_movements", len(used))
             if order.status == models.OrderStatus.SERVED and order.customer_phone and feedback_rng.random() < 0.10:

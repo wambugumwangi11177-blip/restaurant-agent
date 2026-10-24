@@ -5641,7 +5641,7 @@
     "group": "demo",
     "id": "demo.generator",
     "kind": "py",
-    "loc": 978,
+    "loc": 981,
     "path": "backend/demo/generator.py"
    },
    {

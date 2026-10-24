@@ -94,7 +94,7 @@ export type ShiftsBlock = Block & {
   tenders?: { key: string; label: string; kes: Money }[];
   tolerance?: { kes: Money; pct: number };
   three_way?: { state?: BlockState; reason?: string | null; legs?: { key: string; label: string; left_kes: number | null; right_kes: number | null; left_label?: string; right_label?: string; look: boolean }[] };
-  short_count?: { state?: BlockState; reason?: string | null; window?: string; expected_kes?: number; counted_kes?: number; gap_kes?: number; short?: boolean; trick?: string | null; bars?: { key: string; label: string; kes: number }[] };
+  short_count?: { state?: BlockState; reason?: string | null; window?: string; expected_kes?: number; counted_kes?: number; gap_kes?: number; short?: boolean; trick?: string | null; example?: boolean; bars?: { key: string; label: string; kes: number }[] };
 };
 export type CancelledBlock = Block & { cancelled_last_7_days: number; unusual_cancelling: number; unusual_refunds: number; late_night_activity: number; to_check: number; note: string };
 /** The M-Pesa check (backend/owner/mpesa_match.py): a statement against the M-Pesa sales, over the days the statement covers. */

@@ -12,7 +12,7 @@ from routers.ai_ask import _answer_revenue
 from routers.overview import _performance, _summarize
 from routers.reports import _range
 from tests.fixtures import golden_restaurant as gr
-from time_utils import trading_day, trading_window
+from time_utils import service_caption, trading_day, trading_window
 
 AT_0130 = datetime(2026, 10, 23, 22, 30)   # Saturday 01:30 Nairobi; open service is Friday 23 Oct
 AT_1400 = datetime(2026, 10, 24, 11, 0)    # Saturday 14:00 Nairobi
@@ -24,6 +24,8 @@ THURSDAY = datetime(2026, 10, 22, 12, 0)         # Thursday 15:00 Nairobi, KES 5
 def test_open_periods_include_the_hour_after_midnight_and_closed_ones_do_not():
     assert trading_day(AT_0130).isoformat() == "2026-10-23"
     assert trading_day(AT_1400).isoformat() == "2026-10-24"
+    assert service_caption(AT_0130) == "Fri 23 Oct service, still open"
+    assert service_caption(AT_1400) == "Sat 24 Oct service"
 
     today_start, today_end, today = trading_window("today", AT_0130)
     assert today.isoformat() == "2026-10-23"

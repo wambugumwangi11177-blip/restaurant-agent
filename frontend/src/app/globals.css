@@ -53,6 +53,9 @@
   --warning: #fbbf24;
   --danger: #f87171;
   --info: #60a5fa;
+  --chart-bar: #e0b15a;
+  --chart-line: #60a5fa;
+  --chart-cost: #fbbf24;
 }
 
 .vibanda-theme {
@@ -68,6 +71,9 @@
   --success: var(--v-good);
   --warning: var(--v-warn);
   --danger: var(--v-destructive);
+  --chart-bar: hsl(201 47% 29%);
+  --chart-line: hsl(201 47% 40%);
+  --chart-cost: hsl(38 80% 44%);
 }
 
 @theme {

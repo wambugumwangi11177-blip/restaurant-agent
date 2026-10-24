@@ -1,5 +1,5 @@
 "use client";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import api from "@/lib/api";
 import { BLOCK_TITLES } from "@/lib/owner/blocks";
 import { OWNER_DATA_CHANGED } from "@/lib/owner/useOwnerHome";
@@ -26,12 +26,31 @@ export default function PermitsArea({ area }: { area: Area }) {
   );
 }
 
+const LICENCE_WORD: Record<string, string> = { ok: "Fine", expiring: "Expires soon", expired: "Expired" };
+
 function Licences({ block }: { block: LicencesBlock }) {
+  const [fresh, setFresh] = useState<LicencesBlock["items"] | null>(null);
+  useEffect(() => {
+    let active = true;
+    const load = () => {
+      const request = api.get<{ licences: { id: number; name: string; issuer: string; expires_on: string; days_left: number; status: string }[] }>("/api/v1/owner/money/licences");
+      if (!request || typeof request.then !== "function") return;
+      request.then((r) => {
+          if (!active) return;
+          setFresh((r.data.licences ?? []).map((l) => ({ ...l, word: LICENCE_WORD[l.status] ?? l.status })).sort((a, b) => a.expires_on.localeCompare(b.expires_on)));
+        })
+        .catch(() => { if (active) setFresh(null); });
+    };
+    load();
+    window.addEventListener(OWNER_DATA_CHANGED, load);
+    return () => { active = false; window.removeEventListener(OWNER_DATA_CHANGED, load); };
+  }, []);
+  const items = [...(fresh ?? block.items ?? [])].sort((a, b) => a.expires_on.localeCompare(b.expires_on));
   return (<>
-    <BlockFrame title={T.licences} block={block}>{() => (<>
-      {block.items.length === 0 ? <Empty>No licences entered yet. Add them so you hear before one runs out.</Empty> : (
+    <BlockFrame title={T.licences} block={items.length ? { ...block, state: block.state === "no_data" ? "as_entered" : block.state } : block}>{() => (<>
+      {items.length === 0 ? <Empty>No licences entered yet. Add them so you hear before one runs out.</Empty> : (
         <ul className="divide-y divide-[var(--v-border)] text-xs">
-          {block.items.map((l) => (
+          {items.map((l) => (
             <li key={l.id ?? l.name} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <span><b>{l.name}</b><span className="block text-[11px] text-[var(--v-muted-foreground)]">{l.issuer}</span></span>
               <span className="text-right">

@@ -138,7 +138,7 @@ function Dials({ block }: { block: CostDialsBlock }) {
   return (
     <BlockFrame title={T.cost_dials} block={block}>{() => (<>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        <Dial value={block.food_cost_pct} target={block.food_cost_target_pct} label="Out of every KES 100, ingredients" word={block.food_cost_word} tone={tone(block.food_cost_word)} />
+        <Dial value={block.food_cost_pct} target={block.food_cost_target_pct} label="Overall, last 30 days: out of every KES 100, ingredients" word={block.food_cost_word} tone={tone(block.food_cost_word)} />
         {block.wages_pct == null || block.wages_word == null
           ? <p className="self-center text-xs text-[var(--v-muted-foreground)]">Wages are not in yet.</p>
           : <Dial value={block.wages_pct} target={block.wages_target_pct} label="Out of every KES 100, wages" word={block.wages_word} tone={tone(block.wages_word)} />}
@@ -153,8 +153,10 @@ function Dials({ block }: { block: CostDialsBlock }) {
 function Clock({ block }: { block: BreakEvenBlock }) {
   return (
     <BlockFrame title={T.breakeven} block={block}>{() => (<>
-      <BreakEvenClock label="Costs covered" breakEven={block.break_even_kes} soldSoFar={block.sales_today_kes} coveredAt={block.crossed_at} />
-      {block.curve && block.curve.length > 0 && <div className="mt-3"><BreakEvenLine points={block.curve.map((p) => ({ at: p.at, sales: p.sales_kes }))} breakEven={block.break_even_kes} coveredAt={block.crossed_at} toGo={block.to_go_kes} /></div>}
+      <h4 className="mb-1 text-sm font-semibold">Break-even</h4>
+      <p className="mb-2 text-xs text-[var(--v-muted-foreground)]">Cumulative sales on this service against the costs the service has to cover.</p>
+      <BreakEvenClock label="Costs this service has to cover" breakEven={block.break_even_kes} soldSoFar={block.sales_today_kes} coveredAt={block.crossed_at} />
+      <div className="mt-3"><BreakEvenLine points={(block.curve ?? []).map((p) => ({ at: p.at, sales: p.sales_kes }))} breakEven={block.break_even_kes} coveredAt={block.crossed_at} toGo={block.to_go_kes} label="Break-even chart: cumulative sales against the costs line" /></div>
       <p className="mt-3 text-xs">Your fixed costs come to <b>{kes(block.fixed_per_day_kes)} a day</b>. Built from {block.built_from.label}.</p>
       <details className="mt-1">
         <summary className="flex min-h-10 cursor-pointer items-center text-[11px] font-semibold text-[var(--v-muted-foreground)]">What is in it</summary>

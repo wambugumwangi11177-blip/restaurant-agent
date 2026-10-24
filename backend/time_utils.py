@@ -70,6 +70,26 @@ def service_day(utc_naive: datetime | None = None) -> date:
     return trading_day(utc_naive)
 
 
+_WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def service_caption(utc_naive: datetime | None = None) -> str:
+    """The trading day the open-service figures belong to.
+
+    Before 06:00 Nairobi the calendar date has moved on and the service has not,
+    so the caption says so: "Fri 23 Oct service, still open". After the rollover
+    the calendar and the service are the same day: "Sat 24 Oct service".
+    """
+    moment = utcnow() if utc_naive is None else utc_naive
+    local = moment + EAT_OFFSET
+    day = trading_day(moment)
+    name = f"{_WEEKDAYS[day.weekday()]} {day.day} {_MONTHS[day.month - 1]} service"
+    if local.date() != day:
+        return f"{name}, still open"
+    return name
+
+
 def _period_key(period: str) -> str:
     return " ".join(period.strip().lower().replace("-", " ").replace("_", " ").split())
 

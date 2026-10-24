@@ -72,13 +72,27 @@ def short_count(ctx: OwnerContext) -> dict:
 
 
 def _short_count(ctx: OwnerContext) -> dict:
-    row = ctx.db.query(models.CashDrawerCount).filter(
+    rows = ctx.db.query(models.CashDrawerCount).filter(
         models.CashDrawerCount.restaurant_id == ctx.rid,
-        models.CashDrawerCount.window_start >= ctx.now - timedelta(days=14),
-    ).order_by(models.CashDrawerCount.window_start.desc()).first()
-    window = "latest cash count in the last 14 days"
+        models.CashDrawerCount.window_start >= ctx.now - timedelta(days=90),
+    ).order_by(models.CashDrawerCount.window_start.desc()).all()
+    recent = [r for r in rows if r.window_start >= ctx.now - timedelta(days=14)]
+    def _with_money(candidates):
+        return [r for r in candidates if (r.expected_amount_cents or 0) or (r.counted_amount_cents or 0)]
+    usable = _with_money(recent) or _with_money(rows)
+    row = usable[0] if usable else None
+    window = "latest cash count with money in it, last 14 days" if row in recent else "latest cash count with money in it, last 90 days"
     if row is None:
-        return _empty("A short count draws here once a drawer is counted.", window=window, bars=[])
+        # A till and a count of KES 0 is not a short count. Show a labelled example.
+        return {
+            **_empty("Example, not a recorded count. No drawer with money in it has been counted yet.", window="example, not a recorded count", bars=[
+                {"key": "expected", "label": "Till", "kes": 12000},
+                {"key": "counted", "label": "Counted", "kes": 10460},
+            ]),
+            "example": True,
+            "expected_kes": 12000, "counted_kes": 10460, "gap_kes": -1540, "short": True, "cancelled": 0,
+            "trick": "Example: cash taken and the sale left off, or the sale rung and the cash kept.",
+        }
     gap = row.counted_amount_cents - row.expected_amount_cents
     cancelled = ctx.db.query(func.count(models.Order.id)).filter(
         models.Order.restaurant_id == ctx.rid, models.Order.status == models.OrderStatus.CANCELLED,

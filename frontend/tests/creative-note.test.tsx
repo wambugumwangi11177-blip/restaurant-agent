@@ -29,11 +29,11 @@ describe("CreativeNote", () => {
     respondWith(() => story);
     render(<CreativeNote endpoint={ENDPOINT} />);
     expect(await screen.findByText(story.text)).toBeTruthy();
-    expect(screen.getByText("Today’s story · AI-written")).toBeTruthy();
+    expect(screen.getByText(/service(, still open)? · AI-written/)).toBeTruthy();
     expect(screen.getByText(/ideas are suggestions to test/i)).toBeTruthy();
     // 12:05 UTC is 15:05 in Nairobi; the naive backend timestamp must be read as UTC.
     expect(screen.getByText("Written 15:05")).toBeTruthy();
-    expect(screen.getByRole("region", { name: "Today’s story · AI-written" }).getAttribute("aria-live")).toBe("polite");
+    expect(screen.getByRole("region", { name: /service(, still open)? · AI-written/ }).getAttribute("aria-live")).toBe("polite");
     expect(calls()).toEqual([ENDPOINT]);
   });
 

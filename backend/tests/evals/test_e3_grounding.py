@@ -9,8 +9,8 @@ carried by a row, a driver, a column or an assumption of its own answer.
 
   surface                          what happens to the planted figure
   narrator (ai/reasoning)          redacted in place; the reply is flagged unverified
-  report reply (routers/reports)   the whole optional paragraph is dropped; the deterministic report stands
-  creative text (ai/creative)      its sentence is dropped, the rest stays; a text that is mostly invented is dropped whole
+  report reply (routers/reports)   invented sentences are dropped; a grounded sentence stays
+  creative text (ai/creative)      its sentence is dropped, the rest stays, including one grounded sentence among several invented ones
   OS chat, creative on, any answer type          its sentence is dropped
   OS chat, creative off, any answer type         the reply is dropped / its sentence is dropped  (general guidance was unchecked before E3)
   creative notes (report, Home)    its sentence is dropped
@@ -88,8 +88,9 @@ def test_narrator_leaves_a_grounded_reply_untouched(monkeypatch):
 
 # ── report reply, creative sentences ─────────────────────────────────────────
 
-def test_the_optional_report_paragraph_is_dropped_whole_when_it_invents_a_figure():
-    assert reports._grounded_reply(MIXED, EVIDENCE) is None
+def test_the_optional_report_paragraph_keeps_grounded_sentences_when_it_invents_a_figure():
+    assert reports._grounded_reply(MIXED, EVIDENCE) == "Revenue reached KES 500 across 12 orders. Keep the grill warm."
+    assert reports._grounded_reply("Sales will hit KES 987,654 by Friday. Food cost is already at 37%.", EVIDENCE) is None
     assert reports._grounded_reply("Revenue reached KSh 500 across 12 orders. Keep the grill warm.", EVIDENCE) is not None
 
 
@@ -99,9 +100,9 @@ def test_creative_text_loses_the_planted_sentences_and_keeps_the_rest():
     assert text == "Revenue reached KES 500 across 12 orders. Keep the grill warm."
 
 
-def test_creative_text_that_is_mostly_invented_is_dropped_whole():
+def test_creative_text_keeps_the_one_grounded_sentence():
     text, dropped = creative.finish_text("Sales hit KES 987,654. Margin is 37%. Guests grew 41%. Keep the grill warm.", EVIDENCE)
-    assert text is None and dropped == 3
+    assert text == "Keep the grill warm." and dropped == 3
 
 
 @pytest.mark.parametrize("sentence,backed", [

@@ -18,6 +18,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Cpu, RefreshCw, AlertTriangle, ShieldCheck, Activity, Gauge } from "lucide-react";
 import { getErrorMessage, isHttpStatus } from "@/lib/errors";
+import { agentLabel } from "@/app/dashboard/roi/_components/RoiBreakdown";
 import { nairobiClock } from "@/lib/format";
 
 interface UsageData {
@@ -179,7 +180,7 @@ export default function AiOpsPage() {
                         {d.agents.map((a) => (
                             <div key={a.agent} className="text-sm">
                                 <div className="flex items-center justify-between gap-2">
-                                    <span className="text-[#e5e5e5]">{a.agent}</span>
+                                    <span className="text-[#e5e5e5]">{agentLabel(a.agent)}</span>
                                     <span className="text-[#525252] text-xs whitespace-nowrap flex items-center gap-2">
                                         <span className={a.success_rate_pct >= 95 ? "text-emerald-400" : a.success_rate_pct >= 80 ? "text-amber-400" : "text-red-400"}>{a.success_rate_pct}% ok</span>
                                         <span className="flex items-center gap-1"><Gauge className="w-3 h-3" /> {fmt(a.p50_ms)}ms · p95 {fmt(a.p95_ms)}ms</span>
@@ -205,7 +206,7 @@ export default function AiOpsPage() {
                     <div className="space-y-2">
                         {d.scorecards.map((c) => (
                             <div key={c.agent} className="flex items-center justify-between text-sm py-1.5 border-b border-[#1a1a1a] last:border-0">
-                                <span className="text-[#e5e5e5]">{c.agent}</span>
+                                <span className="text-[#e5e5e5]">{agentLabel(c.agent)}</span>
                                 <span className="text-xs text-[#525252] flex items-center gap-3 whitespace-nowrap">
                                     {typeof c.acceptance_rate_pct === "number" && (
                                         <span className={c.acceptance_rate_pct >= 60 ? "text-emerald-400" : "text-amber-400"}>

@@ -12,7 +12,7 @@ type Props = ChartStateProps & {
 };
 
 const W = 320;
-const PAD = { top: 18, bottom: 18, side: 4 };
+const PAD = { top: 22, bottom: 22, side: 4 };
 
 /** Vertical bars with the best one in gold. Bars always start at zero: a shorter bar is a smaller number, never a rescaled one. */
 export default function Bars({ bars, label, format, height = 120, state, reason, day, of }: Props) {
@@ -21,19 +21,21 @@ export default function Bars({ bars, label, format, height = 120, state, reason,
   const slot = (W - PAD.side * 2) / bars.length;
   const barW = Math.min(slot * 0.62, 34);
   const plot = height - PAD.top - PAD.bottom;
+  const dense = bars.length > 8;
   return (
     <svg role="img" aria-label={label} viewBox={`0 0 ${W} ${height}`} className="w-full" style={{ maxHeight: height * 1.6 }}>
-      <line x1={PAD.side} x2={W - PAD.side} y1={height - PAD.bottom} y2={height - PAD.bottom} stroke="var(--v-border)" />
+      <line x1={PAD.side} x2={W - PAD.side} y1={height - PAD.bottom} y2={height - PAD.bottom} stroke="var(--chart-line, #60a5fa)" strokeOpacity="0.35" />
       {bars.map((b, i) => {
         const h = Math.max((b.value / max) * plot, b.value > 0 ? 2 : 0);
         const x = PAD.side + slot * i + (slot - barW) / 2;
         const y = height - PAD.bottom - h;
+        const showLabel = !dense || i % 2 === 0;
         return (
           <g key={b.key}>
             <title>{b.title}</title>
-            <rect x={x} y={y} width={barW} height={h} rx={3} fill={b.highlight ? "var(--v-sidebar-primary)" : "var(--v-primary)"} opacity={b.highlight ? 1 : 0.82} />
-            {format && <text x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize="8.5" fill="var(--v-muted-foreground)">{format(b.value)}</text>}
-            <text x={x + barW / 2} y={height - 5} textAnchor="middle" fontSize="9" fill="var(--v-muted-foreground)">{b.label}</text>
+            <rect x={x} y={y} width={barW} height={h} rx={3} fill={b.highlight ? "var(--chart-cost, #fbbf24)" : "var(--chart-bar, #e0b15a)"} />
+            {format && !dense && <text x={x + barW / 2} y={Math.max(10, y - 4)} textAnchor="middle" fontSize="8" fill="var(--text, #f4f4f5)">{format(b.value)}</text>}
+            {showLabel && <text x={x + barW / 2} y={height - 6} textAnchor="middle" fontSize="8" fill="var(--text-muted, #d4d4d8)">{b.label}</text>}
           </g>
         );
       })}

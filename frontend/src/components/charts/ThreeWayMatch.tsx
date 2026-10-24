@@ -8,20 +8,20 @@ export default function ThreeWayMatch({ legs, label = "Three-way match for the l
   if (legs.length === 0) return <ChartEmpty state="no_data" reason="A cash count, an M-Pesa statement and card sales will meet here for each shift." height={120} />;
   return (
     <figure>
-      <svg role="img" aria-label={label} viewBox="0 0 320 150" className="w-full">
-        <polygon points="160,18 40,128 280,128" fill="none" stroke="var(--v-border)" strokeWidth="1.5" />
+      <svg role="img" aria-label={label} viewBox="0 0 320 100" className="mx-auto w-full max-w-xs">
+        <polygon points="160,12 78,88 242,88" fill="none" stroke="var(--chart-bar, #e0b15a)" strokeWidth="1.5" />
         {legs.slice(0, 3).map((leg, i) => {
-          const pos = [{ x: 160, y: 28, anchor: "middle" }, { x: 48, y: 118, anchor: "start" }, { x: 272, y: 118, anchor: "end" }][i];
-          return (
-            <g key={leg.key}>
-              <text x={pos.x} y={pos.y} textAnchor={pos.anchor as "middle"} fontSize="9" fontWeight="700" fill={leg.look ? "var(--v-destructive)" : "var(--v-foreground)"}>{leg.label}</text>
-              <text x={pos.x} y={pos.y + 12} textAnchor={pos.anchor as "middle"} fontSize="8" fill="var(--v-muted-foreground)">{leg.left} vs {leg.right}</text>
-            </g>
-          );
+          const dot = [{ x: 160, y: 12 }, { x: 78, y: 88 }, { x: 242, y: 88 }][i];
+          return <circle key={leg.key} cx={dot.x} cy={dot.y} r="4" fill={leg.look ? "var(--danger, #f87171)" : "var(--chart-bar, #e0b15a)"}><title>{leg.label}</title></circle>;
         })}
       </svg>
-      <ul className="space-y-1 text-[11px]">
-        {legs.map((leg) => <li key={leg.key}><b>{leg.label}</b>: {leg.left} against {leg.right}. {leg.look ? `Difference ${leg.gap} — look at this.` : "Inside what you accept."}</li>)}
+      <ul className="mt-2 grid gap-2 sm:grid-cols-3">
+        {legs.map((leg) => (
+          <li key={leg.key} className="rounded-lg border border-[var(--v-border)] p-2 text-xs">
+            <b className="block">{leg.label}</b>
+            <span className="text-[var(--v-muted-foreground)]">{leg.left} against {leg.right}. {leg.look ? `Difference ${leg.gap}.` : "Inside what you accept."}</span>
+          </li>
+        ))}
       </ul>
     </figure>
   );

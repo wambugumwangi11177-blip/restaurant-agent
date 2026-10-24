@@ -176,7 +176,18 @@ function WhatIf({ block, idea }: { block: InfoBlock; idea?: PriceIdeasBlock["ide
             <li><span className="block text-[var(--v-muted-foreground)]">After</span><b>{kes(price)}</b></li>
             <li><span className="block text-[var(--v-muted-foreground)]">Change a month</span><b>{kes(gain)}</b></li>
           </ul>
-          <Bars label="Before and after" height={72} bars={[{ key: "b", label: "Before", value: idea.from, title: kes(idea.from) }, { key: "a", label: "After", value: price, highlight: true, title: kes(price) }]} />
+          <div className="mt-3 flex h-24 items-end gap-6" aria-label="Before and after">
+            {[{ key: "before", label: "Before", value: idea.from }, { key: "after", label: "After", value: price }].map((bar) => {
+              const top = Math.max(idea.from, price, 1);
+              return (
+                <div key={bar.key} className="flex w-16 flex-col items-center justify-end">
+                  <span className="mb-1 text-[11px]">{kes(bar.value)}</span>
+                  <div className="w-10 rounded-t bg-[var(--chart-bar,#e0b15a)]" style={{ height: `${Math.max(8, (bar.value / top) * 72)}px` }} />
+                  <span className="mt-1 text-[11px]">{bar.label}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
       <Link href="/os?q=What%20if%20I%20raise%20the%20price%20of%20my%20best%20seller%3F" className="mt-3 inline-flex min-h-10 items-center text-[11px] font-bold text-[var(--v-primary)]">Try it →</Link>

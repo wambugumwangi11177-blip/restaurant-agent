@@ -27,9 +27,9 @@ export default function ProfitSection() {
                 <>
                     <NarrativeBlock n={data.narrative} />
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                        <MiniStat label="Gross Margin" value={`${data.summary.gross_margin_pct}%`} tone={data.summary.gross_margin_pct >= 55 ? "ok" : "warn"} />
-                        <MiniStat label="Food Cost" value={`${data.summary.food_cost_pct}%`} tone={data.summary.food_cost_status === "HEALTHY" ? "ok" : "warn"} />
-                        <MiniStat label="Gross Profit (30d)" value={formatKES(data.summary.total_gross_profit_30d)} tone="ok" />
+                        <MiniStat label="Gross margin, last 30 days" value={`${data.summary.gross_margin_pct}%`} tone={data.summary.gross_margin_pct >= 55 ? "ok" : "warn"} />
+                        <MiniStat label="Overall food cost, last 30 days" value={`${data.summary.food_cost_pct}%`} tone={data.summary.food_cost_status === "HEALTHY" ? "ok" : "warn"} hint="Ingredients as a share of what those dishes sold for. Same figure as Home. Not one dish." />
+                        <MiniStat label="Gross profit, last 30 days" value={formatKES(data.summary.total_gross_profit_30d)} tone="ok" />
                         <MiniStat label="Leaks Found" value={data.summary.profit_leaks_found} tone={data.summary.profit_leaks_found > 0 ? "warn" : "ok"} />
                     </div>
                     {data.summary.total_leak_amount > 0 && (
@@ -49,7 +49,7 @@ export default function ProfitSection() {
                                         </div>
                                         <span className="text-red-400 text-xs font-medium whitespace-nowrap">-{formatKES(l.monthly_leak_cents)}/mo</span>
                                     </div>
-                                    <p className="text-xs text-text-dim mt-1">Margin {l.current_margin_pct}% · food cost {l.food_cost_pct}%</p>
+                                    <p className="text-xs text-text-dim mt-1">This dish, last 30 days: food cost {l.food_cost_pct}% of its price · margin {l.current_margin_pct}%. Overall food cost is the tile above.</p>
                                     <p className="text-xs text-[var(--accent)] mt-0.5">💡 {l.action}</p>
                                     <ExplainButton item={l} label={`Profit leak: ${l.item_name}`} />
                                 </div>

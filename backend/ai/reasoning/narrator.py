@@ -122,9 +122,9 @@ TASKS = {
         "role": "You are explaining the software's ROI to a restaurant owner deciding whether it's worth paying for.",
         "focus": (
             "Explain, in plain language, how many hours of staff time were automated "
-            "away and what that's worth, keeping it clearly separate from the extra "
-            "money captured via approved pricing recommendations and from the "
-            "flagged-but-unrealized opportunities. Never combine the three totals into one number."
+            "away and what that's worth in KES, keeping it clearly separate from the extra "
+            "profit captured via approved pricing recommendations. Never combine the totals "
+            "into one number, never compute a return multiple, and never write $."
         ),
         "keys": None,
     },
@@ -230,6 +230,8 @@ def narrate(payload: dict, task: str, *, restaurant_id: int | None = None,
         return None
 
     tier = tier or cfg["tier"]
+    if task == "roi":
+        payload = _roi_for_speech(payload)
     payload_json = _shrink(payload, cfg.get("keys"))
 
     # PII scrub BEFORE the payload leaves the process (security audit
@@ -253,20 +255,21 @@ def narrate(payload: dict, task: str, *, restaurant_id: int | None = None,
         return {**cached, "cached": True}
 
     system = _build_system(cfg)
+    allowed = grounding.allowed_figures_block(payload_json)
     # Delimiting: the payload sits inside explicit data tags and the system
     # prompt declares it data-not-instructions. The /ai/explain route accepts
     # client-supplied JSON, so without this any Manager-level user could
     # overwrite the narration instructions via the payload itself.
     user = (
         "Here is the deterministic analytics data as JSON, inside <data> tags. "
-        "Only cite numbers that appear in it — never invent, round differently, "
-        "or recompute:\n\n"
-        f"<data>\n{payload_json}\n</data>"
+        "Only cite numbers from the Allowed figures list — never invent, round differently, "
+        "recompute, or write $:\n\n"
+        f"<data>\n{payload_json}\n</data>\n\n{allowed}"
     )
 
-    try:
+    def _once(prompt: str):
         resp = llm_client.chat_with_usage(
-            messages=[{"role": "user", "content": user}],
+            messages=[{"role": "user", "content": prompt}],
             system=system,
             # 700 was too tight for Groq's gpt-oss reasoning models (MEDIUM/HIGH
             # tier): they spend ~700-800 tokens on hidden reasoning before
@@ -278,19 +281,37 @@ def narrate(payload: dict, task: str, *, restaurant_id: int | None = None,
             tier=tier,
             temperature=_TEMPERATURE,
         )
+        # Ground against `payload_json` — the exact text the model saw.
+        cleaned = grounding.verify(_parse(resp.text), payload_json)
+        return cleaned, resp
+
+    try:
+        narrative, resp = _once(user)
     except Exception as exc:  # network / provider / bad model id — degrade cleanly
         logger.warning("narrate(): LLM call failed for task=%s tier=%s: %s", task, tier, exc)
         return None
 
-    narrative = _parse(resp.text)
-    # Grounding guard: redact any figure the model wrote that isn't backed by the
-    # data, and record it. verify() adds `verified` + `ungrounded_numbers`.
-    # We ground against `payload_json` — the exact (whitelisted, truncated) text
-    # the model actually saw — NOT the full pre-shrink `payload`. A model can only
-    # faithfully cite what was in its prompt; grounding against numbers buried in
-    # detail arrays it never received both over-passed fabrications and, on real
-    # payloads, saturated the grounded set so badly that ~all numbers passed.
-    narrative = grounding.verify(narrative, payload_json)
+    if not narrative.get("verified"):
+        bad = ", ".join(narrative.get("ungrounded_numbers") or []) or "numbers that are not allowed"
+        retry_prompt = (
+            user + "\n\nYour previous answer was rejected because it used: " + bad
+            + ". Rewrite. Use only the allowed figures. Write KES, never $. "
+            "Do not invent a percentage or a target. If you suggest a promotion, name a dish that appears in the data. "
+            "Drop any sentence you cannot ground."
+        )
+        try:
+            second, resp2 = _once(retry_prompt)
+        except Exception as exc:
+            logger.warning("narrate(): retry failed for task=%s: %s", task, exc)
+            second, resp2 = None, None
+        else:
+            if _narrative_has_words(second) and resp2 is not None:
+                if restaurant_id is not None:
+                    _log_usage(restaurant_id, resp)
+                narrative, resp = second, resp2
+            elif restaurant_id is not None and resp2 is not None:
+                _log_usage(restaurant_id, resp2)
+
     narrative["model"] = resp.model
     narrative["tier"] = tier
     narrative["cached"] = False
@@ -331,6 +352,40 @@ def get_trust_stats() -> dict:
 # INTERNALS
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _narrative_has_words(narrative: dict | None) -> bool:
+    if not narrative:
+        return False
+    if str(narrative.get("headline") or "").strip():
+        return True
+    return any(str(p).strip() for p in (narrative.get("priorities") or []))
+
+
+def _kes_phrase(cents) -> str:
+    shillings = abs(int(cents or 0)) / 100
+    body = f"{shillings:,.0f}" if shillings >= 100 else f"{shillings:,.2f}"
+    return f"KES {body}"
+
+
+def _roi_for_speech(payload: dict) -> dict:
+    """ROI context for the model: KES phrases only. No dollar token costs, no unit-less money."""
+    saved = payload.get("time_saved") or {}
+    captured = payload.get("money_captured") or {}
+    economics = payload.get("economics") or {}
+    return {
+        "window": f"last {payload.get('window_days') or 30} days",
+        "hours_saved": f"{saved.get('hours_saved_30d', 0)} hours of staff time",
+        "staff_time_worth": _kes_phrase(saved.get("money_saved_cents")),
+        "profit_captured": _kes_phrase(captured.get("monthly_impact_cents")),
+        "approved_price_changes": captured.get("recommendations_approved") or 0,
+        "model_spend": _kes_phrase(economics.get("ai_cost_cents")),
+        "value_from_time_and_captured_profit": _kes_phrase(economics.get("value_delivered_cents")),
+        "say": (
+            "Staff time and captured profit are separate from model spend. "
+            "Do not add them into one number, do not compute a return multiple, and do not write $."
+        ),
+    }
+
+
 def _build_system(cfg: dict) -> str:
     return (
         f"{cfg['role']} {cfg['focus']}\n\n"
@@ -345,10 +400,13 @@ def _build_system(cfg: dict) -> str:
         "1. Prefer qualitative, directional language — 'your bestseller has a "
         "thin margin', 'delivery is your least profitable channel'. Avoid "
         "quoting specific figures.\n"
-        "2. If you do reference a number, it MUST be copied verbatim from the "
-        "JSON. NEVER invent, estimate, round, or recompute any figure — that "
-        "math is not your job and wrong numbers destroy trust.\n"
-        "3. Be concise, specific, and grounded in THIS restaurant's data.\n"
+        "2. If you do reference a number, it MUST be copied from the Allowed figures "
+        "list in the user message. Those amounts are already in KES. NEVER invent, "
+        "estimate, round, recompute, or write a percentage or a target that is not "
+        "on that list. Write KES, never $ or USD.\n"
+        "3. Be concise, specific, and grounded in THIS restaurant's data. A promotion, "
+        "including a weekend promotion, must name a dish that appears in the data and a figure "
+        "from the Allowed figures list. If the data names no dish, do not invent one.\n"
         "4. Respond with ONLY a JSON object, no prose around it, of this exact "
         f"shape:\n{_OUTPUT_SHAPE}"
     )

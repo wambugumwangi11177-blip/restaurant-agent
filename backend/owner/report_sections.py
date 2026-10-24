@@ -12,7 +12,7 @@ in an honest "could not be read".
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import models
 from owner import areas
@@ -62,9 +62,10 @@ def _check_phrase(key: str, n: int) -> str:
     return f"{n} {words.get(key, key)}"
 
 
-def _window_text(period: str, month: date | None, today: date) -> str:
+def _window_text(period: str, month: date | None, today: date, now: datetime | None = None) -> str:
     if period == "daily":
-        return "Today"
+        from time_utils import service_caption
+        return service_caption(now)
     if period == "weekly":
         return "The last 7 days"
     if period == "monthly" and month is not None:
@@ -79,7 +80,7 @@ def cash_check(ctx: OwnerContext, period: str, month: date | None) -> dict:
     from owner import reports
     from ai.cash_reconciliation.intelligence import drawer_tolerance_cents
     lo, hi = reports._window(period, month)
-    window = _window_text(period, month, eat_date(ctx.now))
+    window = _window_text(period, month, eat_date(ctx.now), ctx.now)
     counts = ctx.db.query(models.CashDrawerCount).filter(
         models.CashDrawerCount.restaurant_id == ctx.rid, models.CashDrawerCount.window_start >= lo, models.CashDrawerCount.window_start < hi
     ).order_by(models.CashDrawerCount.window_start.desc()).all()
@@ -89,7 +90,7 @@ def cash_check(ctx: OwnerContext, period: str, month: date | None) -> dict:
     if base["state"] == "no_data":
         return _nothing(base, window, "No cash counts entered yet.")
     if not counts:
-        said = f"No cash count has been entered {'today' if period == 'daily' else 'in this period'}."
+        said = f"No cash count has been entered for {window}." if period == "daily" else "No cash count has been entered in this period."
         return _nothing(no_data(said), window, said)
     s = ctx.settings
     rows, looked = [], 0

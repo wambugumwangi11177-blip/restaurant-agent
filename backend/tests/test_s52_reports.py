@@ -267,7 +267,10 @@ def test_a_day_with_no_cash_count_says_so_in_words(db_session):
                                           expected_amount_cents=1000, counted_amount_cents=1000, counted_by_user_id=g.owner.id, counted_at=utcnow() - timedelta(days=5)))
     db_session.commit()
     sec = next(s for s in reports.compose_report(ctx, "daily")["sections"] if s["key"] == "cash_check")
-    assert sec["state"] == "no_data" and sec["reason"] == "No cash count has been entered today."
+    from time_utils import service_caption
+    caption = service_caption(ctx.now)
+    assert sec["window"] == caption
+    assert sec["state"] == "no_data" and sec["reason"] == f"No cash count has been entered for {caption}."
 
 
 # ═════════════════════════════════════════════════════════════════════════════

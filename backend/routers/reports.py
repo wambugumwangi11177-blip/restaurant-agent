@@ -83,13 +83,14 @@ def _draft(period: str, range_label: str, core: dict, top: list) -> str:
     return "\n".join(lines)
 
 
-def _label(period: str) -> str:
+def _label(period: str, now=None) -> str:
     """Owner-facing date range for a report period, in Nairobi time."""
-    now_eat = utcnow() + _EAT_OFFSET
+    moment = now or utcnow()
+    now_eat = moment + _EAT_OFFSET
     if period == "daily":
         # The daily figures are the open service day (rolls over at 06:00), so name that day, not the calendar one.
-        from time_utils import service_day
-        return service_day().strftime("%d %b %Y")
+        from time_utils import service_caption
+        return service_caption(moment)
     if period == "weekly":
         return f"{(now_eat - timedelta(days=7)).strftime('%d %b')} – {now_eat.strftime('%d %b %Y')}"
     if period == "monthly":
@@ -229,11 +230,12 @@ def _llm_narrative(period: str, label: str, core: dict, top: list, db, owner, ri
 
 
 def _grounded_reply(text: str, evidence: str) -> str | None:
-    """Keep deterministic output when an optional narrative invents figures."""
+    """Keep every sentence the evidence can back. Drop only the ones that invent a figure."""
     from ai.reasoning.grounding import verify
     cleaned = _strip_reasoning_leak(text)
     checked = verify({"headline": cleaned}, evidence)
-    if not cleaned or not checked["verified"]:
+    kept = (checked.get("headline") or "").strip()
+    if not kept:
         return None
     # The owner reads KES. Keep the model's sentences and structure; only the currency word changes.
-    return re.sub(r"\bKSh\b|\bKsh\b", "KES", cleaned)
+    return re.sub(r"\bKSh\b|\bKsh\b", "KES", kept)

@@ -270,6 +270,7 @@ def test_paying_a_bill_records_an_expense_linked_to_it(client, db_session):
     assert paid.status_code == 201, paid.text
     exp = paid.json()
     assert (exp["amount_kes"], exp["category"]["key"], exp["method"], exp["bill_id"], exp["supplier"]) == (70_000, "premises", "bank", bill["id"], "")
+    assert exp["note"] == "Paid Rent"
     assert exp["paid_on"] == _today().isoformat() and exp["paid_by"]["id"] == user.id
     other = client.post(f"{API}/bills/{bill['id']}/pay", headers=h, json={"amount_kes": 68_500.5, "paid_on": (_today() - timedelta(days=3)).isoformat()})
     assert other.json()["amount_kes"] == 68_500.5 and other.json()["method"] == "cash"

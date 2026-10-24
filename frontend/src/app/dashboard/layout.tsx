@@ -278,7 +278,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     >
                         {sidebarOpen ? <X className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
                     </button>
-                    <div className="flex items-center gap-4">
+                    <div className="ml-auto flex items-center gap-4">
                         <RestaurantSwitcher />
                         <AttendanceWidget />
                         <NotificationBell />

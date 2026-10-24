@@ -447,7 +447,8 @@ def pay_bill(bill_id: int, body: PayIn, db: Session = Depends(get_db), user: mod
         raise HTTPException(409, "This bill is switched off.")
     now = utcnow()
     e = models.Expense(restaurant_id=rid, category_id=b.category_id, amount_cents=_cents(body.amount_kes) if body.amount_kes else b.amount_cents,
-                       paid_on=_date(body.paid_on or nairobi_today()), method=body.method, supplier=b.supplier, note=body.note or "",
+                       paid_on=_date(body.paid_on or nairobi_today()), method=body.method, supplier=b.supplier,
+                       note=(body.note or "").strip() or f"Paid {b.name}",
                        bill_id=b.id, paid_by_user_id=user.id, created_at=now, updated_at=now, updated_by_user_id=user.id)
     db.add(e)
     db.commit()

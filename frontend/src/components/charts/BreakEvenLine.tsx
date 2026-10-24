@@ -31,14 +31,14 @@ export default function BreakEvenLine({ points, breakEven, coveredAt, toGo, labe
   return (
     <figure>
       <svg role="img" aria-label={label} viewBox={`0 0 ${W} ${H}`} className="w-full">
-        <line x1={PAD.left} x2={W - PAD.right} y1={beY} y2={beY} stroke="var(--v-warn)" strokeDasharray="4 3" />
-        <text x={W - PAD.right} y={beY - 4} textAnchor="end" fontSize="8" fill="var(--v-muted-foreground)">Costs covered {kes(breakEven)}</text>
-        <path d={line} fill="none" stroke="var(--v-primary)" strokeWidth="2" strokeLinejoin="round" />
-        {points.map((p, i) => <circle key={`${p.at}-${i}`} cx={x(i)} cy={y(p.sales)} r={i === cross ? 3.5 : 2} fill={i === cross ? "var(--v-good)" : "var(--v-primary)"}><title>{p.at}: {kes(p.sales)}</title></circle>)}
+        <line x1={PAD.left} x2={W - PAD.right} y1={beY} y2={beY} stroke="var(--chart-cost, #fbbf24)" strokeDasharray="4 3" />
+        <text x={W - PAD.right} y={Math.max(10, beY - 4)} textAnchor="end" fontSize="8" fill="var(--chart-cost, #fbbf24)">Costs {kes(breakEven)}</text>
+        <path d={line} fill="none" stroke="var(--chart-bar, #e0b15a)" strokeWidth="2" strokeLinejoin="round" />
+        {points.map((p, i) => <circle key={`${p.at}-${i}`} cx={x(i)} cy={y(p.sales)} r={i === cross ? 3.5 : 2} fill={i === cross ? "var(--success, #4ade80)" : "var(--chart-bar, #e0b15a)"}><title>{p.at}: sales {kes(p.sales)}</title></circle>)}
         <text x={PAD.left} y={H - 6} fontSize="8" fill="var(--v-muted-foreground)">{points[0].at}</text>
         <text x={W - PAD.right} y={H - 6} textAnchor="end" fontSize="8" fill="var(--v-muted-foreground)">{points[points.length - 1].at}</text>
       </svg>
-      <figcaption className="mt-1 text-xs">{coveredAt ? `Paid for at ${coveredAt}.` : `${kes(toGo)} still to go today.`}</figcaption>
+      <figcaption className="mt-1 text-xs"><span className="mr-3">Sales so far</span><span>Costs this service has to cover</span>. {coveredAt ? `Sales crossed that line at ${coveredAt}.` : `${kes(toGo)} still to cover.`}</figcaption>
     </figure>
   );
 }

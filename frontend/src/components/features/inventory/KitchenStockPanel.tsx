@@ -222,7 +222,7 @@ export default function KitchenStockPanel() {
             <div className="bg-surface border border-border rounded-xl">
                 <div className="px-4 py-3 border-b border-surface-hover flex items-center gap-2">
                     <Package className="w-3.5 h-3.5 text-accent" />
-                    <p className="text-xs font-semibold text-text">Stock levels</p>
+                    <p className="text-sm font-semibold text-text">Stock levels</p>
                 </div>
                 <div className="divide-y divide-surface-hover">
                     {items.length === 0 ? (
@@ -235,13 +235,13 @@ export default function KitchenStockPanel() {
                                 <div key={item.id} className="px-4 py-3 flex items-center gap-3">
                                     <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isOut ? "bg-danger" : isLow ? "bg-warning" : "bg-success"}`} />
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm text-text">{item.item_name}</p>
-                                        <span className={`text-xs ${isLow ? "text-warning" : "text-text-muted"}`}>
+                                        <p className="text-base text-text">{item.item_name}</p>
+                                        <span className={`text-sm ${isLow ? "text-warning" : "text-text-muted"}`}>
                                             {item.quantity} {item.unit}
                                         </span>
                                     </div>
-                                    {isOut && <span className="text-[10px] text-danger font-semibold">Out</span>}
-                                    {!isOut && isLow && <span className="text-[10px] text-warning font-semibold">Low</span>}
+                                    {isOut && <span className="text-xs text-danger font-semibold">Out</span>}
+                                    {!isOut && isLow && <span className="text-xs text-warning font-semibold">Low</span>}
                                 </div>
                             );
                         })

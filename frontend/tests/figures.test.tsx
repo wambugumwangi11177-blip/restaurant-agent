@@ -10,7 +10,7 @@ afterEach(cleanup);
 it("the break-even line names the crossing time from the sales already recorded", () => {
   render(<BreakEvenLine points={[{ at: "10:00 am", sales: 4000 }, { at: "12:31 pm", sales: 9000 }]} breakEven={8000} coveredAt="12:31 pm" toGo={0} />);
   expect(screen.getByRole("img", { name: /costs this day has to cover/ })).toBeTruthy();
-  expect(screen.getByText("Paid for at 12:31 pm.")).toBeTruthy();
+  expect(screen.getByText(/Sales crossed that line at 12:31 pm/)).toBeTruthy();
 });
 
 it("an empty tender mix says what will appear once an order is paid", () => {

@@ -4,10 +4,10 @@ import StateChip from "@/components/owner/StateChip";
 import { ago, kes, kesShort, nairobiTime, plural, shortDay, signedPct, weekday } from "@/lib/owner/format";
 import type { BreakEven, Pulse as PulseData, OwnerHome } from "@/lib/owner/types";
 
-const PERIOD_WORDS: Record<OwnerHome["period"], string> = { today: "Sales today", "7d": "Sales, last 7 days", "30d": "Sales, last 30 days" };
+const PERIOD_WORDS: Record<OwnerHome["period"], string> = { today: "Sales", "7d": "Sales, last 7 days", "30d": "Sales, last 30 days" };
 
-/** Zone 1 — the pulse: how today is going, against what the restaurant has to cover. */
-export default function Pulse({ pulse, period }: { pulse: PulseData; period: OwnerHome["period"] }) {
+/** Zone 1 — the pulse: how the open service is going, against what the restaurant has to cover. */
+export default function Pulse({ pulse, period, serviceCaption }: { pulse: PulseData; period: OwnerHome["period"]; serviceCaption?: string }) {
   const todayShown = period === "today";
   const sales = todayShown ? pulse.sales_today : pulse.sales_in_period;
   const orders = todayShown ? pulse.orders_today : pulse.orders_in_period;
@@ -20,10 +20,10 @@ export default function Pulse({ pulse, period }: { pulse: PulseData; period: Own
   bars.forEach((b) => { b.highlight = b.value > 0 && b.key === best.key; });
 
   return (
-    <section aria-label="Today's pulse" className="grid gap-4 lg:grid-cols-[1.1fr_1fr_1fr]">
+    <section aria-label="Service pulse" className="grid gap-4 lg:grid-cols-[1.1fr_1fr_1fr]">
       <div className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-5">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)]">{PERIOD_WORDS[period]}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)]">{period === "today" && serviceCaption ? serviceCaption : PERIOD_WORDS[period]}</p>
           <StateChip block={pulse} />
         </div>
         <p data-testid="sales-today" className="font-display mt-2 text-[2.1rem] font-semibold leading-none tracking-[-0.04em]">{kes(sales)}</p>
@@ -44,7 +44,7 @@ export default function Pulse({ pulse, period }: { pulse: PulseData; period: Own
       </div>
 
       <div className="grid gap-3 rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-5">
-        <CostsCovered be={pulse.breakeven_at} />
+        <CostsCovered be={pulse.breakeven_at} serviceCaption={serviceCaption} />
         <Match label="Cash count check" block={pulse.money_match.cash}
           text={pulse.money_match.cash.state === "no_data" || pulse.money_match.cash.state === "unavailable" ? pulse.money_match.cash.reason ?? "" :
             `${plural((pulse.money_match.cash.checked as number) ?? 0, "shift")} checked · ${(pulse.money_match.cash.to_check as number) ? `${pulse.money_match.cash.to_check} to look at` : "all match"}`} />
@@ -64,7 +64,7 @@ function Freshness({ pulse }: { pulse: PulseData }) {
   );
 }
 
-function CostsCovered({ be }: { be: BreakEven | PulseData["breakeven_at"] }) {
+function CostsCovered({ be, serviceCaption }: { be: BreakEven | PulseData["breakeven_at"]; serviceCaption?: string }) {
   if (be.state === "no_data" || be.state === "unavailable") {
     return (
       <div>
@@ -81,13 +81,13 @@ function CostsCovered({ be }: { be: BreakEven | PulseData["breakeven_at"] }) {
         <StateChip block={be} />
       </div>
       <p className="mt-1 text-sm font-semibold">
-        {be.covered ? `Covered at ${be.crossed_at}` : `${kes(be.to_go_kes)} to go`}
+        {be.covered ? `Covered at ${be.crossed_at}${serviceCaption ? ` · ${serviceCaption}` : ""}` : `${kes(be.to_go_kes)} still to cover${serviceCaption ? ` · ${serviceCaption}` : ""}`}
       </p>
-      <div role="progressbar" aria-label="Today's sales against what today has to cover" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share * 100)}
+      <div role="progressbar" aria-label={serviceCaption ? `Sales on ${serviceCaption} against what that service has to cover` : "Sales against what this service has to cover"} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share * 100)}
         className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--v-muted)]">
         <div className={`h-full rounded-full ${be.covered ? "bg-[var(--v-good)]" : "bg-[var(--v-primary)]"}`} style={{ width: `${share * 100}%` }} />
       </div>
-      <p className="mt-1 text-[11px] text-[var(--v-muted-foreground)]">{kes(be.sales_today_kes)} of {kes(be.break_even_kes)} a day</p>
+      <p className="mt-1 text-[11px] text-[var(--v-muted-foreground)]">{kes(be.sales_today_kes)} of {kes(be.break_even_kes)} this service has to cover</p>
     </div>
   );
 }

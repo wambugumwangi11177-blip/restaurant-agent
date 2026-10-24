@@ -174,7 +174,7 @@ export default function TierLayoutShell({
                     >
                         {sidebarOpen ? <X className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
                     </button>
-                    <div className="flex items-center gap-4">
+                    <div className="ml-auto flex items-center gap-4">
                         <AttendanceWidget />
                         <NotificationBell />
                         <div className="text-xs text-[#a3a3a3]">{tierLabel}</div>

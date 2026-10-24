@@ -47,7 +47,10 @@ def trading_day_sales(db: Session, restaurant_id: int, now: datetime | None = No
     """Paid sales for the open service day, in shillings, with the mixes the sales screen shows."""
     from time_utils import EAT_OFFSET
 
+    from time_utils import service_caption
+
     start, end, day = trading_window("today", now)
+    caption = service_caption(now)
     paid = (
         models.Order.restaurant_id == restaurant_id,
         models.Order.is_paid.is_(True),
@@ -112,7 +115,7 @@ def trading_day_sales(db: Session, restaurant_id: int, now: datetime | None = No
     revenue = kes(revenue_cents) or 0
     return {
         "window": "today",
-        "window_label": "Open service day",
+        "window_label": caption,
         "service_day": day.isoformat(),
         "timezone": "Africa/Nairobi",
         "revenue_kes": revenue,

@@ -132,13 +132,13 @@ def compose_report(ctx: OwnerContext, period: str, month: date | None = None) ->
             body = ctx.safe(f"report.{key}", lambda k=key: BUILDERS[k][0](ctx, period, month))
         else:
             body = unavailable("This section is not available yet.", planned=True)
-        body.setdefault("window", rs._window_text(period, month, eat_date(ctx.now)))
+        body.setdefault("window", rs._window_text(period, month, eat_date(ctx.now), ctx.now))
         body.setdefault("rows", [])
         body.setdefault("assumptions", [])
         sections.append({"key": key, "title": title, **body})
     live = [s for s in sections if s["state"] in ("live", "stale", "learning", "as_entered") and not s.get("info")]
     from owner.money.view import period_label
-    label = reports._label(period) if month is None else period_label("month", month, month, month == today_first)
+    label = reports._label(period, ctx.now) if month is None else period_label("month", month, month, month == today_first)
     return {"period": period, "range": label, **({"month": month.strftime("%Y-%m")} if month else {}), "state": live[0]["state"] if live else "no_data",
             "as_of": next((s.get("as_of") for s in live if s.get("as_of")), None), "sections": sections,
             "read": unavailable("LEVIII's read is optional and is left out unless every number in it is backed.", text=None)}

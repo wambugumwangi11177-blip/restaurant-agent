@@ -12,7 +12,7 @@ import NotificationBell from "@/components/NotificationBell";
 import BranchPicker from "@/components/owner/BranchPicker";
 import SettingsProvider from "@/components/owner/settings/SettingsProvider";
 import { useAuth } from "@/context/AuthContext";
-import { nairobiDate } from "@/lib/owner/format";
+import { serviceCaption } from "@/lib/owner/format";
 import { tenantConfig } from "@/lib/tenantConfig";
 import { homeFor, isOwnerAccount, OWNER_HOME } from "@/lib/tenantHome";
 
@@ -42,7 +42,7 @@ export default function OwnerShell({ children }: { children: React.ReactNode }) 
     <div className="vibanda-theme owner-theme min-h-screen pb-20 md:pb-0">
       <header className="px-4 pt-6 pb-2 md:px-8">
         <div className="float-right print:hidden"><NotificationBell ownerHome={OWNER_HOME} /></div>
-        <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">{nairobiDate()} · Nairobi</p>
+        <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">{serviceCaption()} · Nairobi</p>
         {config.banner && (
           <p className="mb-2 inline-flex max-w-full rounded-full border border-[hsl(43_76%_57_/.45)] bg-[hsl(43_76%_57_/.12)] px-3 py-1 text-[11px] text-[var(--v-muted-foreground)]">{config.banner}</p>
         )}

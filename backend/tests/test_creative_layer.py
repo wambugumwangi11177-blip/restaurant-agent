@@ -94,18 +94,18 @@ def test_invented_figure_drops_only_its_sentence():
     assert dropped == 1
 
 
-def test_mostly_invented_text_is_discarded():
+def test_one_grounded_sentence_is_kept():
     text, dropped = creative.keep_grounded_sentences(
         "Revenue hit KSh 9,999. Orders reached 77. Sales rose 31%. Keep the grill warm.", EVIDENCE)
-    assert text is None
+    assert text == "Keep the grill warm."
     assert dropped == 3
 
 
-def test_half_dropped_is_kept_more_than_half_is_not():
+def test_a_single_grounded_sentence_survives_several_invented_ones():
     two_of_four, _ = creative.keep_grounded_sentences("KSh 500 today. KSh 777 more. Warm day. Fresh air.", EVIDENCE)
     assert two_of_four is not None
     one_of_three, _ = creative.keep_grounded_sentences("KSh 777 more. KSh 888 less. Warm day.", EVIDENCE)
-    assert one_of_three is None
+    assert one_of_three == "Warm day."
 
 
 def test_bullets_and_lines_survive_filtering():
@@ -369,13 +369,29 @@ def test_budget_reached_is_a_soft_failure_not_a_429(client, scoped_owner, provid
     assert not stub.calls
 
 
+def test_an_ungrounded_take_retries_once_and_keeps_the_grounded_rewrite(client, db_session, scoped_owner, provider):
+    _, headers = scoped_owner
+    stub = provider(
+        "Sales will hit $5,000. Margin is 64%. The target is $4,900.",
+        "Keep the grill warm. An idea to test: feature the dish the evidence names.",
+    )
+    body = client.get(HOME, headers=headers).json()
+    assert body["text"] == "Keep the grill warm. An idea to test: feature the dish the evidence names."
+    assert len(stub.calls) == 2
+    retry = json.dumps(stub.calls[1][0])
+    assert "64%" in retry and "$" in retry
+    assert "Allowed figures" in json.dumps(stub.calls[0][0])
+    assert db_session.query(models.TokenUsage).count() == 2
+
+
 def test_ungrounded_output_is_discarded_but_the_spend_is_metered(client, db_session, scoped_owner, provider):
     _, headers = scoped_owner
-    provider("Sales hit KSh 9,999. Orders reached 77. Growth was 31%.")
+    stub = provider("Sales hit KSh 9,999. Orders reached 77. Growth was 31%.")
     body = client.get(HOME, headers=headers).json()
     assert body["text"] is None and body["reason"] == "ungrounded"
     assert db_session.query(models.CreativeTake).count() == 0
-    assert db_session.query(models.TokenUsage).count() == 1
+    assert len(stub.calls) == 2
+    assert db_session.query(models.TokenUsage).count() == 2
 
 
 def test_leaked_reasoning_never_reaches_the_owner(client, scoped_owner, provider):
@@ -508,7 +524,7 @@ def test_report_take_carries_report_figures_and_related_findings(client, db_sess
     assert body.status_code == 200, body.text
     assert body.json()["mode"] == "report_take" and body.json()["text"].startswith("My read:")
     (messages, kwargs), = stub.calls
-    evidence = json.loads(messages[0]["content"].split("\n", 1)[1])
+    evidence, _end = json.JSONDecoder().raw_decode(messages[0]["content"].split("\n", 1)[1])
     assert evidence["report"]["revenue_kes"] == 500 and evidence["report"]["paid_orders"] == 1
     assert "30-day analysis window" in evidence["related"]["basis"]
     assert list(evidence["related"]["findings"]) == ["menu"]  # profit said "unavailable": contributes nothing

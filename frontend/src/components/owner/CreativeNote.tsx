@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshCw, Sparkles } from "lucide-react";
 import api from "@/lib/api";
+import { serviceCaption } from "@/lib/owner/format";
 
 type Payload = {
   mode?: string;
@@ -119,7 +120,8 @@ export default function CreativeNote({ endpoint, className = "" }: { endpoint: s
     return null;
   }
 
-  const copy = COPY[data.mode ?? ""] ?? FALLBACK_COPY;
+  const base = COPY[data.mode ?? ""] ?? FALLBACK_COPY;
+  const copy = data.mode === "today_story" ? { ...base, eyebrow: `${serviceCaption()} · AI-written` } : base;
   const time = writtenAt(data.generated_at);
   const failure = data.refresh_failed === true ? FAILURE_NOTE[data.reason ?? ""] : undefined;
 

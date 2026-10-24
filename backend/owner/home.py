@@ -232,9 +232,11 @@ def compose_home(ctx: OwnerContext, period: str = "today") -> dict:
     from owner import figures
     area_blocks = {key: areas.compose_area(ctx, key) for key in areas.AREAS}
     drawn = ctx.safe("home.figures", lambda: figures.compose(ctx, area_blocks))
+    from time_utils import service_caption
     return {
         "restaurant": {"id": ctx.rid, "name": ctx.restaurant.name},
         "period": period,
+        "service_caption": service_caption(ctx.now),
         "timezone": "Africa/Nairobi",
         "generated_at": iso(ctx.now),
         "pulse": ctx.safe("home.pulse", lambda: _pulse(ctx, period)),

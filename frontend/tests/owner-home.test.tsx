@@ -27,8 +27,9 @@ it("Zone 1 shows today's sales, the comparison, costs covered and the money chec
   expect((await screen.findByTestId("sales-today")).textContent).toBe("KES 22,290");
   expect(screen.getByText("13 paid orders")).toBeTruthy();
   expect(screen.getByText("+14.8%")).toBeTruthy();
-  expect(screen.getByText("Covered at 12:31 pm")).toBeTruthy();
-  expect(screen.getByText("KES 22,290 of KES 4,946 a day")).toBeTruthy();
+  expect(screen.getByText("Covered at 12:31 pm · Thu 15 Oct service")).toBeTruthy();
+  expect(screen.getByText("KES 22,290 of KES 4,946 this service has to cover")).toBeTruthy();
+  expect(screen.getAllByText("Thu 15 Oct service").length).toBeGreaterThan(0);
   expect(screen.getByText(/27 shifts checked · 2 to look at/)).toBeTruthy();
   expect(screen.getByText((fixture as unknown as OwnerHome).pulse.money_match.mpesa.headline!)).toBeTruthy();
   expect(screen.getByRole("img", { name: "Sales for each of the last 7 days" })).toBeTruthy();

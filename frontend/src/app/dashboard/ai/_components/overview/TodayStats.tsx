@@ -29,9 +29,9 @@ export default function TodayStats({ qs }: { qs: QuickStats }) {
                 color="#d4a853"
             />
             <StatCard
-                label="Average order"
+                label="Average order, last 30 days"
                 value={formatKES(qs.avg_order_value)}
-                sub={`Across ${qs.menu_items || 0} menu items`}
+                sub="Paid orders in the last 30 days"
                 color="#3b82f6"
             />
             <StatCard

@@ -44,7 +44,7 @@ def test_trading_day_total_includes_orders_past_the_page_cap(client, db_session)
     body = total.json()
     assert body["orders"] == 201
     assert body["revenue_kes"] == 201.0
-    assert body["window_label"] == "Open service day"
+    assert "service" in body["window_label"]
     assert client.get("/api/v1/overview/today", headers=headers).status_code == 403
 
 

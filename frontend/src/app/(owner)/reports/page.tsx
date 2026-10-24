@@ -27,7 +27,7 @@ type SourceConnection = {
 };
 
 const TABS: { id: ReportPeriod; label: string; hint: string }[] = [
-  { id: "daily", label: "Daily", hint: "Did today go to plan?" },
+  { id: "daily", label: "Daily", hint: "The open service" },
   { id: "weekly", label: "Weekly", hint: "How did the week perform?" },
   { id: "monthly", label: "Monthly", hint: "The full Profit & Loss" },
   { id: "yearly", label: "Yearly", hint: "The trends" },

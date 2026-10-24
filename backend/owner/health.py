@@ -22,8 +22,8 @@ def compose(ctx, areas):
         compute_pnl(ctx.db, ctx.rid, start, end, ctx.settings, today=today),
         'week', ctx.settings, as_of=ctx.now, sales_state=ctx.order_state()['state']))
     kept = next((x['kes'] for x in pnl.get('lines', []) if x['key'] == 'kept'), None) if pnl['state'] != 'no_data' else None
-    tile('money', kept, 'KES', 'What you kept this week (as entered)',
-         'Costs not covered' if kept is not None and kept < 0 else 'Costs covered' if kept is not None else 'No costs yet',
+    tile('money', kept, 'KES', 'What you kept this week, after the costs entered for the week',
+         'More went out than came in' if kept is not None and kept < 0 else 'Kept after this week\'s costs' if kept is not None else 'No costs yet',
          'unknown' if kept is None else 'bad' if kept < 0 else 'watch' if not pnl.get('complete') else 'good',
          pnl['state'], source_meta=pnl, rule='Good when the week kept money after its costs.')
     # Like-for-like finished Nairobi days rather than a full week against a partial one.

@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { canRead, type StaffTier } from "@/lib/permissions";
+import { isOwnerAccount } from "@/lib/tenantHome";
+import { kes } from "@/lib/owner/format";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingBag, Banknote, Smartphone, CreditCard, Ban } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
@@ -26,9 +30,15 @@ import type { Order, OrderAiData } from "./types";
  * The trends/forecast/anomalies card is extracted into OrderInsightsPanel
  * (pure display) to keep this file focused on data fetching + order actions.
  */
+type ServiceSales = { revenue_kes: number; orders: number; window_label: string; service_day: string };
+
 export default function OrderList({ showSales = true }: { showSales?: boolean }) {
+    const { user } = useAuth();
+    const tier = (isOwnerAccount(user) ? "owner" : (user?.staff_role || null)) as StaffTier | null;
+    const salesAllowed = showSales && canRead("sales", tier);
     const [orders, setOrders] = useState<Order[]>([]);
     const [aiData, setAiData] = useState<OrderAiData | null>(null);
+    const [serviceSales, setServiceSales] = useState<ServiceSales | null>(null);
     const [loading, setLoading] = useState(true);
     const { showToast, toastNode } = useToast();
     const [submitting, setSubmitting] = useState(false);
@@ -41,14 +51,18 @@ export default function OrderList({ showSales = true }: { showSales?: boolean })
         Promise.all([
             api.get("/api/v1/orders/").catch(() => ({ data: [] })),
             api.get("/api/v1/ai/revenue-forecast").catch(() => ({ data: null })),
-        ]).then(([ordersRes, aiRes]) => {
+            salesAllowed
+                ? api.get("/api/v1/sales/today").catch(() => ({ data: null }))
+                : Promise.resolve({ data: null }),
+        ]).then(([ordersRes, aiRes, salesRes]) => {
             setOrders(Array.isArray(ordersRes.data) ? ordersRes.data : []);
             setAiData(aiRes.data);
+            setServiceSales(salesRes.data && typeof salesRes.data.revenue_kes === "number" ? salesRes.data : null);
             setLoading(false);
         });
     };
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { fetchData(); }, [salesAllowed]);
 
     const handleRecordPayment = async (orderId: number) => {
         setSubmitting(true);
@@ -94,10 +108,8 @@ export default function OrderList({ showSales = true }: { showSales?: boolean })
         );
     }
 
-    const today = new Date().toISOString().split("T")[0];
-    const todayOrders = orders.filter((o) => o.created_at?.startsWith(today));
     const pendingCount = orders.filter((o) => o.status === "pending" || o.status === "prep").length;
-    const todayRevenue = todayOrders.reduce((s: number, o) => s + (o.total || 0), 0);
+    const serviceLabel = serviceSales?.window_label || "Open service";
 
     const trends = aiData?.trends || { total_revenue: 0, avg_order_value: 0 };
     const forecast = aiData?.forecast || [];
@@ -115,16 +127,16 @@ export default function OrderList({ showSales = true }: { showSales?: boolean })
             </div>
 
             {/* Today at a glance */}
-            <div className={`grid grid-cols-1 gap-3 ${showSales ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
-                {showSales && (
+            <div className={`grid grid-cols-1 gap-3 ${salesAllowed ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+                {salesAllowed && (
                 <div className="bg-surface border border-border rounded-xl p-4">
-                    <p className="text-xs text-text-dim">Today&apos;s Sales</p>
-                    <p className="text-lg font-bold text-success mt-1">{formatKES(todayRevenue)}</p>
+                    <p className="text-xs text-text-dim">Sales · {serviceLabel}</p>
+                    <p className="text-lg font-bold text-success mt-1">{kes(serviceSales?.revenue_kes ?? 0)}</p>
                 </div>
                 )}
                 <div className="bg-surface border border-border rounded-xl p-4">
-                    <p className="text-xs text-text-dim">Orders</p>
-                    <p className="text-lg font-bold text-text mt-1">{todayOrders.length}</p>
+                    <p className="text-xs text-text-dim">{salesAllowed ? `Orders · ${serviceLabel}` : "Orders on this list"}</p>
+                    <p className="text-lg font-bold text-text mt-1">{salesAllowed ? (serviceSales?.orders ?? 0) : orders.length}</p>
                 </div>
                 <div className="bg-surface border border-border rounded-xl p-4">
                     <p className="text-xs text-text-dim">In the Kitchen</p>
@@ -132,7 +144,7 @@ export default function OrderList({ showSales = true }: { showSales?: boolean })
                 </div>
             </div>
 
-            {showSales && <OrderInsightsPanel trends={trends} forecast={forecast} anomalies={anomalies} />}
+            {salesAllowed && <OrderInsightsPanel trends={trends} forecast={forecast} anomalies={anomalies} />}
 
             {/* Order List */}
             <div className="bg-surface border border-border rounded-xl">

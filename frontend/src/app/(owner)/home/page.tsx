@@ -18,12 +18,12 @@ import TargetsOnboarding from "@/components/owner/home/TargetsOnboarding";
 import HowItWorks from "@/components/owner/explain/HowItWorks";
 import Section from "@/components/owner/Section";
 import { useAuth } from "@/context/AuthContext";
-import { greeting } from "@/lib/owner/format";
+import { greeting, serviceCaption } from "@/lib/owner/format";
 import type { Insight, OwnerHome } from "@/lib/owner/types";
 import { useOwnerHome } from "@/lib/owner/useOwnerHome";
 import { tenantConfig } from "@/lib/tenantConfig";
 
-const PERIODS: { key: OwnerHome["period"]; label: string }[] = [{ key: "today", label: "Today" }, { key: "7d", label: "Last 7 days" }, { key: "30d", label: "Last 30 days" }];
+const PERIODS: { key: OwnerHome["period"]; label: string }[] = [{ key: "today", label: "Open service" }, { key: "7d", label: "Last 7 days" }, { key: "30d", label: "Last 30 days" }];
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -49,6 +49,7 @@ export default function HomePage() {
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
           <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">{home?.restaurant.name ?? user?.restaurant_name ?? ""}</p>
+          <p className="mb-1 text-xs font-semibold text-[var(--v-muted-foreground)]">{home?.service_caption ?? serviceCaption()}</p>
           <h1 className="font-display text-[clamp(2rem,4vw,3.2rem)] font-semibold leading-[1.03] tracking-[-0.045em]">{greeting()}<span className="text-[var(--v-primary)]">.</span></h1>
         </div>
         {!waiting && (
@@ -72,7 +73,7 @@ export default function HomePage() {
           <AnswersStrip home={home} />
           <TargetsOnboarding restaurantId={home.restaurant.id} chosen={home.setup?.targets_chosen ?? true} />
           {firstWeek.active && <FirstWeekBanner ageDays={ageDays} onSkip={firstWeek.skip} />}
-          <Pulse pulse={home.pulse} period={period} />
+          <Pulse pulse={home.pulse} period={period} serviceCaption={home.service_caption ?? serviceCaption()} />
           <Section id="costing-you-money" eyebrow="What deserves your attention" title="What's costing you money"><CostingYouMoney data={home.costing_you_money} /></Section>
           <Section id="health" eyebrow="How is each part doing?" title="Your restaurant's health"><HealthStrip health={home.health} /></Section>
           <Section id="areas" eyebrow="Open any part for the detail" title="The six areas"><AreaPanels areas={home.areas} opensOn={firstWeek.active ? lockedAreas(ageDays) : {}} /></Section>

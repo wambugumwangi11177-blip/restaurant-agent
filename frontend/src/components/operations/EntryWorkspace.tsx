@@ -90,9 +90,9 @@ export default function EntryWorkspace() {
  return <div className="w-full space-y-5 p-4 text-[var(--v-foreground)]">
   <Link href={homeFor(user)} className="inline-flex min-h-11 items-center text-[var(--v-primary)]">← Back to your workspace</Link>
   <h1 className="text-3xl font-semibold">Team entries</h1><p>Record what actually happened. Amounts are in KES; times are Nairobi time.</p>
-  {user.tenant_name==='Demo Restaurant'&&<p className="rounded-lg bg-amber-100 p-3">Illustrative demo — entries change the demo only.</p>}
+  {user.tenant_name==='Demo Restaurant'&&<p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-amber-200">Illustrative demo — entries change the demo only.</p>}
   <nav aria-label="Entry types" className="flex flex-wrap gap-2">{[...(money?['expense',...(role!=='controller'?['cash']:[]),'export']:[]),...(receiving?['delivery']:[]),...(owner||role==='manager'?['units']:[])].map(t=><button type="button" key={t} disabled={busy} aria-pressed={current===t} className={button} onClick={()=>{setTab(t);entryKey.current=null;setError('');setSuccess('');setPhoto(null);}}>{({expense:'Expense',cash:'Close shift',export:'Accountant export',delivery:'Receive delivery',units:'Buying units'} as Record<string,string>)[t]}</button>)}</nav>
-  {error&&<p role="alert" className="rounded-lg bg-red-100 p-3">{error}</p>}{success&&<p role="status" className="rounded-lg bg-green-100 p-3">{success}</p>}
+  {error&&<p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-red-200">{error}</p>}{success&&<p role="status" className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-emerald-200">{success}</p>}
   {current==='export'?<section className="space-y-4"><label>Month<input aria-label="Export month" className={field} type="month" max={today().slice(0,7)} value={month} onChange={e=>setMonth(e.target.value)}/></label><div className="flex gap-3">{['xlsx','pdf'].map(f=><button type="button" className={button} disabled={busy} key={f} onClick={()=>download(f)}>Download {f.toUpperCase()}</button>)}</div><p>Exports include the recorded costs and their completeness labels.</p></section>:
   <form onSubmit={save} className="space-y-4" onChange={()=>{if(!busy)entryKey.current=null;}}>
    <fieldset disabled={busy} className="space-y-4">

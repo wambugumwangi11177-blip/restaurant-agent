@@ -69,7 +69,7 @@ it("My Money: two dials against the owner's own targets, costs covered, the cash
   open("money");
   const dials = within(panel("Ingredients and wages")).getAllByRole("img");
   expect(dials.map((d) => d.getAttribute("aria-label"))).toEqual([
-    "Out of every KES 100, ingredients: 29.3%, Fine. Your target is 35%.", "Out of every KES 100, wages: 28.2%, Fine. Your target is 32%."]);
+    "Overall, last 30 days: out of every KES 100, ingredients: 29.3%, Fine. Your target is 35%.", "Out of every KES 100, wages: 28.2%, Fine. Your target is 32%."]);
   expect(within(panel("Costs covered")).getByText("Covered at 12:31 pm")).toBeTruthy();
   const bills = panel("Bills coming up");
   expect(within(bills).getByText(/You will be KES 19,406 short on 18 Oct, when Rent falls due\./)).toBeTruthy();

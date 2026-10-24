@@ -81,15 +81,15 @@ export default function MenuReadView() {
                                 >
                                     <div className="flex items-center gap-2">
                                         {!item.is_available && (
-                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#ef4444]/10 text-[#ef4444] uppercase">86&apos;d</span>
+                                            <span className="text-xs px-1.5 py-0.5 rounded bg-[#ef4444]/10 text-[#ef4444] uppercase">86&apos;d</span>
                                         )}
                                         <div>
-                                            <p className="text-sm text-[#e5e5e5]">{item.name}</p>
-                                            <p className="text-xs text-[#525252]">{item.category}</p>
+                                            <p className="text-base text-[#e5e5e5]">{item.name}</p>
+                                            <p className="text-sm text-[#a1a1aa]">{item.category}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <span className="text-sm font-medium text-[var(--accent)]">
+                                        <span className="text-base font-medium text-[var(--accent)]">
                                             KES {(item.price / 100).toLocaleString("en-KE")}
                                         </span>
                                         {isOpen ? <ChevronUp className="w-4 h-4 text-[#525252]" /> : <ChevronDown className="w-4 h-4 text-[#525252]" />}
@@ -102,7 +102,7 @@ export default function MenuReadView() {
                                         )}
                                         <div className="flex items-center gap-1.5 mb-1.5">
                                             <ChefHat className="w-3 h-3 text-[#525252]" />
-                                            <span className="text-[10px] text-[#525252] uppercase tracking-wider">Recipe</span>
+                                            <span className="text-xs text-[#a1a1aa] uppercase tracking-wider">Recipe</span>
                                         </div>
                                         {!ingredients ? (
                                             <p className="text-xs text-[#525252]">Loading…</p>
@@ -111,7 +111,7 @@ export default function MenuReadView() {
                                         ) : (
                                             <ul className="space-y-0.5">
                                                 {ingredients.map((ing) => (
-                                                    <li key={ing.id} className="text-xs text-[#e5e5e5]">
+                                                    <li key={ing.id} className="text-sm text-[#e5e5e5]">
                                                         {ing.quantity_per_serving} {ing.unit || ""} {ing.item_name || `Item #${ing.inventory_item_id}`}
                                                     </li>
                                                 ))}

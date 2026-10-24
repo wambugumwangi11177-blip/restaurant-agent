@@ -124,6 +124,8 @@ export type ComingUp = {
 export type OwnerHome = {
   restaurant: { id: number; name: string };
   period: "today" | "7d" | "30d";
+  /** Trading day the open-service figures belong to, e.g. "Fri 23 Oct service, still open". */
+  service_caption?: string;
   timezone: string;
   generated_at: string;
   pulse: Pulse;

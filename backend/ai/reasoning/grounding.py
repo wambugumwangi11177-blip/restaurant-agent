@@ -46,6 +46,7 @@ Design choices, and why:
     qualitative judgement survives; only the false digit is removed.
 """
 
+import json
 import re
 
 # A number is worth policing if it carries a %/currency/decimal signal or is
@@ -81,7 +82,11 @@ _PCT_KEY_RE = re.compile(r"pct|percent|margin|rate|share|ratio", re.IGNORECASE)
 # Kept so older tests can name the marker. Owner-facing text never contains it:
 # a sentence with a figure we cannot trace is dropped whole.
 _REDACTION = "[unverified]"
-_SENTENCE_RE = re.compile(r"[^.!?\n]+[.!?]?")
+# A dot between digits is a decimal (3.8), not the end of a sentence. Splitting there
+# and joining the pieces with a space is what turned "3.8 kg" into "3. 8 kg".
+_SENTENCE_RE = re.compile(r"(?:[^.!?\n]|\.(?=\d))+[.!?]?")
+# "1. Try the grill" and "10) Second idea" are list markers, not figures.
+_LIST_MARK = re.compile(r"^\s*\d{1,2}[.)]\s+")
 
 # Matches: 1,234.56  |  1234  |  25%  |  KES 9,000  |  $12.50  |  -15% — capturing
 # the numeric core and any %/currency context so we can decide if it's "checkable".
@@ -232,8 +237,13 @@ def _is_grounded(value: float, has_pct: bool, has_cur: bool,
 
 
 def _ungrounded_in(sentence: str, all_nums: set, pct_nums: set) -> list:
-    """Checkable figures in one sentence that are not in the payload. Dollars are never KES."""
+    """Checkable figures in one sentence that are not in the payload. Dollars are never KES.
+
+    A list marker ("1." / "2)") and a bare integer under 10 ("two ideas" is not a
+    digit at all) are words, not figures, so they do not fail the sentence.
+    """
     found: list = []
+    sentence = _LIST_MARK.sub("", sentence)
     if re.search(r"\$|\bUSD\b", sentence, re.IGNORECASE):
         found.append("$")
 
@@ -292,6 +302,94 @@ def redact_free_text(text: str, grounded_numbers: set) -> tuple:
     seen = set()
     unique = [x for x in ungrounded if not (x in seen or seen.add(x))]
     return clean, unique
+
+
+def offenders(text: str, payload) -> list:
+    """Figures in `text` the payload cannot back, as the model wrote them."""
+    return verify({"headline": text or ""}, payload).get("ungrounded_numbers") or []
+
+
+def allowed_figures_block(payload) -> str:
+    """Figures the model may copy, money already written as KES.
+
+    Cents become KES. Percent-role keys stay percentages. Dollar strings are
+    left out. Bare integers under 10 are left out: they are counts and words,
+    and listing them invites the model to invent nearby percentages.
+    """
+    lines: list[str] = []
+    dishes: list[str] = []
+    seen: set[str] = set()
+
+    def add(line: str) -> None:
+        line = " ".join(line.split())
+        if line and line not in seen and "$" not in line and "USD" not in line.upper():
+            seen.add(line)
+            lines.append(line)
+
+    def add_dish(label: str) -> None:
+        label = " ".join(label.split())
+        if label and label not in dishes and "$" not in label and "USD" not in label.upper() and len(dishes) < 8:
+            dishes.append(label)
+
+    def walk(obj, key=None) -> None:
+        if isinstance(obj, bool) or obj is None:
+            return
+        name = str(key or "figure").replace("_", " ")
+        if isinstance(obj, (int, float)):
+            if key and re.search(r"\b(id|hour|year|token|usd|dollar)\b", str(key), re.I):
+                return
+            if key and _PCT_KEY_RE.search(str(key)):
+                add(f"{name}: {obj:g}%")
+                return
+            if key and str(key).endswith("cents"):
+                shillings = abs(float(obj)) / 100.0
+                body = f"{shillings:,.0f}" if shillings >= 100 else f"{shillings:,.2f}"
+                add(f"{name.removesuffix(' cents')}: KES {body}")
+                return
+            if key and (str(key).endswith("_kes") or str(key).endswith(" kes")):
+                add(f"{name}: KES {abs(float(obj)):,.0f}")
+                return
+            if abs(float(obj)) >= _MIN_CHECKABLE_MAGNITUDE:
+                add(f"{name}: {obj:g}")
+            return
+        if isinstance(obj, str):
+            if "$" in obj or "USD" in obj.upper():
+                return
+            if key and re.search(r"(dish|item_name|^name$|^item$|^title$)", str(key), re.I) and 1 < len(obj.strip()) <= 60:
+                add_dish(obj.strip())
+            if re.search(r"\bKES\b|\d", obj):
+                add(f"{name}: {obj}" if key else obj)
+            return
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                walk(v, k)
+            return
+        if isinstance(obj, (list, tuple)):
+            for v in obj:
+                walk(v, key)
+
+    if isinstance(payload, str):
+        try:
+            walk(json.loads(payload))
+        except (json.JSONDecodeError, TypeError):
+            for match in _NUMBER_RE.finditer(payload):
+                add(match.group(0).strip())
+    else:
+        walk(payload)
+    dish_block = ""
+    if dishes:
+        dish_block = (
+            "\nDishes and items you may name — copy these, do not invent others:\n- " + "\n- ".join(dishes)
+        )
+    if not lines:
+        return (
+            "Allowed figures: none. Do not write a number, a percentage, or a currency amount. "
+            "Write KES if you must name the currency, never $." + dish_block
+        )
+    return (
+        "Allowed figures — copy only these, already formatted. Never invent a percentage, a target, "
+        "or a dollar amount. Write KES, never $.\n- " + "\n- ".join(lines[:40]) + dish_block
+    )
 
 
 def verify(narrative: dict, payload) -> dict:

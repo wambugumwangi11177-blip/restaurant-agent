@@ -1,3 +1,25 @@
+# Eleven demo — click-through leftovers — 24 October 2026
+
+Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes. No new migration. No browser click-through in this pass.
+
+1. The accountant Orders page reads `GET /api/v1/sales/today` when the role can read sales (manager, supervisor, accountant, and the owner). The card shows that endpoint's `revenue_kes` and `orders`, with the same `window_label` as Sales. Waiter and kitchen do not call it and do not show a zero sales card. The order list itself is still the page of orders.
+
+2. Open-service labels name the trading day. Before 06:00 Nairobi the caption is "Fri 23 Oct service, still open"; after the rollover it is "Sat 24 Oct service". Home's header, the pulse, the "Covered at" line, the daily report range, and each daily report section use that caption. The period control says "Open service". The cash tender window uses the same caption. A daily report with no count that day says "No cash count has been entered for {caption}."
+
+3. The model is given an Allowed figures list, money already written as KES, plus the dish and item names in the data. The voice rules say to copy only that list, never invent a percentage or a target, write KES never $, and a promotion (including a weekend promotion) must name a dish that appears in the data. The ROI speech payload is KES phrases and hours; it does not send token dollars or the raw multiple. On a rejected reply the narrator, the creative take, and the insight writer retry once and name the offending figures. If the retry is still mixed, sentences with a figure the evidence cannot back are dropped and any grounded sentence is kept. A decimal such as 3.8 is one number. A list marker and a bare integer under 10 do not fail the sentence. `tests/test_grounding_retry.py` stubs a model that emits `$5,000` and `64%`.
+
+4. Overall food cost on Home and on the Manager AI tile is the same 30-day sales-weighted figure, labelled "Overall, last 30 days". A leak line is labelled as that dish. The menu average says it is unweighted and is not the Home figure. The Manager average order is labelled "last 30 days". The health tile says "Kept after this week's costs" (or "More went out than came in").
+
+5. Chart bars use `--chart-bar` (gold on the dark staff shell, teal on the owner theme) and skip crowded labels. The three-way match is a small triangle with the labels in a row underneath. A short count with no money in the drawer is an example, captioned as an example (Till KES 12,000, Counted KES 10,460). Price what-if bars scale with the amount. Portion movement has axes. Pareto has bars and a cumulative line. The ABC calendar is a grid with weekday and short dates. The price decision, why-tree, and alert pyramid are drawn. The break-even chart is the cumulative sales line against the costs line. Empty cash windows ("last 7 days", "last 14 days of sales", "last 28 days" with nothing to show) do not print an empty caption. Kitchen menu and kitchen stock type is larger. Team entries uses the dark staff shell.
+
+6. The ROI page paints the numbers from `narrate=false` and fills the note afterwards. A multiple is omitted when model spend is under KES 50, and capped at 50× with a note when the raw ratio is larger. That ratio is staff time plus captured profit divided by model spend, not cash in the till. AI Ops shows "Inventory analysis runs" rather than `inventory_predictor`.
+
+7. The notification panel sits in the header group (`ml-auto`) and stays on screen (`z-[80]`, capped to the viewport). The licence list loads `GET /api/v1/owner/money/licences` on open and on `OWNER_DATA_CHANGED`, sorted by `expires_on`. Paying a bill with an empty note records "Paid {bill name}", and the ledger row uses that name with no quantity.
+
+8. `python execution/reseed_demo.py` already wipes the Demo Restaurant's business rows before it regenerates them (`backend/demo/wipe.py`: orders, stock, shifts, bookings, counts, licences, expenses, bills, operation entries, creative takes). It does not touch another tenant, and it keeps the audit log, impersonation sessions, support tickets, and token-usage rows. No extra wipe was added.
+
+Validation (24 Oct, this tree, no provider keys): backend `LOG_FORMAT=plain pytest` **2254 passed, 1 skipped**. Frontend: `tsc --noEmit` clean, vitest **248 passed**, `next build` succeeded (74 routes). No new migration. No production database was touched. No browser click-through in this pass.
+
 # Eleven demo — Phase 1 leftovers — 24 October 2026
 
 Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes. No new migration.

@@ -18,7 +18,7 @@
  * from, and WHY it's worth money — including a plain "saved every day" framing.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -102,24 +102,21 @@ export default function RoiDashboard() {
 
     const restaurantName = user?.restaurant_name || "Your Restaurant";
 
-    const fetchData = async () => {
-        setError("");
-        if (!data) setLoading(true);
-        try {
-            const res = await api.get("/api/v1/ai/roi", { params: { narrate: false } });
-            setData(res.data);
-            setLastUpdated(new Date());
-            setLoading(false);
-            api.get("/api/v1/ai/roi", { params: { narrate: true }, timeout: 60000 })
-                .then((note) => { setData(note.data); setLastUpdated(new Date()); })
-                .catch(() => { /* numbers stay up; the note can fail on its own */ });
-        } catch (e) {
-            setError(getErrorMessage(e, "Could not load ROI data"));
-            setLoading(false);
-        }
-    };
+    const fetchData = useCallback(() => {
+        return api.get("/api/v1/ai/roi", { params: { narrate: false } })
+            .then((res) => {
+                setError("");
+                setData(res.data);
+                setLastUpdated(new Date());
+                setLoading(false);
+                return api.get("/api/v1/ai/roi", { params: { narrate: true }, timeout: 60000 })
+                    .then((note) => { setData(note.data); setLastUpdated(new Date()); })
+                    .catch(() => { /* Keep the numbers when narration is unavailable. */ });
+            })
+            .catch((e) => { setError(getErrorMessage(e, "Could not load ROI data")); setLoading(false); });
+    }, []);
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { void fetchData(); }, [fetchData]);
 
     if (loading) {
         return (

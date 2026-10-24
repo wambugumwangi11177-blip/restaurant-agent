@@ -41,7 +41,7 @@ function Missing({ block }: { block: MissingBlock }) {
           <ul className="space-y-3">
             {flagged.map((i) => (
               <li key={i.item} className="text-xs">
-                <div className="flex flex-wrap items-center justify-between gap-2"><button type="button" className="font-bold underline-offset-2 hover:underline" onClick={() => setPicked(i.item)}>{i.item}</button><Pill tone="bad">{i.off_by_pct}% off, last {block.window_days} days</Pill></div>
+                <div className="flex flex-wrap items-center justify-between gap-2"><button type="button" className="min-h-10 font-bold underline-offset-2 hover:underline" onClick={() => setPicked(i.item)}>{i.item}</button><Pill tone="bad">{i.off_by_pct}% off, last {block.window_days} days</Pill></div>
                 <p className="mt-0.5">Used {num(i.used)} {i.unit}; your sales explain {num(i.expected)} {i.unit}. {i.missing > 0 ? <>That is <b>{num(i.missing)} {i.unit}</b> more, worth {kes(i.missing_value)}.</> : <>That is less than your sales explain: check the count.</>}</p>
               </li>
             ))}

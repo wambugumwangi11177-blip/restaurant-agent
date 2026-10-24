@@ -35,7 +35,7 @@ export function Stat({ label, value, note, why }: { label: string; value: ReactN
       <p className="font-display mt-0.5 text-lg font-semibold tracking-[-0.02em]">{value}</p>
       {explanation && (
         <details className="mt-0.5">
-          <summary className="cursor-pointer text-[11px] font-semibold text-[var(--v-muted-foreground)]">Why?</summary>
+          <summary className="min-h-10 py-2 cursor-pointer text-[11px] font-semibold text-[var(--v-muted-foreground)]">Why?</summary>
           <p className="text-[11px] leading-relaxed text-[var(--v-muted-foreground)]">{explanation}</p>
         </details>
       )}

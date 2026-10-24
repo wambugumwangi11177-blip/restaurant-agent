@@ -23,6 +23,9 @@ FRESH = (("New Kitchen", "owner@new-kitchen.example"), ("Targets Phone", "owner@
 PASSWORD = "E6-Passw0rd!x"                   # a throwaway password for a throwaway database
 
 # Set before any backend module is imported: they read these at import time.
+# These credentials exist only in the disposable E6 database.
+for role in ("MANAGER", "STOREKEEPER", "KITCHEN", "ACCOUNTANT"):
+    os.environ[f"DEMO_RESTAURANT_{role}_PASSWORD"] = PASSWORD
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 os.environ["DATABASE_URL"] = f"sqlite:///{DB_PATH}"
 os.environ.setdefault("SECRET_KEY", "e6-" + "x" * 48)

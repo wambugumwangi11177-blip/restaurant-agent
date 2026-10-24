@@ -1898,3 +1898,31 @@ class MpesaStatementLine(Base):
         Index("ix_mpesa_lines_restaurant_completed", "restaurant_id", "completed_at"),
         Index("ix_mpesa_lines_upload", "upload_id"),
     )
+
+
+class TeamWorkflow(Base):
+    """Branch-scoped approval or delegated task; immutable request, audited transitions."""
+    __tablename__ = "team_workflows"
+    id = Column(Integer, primary_key=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    assigned_to = Column(Integer, ForeignKey("users.id"), nullable=True)
+    request_key = Column(String(160), nullable=False, unique=True)
+    kind = Column(String(24), nullable=False)
+    title = Column(String(160), nullable=False)
+    payload = Column(Text, nullable=False)
+    status = Column(String(20), nullable=False, default="pending")
+    revision = Column(Integer, nullable=False, default=0)
+    due_on = Column(Date, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utcnow)
+    updated_at = Column(DateTime, nullable=False, default=utcnow)
+
+
+class TeamWorkflowEvent(Base):
+    __tablename__ = "team_workflow_events"
+    id = Column(Integer, primary_key=True)
+    workflow_id = Column(Integer, ForeignKey("team_workflows.id"), nullable=False, index=True)
+    actor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    action = Column(String(24), nullable=False)
+    note = Column(String(500), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=utcnow)

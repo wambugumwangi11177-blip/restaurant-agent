@@ -1,3 +1,9 @@
+# Completion sprint — 24 October 2026 (in progress)
+
+Authorized: execute the consolidated completion plan. Work on `codex/eleven-completion`, based on pushed `dev/eleven-demo-fixes` at `654d116`. The original cloud checkout stays unchanged. Other developers' unpushed local work is not accessible here.
+
+First gate: fix the CI dependency blockers (follow-redirects, Pillow) and the exact prompt-version Gitleaks false positive; rerun audits and the v2 gate. Then deliver deferred workflows with scoped APIs, UI, isolation tests and migrations tested only on disposable databases. The completion plan is in `COMPLETION_PLAN.md`. Real POS samples, Eleven provisioning and real-device acceptance remain external dependencies. No production writes or live provider calls.
+
 # Eleven demo — click-through leftovers — 24 October 2026
 
 Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes. No new migration. No browser click-through in this pass.

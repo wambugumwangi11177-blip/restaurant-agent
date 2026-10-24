@@ -1,3 +1,5 @@
+> 24 October update: this records the earlier readiness branch. Later fixes automatically re-price expired scheduled quotes (they no longer require reconfirmation), and optional AI notes default on when configured with a provider key. New completion work and current validation are recorded in `PROGRESS.md`; this older checklist is not a release certification.
+
 # Eleven presentation acceptance — 23 October 2026
 
 The PDF is implemented as operational software, checked in the local demo before creating Eleven. This checklist records the final connected paths, rather than treating an isolated calculation as a completed workflow.

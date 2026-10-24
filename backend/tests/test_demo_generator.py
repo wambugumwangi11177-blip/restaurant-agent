@@ -481,7 +481,7 @@ def test_every_table_that_hangs_off_a_restaurant_is_wiped_or_deliberately_kept()
     assert not (set(WIPED) & set(KEPT))
     children = {name for name, t in tables.items() if name not in scoped and name != "restaurants"
                 and any(fk.column.table.name in scoped for c in t.c for fk in c.foreign_keys)}
-    handled = {"order_items", "prep_times", "stock_movements", "menu_ingredients", "workflow_steps", "owner_os_messages"} | set(KEPT_CHILDREN)
+    handled = {"order_items", "prep_times", "stock_movements", "menu_ingredients", "workflow_steps", "owner_os_messages", "team_workflow_events"} | set(KEPT_CHILDREN)
     assert children <= handled | {"prep_times"}, f"child tables with no wipe decision: {children - handled}"
     assert all(KEPT.values()) and all(KEPT_CHILDREN.values()), "every kept table needs a written reason"
 

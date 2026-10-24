@@ -28,7 +28,7 @@ export default function HealthStrip({ health }: { health: Health }) {
             <p className="mt-0.5 text-[10px] leading-snug text-[var(--v-muted-foreground)]">{t.label}</p>
             {t.rule && (
               <details className="mt-1">
-                <summary className="cursor-pointer text-[10px] font-semibold text-[var(--v-primary)]">Why?</summary>
+                <summary className="min-h-10 py-2 cursor-pointer text-[10px] font-semibold text-[var(--v-primary)]">Why?</summary>
                 <p className="mt-0.5 text-[10px] leading-snug text-[var(--v-muted-foreground)]">{t.rule}</p>
               </details>
             )}

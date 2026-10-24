@@ -278,7 +278,7 @@ function BillForm() {
       {error && <p role="alert" className="text-xs text-[var(--v-warn)]">{error}</p>}
       {categories.length > 0 && (
         <details>
-          <summary className="cursor-pointer text-[11px] font-semibold">Rename a cost line</summary>
+          <summary className="min-h-10 py-2 cursor-pointer text-[11px] font-semibold">Rename a cost line</summary>
           <ul className="mt-2 space-y-1">{categories.filter((c) => !c.key || true).slice(0, 8).map((c) => (
             <li key={c.id}><button type="button" className="text-[11px] font-semibold text-[var(--v-primary)]" onClick={() => { const next = window.prompt("Name for this cost line", c.name); if (next && next !== c.name) void rename(c.id, next); }}>Rename {c.name}</button></li>
           ))}</ul>

@@ -13,15 +13,11 @@ export default function TenderMix({ tenders, label = "How today's sales were pai
   return (
     <figure>
       <svg role="img" aria-label={label} viewBox="0 0 320 36" className="w-full">
-        {(() => {
-          let x = 0;
-          return rows.map((t, i) => {
-            const w = (t.kes / total) * 320;
-            const node = <rect key={t.key} x={x} y={4} width={Math.max(w, 1)} height={18} fill={COLORS[i % COLORS.length]}><title>{t.label}: {kes(t.kes)}</title></rect>;
-            x += w;
-            return node;
-          });
-        })()}
+        {rows.map((t, i) => {
+          const x = rows.slice(0, i).reduce((sum, row) => sum + row.kes, 0) / total * 320;
+          const width = t.kes / total * 320;
+          return <rect key={t.key} x={x} y={4} width={Math.max(width, 1)} height={18} fill={COLORS[i % COLORS.length]}><title>{t.label}: {kes(t.kes)}</title></rect>;
+        })}
       </svg>
       <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
         {rows.map((t, i) => (

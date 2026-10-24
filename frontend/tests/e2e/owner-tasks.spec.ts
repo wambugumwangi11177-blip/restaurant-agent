@@ -247,7 +247,8 @@ test.describe("the owner of a brand-new restaurant", () => {
     await expect(page.getByText(/day 1 of 7/)).toBeVisible();
     for (const answer of ["cash", "leak", "bill"] as const) await expect(page.locator(`[data-answer=${answer}]`)).toBeVisible();
     await expect(page.locator("[data-answer=bill]")).toContainText(/No bills/);
-    await expect(page.getByRole("region", { name: /My Money, opens on day 2/ })).toBeVisible();
+    await expect(page.getByRole("region", { name: /Cash Check, opens on day 2/ })).toBeVisible();
+    await expect(page.getByRole("region", { name: /My Money, opens on day 3/ })).toBeVisible();
     expect(problems).toEqual([]);
   });
 
@@ -260,4 +261,53 @@ test.describe("the owner of a brand-new restaurant", () => {
     await expect(dialog).toBeHidden();
     await expect(page.getByRole("heading", { name: "Set your targets" })).toBeHidden();
   });
+});
+
+test.describe('completion workflows', () => {
+  test('owner delegates and completes a task with a visible activity record', async ({page}, testInfo) => {
+    await signIn(page, 'Demo Restaurant');
+    await page.goto('/team-work');
+    await expect(page.getByRole('heading',{name:'Team work & approvals'})).toBeVisible();
+    const person = page.getByLabel('Assign to');
+    await expect(person.locator('option')).not.toHaveCount(1);
+    await person.selectOption({index:1});
+    const title = `Check delivery ${testInfo.project.name}`;
+    await page.getByLabel('Title',{exact:true}).fill(title);
+    await page.getByLabel('Reason and evidence').fill('Compare delivered quantities to the invoice');
+    await page.getByRole('button',{name:'Save request'}).click();
+    const item=page.locator('article').filter({has:page.getByRole('heading',{name:title,exact:true})});
+    await expect(item).toContainText('pending');
+    await page.getByLabel('Review or completion note').fill('Checked with the storekeeper');
+    await item.getByRole('button',{name:'Complete',exact:true}).click();
+    await expect(item).toContainText('completed');
+    await page.screenshot({path:`../.tmp/team-work-${testInfo.project.name}.png`,fullPage:true});
+  });
+
+  test('setup review resumes after reopening, and the iPhone install instructions are available',async({page})=>{
+    await signIn(page,'Demo Restaurant');
+    await page.goto('/setup');
+    await expect(page.getByRole('heading',{name:'Set up this branch'})).toBeVisible();
+    const review=page.getByLabel('What did you verify, and with whom?');
+    if(await review.count()){
+      await review.fill('Reviewed demo menu and yields with the test chef');
+      await page.getByRole('button',{name:'Save review and continue'}).click();
+    }
+    await page.reload();
+    await expect(page.getByText('Reviewed demo menu and yields with the test chef')).toBeVisible();
+    await page.goto('/install');
+    await expect(page.getByRole('heading',{name:'iPhone and iPad'})).toBeVisible();
+    await expect(page.getByText('No App Store download is needed.')).toBeVisible();
+  });
+
+  for(const [role,email] of [['manager','manager@demo-restaurant.example'],['stockkeeper','store@demo-restaurant.example'],['kitchen','kitchen@demo-restaurant.example'],['controller','accountant@demo-restaurant.example']]){
+    test(`${role} can sign in and reach private team work`,async({page})=>{
+      await page.goto('/login');
+      await page.getByRole('button',{name:'Sign in with email instead'}).click();
+      await page.fill('#email',email);await page.fill('#password',PASSWORD);await page.keyboard.press('Enter');
+      await page.waitForURL(`**/staff/${role}`);
+      await page.goto('/team-work');
+      await expect(page.getByRole('heading',{name:'Team work & approvals'})).toBeVisible();
+      await expect(page.getByRole('alert')).toHaveCount(0);
+    });
+  }
 });

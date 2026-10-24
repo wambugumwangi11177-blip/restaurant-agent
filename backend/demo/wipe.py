@@ -31,6 +31,7 @@ _CHILDREN: list[tuple[str, str, str, str]] = [
     # table, fk column, parent table, parent's scoping route
     ("prep_times", "order_item_id", "order_items", "order_items<-orders"),
     ("order_items", "order_id", "orders", "direct"),
+    ("team_workflow_events", "workflow_id", "team_workflows", "direct"),
     ("stock_movements", "inventory_item_id", "inventory_items", "direct"),
     ("menu_ingredients", "menu_item_id", "menu_items", "direct"),
     ("workflow_steps", "run_id", "workflow_runs", "direct"),
@@ -50,7 +51,7 @@ WIPED: tuple[str, ...] = (
     # the uploaded M-Pesa statements (S6.1): lines before the uploads that own them
     "mpesa_statement_lines", "mpesa_statement_uploads",
     # scheduled prices reference dishes, so they go before menu_items
-    "scheduled_menu_prices", "operation_entries",
+    "scheduled_menu_prices", "operation_entries", "team_workflows",
     # these two are parents of children above and are removed after them
     "orders", "inventory_items", "menu_items", "suppliers",
 )

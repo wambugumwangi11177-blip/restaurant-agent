@@ -139,14 +139,17 @@ def compose_report(ctx: OwnerContext, period: str, month: date | None = None) ->
     live = [s for s in sections if s["state"] in ("live", "stale", "learning", "as_entered") and not s.get("info")]
     from owner.money.view import period_label
     label = reports._label(period) if month is None else period_label("month", month, month, month == today_first)
-    payload = {"period": period, "range": label, **({"month": month.strftime("%Y-%m")} if month else {}), "state": live[0]["state"] if live else "no_data",
-               "as_of": next((s.get("as_of") for s in live if s.get("as_of")), None), "sections": sections,
-               "read": unavailable("LEVIII's read is optional and is left out unless every number in it is backed.", text=None)}
+    return {"period": period, "range": label, **({"month": month.strftime("%Y-%m")} if month else {}), "state": live[0]["state"] if live else "no_data",
+            "as_of": next((s.get("as_of") for s in live if s.get("as_of")), None), "sections": sections,
+            "read": unavailable("LEVIII's read is optional and is left out unless every number in it is backed.", text=None)}
+
+
+def compose_report_notes(ctx: OwnerContext, period: str, month: date | None = None) -> dict:
+    """The insight for a report that was already returned. The report itself never waits on this."""
     from ai.insight import attach, report_figures
+    payload = compose_report(ctx, period, month)
     insight = attach(
         ctx.db, ctx.user, ctx.rid, surface="reports",
-        question=f"Report {period} {label}", data=report_figures(payload),
+        question=f"Report {period} {payload.get('range')}", data=report_figures(payload),
     )
-    if insight is not None:
-        payload["insight"] = insight
-    return payload
+    return {"insight": insight} if insight is not None else {}

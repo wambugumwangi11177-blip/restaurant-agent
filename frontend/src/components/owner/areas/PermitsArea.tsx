@@ -32,9 +32,13 @@ function Licences({ block }: { block: LicencesBlock }) {
       {block.items.length === 0 ? <Empty>No licences entered yet. Add them so you hear before one runs out.</Empty> : (
         <ul className="divide-y divide-[var(--v-border)] text-xs">
           {block.items.map((l) => (
-            <li key={l.name} className="flex flex-wrap items-center justify-between gap-2 py-2">
+            <li key={l.id ?? l.name} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <span><b>{l.name}</b><span className="block text-[11px] text-[var(--v-muted-foreground)]">{l.issuer}</span></span>
-              <span className="text-right"><Pill tone={LICENCE_TONE[l.status] ?? "quiet"}>{l.word}</Pill><span className="mt-0.5 block text-[11px] text-[var(--v-muted-foreground)]">{l.days_left < 0 ? `ran out ${shortDay(l.expires_on)}` : `${shortDay(l.expires_on)} · ${plural(l.days_left, "day")} left`}</span></span>
+              <span className="text-right">
+                <Pill tone={LICENCE_TONE[l.status] ?? "quiet"}>{l.word}</Pill>
+                <span className="mt-0.5 block text-[11px] text-[var(--v-muted-foreground)]">{l.days_left < 0 ? `ran out ${shortDay(l.expires_on)}` : `${shortDay(l.expires_on)} · ${plural(l.days_left, "day")} left`}</span>
+                {l.id != null && <LicenceEdit id={l.id} name={l.name} issuer={l.issuer} expires={l.expires_on} />}
+              </span>
             </li>
           ))}
         </ul>
@@ -56,6 +60,38 @@ function Settings({ block }: { block: SettingsBlock }) {
 }
 
 const field = "mt-1 block min-h-11 w-full rounded-lg border border-[var(--v-border)] bg-[var(--v-card)] px-3 text-sm";
+
+function LicenceEdit({ id, name, issuer, expires }: { id: number; name: string; issuer: string; expires: string }) {
+  const [open, setOpen] = useState(false);
+  const [nextName, setNextName] = useState(name);
+  const [nextIssuer, setNextIssuer] = useState(issuer);
+  const [nextExpires, setNextExpires] = useState(expires.slice(0, 10));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState("");
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true); setError(""); setSaved("");
+    try {
+      await api.patch(`/api/v1/owner/money/licences/${id}`, { name: nextName, issuer: nextIssuer, expires_on: nextExpires });
+      setSaved("Licence updated.");
+      window.dispatchEvent(new Event(OWNER_DATA_CHANGED));
+    } catch {
+      setError("Could not update that licence.");
+    } finally { setBusy(false); }
+  };
+  if (!open) return <button type="button" onClick={() => setOpen(true)} className="mt-1 min-h-10 text-[11px] font-bold text-[var(--v-primary)]">Edit</button>;
+  return (
+    <form onSubmit={save} className="mt-2 space-y-2 text-left">
+      <label className="block text-[11px]">Name<input className={field} value={nextName} onChange={(e) => setNextName(e.target.value)} required /></label>
+      <label className="block text-[11px]">Authority<input className={field} value={nextIssuer} onChange={(e) => setNextIssuer(e.target.value)} /></label>
+      <label className="block text-[11px]">Expires<input type="date" className={field} value={nextExpires} onChange={(e) => setNextExpires(e.target.value)} required /></label>
+      <button disabled={busy} className="min-h-10 rounded-lg bg-[var(--v-primary)] px-3 text-[11px] font-bold text-[var(--v-primary-foreground)]">{busy ? "Saving…" : "Save changes"}</button>
+      {saved && <p role="status" className="text-[11px] text-[var(--v-good)]">{saved}</p>}
+      {error && <p role="alert" className="text-[11px] text-[var(--v-warn)]">{error}</p>}
+    </form>
+  );
+}
 
 function LicenceForm() {
   const [open, setOpen] = useState(false);

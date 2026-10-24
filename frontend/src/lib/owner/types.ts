@@ -131,6 +131,7 @@ export type OwnerHome = {
   health: Health;
   areas: Record<AreaKey, Area>;
   coming_up: ComingUp;
+  figures?: Record<string, Block & Record<string, unknown>>;
   read: Block & { text: string | null };
   /** Present only when the creative layer is on. The pulse figures above it are unchanged. */
   insight?: Insight | null;

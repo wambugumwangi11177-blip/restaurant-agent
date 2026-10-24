@@ -140,7 +140,7 @@ it("the period buttons ask for that period", async () => {
   render(<HomePage />);
   await screen.findByTestId("sales-today");
   fireEvent.click(screen.getByRole("button", { name: "Last 7 days" }));
-  await waitFor(() => expect(api.get).toHaveBeenLastCalledWith("/api/v1/owner/home", expect.objectContaining({ params: { period: "7d" } })));
+  await waitFor(() => expect(api.get).toHaveBeenCalledWith("/api/v1/owner/home", expect.objectContaining({ params: { period: "7d" } })));
   expect(screen.getByRole("button", { name: "Last 7 days" }).getAttribute("aria-pressed")).toBe("true");
 });
 

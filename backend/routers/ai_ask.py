@@ -85,7 +85,7 @@ class AnswerCard(BaseModel):
 
 
 def _money(cents: float | None) -> str:
-    return f"KSh {(cents or 0) / 100:,.0f}"
+    return f"KES {(cents or 0) / 100:,.0f}"
 
 
 _SECRET_ASSIGNMENT = re.compile(

@@ -655,7 +655,7 @@ app.add_middleware(ObserverModeMiddleware)
 #     it would break the push endpoint they have already been given.
 #   • health — conventionally unversioned (probes/uptime checks hit /health).
 _VERSIONED_ROUTERS = [
-    menu.router, orders.router, inventory.router, analytics.router,
+    menu.router, orders.router, orders.sales_router, inventory.router, analytics.router,
     reservations.router, ai.router, export.router, flags.router, events.router,
     billing.router, enterprise.router, staff.router, stock_custody.router,
     suppliers.router, purchase_orders.router, notifications.router, support.router,

@@ -2,7 +2,7 @@
  * The blocks of the six areas as the screens read them (backend/owner/areas.py). A block with no data is only
  * `{ state, as_of, reason }`; every field below is present when its state says there is something to show.
  */
-import type { Assumption, Block } from "./types";
+import type { Assumption, Block, BlockState } from "./types";
 
 type Money = number;                       // KES at the edge, to the cent
 
@@ -31,7 +31,7 @@ export type BreakEvenBlock = Block & {
   built_from: { label: string; period: string; days: number; fixed_costs_kes: Money; wages_kes: Money; lines: { name: string; kes: Money }[] };
 };
 export type BillsBlock = Block & {
-  upcoming: { name: string; due_on: string; days_away: number; amount_kes: Money; short: boolean }[];
+  upcoming: { id?: number; name: string; due_on: string; days_away: number; amount_kes: Money; short: boolean }[];
   shortfalls: { date: string; short_by_kes: Money; bills: string[]; bills_kes: Money }[];
   lowest: { date: string; balance_kes: Money } | null;
   days: { date: string; expected_sales_kes: Money; left_kes: Money; bills_kes: Money; balance_kes: Money }[];
@@ -78,6 +78,7 @@ export type ReorderBlock = Block & {
   tracked: number;
   least_cover: { item: string; unit: string; left: number; days_left: number | null; reorder_point?: number | null; par?: number | null }[];
   time_to_reorder: { item: string; unit: string; left: number; status: string; days_left?: number | null; reorder_point?: number | null; par?: number | null }[];
+  history?: { state?: BlockState; reason?: string | null; window?: string; item?: string; unit?: string; reorder?: number | null; par?: number | null; points?: { date: string; on_hand: number }[] };
   drafts: { id: number; supplier: string; lines: number }[];
 };
 export type SuppliersBlock = Block & {
@@ -88,9 +89,12 @@ export type SuppliersBlock = Block & {
 
 // ── Cash Check ───────────────────────────────────────────────────────────────
 export type ShiftsBlock = Block & {
+  window?: string;
   shifts: { from: string; expected: Money; counted: Money; gap: Money; check: boolean; mpesa_gap?: Money | null; cancelled?: number | null; stock_gap?: Money | null; signal?: string | null }[];
   tenders?: { key: string; label: string; kes: Money }[];
   tolerance?: { kes: Money; pct: number };
+  three_way?: { state?: BlockState; reason?: string | null; legs?: { key: string; label: string; left_kes: number | null; right_kes: number | null; left_label?: string; right_label?: string; look: boolean }[] };
+  short_count?: { state?: BlockState; reason?: string | null; window?: string; expected_kes?: number; counted_kes?: number; gap_kes?: number; short?: boolean; trick?: string | null; bars?: { key: string; label: string; kes: number }[] };
 };
 export type CancelledBlock = Block & { cancelled_last_7_days: number; unusual_cancelling: number; unusual_refunds: number; late_night_activity: number; to_check: number; note: string };
 /** The M-Pesa check (backend/owner/mpesa_match.py): a statement against the M-Pesa sales, over the days the statement covers. */
@@ -121,7 +125,7 @@ export type OnShiftBlock = Block & { scheduled: number; on_shift: number };
 export type KitchenBlock = Block & { stations: { station: string; avg_minutes: number }[]; slowest: { station: string; minutes_over_average: number }[] };
 
 // ── Permits & Settings ───────────────────────────────────────────────────────
-export type LicencesBlock = Block & { items: { name: string; issuer: string; expires_on: string; days_left: number; status: string; word: string }[] };
+export type LicencesBlock = Block & { items: { id?: number; name: string; issuer: string; expires_on: string; days_left: number; status: string; word: string }[] };
 export type SettingsBlock = Block & { chosen: boolean; changed: number; total: number; updated_at: string | null };
 export type DataTrustBlock = Block & { dishes: number; costs_known_pct: number; missing_costs: number; to_fix: number };
 

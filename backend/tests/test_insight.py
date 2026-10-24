@@ -14,8 +14,8 @@ import models
 from ai import insight, llm_client
 from ai import spend_cap
 from owner.ask import ask
-from owner.home import compose_home
-from owner.reports import compose_report
+from owner.home import compose_home, compose_home_notes
+from owner.reports import compose_report, compose_report_notes
 from owner.states import OwnerContext
 from time_utils import utcnow
 
@@ -183,13 +183,19 @@ def test_home_and_report_keep_their_figures(db_session, monkeypatch):
     home = compose_home(ctx, "today")
     assert home["pulse"]["sales_today"] == 500.0
     assert home["pulse"]["orders_today"] == 1
-    assert home["insight"]["text"] == "Paid sales are KES 500."
+    assert "insight" not in home
+    assert calls == []
+
+    notes = compose_home_notes(ctx, "today")
+    assert notes["insight"]["text"] == "Paid sales are KES 500."
     assert "Paid sales are KES 500." not in str(home["pulse"])
 
     report = compose_report(ctx, "daily")
     sales = next(section for section in report["sections"] if section["key"] == "sales")
-    assert report["insight"]["label"] == insight.LABEL
-    assert report["insight"]["text"] not in (sales.get("headline") or "")
+    assert "insight" not in report
+    report_notes = compose_report_notes(ctx, "daily")
+    assert report_notes["insight"]["label"] == insight.LABEL
+    assert report_notes["insight"]["text"] not in (sales.get("headline") or "")
     assert sales["state"] in ("live", "no_data", "stale", "learning")
 
 

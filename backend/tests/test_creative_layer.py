@@ -216,7 +216,9 @@ def test_owner_home_read_is_the_grounded_note(client, db_session, scoped_owner, 
     provider("Revenue is KSh 500 today. Try a lunch special.")
     verify_source(db_session, source)
     add_paid_order(db_session, total_cents=50000)
-    body = client.get("/api/v1/owner/home", headers=headers).json()
+    numbers = client.get("/api/v1/owner/home", headers=headers).json()
+    assert numbers["read"]["text"] is None
+    body = client.get("/api/v1/owner/home/notes", headers=headers).json()
     assert "KES 500" in (body["read"]["text"] or "")
     assert body["read"]["state"] == "live"
 

@@ -4,6 +4,7 @@ import CustodyZones from "@/components/charts/CustodyZones";
 import HBars from "@/components/charts/HBars";
 import MissingFormula from "@/components/charts/MissingFormula";
 import StockFlow from "@/components/charts/StockFlow";
+import StockHistory from "@/components/charts/StockHistory";
 import StockLevel from "@/components/charts/StockLevel";
 import { BLOCK_TITLES } from "@/lib/owner/blocks";
 import { kes, plural, shortDay } from "@/lib/owner/format";
@@ -40,7 +41,7 @@ function Missing({ block }: { block: MissingBlock }) {
           <ul className="space-y-3">
             {flagged.map((i) => (
               <li key={i.item} className="text-xs">
-                <div className="flex flex-wrap items-center justify-between gap-2"><button type="button" className="font-bold underline-offset-2 hover:underline" onClick={() => setPicked(i.item)}>{i.item}</button><Pill tone="bad">{i.off_by_pct}% off</Pill></div>
+                <div className="flex flex-wrap items-center justify-between gap-2"><button type="button" className="font-bold underline-offset-2 hover:underline" onClick={() => setPicked(i.item)}>{i.item}</button><Pill tone="bad">{i.off_by_pct}% off, last {block.window_days} days</Pill></div>
                 <p className="mt-0.5">Used {num(i.used)} {i.unit}; your sales explain {num(i.expected)} {i.unit}. {i.missing > 0 ? <>That is <b>{num(i.missing)} {i.unit}</b> more, worth {kes(i.missing_value)}.</> : <>That is less than your sales explain: check the count.</>}</p>
               </li>
             ))}
@@ -49,7 +50,7 @@ function Missing({ block }: { block: MissingBlock }) {
       {rest.length > 0 && (
         <details className="mt-3">
           <summary className="flex min-h-10 cursor-pointer items-center text-[11px] font-semibold text-[var(--v-muted-foreground)]">The other items</summary>
-          <div className="mt-2"><HBars label="Used against what sales explain" max={100} rows={rest.map((i) => ({ key: i.item, label: i.item, value: Math.min(i.off_by_pct, 100), valueLabel: `${i.off_by_pct}% off`, note: `used ${num(i.used)} ${i.unit} · expected ${num(i.expected)} ${i.unit}` }))} /></div>
+          <div className="mt-2"><HBars label={`Used against what sales explain, last ${block.window_days} days`} max={100} rows={rest.map((i) => ({ key: i.item, label: i.item, value: Math.min(i.off_by_pct, 100), valueLabel: `${i.off_by_pct}% off`, note: `used ${num(i.used)} ${i.unit} · expected ${num(i.expected)} ${i.unit}` }))} /></div>
         </details>
       )}
       <Note>Last {block.window_days} days. A reason to check the store and the portions, not a finding about anyone.</Note>
@@ -73,6 +74,7 @@ function Handover({ block }: { block: HandoverBlock }) {
 function Reorder({ block }: { block: ReorderBlock }) {
   return (
     <BlockFrame title={T.reorder} block={block}>{() => (<>
+      {block.history && <StockHistory item={block.history.item} unit={block.history.unit} points={block.history.points} reorder={block.history.reorder} par={block.history.par} state={block.history.state} reason={block.history.reason} windowLabel={block.history.window || "last 14 days"} />}
       {block.time_to_reorder.length > 0 && (
         <ul className="mb-3 space-y-2 text-xs">{block.time_to_reorder.map((r) => <li key={r.item}><Pill tone="warn">Time to reorder</Pill> <b className="ml-1">{r.item}</b> · {num(r.left)} {r.unit} left<StockLevel item={r.item} unit={r.unit} left={r.left} reorder={r.reorder_point ?? null} par={r.par ?? null} /></li>)}</ul>
       )}

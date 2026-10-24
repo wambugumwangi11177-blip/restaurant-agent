@@ -1,7 +1,8 @@
 "use client";
 // Home — everything the owner needs on one screen (docs/v2/SPEC.md §3.1), from one call: GET /api/v1/owner/home.
 //   zone 1  the pulse · zone 2  what is costing you money · health strip · the six areas · zone 4  coming up · zone 5  LEVIII's read
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import api from "@/lib/api";
 import { OsError, OsLoading } from "@/components/os/States";
 import AreaPanels from "@/components/owner/home/AreaPanels";
 import AnswersStrip from "@/components/owner/home/AnswersStrip";
@@ -18,7 +19,7 @@ import HowItWorks from "@/components/owner/explain/HowItWorks";
 import Section from "@/components/owner/Section";
 import { useAuth } from "@/context/AuthContext";
 import { greeting } from "@/lib/owner/format";
-import type { OwnerHome } from "@/lib/owner/types";
+import type { Insight, OwnerHome } from "@/lib/owner/types";
 import { useOwnerHome } from "@/lib/owner/useOwnerHome";
 import { tenantConfig } from "@/lib/tenantConfig";
 
@@ -29,6 +30,15 @@ export default function HomePage() {
   const config = tenantConfig(user?.tenant_name);
   const [period, setPeriod] = useState<OwnerHome["period"]>("today");
   const { home, error, reload } = useOwnerHome(period);
+  const [notes, setNotes] = useState<{ insight?: Insight | null; read?: OwnerHome["read"] } | null>(null);
+  useEffect(() => {
+    if (!home) return;
+    let active = true;
+    api.get<{ insight?: Insight | null; read?: OwnerHome["read"] }>("/api/v1/owner/home/notes", { params: { period }, timeout: 30000 })
+      .then((r) => { if (active) setNotes(r.data); })
+      .catch(() => { if (active) setNotes(null); });
+    return () => { active = false; };
+  }, [home, period]);
   const ageDays = home?.setup?.age_days ?? 999;
   const firstWeek = useFirstWeek(home?.restaurant.id ?? 0, ageDays);
 
@@ -68,8 +78,8 @@ export default function HomePage() {
           <Section id="areas" eyebrow="Open any part for the detail" title="The six areas"><AreaPanels areas={home.areas} opensOn={firstWeek.active ? lockedAreas(ageDays) : {}} /></Section>
           <Section id="coming-up" eyebrow="Before it surprises you" title="Coming up"><ComingUp data={home.coming_up} /></Section>
           <Section id="how" eyebrow="The pictures from the guide" title="How LEVIII works"><HowItWorks home={home} /></Section>
-          <InsightNote insight={home.insight} />
-          <ReadNote read={home.read} />
+          <InsightNote insight={notes?.insight} />
+          {notes?.read && <ReadNote read={notes.read} />}
         </>
       )}
     </div>

@@ -17,7 +17,7 @@ export default function VarianceReportPanel() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.get("/api/v1/stock/variance-report").then((res) => setVariance(res.data)).catch(() => setVariance(null)).finally(() => setLoading(false));
+        api.get("/api/v1/stock/variance-report?hours=168").then((res) => setVariance(res.data)).catch(() => setVariance(null)).finally(() => setLoading(false));
     }, []);
 
     if (loading) {
@@ -37,7 +37,7 @@ export default function VarianceReportPanel() {
             <div>
                 <h1 className="text-xl font-bold text-text">Stock Variance</h1>
                 <p className="text-sm text-text-dim mt-0.5">
-                    Theoretical usage (from recipes) vs. actual stock movement — a real gap flags possible shrinkage.
+                    Theoretical usage (from recipes) vs. actual stock movement, last 7 days — the same window as Home. A real gap flags possible shrinkage.
                 </p>
             </div>
 
@@ -59,7 +59,7 @@ export default function VarianceReportPanel() {
                             <div key={i.inventory_item_id} className="px-4 py-3 flex items-center justify-between">
                                 <p className="text-sm text-text">{i.item_name}</p>
                                 <p className="text-xs text-danger">
-                                    {(i.variance_pct * 100).toFixed(1)}% (expected ~{i.theoretical_usage.toFixed(1)}, actual {i.actual_usage.toFixed(1)})
+                                    {(i.variance_pct * 100).toFixed(1)}% off, last 7 days (expected ~{i.theoretical_usage.toFixed(1)}, actual {i.actual_usage.toFixed(1)})
                                 </p>
                             </div>
                         ))}

@@ -226,10 +226,13 @@ def _setup(ctx: OwnerContext) -> dict:
 
 
 def compose_home(ctx: OwnerContext, period: str = "today") -> dict:
+    """Numbers only. LEVIII's note and the insight load from compose_home_notes so this response never waits on a model."""
     if period not in PERIODS:
         raise ValueError(f"period must be one of {PERIODS}")
+    from owner import figures
     area_blocks = {key: areas.compose_area(ctx, key) for key in areas.AREAS}
-    payload = {
+    drawn = ctx.safe("home.figures", lambda: figures.compose(ctx, area_blocks))
+    return {
         "restaurant": {"id": ctx.rid, "name": ctx.restaurant.name},
         "period": period,
         "timezone": "Africa/Nairobi",
@@ -239,11 +242,31 @@ def compose_home(ctx: OwnerContext, period: str = "today") -> dict:
         "health": _health(ctx, area_blocks),
         "areas": area_blocks,
         "coming_up": ctx.safe("home.coming_up", lambda: _coming_up(ctx)),
-        "read": _read(ctx),
+        "figures": drawn,
+        "read": unavailable("The note loads on its own, after the numbers.", text=None),
         "setup": _setup(ctx),
     }
+
+
+def compose_home_notes(ctx: OwnerContext, period: str = "today") -> dict:
+    """LEVIII's read and the insight. Separate from the numbers so Home can paint first."""
+    if period not in PERIODS:
+        raise ValueError(f"period must be one of {PERIODS}")
     from ai.insight import attach, home_figures
-    insight = attach(ctx.db, ctx.user, ctx.rid, surface="home", question=f"Home {period}", data=home_figures(payload))
+    overview = _overview()
+    from time_utils import service_sales_window, trading_window
+    start, end, _service = service_sales_window(ctx.now)
+    today = overview._summarize(ctx.db, ctx.rid, start, end)
+    last_week = overview._summarize(ctx.db, ctx.rid, start - timedelta(days=7), end - timedelta(days=7))
+    vs = round((today["revenue"] - last_week["revenue"]) / last_week["revenue"] * 100, 1) if last_week["revenue"] else None
+    win_start, win_end, _anchor = trading_window(period, ctx.now)
+    window = overview._summarize(ctx.db, ctx.rid, win_start, win_end)
+    slim = {"period": period, "pulse": {
+        "sales_today": today["revenue"], "orders_today": today["orders"], "vs_same_weekday_pct": vs,
+        "sales_in_period": window["revenue"], "orders_in_period": window["orders"],
+    }}
+    insight = attach(ctx.db, ctx.user, ctx.rid, surface="home", question=f"Home {period}", data=home_figures(slim))
+    notes = {"read": _read(ctx)}
     if insight is not None:
-        payload["insight"] = insight
-    return payload
+        notes["insight"] = insight
+    return notes

@@ -64,7 +64,7 @@ export function useInventoryWorkspace() {
             api.get("/api/v1/inventory/").catch(() => ({ data: [] })),
             api.get("/api/v1/ai/inventory-predictions").catch(() => ({ data: null })),
             api.get("/api/v1/stock/transfers").catch(() => null),
-            api.get("/api/v1/stock/variance-report").catch(() => null),
+            api.get("/api/v1/stock/variance-report?hours=168").catch(() => null),
         ]);
         setItems(Array.isArray(invRes.data) ? invRes.data : []);
         setAiData(aiRes.data);

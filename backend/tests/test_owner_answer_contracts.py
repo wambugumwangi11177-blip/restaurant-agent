@@ -110,7 +110,7 @@ def test_slow_days_answer_is_specific_and_grounded(monkeypatch, db_session, rest
     })
     answer = _answer_revenue(db_session, r.id, "Which days are slow?")
     assert answer["finding"].startswith("Monday is the slowest recorded day")
-    assert "KSh 120" in answer["finding"]          # cents -> KES, not KSh 12,000
+    assert "KES 120" in answer["finding"]          # cents -> KES, not KES 12,000
     assert answer["data"]["narrative_allowed"] is False
     assert "Friday" in answer["steps"][1]["action"]
 
@@ -182,7 +182,7 @@ def test_what_did_i_sell_yesterday_is_that_days_sales_not_the_health_score(db_se
     db_session.commit()
     answer = _answer_revenue(db_session, restaurant_row.id, "What did I sell yesterday?")
     assert answer["finding"].startswith("Yesterday you sold")
-    assert "KSh 250" in answer["finding"]
+    assert "KES 250" in answer["finding"]
     assert "1 paid" in answer["finding"]
     assert "health score" not in answer["finding"].lower()
     from time_utils import service_sales_window
@@ -195,7 +195,7 @@ def test_what_did_i_sell_yesterday_is_that_days_sales_not_the_health_score(db_se
     assert start <= today_at < end
     today = _answer_revenue(db_session, restaurant_row.id, "How are my sales today?")
     assert today["finding"].startswith("Revenue today is")
-    assert f"KSh {expected:,}" in today["finding"]
+    assert f"KES {expected:,}" in today["finding"]
 
 
 def _sales_pair(db_session, monkeypatch, frozen):
@@ -246,7 +246,7 @@ def test_sales_today_and_why_today_agree_before_the_morning_rollover(db_session,
     ))
     db_session.commit()
     what, why = answers()
-    assert "KSh 16,540" in what["finding"]
+    assert "KES 16,540" in what["finding"]
     assert "2 paid" in what["finding"]
     sales = next(row for row in why["rows"] if row["key"] == "sales")
     assert sales["value"] == 16540
@@ -266,8 +266,8 @@ def test_sales_today_after_rollover_does_not_keep_the_previous_service(db_sessio
     ))
     db_session.commit()
     what, why = answers()
-    assert "KSh 100" in what["finding"]
-    assert "KSh 16,340" not in what["finding"]
+    assert "KES 100" in what["finding"]
+    assert "KES 16,340" not in what["finding"]
     sales = next(row for row in why["rows"] if row["key"] == "sales")
     assert sales["value"] == 100
 
@@ -317,7 +317,7 @@ def test_yesterday_before_the_morning_rollover_is_the_day_before_the_open_servic
                                     status=models.OrderStatus.SERVED, created_at=when))
     db_session.commit()
     what = _answer_revenue(db_session, restaurant_row.id, "What did I sell yesterday?")
-    assert "KSh 9,999" in what["finding"] and "1 paid" in what["finding"], what["finding"]
+    assert "KES 9,999" in what["finding"] and "1 paid" in what["finding"], what["finding"]
     user = db_session.query(models.User).filter_by(tenant_id=restaurant_row.tenant_id).first()
     why = build(OwnerContext(db_session, user, restaurant_row), "Why were sales down yesterday?")
     assert why["day"] == "2026-10-22"

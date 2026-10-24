@@ -98,25 +98,37 @@ def shifts(ctx):
     from sqlalchemy import func
     lines = ctx.db.query(models.MpesaStatementLine).filter_by(restaurant_id=ctx.rid).filter(models.MpesaStatementLine.paid_in_cents > 0).all()
     paid_at = func.coalesce(models.Order.completed_at, models.Order.created_at)
-    all_sales = ctx.db.query(models.Order).filter(models.Order.restaurant_id == ctx.rid,
-        models.Order.is_paid.is_(True), models.Order.payment_method == models.PaymentMethod.MPESA,
-        models.Order.status != models.OrderStatus.CANCELLED).all()
     lo = min((l.completed_at for l in lines), default=None)
     hi = max((l.completed_at for l in lines), default=None)
     covered_from = (lo+EAT_OFFSET).replace(hour=0, minute=0, second=0, microsecond=0)-EAT_OFFSET if lo else None
-    sale_rows = [Sale(o.id, o.completed_at or o.created_at, o.total, o.mpesa_receipt)
-                 for o in all_sales if covered_from and covered_from <= (o.completed_at or o.created_at) <= hi+timedelta(minutes=ctx.settings.mpesa_match_minutes)]
+    all_sales = []
+    if covered_from and hi:
+        all_sales = ctx.db.query(models.Order).filter(models.Order.restaurant_id == ctx.rid,
+            models.Order.is_paid.is_(True), models.Order.payment_method == models.PaymentMethod.MPESA,
+            models.Order.status != models.OrderStatus.CANCELLED,
+            paid_at >= covered_from, paid_at <= hi+timedelta(minutes=ctx.settings.mpesa_match_minutes)).all()
+    sale_rows = [Sale(o.id, o.completed_at or o.created_at, o.total, o.mpesa_receipt) for o in all_sales]
     matched = match(sale_rows, [Payment(l.id, l.completed_at, l.paid_in_cents, l.receipt) for l in lines], ctx.settings.mpesa_match_minutes)
     matched_ids = {i for m in matched.matched for i in m.sales}
     unmatched_ids = {s.id for s in matched.sales_without_payment}
     different_ids = {s.id for s, p in matched.different_amounts}
     rows=ctx.db.query(models.CashDrawerCount).filter(models.CashDrawerCount.restaurant_id==ctx.rid,
           models.CashDrawerCount.window_start>=ctx.now-timedelta(days=14)).order_by(models.CashDrawerCount.window_start.desc()).all()
+    cancelled_at: list = []
+    mpesa_rows = []
+    if rows:
+        span_start = min(c.window_start for c in rows)
+        span_end = max(c.window_end for c in rows)
+        cancelled_at = [t for (t,) in ctx.db.query(models.Order.created_at).filter(
+            models.Order.restaurant_id==ctx.rid, models.Order.created_at>=span_start, models.Order.created_at<span_end,
+            models.Order.status==models.OrderStatus.CANCELLED).all()]
+        mpesa_rows = ctx.db.query(models.Order.id, models.Order.total, models.Order.completed_at, models.Order.created_at).filter(
+            models.Order.restaurant_id==ctx.rid, paid_at>=span_start, paid_at<span_end,
+            models.Order.is_paid.is_(True), models.Order.status!=models.OrderStatus.CANCELLED,
+            models.Order.payment_method==models.PaymentMethod.MPESA).all()
     out=[]
     for c in rows:
-        q=ctx.db.query(models.Order).filter(models.Order.restaurant_id==ctx.rid,models.Order.created_at>=c.window_start,models.Order.created_at<c.window_end)
-        mpesa=ctx.db.query(models.Order).filter(models.Order.restaurant_id==ctx.rid,paid_at>=c.window_start,paid_at<c.window_end,
-            models.Order.is_paid.is_(True),models.Order.status!=models.OrderStatus.CANCELLED,models.Order.payment_method==models.PaymentMethod.MPESA).all()
+        mpesa=[o for o in mpesa_rows if c.window_start <= (o.completed_at or o.created_at) < c.window_end]
         stock_rows = []
         for item in stock_catalog:
             counts = [count for count in count_history[item.id] if c.window_start<=count.counted_at<=c.window_end]
@@ -131,7 +143,7 @@ def shifts(ctx):
                     'gap_kes':kes(c.counted_amount_cents-c.expected_amount_cents),
                     'check':abs(c.counted_amount_cents-c.expected_amount_cents)>drawer_tolerance_cents(c.expected_amount_cents,ctx.settings),
                     'mpesa_sales_kes':kes(sum(o.total for o in mpesa)),
-                    'cancelled_sales':q.filter(models.Order.status==models.OrderStatus.CANCELLED).count(),
+                    'cancelled_sales':sum(1 for t in cancelled_at if c.window_start <= t < c.window_end),
                     'mpesa_matched_kes':kes(sum(o.total for o in mpesa if o.id in matched_ids)),
                     'mpesa_unmatched_kes':kes(sum(o.total for o in mpesa if o.id in unmatched_ids or o.id in different_ids)),
                     'mpesa_outside_statement_kes':kes(sum(o.total for o in mpesa if o.id not in matched_ids|unmatched_ids|different_ids)),

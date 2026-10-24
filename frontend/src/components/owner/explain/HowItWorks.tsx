@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import GuideFigures from "./GuideFigures";
 import type { OwnerHome } from "@/lib/owner/types";
 import { kes } from "@/lib/owner/format";
 
@@ -83,6 +84,7 @@ export default function HowItWorks({ home }: { home: OwnerHome }) {
           { title: "Alerts", detail: "A licence, a bill, a count or a price — the loudest thing is the one that costs money now." },
         ]} />
       </Block>
+      {home.figures && <GuideFigures figures={home.figures as never} />}
     </div>
   );
 }

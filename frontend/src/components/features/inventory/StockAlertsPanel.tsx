@@ -22,7 +22,7 @@ export default function StockAlertsPanel({ variance, alerts }: StockAlertsPanelP
                     <div className="px-4 py-3 border-b border-surface-hover flex items-center gap-2">
                         <ShieldAlert className="w-3.5 h-3.5 text-danger" />
                         <p className="text-xs font-semibold text-text">
-                            Stock variance — {variance.items.filter((i) => i.flagged).length} item(s) over {(variance.threshold * 100).toFixed(0)}%
+                            Stock variance, last 7 days — {variance.items.filter((i) => i.flagged).length} item(s) over {(variance.threshold * 100).toFixed(0)}%
                         </p>
                     </div>
                     <div className="divide-y divide-surface-hover">
@@ -30,7 +30,7 @@ export default function StockAlertsPanel({ variance, alerts }: StockAlertsPanelP
                             <div key={i.inventory_item_id} className="px-4 py-2.5 flex items-center justify-between">
                                 <p className="text-xs text-text">{i.item_name}</p>
                                 <p className="text-xs text-danger">
-                                    {(i.variance_pct * 100).toFixed(1)}% (expected ~{i.theoretical_usage.toFixed(1)}, actual {i.actual_usage.toFixed(1)})
+                                    {(i.variance_pct * 100).toFixed(1)}% off, last 7 days (expected ~{i.theoretical_usage.toFixed(1)}, actual {i.actual_usage.toFixed(1)})
                                 </p>
                             </div>
                         ))}

@@ -1,10 +1,9 @@
 /**
- * One sales figure for every staff screen.
+ * Trading-day sales math, kept for tests.
  *
- * Orders store money in cents. Home and GET /overview/today already divide by 100
- * and count only paid, non-cancelled orders inside the Nairobi trading day
- * (rolls at 06:00). Staff sales used to sum the raw cents and bucket by the UTC
- * date, so the same service showed up 100× too high and on the wrong day.
+ * The staff Sales screen does not sum orders. It reads GET /api/v1/sales/today.
+ * Orders store money in cents. This helper divides by 100 and keeps paid,
+ * non-cancelled orders inside the Nairobi trading day (rolls at 06:00).
  */
 
 export const SERVICE_ROLLOVER_HOUR = 6;

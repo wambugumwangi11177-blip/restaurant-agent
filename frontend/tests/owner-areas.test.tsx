@@ -125,7 +125,7 @@ it("Store & Suppliers: the item that went missing is named with how much, how fa
   open("store");
   const missing = panel("Missing stock");
   expect(within(missing).getAllByText("Beef").length).toBeGreaterThan(0);
-  expect(within(missing).getByText("34.2% off")).toBeTruthy();
+  expect(within(missing).getByText("34.2% off, last 7 days")).toBeTruthy();
   expect(missing.textContent).toMatch(/Used 9.91 kg; your sales explain 7.38 kg\. That is 2.53 kg more, worth KES 2,021\./);
   expect(within(missing).getByText(/not a finding about anyone/)).toBeTruthy();
   expect(within(panel("Store-to-kitchen handovers")).getByText(/the store said 4 kg, the kitchen counted 3.8 kg/)).toBeTruthy();

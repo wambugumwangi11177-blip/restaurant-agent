@@ -176,9 +176,12 @@ function Bills({ block }: { block: BillsBlock }) {
       {block.upcoming.length > 0 && (
         <ul className="mt-3 divide-y divide-[var(--v-border)] text-xs">
           {block.upcoming.map((u) => (
-            <li key={`${u.name}-${u.due_on}`} className="flex items-center justify-between gap-3 py-1.5">
+            <li key={`${u.id ?? u.name}-${u.due_on}`} className="flex items-center justify-between gap-3 py-1.5">
               <span>{u.name} · {u.days_away === 0 ? "today" : `in ${plural(u.days_away, "day")}`} ({shortDay(u.due_on)})</span>
-              <b className="tabular-nums">{kes(u.amount_kes)}{u.short && <span className="ml-1.5"><Pill tone="bad">short</Pill></span>}</b>
+              <span className="flex items-center gap-2">
+                <b className="tabular-nums">{kes(u.amount_kes)}{u.short && <span className="ml-1.5"><Pill tone="bad">short</Pill></span>}</b>
+                {u.id != null && <PayBill id={u.id} name={u.name} />}
+              </span>
             </li>
           ))}
         </ul>
@@ -188,6 +191,29 @@ function Bills({ block }: { block: BillsBlock }) {
     </div>)}</BlockFrame>
     <BillForm />
   </>);
+}
+
+function PayBill({ id, name }: { id: number; name: string }) {
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState("");
+  const [error, setError] = useState("");
+  const pay = async () => {
+    setBusy(true); setError(""); setSaved("");
+    try {
+      await api.post(`/api/v1/owner/money/bills/${id}/pay`, { method: "cash" });
+      setSaved(`${name} is marked paid.`);
+      window.dispatchEvent(new Event(OWNER_DATA_CHANGED));
+    } catch {
+      setError("Could not mark that bill paid.");
+    } finally { setBusy(false); }
+  };
+  return (
+    <span>
+      <button type="button" disabled={busy} onClick={pay} className="min-h-10 text-[11px] font-bold text-[var(--v-primary)]">{busy ? "Saving…" : "Mark paid"}</button>
+      {saved && <span role="status" className="ml-1 text-[11px] text-[var(--v-good)]">{saved}</span>}
+      {error && <span role="alert" className="ml-1 text-[11px] text-[var(--v-warn)]">{error}</span>}
+    </span>
+  );
 }
 
 const field = "mt-1 block min-h-11 w-full rounded-lg border border-[var(--v-border)] bg-[var(--v-card)] px-3 text-sm";

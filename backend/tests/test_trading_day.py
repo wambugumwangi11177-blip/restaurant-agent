@@ -16,9 +16,9 @@ from time_utils import trading_day, trading_window
 
 AT_0130 = datetime(2026, 10, 23, 22, 30)   # Saturday 01:30 Nairobi; open service is Friday 23 Oct
 AT_1400 = datetime(2026, 10, 24, 11, 0)    # Saturday 14:00 Nairobi
-FRIDAY_NIGHT = datetime(2026, 10, 23, 19, 0)    # Friday 22:00 Nairobi, KSh 16,340
-AFTER_MIDNIGHT = datetime(2026, 10, 23, 21, 30)  # Saturday 00:30 Nairobi, KSh 2,180
-THURSDAY = datetime(2026, 10, 22, 12, 0)         # Thursday 15:00 Nairobi, KSh 5,000
+FRIDAY_NIGHT = datetime(2026, 10, 23, 19, 0)    # Friday 22:00 Nairobi, KES 16,340
+AFTER_MIDNIGHT = datetime(2026, 10, 23, 21, 30)  # Saturday 00:30 Nairobi, KES 2,180
+THURSDAY = datetime(2026, 10, 22, 12, 0)         # Thursday 15:00 Nairobi, KES 5,000
 
 
 def test_open_periods_include_the_hour_after_midnight_and_closed_ones_do_not():
@@ -108,7 +108,7 @@ def _agree(db, g, moment, sales_kes, orders):
     trend = _performance(db, g.rid, moment)["revenue_trend"][-1]
     assert trend["revenue"] == sales_kes and trend["orders"] == orders
     what = _answer_revenue(db, g.rid, "How were sales today?")
-    assert f"KSh {sales_kes:,.0f}" in what["finding"]
+    assert f"KES {sales_kes:,.0f}" in what["finding"]
     assert f"{orders} paid" in what["finding"]
     assert home["coming_up"]["bookings"]["covers_today"] == 2
     return home
@@ -122,14 +122,14 @@ def test_home_matches_the_trading_day_at_0130_and_1400(db_session, monkeypatch):
     _freeze(monkeypatch, AT_0130)
     _agree(db_session, g, AT_0130, 18_520.0, 2)
     yesterday = _answer_revenue(db_session, g.rid, "What did I sell yesterday?")
-    assert "KSh 5,000" in yesterday["finding"]
-    assert "KSh 16,340" not in yesterday["finding"]
+    assert "KES 5,000" in yesterday["finding"]
+    assert "KES 16,340" not in yesterday["finding"]
 
     _freeze(monkeypatch, AT_1400)
     home = _agree(db_session, g, AT_1400, 2_180.0, 1)
     yesterday = _answer_revenue(db_session, g.rid, "What did I sell yesterday?")
-    assert "KSh 16,340" in yesterday["finding"]
-    assert "KSh 2,180" not in yesterday["finding"]
+    assert "KES 16,340" in yesterday["finding"]
+    assert "KES 2,180" not in yesterday["finding"]
     assert home["pulse"]["breakeven_at"]["sales_today_kes"] == 2_180.0
 
 

@@ -36,6 +36,7 @@ export interface InventoryPrediction {
 
 export interface VarianceReport {
     threshold: number;
+    window_hours?: number;
     items: VarianceItem[];
 }
 

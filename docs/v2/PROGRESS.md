@@ -1,3 +1,23 @@
+# Eleven demo — Phase 1 leftovers — 24 October 2026
+
+Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes. No new migration.
+
+1. Owner Home and Reports return the numbers without waiting on a model. `GET /api/v1/owner/home` and `GET /api/v1/owner/report/{period}` no longer call the insight layer. The note is a second request: `GET /api/v1/owner/home/notes` and `GET /api/v1/owner/report/{period}/notes`. A failed note leaves the numbers on screen. Cash shifts are computed once per request, and the per-count order queries are one cancelled query and one M-Pesa query for the whole window. `tests/test_home_speed.py` builds 220 paid orders and 30 drawer counts, warms `compose_home`, and checks the next call finishes in under 1 second with no `insight` key. The golden-restaurant ceiling in `test_home_on_the_golden_restaurant_is_fast_enough_to_use` stays at 20 seconds.
+
+2. Each cash figure names its window. Tender mix is today. Cash counts and the area summary ("Counts and sales to look at") are the last 14 days. Cancelled sales are the last 7 days. A price under the menu is the last 14 days of sales, and the dishes stay on the block while the restaurant is still inside those 14 days. Repeating patterns are the last 28 days. The two beef-variance percentages both use the last 7 days: Home already did, and the staff variance panel now requests `hours=168`. The backend default for that endpoint stays 24 hours.
+
+3. The remaining guide pictures are on the home payload (`figures`) and on the cash and store areas, so `/owner/area/{key}` matches the block Home embeds. Card settlement has no table in this app, so the card corner is card sales in the count against "Settlement not recorded". A short count draws the till against the count. Stock history is the on-hand line for 14 days. Follow-a-shilling traces the latest paid order in 14 days, and the statement line when that M-Pesa receipt is on file. The price decision, elasticity slope, price ladder, Pareto cumulative line, ABC count calendar, yesterday's why-tree, the alert pyramid, and the four door cards each have a payload, an empty reason, and a test.
+
+4. A licence with an id can be edited (`PATCH /api/v1/owner/money/licences/{id}`). An upcoming bill with an id can be marked paid (`POST /api/v1/owner/money/bills/{id}/pay`, method cash). Both refresh the owner screens after a save.
+
+5. Deterministic Ask headlines use KES. The creative tests that feed a model sentence containing KSh are unchanged; the insight layer still rewrites that to KES before it is shown.
+
+6. Staff Sales reads `GET /api/v1/sales/today`. The total, the payment mix, the channels, the hours, and the top dishes are counted in the database for the open Nairobi service day (rolls at 06:00). Manager, supervisor, and accountant can read it. The owner can read it as an admin. A waiter receives 403. `GET /api/v1/overview/today` stays closed to those staff roles. `GET /api/v1/orders/` is still capped at 200 rows; the sales screen does not sum that list. The test inserts 201 paid orders today plus one order from last year: the order page is 200 rows and the sales total is 201 orders and KES 201. A manager of another restaurant sees 0.
+
+Where this disagrees with a settlement figure in the guide: the card leg's right side is empty on purpose. `startup_checks.py` records that external card settlement is retired, so the screen does not invent a settlement amount.
+
+Validation (24 Oct, this tree, no provider keys): backend `LOG_FORMAT=plain pytest` **2248 passed, 1 skipped**. Frontend: `tsc --noEmit` clean, vitest **247 passed**, `next build` succeeded (74 routes). No new migration. No production database was touched. No browser click-through in this pass.
+
 # Eleven demo — Phase 1 polish — 24 October 2026
 
 Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes. No new migration. Phase 2 (accountant proposals, activity feed, delegation, PIN tablet, spoilage workflow, onboarding wizard, Capacitor/Tauri) is not in this change.
@@ -8,7 +28,7 @@ Figures now drawn from the home payload: tender mix, three-way match, the trick 
 
 Frontend API calls start at `/api/v1`. Removed `frontend/src/components/charts/Sparkline.tsx`, `frontend/src/lib/vibandaAreas.ts`, and `frontend/src/lib/retry.ts`. The sparkline under `components/ai` stays.
 
-Still thinner than the PDF, on purpose for this pass: no card-settlement leg on the triangle; the trick is a sentence, not an animation; stock level is the current quantity against the reorder and par lines, not a history; follow-a-shilling is a map, not one real order traced through the statement; no decision tree, elasticity slope, price-ladder axis, Pareto cumulative line, ABC calendar grid, why-tree, alert pyramid, or door-failure card. Creating a licence or a bill works; editing a licence and paying a bill from those forms does not. Cash-count "2 of 28" versus "1 of 14" versus "Cash Check: 3", and the two beef-variance percentages, are still different windows. Deterministic Ask headlines still say KSh. First-load skeletons are unchanged. `owner/area/{key}` remains the deep link beside Home.
+The leftovers named in this pass (card leg, short-count bars, stock history, one traced order, the price and stock pictures, licence edit, bill pay, window labels, Ask KES) are finished in the entry above. First-load skeletons are unchanged. `owner/area/{key}` remains the deep link beside Home.
 
 Validation (24 Oct, this tree, no provider keys): backend `LOG_FORMAT=plain pytest` **2242 passed, 1 skipped**. Frontend: `tsc --noEmit` clean, vitest **245 passed**, `next build` succeeded (74 routes). No new migration. No production database was touched.
 

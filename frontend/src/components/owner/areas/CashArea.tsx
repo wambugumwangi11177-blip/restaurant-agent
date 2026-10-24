@@ -1,5 +1,6 @@
 "use client";
 import CheckMatrix from "@/components/charts/CheckMatrix";
+import ShortCount from "@/components/charts/ShortCount";
 import HBars from "@/components/charts/HBars";
 import HeatGrid from "@/components/charts/HeatGrid";
 import ShiftTable from "@/components/charts/ShiftTable";
@@ -80,18 +81,28 @@ function Mpesa({ block }: { block: MpesaBlock }) {
 function Shifts({ block, cancelled, pricedUnder }: { block: ShiftsBlock; cancelled?: number; pricedUnder?: number }) {
   const day = (iso: string) => { const d = toDate(iso); const local = new Date(d.getTime() + 3 * 3600_000).toISOString().slice(0, 10); return `${weekday(local)} ${shortDay(local)}, ${nairobiTime(iso)}`; };
   const latest = block.shifts?.[0];
-  const legs = latest ? [leg("cash", "Cash", latest.counted, latest.expected, latest.check)].filter((x) => x != null) : [];
-  if (latest?.mpesa_gap != null) {
+  const drawn = (block.three_way?.legs ?? []).map((item) => ({
+    key: item.key, label: item.label,
+    left: item.left_kes == null ? (item.left_label || "Not recorded") : kes(item.left_kes),
+    right: item.right_kes == null ? (item.right_label || "Not recorded") : kes(item.right_kes),
+    gap: item.left_kes != null && item.right_kes != null ? kes(Math.abs(item.left_kes - item.right_kes)) : "not recorded",
+    look: item.look,
+  }));
+  const legs = drawn.length ? drawn : (latest ? [leg("cash", "Cash", latest.counted, latest.expected, latest.check)].filter((x) => x != null) : []);
+  if (!drawn.length && latest?.mpesa_gap != null) {
     const mpesa = leg("mpesa", "M-Pesa", 0, latest.mpesa_gap, latest.mpesa_gap > 0);
     if (mpesa) legs.push({ ...mpesa, left: "On the statement", right: kes(latest.mpesa_gap) + " not matched", gap: kes(latest.mpesa_gap), look: latest.mpesa_gap > 0 });
   }
   return (
     <div className="space-y-3">
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">Window: today</p>
       <BlockFrame title="How the money came in" block={{ ...block, state: (block.tenders?.length ? block.state === "no_data" ? "live" : block.state : "no_data") as ShiftsBlock["state"], reason: "Paid sales today will split into cash, M-Pesa and card once an order is taken." }}>{() => (
         <TenderMix tenders={block.tenders ?? []} />
       )}</BlockFrame>
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">Window: last 14 days</p>
       <BlockFrame title={T.shifts} block={block}>{() => (<>
-        <ShiftTable label="Each cash count against what the till says" rows={(block.shifts ?? []).map((s) => ({ key: s.from, when: day(s.from), expected: s.expected, counted: s.counted, gap: s.gap, check: s.check, mpesaGap: s.mpesa_gap, cancelled: s.cancelled, stockGap: s.stock_gap, signal: s.signal }))} />
+        <Note>Window: last 14 days. {block.shifts?.length ?? 0} counts, {(block.shifts ?? []).filter((s) => s.check).length} to look at.</Note>
+        <ShiftTable label="Each cash count against what the till says, last 14 days" rows={(block.shifts ?? []).map((s) => ({ key: s.from, when: day(s.from), expected: s.expected, counted: s.counted, gap: s.gap, check: s.check, mpesaGap: s.mpesa_gap, cancelled: s.cancelled, stockGap: s.stock_gap, signal: s.signal }))} />
         <Note>A difference smaller than what you accept is not flagged.</Note>
       </>)}</BlockFrame>
       {block.state !== "no_data" && block.state !== "unavailable" && block.state !== "learning" && (
@@ -101,12 +112,14 @@ function Shifts({ block, cancelled, pricedUnder }: { block: ShiftsBlock; cancell
             <ToleranceCurve toleranceKes={block.tolerance?.kes ?? 0} tolerancePct={block.tolerance?.pct ?? 0} dots={(block.shifts ?? []).map((s) => ({ key: s.from, expected: s.expected, gap: s.gap, label: day(s.from) }))} />
           </div>
           <div>
-            <p className="mb-1 text-[11px] font-bold">The trick a count catches</p>
-            {latest?.check
+            <p className="mb-1 text-[11px] font-bold">The trick a count catches · last 14 days</p>
+            {block.short_count?.bars?.length ? (
+              <ShortCount expected={block.short_count.expected_kes ?? 0} counted={block.short_count.counted_kes ?? 0} gap={block.short_count.gap_kes ?? 0} trick={block.short_count.trick} windowLabel="last 14 days" state={block.short_count.state} reason={block.short_count.reason} />
+            ) : latest?.check
               ? <p className="text-xs">The latest count was {kes(Math.abs(latest.gap))} {latest.gap < 0 ? "short" : "over"}. A short drawer with no cancelled sale and no M-Pesa gap is the usual trick: cash taken and the sale left off, or the sale rung and the cash kept.</p>
               : <p className="text-xs text-[var(--v-muted-foreground)]">When a count sits outside what you accept, this names the trick that count is built to catch. Nothing is outside the line right now.</p>}
           </div>
-          <CheckMatrix counts={{ cash: (block.shifts ?? []).filter((s) => s.check).length, cancelled: cancelled ?? 0, mpesa: (block.shifts ?? []).filter((s) => (s.mpesa_gap ?? 0) > 0).length, price: pricedUnder ?? 0, stock: (block.shifts ?? []).filter((s) => (s.stock_gap ?? 0) > 0).length }} />
+          <CheckMatrix label="Which check catches which trick. Cash counts: last 14 days. Cancelled sales: last 7 days." counts={{ cash: (block.shifts ?? []).filter((s) => s.check).length, cancelled: cancelled ?? 0, mpesa: (block.shifts ?? []).filter((s) => (s.mpesa_gap ?? 0) > 0).length, price: pricedUnder ?? 0, stock: (block.shifts ?? []).filter((s) => (s.stock_gap ?? 0) > 0).length }} />
         </div>
       )}
     </div>
@@ -115,6 +128,8 @@ function Shifts({ block, cancelled, pricedUnder }: { block: ShiftsBlock; cancell
 
 function Cancelled({ block }: { block: CancelledBlock }) {
   return (
+    <>
+    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">Window: last 7 days</p>
     <BlockFrame title={T.cancelled_sales} block={block}>{() => (<>
       <Grid cols={2}>
         <Stat label="Cancelled, last 7 days" value={block.cancelled_last_7_days} />
@@ -122,11 +137,14 @@ function Cancelled({ block }: { block: CancelledBlock }) {
       </Grid>
       <Note>{block.note}</Note>
     </>)}</BlockFrame>
+    </>
   );
 }
 
 function BelowMenu({ block }: { block: BelowMenuPriceBlock }) {
   return (
+    <>
+    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">Window: last 14 days of sales</p>
     <BlockFrame title={T.below_menu_price} block={block}>{() => (<>
       {block.dishes.length === 0 ? <Empty>Every dish was charged its menu price.</Empty> : (<>
         <HBars label="What charging under the menu price costs in a month" rows={block.dishes.map((d) => ({ key: d.dish, label: d.dish, value: d.month_loss, valueLabel: kes(d.month_loss), note: `Menu ${kes(d.menu_price)}, charged ${kes(d.charged)}` }))} />
@@ -137,17 +155,22 @@ function BelowMenu({ block }: { block: BelowMenuPriceBlock }) {
         </ul>
       </>)}
     </>)}</BlockFrame>
+    </>
   );
 }
 
 function Patterns({ block }: { block: PatternsBlock }) {
   return (
+    <>
+    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">Window: last 28 days</p>
     <BlockFrame title={T.patterns} block={block}>{() => (<>
-      <HeatGrid label="Shifts that came up short again and again" cells={block.patterns.map((p) => ({ weekday: p.weekday, shift: p.shift, timesShort: p.times_short, ofLast: p.of_last, title: `${p.when}: short ${p.times_short} of the last ${p.of_last}` }))} />
+      <Note>Window: last 28 days.</Note>
+      <HeatGrid label="Shifts that came up short again and again, last 28 days" cells={block.patterns.map((p) => ({ weekday: p.weekday, shift: p.shift, timesShort: p.times_short, ofLast: p.of_last, title: `${p.when}: short ${p.times_short} of the last ${p.of_last}, last 28 days` }))} />
       {block.patterns.length === 0
         ? <Note>{String(block.reason ?? "No shift has come up short again and again.")}</Note>
         : <ul className="mt-3 space-y-1 text-xs">{block.patterns.map((p) => <li key={p.when}><b>{p.when}</b>: short {p.times_short} of the last {p.of_last} times, about {kes(p.short_each)} each — {kes(p.total)} in all.</li>)}</ul>}
       <Note>{block.note}</Note>
     </>)}</BlockFrame>
+    </>
   );
 }

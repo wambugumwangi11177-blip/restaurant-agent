@@ -1,5 +1,8 @@
 "use client";
+import { FormEvent, useState } from "react";
+import api from "@/lib/api";
 import { BLOCK_TITLES } from "@/lib/owner/blocks";
+import { OWNER_DATA_CHANGED } from "@/lib/owner/useOwnerHome";
 import { plural, shortDay } from "@/lib/owner/format";
 import type { DataTrustBlock, InfoBlock, LicencesBlock, SettingsBlock } from "@/lib/owner/areaTypes";
 import { useSettings } from "@/components/owner/settings/SettingsProvider";
@@ -24,7 +27,7 @@ export default function PermitsArea({ area }: { area: Area }) {
 }
 
 function Licences({ block }: { block: LicencesBlock }) {
-  return (
+  return (<>
     <BlockFrame title={T.licences} block={block}>{() => (<>
       {block.items.length === 0 ? <Empty>No licences entered yet. Add them so you hear before one runs out.</Empty> : (
         <ul className="divide-y divide-[var(--v-border)] text-xs">
@@ -37,7 +40,8 @@ function Licences({ block }: { block: LicencesBlock }) {
         </ul>
       )}
     </>)}</BlockFrame>
-  );
+    <LicenceForm />
+  </>);
 }
 
 function Settings({ block }: { block: SettingsBlock }) {
@@ -46,7 +50,62 @@ function Settings({ block }: { block: SettingsBlock }) {
     <BlockFrame title={T.settings} block={block}>{() => (<>
       <Stat label="Targets you set" value={`${block.changed} of ${block.total}`} note={block.chosen ? "the rest use our defaults" : "all of them use our defaults for now"} />
       {fields && <button type="button" onClick={openTargets} className="mt-3 min-h-10 text-[11px] font-bold text-[var(--v-primary)]">Review my targets →</button>}
+      <SettingsHistory />
     </>)}</BlockFrame>
+  );
+}
+
+const field = "mt-1 block min-h-11 w-full rounded-lg border border-[var(--v-border)] bg-[var(--v-card)] px-3 text-sm";
+
+function LicenceForm() {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [issuer, setIssuer] = useState("");
+  const [expires, setExpires] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState("");
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true); setError(""); setSaved("");
+    try {
+      await api.post("/api/v1/owner/money/licences", { name, issuer, expires_on: expires });
+      setSaved(`${name} is on the licence list and in Coming up.`);
+      setName(""); setIssuer(""); setExpires("");
+      window.dispatchEvent(new Event(OWNER_DATA_CHANGED));
+    } catch {
+      setError("Could not save that licence. Check the expiry date.");
+    } finally { setBusy(false); }
+  };
+  if (!open) return <button type="button" onClick={() => setOpen(true)} className="min-h-10 text-[11px] font-bold text-[var(--v-primary)]">Add a licence</button>;
+  return (
+    <form onSubmit={save} className="space-y-3 rounded-lg border border-[var(--v-border)] bg-[var(--v-bg)] p-3.5">
+      <h4 className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">Add a licence</h4>
+      <label className="block text-xs">Name<input className={field} value={name} onChange={(e) => setName(e.target.value)} required /></label>
+      <label className="block text-xs">Authority<input className={field} value={issuer} onChange={(e) => setIssuer(e.target.value)} /></label>
+      <label className="block text-xs">Expires<input type="date" className={field} value={expires} onChange={(e) => setExpires(e.target.value)} required /></label>
+      <button disabled={busy} className="min-h-10 rounded-lg bg-[var(--v-primary)] px-3 text-[11px] font-bold text-[var(--v-primary-foreground)]">{busy ? "Saving…" : "Save licence"}</button>
+      {saved && <p role="status" className="text-xs text-[var(--v-good)]">{saved}</p>}
+      {error && <p role="alert" className="text-xs text-[var(--v-warn)]">{error}</p>}
+    </form>
+  );
+}
+
+function SettingsHistory() {
+  const [rows, setRows] = useState<{ field: string; old_value: string; new_value: string; changed_at: string }[] | null>(null);
+  const [error, setError] = useState("");
+  const load = () => {
+    api.get("/api/v1/owner/settings/history").then((r) => setRows(r.data.history ?? [])).catch(() => setError("Could not load the history of your targets."));
+  };
+  return (
+    <div className="mt-2">
+      {rows == null ? <button type="button" onClick={load} className="min-h-10 text-[11px] font-bold text-[var(--v-primary)]">History of target changes</button> : (
+        rows.length === 0 ? <p className="text-[11px] text-[var(--v-muted-foreground)]">No target has been changed yet.</p> : (
+          <ul className="space-y-1 text-[11px]">{rows.slice(0, 8).map((r, i) => <li key={`${r.field}-${i}`}>{r.field}: {String(r.old_value)} → {String(r.new_value)}</li>)}</ul>
+        )
+      )}
+      {error && <p role="alert" className="text-[11px] text-[var(--v-warn)]">{error}</p>}
+    </div>
   );
 }
 

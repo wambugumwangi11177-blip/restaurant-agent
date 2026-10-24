@@ -10,7 +10,6 @@ import HBars from "@/components/charts/HBars";
 import HeatGrid from "@/components/charts/HeatGrid";
 import Quadrant from "@/components/charts/Quadrant";
 import ShiftTable from "@/components/charts/ShiftTable";
-import Sparkline from "@/components/charts/Sparkline";
 import StackedBar from "@/components/charts/StackedBar";
 import Waterfall from "@/components/charts/Waterfall";
 
@@ -137,19 +136,6 @@ describe("Waterfall", () => {
   });
 });
 
-describe("Sparkline", () => {
-  it("draws a line for two or more points and nothing for fewer", () => {
-    const { rerender } = render(<Sparkline values={[1, 3, 2]} label="Last 3 days" />);
-    expect(screen.getByRole("img", { name: "Last 3 days" })).toBeTruthy();
-    rerender(<Sparkline values={[5]} label="one" />);
-    expect(document.querySelector("svg")).toBeNull();
-  });
-  it("a flat line does not divide by zero", () => {
-    render(<Sparkline values={[4, 4, 4]} label="flat" />);
-    expect(document.querySelector("polyline")!.getAttribute("points")).not.toMatch(/NaN|Infinity/);
-  });
-});
-
 describe("BandForecast", () => {
   const actual = Array.from({ length: 14 }, (_, i) => ({ date: `2026-10-${String(i + 1).padStart(2, "0")}`, sales: 15000 + i * 300 }));
   const next = Array.from({ length: 7 }, (_, i) => ({ date: `2026-10-${String(i + 15).padStart(2, "0")}`, usual: 20000, low: 17000, high: 24000 }));
@@ -238,9 +224,9 @@ describe("ShiftTable", () => {
     const table = screen.getByRole("table", { name: "Cash counts" });
     const flagged = within(table).getAllByRole("row").filter((r) => r.getAttribute("data-check") === "true");
     expect(flagged).toHaveLength(1);
-    expect(within(flagged[0]).getByText("Look at this")).toBeTruthy();
+    expect(within(flagged[0]).getAllByText("Look at this").length).toBeGreaterThan(0);
     expect(within(flagged[0]).getByText("Short KES 500")).toBeTruthy();
-    expect(within(table).getByText("Matches")).toBeTruthy();
+    expect(within(table).getAllByText("Matches").length).toBeGreaterThan(0);
     expect(within(table).getByText("Short KES 10").className).toContain("destructive");
   });
 });

@@ -124,7 +124,7 @@ it("Sales & Dishes: the 30-day outlook is a range, win-back counts the regulars,
 it("Store & Suppliers: the item that went missing is named with how much, how far off, and what it is worth", () => {
   open("store");
   const missing = panel("Missing stock");
-  expect(within(missing).getByText("Beef")).toBeTruthy();
+  expect(within(missing).getAllByText("Beef").length).toBeGreaterThan(0);
   expect(within(missing).getByText("34.2% off")).toBeTruthy();
   expect(missing.textContent).toMatch(/Used 9.91 kg; your sales explain 7.38 kg\. That is 2.53 kg more, worth KES 2,021\./);
   expect(within(missing).getByText(/not a finding about anyone/)).toBeTruthy();

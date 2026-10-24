@@ -20,9 +20,14 @@ export type PnlBlock = Block & {
   missing_costs: { dish: string; units: number; sales: Money }[];
   delivery_commission: { kes: Money; basis: "entered" | "estimated" | "none" };
 };
-export type CostDialsBlock = Block & { food_cost_pct: number; food_cost_target_pct: number; food_cost_word: string; wages_pct: number; wages_target_pct: number; wages_word: string };
+export type CostDialsBlock = Block & {
+  food_cost_pct: number; food_cost_target_pct: number; food_cost_word: string;
+  wages_pct: number | null; wages_target_pct: number; wages_word: string | null;
+  prime_cost_pct?: number | null; prime_cost_target_pct?: number; prime_cost_word?: string | null;
+};
 export type BreakEvenBlock = Block & {
   break_even_kes: Money; sales_today_kes: Money; to_go_kes: Money; covered: boolean; crossed_at: string | null; fixed_per_day_kes: Money; food_cost_pct: number; note: string;
+  curve?: { at: string; sales_kes: Money }[];
   built_from: { label: string; period: string; days: number; fixed_costs_kes: Money; wages_kes: Money; lines: { name: string; kes: Money }[] };
 };
 export type BillsBlock = Block & {
@@ -71,8 +76,8 @@ export type MissingBlock = Block & {
 export type HandoverBlock = Block & { doesnt_match: { item: string; unit: string; store_said: number; kitchen_counted: number; gap: number }[] };
 export type ReorderBlock = Block & {
   tracked: number;
-  least_cover: { item: string; unit: string; left: number; days_left: number | null }[];
-  time_to_reorder: { item: string; unit: string; left: number; status: string }[];
+  least_cover: { item: string; unit: string; left: number; days_left: number | null; reorder_point?: number | null; par?: number | null }[];
+  time_to_reorder: { item: string; unit: string; left: number; status: string; days_left?: number | null; reorder_point?: number | null; par?: number | null }[];
   drafts: { id: number; supplier: string; lines: number }[];
 };
 export type SuppliersBlock = Block & {
@@ -82,7 +87,11 @@ export type SuppliersBlock = Block & {
 };
 
 // ── Cash Check ───────────────────────────────────────────────────────────────
-export type ShiftsBlock = Block & { shifts: { from: string; expected: Money; counted: Money; gap: Money; check: boolean }[] };
+export type ShiftsBlock = Block & {
+  shifts: { from: string; expected: Money; counted: Money; gap: Money; check: boolean; mpesa_gap?: Money | null; cancelled?: number | null; stock_gap?: Money | null; signal?: string | null }[];
+  tenders?: { key: string; label: string; kes: Money }[];
+  tolerance?: { kes: Money; pct: number };
+};
 export type CancelledBlock = Block & { cancelled_last_7_days: number; unusual_cancelling: number; unusual_refunds: number; late_night_activity: number; to_check: number; note: string };
 /** The M-Pesa check (backend/owner/mpesa_match.py): a statement against the M-Pesa sales, over the days the statement covers. */
 export type MpesaBlock = Block & {

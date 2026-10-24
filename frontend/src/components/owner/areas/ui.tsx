@@ -27,12 +27,18 @@ export function BlockFrame({ title, block, children, quiet = false }: {
   );
 }
 
-export function Stat({ label, value, note }: { label: string; value: ReactNode; note?: ReactNode }) {
+export function Stat({ label, value, note, why }: { label: string; value: ReactNode; note?: ReactNode; why?: ReactNode }) {
+  const explanation = why ?? note;
   return (
     <div className="min-w-0">
       <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">{label}</p>
       <p className="font-display mt-0.5 text-lg font-semibold tracking-[-0.02em]">{value}</p>
-      {note && <p className="text-[11px] text-[var(--v-muted-foreground)]">{note}</p>}
+      {explanation && (
+        <details className="mt-0.5">
+          <summary className="cursor-pointer text-[11px] font-semibold text-[var(--v-muted-foreground)]">Why?</summary>
+          <p className="text-[11px] leading-relaxed text-[var(--v-muted-foreground)]">{explanation}</p>
+        </details>
+      )}
     </div>
   );
 }

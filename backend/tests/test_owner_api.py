@@ -162,7 +162,8 @@ def test_golden_week_gives_the_worked_example_percentages(client, db_session, go
     assert dials["food_cost_pct"] == 32.0 and dials["wages_pct"] == 25.0
     assert dials["food_cost_target_pct"] == 35.0 and dials["food_cost_word"] == "Fine"
     assert dials["wages_target_pct"] == 30.0 and dials["wages_word"] == "Fine"
-    assert {a["setting"] for a in dials["assumptions"]} == {"food_cost_target_pct", "labour_target_pct"}
+    assert dials["prime_cost_pct"] == 57.0 and dials["prime_cost_target_pct"] == 62.0 and dials["prime_cost_word"] == "Fine"
+    assert {a["setting"] for a in dials["assumptions"]} == {"food_cost_target_pct", "labour_target_pct", "prime_cost_target_pct"}
     assert dials["assumption"] == dials["assumptions"][0]
     head = body["areas"]["money"]["summary"]
     assert (head["number"], head["unit"], head["word"], head["status"]) == (32.0, "%", "Fine", "good")

@@ -48,6 +48,22 @@ def _inverse_ordinal(value: int, max_value: int) -> float:
     return 1.0 - (value - 1) / (max_value - 1)
 
 
+def score_parts(impact_cents_month: int | None, confidence_pct: int | None, risk: int | None, difficulty: int | None) -> dict:
+    """The 45 / 25 / 15 / 15 split, in points that add up to the score the owner sees."""
+    if confidence_pct is None or risk is None or difficulty is None:
+        return {}
+    raw = [
+        W_IMPACT * _norm_impact(impact_cents_month),
+        W_CONFIDENCE * (confidence_pct / 100.0),
+        W_RISK * _inverse_ordinal(risk, RISK_MAX),
+        W_EASE * _inverse_ordinal(difficulty, DIFFICULTY_MAX),
+    ]
+    total = round(sum(raw) * 100)
+    points = [round(part * 100) for part in raw]
+    points[-1] += total - sum(points)
+    return {"total": total, "money": points[0], "sure": points[1], "safe": points[2], "easy": points[3]}
+
+
 def score(decision: Decision) -> float:
     """Composite desirability of a decision, in [0, 1]."""
     return (

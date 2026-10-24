@@ -1,14 +1,16 @@
 "use client";
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import { Download } from "lucide-react";
 import api from "@/lib/api";
+import { OWNER_DATA_CHANGED } from "@/lib/owner/useOwnerHome";
 import CashRunway from "@/components/charts/CashRunway";
 import BreakEvenClock from "@/components/charts/BreakEvenClock";
+import BreakEvenLine from "@/components/charts/BreakEvenLine";
 import Dial from "@/components/charts/Dial";
 import StackedBar from "@/components/charts/StackedBar";
 import Waterfall, { type Step } from "@/components/charts/Waterfall";
 import { BLOCK_TITLES } from "@/lib/owner/blocks";
-import { kes, plural, shortDay } from "@/lib/owner/format";
+import { kes, pct, plural, shortDay } from "@/lib/owner/format";
 import type { BillsBlock, BreakEvenBlock, CostDialsBlock, PnlBlock, SavingsBlock, SpikesBlock } from "@/lib/owner/areaTypes";
 import type { Area } from "@/lib/owner/types";
 import { BlockFrame, Empty, Grid, Note, Pill, Stat } from "./ui";
@@ -63,6 +65,11 @@ export function Pnl({ block }: { block: PnlBlock }) {
             { key: "o", label: "Other costs", value: share.other_costs ?? 0, color: "var(--v-muted-foreground)" },
             { key: "k", label: "What you kept", value: share.kept ?? 0, color: "var(--v-good)" },
           ]} />
+          <ul className="mt-3 space-y-1 text-[11px] leading-relaxed">
+            <li>Ingredients = {share.ingredients == null ? "not in yet" : pct(share.ingredients)} of sales.</li>
+            <li>Wages = {share.wages == null ? "not in yet" : pct(share.wages)} of sales.</li>
+            <li>Ingredients + wages = {share.ingredients == null || share.wages == null ? "not in yet" : pct(share.ingredients + share.wages)} of sales.</li>
+          </ul>
         </div>
       )}
       {block.sections?.length > 0 && (
@@ -130,9 +137,14 @@ export function ExportButtons({ start }: { start: string }) {
 function Dials({ block }: { block: CostDialsBlock }) {
   return (
     <BlockFrame title={T.cost_dials} block={block}>{() => (<>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <Dial value={block.food_cost_pct} target={block.food_cost_target_pct} label="Out of every KES 100, ingredients" word={block.food_cost_word} tone={tone(block.food_cost_word)} />
-        <Dial value={block.wages_pct} target={block.wages_target_pct} label="Out of every KES 100, wages" word={block.wages_word} tone={tone(block.wages_word)} />
+        {block.wages_pct == null || block.wages_word == null
+          ? <p className="self-center text-xs text-[var(--v-muted-foreground)]">Wages are not in yet.</p>
+          : <Dial value={block.wages_pct} target={block.wages_target_pct} label="Out of every KES 100, wages" word={block.wages_word} tone={tone(block.wages_word)} />}
+        {block.prime_cost_pct == null || block.prime_cost_word == null || block.prime_cost_target_pct == null
+          ? <p className="self-center text-xs text-[var(--v-muted-foreground)]">Ingredients + wages waits until wages are in.</p>
+          : <Dial value={block.prime_cost_pct} target={block.prime_cost_target_pct} label="Out of every KES 100, ingredients and wages" word={block.prime_cost_word} tone={tone(block.prime_cost_word)} />}
       </div>
     </>)}</BlockFrame>
   );
@@ -142,6 +154,7 @@ function Clock({ block }: { block: BreakEvenBlock }) {
   return (
     <BlockFrame title={T.breakeven} block={block}>{() => (<>
       <BreakEvenClock label="Costs covered" breakEven={block.break_even_kes} soldSoFar={block.sales_today_kes} coveredAt={block.crossed_at} />
+      {block.curve && block.curve.length > 0 && <div className="mt-3"><BreakEvenLine points={block.curve.map((p) => ({ at: p.at, sales: p.sales_kes }))} breakEven={block.break_even_kes} coveredAt={block.crossed_at} toGo={block.to_go_kes} /></div>}
       <p className="mt-3 text-xs">Your fixed costs come to <b>{kes(block.fixed_per_day_kes)} a day</b>. Built from {block.built_from.label}.</p>
       <details className="mt-1">
         <summary className="flex min-h-10 cursor-pointer items-center text-[11px] font-semibold text-[var(--v-muted-foreground)]">What is in it</summary>
@@ -153,7 +166,7 @@ function Clock({ block }: { block: BreakEvenBlock }) {
 }
 
 function Bills({ block }: { block: BillsBlock }) {
-  return (
+  return (<>
     <BlockFrame title={T.bills} block={block}>{() => (<div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
       <CashRunway label="Cash over the next 30 days" days={block.days.map((d) => ({ date: d.date, balance: d.balance_kes, bills: d.bills_kes }))} />
       <div>
@@ -173,6 +186,77 @@ function Bills({ block }: { block: BillsBlock }) {
       {block.notes?.map((n) => <Note key={n}>{n}</Note>)}
       </div>
     </div>)}</BlockFrame>
+    <BillForm />
+  </>);
+}
+
+const field = "mt-1 block min-h-11 w-full rounded-lg border border-[var(--v-border)] bg-[var(--v-card)] px-3 text-sm";
+
+function BillForm() {
+  const [open, setOpen] = useState(false);
+  const [categories, setCategories] = useState<{ key: string; name: string; id: number }[]>([]);
+  const [name, setName] = useState("Rent");
+  const [category, setCategory] = useState("premises");
+  const [amount, setAmount] = useState("");
+  const [frequency, setFrequency] = useState("monthly");
+  const [dueDay, setDueDay] = useState("1");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState("");
+  const load = () => {
+    setOpen(true);
+    api.get("/api/v1/owner/money/categories").then((r) => setCategories(r.data.categories ?? [])).catch(() => setError("Could not load cost lines."));
+  };
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true); setError(""); setSaved("");
+    try {
+      await api.post("/api/v1/owner/money/bills", { name, category, amount_kes: Number(amount), frequency, due_day: Number(dueDay) });
+      setSaved(`${name} will show under bills and on Coming up.`);
+      setAmount("");
+      window.dispatchEvent(new Event(OWNER_DATA_CHANGED));
+    } catch {
+      setError("Could not save that bill. Check the amount and the day it falls due.");
+    } finally { setBusy(false); }
+  };
+  const rename = async (id: number, next: string) => {
+    await api.patch(`/api/v1/owner/money/categories/${id}`, { name: next });
+    setCategories((rows) => rows.map((c) => c.id === id ? { ...c, name: next } : c));
+  };
+  if (!open) return <button type="button" onClick={load} className="min-h-10 text-[11px] font-bold text-[var(--v-primary)]">Add rent or a recurring bill</button>;
+  return (
+    <form onSubmit={save} className="space-y-3 rounded-lg border border-[var(--v-border)] bg-[var(--v-bg)] p-3.5">
+      <h4 className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">Add a recurring bill</h4>
+      <label className="block text-xs">Name<input className={field} value={name} onChange={(e) => setName(e.target.value)} required /></label>
+      <label className="block text-xs">Cost line
+        <select className={field} value={category} onChange={(e) => setCategory(e.target.value)}>
+          {categories.length === 0 && <option value="premises">Rent & premises</option>}
+          {categories.map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
+        </select>
+      </label>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="text-xs">Amount (KES)<input className={field} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} required /></label>
+        <label className="text-xs">How often
+          <select className={field} value={frequency} onChange={(e) => setFrequency(e.target.value)}>
+            <option value="weekly">Every week</option>
+            <option value="monthly">Every month</option>
+            <option value="yearly">Every year</option>
+          </select>
+        </label>
+        <label className="text-xs">Due day<input className={field} inputMode="numeric" value={dueDay} onChange={(e) => setDueDay(e.target.value)} required /></label>
+      </div>
+      <button disabled={busy} className="min-h-10 rounded-lg bg-[var(--v-primary)] px-3 text-[11px] font-bold text-[var(--v-primary-foreground)]">{busy ? "Saving…" : "Save bill"}</button>
+      {saved && <p role="status" className="text-xs text-[var(--v-good)]">{saved}</p>}
+      {error && <p role="alert" className="text-xs text-[var(--v-warn)]">{error}</p>}
+      {categories.length > 0 && (
+        <details>
+          <summary className="cursor-pointer text-[11px] font-semibold">Rename a cost line</summary>
+          <ul className="mt-2 space-y-1">{categories.filter((c) => !c.key || true).slice(0, 8).map((c) => (
+            <li key={c.id}><button type="button" className="text-[11px] font-semibold text-[var(--v-primary)]" onClick={() => { const next = window.prompt("Name for this cost line", c.name); if (next && next !== c.name) void rename(c.id, next); }}>Rename {c.name}</button></li>
+          ))}</ul>
+        </details>
+      )}
+    </form>
   );
 }
 

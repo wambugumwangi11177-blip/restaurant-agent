@@ -89,6 +89,8 @@ export type DecisionCard = {
   assumption: Assumption | null;
   decision: { options: string[] } | null;
   tier: CardTier;
+  /** 45 / 25 / 15 / 15 points. Present when the card has a confidence, a risk and a difficulty. */
+  score?: { total: number; money: number; sure: number; safe: number; easy: number };
 };
 
 export type RankedCard = Pick<DecisionCard, "id" | "domain" | "sentence" | "kes_month" | "tier">;
@@ -96,7 +98,7 @@ export type RankedCard = Pick<DecisionCard, "id" | "domain" | "sentence" | "kes_
 export type CostingYouMoney = Block & { cards: DecisionCard[]; ranked: RankedCard[]; more: number; ranking: string };
 
 export type HealthStatus = "good" | "watch" | "bad" | "unknown";
-export type HealthTile = Partial<Block> & { area: AreaKey; title: string; number: number | null; unit: string; word: string; status: HealthStatus; label: string };
+export type HealthTile = Partial<Block> & { area: AreaKey; title: string; number: number | null; unit: string; word: string; status: HealthStatus; label: string; rule?: string };
 export type Health = Block & { tiles: HealthTile[] };
 
 export const AREA_KEYS = ["money", "sales_dishes", "store", "cash", "staff", "permits"] as const;

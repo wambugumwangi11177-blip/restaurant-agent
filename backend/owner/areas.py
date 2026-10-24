@@ -88,13 +88,17 @@ def _money_cost_dials(ctx: OwnerContext) -> dict:
     profit, labor = _profit(ctx)["summary"], _labor(ctx)["summary"]
     food = profit.get("food_cost_pct") or 0.0
     wages = labor.get("labor_pct") if labor.get("labor_status") != "NO_DATA" else None
+    prime = None if wages is None else round(float(food) + float(wages), 1)
     return {**base,
             "food_cost_pct": food, "food_cost_target_pct": s.food_cost_target_pct,
             "food_cost_word": {"HEALTHY": "Fine", "WARNING": "Watch", "CRITICAL": "High"}.get(profit.get("food_cost_status"), "Not set up"),
             "wages_pct": wages, "wages_target_pct": s.labour_target_pct,
             "wages_word": None if wages is None else ("Fine" if wages <= s.labour_target_pct else "High"),
+            "prime_cost_pct": prime, "prime_cost_target_pct": s.prime_cost_target_pct,
+            "prime_cost_word": None if prime is None else ("Fine" if prime <= s.prime_cost_target_pct else "High"),
             "assumptions": [assume("food_cost_target_pct", s.food_cost_target_pct, label="Ingredient cost target"),
-                            assume("labour_target_pct", s.labour_target_pct, label="Wages target")],
+                            assume("labour_target_pct", s.labour_target_pct, label="Wages target"),
+                            assume("prime_cost_target_pct", s.prime_cost_target_pct, label="Ingredients + wages target")],
             "assumption": assume("food_cost_target_pct", s.food_cost_target_pct, label="Ingredient cost target")}
 
 
@@ -132,6 +136,7 @@ def breakeven_summary(ctx: OwnerContext) -> dict:
             "to_go_kes": kes(progress["to_go_cents"]), "covered": progress["crossed_at"] is not None,
             "crossed_at": _hhmm(progress["crossed_at"]) if progress["crossed_at"] else None,
             "fixed_per_day_kes": kes(be["fixed_per_day_cents"]), "food_cost_pct": be["food_cost_pct"],
+            "curve": [{"at": _hhmm(p["at"]), "sales_kes": kes(p["sales_cents"])} for p in progress.get("points", [])],
             "built_from": {"label": basis["label"], "period": basis["kind"], "days": basis["days"], "fixed_costs_kes": kes(basis["fixed_costs_cents"]),
                            "wages_kes": kes(basis["labour_fixed_cents"]), "lines": [{"name": l["name"], "kes": kes(l["amount_cents"])} for l in basis["fixed_lines"]]},
             "note": "Gas, packaging and other costs that move with sales are not counted, so the real figure is a little higher.",
@@ -439,11 +444,13 @@ def _reorder(ctx: OwnerContext) -> dict:
         models.InventoryItem.restaurant_id == ctx.rid).order_by(models.StockMovement.created_at.desc()).first()
     return {**ctx.entered_state(latest[0] if latest else None, empty="Stock levels recorded, no movements yet."),
             "tracked": len(preds["predictions"]),
-            "least_cover": [{"item": p["name"], "unit": p["unit"], "left": p["current_stock"], "days_left": p.get("days_until_depletion")}
+            "least_cover": [{"item": p["name"], "unit": p["unit"], "left": p["current_stock"], "days_left": p.get("days_until_depletion"),
+                              "reorder_point": p.get("reorder_point"), "par": p.get("low_stock_threshold")}
                             for p in sorted((p for p in preds["predictions"] if p.get("days_until_depletion") is not None),
                                             key=lambda p: p["days_until_depletion"])[:5]],
             "time_to_reorder": [{"item": p["name"], "unit": p["unit"], "left": p["current_stock"], "status": p["status"],
-                                 "days_left": p.get("days_until_depletion")} for p in items[:10]],
+                                 "days_left": p.get("days_until_depletion"), "reorder_point": p.get("reorder_point"),
+                                 "par": p.get("low_stock_threshold")} for p in items[:10]],
             "drafts": [{"item": c.item_name, "unit": c.unit, "order": c.adjusted_quantity, "supplier": c.supplier_name} for c in drafts[:10]]}
 
 
@@ -485,6 +492,32 @@ def store_area(ctx: OwnerContext) -> tuple[dict, dict]:
 # Cash Check
 # ═════════════════════════════════════════════════════════════════════════════
 
+def _today_tenders(ctx: OwnerContext) -> list[dict]:
+    """Paid sales in the open trading day, split by how the guest paid. The same paid orders Home's sales use."""
+    from time_utils import trading_window
+    lo, hi, _day = trading_window("today", ctx.now)
+    grouped = ctx.db.query(models.Order.payment_method, func.sum(models.Order.total)).filter(
+        models.Order.restaurant_id == ctx.rid, models.Order.is_paid.is_(True),
+        models.Order.status != models.OrderStatus.CANCELLED,
+        models.Order.created_at >= lo, models.Order.created_at < hi).group_by(models.Order.payment_method).all()
+    labels = {"cash": "Cash", "mpesa": "M-Pesa", "card": "Card"}
+    out = []
+    for method, total in grouped:
+        key = method.value if hasattr(method, "value") else str(method or "")
+        if key not in labels:
+            continue
+        out.append({"key": key, "label": labels[key], "kes": kes(int(total or 0))})
+    order = {"cash": 0, "mpesa": 1, "card": 2}
+    out.sort(key=lambda row: order[row["key"]])
+    return out
+
+
+def _shift_extras(ctx: OwnerContext) -> dict[int, dict]:
+    """The full shift columns (M-Pesa gap, cancelled, stock gap) from the same report /planning used to draw."""
+    from owner.planning import shifts as planning_shifts
+    return {row["id"]: row for row in planning_shifts(ctx).get("shifts") or []}
+
+
 def _shifts(ctx: OwnerContext) -> dict:
     from ai.cash_reconciliation.intelligence import drawer_tolerance_cents
     rows = ctx.db.query(models.CashDrawerCount).filter(
@@ -493,16 +526,26 @@ def _shifts(ctx: OwnerContext) -> dict:
     latest = ctx.db.query(models.CashDrawerCount.counted_at).filter(models.CashDrawerCount.restaurant_id == ctx.rid).order_by(
         models.CashDrawerCount.counted_at.desc()).first()
     base = ctx.entered_state(latest[0] if latest else None, empty="No cash counts entered yet.")
-    if base["state"] == "no_data":
-        return base
     s = ctx.settings
-    return {**base, "shifts": [{"from": r.window_start.isoformat(), "expected": kes(r.expected_amount_cents), "counted": kes(r.counted_amount_cents),
-                                "gap": kes(r.counted_amount_cents - r.expected_amount_cents),
-                                "check": abs(r.counted_amount_cents - r.expected_amount_cents) > drawer_tolerance_cents(r.expected_amount_cents, s)}
-                               for r in rows],
-            "assumptions": [assume("cash_tolerance_kes", s.cash_tolerance_cents // 100, label="Cash count difference we accept"),
-                            assume("cash_tolerance_pct", s.cash_tolerance_pct, label="…or this share of takings")],
-            "assumption": assume("cash_tolerance_kes", s.cash_tolerance_cents // 100, label="Cash count difference we accept")}
+    extras = _shift_extras(ctx) if rows else {}
+    tenders = _today_tenders(ctx)
+    tolerance = {"kes": s.cash_tolerance_cents // 100, "pct": s.cash_tolerance_pct}
+    assumptions = [assume("cash_tolerance_kes", s.cash_tolerance_cents // 100, label="Cash count difference we accept"),
+                   assume("cash_tolerance_pct", s.cash_tolerance_pct, label="…or this share of takings")]
+    if base["state"] == "no_data":
+        return {**base, "shifts": [], "tenders": tenders, "tolerance": tolerance,
+                "assumptions": assumptions, "assumption": assumptions[0]}
+    shifts = []
+    for r in rows:
+        gap_cents = r.counted_amount_cents - r.expected_amount_cents
+        check = abs(gap_cents) > drawer_tolerance_cents(r.expected_amount_cents, s)
+        extra = extras.get(r.id, {})
+        shifts.append({"from": r.window_start.isoformat(), "expected": kes(r.expected_amount_cents), "counted": kes(r.counted_amount_cents),
+                       "gap": kes(gap_cents), "check": check,
+                       "mpesa_gap": extra.get("mpesa_unmatched_kes"), "cancelled": extra.get("cancelled_sales"),
+                       "stock_gap": extra.get("stock_gap"), "signal": "Look at this" if check else "Matches"})
+    return {**base, "shifts": shifts, "tenders": tenders, "tolerance": tolerance,
+            "assumptions": assumptions, "assumption": assumptions[0]}
 
 
 def _cancelled_sales(ctx: OwnerContext) -> dict:

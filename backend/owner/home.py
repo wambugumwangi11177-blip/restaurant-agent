@@ -92,9 +92,14 @@ def _rank(cards: list[dict]) -> list[dict]:
 
 
 def _card(c: dict) -> dict:
-    return {"id": c["id"], "domain": c["domain"], "sentence": c["title"], "kes_month": kes(c.get("impact_cents_month") or None),
+    from ai.decisions.ranking import score_parts
+    score = score_parts(c.get("impact_cents_month"), c.get("confidence_pct"), c.get("risk"), c.get("difficulty"))
+    card = {"id": c["id"], "domain": c["domain"], "sentence": c["title"], "kes_month": kes(c.get("impact_cents_month") or None),
             "action": c.get("what_to_do", ""), "why": c.get("why", ""), "assumption": c.get("assumption"),
             "decision": {"options": DECISION_OPTIONS}, "tier": "now" if c.get("now") else ("loss" if c.get("kind") == "loss" else "idea")}
+    if score:
+        card["score"] = score
+    return card
 
 
 def ranked_cards(ctx: OwnerContext) -> list[dict]:
@@ -134,7 +139,7 @@ def _coming_up(ctx: OwnerContext) -> dict:
         "bills": ctx.safe("coming_up.bills", lambda: areas.bills_due_block(ctx)),
         "licences": ctx.safe("coming_up.licences", lambda: areas.licences_due_block(ctx)),
         "deliveries": block("as_entered" if deliveries else "no_data", as_of=ctx.now, reason=None if deliveries else "No deliveries expected.",
-                            items=[{"item": d.inventory_item.item_name if d.inventory_item else "", "supplier": d.supplier.name if d.supplier else "",
+                            items=[{"item": (d.inventory_item.item_name if d.inventory_item else "") or (d.notes or "Delivery"), "supplier": d.supplier.name if d.supplier else "",
                                     "expected_at": iso(d.expected_at), "status": d.status} for d in deliveries]),
         "bookings": _bookings(ctx, bookings["covers_today"]),
     }

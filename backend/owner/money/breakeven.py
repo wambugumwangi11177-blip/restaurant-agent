@@ -93,8 +93,19 @@ def todays_progress(db: Session, restaurant_id: int, break_even_cents: int, toda
         models.Order.restaurant_id == restaurant_id, models.Order.is_paid.is_(True), models.Order.status != models.OrderStatus.CANCELLED,
         models.Order.created_at >= lo, models.Order.created_at < hi).order_by(models.Order.created_at, models.Order.id).all()
     running, crossed_at = 0, None
+    points = [{"at": lo, "sales_cents": 0}]
     for created_at, total in rows:
         running += int(total or 0)
         if crossed_at is None and running >= break_even_cents:
             crossed_at = created_at
-    return {"sales_so_far_cents": running, "crossed_at": crossed_at, "to_go_cents": max(break_even_cents - running, 0)}
+        points.append({"at": created_at, "sales_cents": running})
+    if len(points) > 24:
+        step = max(1, len(points) // 24)
+        sampled = points[::step]
+        if sampled[-1] is not points[-1]:
+            sampled.append(points[-1])
+        if crossed_at is not None and not any(p["at"] == crossed_at for p in sampled):
+            sampled.append(next(p for p in points if p["at"] == crossed_at))
+            sampled.sort(key=lambda p: (p["at"], p["sales_cents"]))
+        points = sampled
+    return {"sales_so_far_cents": running, "crossed_at": crossed_at, "to_go_cents": max(break_even_cents - running, 0), "points": points}

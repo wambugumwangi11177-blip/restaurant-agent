@@ -3,7 +3,10 @@ import { useState } from "react";
 import { kes } from "@/lib/owner/format";
 import ChartEmpty, { isEmpty, type ChartStateProps } from "./ChartEmpty";
 
-export type ShiftRow = { key: string; when: string; expected: number; counted: number; gap: number; check: boolean };
+export type ShiftRow = {
+  key: string; when: string; expected: number; counted: number; gap: number; check: boolean;
+  mpesaGap?: number | null; cancelled?: number | null; stockGap?: number | null; signal?: string | null;
+};
 
 type Props = ChartStateProps & {
   rows: ShiftRow[];
@@ -22,7 +25,16 @@ export default function ShiftTable({ rows, label, initial = 8, state, reason, da
     <div className="overflow-x-auto">
       <table aria-label={label} className="w-full text-left text-xs">
         <thead className="text-[10px] uppercase tracking-[0.1em] text-[var(--v-muted-foreground)]">
-          <tr><th scope="col" className="py-1.5 pr-2 font-bold">Shift</th><th scope="col" className="px-1 text-right font-bold sm:px-2">Should hold</th><th scope="col" className="px-1 text-right font-bold sm:px-2">Counted</th><th scope="col" className="pl-2 text-right font-bold">Difference</th></tr>
+          <tr>
+            <th scope="col" className="py-1.5 pr-2 font-bold">Shift</th>
+            <th scope="col" className="px-1 text-right font-bold sm:px-2">Should hold</th>
+            <th scope="col" className="px-1 text-right font-bold sm:px-2">Counted</th>
+            <th scope="col" className="px-1 text-right font-bold sm:px-2">Difference</th>
+            <th scope="col" className="px-1 text-right font-bold sm:px-2">M-Pesa gap</th>
+            <th scope="col" className="px-1 text-right font-bold sm:px-2">Cancelled</th>
+            <th scope="col" className="px-1 text-right font-bold sm:px-2">Stock gap</th>
+            <th scope="col" className="pl-2 text-right font-bold">Signal</th>
+          </tr>
         </thead>
         <tbody>
           {shown.map((r) => (
@@ -30,7 +42,11 @@ export default function ShiftTable({ rows, label, initial = 8, state, reason, da
               <th scope="row" className="py-2 pr-2 font-semibold">{r.when}{r.check && <span className="ml-2 rounded-full bg-[var(--v-destructive)] px-1.5 py-0.5 text-[9px] font-bold text-white">Look at this</span>}</th>
               <td className="px-1 text-right tabular-nums sm:px-2">{kes(r.expected)}</td>
               <td className="px-1 text-right tabular-nums sm:px-2">{kes(r.counted)}</td>
-              <td className={`pl-2 text-right font-semibold tabular-nums ${r.gap < 0 ? "text-[var(--v-destructive)]" : r.gap > 0 ? "text-[var(--v-primary)]" : "text-[var(--v-muted-foreground)]"}`}>{r.gap === 0 ? "Matches" : `${r.gap < 0 ? "Short " : "Over "}${kes(Math.abs(r.gap))}`}</td>
+              <td className={`px-1 text-right font-semibold tabular-nums sm:px-2 ${r.gap < 0 ? "text-[var(--v-destructive)]" : r.gap > 0 ? "text-[var(--v-primary)]" : "text-[var(--v-muted-foreground)]"}`}>{r.gap === 0 ? "Matches" : `${r.gap < 0 ? "Short " : "Over "}${kes(Math.abs(r.gap))}`}</td>
+              <td className="px-1 text-right tabular-nums sm:px-2">{r.mpesaGap == null ? "Not recorded" : kes(r.mpesaGap)}</td>
+              <td className="px-1 text-right tabular-nums sm:px-2">{r.cancelled == null ? "Not recorded" : r.cancelled}</td>
+              <td className="px-1 text-right tabular-nums sm:px-2">{r.stockGap == null ? "Not recorded" : kes(r.stockGap)}</td>
+              <td className="pl-2 text-right">{r.signal ?? (r.check ? "Look at this" : "Matches")}</td>
             </tr>
           ))}
         </tbody>

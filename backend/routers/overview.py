@@ -226,6 +226,8 @@ def _decision_cards(db: Session, rid: int, source_status: dict | None = None, li
             # Surfaced so the UI can show WHY this is first, not just that it is.
             "priority_score": d.get("priority_score"),
             "confidence_pct": d.get("confidence_pct"),
+            "risk": d.get("risk"),
+            "difficulty": d.get("difficulty"),
             # The owner setting the number rests on ({setting, value, label}), or None.
             "assumption": (d.get("meta") or {}).get("assumption"),
             "kind": (d.get("meta") or {}).get("kind"),

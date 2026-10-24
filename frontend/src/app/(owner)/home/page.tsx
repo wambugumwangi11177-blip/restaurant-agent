@@ -14,6 +14,7 @@ import InsightNote from "@/components/owner/InsightNote";
 import ReadNote from "@/components/owner/home/ReadNote";
 import SourceWaiting from "@/components/owner/home/SourceWaiting";
 import TargetsOnboarding from "@/components/owner/home/TargetsOnboarding";
+import HowItWorks from "@/components/owner/explain/HowItWorks";
 import Section from "@/components/owner/Section";
 import { useAuth } from "@/context/AuthContext";
 import { greeting } from "@/lib/owner/format";
@@ -21,7 +22,7 @@ import type { OwnerHome } from "@/lib/owner/types";
 import { useOwnerHome } from "@/lib/owner/useOwnerHome";
 import { tenantConfig } from "@/lib/tenantConfig";
 
-const PERIODS: { key: OwnerHome["period"]; label: string }[] = [{ key: "today", label: "Today" }, { key: "7d", label: "7 days" }, { key: "30d", label: "30 days" }];
+const PERIODS: { key: OwnerHome["period"]; label: string }[] = [{ key: "today", label: "Today" }, { key: "7d", label: "Last 7 days" }, { key: "30d", label: "Last 30 days" }];
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -66,6 +67,7 @@ export default function HomePage() {
           <Section id="health" eyebrow="How is each part doing?" title="Your restaurant's health"><HealthStrip health={home.health} /></Section>
           <Section id="areas" eyebrow="Open any part for the detail" title="The six areas"><AreaPanels areas={home.areas} opensOn={firstWeek.active ? lockedAreas(ageDays) : {}} /></Section>
           <Section id="coming-up" eyebrow="Before it surprises you" title="Coming up"><ComingUp data={home.coming_up} /></Section>
+          <Section id="how" eyebrow="The pictures from the guide" title="How LEVIII works"><HowItWorks home={home} /></Section>
           <InsightNote insight={home.insight} />
           <ReadNote read={home.read} />
         </>

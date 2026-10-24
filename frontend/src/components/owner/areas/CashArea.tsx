@@ -1,6 +1,11 @@
 "use client";
+import CheckMatrix from "@/components/charts/CheckMatrix";
+import HBars from "@/components/charts/HBars";
 import HeatGrid from "@/components/charts/HeatGrid";
 import ShiftTable from "@/components/charts/ShiftTable";
+import TenderMix from "@/components/charts/TenderMix";
+import ThreeWayMatch, { leg } from "@/components/charts/ThreeWayMatch";
+import ToleranceCurve from "@/components/charts/ToleranceCurve";
 import { BLOCK_TITLES } from "@/lib/owner/blocks";
 import { kes, nairobiTime, shortDay, toDate, weekday } from "@/lib/owner/format";
 import type { BelowMenuPriceBlock, CancelledBlock, MpesaBlock, PatternsBlock, ShiftsBlock } from "@/lib/owner/areaTypes";
@@ -14,7 +19,7 @@ export default function CashArea({ area }: { area: Area }) {
   const b = area.blocks;
   return (
     <div className="space-y-3">
-      <Shifts block={b.shifts as ShiftsBlock} />
+      <Shifts block={b.shifts as ShiftsBlock} cancelled={(b.cancelled_sales as CancelledBlock).cancelled_last_7_days} pricedUnder={(b.below_menu_price as BelowMenuPriceBlock).dishes?.length} />
       <div className="grid gap-3 md:grid-cols-2">
         <Cancelled block={b.cancelled_sales as CancelledBlock} />
         <BelowMenu block={b.below_menu_price as BelowMenuPriceBlock} />
@@ -72,13 +77,39 @@ function Mpesa({ block }: { block: MpesaBlock }) {
   );
 }
 
-function Shifts({ block }: { block: ShiftsBlock }) {
+function Shifts({ block, cancelled, pricedUnder }: { block: ShiftsBlock; cancelled?: number; pricedUnder?: number }) {
   const day = (iso: string) => { const d = toDate(iso); const local = new Date(d.getTime() + 3 * 3600_000).toISOString().slice(0, 10); return `${weekday(local)} ${shortDay(local)}, ${nairobiTime(iso)}`; };
+  const latest = block.shifts?.[0];
+  const legs = latest ? [leg("cash", "Cash", latest.counted, latest.expected, latest.check)].filter((x) => x != null) : [];
+  if (latest?.mpesa_gap != null) {
+    const mpesa = leg("mpesa", "M-Pesa", 0, latest.mpesa_gap, latest.mpesa_gap > 0);
+    if (mpesa) legs.push({ ...mpesa, left: "On the statement", right: kes(latest.mpesa_gap) + " not matched", gap: kes(latest.mpesa_gap), look: latest.mpesa_gap > 0 });
+  }
   return (
-    <BlockFrame title={T.shifts} block={block}>{() => (<>
-      <ShiftTable label="Each cash count against what the till says" rows={block.shifts.map((s) => ({ key: s.from, when: day(s.from), expected: s.expected, counted: s.counted, gap: s.gap, check: s.check }))} />
-      <Note>A difference smaller than what you accept is not flagged.</Note>
-    </>)}</BlockFrame>
+    <div className="space-y-3">
+      <BlockFrame title="How the money came in" block={{ ...block, state: (block.tenders?.length ? block.state === "no_data" ? "live" : block.state : "no_data") as ShiftsBlock["state"], reason: "Paid sales today will split into cash, M-Pesa and card once an order is taken." }}>{() => (
+        <TenderMix tenders={block.tenders ?? []} />
+      )}</BlockFrame>
+      <BlockFrame title={T.shifts} block={block}>{() => (<>
+        <ShiftTable label="Each cash count against what the till says" rows={(block.shifts ?? []).map((s) => ({ key: s.from, when: day(s.from), expected: s.expected, counted: s.counted, gap: s.gap, check: s.check, mpesaGap: s.mpesa_gap, cancelled: s.cancelled, stockGap: s.stock_gap, signal: s.signal }))} />
+        <Note>A difference smaller than what you accept is not flagged.</Note>
+      </>)}</BlockFrame>
+      {block.state !== "no_data" && block.state !== "unavailable" && block.state !== "learning" && (
+        <div className="space-y-3">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ThreeWayMatch legs={legs} />
+            <ToleranceCurve toleranceKes={block.tolerance?.kes ?? 0} tolerancePct={block.tolerance?.pct ?? 0} dots={(block.shifts ?? []).map((s) => ({ key: s.from, expected: s.expected, gap: s.gap, label: day(s.from) }))} />
+          </div>
+          <div>
+            <p className="mb-1 text-[11px] font-bold">The trick a count catches</p>
+            {latest?.check
+              ? <p className="text-xs">The latest count was {kes(Math.abs(latest.gap))} {latest.gap < 0 ? "short" : "over"}. A short drawer with no cancelled sale and no M-Pesa gap is the usual trick: cash taken and the sale left off, or the sale rung and the cash kept.</p>
+              : <p className="text-xs text-[var(--v-muted-foreground)]">When a count sits outside what you accept, this names the trick that count is built to catch. Nothing is outside the line right now.</p>}
+          </div>
+          <CheckMatrix counts={{ cash: (block.shifts ?? []).filter((s) => s.check).length, cancelled: cancelled ?? 0, mpesa: (block.shifts ?? []).filter((s) => (s.mpesa_gap ?? 0) > 0).length, price: pricedUnder ?? 0, stock: (block.shifts ?? []).filter((s) => (s.stock_gap ?? 0) > 0).length }} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -97,13 +128,14 @@ function Cancelled({ block }: { block: CancelledBlock }) {
 function BelowMenu({ block }: { block: BelowMenuPriceBlock }) {
   return (
     <BlockFrame title={T.below_menu_price} block={block}>{() => (<>
-      {block.dishes.length === 0 ? <Empty>Every dish was charged its menu price.</Empty> : (
-        <ul className="space-y-2.5 text-xs">
+      {block.dishes.length === 0 ? <Empty>Every dish was charged its menu price.</Empty> : (<>
+        <HBars label="What charging under the menu price costs in a month" rows={block.dishes.map((d) => ({ key: d.dish, label: d.dish, value: d.month_loss, valueLabel: kes(d.month_loss), note: `Menu ${kes(d.menu_price)}, charged ${kes(d.charged)}` }))} />
+        <ul className="mt-3 space-y-2.5 text-xs">
           {block.dishes.map((d) => (
             <li key={d.dish}><div className="flex justify-between gap-3"><b>{d.dish}</b><Pill tone="warn">{d.below_pct}% under</Pill></div><p className="text-[var(--v-muted-foreground)]">Menu {kes(d.menu_price)}, charged {kes(d.charged)} — about {kes(d.month_loss)} a month. A reason to check the till, not a finding about anyone.</p></li>
           ))}
         </ul>
-      )}
+      </>)}
     </>)}</BlockFrame>
   );
 }

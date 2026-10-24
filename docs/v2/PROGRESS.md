@@ -10,6 +10,8 @@ C. Pytest strips provider keys (including after `load_dotenv` reads `backend/.en
 D. Reseeding demo staff does not re-hash a password that already matches the env value, so the determinism check does not depend on whether those passwords are set locally.
 E. A no-show count given to the narrator names the span it was counted over. Dish names sent to a model drop a trailing portion count (`Samosa (2)`); a qualifier such as `(goat)` stays. The offline queue is still stored as `chakula-offline`.
 
+Validation (23 Oct, this tree, no provider keys in the environment): backend `LOG_FORMAT=plain pytest` **2241 passed, 1 skipped**. Frontend: `tsc --noEmit` clean, vitest **239 passed**, `next build` succeeded (74 routes). No new migration. No production database was touched.
+
 # Eleven demo — insight beside the figures — 23 October 2026
 
 Branch `dev/eleven-demo-fixes`. No production writes, no deploy, no provider-secret changes. No new migration.

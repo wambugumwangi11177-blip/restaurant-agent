@@ -4,7 +4,8 @@ import { ChefHat, ShoppingBag, UtensilsCrossed, Package, LifeBuoy } from "lucide
 import TierLayoutShell from "@/components/staff/TierLayoutShell";
 
 const NAV = [
-    { href: "/staff/kitchen", label: "Kitchen", icon: ChefHat },
+    { href: "/staff/kitchen", label: "Daily work", icon: ChefHat },
+    { href: "/staff/kitchen/recipes", label: "Recipes & yield", icon: UtensilsCrossed },
     { href: "/staff/kitchen/orders", label: "Orders", icon: ShoppingBag },
     // Directive 017's kitchen "pull" requisition — request an ingredient
     // from the store and confirm what arrives. Backend has always allowed
@@ -16,7 +17,7 @@ const NAV = [
 
 export default function KitchenLayout({ children }: { children: React.ReactNode }) {
     return (
-        <TierLayoutShell tier="kitchen" tierLabel="Kitchen" navItems={NAV}>
+        <TierLayoutShell tier="kitchen" tierLabel="Chef" navItems={NAV}>
             {children}
         </TierLayoutShell>
     );

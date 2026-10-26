@@ -74,6 +74,9 @@ def review(ctx):
                        'unit': unit, 'first_kes': kes(first.cost_per_unit), 'latest_kes': kes(latest.cost_per_unit),
                        'change_pct': round((latest.cost_per_unit / first.cost_per_unit - 1) * 100, 1),
                        'deliveries': len(orders), 'from': first.delivered_at.isoformat(), 'to': latest.delivered_at.isoformat()})
+    from owner.daily import location_issues
+    flagged=set(location_issues(ctx.db,ctx.rid))
+    for row in rows:row['needs_location_review']=row['id'] in flagged
     latest_entry = max([m.created_at for group in movements.values() for m in group] +
                        [d for group in counts.values() for d in group], default=None)
     return {'state': 'as_entered' if items else 'no_data', 'as_of': ctx.now.isoformat(),

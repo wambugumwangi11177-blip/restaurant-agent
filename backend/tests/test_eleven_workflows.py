@@ -139,12 +139,12 @@ def test_offline_count_cannot_overwrite_later_movement(client,db_session,scoped_
     db_session.refresh(stock);assert stock.quantity==2
 
 
-def test_controller_can_count_but_cannot_issue(client,db_session,scoped_owner,setup_menu):
+def test_controller_can_count_and_issue_for_client_responsibility(client,db_session,scoped_owner,setup_menu):
     user,h=scoped_owner;stock,_=setup_menu
     user.role=models.Role.STAFF;user.staff_role=models.StaffRole.CONTROLLER;db_session.commit()
-    body={'restaurant_id':202,'entry_key':'controller-key','kind':'issue','inventory_item_id':stock.id,'quantity':1,'note':'Not permitted'}
-    assert client.post('/api/v1/owner/operations/entries',headers=h,json=body).status_code==403
-    body['kind']='count'
+    body={'restaurant_id':202,'entry_key':'controller-key','kind':'issue','inventory_item_id':stock.id,'quantity':1,'note':'Kitchen issue by accountant'}
+    assert client.post('/api/v1/owner/operations/entries',headers=h,json=body).status_code==201
+    body['kind']='count';body['entry_key']='controller-count-key'
     assert client.post('/api/v1/owner/operations/entries',headers=h,json=body).status_code==201
 
 

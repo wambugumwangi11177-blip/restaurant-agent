@@ -17,7 +17,7 @@ interface EditForm {
 interface MenuItemRowProps {
     item: MenuItem;
     idx: number;
-    aiItem: MenuAiItem;
+    aiItem?: MenuAiItem;
     classColor: (c: string) => string;
     classLabel: (c: string) => string;
     editingId: number | null;
@@ -79,9 +79,9 @@ export default function MenuItemRow({
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    {aiItem?.margin_pct !== undefined && (
+                    {aiItem?.margin_pct != null && (
                         <span className={`text-[10px] ${aiItem.margin_pct >= 60 ? "text-success" : aiItem.margin_pct >= 30 ? "text-text-muted" : "text-danger"
-                            }`}>{aiItem.margin_pct.toFixed(0)}% profit</span>
+                            }`}>{aiItem.margin_pct.toFixed(0)}% after ingredients</span>
                     )}
                     <span className="text-sm font-semibold text-accent">
                         KES {(item.price / 100).toLocaleString()}

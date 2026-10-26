@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import NotificationBell from "@/components/NotificationBell";
 import AttendanceWidget from "@/components/staff/AttendanceWidget";
@@ -69,7 +69,7 @@ export default function TierLayoutShell({
     // with the same MutationObserver guard against Next.js re-asserting its
     // route metadata title after hydration.
     useEffect(() => {
-        const wanted = `${labelForPath(pathname, navItems.map((i) => ({ href: i.href, label: i.label })))} · Chakula`;
+        const wanted = `${labelForPath(pathname, navItems.map((i) => ({ href: i.href, label: i.label })))} · LEVIII`;
         const apply = () => { document.title = wanted; };
         apply();
         const titleEl = document.querySelector("title");
@@ -91,55 +91,44 @@ export default function TierLayoutShell({
         return <PageLoader />;
     }
 
+    const primaryNav=navItems.slice(0,4);
+    const extraNav=navItems.slice(4);
+    const renderNav=(item:TierNavItem)=>{
+        const active=pathname===item.href||(item.href!==`/staff/${tier}`&&pathname.startsWith(item.href+"/"));
+        return <Link key={item.href} href={item.href} onClick={()=>setSidebarOpen(false)} aria-current={active?"page":undefined} className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${active?"bg-[#e3ece1] text-[#285744]":"text-[#596c61] hover:bg-[#edf2e9] hover:text-[#20362c]"}`}><item.icon className="h-4 w-4"/><span>{item.label}</span></Link>;
+    };
     const restaurantName = user?.restaurant_name || "Your Restaurant";
 
     return (
-        <div className="min-h-screen flex">
+        <div key={user.id} className="min-h-screen flex bg-[#f2f5ef]" style={{"--text":"#20362c","--text-muted":"#596c61","--text-dim":"#596c61","--surface":"#ffffff","--surface-hover":"#edf2e9","--border":"#dce2da","--accent":"#285744"} as CSSProperties}>
             <SkipLink />
             <aside
-                className={`fixed inset-y-0 left-0 z-50 w-56 bg-[#0f0f0f] border-r border-[#1a1a1a] transform transition-transform duration-200 lg:translate-x-0 flex flex-col ${
+                className={`fixed inset-y-0 left-0 z-50 w-56 bg-[#f8faf5] border-r border-[#dce2da] transform transition-transform duration-200 lg:translate-x-0 flex flex-col ${
                     sidebarOpen ? "translate-x-0" : "-translate-x-full"
                 }`}
             >
-                <div className="px-5 py-5 border-b border-[#1a1a1a] shrink-0">
-                    <h1 className="text-lg font-bold text-[#e5e5e5] tracking-tight">Chakula</h1>
+                <div className="px-5 py-5 border-b border-[#dce2da] shrink-0">
+                    <h1 className="text-lg font-bold text-[#20362c] tracking-tight">LEVIII</h1>
                     <p className="text-xs text-[var(--accent)] mt-0.5 truncate font-medium">{restaurantName}</p>
-                    <p className="text-xs text-[#525252] truncate">{tierLabel}</p>
+                    <p className="text-xs text-[#596c61] truncate">{tierLabel}</p>
                 </div>
 
                 <nav className="flex-1 overflow-y-auto p-3 pb-6 space-y-0.5" aria-label="Main navigation">
-                    {navItems.map((item) => {
-                        const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                onClick={() => setSidebarOpen(false)}
-                                aria-current={isActive ? "page" : undefined}
-                                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                                    isActive
-                                        ? "bg-[#1a1a1a] text-[var(--accent)]"
-                                        : "text-[#737373] hover:text-[#e5e5e5] hover:bg-[#141414]"
-                                }`}
-                            >
-                                <item.icon className="w-4 h-4" />
-                                <span className="font-medium">{item.label}</span>
-                            </Link>
-                        );
-                    })}
+                    {primaryNav.map(renderNav)}
+                    {!!extraNav.length&&<details open={extraNav.some(item=>pathname===item.href)||undefined}><summary className="min-h-11 cursor-pointer px-3 py-3 text-xs font-semibold text-[#596c61]">More tools ({extraNav.length})</summary>{extraNav.map(renderNav)}</details>}
                 </nav>
 
-                <div className="shrink-0 p-3 border-t border-[#1a1a1a] space-y-0.5">
+                <div className="shrink-0 p-3 border-t border-[#dce2da] space-y-0.5">
                     <button
                         onClick={() => setShowQuickSwitch(true)}
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[#737373] hover:text-[var(--accent)] hover:bg-[#141414] w-full transition-colors"
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[#596c61] hover:text-[var(--accent)] hover:bg-[#edf2e9] w-full transition-colors"
                     >
                         <Repeat className="w-4 h-4" />
                         <span className="font-medium">Switch user</span>
                     </button>
                     <button
                         onClick={() => { logout(); router.push("/login"); }}
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[#737373] hover:text-red-400 hover:bg-red-500/5 w-full transition-colors"
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[#596c61] hover:text-red-400 hover:bg-red-500/5 w-full transition-colors"
                     >
                         <LogOut className="w-4 h-4" />
                         <span className="font-medium">Logout</span>
@@ -165,18 +154,18 @@ export default function TierLayoutShell({
             )}
 
             <main id="main-content" tabIndex={-1} className="flex-1 lg:ml-56 min-h-screen focus:outline-none">
-                <header className="sticky top-0 z-30 bg-[#0a0a0a]/90 backdrop-blur-sm border-b border-[#1a1a1a] px-5 py-3 flex items-center justify-between">
+                <header className="sticky top-0 z-30 bg-[#f8faf5]/95 backdrop-blur-sm border-b border-[#dce2da] px-5 py-3 flex items-center justify-between">
                     <button
                         onClick={() => setSidebarOpen(!sidebarOpen)}
                         aria-label={sidebarOpen ? "Close menu" : "Open menu"}
-                        className="lg:hidden text-[#737373] hover:text-[#e5e5e5]"
+                        className="lg:hidden text-[#596c61] hover:text-[#20362c]"
                     >
                         {sidebarOpen ? <X className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
                     </button>
                     <div className="flex items-center gap-4">
                         <AttendanceWidget />
                         <NotificationBell />
-                        <div className="text-xs text-[#525252]">{tierLabel}</div>
+                        <div className="text-xs text-[#596c61]">{tierLabel}</div>
                     </div>
                 </header>
 

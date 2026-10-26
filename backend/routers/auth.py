@@ -124,6 +124,7 @@ class QuickSwitchBody(StrictModel):
 
 
 class QuickSwitchRosterEntry(StrictModel):
+    restaurant_name: str | None = None
     user_id: int
     name: str
     role_title: str | None = None
@@ -652,6 +653,7 @@ async def quick_switch_roster(
         {
             "user_id": u.id,
             "name": m.name,
+            "restaurant_name": m.restaurant.name if m.restaurant else None,
             "role_title": m.role_title,
             "staff_role": u.staff_role.value if u.staff_role else None,
         }

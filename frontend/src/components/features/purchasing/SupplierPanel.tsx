@@ -124,7 +124,7 @@ export default function SupplierPanel({ suppliers, submitting, setSubmitting, sh
                                 <div>
                                     <p className="text-sm text-text">{s.name}</p>
                                     <p className="text-[10px] text-text-dim mt-0.5">
-                                        {s.contact_phone || "No phone on file"} · reliability {s.reliability_score != null ? `${s.reliability_score.toFixed(0)}%` : "n/a"}
+                                        {s.contact_phone || "No phone on file"} · saved supplier rating {s.reliability_score != null ? `${s.reliability_score.toFixed(0)}%` : "n/a"}
                                     </p>
                                 </div>
                                 <button onClick={() => openEditSupplier(s)}

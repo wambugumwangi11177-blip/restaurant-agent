@@ -24,9 +24,9 @@ interface StaffMember {
 const STAFF_ROLES = [
     { value: "manager", label: "Manager" },
     { value: "supervisor", label: "Supervisor" },
-    { value: "controller", label: "Controller" },
+    { value: "controller", label: "Accountant" },
     { value: "stockkeeper", label: "Stockkeeper" },
-    { value: "kitchen", label: "Kitchen" },
+    { value: "kitchen", label: "Chef" },
     { value: "waiter", label: "Waiter" },
 ];
 

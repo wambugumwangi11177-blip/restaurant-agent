@@ -50,6 +50,7 @@ interface CartItem {
  * no read-only variant exists for this route).
  */
 export default function POSWorkspace() {
+    const [menuError,setMenuError]=useState("");
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
     const [cart, setCart] = useState<CartItem[]>([]);
     const [selectedCategory, setSelectedCategory] = useState("All");
@@ -78,11 +79,15 @@ export default function POSWorkspace() {
         return result;
     }, [refreshPendingCount]);
 
-    useEffect(() => {
-        api.get("/menu/").then((res) => {
+    const loadMenu=()=>{
+        setMenuError("");setLoading(true);
+        return api.get("/menu/").then((res) => {
             setMenuItems(res.data.filter((i: MenuItem) => i.is_available !== false));
             setLoading(false);
-        }).catch(() => setLoading(false));
+        }).catch(() => {setLoading(false);setMenuError("Could not load your menu. Check the connection and retry.");});
+    };
+    useEffect(() => {
+        void loadMenu();
 
         // Audit remediation, Tier 4 item 10: replay anything queued from a
         // prior offline session on mount (covers the PWA being reopened after
@@ -258,6 +263,8 @@ export default function POSWorkspace() {
                 )}
             </div>
 
+            {menuError&&<p role="alert" className="mb-3 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900">{menuError} <button className="min-h-11 px-3 underline" onClick={()=>void loadMenu()}>Retry menu</button></p>}
+            {!loading&&!menuError&&menuItems.length===0&&<p role="status">No available dishes recorded in this branch. Ask a manager to review the menu.</p>}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
                 {/* Left: Menu items */}
                 <div className="lg:col-span-2 flex flex-col min-h-0">
@@ -268,7 +275,7 @@ export default function POSWorkspace() {
                                 key={cat}
                                 onClick={() => setSelectedCategory(cat)}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${selectedCategory === cat
-                                        ? "bg-accent text-black"
+                                        ? "bg-accent text-white"
                                         : "bg-surface-hover text-text-muted hover:text-text"
                                     }`}
                             >
@@ -290,7 +297,7 @@ export default function POSWorkspace() {
                                         }`}
                                 >
                                     {inCart && (
-                                        <span className="absolute -top-1.5 -right-1.5 bg-accent text-black text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                                        <span className="absolute -top-1.5 -right-1.5 bg-accent text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
                                             {inCart.quantity}
                                         </span>
                                     )}
@@ -463,7 +470,7 @@ export default function POSWorkspace() {
                                 onClick={handleSubmit}
                                 disabled={cart.length === 0 || submitting}
                                 className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${cart.length > 0 && !submitting
-                                        ? "bg-accent text-black hover:bg-[#c49843]"
+                                        ? "bg-accent text-white hover:bg-[#c49843]"
                                         : "bg-border text-text-dim cursor-not-allowed"
                                     }`}
                             >

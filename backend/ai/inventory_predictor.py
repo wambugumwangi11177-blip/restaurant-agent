@@ -131,6 +131,8 @@ def _analyze_single_item(item, movements, now, thirty_days_ago, seven_days_ago):
     """Exhaustive analysis for a single inventory item."""
     alerts = []
 
+    # Location handovers leave the restaurant total unchanged; neither leg is consumption or purchasing.
+    movements=[m for m in movements if not (m.reason or '').lower().startswith('transfer ')]
     # ── Separate OUT / IN / ADJUST movements ──
     outs = [m for m in movements if m.movement_type == models.StockMovementType.OUT]
     ins = [m for m in movements if m.movement_type == models.StockMovementType.IN]

@@ -191,7 +191,7 @@ def test_mismatched_transfer_disputes_without_writing_movements(client, db_sessi
     assert after_movements == before_movements
 
 
-def test_transfer_cannot_be_confirmed_twice(client, db_session, transfer_setup):
+def test_transfer_confirmation_retry_returns_one_result(client, db_session, transfer_setup):
     restaurant, item, sender_token, receiver_token = transfer_setup
     r = client.post("/stock/transfers", json={"inventory_item_id": item.id, "quantity": 5.0},
                      headers={"Authorization": f"Bearer {sender_token}"})
@@ -200,7 +200,10 @@ def test_transfer_cannot_be_confirmed_twice(client, db_session, transfer_setup):
                 headers={"Authorization": f"Bearer {receiver_token}"})
     r2 = client.post(f"/stock/transfers/{transfer_id}/confirm", json={"confirmed_quantity": 5.0},
                       headers={"Authorization": f"Bearer {receiver_token}"})
-    assert r2.status_code == 400
+    assert r2.status_code == 200
+    assert db_session.query(models.StockMovement).filter_by(inventory_item_id=item.id).count()==2
+    changed=client.post(f"/stock/transfers/{transfer_id}/confirm",json={"confirmed_quantity":4.0},headers={"Authorization":f"Bearer {receiver_token}"})
+    assert changed.status_code==400
 
 
 # ── Variance computation (ai/stock_custody.py) ─────────────────────────────────

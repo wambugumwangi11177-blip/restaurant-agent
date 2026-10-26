@@ -430,7 +430,8 @@ class StockTransferCreate(StrictModel):
     notes: str = ""
 
 class StockTransferConfirm(StrictModel):
-    confirmed_quantity: float
+    photo_ref: Optional[str] = Field(default=None,max_length=255)
+    confirmed_quantity: float = Field(ge=0,le=1000000,allow_inf_nan=False)
     notes: str = ""
 
 class StockTransferOut(StrictModel):

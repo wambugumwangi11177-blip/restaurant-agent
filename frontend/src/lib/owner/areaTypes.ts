@@ -20,7 +20,7 @@ export type PnlBlock = Block & {
   missing_costs: { dish: string; units: number; sales: Money }[];
   delivery_commission: { kes: Money; basis: "entered" | "estimated" | "none" };
 };
-export type CostDialsBlock = Block & { food_cost_pct: number; food_cost_target_pct: number; food_cost_word: string; wages_pct: number; wages_target_pct: number; wages_word: string };
+export type CostDialsBlock = Block & { prime_cost_pct?: number | null; prime_cost_target_pct?: number; prime_cost_word?: string; food_cost_pct: number; food_cost_target_pct: number; food_cost_word: string; wages_pct: number; wages_target_pct: number; wages_word: string };
 export type BreakEvenBlock = Block & {
   break_even_kes: Money; sales_today_kes: Money; to_go_kes: Money; covered: boolean; crossed_at: string | null; fixed_per_day_kes: Money; food_cost_pct: number; note: string;
   built_from: { label: string; period: string; days: number; fixed_costs_kes: Money; wages_kes: Money; lines: { name: string; kes: Money }[] };
@@ -68,12 +68,12 @@ export type MissingBlock = Block & {
   window_days: number;
   items: { item: string; unit: string; expected: number; used: number; missing: number; missing_value: Money; off_by_pct: number; check: boolean }[];
 };
-export type HandoverBlock = Block & { doesnt_match: { item: string; unit: string; store_said: number; kitchen_counted: number; gap: number }[] };
+export type HandoverBlock = Block & { pending?: number; transfers?: {id:number;item:string;unit:string;sent:number|null;received:number|null;status:string;from:string;to:string}[]; doesnt_match: { item: string; unit: string; store_said: number; kitchen_counted: number; gap: number }[] };
 export type ReorderBlock = Block & {
   tracked: number;
   least_cover: { item: string; unit: string; left: number; days_left: number | null }[];
   time_to_reorder: { item: string; unit: string; left: number; status: string }[];
-  drafts: { id: number; supplier: string; lines: number }[];
+  drafts: { id?: number; supplier: string; lines?: number; item?: string; order?: number; unit?: string }[];
 };
 export type SuppliersBlock = Block & {
   suppliers: { name: string; on_time_pct: number | null; closed_orders: number; word: string }[];

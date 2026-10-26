@@ -58,11 +58,11 @@ def _restaurant_id(db: Session, user) -> int:
 
 def _eat_range(period: str):
     now_eat = _eat_now()
-    if period == "today":
-        start_eat = now_eat.replace(hour=0, minute=0, second=0, microsecond=0)
-    else:
-        start_eat = now_eat - _PERIODS[period]
-    return start_eat - _EAT_OFFSET, now_eat - _EAT_OFFSET  # naive UTC for column compare
+    from time_utils import reporting_days
+    if period == "1h":
+        return now_eat - _EAT_OFFSET - timedelta(hours=1), now_eat - _EAT_OFFSET
+    return reporting_days({"today":1,"7d":7,"30d":30}[period],now_eat - _EAT_OFFSET)
+
 
 
 def _summarize(db: Session, rid: int, start, end) -> dict:
@@ -369,7 +369,7 @@ def _performance(db: Session, rid: int) -> dict:
         day = (now_eat - timedelta(days=back)).date()
         s = day.strftime("%Y-%m-%d")
         start_utc = now_eat.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=back) - _EAT_OFFSET
-        end_utc = start_utc + timedelta(days=1)
+        end_utc = min(start_utc + timedelta(days=1), now_eat - _EAT_OFFSET)
         rev, cnt = db.query(
             func.coalesce(func.sum(models.Order.total), 0),
             func.count(models.Order.id),

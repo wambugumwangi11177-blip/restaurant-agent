@@ -137,6 +137,11 @@ def compose_report(ctx: OwnerContext, period: str, month: date | None = None) ->
     live = [s for s in sections if s["state"] in ("live", "stale", "learning", "as_entered") and not s.get("info")]
     from owner.money.view import period_label
     label = reports._label(period) if month is None else period_label("month", month, month, month == today_first)
-    return {"period": period, "range": label, **({"month": month.strftime("%Y-%m")} if month else {}), "state": live[0]["state"] if live else "no_data",
+    daily_review={}
+    if period=='daily':
+        import models
+        review=ctx.db.query(models.DailyShiftClose).filter_by(restaurant_id=ctx.rid,day=eat_date(ctx.now)).first()
+        daily_review={'day_close':{'day':eat_date(ctx.now).isoformat(),'status':review.status if review else 'open','version':review.version if review else 0,'closed_at':review.closed_at.isoformat()+'Z' if review and review.closed_at else None}}
+    return {**daily_review,"period": period, "range": label, **({"month": month.strftime("%Y-%m")} if month else {}), "state": live[0]["state"] if live else "no_data",
             "as_of": next((s.get("as_of") for s in live if s.get("as_of")), None), "sections": sections,
             "read": unavailable("LEVIII's read is optional and is left out unless every number in it is backed.", text=None)}

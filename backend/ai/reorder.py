@@ -255,7 +255,7 @@ def approve_and_send(db: Session, po_id: int, restaurant_id: int, approved_by_em
 
 def receive_purchase_order(
     db: Session, po_id: int, restaurant_id: int, quantity_received: float,
-    received_by_user_id: int, notes: str = "",
+    received_by_user_id: int, notes: str = "", expires_on=None,
 ) -> models.PurchaseOrder:
     """
     SENT -> DELIVERED (or PARTIAL if short). Writes the received quantity
@@ -268,7 +268,7 @@ def receive_purchase_order(
     po = db.query(models.PurchaseOrder).filter(
         models.PurchaseOrder.id == po_id,
         models.PurchaseOrder.restaurant_id == restaurant_id,
-    ).first()
+    ).with_for_update().first()
     if not po:
         raise PurchaseOrderError("Purchase order not found")
     if po.status != "SENT":
@@ -300,6 +300,10 @@ def receive_purchase_order(
     from ai.supply_chain.intelligence import refresh_supplier_reliability
     refresh_supplier_reliability(db, po.supplier_id)
 
+    if item is not None:
+        from owner.daily import zone_event
+        zone_event(db,item,'store',quantity_received,'delivery',received_by_user_id,f'delivery:{po.id}')
+        db.add(models.StockReceiptBatch(restaurant_id=restaurant_id,inventory_item_id=item.id,purchase_order_id=po.id,quantity=quantity_received,expires_on=expires_on,received_by=received_by_user_id))
     db.commit()
     db.refresh(po)
 

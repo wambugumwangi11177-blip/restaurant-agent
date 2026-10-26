@@ -1,6 +1,6 @@
 {
-    "name": "Chakula — Restaurant Manager",
-    "short_name": "Chakula",
+    "name": "LEVIII — Your restaurant partner",
+    "short_name": "LEVIII",
     "description": "Restaurant management for ordering, POS, kitchen display, inventory & analytics",
     "start_url": "/dashboard",
     "display": "standalone",

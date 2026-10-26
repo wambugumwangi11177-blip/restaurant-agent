@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from database import get_db
+from time_utils import utcnow
 import models
 import schemas
 import auth
@@ -33,13 +34,13 @@ router = APIRouter(prefix="/stock", tags=["stock-custody"])
 
 # Directive 015's matrix: inventory write access is Owner/Manager/Stockkeeper;
 # Kitchen has read + the ability to confirm what arrives at their own station.
-_CAN_INITIATE = (models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER)
-_CAN_CONFIRM = (models.StaffRole.MANAGER, models.StaffRole.KITCHEN, models.StaffRole.STOCKKEEPER)
+_CAN_INITIATE = (models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER)
+_CAN_CONFIRM = (models.StaffRole.MANAGER, models.StaffRole.KITCHEN, models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER)
 _CAN_READ_VARIANCE = (models.StaffRole.MANAGER, models.StaffRole.CONTROLLER)
 # Directive 017: the kitchen is the one asking (a "pull"), the storekeeper is
 # the one fulfilling — distinct from _CAN_INITIATE's push-side roles.
 _CAN_REQUEST = (models.StaffRole.MANAGER, models.StaffRole.KITCHEN)
-_CAN_FULFILL = (models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER)
+_CAN_FULFILL = (models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER)
 # A count is specifically valuable as an independent check when the counter
 # isn't only ever the same person moving the stock — Controller included
 # deliberately (a surprise count is a standard internal-audit practice).
@@ -60,6 +61,9 @@ async def initiate_transfer(
     if not item:
         raise HTTPException(status_code=404, detail="Inventory item not found")
 
+    if body.unit and body.unit.strip().lower()!=item.unit.strip().lower():
+        raise HTTPException(422,'Use the inventory item unit for a handover')
+
     transfer = models.StockTransfer(
         restaurant_id=restaurant.id,
         inventory_item_id=item.id,
@@ -69,9 +73,13 @@ async def initiate_transfer(
         to_location=body.to_location,
         status=models.StockTransferStatus.PENDING,
         initiated_by_user_id=current_user.id,
+        initiated_at=utcnow(),
         notes=body.notes,
     )
     db.add(transfer)
+    db.flush()
+    from owner.daily import dispatch
+    dispatch(db, transfer)
     db.commit()
     db.refresh(transfer)
 
@@ -98,7 +106,7 @@ async def confirm_transfer(
     try:
         return variance_engine.confirm_transfer(
             db, transfer_id, restaurant.id, current_user.id,
-            body.confirmed_quantity, body.notes,
+            body.confirmed_quantity, body.notes, photo_ref=body.photo_ref,
         )
     except variance_engine.TransferConfirmError as exc:
         status_code = 404 if str(exc) == "Transfer not found" else 400

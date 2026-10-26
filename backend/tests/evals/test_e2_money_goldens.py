@@ -28,6 +28,18 @@ import pytest
 import models
 from tests.fixtures import golden_restaurant as gr
 
+@pytest.mark.parametrize('hour,minute', [(0, 0), (0, 30), (12, 0)])
+def test_weekly_golden_stays_inside_seven_nairobi_days(db_session, hour, minute):
+    from datetime import timedelta
+    from time_utils import reporting_days
+    from routers.overview import _summarize
+
+    now = datetime(2026, 10, 26, hour, minute, 1) - timedelta(hours=3)
+    g = gr.build_skeleton(db_session, now=now)
+    gr.seed_pnl_week(db_session, g)
+    start, end = reporting_days(7, now)
+    assert _summarize(db_session, g.rid, start, end) == {'revenue': 100_000.0, 'orders': 100}
+
 # ═════════════════════════════════════════════════════════════════════════════
 # LIVE — what today's engines say
 # ═════════════════════════════════════════════════════════════════════════════

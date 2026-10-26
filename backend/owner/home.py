@@ -61,7 +61,7 @@ def _pulse(ctx: OwnerContext, period: str) -> dict:
             "vs_same_weekday_pct": vs,
             "vs_same_weekday_state": "live" if vs is not None else "learning",
             "sales_in_period": window["revenue"], "orders_in_period": window["orders"],
-            "trend_7d": [{"date": d["date"], "sales": d["revenue"], "orders": d["orders"]} for d in overview._performance(ctx.db, ctx.rid)["revenue_trend"]],
+            "trend_7d": [{"date": d["date"], "sales": d["revenue"], "orders": d["orders"]} for d in ctx.cached("seven_day_trend", lambda: overview._performance(ctx.db, ctx.rid)["revenue_trend"])],
             "breakeven_at": ctx.safe("home.breakeven", lambda: areas.breakeven_summary(ctx)),
             "money_match": {"cash": cash, "mpesa": _mpesa_summary(areas._mpesa(ctx))},
             "freshness": {"latest_sale_at": freshness["latest_order_at"], "data_age_days": freshness["data_age_days"],

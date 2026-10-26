@@ -67,7 +67,11 @@ def _matches(patterns: tuple[str, ...], q: str) -> bool:
 def classify_what(question: str) -> str:
     """The topic of a "what" question: the longest keyword wins; the areas answered from Home's blocks come before the old handlers on a tie."""
     from routers import ai_ask
+    from owner.question_catalog import QUESTION_TOPICS
     q = question.lower().replace("’", "'")
+    known = QUESTION_TOPICS.get(q.strip().rstrip("?").strip())
+    if known:
+        return known
     best, score = "ops", 0
     for topic, keywords in [*_TOPIC_RULES, *ai_ask._ROUTING_RULES]:
         s = max((len(k) for k in keywords if k in q), default=0)
@@ -106,7 +110,12 @@ _BUILDERS = {
 def ask(ctx: OwnerContext, question: str, form: str | None = None, topic: str | None = None) -> dict:
     """Answer `question` in `form` (chosen by the owner, else by the words of the question)."""
     question = question.strip()
+    if re.fullmatch(r"(?:(?:hi|hii|hello|hey|yo|habari|sasa)(?: there| leviii)?|good (?:morning|afternoon|evening))[!., ]*",question,re.I):
+        from owner.answers import make
+        return make('what','conversation',question,state='live',label='Let’s work on your restaurant',headline='Hello. What would you like to check or record?',next=['What needs my attention today?','How is my cash count looking?','What stock should I check?'])
     auto_form, auto_topic = classify(question)
+    if (form or auto_form)=='what' and classify_what(question)=='ops' and not re.search(r'health|restaurant|business|overview|operations|doing|attention|status|overall',question,re.I):
+        return nothing('what','conversation',question,'Which part would you like to check: sales, stock, cash, food cost or wages?',next=['What stock should I check?','How are sales this week?'])
     form = form or auto_form
     if form not in FORMS:
         raise ValueError(f"form must be one of {FORMS}")

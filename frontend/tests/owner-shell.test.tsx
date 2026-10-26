@@ -22,29 +22,30 @@ it("an owner sees Home, Ask LEVIII and Reports, with the current page marked", (
   auth.value = { user: owner("Mama Oliech"), isLoading: false };
   nav.pathname = "/reports";
   render(<OwnerShell><p>page body</p></OwnerShell>);
-  expect(pages()).toEqual(["Home", "Ask LEVIII", "Reports", "Operations"]);
+  expect(pages()).toEqual(["Home", "Ask LEVIII", "Reports", "Daily work", "All tools", "Plan & improve", "Team entries", "Operations"]);
   const current = screen.getAllByRole("link", { current: "page" });
   expect(current.length).toBeGreaterThan(0);
   expect(current.every((a) => a.textContent?.includes("Reports"))).toBe(true);
   expect(screen.getByText("page body")).toBeTruthy();
 });
 
-it("Vibanda and the Demo Restaurant have no way into the operational screens, and the Demo says it is made up", () => {
+it("every owner can reach planning and team entries, with generated data labelled in the demo", () => {
   auth.value = { user: owner("Vibanda Village"), isLoading: false };
   const { unmount } = render(<OwnerShell>x</OwnerShell>);
-  expect(pages()).toEqual(["Home", "Ask LEVIII", "Reports"]);
+  expect(pages()).toEqual(["Home", "Ask LEVIII", "Reports", "Daily work", "All tools", "Plan & improve", "Team entries"]);
   unmount();
   auth.value = { user: owner("Demo Restaurant"), isLoading: false };
   render(<OwnerShell>x</OwnerShell>);
-  expect(pages()).toEqual(["Home", "Ask LEVIII", "Reports"]);
-  expect(screen.getByText(/made-up restaurant/)).toBeTruthy();
+  expect(pages()).toEqual(["Home", "Ask LEVIII", "Reports", "Daily work", "All tools", "Plan & improve", "Team entries"]);
+  expect(screen.getByText(/Generated restaurant records/)).toBeTruthy();
 });
 
 it("the date is the Nairobi date and the shell is keyboard-navigable (two named navs, links not buttons)", () => {
   auth.value = { user: owner("Mama Oliech"), isLoading: false };
   render(<OwnerShell>x</OwnerShell>);
   expect(screen.getByText(/· Nairobi$/)).toBeTruthy();
-  expect(screen.getAllByRole("navigation", { name: "Owner pages" })).toHaveLength(2);
+  expect(screen.getByRole("navigation", { name: "Owner pages" })).toBeTruthy();
+  expect(screen.getByRole("navigation", { name: "Mobile owner pages" })).toBeTruthy();
 });
 
 it("a signed-out visitor goes to login and a manager to their own screens; neither sees the owner's figures", () => {

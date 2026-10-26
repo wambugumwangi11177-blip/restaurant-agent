@@ -32,12 +32,9 @@ _EAT_OFFSET = timedelta(hours=3)
 
 
 def _range(period: str):
-    now_eat = utcnow() + _EAT_OFFSET
-    if period == "daily":
-        start_eat = now_eat.replace(hour=0, minute=0, second=0, microsecond=0)
-    else:
-        start_eat = now_eat - _PERIOD_SPANS[period]
-    return start_eat - _EAT_OFFSET, now_eat - _EAT_OFFSET
+    from time_utils import reporting_days
+    return reporting_days({"daily":1,"weekly":7,"monthly":30,"yearly":365}[period],utcnow())
+
 
 
 def _top_items(db: Session, rid: int, start, end, limit=5) -> list:

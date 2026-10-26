@@ -1,5 +1,7 @@
 "use client";
-import { useState } from "react";
+import Link from "next/link";
+import PriceImpact from "@/components/owner/PriceImpact";
+import { useContext, useState } from "react";
 import { Download } from "lucide-react";
 import api from "@/lib/api";
 import CashRunway from "@/components/charts/CashRunway";
@@ -11,16 +13,19 @@ import { BLOCK_TITLES } from "@/lib/owner/blocks";
 import { kes, plural, shortDay } from "@/lib/owner/format";
 import type { BillsBlock, BreakEvenBlock, CostDialsBlock, PnlBlock, SavingsBlock, SpikesBlock } from "@/lib/owner/areaTypes";
 import type { Area } from "@/lib/owner/types";
-import { BlockFrame, Empty, Grid, Note, Pill, Stat } from "./ui";
+import { AreaFocus, BlockFrame, Empty, Grid, Note, Pill, Stat } from "./ui";
 
 const T = BLOCK_TITLES.money;
 const tone = (word: string) => (word === "Fine" ? "good" : word === "Watch" ? "warn" : "bad") as "good" | "warn" | "bad";
 
 export default function MoneyArea({ area }: { area: Area }) {
   const b = area.blocks;
+  const focus = useContext(AreaFocus);
   return (
     <div className="space-y-3">
+      {['food-cost','wages','prime-cost'].includes(focus)&&<CostMeasure block={b.cost_dials as CostDialsBlock} kind={focus}/>}
       <Pnl block={b.pnl as PnlBlock} />
+      {(!focus || focus === "price-impact") && <PriceImpact />}
       <div className="grid gap-3 md:grid-cols-2">
         <Dials block={b.cost_dials as CostDialsBlock} />
         <Clock block={b.breakeven as BreakEvenBlock} />
@@ -130,8 +135,9 @@ export function ExportButtons({ start }: { start: string }) {
 function Dials({ block }: { block: CostDialsBlock }) {
   return (
     <BlockFrame title={T.cost_dials} block={block}>{() => (<>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <Dial value={block.food_cost_pct} target={block.food_cost_target_pct} label="Out of every KES 100, ingredients" word={block.food_cost_word} tone={tone(block.food_cost_word)} />
+        {block.prime_cost_pct != null && <Dial value={block.prime_cost_pct} target={block.prime_cost_target_pct ?? 62} label="Ingredients + wages (prime cost)" word={block.prime_cost_word ?? "Learning"} tone={tone(block.prime_cost_word ?? "Watch")} />}
         <Dial value={block.wages_pct} target={block.wages_target_pct} label="Out of every KES 100, wages" word={block.wages_word} tone={tone(block.wages_word)} />
       </div>
     </>)}</BlockFrame>
@@ -141,11 +147,17 @@ function Dials({ block }: { block: CostDialsBlock }) {
 function Clock({ block }: { block: BreakEvenBlock }) {
   return (
     <BlockFrame title={T.breakeven} block={block}>{() => (<>
+      <p className="mb-4 text-sm">Break-even: the sales needed today to cover your recorded fixed costs after ingredients.</p>
       <BreakEvenClock label="Costs covered" breakEven={block.break_even_kes} soldSoFar={block.sales_today_kes} coveredAt={block.crossed_at} />
       <p className="mt-3 text-xs">Your fixed costs come to <b>{kes(block.fixed_per_day_kes)} a day</b>. Built from {block.built_from.label}.</p>
-      <details className="mt-1">
+      <div className="my-4 grid gap-3 sm:grid-cols-3"><Stat label="Daily sales target" value={kes(block.break_even_kes)}/><Stat label="Sold today" value={kes(block.sales_today_kes)}/><Stat label="Still to sell" value={kes(block.to_go_kes)}/></div>
+      <p className="text-xs">Daily fixed costs ÷ the share left after ingredients = daily sales target. Ingredient share: {block.food_cost_pct}% from {block.built_from.label}.</p>
+      {block.sales_today_kes===0&&<Note>No paid sales recorded today. The target is still shown; the ring will fill as sales arrive.</Note>}
+      <details open className="mt-1">
         <summary className="flex min-h-10 cursor-pointer items-center text-[11px] font-semibold text-[var(--v-muted-foreground)]">What is in it</summary>
         <ul className="mt-1 space-y-0.5 text-[11px] text-[var(--v-muted-foreground)]">{block.built_from.lines.map((l) => <li key={l.name} className="flex justify-between"><span>{l.name}</span><span className="tabular-nums">{kes(l.kes)}</span></li>)}</ul>
+        {block.built_from.wages_kes>0&&<p className="mt-2 text-xs">Fixed wages included: {kes(block.built_from.wages_kes)}</p>}
+        <Link href="/entries" className="mt-2 inline-flex min-h-10 items-center text-xs underline">Review costs in team entries →</Link>
       </details>
       <Note>{block.note}</Note>
     </>)}</BlockFrame>
@@ -203,4 +215,16 @@ function Savings({ block }: { block: SavingsBlock }) {
       </Grid>
     </>)}</BlockFrame>
   );
+}
+
+function CostMeasure({block,kind}:{block:CostDialsBlock;kind:string}) {
+ const data=block as CostDialsBlock & {period?:{label:string;from?:string;to?:string};sales_kes?:number;ingredients_kes?:number;wages_kes?:number;notes?:string[]};
+ const title=kind==='food-cost'?'Food cost':kind==='wages'?'Wages':'Prime cost';
+ const value=kind==='food-cost'?block.food_cost_pct:kind==='wages'?block.wages_pct:block.prime_cost_pct;
+ const target=kind==='food-cost'?block.food_cost_target_pct:kind==='wages'?block.wages_target_pct:block.prime_cost_target_pct;
+ const amount=kind==='food-cost'?data.ingredients_kes:kind==='wages'?data.wages_kes:data.ingredients_kes!=null&&data.wages_kes!=null?data.ingredients_kes+data.wages_kes:null;
+ const rule=kind==='food-cost'?'food_cost_target_pct':kind==='wages'?'labour_target_pct':'prime_cost_target_pct';
+ const rules=block.assumptions?.filter(a=>a.setting===rule)??[];
+ const notes=data.notes?.filter(note=>kind==='prime-cost'||(kind==='food-cost'?!/wages|payroll|meals/i.test(note):!/ingredient cost/i.test(note)));
+ return <BlockFrame title={title} block={{...block,assumptions:rules,assumption:rules[0]}}>{()=><div className="space-y-4"><p className="text-sm">{data.period?.label??'Last 30 calendar days'}{data.period?.from&&` (${data.period.from} to ${data.period.to})`} · the same sales denominator across food, wages and prime cost.</p><div className="grid gap-4 sm:grid-cols-3"><Stat label={title+' share'} value={value==null?'Not recorded':`${value.toFixed(1)}%`}/><Stat label="Recorded cost" value={kes(amount)}/><Stat label="Your target" value={target==null?'Not set':`${target}%`}/></div><p className="text-sm">{kind==='food-cost'?'Ingredients used by your recorded sales. This is different from money spent buying stock.':kind==='wages'?'Recorded payroll or shift-based wages against sales. Any estimates remain labelled in Profit & Loss.':'Ingredients plus wages. The combined result is useful for control, while the two costs remain separately reviewable.'}</p>{notes?.map(note=><Note key={note}>{note}</Note>)}<Link href={kind==='food-cost'?'/planning?tool=recipe-plan':kind==='wages'?'/areas/staff?tool=wages':'/areas/money?tool=profit-and-loss'} className="leviii-primary-button">{kind==='food-cost'?'Review recipes & yield':kind==='wages'?'Review wages & shifts':'Open Profit & Loss'} →</Link></div>}</BlockFrame>;
 }

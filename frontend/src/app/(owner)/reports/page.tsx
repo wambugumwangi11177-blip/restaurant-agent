@@ -2,6 +2,10 @@
 // Reports — Daily (control) · Weekly (performance) · Monthly (the full Profit & Loss, with the accountant's file) · Yearly (trends).
 // Every section is the block Home shows for the same thing, worked out by the owner API (/owner/report/{period}); the writing
 // assistant's own take is a separate, optional note that is left out unless every number in it is backed.
+import {useDailyReview} from "@/lib/owner/useDailyReview";
+import Link from "next/link";
+import {useListQuery} from "@/lib/owner/useListQuery";
+import { Download, Printer } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -56,8 +60,13 @@ export default function ReportsPage() {
 function ReportsContent() {
   const { user } = useAuth();
   const macsoft = tenantConfig(user?.tenant_name).source === "macsoft";
-  const [period, setPeriod] = useState<ReportPeriod>("daily");
-  const [month, setMonth] = useState<string | null>(null);        // null: the month so far
+  const reviewDay=useDailyReview();
+  const [periodQuery,writePeriod]=useListQuery("period","daily");
+  const period:ReportPeriod=TABS.some(t=>t.id===periodQuery)?periodQuery as ReportPeriod:"daily";
+  const setPeriod=(p:ReportPeriod)=>writePeriod(p);
+  const [monthQuery,writeMonth]=useListQuery("month");
+  const month=monthQuery||null;
+  const setMonth=(m:string|null)=>writeMonth(m??"");        // null: the month so far
   const [report, setReport] = useState<OwnerReport | null>(null);
   const [err, setErr] = useState(false);
   const [connection, setConnection] = useState<SourceConnection | null>(null);
@@ -83,17 +92,22 @@ function ReportsContent() {
   }, []);
   useEffect(() => {
     // The request itself is the external synchronization performed here.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     load(period, month);
     return () => { requestId.current += 1; };
-  }, [period, month, load]);
+  }, [period, month, load,reviewDay]);
 
   const sales = report?.sections.find((s) => s.key === "sales");
   const hasOrders = !!sales && sales.state !== "no_data" && Number(sales.orders ?? 0) > 0;
   const isNow = period !== "monthly" || month === null || month === months[0].value;
+  const [exporting,setExporting]=useState(false);
+  const [exportError,setExportError]=useState(false);
+  const downloadReport=async()=>{setExporting(true);setExportError(false);try{const r=await api.get(`/api/v1/owner/report/${period}/pdf`,{params:period==="monthly"&&month?{month}:undefined,responseType:"blob"});const url=URL.createObjectURL(r.data);const a=document.createElement("a");a.href=url;a.download=`LEVIII-${period}-report.pdf`;a.click();URL.revokeObjectURL(url);}catch{setExportError(true);}finally{setExporting(false);}};
+
 
   return (
-    <div className="animate-rise-in max-w-4xl space-y-4">
+    <div className="animate-rise-in max-w-5xl space-y-5">
+      <div className="flex flex-wrap justify-end gap-2 print:hidden"><button type="button" disabled={exporting||!report} onClick={()=>void downloadReport()} className="leviii-primary-button"><Download size={15}/>{exporting?"Preparing…":"Download report"}</button><button type="button" onClick={()=>window.print()} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--v-border)] bg-white px-4 text-xs font-semibold"><Printer size={15}/>Print</button></div>
+      {exportError&&<p role="alert" className="text-sm text-[var(--v-destructive)]">The report could not be downloaded. Please try again.</p>}
       <div className="mb-2">
         <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">Worked out from your records</p>
         <h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-semibold leading-[1.02] tracking-[-0.045em]">
@@ -103,6 +117,7 @@ function ReportsContent() {
         {connection && <p className="mt-2 text-sm text-[var(--v-muted-foreground)]">{sourceLine(connection)}</p>}
       </div>
 
+      {report?.day_close&&<div className="rounded-xl border border-[var(--v-border)] bg-white p-4 text-sm"><b>Day close · {report.day_close.day}: {report.day_close.status.replaceAll("_"," ")}</b><p className="mt-1 text-xs text-[var(--v-muted-foreground)]">The operating result and the sign-off status are separate. <Link className="inline-flex min-h-11 items-center font-semibold underline" href={"/daily?day="+report.day_close.day}>Review checklist →</Link></p></div>}
       <div className="flex flex-wrap items-center gap-3">
         <div role="tablist" aria-label="Report" className="inline-flex rounded-lg border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.68)] p-1">
           {TABS.map((t) => (
@@ -138,7 +153,7 @@ function ReportsContent() {
             <p role="status" className="rounded-lg bg-[var(--v-muted)] px-3 py-2 text-xs text-[var(--v-muted-foreground)]">Nothing is recorded for this report yet. Each section below says what it is waiting for.</p>
           )}
           <div className="space-y-3">
-            {report.sections.map((s) => <ReportSectionCard key={s.key} section={s} period={report.period} />)}
+            {report.sections.map((s,index) => index===0?<ReportSectionCard key={s.key} section={s} period={report.period}/>:<details key={s.key} className="rounded-xl border border-[var(--v-border)] bg-white p-4"><summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold">{s.title??s.key.replaceAll('_',' ')}</summary><ReportSectionCard section={s} period={report.period}/></details>)}
           </div>
         </>
       )}

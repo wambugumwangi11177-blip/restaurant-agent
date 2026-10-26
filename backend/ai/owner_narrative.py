@@ -4,6 +4,7 @@ Only text leaves this boundary. No tools or operational write capabilities are
 provided. Numeric verification remains the caller's job; it is not a complete
 semantic or prompt-injection defense.
 """
+import logging
 import re
 
 from fastapi import HTTPException
@@ -11,6 +12,39 @@ from fastapi import HTTPException
 import models
 from ai import llm_client, pii_scrub, spend_cap
 from ai.cost_model import cost_usd
+
+logger = logging.getLogger(__name__)
+
+
+def _drop_reservation(db, reservation_id):
+    """The provider call failed, so nothing was spent: give the reserved estimate back."""
+    try:
+        db.rollback()
+        row = db.get(models.TokenUsage, reservation_id)
+        if row is not None:
+            db.delete(row)
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.warning("narrate: could not release a reserved estimate; it stays counted until midnight UTC", exc_info=True)
+
+
+def _record_actual_usage(db, reservation_id, restaurant_id, prompt_version, result):
+    """Replace the reserved estimate with what the provider reported. Paid output is metered even if a later
+    grounding check rejects its content. If this write fails the estimate stays, so spend is over-counted,
+    never lost."""
+    try:
+        row = db.get(models.TokenUsage, reservation_id)
+        if row is None:
+            row = models.TokenUsage(restaurant_id=restaurant_id, prompt_version=prompt_version)
+            db.add(row)
+        row.llm_model = result.model
+        row.input_tokens = result.usage.input_tokens
+        row.output_tokens = result.usage.output_tokens
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.warning("narrate: could not record actual token usage; the reserved estimate stays", exc_info=True)
 
 
 def narrate(db, user, restaurant_id, messages, system, max_tokens, prompt_version,
@@ -21,8 +55,14 @@ def narrate(db, user, restaurant_id, messages, system, max_tokens, prompt_versio
     existing caller relies on (0 / medium). The creative layer (ai/creative.py)
     passes its own; the budget estimate below uses the SAME tier as the call so a
     dearer creative model cannot slip past the cap on a medium-model estimate.
+
+    The budget is checked and this call's estimated cost is reserved (as a usage row) in one short
+    transaction under a tenant lock. That transaction is committed BEFORE the provider is called, so a slow
+    model never holds a database lock or connection, and a simultaneous request already sees this call's
+    reservation when it checks the budget. When the provider answers, the reservation is replaced by the
+    real usage; when it fails, the reservation is removed.
     """
-    # Lock the tenant while checking and metering so simultaneous chat/report
+    # Lock the tenant while checking and reserving so simultaneous chat/report
     # requests cannot independently spend the same remaining estimated budget.
     db.query(models.Tenant).filter_by(id=user.tenant_id).with_for_update().one()
     restaurant_ids = [row[0] for row in db.query(models.Restaurant.id).filter_by(tenant_id=user.tenant_id)]
@@ -34,20 +74,28 @@ def narrate(db, user, restaurant_id, messages, system, max_tokens, prompt_versio
     clean_messages = [{"role": m["role"], "content": pii_scrub.scrub_for_llm(m["content"], known_names)} for m in messages]
     # UTF-8 bytes overestimate ordinary text tokens. Include a framing margin.
     input_bound = len(clean_system.encode()) + sum(len(m['content'].encode()) for m in clean_messages) + 1024
-    estimate = cost_usd(llm_client.model_for_tier(tier), input_bound, max_tokens)
+    model = llm_client.model_for_tier(tier)
+    estimate = cost_usd(model, input_bound, max_tokens)
     if extra_body:
         estimate += 0.01  # a provider-side web search is billed per request, on top of tokens
     if spent + estimate >= spend_cap.DAILY_LLM_SPEND_CAP_USD:
         raise HTTPException(429, "Daily estimated AI budget reached. Deterministic reports remain available.")
-    extra = {"extra_body": extra_body} if extra_body else {}
-    result = llm_client.chat_with_usage(clean_messages, system=clean_system,
-                                        max_tokens=max_tokens, tier=tier, temperature=temperature, **extra)
-    # Meter paid output even if a later grounding check rejects its content.
-    db.add(models.TokenUsage(restaurant_id=restaurant_id, llm_model=result.model,
-                            input_tokens=result.usage.input_tokens,
-                            output_tokens=result.usage.output_tokens,
-                            prompt_version=prompt_version))
+    # Reserve the estimate as a usage row, then commit to release the tenant lock before the slow call. (The
+    # optional web-search surcharge is checked above but not stored: usage rows hold tokens only.)
+    reservation = models.TokenUsage(restaurant_id=restaurant_id, llm_model=model, prompt_version=prompt_version,
+                                    input_tokens=input_bound, output_tokens=max_tokens)
+    db.add(reservation)
+    db.flush()
+    reservation_id = reservation.id
     db.commit()
+    extra = {"extra_body": extra_body} if extra_body else {}
+    try:
+        result = llm_client.chat_with_usage(clean_messages, system=clean_system,
+                                            max_tokens=max_tokens, tier=tier, temperature=temperature, **extra)
+    except Exception:
+        _drop_reservation(db, reservation_id)
+        raise
+    _record_actual_usage(db, reservation_id, restaurant_id, prompt_version, result)
     return pii_scrub.scrub_for_llm(result.text, known_names)
 
 

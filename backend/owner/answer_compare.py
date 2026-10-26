@@ -45,7 +45,7 @@ def _branch(ctx: OwnerContext, restaurant: models.Restaurant) -> dict:
     overview = areas._overview_core(c)
     core = overview._summarize(c.db, c.rid, ctx.now - timedelta(days=30), ctx.now)
     has = dials.get("state") in ("live", "stale", "learning")
-    return {"name": restaurant.name, "sales": core["revenue"], "orders": core["orders"],
+    return {"name": restaurant.name, "sales": dials.get("sales_kes", core["revenue"]), "orders": dials.get("orders",core["orders"]),
             "food_cost_pct": dials["food_cost_pct"] if has else None, "wages_pct": dials.get("wages_pct") if has else None,
             "food_cost_word": dials.get("food_cost_word") if has else None, "state": dials.get("state")}
 

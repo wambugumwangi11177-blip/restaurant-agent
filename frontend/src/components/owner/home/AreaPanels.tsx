@@ -43,7 +43,7 @@ export default function AreaPanels({ areas, opensOn = {} }: {
   const toggle = (key: AreaKey) => setOpen((o) => { const n = new Set(o); if (n.has(key)) n.delete(key); else n.add(key); return n; });
 
   return (
-    <div className="space-y-2">
+    <div className="leviii-area-list space-y-3">
       {AREA_KEYS.map((key) => {
         const area = areas[key];
         if (!area) return null;

@@ -67,3 +67,16 @@ def aware_utcnow() -> datetime:
     `DateTime` column without attaching tzinfo first — see this module's docstring.
     """
     return datetime.now(timezone.utc)
+
+
+def reporting_days(days: int, now: datetime) -> tuple[datetime, datetime]:
+    """N Nairobi calendar dates including today, up to now, returned as naive UTC.
+
+    A seven-day total and its seven daily bars must use the same first midnight.
+    This intentionally differs from a rolling 168-hour query and from seven complete days.
+    """
+    if days < 1:
+        raise ValueError("At least one reporting day is required")
+    local = now + EAT_OFFSET
+    start = local.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days-1)
+    return start - EAT_OFFSET, now

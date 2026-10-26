@@ -1,4 +1,5 @@
 "use client";
+import {useDailyReview} from "@/lib/owner/useDailyReview";
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
@@ -15,6 +16,7 @@ import type { InventoryItem, StockTransfer, VarianceReport, InventoryAiData } fr
  * original inline implementation.
  */
 export function useInventoryWorkspace() {
+ const reviewDay=useDailyReview();
     const [items, setItems] = useState<InventoryItem[]>([]);
     const [aiData, setAiData] = useState<InventoryAiData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -81,7 +83,7 @@ export function useInventoryWorkspace() {
         setLoading(false);
     };
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { fetchData(); }, [reviewDay]);
 
     const handleAddItem = async () => {
         if (!newName) return;

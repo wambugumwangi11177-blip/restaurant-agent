@@ -1,4 +1,5 @@
 "use client";
+import { useContext } from "react";
 import HeatGrid from "@/components/charts/HeatGrid";
 import ShiftTable from "@/components/charts/ShiftTable";
 import { BLOCK_TITLES } from "@/lib/owner/blocks";
@@ -6,7 +7,7 @@ import { kes, nairobiTime, shortDay, toDate, weekday } from "@/lib/owner/format"
 import type { BelowMenuPriceBlock, CancelledBlock, MpesaBlock, PatternsBlock, ShiftsBlock } from "@/lib/owner/areaTypes";
 import type { Area } from "@/lib/owner/types";
 import MpesaUpload from "./MpesaUpload";
-import { BlockFrame, Empty, Grid, Note, Pill, Stat } from "./ui";
+import { AreaFocus, BlockFrame, Empty, Grid, Note, Pill, Stat } from "./ui";
 
 const T = BLOCK_TITLES.cash;
 
@@ -32,6 +33,8 @@ function sinceWhen(iso: string) {
 
 /** The statement against the M-Pesa sales: the sentence, what was checked, then the two kinds of gap. The upload is always here: with no statement, it is the whole panel. */
 function Mpesa({ block }: { block: MpesaBlock }) {
+  const focus = useContext(AreaFocus);
+  if (focus && focus !== "m-pesa-check") return null;
   return (
     <div className="space-y-3">
       <BlockFrame title={T.mpesa} block={block}>{() => {

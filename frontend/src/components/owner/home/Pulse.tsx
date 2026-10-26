@@ -20,7 +20,7 @@ export default function Pulse({ pulse, period }: { pulse: PulseData; period: Own
   bars.forEach((b) => { b.highlight = b.value > 0 && b.key === best.key; });
 
   return (
-    <section aria-label="Today's pulse" className="grid gap-4 lg:grid-cols-[1.1fr_1fr_1fr]">
+    <section aria-label="Today's pulse" className="leviii-pulse grid gap-4 lg:grid-cols-[1.1fr_1fr_1fr]">
       <div className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-5">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)]">{PERIOD_WORDS[period]}</p>
@@ -39,7 +39,7 @@ export default function Pulse({ pulse, period }: { pulse: PulseData; period: Own
       </div>
 
       <div className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-5">
-        <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)]">The last 7 days</p>
+        <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)]">The last 7 days</p><p className="mb-3 text-[10px] text-[var(--v-muted-foreground)]">Including today, up to now</p>
         <Bars bars={bars} label="Sales for each of the last 7 days" format={kesShort} state={pulse.trend_7d.some((d) => d.sales > 0) ? undefined : "no_data"} reason="No sales recorded in the last 7 days." />
       </div>
 

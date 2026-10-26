@@ -16,10 +16,10 @@ function value(number: number | null, unit: string): string {
 export default function HealthStrip({ health }: { health: Health }) {
   if (health.tiles.length === 0) return <p className="text-xs text-[var(--v-muted-foreground)]">{health.reason ?? "Nothing to summarise yet."}</p>;
   return (
-    <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+    <ul className="leviii-health grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
       {health.tiles.map((t) => (
         <li key={t.area}>
-          <a href={`#area-${t.area}`} className="block h-full rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-3 hover:border-[var(--v-primary)]">
+          <a href={`/areas/${t.area}`} className="block h-full rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-3 hover:border-[var(--v-primary)]">
             <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">
               <span aria-hidden className={`h-2 w-2 rounded-full ${DOT[t.status]}`} />{t.title}
             </p>

@@ -17,7 +17,7 @@ export function worth(tier: CardTier, kesMonth: number | null): string {
 }
 
 /** Zone 2 — what is costing you money: what is happening now first, then the money going out (most first), then ideas. */
-export default function CostingYouMoney({ data }: { data: Data }) {
+export default function CostingYouMoney({ data, previewLimit = 3 }: { data: Data; previewLimit?:number }) {
   const [gone, setGone] = useState<Set<string>>(new Set());
   const [more, setMore] = useState(false);
   const cards = data.cards.filter((c) => !gone.has(c.id));
@@ -33,13 +33,13 @@ export default function CostingYouMoney({ data }: { data: Data }) {
   const rest = data.ranked.filter((r) => !shown.has(r.id) && !gone.has(r.id));
   return (
     <div className="space-y-3">
-      {cards.map((c) => <Card key={c.id} card={c} onDone={() => setGone((g) => new Set(g).add(c.id))} />)}
-      {rest.length > 0 && (
+      <div className="grid gap-3 lg:grid-cols-3">{cards.slice(0,previewLimit).map((c) => <Card key={c.id} card={c} onDone={() => setGone((g) => new Set(g).add(c.id))} />)}</div>
+      {(rest.length > 0 || cards.length>previewLimit) && (
         <div>
           <button type="button" aria-expanded={more} onClick={() => setMore((m) => !m)} className="inline-flex min-h-10 items-center gap-1 text-xs font-semibold text-[var(--v-primary)]">
-            {more ? "Show fewer" : `${rest.length} more ${rest.length === 1 ? "idea" : "ideas"}`} <ChevronRight size={12} aria-hidden className={more ? "rotate-90" : ""} />
+            {more ? "Show fewer" : `${rest.length+Math.max(cards.length-previewLimit,0)} more to review`} <ChevronRight size={12} aria-hidden className={more ? "rotate-90" : ""} />
           </button>
-          {more && <ul className="mt-1 divide-y divide-[var(--v-border)] rounded-xl border border-[var(--v-border)] bg-[var(--v-card)]">{rest.map((r) => <MoreRow key={r.id} row={r} />)}</ul>}
+          {more && <div className="space-y-3">{cards.slice(previewLimit).map(c=><Card key={c.id} card={c} onDone={()=>setGone(g=>new Set(g).add(c.id))}/>)}</div>}{more && <ul className="mt-1 divide-y divide-[var(--v-border)] rounded-xl border border-[var(--v-border)] bg-[var(--v-card)]">{rest.map((r) => <MoreRow key={r.id} row={r} />)}</ul>}
         </div>
       )}
     </div>

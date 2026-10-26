@@ -25,7 +25,7 @@ function respond(over: { connection?: unknown; creative?: unknown } = {}) {
   });
 }
 
-beforeEach(() => { vi.clearAllMocks(); auth.tenant = "Demo Restaurant"; respond(); });
+beforeEach(() => { window.history.replaceState({},"","/reports");vi.clearAllMocks(); auth.tenant = "Demo Restaurant"; respond(); });
 afterEach(cleanup);
 
 describe("the four reports", () => {

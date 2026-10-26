@@ -1,5 +1,7 @@
 "use client";
-import type { ReactNode } from "react";
+import { blockAnchor } from "@/lib/owner/features";
+import { createContext, useContext, type ReactNode } from "react";
+export const AreaFocus = createContext("");
 import ChartEmpty, { isEmpty } from "@/components/charts/ChartEmpty";
 import AssumptionChip from "@/components/owner/settings/AssumptionChip";
 import StateChip from "@/components/owner/StateChip";
@@ -14,9 +16,11 @@ export function BlockFrame({ title, block, children, quiet = false }: {
   /** an information block has no data state worth a chip */
   quiet?: boolean;
 }) {
+  const focus = useContext(AreaFocus);
+  if (focus && focus !== blockAnchor(title)) return null;
   const empty = isEmpty(block.state);
   return (
-    <section aria-label={title} className="rounded-lg border border-[var(--v-border)] bg-[var(--v-bg)] p-3.5 sm:p-4">
+    <section id={blockAnchor(title)} aria-label={title} className="rounded-lg border border-[var(--v-border)] bg-[var(--v-bg)] p-3.5 sm:p-4">
       <div className="mb-2.5 flex flex-wrap items-center gap-2">
         <h4 className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">{title}</h4>
         {!quiet && <StateChip block={block} />}

@@ -223,11 +223,46 @@ def _money(ctx: OwnerContext, q: str) -> dict:
                 next=["Which bills are due soon?", "Compare this month with last month"])
 
 
+def _revenue(ctx: OwnerContext, q: str) -> dict:
+    """Sales and forecasts share the exact Home/report computations and labelled windows."""
+    from routers import overview
+    from datetime import timedelta
+    lower=q.lower()
+    period="30d" if any(w in lower for w in ("30 days","this month")) else "7d" if any(w in lower for w in ("week","7 days")) else "today"
+    start,end=overview._eat_range(period)
+    label={"today":"today","7d":"in the last 7 days","30d":"in the last 30 days"}[period]
+    if "yesterday" in lower:
+        start,end=overview._eat_range("today");start-=timedelta(days=1);end=start+timedelta(days=1);label="yesterday"
+    if "this month" in lower:
+        from owner.money.pnl import nairobi_utc_range,period_range
+        from time_utils import eat_date
+        start,end=nairobi_utc_range(*period_range("month",eat_date(ctx.now)));end=min(end,ctx.now);label="this calendar month so far"
+    core=overview._summarize(ctx.db,ctx.rid,start,end)
+    average=round(core['revenue']/core['orders'],2) if core['orders'] else 0
+    rows=[row("sales","Sales",core['revenue'],"kes",label),row("orders","Paid orders",core['orders'],"count",label),row("average_order","Average paid order",average,"kes",label)]
+    headline=f"You sold {kes_text(core['revenue'])} from {core['orders']} paid orders {label}. The average order was {kes_text(average)}."
+    if any(w in lower for w in ("expect","forecast","next week","busiest","saturday","sunday","monday","tuesday","wednesday","thursday","friday")):
+        forecast=areas._forecast(ctx)
+        days=forecast.get('next_7_days',[])
+        requested=next((d for d in days if d['day'].lower() in lower or d['day'][:3].lower() in lower),None)
+        selected=[requested] if requested else days
+        if selected:
+            rows=[row("forecast",d['date'],d['usual'],"kes",f"{d['day']}: {kes_text(d['low'])} to {kes_text(d['high'])}") for d in selected]
+            total=sum(d['usual'] for d in selected)
+            headline=f"Expected sales: about {kes_text(total)} over {'the selected day' if requested else 'the next 7 days'}. This is a forecast from recorded sales, not a promise."
+        else:
+            headline=forecast.get('reason') or "More recorded trading days are needed before a forecast can be shown."
+    base=ctx.order_state()
+    return make("what","revenue",q,state=base['state'],as_of=base.get('as_of'),headline=headline,rows=rows,reason=base.get('reason'),
+                assumptions=[assumption("Paid, non-cancelled orders in the labelled Nairobi window. Forecasts use the same engine as Sales & Dishes.")],
+                next=["What should I expect next week?","Compare this week with last week"])
+
+
 # ── the table ────────────────────────────────────────────────────────────────
 
 AREA_TOPICS: dict[str, Callable[[OwnerContext, str], dict]] = {
     "cash": _cash, "mpesa": _mpesa, "things_to_check": _things_to_check, "suppliers": _suppliers, "win_back": _win_back,
-    "savings": _savings, "data_trust": _data_trust, "money": _money,
+    "savings": _savings, "data_trust": _data_trust, "money": _money, "revenue": _revenue,
 }
 
 

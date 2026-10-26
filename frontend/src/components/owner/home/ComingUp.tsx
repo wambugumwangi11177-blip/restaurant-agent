@@ -25,7 +25,7 @@ export default function ComingUp({ data }: { data: Data }) {
       <Card title="Bills" block={bills}>
         {bills.items?.length ? (
           <ul className="space-y-1.5">
-            {bills.items.map((b) => (
+            {bills.items.slice(0,5).map((b) => (
               <li key={`${b.name}-${b.due_on}`} className="flex justify-between gap-3">
                 <span>{b.name} · {b.days_away === 0 ? "today" : `in ${plural(b.days_away, "day")}`} ({shortDay(b.due_on)})</span>
                 <b className={b.short ? "text-[var(--v-destructive)]" : ""}>{kes(b.amount_kes)}{b.short ? " · short" : ""}</b>
@@ -37,7 +37,7 @@ export default function ComingUp({ data }: { data: Data }) {
       <Card title="Licences" block={licences}>
         {licences.items?.length ? (
           <ul className="space-y-1.5">
-            {licences.items.map((l) => (
+            {licences.items.slice(0,5).map((l) => (
               <li key={l.name} className="flex justify-between gap-3"><span>{l.name}</span><b className={l.status === "expired" ? "text-[var(--v-destructive)]" : ""}>{l.word} · {shortDay(l.expires_on)}</b></li>
             ))}
           </ul>
@@ -46,7 +46,7 @@ export default function ComingUp({ data }: { data: Data }) {
       <Card title="Deliveries" block={deliveries}>
         {deliveries.items?.length ? (
           <ul className="space-y-1.5">
-            {deliveries.items.map((d) => (
+            {deliveries.items.slice(0,5).map((d) => (
               <li key={`${d.item}-${d.expected_at}`} className="flex justify-between gap-3"><span>{d.item} · {d.supplier}</span><b>{shortDay(d.expected_at.slice(0, 10))}, {nairobiTime(d.expected_at)}</b></li>
             ))}
           </ul>
@@ -57,10 +57,11 @@ export default function ComingUp({ data }: { data: Data }) {
           <>
             <p className="mb-1.5">{bookings.covers_today ? `${plural(bookings.covers_today, "guest")} booked tonight.` : bookings.reason}</p>
             <ul className="space-y-1">
-              {bookings.next_days.map((d) => (
+              {bookings.next_days.slice(0,5).map((d) => (
                 <li key={d.date} className="flex justify-between gap-3"><span>{weekday(d.date)} {shortDay(d.date)}</span><b>{plural(d.bookings, "booking")} · {plural(d.covers, "guest")}</b></li>
               ))}
             </ul>
+            {bookings.next_days.length>5&&<details><summary className="min-h-11 cursor-pointer py-2 font-semibold">{bookings.next_days.length-5} more days</summary>{bookings.next_days.slice(5).map(d=><p key={d.date} className="py-2">{weekday(d.date)} {shortDay(d.date)} · {plural(d.bookings,'booking')} · {plural(d.covers,'guest')}</p>)}</details>}
           </>
         ) : <Quiet text={bookings.reason ?? "No bookings in the next 7 days."} />}
       </Card>

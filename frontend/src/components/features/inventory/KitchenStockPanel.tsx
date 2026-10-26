@@ -1,6 +1,9 @@
 "use client";
+import {useListQuery} from "@/lib/owner/useListQuery";
+import {useDailyReview} from "@/lib/owner/useDailyReview";
 
 import { useEffect, useState } from "react";
+import {useAuth} from "@/context/AuthContext";
 import api from "@/lib/api";
 import { AnimatePresence, motion } from "framer-motion";
 import { Package, ClipboardList } from "lucide-react";
@@ -20,7 +23,12 @@ import type { InventoryItem, StockTransfer } from "./types";
  * matrix, not write) rather than reusing that full workspace and hiding
  * buttons after the fact.
  */
-export default function KitchenStockPanel() {
+export default function KitchenStockPanel({ focused = false }: { focused?: boolean }) {
+ const [tool]=useListQuery("tool","receipts");
+ const reviewDay=useDailyReview();
+    const {user}=useAuth();
+    const [failure,setFailure]=useState("");
+    const [photo,setPhoto]=useState<File|null>(null);
     const [items, setItems] = useState<InventoryItem[]>([]);
     const [transfers, setTransfers] = useState<StockTransfer[]>([]);
     const [loading, setLoading] = useState(true);
@@ -35,8 +43,8 @@ export default function KitchenStockPanel() {
 
     const fetchData = async () => {
         const [invRes, transfersRes] = await Promise.all([
-            api.get("/inventory/").catch(() => ({ data: [] })),
-            api.get("/stock/transfers").catch(() => ({ data: [] })),
+            api.get("/inventory/").catch(() => {setFailure("Could not read inventory. Reload to retry.");return {data:[]};}),
+            api.get("/stock/transfers").catch(() => {setFailure("Could not read handovers. Reload to retry.");return {data:[]};}),
         ]);
         setItems(Array.isArray(invRes.data) ? invRes.data : []);
         setTransfers(
@@ -47,7 +55,7 @@ export default function KitchenStockPanel() {
         setLoading(false);
     };
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { fetchData(); }, [reviewDay]);
 
     const handleRequestStock = async () => {
         if (!requestItemId) return;
@@ -70,7 +78,10 @@ export default function KitchenStockPanel() {
         if (!confirmQty) return;
         setSubmitting(true);
         try {
+            let photo_ref=null;
+            if(photo){const form=new FormData();form.append('file',photo);photo_ref=(await api.post('/api/v1/owner/operations/receipts',form,{headers:{'Content-Type':'multipart/form-data'}})).data.receipt_ref;}
             const res = await api.post(`/stock/transfers/${transferId}/confirm`, {
+                photo_ref,
                 confirmed_quantity: parseFloat(confirmQty),
             });
             showToast(
@@ -99,17 +110,17 @@ export default function KitchenStockPanel() {
 
     return (
         <div className="space-y-5">
-            {toastNode}
+            {toastNode}{failure&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-red-900">{failure}</p>}
 
             <div>
-                <h1 className="text-xl font-bold text-text">Stock</h1>
+                <h1 className="text-xl font-bold text-text">{focused?(tool==="request"?"Request stock from store":"Kitchen receipt confirmations"):"Stock"}</h1>
                 <p className="text-sm text-text-dim mt-0.5">
-                    Running low on something? Request it from the store — the storekeeper gets notified right away.
+                    {focused?(tool==="request"?"Choose an ingredient to request from the store.":"Confirm the quantity that actually arrived from the store."):"Request ingredients from the store and confirm your own count when they arrive."}
                 </p>
             </div>
 
             {/* Request from store */}
-            <div className="bg-surface border border-border rounded-xl">
+            {(!focused||tool==="request")&&<div className="bg-surface border border-border rounded-xl">
                 <div className="px-4 py-3 border-b border-surface-hover flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <ClipboardList className="w-3.5 h-3.5 text-accent" />
@@ -141,16 +152,17 @@ export default function KitchenStockPanel() {
                 </AnimatePresence>
             </div>
 
+            }
             {/* Pending requests / awaiting confirmation */}
             <div className="bg-surface border border-border rounded-xl">
                 <div className="px-4 py-3 border-b border-surface-hover">
                     <p className="text-xs font-semibold text-text">Requests & deliveries</p>
                 </div>
                 <div className="divide-y divide-surface-hover">
-                    {transfers.length === 0 ? (
+                    {transfers.filter(t=>!focused||(tool==="request"?t.status==="requested":t.status==="pending")).length === 0 ? (
                         <p className="text-xs text-text-dim text-center py-6">Nothing pending</p>
                     ) : (
-                        transfers.map((t) => {
+                        transfers.filter(t=>!focused||(tool==="request"?t.status==="requested":t.status==="pending")).map((t) => {
                             const isRequested = t.status === "requested";
                             return (
                                 <div key={t.id} className="px-4 py-3">
@@ -163,9 +175,9 @@ export default function KitchenStockPanel() {
                                                 {isRequested ? "Waiting for the store to send it" : "Ready to collect — confirm what actually arrived"}
                                             </p>
                                         </div>
-                                        {!isRequested && (
+                                        {!isRequested && t.initiated_by_user_id!==user?.id && (
                                             <button
-                                                onClick={() => { setConfirmingId(confirmingId === t.id ? null : t.id); setConfirmQty(String(t.quantity)); }}
+                                                onClick={() => { setConfirmingId(confirmingId === t.id ? null : t.id); setConfirmQty("");setPhoto(null); }}
                                                 className="text-[10px] px-2 py-1 rounded bg-surface-hover text-text-muted hover:text-success transition-all">
                                                 Confirm receipt
                                             </button>
@@ -177,12 +189,13 @@ export default function KitchenStockPanel() {
                                                 className="mt-2 flex gap-2 items-end">
                                                 <FormField
                                                     label="Actual quantity received"
-                                                    placeholder="Actual quantity received"
+                                                    aria-label="Actual quantity received" placeholder="Actual quantity received" min="0" step="any"
                                                     value={confirmQty}
                                                     onChange={(e) => setConfirmQty(e.target.value)}
                                                     type="number"
                                                     className="flex-1 bg-surface-hover border border-border rounded-lg px-2 py-1.5 text-xs text-text placeholder-text-dim focus:outline-none"
                                                 />
+                                                <label className="text-xs">Photo (optional)<input type="file" accept="image/*" capture="environment" onChange={e=>setPhoto(e.target.files?.[0]??null)}/></label>
                                                 <button onClick={() => handleConfirmTransfer(t.id)} disabled={!confirmQty || submitting}
                                                     className="bg-success text-black rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50">
                                                     {submitting ? "..." : "Confirm"}
@@ -198,16 +211,16 @@ export default function KitchenStockPanel() {
             </div>
 
             {/* Read-only stock levels */}
-            <div className="bg-surface border border-border rounded-xl">
+            {!focused&&<div className="bg-surface border border-border rounded-xl">
                 <div className="px-4 py-3 border-b border-surface-hover flex items-center gap-2">
                     <Package className="w-3.5 h-3.5 text-accent" />
-                    <p className="text-xs font-semibold text-text">Stock levels</p>
+                    <p className="text-xs font-semibold text-text">Stock preview · first 5 items</p>
                 </div>
                 <div className="divide-y divide-surface-hover">
                     {items.length === 0 ? (
                         <p className="text-xs text-text-dim text-center py-8">No stock items tracked yet</p>
                     ) : (
-                        items.map((item) => {
+                        items.slice(0,5).map((item) => {
                             const isLow = item.quantity <= item.low_stock_threshold;
                             const isOut = item.quantity <= 0;
                             return (
@@ -226,7 +239,8 @@ export default function KitchenStockPanel() {
                         })
                     )}
                 </div>
-            </div>
+            </div>}
+
         </div>
     );
 }

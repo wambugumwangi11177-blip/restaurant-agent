@@ -141,3 +141,68 @@ def shifts(ctx):
             'entered_up_to':max((eat_date(c.counted_at).isoformat() for c in rows if c.counted_at),default=None),
             'reason':None if rows else 'No drawer counts recorded in the last 14 days.','shifts':out,
             'mpesa':matches,'note':'Nairobi time. M-Pesa uses receipt/exact/grouped/split statement matching, attributed by payment time; outside-statement sales are not missing payments. Stock covers only items with exactly two physical counts inside the shift, within 15 minutes of its boundaries; the actual count interval is shown. Other items remain unknown. Cancelled sales are orders opened in the shift. Overlapping drawer checks must not be added.'}
+
+
+def price_impact(ctx, menu_item_id, new_price_cents):
+    from sqlalchemy import func
+    from owner.areas import month_pnl
+    from owner.money.pnl import nairobi_utc_range
+    from datetime import date
+    dish=ctx.db.query(models.MenuItem).filter_by(id=menu_item_id,restaurant_id=ctx.rid).first()
+    if dish is None:
+        raise LookupError("Dish not found in this branch")
+    pnl=month_pnl(ctx)
+    start,end=nairobi_utc_range(date.fromisoformat(pnl['period']['start']),date.fromisoformat(pnl['period']['end']))
+    end=min(end,ctx.now)
+    portions=int(ctx.db.query(func.coalesce(func.sum(models.OrderItem.quantity),0)).join(models.Order,models.Order.id==models.OrderItem.order_id).filter(
+        models.Order.restaurant_id==ctx.rid,models.OrderItem.menu_item_id==dish.id,models.Order.is_paid.is_(True),
+        models.Order.status!=models.OrderStatus.CANCELLED,models.Order.created_at>=start,models.Order.created_at<end).scalar())
+    delta_cents=(new_price_cents-dish.price)*portions
+    delta=delta_cents/100
+    before={r['key']:r['kes'] for r in pnl['lines']}
+    after={k:round(v+(delta if k in {'sales','left_after_ingredients','kept'} else 0),2) for k,v in before.items()}
+    if after['sales'] <= 0:
+        raise ValueError('This price difference exceeds the recorded sales baseline. Choose a smaller change.')
+    def pct(key,value,sales):
+        if not sales:return None
+        return round((abs(value) if key in {'ingredients','wages','other_costs'} else value)/sales*100,2)
+    rows=[{'key':r['key'],'label':r['label'],'before_kes':r['kes'],'after_kes':after[r['key']],
+           'before_pct':pct(r['key'],r['kes'],before['sales']),
+           'after_pct':pct(r['key'],after[r['key']],after['sales']),
+           'change_kes':round(after[r['key']]-r['kes'],2)} for r in pnl['lines']]
+    return {'dish':dish.name,'portions':portions,'current_price_kes':dish.price/100,'new_price_kes':new_price_cents/100,
+            'period':pnl['period'],'rows':rows,'extra_sales_kes':delta,'complete':pnl['complete'],
+            'missing_costs':pnl.get('missing_costs',[]),'notes':pnl.get('notes',[]),
+            'assumption':'Illustration using this month’s recorded portions at the proposed price difference from today’s menu. Same portions, ingredient costs, wages and other costs. Demand and commission changes are not modelled. No price is saved. Use Ask LEVIII for a demand-response simulation.'}
+
+
+def price_simulation(ctx, menu_item_id: int, new_price_cents: int) -> dict:
+    """Owner-facing adapter over the same demand engine used by Ask; read-only, tenant scoped."""
+    from ai.simulation.engine import simulate_price_change
+    item = ctx.db.query(models.MenuItem).filter_by(id=menu_item_id, restaurant_id=ctx.rid).first()
+    if item is None:
+        raise LookupError('Dish not found in this restaurant')
+    result = simulate_price_change(ctx.db, ctx.rid, menu_item_id, new_price_cents, ctx.settings)
+    if not result.get('available'):
+        raise ValueError(result.get('error', 'Could not model this price'))
+    before, after = result['baseline'], result['projected']
+    known_cost = bool(item.cost_price and item.cost_price > 0)
+    return {
+        'state': 'assumption' if before['daily_qty'] > 0 else 'no_data',
+        'dish': item.name, 'current_price_kes': kes(item.price), 'proposed_price_kes': kes(new_price_cents),
+        'rows': [
+            {'key': 'portions', 'label': 'Portions per 30 days', 'unit': 'portions', 'before': before['monthly_qty'], 'after': after['monthly_qty']},
+            {'key': 'sales', 'label': 'Dish sales per 30 days', 'unit': 'kes', 'before': kes(before['monthly_revenue_cents']), 'after': kes(after['monthly_revenue_cents'])},
+            {'key': 'contribution', 'label': 'Left after this dish’s ingredients', 'unit': 'kes', 'before': kes(before['monthly_profit_cents']) if known_cost else None, 'after': kes(after['monthly_profit_cents']) if known_cost else None},
+            {'key': 'margin', 'label': 'Share left after ingredients', 'unit': 'percent', 'before': before['margin_pct'] if known_cost else None, 'after': after['margin_pct'] if known_cost else None},
+        ],
+        'demand_change_pct': result['deltas']['sales_pct'],
+        'elasticity': result['elasticity_used'], 'sensitivity_source': result['sensitivity_source'],
+        'confidence_pct': result['confidence_pct'],
+        'notes': [
+            'Assumption, not a promise: projected demand uses the shared price-response model and recorded sales history.',
+            'A 30-day dish contribution comparison. Wages, rent, other operating costs and delivery commissions are excluded; this is not restaurant net profit.',
+            'No menu price is saved. Check the fixed-portions P&L comparison separately.',
+        ] + (['No recorded demand for this dish in the baseline; record sales before relying on a projection.'] if before['daily_qty'] == 0 else [])
+          + ([] if known_cost else ['Ingredient cost is missing; contribution and margin cannot be calculated.']),
+    }

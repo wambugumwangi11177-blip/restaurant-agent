@@ -2,7 +2,7 @@
 import io
 import uuid
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
 from pydantic import BaseModel, ConfigDict, Field
@@ -14,12 +14,12 @@ from auth import require_staff_role
 from database import get_db
 from routers.deps import get_or_create_restaurant
 from ai import reorder
-from time_utils import utcnow
+from time_utils import utcnow, eat_date
 from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(prefix='/owner/operations', tags=['staff-entry'])
 readers = require_staff_role(models.StaffRole.OWNER, models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER)
-receivers = require_staff_role(models.StaffRole.OWNER, models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER)
+receivers = require_staff_role(models.StaffRole.OWNER, models.StaffRole.MANAGER, models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER)
 managers = require_staff_role(models.StaffRole.OWNER, models.StaffRole.MANAGER)
 
 class Strict(BaseModel):
@@ -64,8 +64,8 @@ def record_operation(body:OperationIn,db:Session=Depends(get_db),user=Depends(re
     if body.restaurant_id!=rid:
         raise HTTPException(409,'Branch changed. Return to the branch where this entry was captured.')
     owner=user.role in (models.Role.ADMIN,models.Role.SUPERADMIN) or user.staff_role==models.StaffRole.OWNER
-    if not owner and user.staff_role==models.StaffRole.CONTROLLER and body.kind!='count':
-        raise HTTPException(403,'Your role can count but cannot move stock or pay bills')
+    if not owner and user.staff_role==models.StaffRole.CONTROLLER and body.kind=='bill':
+        raise HTTPException(403,'Use the accounting bill payment workflow for bill payments')
     if not owner and user.staff_role==models.StaffRole.STOCKKEEPER and body.kind=='bill':
         raise HTTPException(403,'A manager records bill payments')
     key=f'ops:{rid}:{user.id}:{body.entry_key}'
@@ -83,7 +83,6 @@ def record_operation(body:OperationIn,db:Session=Depends(get_db),user=Depends(re
         raise HTTPException(422,'Entry capture time must be within the last seven days')
     result={}
     if body.kind=='bill':
-        from time_utils import eat_date
         bill=db.query(models.RecurringBill).filter_by(id=body.bill_id,restaurant_id=rid,is_active=True).with_for_update().first()
         if not bill:
             raise HTTPException(404,'Active bill not found')
@@ -122,9 +121,13 @@ def record_operation(body:OperationIn,db:Session=Depends(get_db),user=Depends(re
                 raise HTTPException(422,'Issue a positive quantity')
             transfer=models.StockTransfer(restaurant_id=rid,inventory_item_id=item.id,quantity=body.quantity,unit=item.unit,
                 from_location='store',to_location='kitchen',status=models.StockTransferStatus.PENDING,
-                initiated_by_user_id=user.id,notes=body.note)
+                initiated_by_user_id=user.id,initiated_at=utcnow(),notes=body.note)
             db.add(transfer);db.flush()
+            from owner.daily import dispatch
+            dispatch(db,transfer)
             result={'message':'Kitchen issue saved. A different person must confirm what arrived.','transfer_id':transfer.id}
+    from owner.daily import reopen
+    reopen(db,rid,eat_date(captured or now),'Staff entry recorded')
     entry=models.OperationEntry(restaurant_id=rid,user_id=user.id,entry_key=key,kind=body.kind,payload=payload,result=json.dumps(result),created_at=now)
     db.add(entry)
     try:
@@ -166,7 +169,12 @@ def undo_operation(entry_id:int,db:Session=Depends(get_db),user=Depends(readers)
         transfer=db.query(models.StockTransfer).filter_by(id=result['transfer_id'],restaurant_id=rid).first()
         if transfer.status!=models.StockTransferStatus.PENDING:
             raise HTTPException(409,'Kitchen already processed this issue; resolve the handover instead')
-        db.delete(transfer)  # original issued quantities remain in the immutable operation journal
+        from owner.daily import zone_event
+        item=item_for(db,user,transfer.inventory_item_id)
+        if db.query(models.StockZoneEvent).filter_by(entry_key=f'transfer:{transfer.id}:store').first():
+            zone_event(db,item,'store',transfer.quantity,'dispatch_reversal',user.id,f'transfer:{transfer.id}:undo-store')
+            zone_event(db,item,'in_transit',-transfer.quantity,'dispatch_reversal',user.id,f'transfer:{transfer.id}:undo-transit')
+        db.delete(transfer)  # issued quantities and reversal remain in the journal and zone ledger
     elif entry.kind in ('count','waste'):
         item=item_for(db,user,result['item_id']);db.refresh(item,with_for_update=True)
         later=db.query(models.StockMovement).filter(models.StockMovement.inventory_item_id==item.id,
@@ -188,6 +196,13 @@ def undo_operation(entry_id:int,db:Session=Depends(get_db),user=Depends(readers)
         entry.result=json.dumps(result)
     else:
         raise HTTPException(409,'This entry cannot be undone here')
+    from owner.daily import reopen
+    reopen(db,rid,eat_date(entry.created_at),'Entry reversed')
+    original_capture=json.loads(entry.payload).get('captured_at')
+    if original_capture:
+        at=datetime.fromisoformat(original_capture.replace('Z','+00:00'))
+        if at.tzinfo:at=at.astimezone(timezone.utc).replace(tzinfo=None)
+        reopen(db,rid,eat_date(at),'Entry captured on this day was reversed')
     entry.undone_at=utcnow();db.commit()
     return {'message':'Entry reversed. Original record and correction retained for review.'}
 
@@ -214,7 +229,7 @@ def receipt_key(ref, rid):
     return ref
 
 @router.post('/receipts', status_code=201)
-async def upload_receipt(file: UploadFile=File(...), db: Session=Depends(get_db), user=Depends(readers)):
+async def upload_receipt(file: UploadFile=File(...), db: Session=Depends(get_db), user=Depends(require_staff_role(models.StaffRole.MANAGER,models.StaffRole.STOCKKEEPER,models.StaffRole.CONTROLLER,models.StaffRole.KITCHEN))):
     rid = get_or_create_restaurant(db,user).id
     data = await file.read(750001)
     if len(data)>750000:
@@ -233,7 +248,7 @@ async def upload_receipt(file: UploadFile=File(...), db: Session=Depends(get_db)
     return {'receipt_ref':key}
 
 @router.get('/receipts/{name}')
-def read_receipt(name: str, db: Session=Depends(get_db), user=Depends(readers)):
+def read_receipt(name: str, db: Session=Depends(get_db), user=Depends(require_staff_role(models.StaffRole.MANAGER,models.StaffRole.STOCKKEEPER,models.StaffRole.CONTROLLER,models.StaffRole.KITCHEN))):
     rid=get_or_create_restaurant(db,user).id
     key=receipt_key(f'receipts/{rid}/{name}',rid)
     return Response(storage.load(key),media_type='image/jpeg',headers={'Cache-Control':'no-store','Content-Disposition':'inline; filename="receipt.jpg"'})
@@ -242,6 +257,7 @@ class ReceiveIn(Strict):
     quantity: float = Field(ge=0, le=1000000, allow_inf_nan=False)
     units: Literal['counting','buying']='counting'
     invoice_ref: str | None = Field(default=None, max_length=255)
+    expires_on: date | None = None
 
 @router.post('/deliveries/{po_id}/receive')
 def receive(po_id: int, body: ReceiveIn, db: Session=Depends(get_db), user=Depends(receivers)):
@@ -258,10 +274,18 @@ def receive(po_id: int, body: ReceiveIn, db: Session=Depends(get_db), user=Depen
     if po.status in ('PARTIAL','DELIVERED'):
         if po.quantity_received!=quantity or (body.invoice_ref and po.invoice_ref!=body.invoice_ref):
             raise HTTPException(409,'This delivery was already recorded with different details')
-        return {'id':po.id,'received':po.quantity_received,'status':po.status,'invoice_ref':po.invoice_ref}
+        return receipt_result(db,po,item,user,body.expires_on)
     po.invoice_ref=body.invoice_ref
     try:
-        po=reorder.receive_purchase_order(db,po_id,rid,quantity,user.id)
+        po=reorder.receive_purchase_order(db,po_id,rid,quantity,user.id,expires_on=body.expires_on)
     except reorder.PurchaseOrderError as exc:
         raise HTTPException(400,str(exc)) from exc
+    return receipt_result(db,po,item,user,body.expires_on)
+
+
+def receipt_result(db,po,item,user,expires_on):
+    batch=db.query(models.StockReceiptBatch).filter_by(purchase_order_id=po.id,restaurant_id=po.restaurant_id).first()
+    if batch and batch.expires_on!=expires_on and expires_on is not None:
+        raise HTTPException(409,'Receipt batch already recorded with a different expiry')
+    # Historical received orders without batch evidence remain unallocated; never infer a past location on retry.
     return {'id':po.id,'received':po.quantity_received,'status':po.status,'invoice_ref':po.invoice_ref}

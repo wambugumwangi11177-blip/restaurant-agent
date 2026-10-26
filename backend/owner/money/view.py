@@ -44,6 +44,10 @@ def owner_pnl(p: dict, kind: str, settings: Settings, *, as_of: datetime | None 
         notes.append("Wages are worked out from your shift records. Enter your salaries to use your real payroll.")
     elif p["labour_basis"] == "none":
         notes.append("No wages recorded for this period yet.")
+    if p.get("staff_meals_cents"):
+        notes.append("Recorded staff meals are included in staff costs; they do not replace payroll or shift-based wages.")
+    if p.get("payroll_missing") and p.get("staff_meals_cents"):
+        notes.append("Only staff meals are recorded. Payroll and costed shifts are missing, so total staff costs are incomplete.")
     if p["ingredients_basis"] == "purchases":
         notes.append("Most dishes have no ingredient cost yet, so ingredients are what you bought in this period.")
     if p["missing_costs"]:
@@ -56,7 +60,7 @@ def owner_pnl(p: dict, kind: str, settings: Settings, *, as_of: datetime | None 
     if period["partial"]:
         notes.append(f"{label} ({period['days_elapsed']} of {period['days']} days).")
 
-    complete = p["costs_entered"] and not p["missing_categories"] and not p["missing_costs"]
+    complete = p["costs_entered"] and not p["missing_categories"] and not p["missing_costs"] and not p.get("payroll_missing")
     lines = [
         {"key": "sales", "label": "Sales", "kes": _k(sales), "state": sales_state},
         {"key": "ingredients", "label": "Ingredients", "kes": -_k(ingredients), "state": "live" if p["ingredients_basis"] == "recipe" else "as_entered"},

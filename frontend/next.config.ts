@@ -28,8 +28,7 @@ const SECURITY_HEADERS = [
   },
 ];
 
-// The two old owner shells (/vibanda for the Macsoft-fed restaurant, /demo for the demonstration one) are now one shell at /home,
-// /os and /reports. Every old address still works: a deep link or a bookmark lands where its content lives now.
+// Both historical shells resolve to one owner experience and one set of records.
 const LEGACY_SHELLS = ["vibanda", "demo"];
 const legacyRedirects = LEGACY_SHELLS.flatMap((shell) => [
   { source: `/${shell}`, destination: "/home", permanent: false },

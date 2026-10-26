@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Users, ArrowLeft } from "lucide-react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -9,6 +9,7 @@ import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 
 interface RosterEntry {
+    restaurant_name?: string|null;
     user_id: number;
     name: string;
     role_title: string | null;
@@ -41,12 +42,13 @@ export default function QuickSwitchModal({
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
 
-    useEffect(() => {
-        api.get("/api/v1/auth/quick-switch/roster")
+    const loadRoster=useCallback(()=>{
+        return api.get("/api/v1/auth/quick-switch/roster")
             .then((res) => setRoster(res.data))
-            .catch(() => setRoster([]))
+            .catch(() => {setRoster([]);setError("Could not load teammates. Check your connection and retry.");})
             .finally(() => setLoading(false));
-    }, []);
+    },[]);
+    useEffect(() => {void loadRoster();}, [loadRoster]);
 
     const handlePinSubmit = async () => {
         if (!selected || pin.length < 4) return;
@@ -66,8 +68,9 @@ export default function QuickSwitchModal({
         <Modal label={selected ? `Enter PIN for ${selected.name}` : "Switch user"} onClose={onClose}>
             {!selected ? (
                 <div className="space-y-2">
+                    {error&&<p role="alert" className="text-sm text-red-400">{error} <button className="min-h-11 px-3 underline" onClick={()=>{setLoading(true);setError("");void loadRoster();}}>Retry roster</button></p>}
                     {loading && <p className="text-xs text-[var(--text-dim)]">Loading teammates…</p>}
-                    {!loading && roster.length === 0 && (
+                    {!loading && !error && roster.length === 0 && (
                         <p className="text-xs text-[var(--text-dim)]">
                             No teammates have set up a quick-switch PIN yet. Set one from your
                             account settings, then it&apos;ll show up here for others.
@@ -83,7 +86,7 @@ export default function QuickSwitchModal({
                             <div className="min-w-0">
                                 <p className="text-sm text-[var(--text)] truncate">{r.name}</p>
                                 {r.role_title && (
-                                    <p className="text-xs text-[var(--text-dim)] truncate">{r.role_title}</p>
+                                    <p className="text-xs text-[var(--text-dim)] truncate">{r.staff_role==='controller'?'Accountant':r.role_title}{r.restaurant_name?' · '+r.restaurant_name:''}</p>
                                 )}
                             </div>
                         </button>

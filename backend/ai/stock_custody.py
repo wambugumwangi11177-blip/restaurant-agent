@@ -89,6 +89,8 @@ def _actual_usage_by_item(db: Session, restaurant_id: int, since) -> dict[int, f
             models.StockMovement.movement_type == models.StockMovementType.OUT,
             models.StockMovement.created_at >= since,
               *valid_movement_filters(db,restaurant_id),
+            func.lower(func.coalesce(models.StockMovement.reason,'')).notlike('transfer %'),
+            func.lower(func.coalesce(models.StockMovement.reason,'')).notlike('waste:%'),
         )
         .group_by(models.StockMovement.inventory_item_id)
         .all()
@@ -193,6 +195,7 @@ def confirm_transfer(
     confirming_user_id: int,
     confirmed_quantity: float,
     notes: str = "",
+    photo_ref: str | None = None,
 ) -> models.StockTransfer:
     """
     Shared confirm logic for both routers/stock_custody.py's HTTP endpoint and
@@ -207,14 +210,27 @@ def confirm_transfer(
     transfer = db.query(models.StockTransfer).filter(
         models.StockTransfer.id == transfer_id,
         models.StockTransfer.restaurant_id == restaurant_id,
-    ).first()
+    ).with_for_update().first()
     if not transfer:
         raise TransferConfirmError("Transfer not found")
+    if transfer.initiated_by_user_id == confirming_user_id:
+        raise TransferConfirmError("A different person must confirm this handover")
+    if transfer.status in (models.StockTransferStatus.CONFIRMED, models.StockTransferStatus.DISPUTED) and transfer.confirmed_by_user_id == confirming_user_id and transfer.confirmed_quantity == confirmed_quantity:
+        return transfer
     if transfer.status != models.StockTransferStatus.PENDING:
         raise TransferConfirmError(f"Transfer already {transfer.status.value}")
-    if confirmed_quantity < 0:
-        raise TransferConfirmError("confirmed_quantity cannot be negative")
+    import math
+    if not math.isfinite(confirmed_quantity) or confirmed_quantity < 0 or confirmed_quantity > 1000000:
+        raise TransferConfirmError("confirmed_quantity must be a finite quantity between zero and one million")
 
+    if photo_ref:
+        from routers.owner_operations import receipt_key
+        receipt_key(photo_ref,restaurant_id)
+    from sqlalchemy import update
+    claim=db.execute(update(models.StockTransfer).where(models.StockTransfer.id==transfer_id,models.StockTransfer.restaurant_id==restaurant_id,
+        models.StockTransfer.status==models.StockTransferStatus.PENDING,models.StockTransfer.confirmed_at.is_(None)).values(confirmed_at=utcnow()),execution_options={'synchronize_session':False})
+    if claim.rowcount!=1:
+        raise TransferConfirmError('Handover changed; reload before confirming')
     transfer.confirmed_by_user_id = confirming_user_id
     transfer.confirmed_at = utcnow()
     transfer.confirmed_quantity = confirmed_quantity
@@ -246,6 +262,13 @@ def confirm_transfer(
             performed_by_user_id=confirming_user_id,
         ))
 
+    from owner.daily import arrive, reopen
+    from time_utils import eat_date
+    arrive(db, transfer)
+    if photo_ref:
+        from owner.daily import zone_event
+        zone_event(db,item,'kitchen',0,'receipt_photo',confirming_user_id,f'transfer:{transfer.id}:photo',{'photo_ref':photo_ref,'transfer_id':transfer.id})
+    reopen(db, restaurant_id, eat_date(utcnow()), 'Kitchen receipt confirmed')
     db.commit()
     db.refresh(transfer)
 
@@ -371,6 +394,8 @@ def fulfill_transfer(
     if notes:
         transfer.notes = f"{transfer.notes}\n[fulfil] {notes}".strip()
 
+    from owner.daily import dispatch
+    dispatch(db, transfer)
     db.commit()
     db.refresh(transfer)
 

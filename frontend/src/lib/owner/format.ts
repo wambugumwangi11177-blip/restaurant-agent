@@ -10,7 +10,8 @@ const GROUP_CENTS = new Intl.NumberFormat("en-KE", { minimumFractionDigits: 2, m
 
 /** KES 412,000 · -KES 1,200 · whole shillings unless `cents` (an accountant's figure). null/undefined → "—" is never produced here. */
 export function kes(value: number | null | undefined, opts: { cents?: boolean } = {}): string {
-  const n = Number.isFinite(value as number) ? (value as number) : 0;
+  if (value == null || !Number.isFinite(value)) return "Not recorded";
+  const n = value;
   const body = opts.cents ? GROUP_CENTS.format(Math.abs(n)) : GROUP.format(Math.abs(Math.round(n)));
   return `${n < 0 && Math.round(n) !== 0 ? "-" : ""}KES ${body}`;
 }
@@ -25,10 +26,10 @@ export function kesShort(value: number): string {
   return `${sign}KES ${Math.round(n)}`;
 }
 
-/** 29.3% — one decimal, a trailing .0 is dropped. */
+/** Percentages always use one decimal in the daily experience. */
 export function pct(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "0%";
-  return `${value.toFixed(1).replace(/\.0$/, "")}%`;
+  if (value == null || !Number.isFinite(value)) return "Not recorded";
+  return `${value.toFixed(1)}%`;
 }
 
 /** "+14.8%" / "-3.2%" — a change against the same weekday last week. */

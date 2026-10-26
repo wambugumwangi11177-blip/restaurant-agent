@@ -1,3 +1,29 @@
+## Completion validation resumed — 26 October 2026
+
+Recovered the interrupted Eleven daily-workflow task from the prior local chat. Finished the production build and stable frontend regression; phone/desktop acceptance evidence is in `.tmp/resume-browser/`. Preserve all demo records; no production, provider or deployment changes.
+
+Resolved cross-drive package failures with a contiguous runtime at `D:/codex-eleven-runtime/2026-10-26-frontend`. Its production build and TypeScript pass. Workspace `frontend/node_modules` and `.next` link to that verified runtime; original dependency/build copies are preserved. The system drive repeatedly filled, including during a progress-log save. Recovered the progress history from Git plus the previously read uncommitted entries, saved a recovery copy on D:, and moved `docs/v2` to D: with its original path preserved by a junction. Temporary evidence is likewise preserved under the original `.tmp` path.
+
+Frontend: **303 tests in 26 files passed** with one thread worker (`.tmp/resume-ui-threads.log`); stalled fork-worker attempts are retained as incomplete attempts. Read-only API validation: **91 checks/identity proofs passed** across both branches (`.tmp/resume-live-api.log`). Backend focused regression found two test defects: weekly fixture orders crossed the Nairobi calendar boundary just after midnight, and one assertion reused an ORM object cached before a separate HTTP transaction. Corrected fixture placement and refreshed that object; added three time-boundary cases. The daily/golden recheck is **56 passed** (`.tmp/resume-midnight-final.log`); the broader run covered **93 tests**, with its one exact-midnight fixture failure corrected and covered by the final recheck. These groups overlap.
+
+Final browser acceptance: **72 route visits at 390 and 1440 px**, **four filter/retry journeys**, and **eight one-click staff task journeys** passed with no horizontal overflow or JavaScript exceptions. Includes the chef's actual arrival-confirmation screen, waiter sales, and stockkeeper/accountant location records. Report periods survive reload and Back; review dates survive reload; menu/PIN roster recover from controlled HTTP 503 failures. Evidence: `.tmp/resume-browser/results.json`, `navigation.json`, and 18 screenshots. Lint ratchet: **14 errors / 4 warnings, no new problems** (`.tmp/resume-lint.log`). A Git refresh failed while C: was full; after preserving the outer checkout's generated Next cache on D:, `git --no-optional-locks diff --check` passed. The entire repository sprint gate has not been run or claimed.
+
+## Active implementation — Eleven daily experience, 25 October 2026
+
+Implement approved owner/staff plan on current branch without resetting prior work. Order: shared custody/evidence/shift records and local additive migration; individual cost views and daily task summaries; progressive disclosure across owner/staff screens; isolated complete-day scenarios, financial/isolation tests and phone/desktop browser acceptance. No production or provider changes, no reseed of current demo. Existing raw modules remain reachable.
+
+## Individual tool correction — verification, 25 October 2026
+
+- Replaced fragment-only area/planning navigation with absolute `?tool=` links; recovered both raw and encoded stacked fragments; unknown tools show an error instead of a dashboard. All 31 backed blocks plus P&L comparison have individual entries.
+- Browser read each of 32 individual area bodies and seven planning workspaces. Tested the reported encoded legacy link, selecting Bills afterwards, and browser Back. Break-even shows its actual KES 4,700 target, reference costs, formula and zero-current-sales explanation. Browser evidence: `.tmp/tool-browser-audit.json`, `.tmp/planning-browser-audit.json`, `.tmp/break-even-working.png`.
+- Implemented an interactive demand simulator over the shared engine, endpoint `/owner/planning/price-simulation`. Browser Quarter chicken 400→450: projected monthly portions 49→45.5, dish sales 19,600→20,487, contribution 2,783→4,862. Assumptions and exclusions visible; no price changed. Screenshot `.tmp/price-demand-working.png`.
+- Tests: 293 frontend tests passed (24 files); production build/TypeScript passed. Six focused backend tests passed, including the three new demand simulation tests for shared-engine agreement, tenant isolation/strict cents and missing ingredient cost. The additional money/workflow regression passed 36 tests. Initial parallel frontend run hit worker timeouts under host load; final single-worker run passed. Full sprint gate has not been claimed. Graphify unavailable on this host.
+- Remaining backend work and acceptance sequence: `TOOL_COMPLETION_PLAN.md`. Independent zone balances, client till/statement compatibility, provider delivery evidence and consent-reviewed win-back execution are not claimed complete. No production deployment, supplier approval or external message.
+
+## Correction plan — individual tool navigation, 25 October 2026
+
+User reports break-even and other tools still showing dashboards. Plan: replace fragile fragment-only navigation with explicit `?tool=` selection; recover legacy stacked fragments; audit every area block and planning tool against live APIs and browser output; improve break-even explanation from existing calculation; add navigation regression tests; document backend gaps and implementation sequence in TOOL_COMPLETION_PLAN.md. Preserve full overviews and existing operations. Local data only.
+
 # Eleven presentation follow-through completed locally — 23 October 2026
 
 The user’s “FINISH” instruction authorized completing the remaining demo workflows. Added forecast-led portions and raw prep through supplier-selected pending purchase drafts; shift statement matching and bounded physical count evidence; shared scheduled checkout pricing with signed one-hour quotes; price ladder, long-tail review and hide action, Star–Puzzle combo candidates; measured price-change results feeding simulations, subsequent pricing impacts and monthly reports; 30-day ABC count calendar and expanded branch control comparison. Staff entries now cover counts, waste, two-party kitchen issues and bill payments, with retry-safe journal, branch-bound device queue, stale-count rejection, ten-minute audited undo, accountant P&L/checklist and expense/receipt review. Approved scheduled discounts no longer appear as unapproved below-menu sales. Fixed ABC boundary handling so the largest spend item cannot fall into a lower band merely because it crosses 80% by itself.
@@ -680,3 +706,8 @@ Environment: Python 3.13.16 (venv outside the repo, deps from `backend/requireme
 Reproduce: `PY=/path/to/venv/bin/python make -C docs/v2 gate` (E1 + evals; evals dir is empty until S0.3).
 
 Environment note: `pip install -r backend/requirements.txt` fails against the system Debian `setuptools` for `py-vapid`/`http-ece` (`install_layout`); a fresh venv installs cleanly. CI on Python 3.12 is unaffected. Use a venv.
+
+
+## 26 October 2026 — standalone tools and daily data audit
+
+80 separate owner tool destinations; All sections removed; daily Nairobi review refresh. Corrected meal-only payroll fallback, staff/branch period mismatches, invented menu zero margins and supplier price precision. Browser content/calculator checks and database reconciliation are recorded in [ATOMIC_TOOL_DATA_AUDIT.md](ATOMIC_TOOL_DATA_AUDIT.md). Final frontend 319 passing, backend selected gate 152 passing plus focused regressions, production build and TypeScript pass, lint baseline unchanged.

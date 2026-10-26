@@ -9,7 +9,7 @@ async function redirects() {
   return new Map(list.map((r) => [r.source, r.destination]));
 }
 
-it("the old owner addresses all land on the new shell, for both old shells", async () => {
+it("the old owner addresses all land on the new shell, for both historical shells", async () => {
   const map = await redirects();
   for (const shell of ["vibanda", "demo"]) {
     expect(map.get(`/${shell}`)).toBe("/home");

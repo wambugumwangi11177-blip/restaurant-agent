@@ -26,7 +26,7 @@ import StockAlertsPanel from "./StockAlertsPanel";
  * file is pure composition of the split sub-components (AddItemModal,
  * InventoryList, AdjustStockModal, InventoryInsights, StockAlertsPanel).
  */
-export default function InventoryWorkspace() {
+export default function InventoryWorkspace({ focused = false }: { focused?: boolean }) {
     const w = useInventoryWorkspace();
 
     if (w.loading) {
@@ -73,10 +73,10 @@ export default function InventoryWorkspace() {
                 onSubmit={w.handleAddItem}
             />
 
-            <InventoryInsights
+            {!focused && <InventoryInsights
                 summary={w.summary}
                 predictionsCount={w.predictions.length}
-            />
+            />}
 
             {/* Stock items */}
             <InventoryList
@@ -103,7 +103,7 @@ export default function InventoryWorkspace() {
                 roles that can reach /stock/transfers — Waiter/Supervisor get
                 null back and the panels don't render, rather than an error
                 state. */}
-            {w.transfers !== null && (
+            {!focused && w.transfers !== null && (
                 <AdjustStockModal
                     items={w.items}
                     transfers={w.transfers}
@@ -140,7 +140,7 @@ export default function InventoryWorkspace() {
                 />
             )}
 
-            <StockAlertsPanel variance={w.variance} alerts={w.alerts} />
+            {!focused && <StockAlertsPanel variance={w.variance} alerts={w.alerts} />}
         </div>
     );
 }

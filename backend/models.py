@@ -1897,3 +1897,84 @@ class MpesaStatementLine(Base):
         Index("ix_mpesa_lines_restaurant_completed", "restaurant_id", "completed_at"),
         Index("ix_mpesa_lines_upload", "upload_id"),
     )
+
+
+class StockZoneEvent(Base):
+    """Append-only location evidence. Unallocated is the residual of the existing whole-item ledger."""
+    __tablename__ = 'stock_zone_events'
+    id = Column(Integer, primary_key=True)
+    restaurant_id = Column(Integer, ForeignKey('restaurants.id'), nullable=False, index=True)
+    inventory_item_id = Column(Integer, ForeignKey('inventory_items.id'), nullable=False, index=True)
+    zone = Column(String(20), nullable=False)
+    delta = Column(Float, nullable=False)
+    kind = Column(String(24), nullable=False)
+    actor_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    entry_key = Column(String(180), nullable=False, unique=True)
+    details = Column(Text, nullable=False, default='{}')
+    created_at = Column(DateTime, nullable=False, default=utcnow)
+
+
+class StockReceiptBatch(Base):
+    __tablename__ = 'stock_receipt_batches'
+    id = Column(Integer, primary_key=True)
+    restaurant_id = Column(Integer, ForeignKey('restaurants.id'), nullable=False, index=True)
+    inventory_item_id = Column(Integer, ForeignKey('inventory_items.id'), nullable=False)
+    purchase_order_id = Column(Integer, ForeignKey('purchase_orders.id'), nullable=False, unique=True)
+    quantity = Column(Float, nullable=False)
+    expires_on = Column(Date, nullable=True)
+    received_by = Column(Integer, ForeignKey('users.id'), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=utcnow)
+
+
+class DailyShiftClose(Base):
+    __tablename__ = 'daily_shift_closes'
+    id = Column(Integer, primary_key=True)
+    restaurant_id = Column(Integer, ForeignKey('restaurants.id'), nullable=False, index=True)
+    day = Column(Date, nullable=False)
+    status = Column(String(32), nullable=False, default='open')
+    version = Column(Integer, nullable=False, default=0)
+    reviewed_by = Column(Integer, ForeignKey('users.id'), nullable=True)
+    closed_at = Column(DateTime, nullable=True)
+    snapshot = Column(Text, nullable=False, default='{}')
+    history = Column(Text, nullable=False, default='[]')
+    __table_args__ = (UniqueConstraint('restaurant_id', 'day', name='uq_daily_shift_close_branch_day'),)
+    __mapper_args__ = {'version_id_col':version,'version_id_generator':False}
+
+
+# Existing and new entry paths both invalidate a completed daily review when its evidence changes.
+from sqlalchemy import event as _sa_event
+from sqlalchemy.orm import Session as _OrmSession
+@_sa_event.listens_for(_OrmSession, 'before_flush')
+def _reopen_daily_reviews(session, flush_context, instances):
+    changed=list(session.new)+[r for r in session.dirty if session.is_modified(r,include_collections=False)]
+    relevant=(StockMovement,StockCount,CashDrawerCount,Expense,StockTransfer,Order)
+    rows=[r for r in changed if isinstance(r,relevant)]
+    if not rows:return
+    from time_utils import eat_date
+    from sqlalchemy import inspect
+    import json
+    with session.no_autoflush:
+        if not inspect(session.connection()).has_table('daily_shift_closes'):return
+        closed=session.query(DailyShiftClose).filter(DailyShiftClose.status.in_(['closed','closed_with_exceptions','ready_for_review'])).all()
+        if not closed:return
+        keyed={(r.restaurant_id,r.day):r for r in closed}
+        for row in rows:
+            rid=getattr(row,'restaurant_id',None)
+            if rid is None and isinstance(row,StockMovement):
+                stock=session.get(InventoryItem,row.inventory_item_id)
+                rid=stock.restaurant_id if stock else None
+            if rid is None:continue
+            date_fields=('paid_on','window_start','counted_at','completed_at','created_at','initiated_at')
+            dates=[getattr(row,name,None) for name in date_fields]
+            # Moving a record to another day invalidates both the original and corrected review.
+            state=inspect(row)
+            for name in date_fields:
+                if name in state.attrs:dates.extend(state.attrs[name].history.deleted)
+            dates=[at for at in dates if at is not None] or [utcnow()]
+            for at in dates:
+                day=at if isinstance(at,__import__('datetime').date) and not isinstance(at,__import__('datetime').datetime) else eat_date(at)
+                review=keyed.get((rid,day))
+                if review and review.status!='open':
+                    history=json.loads(review.history)
+                    history.append({'at':utcnow().isoformat()+'Z','action':'reopened','reason':'Underlying records changed; review again'})
+                    review.history=json.dumps(history);review.status='open';review.closed_at=None;review.version+=1

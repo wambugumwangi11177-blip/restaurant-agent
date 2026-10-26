@@ -83,6 +83,9 @@ def deduct_ingredients_for_order(db: Session, order: models.Order, performed_by_
             if not item:
                 continue   # Recipe references a since-deleted inventory item — nothing to deduct from.
 
+            from owner.daily import zone_event
+            if db.query(models.StockZoneEvent).filter_by(entry_key=f'order:{order.id}:line:{oi.id}:ingredient:{ingredient.id}').first():continue
+            zone_event(db,item,'kitchen',-qty,'recipe',performed_by_user_id,f'order:{order.id}:line:{oi.id}:ingredient:{ingredient.id}')
             item.quantity -= qty
             db.add(models.StockMovement(
                 inventory_item_id=item.id,
@@ -177,6 +180,11 @@ def reverse_ingredients_for_order(db: Session, order: models.Order, performed_by
             if not item:
                 continue
 
+            from owner.daily import zone_event
+            original=db.query(models.StockZoneEvent).filter_by(entry_key=f'order:{order.id}:line:{oi.id}:ingredient:{ingredient.id}').first()
+            if original is not None:qty=-original.delta
+            if db.query(models.StockZoneEvent).filter_by(entry_key=f'order-return:{order.id}:line:{oi.id}:ingredient:{ingredient.id}').first():continue
+            zone_event(db,item,'kitchen',qty,'recipe_return',performed_by_user_id,f'order-return:{order.id}:line:{oi.id}:ingredient:{ingredient.id}')
             item.quantity += qty
             db.add(models.StockMovement(
                 inventory_item_id=item.id,

@@ -262,9 +262,13 @@ def seed_pnl_week(db, g: Golden, *, price_rise: bool = False) -> models.MenuItem
     db.flush()
     unit = 105_000 if price_rise else 100_000
     per_day = [15, 15, 14, 14, 14, 14, 14]            # 100 orders over 7 days
+    today_start = (g.now + timedelta(hours=3)).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=3)
+    elapsed = min(g.now - today_start, timedelta(hours=2))
     for day, count in enumerate(per_day):
         for k in range(count):
-            add_order(db, g, [(meal, 1, unit)], g.now - timedelta(days=day, minutes=10 * k))
+            # Stay within each Nairobi day, even when the suite runs just after midnight.
+            placed_at = today_start - timedelta(days=day) + elapsed * (k + 1) / (count + 1)
+            add_order(db, g, [(meal, 1, unit)], placed_at)
     staff = []
     for n in range(5):
         member = models.StaffMember(restaurant_id=g.rid, name=f"Staff {n + 1}", role_title="Waiter",

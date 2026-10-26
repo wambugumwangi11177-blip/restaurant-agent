@@ -20,6 +20,7 @@ export type ReportSection = Block & {
 };
 
 export type OwnerReport = {
+  day_close?:{day:string;status:string;version:number;closed_at:string|null};
   period: ReportPeriod;
   range: string;
   /** monthly only: the month the sections cover, 2026-10 */

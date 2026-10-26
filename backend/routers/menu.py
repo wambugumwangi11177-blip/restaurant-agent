@@ -173,7 +173,7 @@ async def add_ingredient(
     item_id: int,
     body: schemas.MenuIngredientCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE, models.StaffRole.KITCHEN)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     menu_item = db.query(models.MenuItem).filter(
@@ -216,7 +216,7 @@ async def update_ingredient(
     ingredient_id: int,
     body: schemas.MenuIngredientUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE, models.StaffRole.KITCHEN)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     row = db.query(models.MenuIngredient).join(
@@ -244,7 +244,7 @@ async def delete_ingredient(
     item_id: int,
     ingredient_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE, models.StaffRole.KITCHEN)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     row = db.query(models.MenuIngredient).join(

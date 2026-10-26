@@ -24,28 +24,34 @@ import models
 from ai.analysis_clock import analysis_anchor
 from owner.settings import Settings, resolve
 from time_utils import eat_date
+from owner.money.pnl import nairobi_utc_range
 
 # The wages target (default 30% of sales — a placeholder to confirm with the first owner) and the hour after
 # which overtime applies (default 8) are the owner's settings: labour_target_pct, overtime_after_hours.
 
 
-def get_labor_intelligence(db: Session, restaurant_id: int, settings: Settings | None = None) -> dict:
+def get_labor_intelligence(db: Session, restaurant_id: int, settings: Settings | None = None, *, now: datetime | None = None) -> dict:
     """Complete labor analytics for the last 30 days. `settings` defaults to the restaurant's saved thresholds."""
     settings = resolve(db, restaurant_id, settings)
     # Anchored to the restaurant's most recent order, not wall-clock time —
     # see ai/analysis_clock.py.
-    now              = analysis_anchor(db, restaurant_id)
-    thirty_days_ago  = now - timedelta(days=30)
+    current_window = now is not None
+    now = now or analysis_anchor(db, restaurant_id)
+    start_day = eat_date(now) - timedelta(days=29) if current_window else (now-timedelta(days=30)).date()
+    thirty_days_ago, until = nairobi_utc_range(start_day, eat_date(now)) if current_window else (now-timedelta(days=30), datetime.max)
 
     shifts = db.query(models.LaborShift).filter(
         models.LaborShift.restaurant_id == restaurant_id,
-        models.LaborShift.shift_date    >= thirty_days_ago.date(),
+        models.LaborShift.shift_date    >= start_day,
+        models.LaborShift.shift_date    <= (eat_date(now) if current_window else date.max),
     ).all()
 
     revenue_30d = db.query(func.sum(models.Order.total)).filter(
         models.Order.restaurant_id == restaurant_id,
         models.Order.status        != models.OrderStatus.CANCELLED,
         models.Order.created_at    >= thirty_days_ago,
+        models.Order.created_at    < until,
+        models.Order.is_paid.is_(True),
     ).scalar() or 0
 
     if not shifts:
@@ -80,6 +86,8 @@ def get_labor_intelligence(db: Session, restaurant_id: int, settings: Settings |
         models.Order.restaurant_id == restaurant_id,
         models.Order.status        != models.OrderStatus.CANCELLED,
         models.Order.created_at    >= thirty_days_ago,
+        models.Order.created_at    < until,
+        models.Order.is_paid.is_(True),
     ).all():
         daily_rev[eat_date(created_at)] += total or 0
 
@@ -99,7 +107,7 @@ def get_labor_intelligence(db: Session, restaurant_id: int, settings: Settings |
     ], key=lambda x: x["date"])
 
     # ── Staff productivity ─────────────────────────────────────────────────────
-    staff_metrics = _staff_productivity(db, shifts, thirty_days_ago, restaurant_id)
+    staff_metrics = _staff_productivity(db, shifts, thirty_days_ago, restaurant_id, until)
 
     # ── Recommendations ────────────────────────────────────────────────────────
     recommendations = _generate_recommendations(
@@ -129,6 +137,7 @@ def _staff_productivity(
     shifts: list,
     since: datetime,
     restaurant_id: int,
+    until: datetime,
 ) -> list[dict]:
     """Revenue-per-hour by staff member."""
     staff_map: dict[int, dict] = {}
@@ -146,6 +155,8 @@ def _staff_productivity(
         models.Order.restaurant_id == restaurant_id,
         models.Order.status        != models.OrderStatus.CANCELLED,
         models.Order.created_at    >= since,
+        models.Order.created_at    < until,
+        models.Order.is_paid.is_(True),
     ).scalar() or 0
 
     revenue_per_hour = total_revenue / max(total_hours, 1)

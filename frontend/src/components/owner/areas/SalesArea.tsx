@@ -1,4 +1,6 @@
 "use client";
+import {useContext,useState} from "react";
+import PriceSimulator from "@/components/owner/PriceSimulator";
 import Link from "next/link";
 import Bars from "@/components/charts/Bars";
 import BandForecast from "@/components/charts/BandForecast";
@@ -8,10 +10,10 @@ import { BLOCK_TITLES } from "@/lib/owner/blocks";
 import { kes, kesShort, plural, shortDay, weekday } from "@/lib/owner/format";
 import type { DeliveryBlock, DishesByKesBlock, ForecastBlock, InfoBlock, MatrixBlock, OutlookBlock, PriceIdeasBlock, SevenDayBlock, WinBackBlock } from "@/lib/owner/areaTypes";
 import type { Area } from "@/lib/owner/types";
-import { BlockFrame, Empty, Grid, Note, Pill, Stat } from "./ui";
+import { AreaFocus, BlockFrame, Empty, Grid, Note, Pill, Stat } from "./ui";
 
 const T = BLOCK_TITLES.sales_dishes;
-const GAPS_SHOWN = 5;
+
 const KINDS = ["Best dish", "Popular, earns little", "Earns well, few order it", "Consider removing"];
 
 export default function SalesArea({ area }: { area: Area }) {
@@ -49,15 +51,18 @@ function SevenDay({ block }: { block: SevenDayBlock }) {
 }
 
 function Forecast({ block }: { block: ForecastBlock }) {
+ const focus=useContext(AreaFocus);const unusual=focus==='unusual-sales-days';
+ if(unusual)return <BlockFrame title="Unusual sales days" block={block}>{()=> <><p>Recorded sales compared with expected sales for the same day.</p>{block.unusual_days.length?block.unusual_days.map(u=><p key={u.date}>{shortDay(u.date)}: {kes(u.sales)} recorded against {kes(u.expected)} expected · {u.off_by_pct.toFixed(1)}%</p>):<p>No unusual sales days in this analysis window.</p>}<Note>{block.note}</Note></>}</BlockFrame>;
+
   return (
     <BlockFrame title={T.forecast} block={block}>{() => (<>
       <BandForecast label="Sales so far and the likely range for the next 7 days"
         actual={block.actual.map((a) => ({ date: a.date, sales: a.sales }))} next={block.next_7_days.map((n) => ({ date: n.date, usual: n.usual, low: n.low, high: n.high }))}
-        unusual={block.unusual_days.map((u) => ({ date: u.date, sales: u.sales, expected: u.expected }))} />
+        unusual={(focus?[]:block.unusual_days).map((u) => ({ date: u.date, sales: u.sales, expected: u.expected }))} />
       <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px] text-[var(--v-muted-foreground)] sm:grid-cols-3">
         {block.next_7_days.map((n) => <li key={n.date} className="flex justify-between gap-2"><span>{n.day.slice(0, 3)}</span><span className="tabular-nums">{kesShort(n.low).replace("KES ", "")}–{kesShort(n.high).replace("KES ", "")}</span></li>)}
       </ul>
-      {block.unusual_days.length > 0 && <Note>Red dots: days that sold far from the usual — {block.unusual_days.map((u) => `${shortDay(u.date)} (${u.off_by_pct > 0 ? "+" : ""}${u.off_by_pct}%)`).join(", ")}.</Note>}
+      {!focus&&block.unusual_days.length > 0 && <Note>Red dots: days that sold far from the usual — {block.unusual_days.map((u) => `${shortDay(u.date)} (${u.off_by_pct > 0 ? "+" : ""}${u.off_by_pct}%)`).join(", ")}.</Note>}
       <Note>{block.note}</Note>
     </>)}</BlockFrame>
   );
@@ -103,33 +108,13 @@ function PriceIdeas({ block }: { block: PriceIdeasBlock }) {
 }
 
 function Delivery({ block }: { block: DeliveryBlock }) {
-  return (
-    <BlockFrame title={T.delivery} block={block}>{() => (<>
-      <div className="grid gap-4 md:grid-cols-2">
-        <div>
-          <p className="mb-2 text-[11px] font-bold">What you keep of every KES 100, by where it was ordered</p>
-          <HBars label="Share kept by channel" max={100} rows={block.channels.map((c) => ({ key: c.channel, label: c.channel, value: c.keeps_pct, valueLabel: `${c.keeps_pct}%`, note: `${plural(c.orders, "order")} · ${kes(c.keeps)} kept${c.pays_commission ? " after the app's commission" : ""}`, flag: c.pays_commission && c.keeps_pct < 40 }))} />
-        </div>
-        <div>
-          <p className="mb-2 text-[11px] font-bold">Best and weakest hours</p>
-          <HBars label="Share kept by time of day" max={100} rows={block.best_and_weakest_hours.map((h) => ({ key: h.hours, label: h.hours.charAt(0).toUpperCase() + h.hours.slice(1), value: h.keeps_pct, valueLabel: `${h.keeps_pct}%`, note: plural(h.orders, "order") }))} />
-        </div>
-      </div>
-      {block.delivery_gaps.length > 0 && (
-        <div className="mt-4">
-          <p className="mb-1.5 text-[11px] font-bold">Dishes that lose too much to a delivery app</p>
-          <ul className="divide-y divide-[var(--v-border)] text-xs">
-            {block.delivery_gaps.slice(0, GAPS_SHOWN).map((g) => (
-              <li key={`${g.channel}-${g.dish}`} className="py-1.5">
-                <b>{g.dish}</b> on {g.channel}: keeps {kes(g.keeps)} a plate instead of {kes(g.keeps_dine_in)} in the restaurant ({g.commission_pct}% commission). It would need {kes(g.price_to_keep_floor)} to keep your floor.
-              </li>
-            ))}
-          </ul>
-          {block.delivery_gaps.length > GAPS_SHOWN && <Note>{block.delivery_gaps.length - GAPS_SHOWN} more dishes lose too much to a delivery app. Ask LEVIII for the list.</Note>}
-        </div>
-      )}
-    </>)}</BlockFrame>
-  );
+ const focus=useContext(AreaFocus),hours=focus==='best-and-weakest-hours';
+ const [showGaps,setShowGaps]=useState(false);
+ return <BlockFrame title={hours?'Best and weakest hours':T.delivery} block={hours?{...block,assumptions:[],assumption:undefined}:block}>{()=> <>
+ {(!focus||!hours)&&<><p>Contribution after ingredients and recorded delivery commissions, by ordering channel.</p><HBars label="Share kept by channel" max={100} rows={block.channels.map(c=>({key:c.channel,label:c.channel,value:c.keeps_pct,valueLabel:`${c.keeps_pct.toFixed(1)}%`,note:`${plural(c.orders,'order')} · ${kes(c.keeps)} kept${c.pays_commission?' after commission':''}`}))}/>
+ <h3 className="mt-4 font-semibold">Delivery dishes below your floor</h3>{block.delivery_gaps.length?block.delivery_gaps.slice(0,showGaps?undefined:5).map(g=><p className="py-2 text-sm" key={`${g.channel}-${g.dish}`}>{g.dish} on {g.channel}: keeps {kes(g.keeps)} a plate instead of {kes(g.keeps_dine_in)} in the restaurant ({g.commission_pct}% commission). It would need {kes(g.price_to_keep_floor)} to keep your floor.</p>):<p>No delivery dish falls below your configured margin floor.</p>}{block.delivery_gaps.length>5&&<><p className="text-sm">{block.delivery_gaps.length-5} more dishes lose too much to a delivery app.</p><button className="min-h-11 underline" onClick={()=>setShowGaps(v=>!v)}>{showGaps?"Show fewer":`Show all ${block.delivery_gaps.length} delivery findings`}</button></>}</>}
+ {(!focus||hours)&&<><h3 className="font-semibold">Best and weakest hours</h3><p>Margin after ingredients by Nairobi time of day, before delivery commissions and other operating costs. This is a share of sales, not net profit.</p><HBars label="Share kept by time of day" max={100} rows={block.best_and_weakest_hours.map(h=>({key:h.hours,label:h.hours.charAt(0).toUpperCase()+h.hours.slice(1),value:h.keeps_pct,valueLabel:`${h.keeps_pct.toFixed(1)}%`,note:plural(h.orders,'order')}))}/></>}
+ </>}</BlockFrame>;
 }
 
 function Outlook({ block }: { block: OutlookBlock }) {
@@ -154,8 +139,7 @@ function WinBack({ block }: { block: WinBackBlock }) {
 function WhatIf({ block }: { block: InfoBlock }) {
   return (
     <BlockFrame title={T.simulator} block={block} quiet>{() => (<>
-      <p className="text-xs leading-relaxed">{block.how}</p>
-      <Link href="/os?q=What%20if%20I%20raise%20the%20price%20of%20my%20best%20seller%3F" className="mt-3 inline-flex min-h-10 items-center text-[11px] font-bold text-[var(--v-primary)]">Try it →</Link>
+      <PriceSimulator/>
     </>)}</BlockFrame>
   );
 }

@@ -138,14 +138,20 @@ def compute_pnl(db: Session, restaurant_id: int, start: date, end: date, setting
 
     # wages: the Staff lines you entered, else the shifts' cost
     staff_entered = sum(t for c, t, _n, _l in by_category.values() if c.pnl_line == "staff")
+    # Meals are a staff cost, but do not prove that payroll has been entered.
+    # A meal-only expense must not discard the wages in recorded shifts.
+    payroll_entered = any(c.pnl_line == "staff" and c.key != "staff_meals" for c, *_ in by_category.values())
+    staff_meals = sum(t for c, t, _n, _l in by_category.values() if c.pnl_line == "staff" and c.key == "staff_meals")
     shifts_cost = int(db.query(func.coalesce(func.sum(models.LaborShift.labor_cost), 0)).filter(
         models.LaborShift.restaurant_id == restaurant_id, models.LaborShift.shift_date >= start, models.LaborShift.shift_date <= end).scalar() or 0)
-    if any(c.pnl_line == "staff" for c, *_ in by_category.values()):
+    if payroll_entered:
         labour, labour_basis = staff_entered, "entered"
         labour_fixed = sum(t for c, t, _n, _l in by_category.values() if c.pnl_line == "staff" and c.is_fixed)
     elif shifts_cost:
-        labour, labour_basis = shifts_cost, "shifts"
+        labour, labour_basis = shifts_cost + staff_meals, "shifts"
         labour_fixed = shifts_cost                   # the people on the rota are there whatever the sales
+    elif staff_meals:
+        labour, labour_basis, labour_fixed = staff_meals, "entered", 0
     else:
         labour, labour_basis, labour_fixed = 0, "none", 0
 
@@ -205,6 +211,7 @@ def compute_pnl(db: Session, restaurant_id: int, start: date, end: date, setting
         "ingredients_cents": ingredients, "ingredients_basis": ingredients_basis, "missing_costs": missing_costs,
         "gross_profit_cents": gross,
         "labour_cents": labour, "labour_basis": labour_basis, "shifts_cost_cents": shifts_cost,
+        "staff_meals_cents": staff_meals, "payroll_missing": not payroll_entered and not shifts_cost,
         "other_costs_cents": other_costs, "sections": ordered_sections,
         "labour_fixed_cents": labour_fixed, "fixed_costs_cents": fixed_costs,         # the costs that do not move with sales: break-even's numerator
         "delivery_commission_cents": commission, "delivery_commission_basis": commission_basis,

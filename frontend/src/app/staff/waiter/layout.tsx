@@ -4,7 +4,8 @@ import { CreditCard, ShoppingBag, CalendarDays, ChefHat, UtensilsCrossed, LifeBu
 import TierLayoutShell from "@/components/staff/TierLayoutShell";
 
 const NAV = [
-    { href: "/staff/waiter", label: "POS", icon: CreditCard },
+    { href: "/staff/waiter", label: "Your shift", icon: CreditCard },
+    { href: "/staff/waiter/pos", label: "Record sales", icon: CreditCard },
     { href: "/staff/waiter/orders", label: "Orders", icon: ShoppingBag },
     { href: "/staff/waiter/reservations", label: "Bookings", icon: CalendarDays },
     { href: "/staff/waiter/kitchen", label: "Kitchen", icon: ChefHat },

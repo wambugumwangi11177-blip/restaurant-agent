@@ -159,10 +159,11 @@ def test_golden_week_gives_the_worked_example_percentages(client, db_session, go
     gr.seed_pnl_week(db_session, golden)
     body = _get(client, golden, "/home").json()
     dials = body["areas"]["money"]["blocks"]["cost_dials"]
+    assert dials["prime_cost_pct"] == 57.0
     assert dials["food_cost_pct"] == 32.0 and dials["wages_pct"] == 25.0
     assert dials["food_cost_target_pct"] == 35.0 and dials["food_cost_word"] == "Fine"
     assert dials["wages_target_pct"] == 30.0 and dials["wages_word"] == "Fine"
-    assert {a["setting"] for a in dials["assumptions"]} == {"food_cost_target_pct", "labour_target_pct"}
+    assert {a["setting"] for a in dials["assumptions"]} == {"food_cost_target_pct", "labour_target_pct", "prime_cost_target_pct"}
     assert dials["assumption"] == dials["assumptions"][0]
     head = body["areas"]["money"]["summary"]
     assert (head["number"], head["unit"], head["word"], head["status"]) == (32.0, "%", "Fine", "good")
@@ -284,11 +285,13 @@ def test_one_failing_engine_only_blanks_its_own_blocks(client, db_session, golde
     assert res.status_code == 200
     body = res.json()
     dials = body["areas"]["money"]["blocks"]["cost_dials"]
-    assert dials["state"] == "unavailable" and "could not be read" in dials["reason"]
+    assert dials["state"] != "unavailable"
+    failed = body["areas"]["sales_dishes"]["blocks"]["dishes_by_kes"]
+    assert failed["state"] == "unavailable" and "could not be read" in failed["reason"]
     assert "engine exploded" not in json.dumps(body)                           # internals never leak
     assert body["areas"]["staff"]["blocks"]["wages"]["state"] == "as_entered"   # an unrelated engine is untouched
     assert body["pulse"]["state"] == "live"
-    assert body["areas"]["money"]["summary"]["number"] is None
+    assert body["areas"]["money"]["summary"]["number"] is not None
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -361,13 +364,15 @@ def test_every_report_section_is_built_and_none_is_planned(client, db_session, g
         assert body["read"]["text"] is None
 
 
-def test_ask_delegates_to_the_deterministic_handlers(client, db_session, golden):
+def test_ask_sales_agrees_with_home_shared_summary(client, db_session, golden):
     gr.seed_pnl_week(db_session, golden)
     question = "how are sales going?"
     new = client.post(f"{API}/ask", headers=_headers(golden.owner), json={"question": question}).json()
-    old = client.get("/api/v1/ai/ask", params={"question": question}, headers=_headers(golden.owner)).json()
+    home = client.get(f"{API}/home", headers=_headers(golden.owner)).json()
     assert new["topic"] == "revenue" and new["form"] == "what"
-    assert new["answer"]["finding"] == old["finding"] and new["answer"]["impact"] == old["impact"]
+    rows = {r["key"]: r["value"] for r in new["rows"]}
+    assert rows["sales"] == home["pulse"]["sales_today"]
+    assert rows["orders"] == home["pulse"]["orders_today"]
     assert new["state"] in ("live", "stale")
     assert new["as_of"]
 
@@ -377,11 +382,11 @@ def test_ask_validates_and_degrades(client, db_session, golden, monkeypatch):
     assert client.post(f"{API}/ask", headers=h, json={"question": "hi"}).status_code == 422
     assert client.post(f"{API}/ask", headers=h, json={"question": "x" * 501}).status_code == 422
     assert client.post(f"{API}/ask", headers=h, json={"question": "how are sales", "restaurant_id": 2}).status_code == 422
-    from routers import ai_ask
+    from routers import overview
 
-    def boom(db, rid, q):
+    def boom(db, rid, start, end):
         raise RuntimeError("handler exploded")
-    monkeypatch.setitem(ai_ask._HANDLERS, "revenue", boom)
+    monkeypatch.setattr(overview, "_summarize", boom)
     res = client.post(f"{API}/ask", headers=h, json={"question": "how are sales going?"})
     assert res.status_code == 200 and res.json()["state"] == "unavailable"
     assert "handler exploded" not in res.text

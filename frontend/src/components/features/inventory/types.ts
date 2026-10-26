@@ -8,6 +8,7 @@ export interface InventoryItem {
 }
 
 export interface StockTransfer {
+    initiated_by_user_id?:number|null;
     id: number;
     from_location: string;
     to_location: string;

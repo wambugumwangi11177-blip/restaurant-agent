@@ -58,7 +58,7 @@ def _pricing(ctx: OwnerContext) -> dict:
 
 def _labor(ctx: OwnerContext) -> dict:
     from ai.labor.intelligence import get_labor_intelligence
-    return ctx.cached("labor", lambda: get_labor_intelligence(ctx.db, ctx.rid, ctx.settings))
+    return ctx.cached("labor", lambda: get_labor_intelligence(ctx.db, ctx.rid, ctx.settings, now=ctx.now))
 
 
 def _menu(ctx: OwnerContext) -> dict:
@@ -85,16 +85,27 @@ def _money_cost_dials(ctx: OwnerContext) -> dict:
     base = ctx.order_state(needs_days=14)
     if base["state"] == "no_data":
         return base
-    profit, labor = _profit(ctx)["summary"], _labor(ctx)["summary"]
-    food = profit.get("food_cost_pct") or 0.0
-    wages = labor.get("labor_pct") if labor.get("labor_status") != "NO_DATA" else None
+    from owner.money.pnl import compute_pnl
+    today=eat_date(ctx.now)
+    ledger=compute_pnl(ctx.db,ctx.rid,today-timedelta(days=29),today,s,today=today)
+    food=None if ledger.get('missing_costs') else ledger.get('food_cost_pct')
+    sales=ledger.get('sales_cents',0)
+    wages=ledger.get('labour_pct') if sales and ledger.get('labour_basis')!='none' and not ledger.get('payroll_missing') else None
+    prime=ledger.get('prime_cost_pct') if food is not None and wages is not None else None
+    profit={'food_cost_status':'HEALTHY' if food is not None and food<=s.food_cost_target_pct else 'WARNING'}
     return {**base,
+            "period": {"label":"Last 30 calendar days", "from":(today-timedelta(days=29)).isoformat(),"to":today.isoformat()},
+            "notes": (["Some dishes have no ingredient cost; food and prime cost shares cannot be completed."] if ledger.get('missing_costs') else []) + (["Wages are estimated from recorded shifts; enter payroll to replace that estimate."] if ledger.get('labour_basis')=='shifts' else []) + (["No payroll or costed shifts recorded."] if ledger.get('payroll_missing') else []) + (["Recorded staff meals are added to wages, not used as a replacement for payroll."] if ledger.get('staff_meals_cents') else []),
+            "orders":ledger.get("orders",0), "sales_kes":kes(sales), "ingredients_kes":kes(ledger.get("ingredients_cents",0)) if food is not None else None,"wages_kes":kes(ledger.get("labour_cents",0)) if wages is not None else None,
+            "prime_cost_pct": prime, "prime_cost_target_pct": s.prime_cost_target_pct,
+            "prime_cost_word": "Not set up" if prime is None else "Fine" if prime <= s.prime_cost_target_pct else "High",
             "food_cost_pct": food, "food_cost_target_pct": s.food_cost_target_pct,
-            "food_cost_word": {"HEALTHY": "Fine", "WARNING": "Watch", "CRITICAL": "High"}.get(profit.get("food_cost_status"), "Not set up"),
+            "food_cost_word": "Not recorded" if food is None else "Fine" if food<=s.food_cost_target_pct else "High",
             "wages_pct": wages, "wages_target_pct": s.labour_target_pct,
             "wages_word": None if wages is None else ("Fine" if wages <= s.labour_target_pct else "High"),
             "assumptions": [assume("food_cost_target_pct", s.food_cost_target_pct, label="Ingredient cost target"),
-                            assume("labour_target_pct", s.labour_target_pct, label="Wages target")],
+                            assume("labour_target_pct", s.labour_target_pct, label="Wages target"),
+                            assume("prime_cost_target_pct", s.prime_cost_target_pct, label="Ingredients + wages target")],
             "assumption": assume("food_cost_target_pct", s.food_cost_target_pct, label="Ingredient cost target")}
 
 
@@ -256,7 +267,7 @@ def money_area(ctx: OwnerContext) -> tuple[dict, dict]:
 
 def _seven_day(ctx: OwnerContext) -> dict:
     overview = _overview_core(ctx)
-    trend = overview._performance(ctx.db, ctx.rid)["revenue_trend"]
+    trend = ctx.cached("seven_day_trend", lambda: overview._performance(ctx.db, ctx.rid)["revenue_trend"])
     total = sum(d["revenue"] for d in trend)
     return {**ctx.order_state(), "days": [{"date": d["date"], "sales": d["revenue"], "orders": d["orders"]} for d in trend],
             "total": round(total, 2)}
@@ -336,7 +347,7 @@ def _delivery_and_dayparts(ctx: OwnerContext) -> dict:
             "delivery_gaps": [{"channel": CHANNEL_WORDS.get(g["channel"], g["channel"]), "dish": g["item_name"],
                                "commission_pct": g["commission_pct"], "keeps_pct": g["effective_delivery_margin"],
                                "keeps": kes(g["delivery_keeps_cents"]), "keeps_dine_in": kes(g["dine_in_keeps_cents"]),
-                               "price_to_keep_floor": kes(g["recommended_delivery_price"])} for g in pricing.get("delivery_gaps", [])[:10]],
+                               "price_to_keep_floor": kes(g["recommended_delivery_price"])} for g in pricing.get("delivery_gaps", [])],
             "best_and_weakest_hours": [{"hours": d["daypart"].replace("_", " "), "keeps_pct": d["margin_pct"], "orders": d["orders"]}
                                        for d in profit.get("daypart_analysis", [])],
             "assumption": assume("commission_glovo_pct", s.commission_glovo_pct, label="Delivery commission"),
@@ -422,8 +433,11 @@ def _handovers(ctx: OwnerContext) -> dict:
     base = ctx.entered_state(latest[0] if latest else None, empty="No store-to-kitchen handovers recorded yet.")
     if base["state"] == "no_data":
         return base
-    return {**base, "doesnt_match": [{"item": r.inventory_item.item_name if r.inventory_item else "", "unit": r.unit, "store_said": r.quantity,
+    recent = ctx.db.query(models.StockTransfer).filter(models.StockTransfer.restaurant_id == ctx.rid, models.StockTransfer.initiated_at >= ctx.now-timedelta(days=30)).order_by(models.StockTransfer.initiated_at.desc()).limit(30).all()
+    return {**base, "pending": sum(1 for r in recent if r.status in (models.StockTransferStatus.PENDING, models.StockTransferStatus.REQUESTED)),
+            "transfers": [{"id":r.id,"item":r.inventory_item.item_name if r.inventory_item else "","unit":r.unit,"sent":r.quantity,"received":r.confirmed_quantity,"status":r.status.value,"from":r.from_location,"to":r.to_location} for r in recent], "doesnt_match": [{"item": r.inventory_item.item_name if r.inventory_item else "", "unit": r.unit, "store_said": r.quantity,
                                       "kitchen_counted": r.confirmed_quantity, "gap": round((r.quantity or 0) - (r.confirmed_quantity or 0), 2)} for r in rows]}
+
 
 
 def _reorder(ctx: OwnerContext) -> dict:
@@ -583,15 +597,17 @@ def cash_area(ctx: OwnerContext) -> tuple[dict, dict]:
 def _wages(ctx: OwnerContext) -> dict:
     labor = _labor(ctx)
     summ = labor["summary"]
-    if summ.get("labor_status") == "NO_DATA":
+    dials=_money_cost_dials(ctx)
+    if dials.get("wages_pct") is None:
         return no_data("No staff shifts recorded yet.")
     latest = ctx.db.query(models.LaborShift.created_at).filter(models.LaborShift.restaurant_id == ctx.rid).order_by(
         models.LaborShift.created_at.desc()).first()
     s = ctx.settings
     return {**ctx.entered_state(latest[0] if latest else None),
-            "wages_pct": summ["labor_pct"], "wages_30d": kes(summ["total_labor_cost_30d"]), "sales_per_staff_hour": kes(summ["sales_per_hour"]),
+            "period": dials.get("period"), "wages_basis":"shared P&L payroll or estimated shifts",
+            "wages_pct": dials["wages_pct"], "wages_30d": dials["wages_kes"], "sales_per_staff_hour": kes(summ["sales_per_hour"]),
             "overtime_hours": summ["overtime_hours_30d"], "overtime_cost": kes(summ["overtime_cost_30d"]),
-            "word": "Fine" if summ["labor_status"] == "HEALTHY" else "High",
+            "word": dials["wages_word"],
             "by_person": [{"name": p["staff_name"], "hours": p["hours_worked"], "wages": kes(p["labor_cost"])} for p in labor.get("staff_productivity", [])[:10]],
             "assumptions": [assume("labour_target_pct", s.labour_target_pct, label="Wages target"),
                             assume("overtime_after_hours", s.overtime_after_hours, label="Overtime starts after (hours)")],

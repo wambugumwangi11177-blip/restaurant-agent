@@ -4,8 +4,10 @@ import { DollarSign, ShoppingBag, ShieldAlert, Truck, Clock, Brain, Cpu, LifeBuo
 import TierLayoutShell from "@/components/staff/TierLayoutShell";
 
 const NAV = [
+    { href: "/staff/controller", label: "Daily review", icon: ShieldAlert },
+    { href: "/staff/controller/records", label: "Ingredients & stock", icon: Truck },
+    { href: "/staff/controller/receiving", label: "Confirm arrivals", icon: Truck },
     { href: "/entries", label: "Team entries", icon: DollarSign },
-    { href: "/staff/controller", label: "Variance", icon: ShieldAlert },
     { href: "/staff/controller/sales", label: "Sales", icon: DollarSign },
     { href: "/staff/controller/orders", label: "Orders", icon: ShoppingBag },
     { href: "/staff/controller/purchasing", label: "Purchasing", icon: Truck },
@@ -17,7 +19,7 @@ const NAV = [
 
 export default function ControllerLayout({ children }: { children: React.ReactNode }) {
     return (
-        <TierLayoutShell tier="controller" tierLabel="Controller" navItems={NAV}>
+        <TierLayoutShell tier="controller" tierLabel="Accountant" navItems={NAV}>
             {children}
         </TierLayoutShell>
     );

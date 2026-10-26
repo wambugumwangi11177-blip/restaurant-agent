@@ -1,0 +1,632 @@
+"use client";
+// Demo Restaurant — HOME, cloned from the Vibanda Village Home. Same layout and
+// sections; the one difference is that there is no source gate: this restaurant
+// records its data directly, so the operational view renders straight away
+// (empty until records exist) instead of waiting on MacSoft.
+//
+// Original Vibanda notes — HOME = "Overview Today", restyled to the approved sketch:
+// eyebrow labels (10px bold uppercase tracking-[0.16em]), font-display serif
+// headings, rounded-xl cards on translucent card surface, teal primary,
+// gold accents, sketch section order (6 cards → attention → pulse →
+// parts → performance).
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ChevronRight, TrendingUp } from "lucide-react";
+import api from "@/lib/api";
+import { getWithFallback } from "@/lib/retry";
+import { fmtKes, fmtPct, greetingFor } from "@/lib/format";
+import { OsLoading, OsError } from "@/components/os/States";
+import { useAuth } from "@/context/AuthContext";
+import { VIBANDA_HOME_LINKS } from "@/lib/vibandaAreas";
+import DemoIdeas from "@/components/demo/DemoIdeas";
+import { Donut } from "@/components/demo/DemoCharts";
+
+type AttentionItem = {
+  id: string; domain: string; title: string; why: string; what_to_do: string;
+  impact: string; status: string;
+  // "urgent" and "opportunity" cards are decisions for the owner; "watch" ones are the compact list.
+  level?: "urgent" | "watch" | "opportunity";
+  link?: string;
+  // Present only on cards produced by the decision layer. An operational
+  // alert ("Beef is running low") is a fact and carries neither: it is not an
+  // inference, so a trust % on it would be theatre.
+  priority_score?: number;
+  confidence_pct?: number;
+};
+
+type Feed = {
+  source_status?: Record<string, { state: string; recommendations: number | null }>;
+  data_provenance?: { notice: string; latest_order_at: string | null; source_connection?: { state?: string; reconciled?: boolean } };
+  greeting_date: string;
+  restaurant_name: string;
+  period: string;
+  period_label?: string;
+  period_note?: string;
+  unavailable_metrics: string[];
+  revenue: { revenue: number; orders: number; avg_order: number; pace_projection: number };
+  orders: { revenue: number; orders: number; delayed: number; active_now: number; split: Record<string, number> };
+  kitchen: { avg_prep_min: number; delay_risk: number; bottleneck: string | null };
+  stock: {
+    recorded_items?: number; low_stock: { name: string; qty: number; unit?: string; runs_out_day?: string | null }[]; expiring_48h: string[];
+    soon_count?: number; first_low_order?: { name: string; order_by: string | null; order_qty: number; unit: string } | null;
+  };
+  bookings: { covers_today: number; next_reservation_min: number | null; waitlist: number; no_show_pct: number };
+  staff: { scheduled: number; on_shift: number; overtime_risk: number; labor_cost_pct: number };
+  attention: AttentionItem[];
+  watching?: AttentionItem[];
+  pulse: { domain: string; headline: string; detail: string; link?: string }[];
+  money_today?: { sales: number; food_cost: number; contribution: number; labor: number; other: number; surplus: number };
+  week_ahead?: { date: string; day: string; revenue: number; low: number; high: number; plates: number; people: number; covers: number }[];
+  roi?: { potential_daily: number; realised: number; label: string; assumption: string; opportunities?: unknown[] };
+  performance: { revenue_trend: { date: string; revenue: number; orders: number }[] };
+};
+
+type Decision = "approved" | "later" | "rejected";
+
+// Demo choices stay in the browser, for this session only: a reload or a trip to another page must not undo them,
+// and nothing is ever written to the server. Storage can be blocked or full, so every access is guarded.
+const DECISIONS_KEY = "demo-home-decisions-v1";
+const DECISION_VALUES: string[] = ["approved", "later", "rejected"];
+
+function readDecisions(): Record<string, Decision> {
+  try {
+    const parsed: unknown = JSON.parse(window.sessionStorage.getItem(DECISIONS_KEY) ?? "{}");
+    if (!parsed || typeof parsed !== "object") return {};
+    return Object.fromEntries(Object.entries(parsed).filter(([, value]) => DECISION_VALUES.includes(String(value)))) as Record<string, Decision>;
+  } catch {
+    return {};
+  }
+}
+
+function writeDecisions(next: Record<string, Decision>) {
+  try {
+    window.sessionStorage.setItem(DECISIONS_KEY, JSON.stringify(next));
+  } catch {
+    /* blocked or full: the choices then last only until the page is reloaded */
+  }
+}
+
+const PERIODS = ["1h", "today", "7d", "30d"] as const;
+const PERIOD_LABEL: Record<string, string> = { "1h": "1H", today: "Today", "7d": "7D", "30d": "30D" };
+
+// Sketch pattern: eyebrow + font-display heading per section
+function SectionHead({ eyebrow, title, meta, id }: { eyebrow: string; title: string; meta?: string; id?: string }) {
+  return (
+    <div className="mb-4 flex items-end justify-between">
+      <div>
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">{eyebrow}</p>
+        <h2 id={id} className="font-display text-2xl font-semibold tracking-[-0.035em]">{title}</h2>
+      </div>
+      {meta && <span className="hidden text-[10px] text-[var(--v-muted-foreground)] sm:block">{meta}</span>}
+    </div>
+  );
+}
+
+// Sketch pillar card: min-h-[190px], translucent card, icon chip.
+//
+// NOT a navigation target. The whole card used to be one big <button> that
+// jumped to /demo/os — so on Home, pressing anything took you to the OS
+// page. Home is where the system reports to you; OS is where you question it.
+// The card now just reports, and carries one small, explicit "Ask" affordance
+// for the moment you actually want to go and ask.
+function PillarCard({ label, scope, primaryLabel, primary, comparison, signals, askLabel, onAsk, href }: {
+  label: string; scope?: string; primaryLabel: string; primary: string; comparison: string;
+  signals: string[]; askLabel: string; onAsk: () => void; href: string;
+}) {
+  return (
+    <article className="group flex min-h-[190px] flex-col justify-between rounded-xl border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.72)] p-4 text-left transition-all hover:border-[hsl(201_47%_29_/_0.38)] hover:bg-[var(--v-card)]">
+      <div>
+        <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--v-muted)] text-[var(--v-primary)]">
+            <TrendingUp size={14} />
+          </span>
+          {label}
+          {scope && <span className="ml-auto rounded-full bg-[var(--v-muted)] px-2 py-0.5 text-[9px] font-semibold normal-case tracking-normal">{scope}</span>}
+        </span>
+        <p className="mt-5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">{primaryLabel}</p>
+        <p className="font-display mt-1 text-[1.55rem] font-semibold tracking-[-0.035em]">{primary}</p>
+      </div>
+      <div className="mt-4 space-y-1.5">
+        {comparison && <p className="text-[11px] font-semibold text-[var(--v-primary)]">{comparison}</p>}
+        {signals.map((s) => (
+          <p key={s} className="text-[10px] text-[var(--v-muted-foreground)]">{s}</p>
+        ))}
+        <button
+          type="button"
+          onClick={onAsk}
+          className="mt-2 inline-flex min-h-8 items-center gap-1 rounded-lg border border-[var(--v-border)] px-2 py-1 text-[10px] font-bold text-[var(--v-primary)] opacity-80 transition-all hover:border-[hsl(201_47%_29_/_0.45)] hover:bg-[var(--v-muted)] hover:opacity-100"
+        >
+          {askLabel} <ChevronRight size={11} />
+        </button>
+        <Link href={href}
+          className="ml-2 inline-flex min-h-8 items-center gap-1 rounded-lg border border-[hsl(201_47%_29_/_0.45)] px-2 py-1 text-[10px] font-bold text-[var(--v-primary)] hover:bg-[var(--v-muted)]">
+          Open details <ChevronRight size={11} />
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+// How much the system trusts its own recommendation.
+//
+// Shown ONLY on cards the decision layer produced. An operational alert is a
+// measured fact — the beef really is below its reorder point — and putting a
+// percentage on it would imply doubt that does not exist. A recommendation is
+// an inference, and the owner deserves to know whether it is a near-certainty
+// or a hunch before acting on it.
+//
+// The number is the agent's own confidence, already scaled by that agent's
+// recent forecast accuracy (ai/decisions/__init__.py::_apply_reliability), so
+// an agent that has been getting it wrong reports lower confidence here.
+function ConfidenceChip({ pct }: { pct: number }) {
+  const band =
+    pct >= 75 ? { label: "high confidence", tone: "var(--v-good)" }
+    : pct >= 50 ? { label: "moderate confidence", tone: "var(--v-primary)" }
+    : { label: "low confidence", tone: "var(--v-muted-foreground)" };
+  return (
+    <span
+      className="text-[10px] font-semibold"
+      style={{ color: band.tone }}
+      title={`The system is ${pct}% confident in this recommendation, adjusted for how accurate this agent has been recently. Not a guarantee.`}
+    >
+      {pct}% · {band.label}
+    </span>
+  );
+}
+
+// Sketch attention card: icon square, source · impact row, Why/What-to-do
+// grid under a top border, action buttons.
+function AttentionCard({ card, onDecide, onAsk }: {
+  card: AttentionItem;
+  onDecide: (id: string, d: Decision) => Promise<void>;
+  onAsk: (question: string) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [decisionError, setDecisionError] = useState(false);
+  const recordDecision = async (decision: Decision) => {
+    if (saving) return;
+    setSaving(true);
+    setDecisionError(false);
+    try {
+      await onDecide(card.id, decision);
+    } catch {
+      setDecisionError(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <article className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-4 transition-shadow hover:shadow-[0_10px_30px_hsl(201_47%_29_/.05)] sm:p-5">
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(42_71%_75_/_0.62)] text-[var(--v-primary)]">
+          <TrendingUp size={17} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {card.level === "urgent" && <span className="rounded-full bg-[hsl(0_60%_48%_/_0.12)] px-2 py-0.5 text-[10px] font-bold text-[hsl(0_60%_40%)]">Urgent</span>}
+            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)]">{card.domain}</span>
+            {card.impact && <span className="h-1 w-1 rounded-full bg-[var(--v-border)]" />}
+            {card.impact && <span className="text-[10px] font-semibold text-[var(--v-primary)]">{card.impact}</span>}
+            {typeof card.confidence_pct === "number" && (
+              <>
+                <span className="h-1 w-1 rounded-full bg-[var(--v-border)]" />
+                <ConfidenceChip pct={card.confidence_pct} />
+              </>
+            )}
+          </div>
+          <h3 className="mt-2 text-sm font-bold leading-snug">{card.title}</h3>
+        </div>
+      </div>
+      <div className="ml-12 mt-4 grid gap-3 border-t border-[var(--v-border)] pt-4 sm:grid-cols-2">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)]">Why</p>
+          <p className="mt-1 text-xs leading-relaxed text-[hsl(208_29%_19_/_0.72)]">{card.why}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)]">What to do</p>
+          <p className="mt-1 text-xs leading-relaxed text-[hsl(208_29%_19_/_0.72)]">{card.what_to_do}</p>
+        </div>
+      </div>
+      <div className="ml-12 mt-4 flex flex-wrap items-center gap-2">
+        <button disabled={saving} onClick={() => recordDecision("approved")}
+          className="min-h-9 rounded-lg bg-[var(--v-primary)] px-3 py-2 text-[10px] font-bold text-[var(--v-primary-foreground)] hover:brightness-105">Acknowledge</button>
+        <button disabled={saving} onClick={() => recordDecision("later")}
+          className="min-h-10 rounded-lg border border-[var(--v-border)] px-2 py-2 text-[11px] font-bold hover:bg-[var(--v-muted)]">Not now</button>
+        <button disabled={saving} onClick={() => recordDecision("rejected")}
+          className="min-h-10 rounded-lg border border-[var(--v-border)] px-2 py-2 text-[11px] font-bold hover:bg-[var(--v-muted)]">Dismiss</button>
+        <button
+          onClick={() => onAsk(card.title)}
+          className="min-h-10 rounded-lg border border-[hsl(201_47%_29_/_0.45)] px-2 py-2 text-[11px] font-bold text-[var(--v-primary)] hover:bg-[var(--v-muted)]">
+          Ask OS about this
+        </button>
+        {card.link && (
+          <Link href={`/demo/${card.link}`}
+            className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-[var(--v-border)] px-2 py-2 text-[11px] font-bold text-[var(--v-primary)] hover:bg-[var(--v-muted)]">
+            See the numbers <ChevronRight size={11} />
+          </Link>
+        )}
+      </div>
+      <p className="ml-12 mt-2 text-xs text-[var(--v-muted-foreground)]">
+          Demo only: moves this card out of the list for this browser session. No business records change.
+      </p>
+      {decisionError && <p role="alert" className="ml-12 mt-2 text-xs text-[var(--v-warn)]">
+        Your decision could not be saved. Please try again.
+      </p>}
+    </article>
+  );
+}
+
+// No source gate (the Vibanda Home waits for a verified MacSoft delivery here).
+export default function DemoHomePage() {
+  return <DemoOperationalHome />;
+}
+
+function DemoOperationalHome({ initialFeed = null }: { initialFeed?: Feed | null }) {
+  const { user } = useAuth();
+  const router = useRouter();
+  const [feed, setFeed] = useState<Feed | null>(() => initialFeed);
+  const [err, setErr] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [stale, setStale] = useState(false);
+  const [period, setPeriod] = useState("today");
+  const [dailyReport, setDailyReport] = useState<string | null>(null);
+  const [showReport, setShowReport] = useState(false);
+  const requestId = useRef(0);
+
+  const load = useCallback((p: string) => {
+    const id = ++requestId.current;
+    setErr(false);
+    setFeed(null);
+    setReconnecting(false);
+    setStale(false);
+    // A restart or a dropped connection passes in seconds: retry quietly, and fall back to the last good view.
+    getWithFallback(`home:${p}`, () => api.get<Feed>(`/api/v1/demo/home?period=${p}`), { onRetry: () => { if (id === requestId.current) setReconnecting(true); } })
+      .then((r) => { if (id === requestId.current) { setFeed(r.data); setStale(r.stale); setReconnecting(false); } })
+      .catch(() => { if (id === requestId.current) { setErr(true); setReconnecting(false); } });
+  }, []);
+
+  useEffect(() => {
+    if (initialFeed && period === initialFeed.period) {
+      return;
+    }
+    // The request itself is the external synchronization performed here.
+    // Loading/error state is deliberately reset by the request helper.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load(period);
+    return () => { requestId.current += 1; };
+  }, [period, load, initialFeed]);
+  useEffect(() => {
+    api.get("/api/v1/demo/reports/daily").then((r) => setDailyReport(r.data.headline ?? r.data.report_text)).catch(() => {});
+  }, []);
+
+  // Demo decisions stay in this browser session; nothing is written to the server.
+  const [decided, setDecided] = useState<Record<string, Decision>>({});
+  useEffect(() => {
+    // Read after mount so the server render and the first client render agree.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDecided(readDecisions());
+  }, []);
+  const save = (next: Record<string, Decision>) => {
+    setDecided(next);
+    writeDecisions(next);
+  };
+  const decide = async (cardId: string, decision: Decision) => {
+    save({ ...decided, [cardId]: decision });
+  };
+  const undo = (cardId: string) => {
+    const next = { ...decided };
+    delete next[cardId];
+    save(next);
+  };
+  const open = (feed?.attention ?? []).filter((c) => !decided[c.id]);
+  const acknowledged = (feed?.attention ?? []).filter((c) => decided[c.id] === "approved");
+  const setAside = (feed?.attention ?? []).filter((c) => decided[c.id] === "later");
+  const urgentOpen = open.filter((c) => c.level === "urgent").length;
+
+  const firstName = (user?.restaurant_name || "").split(" ")[0];
+  const hour = new Date().getHours();
+  const greeting = greetingFor(hour);
+  const ask = (q: string) => router.push(`/demo/os?q=${encodeURIComponent(q)}`);
+
+  return (
+    <div className="animate-rise-in space-y-10">
+      {/* Hero — sketch pattern: eyebrow date (in layout), big display heading
+          with primary-colored period, context subtitle */}
+      <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+        <div>
+          <h1 className="font-display text-[clamp(2rem,4vw,3.2rem)] font-semibold leading-[1.03] tracking-[-0.045em]">
+            {greeting}
+            {firstName ? `, ${firstName}` : ""}
+            <span className="text-[var(--v-primary)]">.</span>
+          </h1>
+          <p className="mt-3 max-w-xl text-sm text-[var(--v-muted-foreground)]">
+            {feed
+              ? <>Here&apos;s what deserves your attention at <b>{feed.restaurant_name}</b> today.</>
+              : "Loading your restaurant…"}
+          </p>
+        </div>
+        {/* Sketch period control: bordered pill group */}
+        <div className="inline-flex rounded-lg border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.68)] p-1">
+          {PERIODS.map((p) => (
+            <button key={p} onClick={() => setPeriod(p)}
+              className={`min-h-8 rounded-md px-3 text-[10px] font-bold transition-colors ${
+                period === p
+                  ? "bg-[var(--v-primary)] text-[var(--v-primary-foreground)]"
+                  : "text-[var(--v-muted-foreground)]"
+              }`}>
+              {PERIOD_LABEL[p]}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="flex items-center gap-2 rounded-lg border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.55)] px-3 py-2 text-[10px] text-[var(--v-muted-foreground)]">
+        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--v-accent)] text-[var(--v-accent-foreground)]">i</span>
+        {feed?.data_provenance?.notice ?? "Recorded directly in this system."}
+      </p>
+      {feed?.period_note && <p className="-mt-6 px-1 text-[10px] text-[var(--v-muted-foreground)]">{feed.period_note}</p>}
+
+      {err && <OsError message="We couldn't load your restaurant just now. Please try again." onRetry={() => load(period)} />}
+      {stale && feed && <p role="status" className="flex flex-wrap items-center gap-2 rounded-lg border border-[hsl(43_76%_57%_/_0.6)] bg-[hsl(42_71%_75%_/_0.18)] px-3 py-2 text-xs">We could not reach the service just now, so you are seeing the last view that loaded. <button type="button" onClick={() => load(period)} className="font-semibold text-[var(--v-primary)] underline">Try again</button></p>}
+      {!err && !feed && reconnecting && <p role="status" className="text-xs text-[var(--v-muted-foreground)]">Reconnecting… this can take a few seconds.</p>}
+      {!err && !feed && <OsLoading />}
+      {!err && feed && (
+        <>
+          {/* Today snapshot — 6 pillar cards */}
+          <section aria-labelledby="snapshot-heading">
+            <SectionHead id="snapshot-heading" eyebrow="How are we doing?" title={`${period === "today" ? "Today" : (feed.period_label ?? PERIOD_LABEL[period])} at ${feed.restaurant_name}`}
+              meta="Revenue and orders follow the period · the rest is right now" />
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <PillarCard label="Revenue" scope="For the period" primaryLabel={`Revenue · ${PERIOD_LABEL[period]}`} primary={fmtKes(feed.revenue.revenue)}
+                comparison={feed.revenue.orders ? `Average order · ${fmtKes(feed.revenue.avg_order)}` : ""}
+                signals={[
+                  "Open details to see the next 7 days and why",
+                ]}
+                askLabel="Ask about sales" onAsk={() => ask("How are my sales today?")} href="/demo/revenue" />
+              <PillarCard label="Orders" scope="For the period" primaryLabel={`Orders · ${PERIOD_LABEL[period]}`} primary={`${feed.orders.orders} orders`}
+                comparison={feed.orders.active_now ? `${feed.orders.active_now} active now` : ""}
+                signals={[Object.entries(feed.orders.split).filter(([, v]) => v > 0).map(([k, v]) => `${v} ${k.replace("_", "-")}`).join(" · ") || "—"]}
+                askLabel="Ask about orders" onAsk={() => ask("Are there any delayed orders?")} href="/demo/orders" />
+              <PillarCard label="Kitchen" scope="Right now" primaryLabel="Kitchen" primary={feed.unavailable_metrics.includes("kitchen") ? "Not available" : `${feed.kitchen.avg_prep_min} min prep`}
+                comparison={feed.kitchen.delay_risk ? `${feed.kitchen.delay_risk} orders approaching delay` : ""}
+                signals={[feed.unavailable_metrics.includes("kitchen") ? "Prep times and delays have not been verified" : (feed.kitchen.bottleneck ? `Bottleneck: ${feed.kitchen.bottleneck}` : "No bottleneck recorded")]}
+                askLabel="Ask about the kitchen" onAsk={() => ask("Is the kitchen running behind?")} href="/demo/kitchen" />
+              <PillarCard label="Stock" scope="Right now" primaryLabel="Stock" primary={feed.stock.low_stock.length ? `${feed.stock.low_stock.length} to watch` : "No low-stock alerts"}
+                comparison={feed.stock.low_stock[0]
+                  ? (feed.stock.first_low_order?.order_qty
+                    ? `${feed.stock.low_stock[0].name} is running low: order about ${feed.stock.first_low_order.order_qty} ${feed.stock.first_low_order.unit} ${feed.stock.first_low_order.order_by === "Today" ? "today" : feed.stock.first_low_order.order_by ? `by ${feed.stock.first_low_order.order_by}` : ""}`.trim()
+                    : `${feed.stock.low_stock[0].name} is running low: order soon`)
+                  : ""}
+                signals={[...feed.stock.low_stock.slice(0, 2).map((i) => `${i.name} · ${i.qty}${i.unit ? ` ${i.unit}` : ""} left${i.runs_out_day ? ` · runs out ${i.runs_out_day}` : ""}`), ...feed.stock.expiring_48h.slice(0, 1).map((e) => `${e.replace(" · ", ": ")} to use soon`),
+                  ...(feed.stock.soon_count ? [`${feed.stock.soon_count} ingredients run out within 3 days`] : [])]}
+                askLabel="Ask about stock" onAsk={() => ask("What am I about to run out of?")} href="/demo/stock" />
+              <PillarCard label="Bookings" scope="Right now" primaryLabel="Covers expected" primary={`${feed.bookings.covers_today} covers`}
+                comparison={feed.bookings.next_reservation_min ? `Next reservation in ${feed.bookings.next_reservation_min} min` : ""}
+                signals={[feed.unavailable_metrics.includes("waitlist") ? "Waitlist data not available" : `${feed.bookings.waitlist} tables on the waitlist`]}
+                askLabel="Ask about bookings" onAsk={() => ask("Who's booked tonight?")} href="/demo/bookings" />
+              <PillarCard label="Staff" scope="Right now" primaryLabel="Coverage" primary={`${feed.staff.scheduled} scheduled`}
+                comparison={feed.staff.overtime_risk ? `${feed.staff.overtime_risk} hours of overtime could be avoided` : ""}
+                signals={[feed.staff.labor_cost_pct ? `Labor cost · ${fmtPct(feed.staff.labor_cost_pct)}` : "—"]}
+                askLabel="Ask about staff" onAsk={() => ask("Who worked the most shifts this week?")} href="/demo/team" />
+            </div>
+          </section>
+
+          {/* What needs your attention */}
+          <section aria-labelledby="attention-heading">
+            <SectionHead id="attention-heading" eyebrow="For you to decide" title="What needs your attention"
+              meta={open.length ? `${open.length} ${open.length === 1 ? "item" : "items"}${urgentOpen ? ` · ${urgentOpen} urgent` : ""}` : undefined} />
+            <div className="space-y-3">
+              {open.length === 0 && (
+                <div className="rounded-xl border border-[hsl(150_28%_41_/_0.24)] bg-[hsl(150_28%_41_/_0.06)] px-5 py-8 text-center sm:px-10">
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[hsl(150_28%_41_/_0.12)] text-[var(--v-good)]">✓</div>
+                  <h3 className="font-display mt-3 text-xl font-semibold tracking-[-0.02em]">Nothing needs your attention right now</h3>
+                  <p className="mx-auto mt-1.5 max-w-md text-xs text-[var(--v-muted-foreground)]">
+                    You have dealt with everything on this list. Reload the page to see it again.
+                  </p>
+                </div>
+              )}
+              {open.map((c) => (
+                <AttentionCard key={c.id} card={c} onDecide={decide} onAsk={ask} />
+              ))}
+              {acknowledged.length > 0 && (
+                <p className="text-xs text-[var(--v-muted-foreground)]">
+                  Acknowledged:{" "}
+                  {acknowledged.map((c) => (
+                    <span key={c.id} className="mr-3">{c.title} <button type="button" onClick={() => undo(c.id)} className="font-semibold text-[var(--v-primary)] underline">Undo</button></span>
+                  ))}
+                </p>
+              )}
+              {setAside.length > 0 && (
+                <div className="rounded-lg border border-[var(--v-border)] px-3 py-2 text-xs text-[var(--v-muted-foreground)]">
+                  <p className="font-semibold">Set aside for now</p>
+                  <ul className="mt-1 space-y-1">
+                    {setAside.map((c) => (
+                      <li key={c.id}>{c.title} <button type="button" onClick={() => undo(c.id)} className="ml-1 font-semibold text-[var(--v-primary)] underline">Bring back</button></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {!!feed.watching?.length && (
+                <div className="rounded-xl border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.55)] p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)]">Also worth watching</p>
+                  <ul className="mt-2 divide-y divide-[var(--v-border)]">
+                    {feed.watching.map((w) => (
+                      <li key={w.id} className="py-2">
+                        <Link href={`/demo/${w.link ?? ""}`} className="block hover:text-[var(--v-primary)]">
+                          <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">{w.domain}</span>
+                          <span className="mt-0.5 block text-xs font-semibold">{w.title}</span>
+                          <span className="block text-[11px] text-[var(--v-muted-foreground)]">{w.what_to_do}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Operational pulse */}
+          {feed.pulse.length > 0 && (
+            <section aria-labelledby="pulse-heading">
+              <SectionHead id="pulse-heading" eyebrow="What's happening right now?" title="Right now"
+                meta="Illustrative operating context" />
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {feed.pulse.map((p) => {
+                  const body = (
+                    <>
+                      <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--v-good)]" />
+                      <span className="min-w-0">
+                        <strong className="block text-[11px] leading-snug">{p.domain}</strong>
+                        <span className="mt-1 block text-[11px] font-semibold text-[hsl(208_29%_19_/_0.78)]">{p.headline}</span>
+                        <small className="mt-1 block text-[10px] text-[var(--v-muted-foreground)]">{p.detail}</small>
+                      </span>
+                    </>
+                  );
+                  const cls = "flex min-h-[88px] items-start gap-3 rounded-lg border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.48)] p-3.5 text-left";
+                  return p.link
+                    ? <Link key={p.domain + p.headline} href={`/demo/${p.link}`} className={`${cls} transition hover:border-[var(--v-primary)]/60`}>{body}</Link>
+                    : <div key={p.domain + p.headline} className={cls}>{body}</div>;
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* Where today's money went — straight from the daily report's money_today. */}
+          {feed.money_today && (
+            <section aria-labelledby="money-heading">
+              <SectionHead id="money-heading" eyebrow="Money today" title="Where today's sales went"
+                meta="Contribution is not profit; real accounts include more" />
+              <div className="rounded-xl border border-[var(--v-border)] bg-[var(--v-card)] p-5">
+                <Donut slices={[
+                  { label: "Ingredients", value: feed.money_today.food_cost },
+                  { label: "Staff", value: feed.money_today.labor },
+                  { label: "Other running costs", value: feed.money_today.other },
+                  { label: "What is left", value: Math.max(0, feed.money_today.surplus) },
+                ]} />
+                <p className="mt-3 text-xs text-[var(--v-muted-foreground)]">
+                  Of {fmtKes(feed.money_today.sales)} sold today, {fmtKes(feed.money_today.contribution)} is left after ingredients.
+                  <Link href="/demo/finance" className="ml-2 font-semibold text-[var(--v-primary)]">Open finance <ChevronRight className="inline" size={12} /></Link>
+                </p>
+              </div>
+            </section>
+          )}
+
+          {/* The week ahead — the same forecast the Revenue, Kitchen, Bookings and Team pages use. */}
+          {!!feed.week_ahead?.length && (
+            <section aria-labelledby="week-heading">
+              <SectionHead id="week-heading" eyebrow="Plan ahead" title="The week ahead"
+                meta="Expected from the last 8 weeks · an estimate, not a promise" />
+              <div className="overflow-x-auto rounded-xl border border-[var(--v-border)] bg-[var(--v-card)]">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-[var(--v-border)] text-[10px] uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">
+                      <th className="px-3 py-2">Day</th><th className="px-3 py-2">Expected sales</th><th className="px-3 py-2">Normal range</th>
+                      <th className="px-3 py-2">Plates</th><th className="px-3 py-2">People</th><th className="px-3 py-2">Guests</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {feed.week_ahead.map((d) => (
+                      <tr key={d.date} className="border-b border-[var(--v-border)] last:border-0">
+                        <td className="px-3 py-2 font-semibold">{d.day}</td>
+                        <td className="px-3 py-2">{fmtKes(d.revenue)}</td>
+                        <td className="px-3 py-2 text-[var(--v-muted-foreground)]">{fmtKes(d.low)} – {fmtKes(d.high)}</td>
+                        <td className="px-3 py-2">{d.plates}</td><td className="px-3 py-2">{d.people}</td><td className="px-3 py-2">{d.covers}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-[10px] text-[var(--v-muted-foreground)]">
+                Plates, people and guests assume the same mix of dishes and the same sales per person as today.
+                <Link href="/demo/revenue" className="ml-2 font-semibold text-[var(--v-primary)]">See why each day looks this way</Link>
+              </p>
+            </section>
+          )}
+
+          {/* The opportunities the attention cards add up to — potential, never realised. */}
+          {feed.roi && (
+            <section aria-labelledby="roi-heading" className="rounded-xl border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.55)] p-4 sm:p-5">
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">{feed.roi.label}</p>
+              <h2 id="roi-heading" className="font-display text-2xl font-semibold tracking-[-0.035em]">
+                {fmtKes(feed.roi.potential_daily)} a day, if {feed.roi.opportunities?.length ? `all ${feed.roi.opportunities.length} ideas` : "the ideas"} work
+              </h2>
+              <p className="mt-1.5 text-xs text-[var(--v-muted-foreground)]">
+                Earned so far: {fmtKes(feed.roi.realised)}. {feed.roi.assumption}
+                <Link href="/demo/intelligence" className="ml-2 font-semibold text-[var(--v-primary)]">See the sums</Link>
+              </p>
+            </section>
+          )}
+
+          {/* How each part is doing */}
+
+          <section aria-labelledby="owner-areas-heading">
+            <SectionHead id="owner-areas-heading" eyebrow="Owner controls" title="The rest of your restaurant"
+              meta="Open a page when you need the detail" />
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {VIBANDA_HOME_LINKS.map(([label, note, slug]) => (
+                <Link key={slug} href={`/demo/${slug}`}
+                  className="rounded-xl border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.72)] p-4 transition hover:-translate-y-0.5 hover:border-[var(--v-primary)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--v-primary)]/60">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--v-muted-foreground)]">{label}</p>
+                  <p className="mt-2 text-xs leading-5 text-[var(--v-muted-foreground)]">{note}</p>
+                  <p className="mt-3 text-[11px] font-semibold text-[var(--v-primary)]">Open {label.toLowerCase()} <ChevronRight className="inline" size={12} /></p>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          {/* Business performance */}
+          <section aria-labelledby="performance-heading" className="mt-10 rounded-xl border border-[var(--v-border)] bg-[hsl(42_40%_99_/_0.55)] p-4 sm:p-5">
+            <div className="mb-4 flex items-end justify-between">
+              <div>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--v-muted-foreground)]">Deeper context</p>
+                <h2 id="performance-heading" className="font-display text-2xl font-semibold tracking-[-0.035em]">Business performance</h2>
+                <p className="mt-1.5 text-xs text-[var(--v-muted-foreground)]">Enough to know if the business is doing okay. Open a page when you want the reason.</p>
+              </div>
+              <button onClick={() => ask("How is my restaurant performing?")}
+                className="inline-flex min-h-9 items-center gap-1.5 self-start rounded-lg border border-[var(--v-border)] px-3 py-2 text-[10px] font-bold text-[var(--v-primary)] hover:border-[hsl(201_47%_29_/_0.45)] hover:bg-[var(--v-muted)]">
+                Ask OS about performance <ChevronRight size={13} />
+              </button>
+            </div>
+            {/* Sketch: 7-day bars */}
+            <div className="flex h-24 items-end gap-1.5">
+              {(() => {
+                const trend = feed.performance.revenue_trend;
+                const max = Math.max(...trend.map((t) => t.revenue), 1);
+                return trend.map((t) => (
+                  <div key={t.date} className="flex min-w-0 flex-1 flex-col items-center gap-1.5"
+                    title={`${t.date}: ${fmtKes(t.revenue)} · ${t.orders} orders`}>
+                    <div className="flex h-20 w-full items-end">
+                      <div className="w-full rounded-t-md bg-[hsl(201_47%_29_/_0.75)] transition-all hover:bg-[var(--v-primary)]"
+                        style={{ height: `${Math.max((t.revenue / max) * 100, 3)}%` }} />
+                    </div>
+                    <span className="truncate text-[9px] text-[var(--v-muted-foreground)]">{t.date.slice(5)}</span>
+                  </div>
+                ));
+              })()}
+            </div>
+            {dailyReport && (
+              <div className="mt-4 border-t border-[var(--v-border)] pt-4">
+                <button onClick={() => setShowReport((s) => !s)}
+                  className="flex w-full items-center justify-between text-left text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--v-muted-foreground)]">
+                  <span>Today in a few words</span>
+                  <span>{showReport ? "Hide" : "Show"}</span>
+                </button>
+                {showReport && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-[13px] leading-relaxed text-[hsl(208_29%_19_/_0.82)]">{dailyReport}</p>
+                    <Link href="/demo/reports" className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--v-primary)]">
+                      Open the full report and download it <ChevronRight size={12} />
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* Ideas: numbers first, then a few creative ones. */}
+          <DemoIdeas />
+        </>
+      )}
+    </div>
+  );
+}

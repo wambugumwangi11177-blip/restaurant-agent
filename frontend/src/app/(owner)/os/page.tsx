@@ -7,6 +7,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import AnswerCard from "@/components/owner/ask/AnswerCard";
 import { tenantConfig } from "@/lib/tenantConfig";
+import { DEMO_QUESTION_SECTIONS } from "@/lib/demoQuestions";
 import { ASK_FORMS, asOwnerAnswer, isGuidance, type AskForm, type OwnerAnswer } from "@/lib/owner/ask";
 
 /** An explanation of the software or help with an idea: the writing assistant answers these (/ai/chat). Everything about the owner's own figures is answered in the five forms (/owner/ask). */
@@ -238,6 +239,9 @@ function OSChatInner() {
           {group.examples.map((text) => <button type="button" key={text} onClick={() => void send(text, { form: group.id })} className="min-h-10 rounded-lg border border-[var(--v-border)] bg-white/70 px-3 py-2 text-left text-xs transition hover:border-[var(--v-primary)]/50">{text}</button>)}
         </div>
       </details>)}
+      <div className="pt-4"><p className="leviii-eyebrow">Explore your whole restaurant</p><p className="mb-4 text-xs text-[var(--v-muted-foreground)]">Useful questions, answered from this branch’s records.</p>
+        {DEMO_QUESTION_SECTIONS.map(section=>{const areas=section.areas.map(area=>({...area,questions:area.questions.filter(q=>!search||q.toLowerCase().includes(search.toLowerCase())||area.label.toLowerCase().includes(search.toLowerCase()))})).filter(a=>a.questions.length);return areas.length?<details key={section.id} open={!!search} className="mb-3 rounded-xl border border-[var(--v-border)] bg-white"><summary className="cursor-pointer p-4 text-sm font-semibold">{section.title}<span className="float-right text-xs font-normal text-[var(--v-muted-foreground)]">{areas.length} areas</span></summary><div className="space-y-4 border-t border-[var(--v-border)] p-4">{areas.map(area=><div key={area.slug}><h3 className="mb-2 text-xs font-bold">{area.label}</h3><div className="flex flex-wrap gap-2">{area.questions.map(q=><button key={q} type="button" onClick={()=>void send(q,{form:"auto"})} className="min-h-10 rounded-lg border border-[var(--v-border)] bg-[#f7f9f5] px-3 py-2 text-left text-xs hover:border-[var(--v-primary)]">{q}</button>)}</div></div>)}</div></details>:null;})}
+      </div>
     </section>
   );
 

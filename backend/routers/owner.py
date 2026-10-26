@@ -343,3 +343,39 @@ def ask(body: AskBody, db: Session = Depends(get_db), user: models.User = Depend
         db.commit()
         answer = {**answer, "conversation_id": conversation.id}
     return answer
+
+
+@router.get("/report/{period}/pdf")
+def report_pdf(period: str, month: Optional[str] = None, db: Session = Depends(get_db), user: models.User = Depends(_owner_only)):
+    from fastapi import Response
+    from owner.report_pdf import build
+    payload = report(period, month, db, user)
+    restaurant = _restaurant(db, user)
+    return Response(build(payload, restaurant.name), media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="LEVIII-{period}-report.pdf"', "Cache-Control": "no-store"})
+
+
+class PriceImpactIn(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    menu_item_id: int=Field(gt=0)
+    new_price_cents: StrictInt=Field(gt=0,le=100000000)
+
+@router.post("/planning/price-impact")
+def price_impact(body:PriceImpactIn,db:Session=Depends(get_db),user=Depends(_owner_only)):
+    from owner.planning import price_impact as calculate
+    try:
+        return calculate(_context(db,user),body.menu_item_id,body.new_price_cents)
+    except LookupError as exc:
+        raise HTTPException(404,str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422,str(exc)) from exc
+
+
+@router.post("/planning/price-simulation")
+def price_simulation(body: PriceImpactIn, db: Session = Depends(get_db), user=Depends(_owner_only)):
+    from owner.planning import price_simulation as calculate
+    try:
+        return calculate(_context(db, user), body.menu_item_id, body.new_price_cents)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc

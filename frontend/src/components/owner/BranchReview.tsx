@@ -1,9 +1,12 @@
 "use client";
-import { useState } from 'react';
+import {useDailyReview} from '@/lib/owner/useDailyReview';
+import { useEffect,useState } from 'react';
 import api from '@/lib/api';
 import { kes } from '@/lib/owner/format';
 type Branch={name:string;sales:number;food_cost_pct:number|null;wages_pct:number|null;cash_gap_kes:number|null;cash_note:string;stock_gaps_kes:number|null;stock_checks:number;below_menu_estimate_kes_month:number};
 export default function BranchReview(){
+ const reviewDay=useDailyReview();
  const [data,setData]=useState<{branches:Branch[];note:string}|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ useEffect(()=>{let active=true;api.get('/api/v1/owner/planning/branches').then(r=>{if(active){setData(r.data);setError('');}}).catch(()=>{if(active)setError('Could not compare branches. Retry after checking the connection.');}).finally(()=>{if(active)setBusy(false);});return()=>{active=false;};},[reviewDay]);
  return <section id="branch-review" className="space-y-4 rounded-xl border border-[var(--v-border)] p-4"><h2 className="text-xl font-semibold">Branches side by side</h2><button className="min-h-11 rounded-lg border px-4 py-2" disabled={busy} onClick={async()=>{setBusy(true);setError('');try{setData((await api.get('/api/v1/owner/planning/branches')).data);}catch{setError('Could not compare branches. Retry after checking the connection.');}finally{setBusy(false);}}}>Compare recorded branch performance</button>{error&&<p role="alert">{error}</p>}{data&&<><p className="text-sm">{data.note}</p><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{['Branch','Sales','Ingredients','Wages','Cash difference','Stock count shortages','Below-menu estimate / month'].map(x=><th className="p-2" key={x}>{x}</th>)}</tr></thead><tbody>{data.branches.map((b,n)=><tr key={n}><th className="p-2">{b.name}</th><td className="p-2">{kes(b.sales)}</td><td className="p-2">{b.food_cost_pct===null?'No data':`${b.food_cost_pct}%`}</td><td className="p-2">{b.wages_pct===null?'No data':`${b.wages_pct}%`}</td><td className="p-2">{b.cash_gap_kes===null?'Not combined':kes(b.cash_gap_kes)}<p>{b.cash_note}</p></td><td className="p-2">{b.stock_gaps_kes===null?'No counts':kes(b.stock_gaps_kes)} · {b.stock_checks} checks</td><td className="p-2">{kes(b.below_menu_estimate_kes_month)}</td></tr>)}</tbody></table></div></>}</section>;
 }

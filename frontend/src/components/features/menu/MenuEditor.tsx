@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useDailyReview } from "@/lib/owner/useDailyReview";
 import api from "@/lib/api";
 import { UtensilsCrossed, Plus, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
@@ -21,7 +22,9 @@ import type { MenuItem, MenuAiData, RecipeIngredient, InventoryPickItem } from "
  * file focused on data fetching + the open/edit state that must stay lifted
  * here so only one item's edit form or recipe panel is open at a time.
  */
-export default function MenuEditor() {
+export default function MenuEditor({ focused = false }: { focused?: boolean }) {
+    const reviewDay = useDailyReview();
+    const [loadError, setLoadError] = useState("");
     const [items, setItems] = useState<MenuItem[]>([]);
     const [aiData, setAiData] = useState<MenuAiData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -45,16 +48,16 @@ export default function MenuEditor() {
 
     useEffect(() => {
         Promise.all([
-            api.get("/menu/").catch(() => ({ data: [] })),
+            api.get("/menu/"),
             api.get("/ai/menu-engineering").catch(() => ({ data: null })),
             api.get("/inventory/").catch(() => ({ data: [] })),
         ]).then(([menuRes, aiRes, invRes]) => {
+            setLoadError("");
             setItems(menuRes.data || []);
             setAiData(aiRes.data);
             setInventoryItems(Array.isArray(invRes.data) ? invRes.data : []);
-            setLoading(false);
-        });
-    }, []);
+        }).catch((err) => setLoadError(getErrorMessage(err, "Menu records could not be loaded. Reload to try again."))).finally(() => setLoading(false));
+    }, [reviewDay]);
 
     const fetchIngredients = async (itemId: number) => {
         try {
@@ -201,7 +204,8 @@ export default function MenuEditor() {
                 </button>
             </div>
 
-            <MenuInsightsPanel summary={summary} recommendations={recommendations} />
+            {loadError && <p role="alert" className="text-danger">{loadError}</p>}
+            {!focused && <MenuInsightsPanel summary={summary} recommendations={recommendations} />}
 
             {showForm && (
                 <AddMenuItemForm
@@ -224,8 +228,7 @@ export default function MenuEditor() {
                             <h3 className="text-xs font-semibold text-text-dim uppercase tracking-wider mb-2 px-1">{cat}</h3>
                             <div className="space-y-1">
                                 {items.filter((i) => i.category === cat).map((item, idx) => {
-                                    const aiItem = matrix.find((m) => m.item_id === item.id)
-                                        ?? { item_id: item.id, classification: "", margin_pct: 0 };
+                                    const aiItem = focused ? undefined : matrix.find((m) => m.item_id === item.id);
                                     return (
                                         <MenuItemRow
                                             key={item.id}

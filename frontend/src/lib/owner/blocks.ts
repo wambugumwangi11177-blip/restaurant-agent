@@ -6,7 +6,7 @@ export const AREA_TITLES: Record<AreaKey, string> = {
 };
 
 export const BLOCK_TITLES: Record<AreaKey, Record<string, string>> = {
-  money: { pnl: "Profit & Loss", cost_dials: "Ingredients and wages", breakeven: "Costs covered", bills: "Bills coming up", spikes: "Costs going up", savings: "What LEVIII saved you" },
+  money: { food_cost: "Food cost", wages: "Wages", prime_cost: "Prime cost", pnl: "Profit & Loss", cost_dials: "Ingredients and wages", breakeven: "Costs covered", bills: "Bills coming up", spikes: "Costs going up", savings: "What LEVIII saved you" },
   sales_dishes: {
     seven_day: "Sales, last 7 days", forecast: "Next 7 days", matrix: "Best and weakest dishes", dishes_by_kes: "What each dish earns", price_ideas: "Price ideas",
     delivery: "What delivery really pays", outlook: "Next 30 days", win_back: "Winning guests back", simulator: "What if I change a price",

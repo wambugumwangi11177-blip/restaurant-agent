@@ -55,7 +55,7 @@ it("My Money: a cost nobody has entered is said, not shown as a flattering profi
 it("My Money: the accountant's file downloads as Excel or PDF for the month on screen, and says so if it cannot be made", async () => {
   const createObjectURL = vi.fn(() => "blob:x");
   Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
-  vi.mocked(api.get).mockResolvedValueOnce({ data: new Blob(["x"]) } as never);
+  vi.mocked(api.get).mockImplementation(async (url) => ({ data: String(url).includes("/pnl/export") ? new Blob(["x"]) : {items:[]} }) as never);
   open("money");
   fireEvent.click(screen.getByRole("button", { name: "Excel" }));
   await waitFor(() => expect(api.get).toHaveBeenCalledWith("/api/v1/owner/money/pnl/export", expect.objectContaining({ params: { month: "2026-10", format: "xlsx" }, responseType: "blob" })));
@@ -112,11 +112,11 @@ it("Sales & Dishes: what each dish earns, price ideas with the way they are wort
   expect(within(delivery).getByText(/Best and weakest hours/)).toBeTruthy();
 });
 
-it("Sales & Dishes: the 30-day outlook is a range, win-back counts the regulars, and what-if points at Ask LEVIII", () => {
+it("Sales & Dishes: the 30-day outlook is a range, win-back counts the regulars, and what-if offers a working simulator", () => {
   open("sales_dishes");
   expect(within(panel("Next 30 days")).getByText(/likely, between KES 348,912 and KES 594,432/)).toBeTruthy();
   expect(within(panel("Winning guests back")).getByText("31")).toBeTruthy();
-  expect(within(panel("What if I change a price")).getByRole("link", { name: /Try it/ }).getAttribute("href")).toMatch(/^\/os\?q=What/);
+  expect(within(panel("What if I change a price")).getByRole("button", { name: "Model price & demand" })).toBeTruthy();
 });
 
 // ── Store & Suppliers ────────────────────────────────────────────────────────
@@ -161,7 +161,7 @@ it("Staff: wages against the owner's target, sales per staff hour, overtime, eac
   const wages = panel("Wages");
   expect(within(wages).getByRole("img").getAttribute("aria-label")).toBe("Out of every KES 100, wages: 28.2%, Fine. Your target is 32%.");
   expect(within(wages).getByText("KES 362")).toBeTruthy();
-  expect(within(wages).getByRole("list", { name: "Wages by person, last 30 days" })).toBeTruthy();
+  expect(within(wages).getByRole("list", { name: "Recorded shift costs by person, last 30 days" })).toBeTruthy();
   expect(within(panel("On shift")).getByText("5")).toBeTruthy();
   const kitchen = panel("Kitchen speed");
   expect(within(kitchen).getByText("Grill")).toBeTruthy();
@@ -228,4 +228,23 @@ it("Sales & Dishes: a long list of delivery gaps shows the worst few and says ho
   const delivery = panel("What delivery really pays");
   expect(within(delivery).getAllByText(/to keep your floor/)).toHaveLength(5);
   expect(within(delivery).getByText(/\d+ more dishes lose too much to a delivery app/)).toBeTruthy();
+});
+
+
+it.each([['money', 'profit-and-loss', 'Profit & Loss', 'Bills coming up'], ['store', 'missing-stock', 'Missing stock', 'Suppliers'], ['cash', 'cash-count-check', 'Cash count check', 'M-Pesa check']] as const)("%s tool links show only the selected section", async (key, focus, visible, hidden) => {
+  const { AreaFocus } = await import('@/components/owner/areas/ui');
+  render(<AreaFocus.Provider value={focus}><AreaBody area={areas()[key]} /></AreaFocus.Provider>);
+  expect(screen.getByRole('region', {name: visible})).toBeTruthy();
+  expect(screen.queryByRole('region', {name: hidden})).toBeNull();
+  expect(screen.queryByText('What a price change does to your P&L')).toBeNull();
+  expect(screen.queryByRole('region', {name: 'Your M-Pesa statement'})).toBeNull();
+});
+
+
+it.each(AREA_KEYS.flatMap(key=>Object.entries(BLOCK_TITLES[key]).map(([block,title])=>({key,block,title}))))('$key.$block renders as an individual tool',async({key,title})=>{
+ const {AreaFocus}=await import('@/components/owner/areas/ui');
+ const {blockAnchor}=await import('@/lib/owner/features');
+ render(<AreaFocus.Provider value={blockAnchor(title)}><AreaBody area={areas()[key]}/></AreaFocus.Provider>);
+ expect(screen.getByRole('region',{name:title})).toBeTruthy();
+ for(const other of Object.values(BLOCK_TITLES[key]).filter(t=>t!==title))expect(screen.queryByRole('region',{name:other})).toBeNull();
 });

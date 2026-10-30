@@ -113,9 +113,11 @@
           '<p class="card__sentence">Missing stock: ' + m.item + '.</p>' +
           '<p class="card__number">' + m.gap + ', about ' + D.formatKES(m.kes) + '</p>' +
           '<p style="font-size:0.875rem">Store sent ' + m.store + '. Kitchen confirmed ' + m.kitchen + '.</p>' +
-          (m.handover ? '<p class="status-word status-word--check"><span class="status-word__shape"></span> Handover doesn\'t match</p>' : '') +
+          (m.initiatedBy ? '<p class="caption">' + m.initiatedBy + (m.confirmedBy ? ' → ' + m.confirmedBy : '') + '</p>' : '') +
+          (m.handover ? '<p class="status-word status-word--check"><span class="status-word__shape"></span> ' + (m.transferStatus || "Handover doesn't match") + '</p>' : '') +
           '<p class="freshness-line">' + m.note + '</p>' +
-          '<button type="button" class="button">Check this</button>';
+          '<button type="button" class="button">Check this</button>' +
+          '<button type="button" class="why-link" data-why data-why-title="How this was worked out" data-why-body="Deterministic variance: theoretical usage from recipes and sales vs recorded stock movements and transfer confirms (POST /stock/transfers/…/confirm).">Why?</button>';
         miss.appendChild(card);
       });
       var sp = document.getElementById("spoiled-list");

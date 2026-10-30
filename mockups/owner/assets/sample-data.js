@@ -4,6 +4,20 @@ window.LEVIII_DATA = {
     return "KES " + Number(n).toLocaleString("en-KE");
   },
 
+  restaurant: {
+    name: "Eleven",
+    posLabel: "Quick Sell",
+    posIngest: "MacSoft webhook push into LEVIII mirror",
+  },
+
+  /** Mirrors GET /api/v1/overview/today → data_provenance (freshness copy). */
+  provenance: {
+    latestTillAt: "2 minutes ago",
+    costsEnteredThrough: "Tuesday",
+    timezone: "Africa/Nairobi",
+    salesBasis: "paid_non_cancelled_orders_by_creation_time",
+  },
+
   home: {
     salesToday: 64300,
     salesCompare: "Up 8% on a usual Thursday",
@@ -20,7 +34,8 @@ window.LEVIII_DATA = {
         amount: 25700,
         period: "a month",
         button: "See details",
-        why: "We compared till receipts to your menu prices for the last 30 days.",
+        why:
+          "Deterministic check: sum of (menu price − till line price) × quantity for 30 days of paid orders from Quick Sell. No AI in this number.",
         freshness: "Includes costs entered up to Tuesday",
       },
       {
@@ -29,7 +44,8 @@ window.LEVIII_DATA = {
         amount: 10500,
         period: "a month",
         button: "Raise to 435",
-        why: "Your cost per plate is above what you charge at the current price.",
+        why:
+          "Deterministic check: recipe cost per quarter chicken (store issues + prep yield) compared with menu price 400. Gap × plates sold this month.",
         freshness: "Based on: a 10% offer usually brings about 30% more orders",
       },
       {
@@ -37,7 +53,8 @@ window.LEVIII_DATA = {
         sentence: "Missing stock: beef.",
         amountLabel: "10 kg, about KES 6,500",
         button: "Check kitchen",
-        why: "Store sent 50 kg this week; kitchen used 60 kg on portions logged.",
+        why:
+          "Deterministic check: theoretical usage from recipes × sales minus store OUT movements and kitchen counts. 10 kg unaccounted — check portions and waste first.",
         freshness: "Not updated since Monday",
       },
     ],
@@ -183,6 +200,7 @@ window.LEVIII_DATA = {
         kes: 6500,
         store: "40 kg",
         kitchen: "40 kg",
+        initiatedBy: "Jack (Storekeeper)",
         note: "The 10 kg gap is in the kitchen, check portions and waste first.",
       },
       {
@@ -191,8 +209,11 @@ window.LEVIII_DATA = {
         kes: 600,
         store: "40 kg",
         kitchen: "38 kg",
+        initiatedBy: "Jack (Storekeeper)",
+        confirmedBy: "Kitchen count",
+        transferStatus: "Handover doesn't match",
         handover: true,
-        note: "Handover doesn't match — store and kitchen counts differ.",
+        note: "Store sent 40 kg; kitchen blind count confirmed 38 kg. A gap is something to check, not proof of wrongdoing.",
       },
     ],
     missingCaption: "A gap is not proof of anything. It tells you where to look.",
@@ -356,7 +377,7 @@ window.LEVIII_DATA = {
       what: {
         sentence: "Yesterday you sold KES 58,400 across 186 receipts.",
         number: "KES 58,400",
-        source: "Quick Sell till export, Wed 29 Oct 2026",
+        source: "GET /api/v1/overview/today → revenue (paid orders), Wed 29 Oct 2026",
         ai: false,
         followUp: "Show top dishes yesterday",
       },
@@ -367,7 +388,7 @@ window.LEVIII_DATA = {
           "Chips ran out at 7 pm — lost roughly 14 orders (stock log)",
           "One delivery tablet offline 2 hours (delivery partner)",
         ],
-        source: "Till, stock, and delivery logs, Tue 28 Oct 2026",
+        source: "Deterministic modules: revenue_forecaster + inventory low-stock log, Tue 28 Oct 2026",
         ai: true,
         followUp: "What sold well anyway?",
       },
@@ -380,7 +401,7 @@ window.LEVIII_DATA = {
       },
       fix: {
         sentence: "This week, fix beef gaps, approve the Kenchic order, and match the M-Pesa sale for KES 1,200.",
-        source: "Home leaks, Stock to order, Cash Check",
+        source: "Ranked attention cards + stock custody report + cash reconciliation report",
         ai: true,
         followUp: "Open Missing stock",
       },
@@ -398,7 +419,7 @@ window.LEVIII_DATA = {
       cant: {
         question: "Which table ordered the most wine?",
         reply: "I can't answer that yet. Your till doesn't record this.",
-        source: "No wine category on Quick Sell",
+        source: "Quick Sell mirror — no wine category on exported line items",
         ai: true,
       },
     },
@@ -406,14 +427,21 @@ window.LEVIII_DATA = {
 
   staff: {
     date: "Thursday 30 Oct 2026",
-    roster: ["Jane — Manager", "Peter — Kitchen", "Amina — Waiter", "James — Storekeeper"],
+    roster: [
+      "Jane — Manager",
+      "Jack — Storekeeper",
+      "Peter — Kitchen",
+      "Grace — Accountant",
+      "Amina — Waiter",
+    ],
     labourShare: "25% of sales today",
     labourStatus: "Fine",
     attendance: ["8 scheduled", "7 clocked in", "1 late — Amina"],
     activity: [
-      { who: "Storekeeper", what: "Opening counts and Kenchic delivery", when: "6:42 am" },
-      { who: "Manager", what: "Shift close and petty cash", when: "11:05 pm Wed" },
-      { who: "Accountant", what: "Month-end export sent", when: "Tue 3:18 pm" },
+      { who: "Jack (Storekeeper)", what: "Opening stock count and Kenchic delivery receipt", when: "6:42 am" },
+      { who: "Peter (Kitchen)", what: "Confirmed tomato transfer — count differed from store send", when: "7:15 am" },
+      { who: "Jane (Manager)", what: "Shift close and petty cash entry", when: "11:05 pm Wed" },
+      { who: "Grace (Accountant)", what: "Month-end export sent", when: "Tue 3:18 pm" },
     ],
   },
 

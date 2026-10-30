@@ -10,7 +10,6 @@
   <div class="app-shell">
     <header class="page-header">
       <h1 class="page-header__title">Reports</h1>
-
       <div class="page-header__actions">
         <a href="alerts.html" class="icon-btn" aria-label="Alerts">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 16v-5a6 6 0 10-12 0v5l-2 2h16l-2-2"/><path d="M10 20a2 2 0 004 0"/></svg>
@@ -18,34 +17,80 @@
         <a href="settings.html" class="profile-circle" aria-label="Profile">E</a>
       </div>
     </header>
-    <main class="page-content">
-      <p class="caption">Page content loads in later sprints.</p>
+    <main class="page-content" id="reports-tabs">
+      <div class="tabs" role="tablist">
+        <button type="button" class="is-active" data-tab="today">Today's close</button>
+        <button type="button" data-tab="week">This week</button>
+        <button type="button" data-tab="month">This month</button>
+        <button type="button" data-tab="year">This year</button>
+      </div>
+
+      <div class="tab-panel is-active" data-panel="today">
+        <div class="card">
+          <div class="row"><span class="row__label">Money balance</span><span class="status-word status-word--fine"><span class="status-word__shape"></span> Fine</span></div>
+          <div class="row"><span class="row__label">Stock balance</span><span class="status-word status-word--check"><span class="status-word__shape"></span> Check</span></div>
+          <ul class="plain-list">
+            <li>Sales closed at <span data-bind="home.costsCoveredTime"></span></li>
+            <li>1 handover to review on tomatoes</li>
+          </ul>
+          <p class="freshness-line">Updated just now</p>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="week">
+        <div class="card">
+          <div class="row"><span class="row__label">Ingredients out of every KES 100</span><span class="row__value" id="week-ing-pct"></span></div>
+          <div class="row"><span class="row__label">Wages out of every KES 100</span><span class="row__value" id="week-wage-pct"></span></div>
+          <p class="freshness-line">Includes costs entered up to Tuesday</p>
+          <p><strong>Menu movers:</strong> Fish fillet up, veg curry down.</p>
+          <ol>
+            <li>Approve Kenchic order</li>
+            <li>Match M-Pesa KES 1,200</li>
+            <li>Review Tue Night shift</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="month">
+        <div class="card">
+          <div class="row"><span class="row__label">Sales</span><span class="row__value" data-bind="reports.month.sales" data-format="kes"></span></div>
+          <div class="row"><span class="row__label">Ingredients</span><span class="row__value" data-bind="reports.month.ingredients" data-format="kes"></span></div>
+          <div class="row"><span class="row__label">Left after ingredients</span><span class="row__value" data-bind="reports.month.leftAfterIngredients" data-format="kes"></span></div>
+          <div class="row"><span class="row__label">Wages</span><span class="row__value" data-bind="reports.month.wages" data-format="kes"></span></div>
+          <div class="row"><span class="row__label">Running costs</span><span class="row__value" data-bind="reports.month.runningCosts" data-format="kes"></span></div>
+          <div class="row"><span class="row__label">What you kept</span><span class="row__value" data-bind="reports.month.kept" data-format="kes"></span></div>
+          <p class="freshness-line">Includes costs entered up to Tuesday</p>
+          <p>Costs covered on day <span data-bind="reports.month.breakEvenDay"></span> of the month.</p>
+          <p data-bind="reports.month.menuMoves"></p>
+          <p data-bind="reports.month.priceChanges"></p>
+          <p>Gaps total <span data-bind="reports.month.gaps" data-format="kes"></span> — check Missing stock.</p>
+        </div>
+        <div class="card ai-read">
+          <p class="ai-read__label">Written by AI</p>
+          <p><strong>My read:</strong> <span data-bind="reports.month.aiRead"></span></p>
+          <p><strong>Try this:</strong> <span data-bind="reports.month.aiTry"></span></p>
+        </div>
+        <button type="button" class="button button-block" id="download-accountant">Download for accountant</button>
+      </div>
+
+      <div class="tab-panel" data-panel="year">
+        <div class="card">
+          <div class="chart-wrap" id="year-chart"></div>
+          <p class="chart-caption">Sales by month this year (KES thousands).</p>
+          <p class="freshness-line">Updated just now</p>
+          <p><strong>Next year</strong></p>
+          <ul id="next-year"></ul>
+        </div>
+      </div>
     </main>
-
-<nav class="nav-pill" aria-label="Main">
-  <a href="home.html" class="nav-pill__item" data-nav="home">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/></svg></span>
-    <span class="nav-pill__label">Home</span>
-  </a>
-  <a href="money.html" class="nav-pill__item" data-nav="money">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 10h4a2 2 0 110 4h-2"/></svg></span>
-    <span class="nav-pill__label">Money</span>
-  </a>
-  <a href="stock.html" class="nav-pill__item" data-nav="stock">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 8h16v12H4z"/><path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span>
-    <span class="nav-pill__label">Stock</span>
-  </a>
-  <a href="ask.html" class="nav-pill__item" data-nav="ask">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H7l-3 3V6z"/></svg></span>
-    <span class="nav-pill__label">Ask</span>
-  </a>
-  <a href="more.html" class="nav-pill__item" data-nav="more">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span>
-    <span class="nav-pill__label">More</span>
-  </a>
-</nav>
+    <nav class="nav-pill" aria-label="Main">
+      <a href="home.html" class="nav-pill__item" data-nav="home"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/></svg></span><span class="nav-pill__label">Home</span></a>
+      <a href="money.html" class="nav-pill__item" data-nav="money"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 10h4a2 2 0 110 4h-2"/></svg></span><span class="nav-pill__label">Money</span></a>
+      <a href="stock.html" class="nav-pill__item" data-nav="stock"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 8h16v12H4z"/><path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span><span class="nav-pill__label">Stock</span></a>
+      <a href="ask.html" class="nav-pill__item" data-nav="ask"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H7l-3 3V6z"/></svg></span><span class="nav-pill__label">Ask</span></a>
+      <a href="more.html" class="nav-pill__item" data-nav="more"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span><span class="nav-pill__label">More</span></a>
+    </nav>
   </div>
-
   <div id="sheet-overlay" class="sheet-overlay" aria-hidden="true">
     <div class="sheet" role="dialog" aria-modal="true">
       <div class="sheet__handle"></div>
@@ -56,5 +101,36 @@
   </div>
   <script src="assets/sample-data.js"></script>
   <script src="assets/app.js"></script>
+  <script>
+    (function () {
+      var D = window.LEVIII_DATA;
+      var months = ["J","F","M","A","M","J","J","A","S","O","N","D"];
+      var svg = '<svg viewBox="0 0 320 120" role="img">';
+      D.reports.yearSales.forEach(function (v, i) {
+        var h = v / 2;
+        var x = 14 + i * 24;
+        svg += '<rect x="' + x + '" y="' + (100 - h) + '" width="16" height="' + h + '" fill="#000"/>';
+        svg += '<text x="' + x + '" y="115" font-size="8">' + months[i] + "</text>";
+      });
+      svg += "</svg>";
+      document.getElementById("year-chart").innerHTML = svg;
+      var ny = document.getElementById("next-year");
+      D.reports.nextYear.forEach(function (line) {
+        var li = document.createElement("li");
+        li.textContent = line;
+        ny.appendChild(li);
+      });
+      document.getElementById("week-ing-pct").textContent = D.money.periods.week.ingredientsPct + " of every 100";
+      document.getElementById("week-wage-pct").textContent = D.money.periods.week.wagesPct + " of every 100";
+      var m = D.reports.month;
+      document.getElementById("download-accountant").addEventListener("click", function () {
+        window.LEVIII.openSheet("Download for accountant",
+          "<p>Preview of <strong>" + D.reports.downloadName + "</strong></p>" +
+          '<table class="spreadsheet-preview"><tr><th>Line</th><th>KES</th></tr>' +
+          "<tr><td>Sales</td><td>" + m.sales.toLocaleString("en-KE") + "</td></tr>" +
+          "<tr><td>What you kept</td><td>" + m.kept.toLocaleString("en-KE") + "</td></tr></table>");
+      });
+    })();
+  </script>
 </body>
 </html>

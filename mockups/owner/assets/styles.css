@@ -128,7 +128,7 @@ main.page-content {
 
 /* Typography */
 .section-label {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -519,7 +519,7 @@ main.page-content {
   gap: 2px;
   text-decoration: none;
   color: var(--grey-400);
-  font-size: 0.625rem;
+  font-size: 0.75rem;
   font-weight: 600;
   min-width: 56px;
   min-height: var(--min-touch);
@@ -904,7 +904,7 @@ main.page-content {
 }
 
 .chat-bubble .ai-label {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1067,7 +1067,7 @@ main.page-content {
 }
 
 .ai-read__label {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;

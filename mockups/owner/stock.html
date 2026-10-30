@@ -96,16 +96,6 @@
           '<button type="button" class="button button-outline hidden" data-send-supplier>Send to supplier</button></div>';
         orderRoot.appendChild(row);
       });
-      document.querySelectorAll("[data-approve-order]").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          if (btn.classList.contains("is-done")) return;
-          btn.textContent = "Approved";
-          btn.classList.add("is-done");
-          btn.disabled = true;
-          var send = btn.parentElement.querySelector("[data-send-supplier]");
-          if (send) send.classList.remove("hidden");
-        });
-      });
       var low = document.getElementById("running-low");
       D.stock.runningLow.forEach(function (item) {
         var cls = item.status === "Low" ? "low" : "fine";

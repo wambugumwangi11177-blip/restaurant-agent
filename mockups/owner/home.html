@@ -126,11 +126,6 @@
           '</div>';
         leaks.appendChild(card);
       });
-      document.querySelectorAll("#leak-cards [data-why]").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          window.LEVIII.openSheet("Why this number?", "<p>" + btn.getAttribute("data-why-body") + "</p>");
-        });
-      });
       var health = document.getElementById("health-grid");
       Object.keys(D.home.health).forEach(function (key) {
         var h = D.home.health[key];
@@ -155,11 +150,6 @@
         var li = document.createElement("li");
         li.textContent = line;
         cl.appendChild(li);
-      });
-      document.querySelectorAll("[data-dismiss-card],[data-later-card]").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          btn.closest(".card").classList.add("is-dismissed");
-        });
       });
     })();
   </script>

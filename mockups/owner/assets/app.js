@@ -36,12 +36,12 @@
         closeSheet();
       }
     });
-    document.querySelectorAll("[data-why]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var title = btn.getAttribute("data-why-title") || "Why this number?";
-        var body = btn.getAttribute("data-why-body") || "Example explanation for this mockup.";
-        openSheet(title, "<p>" + body + "</p>");
-      });
+    document.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-why]");
+      if (!btn) return;
+      var title = btn.getAttribute("data-why-title") || "Why this number?";
+      var body = btn.getAttribute("data-why-body") || "Example explanation for this mockup.";
+      openSheet(title, "<p>" + body + "</p>");
     });
   }
 
@@ -65,17 +65,11 @@
   }
 
   function initDismissCards() {
-    document.querySelectorAll("[data-dismiss-card]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var card = btn.closest(".card");
-        if (card) card.classList.add("is-dismissed");
-      });
-    });
-    document.querySelectorAll("[data-later-card]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var card = btn.closest(".card");
-        if (card) card.classList.add("is-dismissed");
-      });
+    document.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-dismiss-card], [data-later-card]");
+      if (!btn) return;
+      var card = btn.closest(".card");
+      if (card) card.classList.add("is-dismissed");
     });
   }
 
@@ -116,24 +110,22 @@
   }
 
   function initStockApprove() {
-    document.querySelectorAll("[data-approve-order]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        if (btn.classList.contains("is-done")) return;
-        btn.textContent = "Approved";
-        btn.classList.add("is-done");
-        btn.disabled = true;
-        var send = btn.parentElement.querySelector("[data-send-supplier]");
-        if (send) send.classList.remove("hidden");
-      });
+    document.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-approve-order]");
+      if (!btn || btn.classList.contains("is-done")) return;
+      btn.textContent = "Approved";
+      btn.classList.add("is-done");
+      btn.disabled = true;
+      var send = btn.parentElement.querySelector("[data-send-supplier]");
+      if (send) send.classList.remove("hidden");
     });
   }
 
   function initDishBoxes() {
-    document.querySelectorAll("[data-dish-group]").forEach(function (box) {
-      box.addEventListener("click", function () {
-        var action = box.getAttribute("data-dish-action");
-        openSheet("Suggested action", "<p>" + action + "</p>");
-      });
+    document.addEventListener("click", function (e) {
+      var box = e.target.closest("[data-dish-group]");
+      if (!box) return;
+      openSheet("Suggested action", "<p>" + box.getAttribute("data-dish-action") + "</p>");
     });
   }
 
@@ -156,20 +148,20 @@
   }
 
   function initShiftRows() {
-    document.querySelectorAll("[data-shift-id]").forEach(function (row) {
-      row.addEventListener("click", function () {
-        var label = row.getAttribute("data-shift-label");
-        openSheet(
-          label + " shift",
-          "<p>Sales " +
-            row.getAttribute("data-shift-sales") +
-            ". Cash gap " +
-            row.getAttribute("data-shift-cash") +
-            ". M-Pesa gap " +
-            row.getAttribute("data-shift-mpesa") +
-            ".</p><p class=\"freshness-line\">From shift close report.</p>"
-        );
-      });
+    document.addEventListener("click", function (e) {
+      var row = e.target.closest("[data-shift-id]");
+      if (!row) return;
+      var label = row.getAttribute("data-shift-label");
+      openSheet(
+        label + " shift",
+        "<p>Sales " +
+          row.getAttribute("data-shift-sales") +
+          ". Cash gap " +
+          row.getAttribute("data-shift-cash") +
+          ". M-Pesa gap " +
+          row.getAttribute("data-shift-mpesa") +
+          ".</p><p class=\"freshness-line\">From shift close report.</p>"
+      );
     });
   }
 
@@ -275,21 +267,21 @@
       return html;
     }
 
-    document.querySelectorAll("[data-ask-chip]").forEach(function (chip) {
-      chip.addEventListener("click", function () {
-        var key = chip.getAttribute("data-ask-chip");
-        var label = chip.textContent.trim();
-        addBubble(label, "user");
-        var typing = document.createElement("div");
-        typing.className = "chat-bubble chat-bubble--ai typing-dots";
-        typing.textContent = "LEVIII is typing";
-        chat.appendChild(typing);
-        chat.scrollTop = chat.scrollHeight;
-        setTimeout(function () {
-          typing.remove();
-          addBubble(formatAnswer(key), "ai");
-        }, 1000);
-      });
+    document.addEventListener("click", function (e) {
+      var chip = e.target.closest("[data-ask-chip]");
+      if (!chip || !document.getElementById("chat-messages")) return;
+      var key = chip.getAttribute("data-ask-chip");
+      var label = chip.textContent.trim();
+      addBubble(label, "user");
+      var typing = document.createElement("div");
+      typing.className = "chat-bubble chat-bubble--ai typing-dots";
+      typing.textContent = "LEVIII is typing";
+      chat.appendChild(typing);
+      chat.scrollTop = chat.scrollHeight;
+      setTimeout(function () {
+        typing.remove();
+        addBubble(formatAnswer(key), "ai");
+      }, 1000);
     });
 
     var cantBtn = document.getElementById("ask-cant-example");
@@ -317,13 +309,13 @@
   }
 
   function initPriceApprove() {
-    document.querySelectorAll("[data-price-approve]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var note = btn.closest(".card").querySelector("[data-till-note]");
-        if (note) note.classList.remove("hidden");
-        btn.disabled = true;
-        btn.textContent = "Approved";
-      });
+    document.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-price-approve]");
+      if (!btn || btn.disabled) return;
+      var note = btn.closest(".card").querySelector("[data-till-note]");
+      if (note) note.classList.remove("hidden");
+      btn.disabled = true;
+      btn.textContent = "Approved";
     });
   }
 

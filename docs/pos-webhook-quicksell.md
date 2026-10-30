@@ -1,6 +1,6 @@
 # QuickSell POS → LEVIII (Eleven)
 
-One-way HTTPS push: your POS sends sales JSON to us. We store every payload and map sales into the Eleven owner app. We never write back to your system.
+One-way HTTPS push: your POS sends JSON to us in **your existing format**. We store every payload in our mirror first and return success; we only map records we recognise as sales/orders into the Eleven owner app. Other data (stock, staff, payments, etc.) stays in the mirror for later mapping. We never write back to your system.
 
 **Base URL (placeholder):** `https://api.example.com`  
 **Endpoint:** `POST /webhooks/quicksell/data`  
@@ -9,22 +9,21 @@ One-way HTTPS push: your POS sends sales JSON to us. We store every payload and 
 
 ## What to send
 
-Send either:
+Send your data as JSON in your existing format — for example:
 
 - A JSON object with a `records` array (or `data`, `sales`, `transactions`, …), or  
-- A JSON array of sale objects, or  
-- A single sale object.
+- A JSON array of objects, or  
+- A single object.
 
-We do not require a fixed schema beyond the two rules below. Use the field names you already export; we recognise common aliases (`receipt_no`, `transaction_id`, `total_cents`, `occurred_at`, etc.).
+We do not require a fixed schema. Use the field names you already export; we recognise common aliases when mapping sales (`receipt_no`, `transaction_id`, `total_cents`, `occurred_at`, etc.).
 
-### Required on every sale record
+**IDs:** If you include a stable record id, we use it for deduplication (safe retries). If not, we dedupe on a hash of the record content.
 
-1. **Unique record ID** — stable across retries (e.g. `source_id`, `receipt_no`, `transaction_id`). Same ID + same version → duplicate ignored (safe to retry).
-2. **Timestamp with timezone offset** — ISO-8601, e.g. `2026-09-19T14:30:00+03:00` or `…Z`. Naive local times are rejected so each sale lands on the correct Nairobi business day.
+**Timestamps:** If a timestamp includes a timezone offset, we use it. If it is naive (no offset), we treat it as **Africa/Nairobi**. If there is no timestamp, we use the time we received the batch.
 
-Include a **total** as `total_cents` (integer) or `total` (major units).
+For **sales**, include a **total** as `total_cents` (integer) or `total` (major units) so we can create order rows.
 
-### Example
+### Example (one possible shape)
 
 ```json
 {
@@ -44,7 +43,7 @@ Include a **total** as `total_cents` (integer) or `total` (major units).
 | Code | Meaning |
 |------|---------|
 | **200** | Batch stored (`inserted`, `duplicates_ignored`, `orders_inserted` in JSON body) |
-| **400** | Invalid JSON, empty batch, or a record missing ID/timestamp/total |
+| **400** | Body is not valid JSON |
 | **401** | Missing or wrong `x-api-key` |
 | **413** | More than 500 records in one request |
 | **500** | Server error — retry the whole batch |

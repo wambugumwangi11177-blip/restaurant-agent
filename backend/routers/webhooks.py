@@ -14,6 +14,8 @@ the delete, so master shipped with no way for MacSoft to deliver data at all —
 the endpoint the production MACSOFT_API_KEY exists for — while keeping the 26
 tests that prove it works. This restores the MacSoft half only.
 """
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Request, HTTPException, Depends, Header
 from sqlalchemy.orm import Session
 import hmac
@@ -140,23 +142,9 @@ def _identity(record: dict) -> tuple[str, str, bool]:
 
 
 def _records_from(payload) -> tuple[str, list[dict]]:
-    """
-    (entity, records) from whatever shape arrived.
+    from integration.payload_parse import records_from
 
-    Accepts the documented envelope, a bare list, or a single bare object, so
-    MacSoft can send their natural export without reshaping it.
-    """
-    if isinstance(payload, list):
-        return ("unknown", [r for r in payload if isinstance(r, dict)])
-    if not isinstance(payload, dict):
-        return ("unknown", [])
-    entity = str(payload.get("entity") or payload.get("type") or "unknown").strip() or "unknown"
-    for key in ("records", "data", "items", "rows", "transactions", "sales"):
-        block = payload.get(key)
-        if isinstance(block, list):
-            return (entity, [r for r in block if isinstance(r, dict)])
-    # A single bare record.
-    return (entity, [payload])
+    return records_from(payload)
 
 
 @router.post("/macsoft/data")
@@ -313,12 +301,7 @@ async def receive_quicksell_data(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON payload")
 
-    entity, records = _records_from(payload)
-    if not records:
-        raise HTTPException(
-            status_code=400,
-            detail="No records found. Send a JSON object with a 'records' array, a bare array, or one record object.",
-        )
+    entity, records = qs.normalize_payload(payload)
     if len(records) > 500:
         raise HTTPException(status_code=413, detail="Batch too large — send at most 500 records.")
 
@@ -327,30 +310,31 @@ async def receive_quicksell_data(
     counts = {"inserted": 0, "superseded": 0, "skipped": 0}
     order_counts = {"order_inserted": 0, "order_updated": 0, "order_unchanged": 0}
     business_days: list[str] = []
+    received_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     try:
         for record in records:
-            try:
-                source_id = qs.require_source_id(record)
-                occurred_at = qs.parse_timestamp(record)
-                version = qs.source_version_for(record, occurred_at)
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            source_id, _derived = qs.source_id_for(record)
+            occurred_at = qs.parse_timestamp(record, received_at)
+            version = qs.source_version_for(record, occurred_at)
+            rec_entity = str(record.get("entity") or record.get("type") or entity).strip() or entity
+            mirror_entity = rec_entity if rec_entity != "unknown" else "envelope"
 
             business_days.append(qs.nairobi_business_day(occurred_at))
             action = ingest(
                 db,
                 source_system_id=source_system_id,
-                entity=entity if entity != "unknown" else "sale",
+                entity=mirror_entity,
                 source_id=source_id,
                 source_version=version,
                 payload=record,
                 commit=False,
             )
             counts[action] = counts.get(action, 0) + 1
-            oc = qs.apply_sale(
+            oc = qs.maybe_apply_sale(
                 db,
                 restaurant_id=restaurant_id,
+                entity=rec_entity,
                 source_id=source_id,
                 ingest_action=action,
                 record=record,

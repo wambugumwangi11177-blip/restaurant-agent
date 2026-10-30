@@ -88,14 +88,37 @@ def test_late_night_utc_maps_to_next_nairobi_day(client, eleven_restaurant):
     assert res.json()["nairobi_business_days"] == ["2026-09-20"]
 
 
-def test_missing_id_is_400(client, eleven_restaurant):
-    body = {"records": [{"occurred_at": "2026-09-19T10:00:00+03:00", "total_cents": 100}]}
-    assert _post(client, body).status_code == 400
+def test_missing_id_accepted_uses_content_hash(client, db_session, eleven_restaurant):
+    body = {"entity": "sale", "records": [{"occurred_at": "2026-09-19T10:00:00+03:00", "total_cents": 100}]}
+    res = _post(client, body)
+    assert res.status_code == 200
+    assert res.json()["orders_inserted"] == 1
+    order = db_session.query(Order).one()
+    assert order.notes.startswith("quicksell:sha256:")
 
 
-def test_naive_timestamp_is_400(client, eleven_restaurant):
-    body = {"records": [{"source_id": "X", "occurred_at": "2026-09-19T10:00:00", "total_cents": 100}]}
-    assert _post(client, body).status_code == 400
+def test_naive_timestamp_treated_as_nairobi(client, eleven_restaurant):
+    # 10:00 naive EAT on 2026-09-19
+    body = {"entity": "sale", "records": [{"source_id": "X", "occurred_at": "2026-09-19T10:00:00", "total_cents": 100}]}
+    res = _post(client, body)
+    assert res.status_code == 200
+    assert res.json()["nairobi_business_days"] == ["2026-09-19"]
+
+
+def test_stock_payload_mirrored_no_order(client, db_session, eleven_restaurant):
+    body = {
+        "entity": "stock",
+        "records": [{"sku": "FLOUR-25KG", "qty": 12, "warehouse": "main"}],
+    }
+    res = _post(client, body)
+    assert res.status_code == 200
+    assert res.json()["inserted"] == 1
+    assert res.json()["orders_inserted"] == 0
+    assert db_session.query(Order).count() == 0
+
+
+def test_empty_records_array_still_accepted(client, eleven_restaurant):
+    assert _post(client, {"entity": "sale", "records": []}).status_code == 200
 
 
 def test_malformed_json_400(client, eleven_restaurant):

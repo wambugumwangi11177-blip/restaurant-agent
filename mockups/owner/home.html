@@ -10,7 +10,6 @@
   <div class="app-shell">
     <header class="page-header">
       <h1 class="page-header__title">Home</h1>
-
       <div class="page-header__actions">
         <a href="alerts.html" class="icon-btn" aria-label="Alerts">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 16v-5a6 6 0 10-12 0v5l-2 2h16l-2-2"/><path d="M10 20a2 2 0 004 0"/></svg>
@@ -19,33 +18,82 @@
       </div>
     </header>
     <main class="page-content">
-      <p class="caption">Page content loads in later sprints.</p>
+      <div class="dev-toggle">
+        <span>Developer:</span>
+        <label><input type="checkbox" id="day-toggle"> Day 1 view</label>
+      </div>
+
+      <div id="home-full">
+        <section class="card card-dark" aria-labelledby="pulse-label">
+          <p class="section-label" id="pulse-label" style="color:var(--grey-300);margin-top:0">Today's pulse</p>
+          <p class="card__number" data-bind="home.salesToday" data-format="kes"></p>
+          <p class="freshness-line" data-bind="home.salesCompare"></p>
+          <p style="margin:var(--space-3) 0 var(--space-1);font-size:0.875rem">Costs covered at <span data-bind="home.costsCoveredTime"></span></p>
+          <div class="progress-bar" aria-hidden="true"><div class="progress-bar__fill" style="width:100%"></div></div>
+          <div style="display:flex;flex-wrap:wrap;gap:var(--space-4);margin-top:var(--space-3)">
+            <span class="status-word status-word--fine">Cash <span class="status-word__shape"></span> <span data-bind="home.cashStatus"></span></span>
+            <span class="status-word status-word--fine">M-Pesa <span class="status-word__shape"></span> <span data-bind="home.mpesaStatus"></span></span>
+          </div>
+          <p class="freshness-line" data-bind="home.tillFreshness"></p>
+          <p class="freshness-line" data-bind="home.pulseFreshness"></p>
+        </section>
+
+        <h2 class="section-label">What's costing you money</h2>
+        <div id="leak-cards"></div>
+
+        <h2 class="section-label">Health strip</h2>
+        <p class="caption">Sales is Check if down more than 15% on last week; Compliance is Check if a licence expires within 14 days.</p>
+        <div class="health-grid" id="health-grid"></div>
+
+        <h2 class="section-label">Coming up</h2>
+        <ul class="plain-list" id="coming-up"></ul>
+
+        <h2 class="section-label">LEVIII's read</h2>
+        <div class="card ai-read">
+          <p class="ai-read__label">Written by AI</p>
+          <p data-bind="home.aiRead"></p>
+          <p class="freshness-line">Updated just now</p>
+        </div>
+      </div>
+
+      <div id="home-day1" class="hidden">
+        <section class="card card-dark">
+          <p class="section-label" style="color:var(--grey-300);margin-top:0">Today's pulse</p>
+          <p class="card__number" data-bind="home.day1.salesToday" data-format="kes"></p>
+          <p class="freshness-line" data-bind="home.day1.moneyMatch"></p>
+        </section>
+        <div class="card">
+          <p class="card__sentence" data-bind="home.day1.setupCard"></p>
+          <button type="button" class="button">Add bills</button>
+          <p class="freshness-line">Still learning your restaurant, day 12 of 30</p>
+        </div>
+        <h2 class="section-label">Getting started</h2>
+        <ul class="checklist-day1" id="day1-checklist"></ul>
+      </div>
     </main>
-
-<nav class="nav-pill" aria-label="Main">
-  <a href="home.html" class="nav-pill__item" data-nav="home">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/></svg></span>
-    <span class="nav-pill__label">Home</span>
-  </a>
-  <a href="money.html" class="nav-pill__item" data-nav="money">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 10h4a2 2 0 110 4h-2"/></svg></span>
-    <span class="nav-pill__label">Money</span>
-  </a>
-  <a href="stock.html" class="nav-pill__item" data-nav="stock">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 8h16v12H4z"/><path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span>
-    <span class="nav-pill__label">Stock</span>
-  </a>
-  <a href="ask.html" class="nav-pill__item" data-nav="ask">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H7l-3 3V6z"/></svg></span>
-    <span class="nav-pill__label">Ask</span>
-  </a>
-  <a href="more.html" class="nav-pill__item" data-nav="more">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span>
-    <span class="nav-pill__label">More</span>
-  </a>
-</nav>
+    <nav class="nav-pill" aria-label="Main">
+      <a href="home.html" class="nav-pill__item" data-nav="home">
+        <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/></svg></span>
+        <span class="nav-pill__label">Home</span>
+      </a>
+      <a href="money.html" class="nav-pill__item" data-nav="money">
+        <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 10h4a2 2 0 110 4h-2"/></svg></span>
+        <span class="nav-pill__label">Money</span>
+      </a>
+      <a href="stock.html" class="nav-pill__item" data-nav="stock">
+        <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 8h16v12H4z"/><path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span>
+        <span class="nav-pill__label">Stock</span>
+      </a>
+      <a href="ask.html" class="nav-pill__item" data-nav="ask">
+        <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H7l-3 3V6z"/></svg></span>
+        <span class="nav-pill__label">Ask</span>
+      </a>
+      <a href="more.html" class="nav-pill__item" data-nav="more">
+        <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span>
+        <span class="nav-pill__label">More</span>
+      </a>
+    </nav>
   </div>
-
   <div id="sheet-overlay" class="sheet-overlay" aria-hidden="true">
     <div class="sheet" role="dialog" aria-modal="true">
       <div class="sheet__handle"></div>
@@ -56,5 +104,64 @@
   </div>
   <script src="assets/sample-data.js"></script>
   <script src="assets/app.js"></script>
+  <script>
+    (function () {
+      var D = window.LEVIII_DATA;
+      var leaks = document.getElementById("leak-cards");
+      D.home.leaks.forEach(function (L) {
+        var card = document.createElement("article");
+        card.className = "card";
+        var num = L.amountLabel || (window.LEVIII_DATA.formatKES(L.amount) + " " + (L.period || ""));
+        card.innerHTML =
+          '<p class="card__sentence">' + L.sentence + '</p>' +
+          '<p class="card__number">' + num + '</p>' +
+          '<p class="freshness-line">' + L.freshness + '</p>' +
+          '<div class="card__actions">' +
+          '<button type="button" class="button">' + L.button + '</button>' +
+          '<button type="button" class="why-link" data-why data-why-title="Why this number?" data-why-body="' + L.why.replace(/"/g, "&quot;") + '">Why?</button>' +
+          '</div>' +
+          '<div class="card__meta-actions">' +
+          '<button type="button" data-later-card>Later</button>' +
+          '<button type="button" data-dismiss-card>Dismiss</button>' +
+          '</div>';
+        leaks.appendChild(card);
+      });
+      document.querySelectorAll("#leak-cards [data-why]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          window.LEVIII.openSheet("Why this number?", "<p>" + btn.getAttribute("data-why-body") + "</p>");
+        });
+      });
+      var health = document.getElementById("health-grid");
+      Object.keys(D.home.health).forEach(function (key) {
+        var h = D.home.health[key];
+        var tile = document.createElement("div");
+        tile.className = "health-tile";
+        var cls = h.word === "Check" ? "check" : "fine";
+        tile.innerHTML =
+          '<div class="health-tile__label">' + key + '</div>' +
+          '<div class="health-tile__number">' + h.number + '</div>' +
+          '<span class="status-word status-word--' + cls + '"><span class="status-word__shape"></span>' + h.word + '</span>' +
+          '<p class="freshness-line">Updated just now</p>';
+        health.appendChild(tile);
+      });
+      var up = document.getElementById("coming-up");
+      D.home.comingUp.forEach(function (line) {
+        var li = document.createElement("li");
+        li.textContent = line;
+        up.appendChild(li);
+      });
+      var cl = document.getElementById("day1-checklist");
+      D.home.day1.checklist.forEach(function (line) {
+        var li = document.createElement("li");
+        li.textContent = line;
+        cl.appendChild(li);
+      });
+      document.querySelectorAll("[data-dismiss-card],[data-later-card]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          btn.closest(".card").classList.add("is-dismissed");
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

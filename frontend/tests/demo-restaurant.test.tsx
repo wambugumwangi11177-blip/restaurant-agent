@@ -139,6 +139,7 @@ it("routes the Demo Restaurant owner to /demo and leaves Vibanda on /vibanda", (
   expect(homeFor("Demo Restaurant")).toBe("/demo");
   expect(homeFor(" demo restaurant ")).toBe("/demo");
   expect(homeFor("Vibanda Village")).toBe("/vibanda");
+  expect(homeFor("Eleven")).toBe("/eleven");
   expect(homeFor("Someone Else")).toBe("/dashboard");
 });
 

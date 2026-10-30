@@ -10,7 +10,7 @@ alembic==1.18.4
 psycopg2-binary==2.9.11
 
 # Auth
-python-jose==3.5.0
+PyJWT==2.15.1
 passlib==1.7.4
 argon2-cffi==25.1.0
 python-multipart==0.0.31   # CVE bumps 2026-07-08 (form parsing; Twilio webhook)
@@ -60,4 +60,4 @@ httpx==0.28.1
 
 # Owner reports as downloadable PDFs (demo_report_pdf.py). Pure Python; pillow is its imaging dependency.
 reportlab==4.4.10
-pillow==12.3.0
+pillow==13.0.0

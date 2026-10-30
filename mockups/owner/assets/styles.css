@@ -838,7 +838,7 @@ main.page-content {
 .day-square {
   width: 32px;
   height: 32px;
-  border: 2px solid var(--black);
+  border: 2px solid rgba(255, 255, 255, 0.7);
   border-radius: 4px;
   display: flex;
   align-items: center;

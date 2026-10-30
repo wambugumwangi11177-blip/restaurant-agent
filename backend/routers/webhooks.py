@@ -1,6 +1,7 @@
 """Inbound webhooks.
 
-Only MacSoft remains. Stripe, M-Pesa and WhatsApp were retired in 6aee044
+MacSoft (Vibanda) and QuickSell (Eleven POS) one-way data pushes. Stripe,
+M-Pesa and WhatsApp were retired in 6aee044
 ("retire external payment and phone integrations") and must stay gone —
 tests/test_retired_integrations.py asserts those paths 404 and cannot settle
 an order.
@@ -20,6 +21,7 @@ import logging
 import os
 
 from database import get_db
+from integration import quicksell as qs
 from integration.ingest import ingest
 from rate_limit import limiter
 import models  # noqa: F401  (kept for parity with the rest of routers/)
@@ -242,6 +244,148 @@ async def receive_macsoft_data(
         # Surfaced so MacSoft can see we could not find an id/version on some
         # records and tell us the right field names.
         "records_without_id_or_version": derived_identity,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# QuickSell inbound data push (Eleven restaurant)
+# ─────────────────────────────────────────────────────────────────────────────
+
+QUICKSELL_SOURCE_SLUG = "quicksell"
+ELEVEN_RESTAURANT_NAME = os.getenv("ELEVEN_RESTAURANT_NAME", "Eleven").strip() or "Eleven"
+
+
+def _verify_quicksell_key(supplied: str | None) -> None:
+    expected = os.getenv("QUICKSELL_API_KEY", "").strip()
+    if not expected:
+        logger.error("[QuickSell Webhook] QUICKSELL_API_KEY unset — rejecting (fail closed).")
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if supplied is None or not hmac.compare_digest(supplied, expected):
+        logger.warning("[QuickSell Webhook] Rejected request with missing/incorrect x-api-key")
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+def _quicksell_source_system(db: Session) -> int:
+    from integration.models import SourceSystem
+
+    row = db.query(SourceSystem).filter(SourceSystem.slug == QUICKSELL_SOURCE_SLUG).first()
+    if row is None:
+        row = SourceSystem(
+            slug=QUICKSELL_SOURCE_SLUG,
+            display_name="QuickSell (Eleven)",
+            mechanism="webhook",
+            is_authoritative=1,
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+    return row.id
+
+
+def _eleven_restaurant_id(db: Session) -> int:
+    row = (
+        db.query(models.Restaurant.id)
+        .join(models.Tenant, models.Tenant.id == models.Restaurant.tenant_id)
+        .filter(models.Restaurant.name == ELEVEN_RESTAURANT_NAME)
+        .order_by(models.Restaurant.id)
+        .first()
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Eleven restaurant {ELEVEN_RESTAURANT_NAME!r} is not configured on this server.",
+        )
+    return row[0]
+
+
+@router.post("/quicksell/data")
+@limiter.limit("60/minute")
+async def receive_quicksell_data(
+    request: Request,
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    """One-way POS push for Eleven. Raw JSON is mirrored, then mapped to orders."""
+    _verify_quicksell_key(x_api_key)
+
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    entity, records = _records_from(payload)
+    if not records:
+        raise HTTPException(
+            status_code=400,
+            detail="No records found. Send a JSON object with a 'records' array, a bare array, or one record object.",
+        )
+    if len(records) > 500:
+        raise HTTPException(status_code=413, detail="Batch too large — send at most 500 records.")
+
+    restaurant_id = _eleven_restaurant_id(db)
+    source_system_id = _quicksell_source_system(db)
+    counts = {"inserted": 0, "superseded": 0, "skipped": 0}
+    order_counts = {"order_inserted": 0, "order_updated": 0, "order_unchanged": 0}
+    business_days: list[str] = []
+
+    try:
+        for record in records:
+            try:
+                source_id = qs.require_source_id(record)
+                occurred_at = qs.parse_timestamp(record)
+                version = qs.source_version_for(record, occurred_at)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+            business_days.append(qs.nairobi_business_day(occurred_at))
+            action = ingest(
+                db,
+                source_system_id=source_system_id,
+                entity=entity if entity != "unknown" else "sale",
+                source_id=source_id,
+                source_version=version,
+                payload=record,
+                commit=False,
+            )
+            counts[action] = counts.get(action, 0) + 1
+            oc = qs.apply_sale(
+                db,
+                restaurant_id=restaurant_id,
+                source_id=source_id,
+                ingest_action=action,
+                record=record,
+                occurred_at=occurred_at,
+            )
+            order_counts[oc] = order_counts.get(oc, 0) + 1
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("[QuickSell] batch failed, rolled back (n=%d)", len(records))
+        raise HTTPException(status_code=500, detail="Could not store batch — please retry.")
+
+    logger.info(
+        "[QuickSell] entity=%s received=%d inserted=%d superseded=%d skipped=%d orders_inserted=%d",
+        entity,
+        len(records),
+        counts["inserted"],
+        counts["superseded"],
+        counts["skipped"],
+        order_counts.get("order_inserted", 0),
+    )
+
+    return {
+        "status": "stored",
+        "entity": entity,
+        "received": len(records),
+        "inserted": counts["inserted"],
+        "updated": counts["superseded"],
+        "duplicates_ignored": counts["skipped"],
+        "orders_inserted": order_counts.get("order_inserted", 0),
+        "orders_updated": order_counts.get("order_updated", 0),
+        "nairobi_business_days": sorted(set(business_days)),
     }
 
 

@@ -13,7 +13,13 @@ export const DEMO_TENANT = "Demo Restaurant";
 export function isDemoRestaurant(tenantName?: string | null): boolean {
   return (tenantName ?? "").trim().toLowerCase() === DEMO_TENANT.toLowerCase();
 }
+/** Eleven — owner shell aligned with mockups/owner (5-tab glass UI). */
+export const ELEVEN_TENANT = "Eleven";
+export function isEleven(tenantName?: string | null): boolean {
+  return (tenantName ?? "").trim().toLowerCase() === ELEVEN_TENANT.toLowerCase();
+}
 export function homeFor(tenantName?: string | null): string {
   if (isDemoRestaurant(tenantName)) return "/demo";
+  if (isEleven(tenantName)) return "/eleven";
   return isVibanda(tenantName) ? "/vibanda" : "/dashboard";
 }

@@ -59,7 +59,7 @@ jobs:
       #     `starlette < 1.0.0`, so they cannot be taken without a fastapi major
       #     upgrade — tracked separately, not smuggled into a hardening pass.
       #
-      #   PYSEC-2026-1325 (ecdsa, a python-jose transitive dep)
+      #   PYSEC-2026-1325 (ecdsa — legacy ignore; was python-jose transitive)
       #     A timing side-channel (Minerva) in ECDSA verification, with NO fix
       #     version published. Not reachable here: auth.py signs and verifies
       #     JWTs with HS256 (symmetric HMAC); the ECDSA code path is never

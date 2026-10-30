@@ -86,6 +86,9 @@
     function render(period) {
       var p = D.money.periods[period];
       if (!p) return;
+      var labels = { today: "What you kept today", week: "What you kept this week", month: "What you kept this month" };
+      var heroLabel = root.querySelector("[data-money-hero-label]");
+      if (heroLabel) heroLabel.textContent = labels[period] || labels.month;
       root.querySelector("[data-money-kept]").textContent = D.formatKES(p.kept);
       root.querySelector("[data-money-kept-of100]").textContent =
         "out of every KES 100 you sold, KES " + p.keptOf100 + " was kept";

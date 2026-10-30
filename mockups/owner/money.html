@@ -10,7 +10,6 @@
   <div class="app-shell">
     <header class="page-header">
       <h1 class="page-header__title">My Money</h1>
-
       <div class="page-header__actions">
         <a href="alerts.html" class="icon-btn" aria-label="Alerts">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 16v-5a6 6 0 10-12 0v5l-2 2h16l-2-2"/><path d="M10 20a2 2 0 004 0"/></svg>
@@ -18,34 +17,78 @@
         <a href="settings.html" class="profile-circle" aria-label="Profile">E</a>
       </div>
     </header>
-    <main class="page-content">
-      <p class="caption">Page content loads in later sprints.</p>
+    <main class="page-content" id="money-root">
+      <div class="segmented" role="tablist" aria-label="Period">
+        <button type="button" data-period="today">Today</button>
+        <button type="button" data-period="week">Week</button>
+        <button type="button" class="is-active" data-period="month">Month</button>
+      </div>
+
+      <section class="card card-dark">
+        <p class="card__sentence" data-money-hero-label>What you kept this month</p>
+        <p class="card__number" data-money-kept></p>
+        <p class="freshness-line" data-money-kept-of100></p>
+        <p class="freshness-line" data-bind="money.heroFreshness"></p>
+      </section>
+
+      <h2 class="section-label">Your profit and loss</h2>
+      <div class="card">
+        <div class="row"><span class="row__label">Sales</span><span class="row__value">KES <span data-pl-sales></span></span></div>
+        <div class="row"><span class="row__label">Ingredients minus</span><span class="row__value">KES <span data-pl-ing></span> (<span data-pl-ing-pct></span>)</span></div>
+        <div class="row"><span class="row__label">Left after ingredients</span><span class="row__value">KES <span data-pl-left></span></span></div>
+        <div class="row"><span class="row__label">Wages minus</span><span class="row__value">KES <span data-pl-wages></span> (<span data-pl-wages-pct></span>)</span></div>
+        <div class="row"><span class="row__label">Running costs minus</span><span class="row__value">KES <span data-pl-run></span> (<span data-pl-run-pct></span>)</span></div>
+        <div class="row"><span class="row__label">What you kept</span><span class="row__value">KES <span data-pl-kept></span></span></div>
+        <p class="freshness-line">Includes costs entered up to Tuesday</p>
+        <p class="status-word status-word--fine" style="margin-top:var(--space-3)"><span class="status-word__shape"></span> Ingredients plus wages: <span data-bind="money.ingredientsWagesStatus"></span></p>
+      </div>
+
+      <h2 class="section-label">Costs covered today</h2>
+      <div class="card">
+        <div class="chart-wrap">
+          <svg viewBox="0 0 320 120" role="img" aria-label="Sales through the day versus costs line">
+            <line x1="20" y1="95" x2="300" y2="95" stroke="#bdbdbd" stroke-width="1"/>
+            <line x1="20" y1="55" x2="300" y2="55" stroke="#000" stroke-width="1" stroke-dasharray="6 4"/>
+            <polyline fill="none" stroke="#000" stroke-width="2" points="20,90 80,82 140,70 200,58 240,50 280,42"/>
+            <text x="20" y="48" font-size="10" fill="#757575">Costs line</text>
+          </svg>
+        </div>
+        <p class="chart-caption">Today's costs were covered at <span data-breakeven-time></span>. Everything after is profit.</p>
+        <p class="freshness-line">Updated just now</p>
+      </div>
+
+      <h2 class="section-label">Bills coming up</h2>
+      <div class="card" id="bill-radar"></div>
+      <div class="card">
+        <p class="card__sentence" data-bind="money.billWarning.text"></p>
+        <button type="button" class="button" data-why data-why-title="Why short?" data-why-body="Rent and electricity fall in the same week as a supplier prepayment.">See why</button>
+        <p class="freshness-line">Includes costs entered up to Tuesday</p>
+      </div>
+
+      <h2 class="section-label">Costs going up</h2>
+      <div class="card">
+        <p class="card__sentence" data-bind="money.costsGoingUp.label"></p>
+        <div class="chart-wrap" id="costs-bar-chart"></div>
+        <p class="chart-caption">Gas and charcoal spend by month, compared with your 3-month average.</p>
+        <p class="freshness-line">Not updated since Monday</p>
+      </div>
+
+      <h2 class="section-label">Money coming in</h2>
+      <div class="card" id="money-in-bars"></div>
+
+      <div class="button-row">
+        <a href="reports.html" class="button button-block">Open monthly report</a>
+        <button type="button" class="button button-outline button-block" id="send-accountant">Send to my accountant</button>
+      </div>
     </main>
-
-<nav class="nav-pill" aria-label="Main">
-  <a href="home.html" class="nav-pill__item" data-nav="home">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/></svg></span>
-    <span class="nav-pill__label">Home</span>
-  </a>
-  <a href="money.html" class="nav-pill__item" data-nav="money">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 10h4a2 2 0 110 4h-2"/></svg></span>
-    <span class="nav-pill__label">Money</span>
-  </a>
-  <a href="stock.html" class="nav-pill__item" data-nav="stock">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 8h16v12H4z"/><path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span>
-    <span class="nav-pill__label">Stock</span>
-  </a>
-  <a href="ask.html" class="nav-pill__item" data-nav="ask">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H7l-3 3V6z"/></svg></span>
-    <span class="nav-pill__label">Ask</span>
-  </a>
-  <a href="more.html" class="nav-pill__item" data-nav="more">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span>
-    <span class="nav-pill__label">More</span>
-  </a>
-</nav>
+    <nav class="nav-pill" aria-label="Main">
+      <a href="home.html" class="nav-pill__item" data-nav="home"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/></svg></span><span class="nav-pill__label">Home</span></a>
+      <a href="money.html" class="nav-pill__item" data-nav="money"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 10h4a2 2 0 110 4h-2"/></svg></span><span class="nav-pill__label">Money</span></a>
+      <a href="stock.html" class="nav-pill__item" data-nav="stock"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 8h16v12H4z"/><path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span><span class="nav-pill__label">Stock</span></a>
+      <a href="ask.html" class="nav-pill__item" data-nav="ask"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H7l-3 3V6z"/></svg></span><span class="nav-pill__label">Ask</span></a>
+      <a href="more.html" class="nav-pill__item" data-nav="more"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span><span class="nav-pill__label">More</span></a>
+    </nav>
   </div>
-
   <div id="sheet-overlay" class="sheet-overlay" aria-hidden="true">
     <div class="sheet" role="dialog" aria-modal="true">
       <div class="sheet__handle"></div>
@@ -56,5 +99,44 @@
   </div>
   <script src="assets/sample-data.js"></script>
   <script src="assets/app.js"></script>
+  <script>
+    (function () {
+      var D = window.LEVIII_DATA;
+      var list = document.getElementById("bill-radar");
+      D.money.billRadar.forEach(function (b) {
+        var row = document.createElement("div");
+        row.className = "row";
+        row.innerHTML = '<span class="row__label">' + b.date + " — " + b.item + '</span><span class="row__value">' + D.formatKES(b.amount) + "</span>";
+        list.appendChild(row);
+      });
+      var bars = document.getElementById("money-in-bars");
+      var max = 0;
+      D.money.moneyIn.forEach(function (m) { if (m.amount > max) max = m.amount; });
+      D.money.moneyIn.forEach(function (m) {
+        var w = Math.round((m.amount / max) * 100);
+        var div = document.createElement("div");
+        div.className = "bar-h";
+        div.innerHTML = '<span>' + m.method + '</span><div class="bar-h__track"><div class="bar-h__fill" style="width:' + w + '%"></div></div><span>' + D.formatKES(m.amount) + "</span>";
+        bars.appendChild(div);
+      });
+      var p = document.createElement("p");
+      p.className = "freshness-line";
+      p.textContent = D.money.moneyInNote;
+      bars.appendChild(p);
+      var cg = D.money.costsGoingUp;
+      var svg = '<svg viewBox="0 0 320 100" role="img"><line x1="20" y1="85" x2="300" y2="85" stroke="#e0e0e0"/>';
+      cg.values.forEach(function (v, i) {
+        var h = v * 1.1;
+        var x = 30 + i * 45;
+        svg += '<rect x="' + x + '" y="' + (85 - h) + '" width="28" height="' + h + '" fill="#000"/>';
+        svg += '<text x="' + x + '" y="98" font-size="9">' + cg.months[i] + "</text>";
+      });
+      svg += "</svg>";
+      document.getElementById("costs-bar-chart").innerHTML = svg;
+      document.getElementById("send-accountant").addEventListener("click", function () {
+        window.LEVIII.openSheet("Send to accountant", "<p>Ready to send: <strong>" + D.money.reportFile + "</strong></p><p class=\"freshness-line\">Mock export for this demo.</p>");
+      });
+    })();
+  </script>
 </body>
 </html>

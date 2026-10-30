@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Money — LEVIII Owner</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body data-page="money">
+  <div class="app-shell">
+    <header class="page-header">
+      <h1 class="page-header__title">My Money</h1>
+
+      <div class="page-header__actions">
+        <a href="alerts.html" class="icon-btn" aria-label="Alerts">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 16v-5a6 6 0 10-12 0v5l-2 2h16l-2-2"/><path d="M10 20a2 2 0 004 0"/></svg>
+        </a>
+        <a href="settings.html" class="profile-circle" aria-label="Profile">E</a>
+      </div>
+    </header>
+    <main class="page-content">
+      <p class="caption">Page content loads in later sprints.</p>
+    </main>
+
+<nav class="nav-pill" aria-label="Main">
+  <a href="home.html" class="nav-pill__item" data-nav="home">
+    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/></svg></span>
+    <span class="nav-pill__label">Home</span>
+  </a>
+  <a href="money.html" class="nav-pill__item" data-nav="money">
+    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 10h4a2 2 0 110 4h-2"/></svg></span>
+    <span class="nav-pill__label">Money</span>
+  </a>
+  <a href="stock.html" class="nav-pill__item" data-nav="stock">
+    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 8h16v12H4z"/><path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span>
+    <span class="nav-pill__label">Stock</span>
+  </a>
+  <a href="ask.html" class="nav-pill__item" data-nav="ask">
+    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H7l-3 3V6z"/></svg></span>
+    <span class="nav-pill__label">Ask</span>
+  </a>
+  <a href="more.html" class="nav-pill__item" data-nav="more">
+    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span>
+    <span class="nav-pill__label">More</span>
+  </a>
+</nav>
+  </div>
+
+  <div id="sheet-overlay" class="sheet-overlay" aria-hidden="true">
+    <div class="sheet" role="dialog" aria-modal="true">
+      <div class="sheet__handle"></div>
+      <h2 class="sheet__title"></h2>
+      <div class="sheet__body"></div>
+      <button type="button" class="button button-block" data-sheet-close>Close</button>
+    </div>
+  </div>
+  <script src="assets/sample-data.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

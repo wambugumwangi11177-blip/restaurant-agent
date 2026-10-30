@@ -10,7 +10,6 @@
   <div class="app-shell">
     <header class="page-header">
       <h1 class="page-header__title">Cash Check</h1>
-
       <div class="page-header__actions">
         <a href="alerts.html" class="icon-btn" aria-label="Alerts">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 16v-5a6 6 0 10-12 0v5l-2 2h16l-2-2"/><path d="M10 20a2 2 0 004 0"/></svg>
@@ -19,33 +18,53 @@
       </div>
     </header>
     <main class="page-content">
-      <p class="caption">Page content loads in later sprints.</p>
+      <div class="card">
+        <p class="card__sentence" data-bind="cash.headline"></p>
+        <p class="status-word status-word--fine"><span class="status-word__shape"></span> <span data-bind="cash.overallStatus"></span></p>
+        <div class="day-squares" id="day-squares"></div>
+        <p class="freshness-line">Updated just now</p>
+      </div>
+
+      <h2 class="section-label">The three-way match</h2>
+      <div class="card">
+        <p class="row__label">What the till says was sold</p>
+        <p class="card__number" data-bind="cash.till" data-format="kes"></p>
+        <p class="freshness-line">Your till updated 2 minutes ago</p>
+      </div>
+      <div class="card">
+        <p class="row__label">Cash counted</p>
+        <p class="card__number" data-bind="cash.cashCounted" data-format="kes"></p>
+        <p class="freshness-line">Includes costs entered up to Tuesday</p>
+      </div>
+      <div class="card">
+        <p class="row__label">M-Pesa statement</p>
+        <p class="card__number" data-bind="cash.mpesaStatement" data-format="kes"></p>
+        <p class="freshness-line">Not updated since Monday</p>
+      </div>
+      <p class="caption" data-bind="cash.cashResult"></p>
+      <p class="caption" data-bind="cash.mpesaResult"></p>
+
+      <h2 class="section-label">Shift report</h2>
+      <div class="card" id="shift-list"></div>
+
+      <h2 class="section-label">Pattern</h2>
+      <div class="card">
+        <div class="pattern-grid" id="pattern-grid"></div>
+        <p class="chart-caption" data-bind="cash.patternCaption"></p>
+        <p class="freshness-line">Still learning your restaurant, day 12 of 30</p>
+      </div>
+
+      <p class="caption" style="margin-top:var(--space-5)" data-bind="cash.bottomCaption"></p>
+      <p class="freshness-line" data-bind="cash.ownerOnly"></p>
     </main>
-
-<nav class="nav-pill" aria-label="Main">
-  <a href="home.html" class="nav-pill__item" data-nav="home">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/></svg></span>
-    <span class="nav-pill__label">Home</span>
-  </a>
-  <a href="money.html" class="nav-pill__item" data-nav="money">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 10h4a2 2 0 110 4h-2"/></svg></span>
-    <span class="nav-pill__label">Money</span>
-  </a>
-  <a href="stock.html" class="nav-pill__item" data-nav="stock">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 8h16v12H4z"/><path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span>
-    <span class="nav-pill__label">Stock</span>
-  </a>
-  <a href="ask.html" class="nav-pill__item" data-nav="ask">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H7l-3 3V6z"/></svg></span>
-    <span class="nav-pill__label">Ask</span>
-  </a>
-  <a href="more.html" class="nav-pill__item" data-nav="more">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span>
-    <span class="nav-pill__label">More</span>
-  </a>
-</nav>
+    <nav class="nav-pill" aria-label="Main">
+      <a href="home.html" class="nav-pill__item" data-nav="home"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/></svg></span><span class="nav-pill__label">Home</span></a>
+      <a href="money.html" class="nav-pill__item" data-nav="money"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 10h4a2 2 0 110 4h-2"/></svg></span><span class="nav-pill__label">Money</span></a>
+      <a href="stock.html" class="nav-pill__item" data-nav="stock"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 8h16v12H4z"/><path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span><span class="nav-pill__label">Stock</span></a>
+      <a href="ask.html" class="nav-pill__item" data-nav="ask"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H7l-3 3V6z"/></svg></span><span class="nav-pill__label">Ask</span></a>
+      <a href="more.html" class="nav-pill__item" data-nav="more"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span><span class="nav-pill__label">More</span></a>
+    </nav>
   </div>
-
   <div id="sheet-overlay" class="sheet-overlay" aria-hidden="true">
     <div class="sheet" role="dialog" aria-modal="true">
       <div class="sheet__handle"></div>
@@ -56,5 +75,41 @@
   </div>
   <script src="assets/sample-data.js"></script>
   <script src="assets/app.js"></script>
+  <script>
+    (function () {
+      var D = window.LEVIII_DATA;
+      var sq = document.getElementById("day-squares");
+      D.cash.last7.forEach(function (s, i) {
+        var el = document.createElement("div");
+        el.className = "day-square" + (s === "Check" ? " day-square--check" : "");
+        el.textContent = i + 1;
+        el.title = s;
+        sq.appendChild(el);
+      });
+      var list = document.getElementById("shift-list");
+      D.cash.shifts.forEach(function (sh) {
+        var row = document.createElement("div");
+        row.className = "row shift-row";
+        row.setAttribute("data-shift-id", sh.id);
+        row.setAttribute("data-shift-label", sh.label);
+        row.setAttribute("data-shift-sales", D.formatKES(sh.sales));
+        row.setAttribute("data-shift-cash", D.formatKES(sh.cashGap));
+        row.setAttribute("data-shift-mpesa", D.formatKES(sh.mpesaGap));
+        var cls = sh.status === "Check" ? "check" : "fine";
+        row.innerHTML = '<span class="row__label"><strong>' + sh.label + '</strong><br><span class="caption">Sales ' + D.formatKES(sh.sales) + '</span></span>' +
+          '<span class="status-word status-word--' + cls + '"><span class="status-word__shape"></span>' + sh.status + '</span>';
+        list.appendChild(row);
+      });
+      var pg = document.getElementById("pattern-grid");
+      for (var w = 0; w < 4; w++) {
+        for (var d = 0; d < 7; d++) {
+          var cell = document.createElement("div");
+          cell.className = "pattern-cell";
+          if (d === 2 && w >= 1) cell.classList.add("pattern-cell--flag");
+          pg.appendChild(cell);
+        }
+      }
+    })();
+  </script>
 </body>
 </html>

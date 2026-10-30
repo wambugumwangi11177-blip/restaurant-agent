@@ -10,7 +10,6 @@
   <div class="app-shell">
     <header class="page-header">
       <h1 class="page-header__title">Sales & Dishes</h1>
-
       <div class="page-header__actions">
         <a href="alerts.html" class="icon-btn" aria-label="Alerts">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 16v-5a6 6 0 10-12 0v5l-2 2h16l-2-2"/><path d="M10 20a2 2 0 004 0"/></svg>
@@ -19,33 +18,53 @@
       </div>
     </header>
     <main class="page-content">
-      <p class="caption">Page content loads in later sprints.</p>
+      <h2 class="section-label" style="margin-top:0">Sales today</h2>
+      <div class="card">
+        <div class="chart-wrap">
+          <svg viewBox="0 0 320 100" role="img" aria-label="Today versus usual weekday range">
+            <rect x="40" y="30" width="240" height="40" fill="#e0e0e0" rx="4"/>
+            <polyline fill="none" stroke="#000" stroke-width="2" points="40,55 120,48 200,42 280,38"/>
+            <text x="40" y="22" font-size="10">Usual weekday band</text>
+          </svg>
+        </div>
+        <p class="chart-caption">Today <span data-bind="sales.salesToday" data-format="kes"></span> versus usual weekday range.</p>
+        <p class="freshness-line">Updated just now</p>
+      </div>
+
+      <h2 class="section-label">Your dishes in four groups</h2>
+      <div class="dish-grid" id="dish-grid"></div>
+
+      <h2 class="section-label">Price ideas</h2>
+      <div id="price-ideas"></div>
+
+      <h2 class="section-label">Combo idea</h2>
+      <div class="card">
+        <p class="card__sentence" id="combo-text"></p>
+        <p class="freshness-line">Updated just now</p>
+      </div>
+
+      <h2 class="section-label">Delivery</h2>
+      <div class="card" id="delivery-card"></div>
+
+      <h2 class="section-label">Best and weakest hours</h2>
+      <div class="card" id="hours-bars"></div>
+
+      <h2 class="section-label">Try before you change</h2>
+      <div class="card simulator">
+        <p>Pilau price change (%)</p>
+        <input type="range" id="pilau-slider" min="-10" max="15" value="5" step="1">
+        <p class="simulator-result" id="pilau-result"></p>
+        <p class="freshness-line">Based on: customers react by about 0.7 for each 1 percent</p>
+      </div>
     </main>
-
-<nav class="nav-pill" aria-label="Main">
-  <a href="home.html" class="nav-pill__item" data-nav="home">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/></svg></span>
-    <span class="nav-pill__label">Home</span>
-  </a>
-  <a href="money.html" class="nav-pill__item" data-nav="money">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 10h4a2 2 0 110 4h-2"/></svg></span>
-    <span class="nav-pill__label">Money</span>
-  </a>
-  <a href="stock.html" class="nav-pill__item" data-nav="stock">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 8h16v12H4z"/><path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span>
-    <span class="nav-pill__label">Stock</span>
-  </a>
-  <a href="ask.html" class="nav-pill__item" data-nav="ask">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H7l-3 3V6z"/></svg></span>
-    <span class="nav-pill__label">Ask</span>
-  </a>
-  <a href="more.html" class="nav-pill__item" data-nav="more">
-    <span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span>
-    <span class="nav-pill__label">More</span>
-  </a>
-</nav>
+    <nav class="nav-pill" aria-label="Main">
+      <a href="home.html" class="nav-pill__item" data-nav="home"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/></svg></span><span class="nav-pill__label">Home</span></a>
+      <a href="money.html" class="nav-pill__item" data-nav="money"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 10h4a2 2 0 110 4h-2"/></svg></span><span class="nav-pill__label">Money</span></a>
+      <a href="stock.html" class="nav-pill__item" data-nav="stock"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 8h16v12H4z"/><path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span><span class="nav-pill__label">Stock</span></a>
+      <a href="ask.html" class="nav-pill__item" data-nav="ask"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H7l-3 3V6z"/></svg></span><span class="nav-pill__label">Ask</span></a>
+      <a href="more.html" class="nav-pill__item" data-nav="more"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span><span class="nav-pill__label">More</span></a>
+    </nav>
   </div>
-
   <div id="sheet-overlay" class="sheet-overlay" aria-hidden="true">
     <div class="sheet" role="dialog" aria-modal="true">
       <div class="sheet__handle"></div>
@@ -56,5 +75,59 @@
   </div>
   <script src="assets/sample-data.js"></script>
   <script src="assets/app.js"></script>
+  <script>
+    (function () {
+      var D = window.LEVIII_DATA;
+      var groups = [
+        { key: "best", title: "Best dishes", action: D.sales.dishActions.best },
+        { key: "popularLow", title: "Popular but earns little", action: D.sales.dishActions.popularLow },
+        { key: "earnsFew", title: "Earns well but few order it", action: D.sales.dishActions.earnsFew },
+        { key: "considerRemove", title: "Consider removing", action: D.sales.dishActions.considerRemove },
+      ];
+      var grid = document.getElementById("dish-grid");
+      groups.forEach(function (g) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "dish-box";
+        btn.setAttribute("data-dish-group", g.key);
+        btn.setAttribute("data-dish-action", g.action);
+        var ul = "<ul>";
+        D.sales.dishes[g.key].forEach(function (d) { ul += "<li>" + d + "</li>"; });
+        ul += "</ul>";
+        btn.innerHTML = '<div class="dish-box__title">' + g.title + "</div>" + ul;
+        grid.appendChild(btn);
+      });
+      var ideas = document.getElementById("price-ideas");
+      D.sales.priceIdeas.forEach(function (idea) {
+        var card = document.createElement("article");
+        card.className = "card";
+        var num = idea.amount ? D.formatKES(idea.amount) + " a month" : "";
+        card.innerHTML =
+          '<p class="card__sentence">' + idea.sentence + '</p>' +
+          (num ? '<p class="card__number">' + num + '</p>' : '') +
+          '<p class="freshness-line">' + idea.freshness + '</p>' +
+          '<div class="card__actions"><button type="button" class="button" data-price-approve>Approve</button>' +
+          '<button type="button" class="why-link" data-why data-why-body="' + idea.why + '">Why?</button></div>' +
+          '<div class="card__meta-actions"><button type="button" data-later-card>Later</button><button type="button" data-dismiss-card>Dismiss</button></div>' +
+          '<p class="freshness-line hidden" data-till-note>Change this price in your till. LEVIII never changes your till.</p>';
+        ideas.appendChild(card);
+      });
+      var c = D.sales.combo;
+      document.getElementById("combo-text").textContent =
+        c.title + " at " + D.formatKES(c.price) + " instead of " + D.formatKES(c.was) + ", margin " + c.margin + "%.";
+      var del = D.sales.delivery;
+      document.getElementById("delivery-card").innerHTML =
+        '<p class="card__sentence">' + del.item + " at " + D.formatKES(del.price) + " earns " + D.formatKES(del.restaurant) + " in the restaurant and " + D.formatKES(del.delivery) + " on delivery.</p>" +
+        '<div class="bar-h"><span>In restaurant</span><div class="bar-h__track"><div class="bar-h__fill" style="width:' + Math.round(del.restaurant / del.price * 100) + '%"></div></div></div>' +
+        '<div class="bar-h"><span>Delivery</span><div class="bar-h__track"><div class="bar-h__fill" style="width:' + Math.round(del.delivery / del.price * 100) + '%"></div></div></div>' +
+        '<p class="freshness-line">Updated just now</p>';
+      var hb = document.getElementById("hours-bars");
+      D.sales.hours.forEach(function (h) {
+        var label = h.name + (h.weakest ? " (weakest)" : "");
+        hb.innerHTML += '<div class="bar-h"><span>' + label + '</span><div class="bar-h__track"><div class="bar-h__fill" style="width:' + h.pct + '%"></div></div><span>' + h.pct + '%</span></div>';
+      });
+      hb.innerHTML += '<p class="freshness-line">Updated just now</p>';
+    })();
+  </script>
 </body>
 </html>

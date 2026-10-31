@@ -20,7 +20,7 @@
     <main class="page-content">
       <div class="chips-row" id="ask-chips"></div>
       <div class="chat-area" id="chat-messages" aria-live="polite"></div>
-      <button type="button" class="chip" id="ask-cant-example" style="margin-bottom:var(--space-3)">Example: wine orders by table</button>
+      <button type="button" class="chip" id="ask-cant-example" style="margin-bottom:var(--space-3)">Example: how much did we spend on beef this week?</button>
       <div class="chat-input-row">
         <input type="text" placeholder="Ask a question…" aria-label="Ask a question">
         <button type="button" class="button">Send</button>
@@ -52,7 +52,7 @@
         btn.type = "button";
         btn.className = "chip";
         btn.setAttribute("data-ask-chip", c.key);
-        btn.textContent = c.type + ": " + c.label;
+        btn.textContent = c.label;
         row.appendChild(btn);
       });
     })();

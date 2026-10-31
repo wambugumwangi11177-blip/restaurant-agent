@@ -24,8 +24,10 @@
       </div>
 
       <div id="home-full">
-        <section class="card card-dark" aria-labelledby="pulse-label">
-          <p class="section-label" id="pulse-label" style="color:var(--grey-300);margin-top:0">Today's pulse</p>
+        <p class="freshness-line" id="global-freshness" data-bind="home.pageFreshness"></p>
+
+        <section class="card card-hero" aria-labelledby="pulse-label">
+          <p class="section-label" id="pulse-label" style="margin-top:0">Today's pulse</p>
           <p class="card__number" data-bind="home.salesToday" data-format="kes"></p>
           <p class="freshness-line" data-bind="home.salesCompare"></p>
           <p style="margin:var(--space-3) 0 var(--space-1);font-size:0.875rem">Costs covered at <span data-bind="home.costsCoveredTime"></span></p>
@@ -35,14 +37,29 @@
             <span class="status-word status-word--fine">M-Pesa <span class="status-word__shape"></span> <span data-bind="home.mpesaStatus"></span></span>
           </div>
           <p class="freshness-line" data-bind="home.tillFreshness"></p>
-          <p class="freshness-line" data-bind="home.pulseFreshness"></p>
         </section>
+
+        <section class="card" id="needs-you-card">
+          <p class="section-label" style="margin-top:0">Needs you</p>
+          <p class="card__sentence" data-bind="home.needsYou.text"></p>
+          <a href="stock.html" class="button" data-bind="home.needsYou.button"></a>
+        </section>
+
+        <div class="card">
+          <div class="row row--stacked">
+            <div class="row__main">
+              <span class="row__label">Cash today</span>
+              <span class="row__sub">Expected in drawer vs counted</span>
+            </div>
+            <span class="row__value"><span data-bind="home.cashToday.counted" data-format="kes"></span></span>
+          </div>
+          <p class="freshness-line" style="margin-top:var(--space-2)">Expected <span data-bind="home.cashToday.expected" data-format="kes"></span></p>
+        </div>
 
         <h2 class="section-label">What's costing you money</h2>
         <div id="leak-cards"></div>
 
         <h2 class="section-label">Health strip</h2>
-        <p class="caption">Sales is Check if down more than 15% on last week; Compliance is Check if a licence expires within 14 days.</p>
         <div class="health-grid" id="health-grid"></div>
 
         <h2 class="section-label">Coming up</h2>
@@ -52,12 +69,11 @@
         <div class="card ai-read">
           <p class="ai-read__label">Written by AI</p>
           <p data-bind="home.aiRead"></p>
-          <p class="freshness-line">Updated just now</p>
         </div>
       </div>
 
       <div id="home-day1" class="hidden">
-        <section class="card card-dark">
+        <section class="card card-hero">
           <p class="section-label" style="color:var(--grey-300);margin-top:0">Today's pulse</p>
           <p class="card__number" data-bind="home.day1.salesToday" data-format="kes"></p>
           <p class="freshness-line" data-bind="home.day1.moneyMatch"></p>
@@ -93,6 +109,7 @@
         <span class="nav-pill__label">More</span>
       </a>
     </nav>
+    <div id="undo-bar" class="undo-bar hidden" role="status" aria-live="polite"></div>
   </div>
   <div id="sheet-overlay" class="sheet-overlay" aria-hidden="true">
     <div class="sheet" role="dialog" aria-modal="true">
@@ -107,6 +124,27 @@
   <script>
     (function () {
       var D = window.LEVIII_DATA;
+      var globalFresh = D.home.pageFreshness || "Updated just now";
+      var healthTitles = {
+        money: "Money",
+        sales: "Sales",
+        stock: "Stock",
+        cash: "Cash",
+        people: "People",
+        compliance: "Compliance",
+      };
+      var healthSubtitles = {
+        money: "Kept this month",
+        sales: "Against last week",
+        stock: "Missing stock this week, in KES",
+        cash: "Unmatched today",
+        people: "Wages as a share of sales",
+        compliance: "Next licence due",
+      };
+      function freshnessHtml(line) {
+        if (!line || line === globalFresh) return "";
+        return '<p class="freshness-line">' + line + "</p>";
+      }
       var leaks = document.getElementById("leak-cards");
       D.home.leaks.forEach(function (L) {
         var card = document.createElement("article");
@@ -115,7 +153,7 @@
         card.innerHTML =
           '<p class="card__sentence">' + L.sentence + '</p>' +
           '<p class="card__number">' + num + '</p>' +
-          '<p class="freshness-line">' + L.freshness + '</p>' +
+          freshnessHtml(L.freshness) +
           '<div class="card__actions">' +
           '<button type="button" class="button">' + L.button + '</button>' +
           '<button type="button" class="why-link" data-why data-why-title="Why this number?" data-why-body="' + L.why.replace(/"/g, "&quot;") + '">Why?</button>' +
@@ -133,10 +171,11 @@
         tile.className = "health-tile";
         var cls = h.word === "Check" ? "check" : "fine";
         tile.innerHTML =
-          '<div class="health-tile__label">' + key + '</div>' +
+          '<div class="health-tile__label">' + (healthTitles[key] || key) + '</div>' +
+          '<p class="health-tile__subtitle">' + (healthSubtitles[key] || "") + '</p>' +
           '<div class="health-tile__number">' + h.number + '</div>' +
           '<span class="status-word status-word--' + cls + '"><span class="status-word__shape"></span>' + h.word + '</span>' +
-          '<p class="freshness-line">Updated just now</p>';
+          freshnessHtml(h.freshness);
         health.appendChild(tile);
       });
       var up = document.getElementById("coming-up");

@@ -24,7 +24,7 @@
         <button type="button" class="is-active" data-period="month">Month</button>
       </div>
 
-      <section class="card card-dark">
+      <section class="card card-hero">
         <p class="card__sentence" data-money-hero-label>What you kept this month</p>
         <p class="card__number" data-money-kept></p>
         <p class="freshness-line" data-money-kept-of100></p>
@@ -32,13 +32,13 @@
       </section>
 
       <h2 class="section-label">Your profit and loss</h2>
-      <div class="card">
-        <div class="row"><span class="row__label">Sales</span><span class="row__value">KES <span data-pl-sales></span></span></div>
-        <div class="row"><span class="row__label">Ingredients minus</span><span class="row__value">KES <span data-pl-ing></span> (<span data-pl-ing-pct></span>)</span></div>
-        <div class="row"><span class="row__label">Left after ingredients</span><span class="row__value">KES <span data-pl-left></span></span></div>
-        <div class="row"><span class="row__label">Wages minus</span><span class="row__value">KES <span data-pl-wages></span> (<span data-pl-wages-pct></span>)</span></div>
-        <div class="row"><span class="row__label">Running costs minus</span><span class="row__value">KES <span data-pl-run></span> (<span data-pl-run-pct></span>)</span></div>
-        <div class="row"><span class="row__label">What you kept</span><span class="row__value">KES <span data-pl-kept></span></span></div>
+      <div class="card pl-card">
+        <div class="row row--stacked"><div class="row__main"><span class="row__label">Sales</span></div><span class="row__value">KES <span data-pl-sales></span></span></div>
+        <div class="row row--stacked"><div class="row__main"><span class="row__label">Ingredients minus</span><span class="row__sub" data-pl-ing-pct></span></div><span class="row__value">KES <span data-pl-ing></span></span></div>
+        <div class="row row--stacked"><div class="row__main"><span class="row__label">Left after ingredients</span></div><span class="row__value">KES <span data-pl-left></span></span></div>
+        <div class="row row--stacked"><div class="row__main"><span class="row__label">Wages minus</span><span class="row__sub" data-pl-wages-pct></span></div><span class="row__value">KES <span data-pl-wages></span></span></div>
+        <div class="row row--stacked"><div class="row__main"><span class="row__label">Running costs minus</span><span class="row__sub" data-pl-run-pct></span></div><span class="row__value">KES <span data-pl-run></span></span></div>
+        <div class="row row--stacked"><div class="row__main"><span class="row__label">What you kept</span></div><span class="row__value">KES <span data-pl-kept></span></span></div>
         <p class="freshness-line">Includes costs entered up to Tuesday</p>
         <p class="status-word status-word--fine" style="margin-top:var(--space-3)"><span class="status-word__shape"></span> Ingredients plus wages: <span data-bind="money.ingredientsWagesStatus"></span></p>
       </div>

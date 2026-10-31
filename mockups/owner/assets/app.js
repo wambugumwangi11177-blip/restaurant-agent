@@ -41,7 +41,10 @@
       if (!btn) return;
       var title = btn.getAttribute("data-why-title") || "Why this number?";
       var body = btn.getAttribute("data-why-body") || "Example explanation for this mockup.";
-      openSheet(title, "<p>" + body + "</p>");
+      var html = body.split(/\n+/).filter(Boolean).map(function (p) {
+        return "<p>" + p + "</p>";
+      }).join("");
+      openSheet(title, html || "<p>" + body + "</p>");
     });
   }
 
@@ -64,12 +67,53 @@
     });
   }
 
+  function ensureUndoBar() {
+    var bar = document.getElementById("undo-bar");
+    if (bar) return bar;
+    bar = document.createElement("div");
+    bar.id = "undo-bar";
+    bar.className = "undo-bar hidden";
+    bar.setAttribute("role", "status");
+    bar.setAttribute("aria-live", "polite");
+    var shell = document.querySelector(".app-shell");
+    if (shell) shell.appendChild(bar);
+    return bar;
+  }
+
+  function showUndo(message, restoreFn) {
+    var bar = ensureUndoBar();
+    if (!bar) return;
+    if (bar._undoTimer) clearTimeout(bar._undoTimer);
+    bar.innerHTML = "<span>" + message + '</span><button type="button" data-undo-action>Undo</button>';
+    bar.classList.remove("hidden");
+    bar._restoreFn = restoreFn;
+    bar._undoTimer = setTimeout(function () {
+      bar.classList.add("hidden");
+      bar._restoreFn = null;
+    }, 5000);
+  }
+
   function initDismissCards() {
     document.addEventListener("click", function (e) {
+      if (e.target.closest("[data-undo-action]")) {
+        var bar = document.getElementById("undo-bar");
+        if (bar && bar._restoreFn) {
+          bar._restoreFn();
+          bar.classList.add("hidden");
+          bar._restoreFn = null;
+          if (bar._undoTimer) clearTimeout(bar._undoTimer);
+        }
+        return;
+      }
       var btn = e.target.closest("[data-dismiss-card], [data-later-card]");
       if (!btn) return;
       var card = btn.closest(".card");
-      if (card) card.classList.add("is-dismissed");
+      if (!card || card.classList.contains("is-dismissed")) return;
+      var isLater = btn.hasAttribute("data-later-card");
+      card.classList.add("is-dismissed");
+      showUndo(isLater ? "We'll remind you tomorrow" : "Hidden", function () {
+        card.classList.remove("is-dismissed");
+      });
     });
   }
 

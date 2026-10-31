@@ -49,7 +49,7 @@
       <div class="card" id="supplier-scores"></div>
 
       <h2 class="section-label">Stock value</h2>
-      <div class="card card-dark">
+      <div class="card card-hero">
         <p class="card__number" data-bind="stock.stockValue" data-format="kes"></p>
         <p class="freshness-line" data-bind="stock.freshness"></p>
         <p style="margin-top:var(--space-3);font-size:0.875rem">Slow movers</p>
@@ -117,7 +117,7 @@
           (m.handover ? '<p class="status-word status-word--check"><span class="status-word__shape"></span> ' + (m.transferStatus || "Handover doesn't match") + '</p>' : '') +
           '<p class="freshness-line">' + m.note + '</p>' +
           '<button type="button" class="button">Check this</button>' +
-          '<button type="button" class="why-link" data-why data-why-title="How this was worked out" data-why-body="Deterministic variance: theoretical usage from recipes and sales vs recorded stock movements and transfer confirms (POST /stock/transfers/…/confirm).">Why?</button>';
+          '<button type="button" class="why-link" data-why data-why-title="How this was worked out" data-why-body="We compare what recipes and sales say you should have used with what left the store and what the kitchen counted.\nHandovers that do not match are flagged so you know where to look, not who to blame.">Why?</button>';
         miss.appendChild(card);
       });
       var sp = document.getElementById("spoiled-list");

@@ -19,6 +19,7 @@ window.LEVIII_DATA = {
   },
 
   home: {
+    pageFreshness: "Updated just now",
     salesToday: 64300,
     salesCompare: "Up 8% on a usual Thursday",
     costsCoveredTime: "3:40 pm",
@@ -26,7 +27,14 @@ window.LEVIII_DATA = {
     cashStatus: "Fine",
     mpesaStatus: "Fine",
     tillFreshness: "Your till updated 2 minutes ago, costs to yesterday",
-    pulseFreshness: "Updated just now",
+    needsYou: {
+      text: "Approve supplier order, Fresh Farm",
+      button: "Review",
+    },
+    cashToday: {
+      expected: 24150,
+      counted: 24000,
+    },
     leaks: [
       {
         id: "below-menu",
@@ -35,7 +43,7 @@ window.LEVIII_DATA = {
         period: "a month",
         button: "See details",
         why:
-          "Deterministic check: sum of (menu price − till line price) × quantity for 30 days of paid orders from Quick Sell. No AI in this number.",
+          "We compared your menu prices with what the till actually charged over the last 30 days.\nThe gap is the total discount or undercharge on paid plates.",
         freshness: "Includes costs entered up to Tuesday",
       },
       {
@@ -45,8 +53,8 @@ window.LEVIII_DATA = {
         period: "a month",
         button: "Raise to 435",
         why:
-          "Deterministic check: recipe cost per quarter chicken (store issues + prep yield) compared with menu price 400. Gap × plates sold this month.",
-        freshness: "Based on: a 10% offer usually brings about 30% more orders",
+          "We worked out the true cost of one quarter chicken from store issues and kitchen yield.\nAt KES 400 you are leaving about KES 10,500 on the table this month at current sales.",
+        freshness: "Includes costs entered up to Tuesday",
       },
       {
         id: "beef-gap",
@@ -54,16 +62,16 @@ window.LEVIII_DATA = {
         amountLabel: "10 kg, about KES 6,500",
         button: "Check kitchen",
         why:
-          "Deterministic check: theoretical usage from recipes × sales minus store OUT movements and kitchen counts. 10 kg unaccounted — check portions and waste first.",
+          "Sales and recipes say you should have used more beef than the store and kitchen counts show.\nStart with portions, waste, and whether the last handover was counted correctly.",
         freshness: "Not updated since Monday",
       },
     ],
     health: {
-      money: { number: "KES 65,200", status: "Fine", word: "Fine" },
-      sales: { number: "KES 64,300", status: "Fine", word: "Fine" },
-      stock: { number: "3 gaps", status: "Check", word: "Check" },
+      money: { number: "KES 65,200", status: "Fine", word: "Fine", freshness: "Includes costs entered up to Tuesday" },
+      sales: { number: "+8%", status: "Fine", word: "Fine" },
+      stock: { number: "KES 7,100", status: "Check", word: "Check", freshness: "Not updated since Monday" },
       cash: { number: "KES 150", status: "Fine", word: "Fine" },
-      people: { number: "8 on shift", status: "Fine", word: "Fine" },
+      people: { number: "32%", status: "Fine", word: "Fine" },
       compliance: { number: "41 days", status: "Fine", word: "Fine" },
     },
     comingUp: [
@@ -260,16 +268,18 @@ window.LEVIII_DATA = {
         amount: 10500,
         period: "a month",
         button: "Approve",
-        freshness: "Based on: a 10% offer usually brings about 30% more orders",
-        why: "Cost per plate exceeds current menu price at busy hours.",
+        freshness: "Includes costs entered up to Tuesday",
+        why:
+          "Your recipe and store costs for quarter chicken are above the menu price at busy hours.\nRaising to KES 435 would recover about KES 10,500 a month at today's volume.",
       },
       {
         id: "fish-offer",
         sentence: "Try a 10% offer on fish fillet this week.",
         amount: null,
         button: "Approve",
-        freshness: "Based on: a 10% offer usually brings about 30% more orders",
-        why: "Fish fillet is in the earns-well-but-few-order-it group.",
+        freshness: "Updated just now",
+        why:
+          "Fish fillet earns well but does not sell often.\nA short offer can train staff and guests to order it without cutting margin long term.",
       },
     ],
     combo: {
@@ -417,9 +427,9 @@ window.LEVIII_DATA = {
         followUp: "Why did costs go up?",
       },
       cant: {
-        question: "Which table ordered the most wine?",
-        reply: "I can't answer that yet. Your till doesn't record this.",
-        source: "Quick Sell mirror — no wine category on exported line items",
+        question: "How much did we spend on beef this week?",
+        reply: "I can't answer that yet. Beef purchases aren't split out in what we've received from suppliers this week.",
+        source: "Supplier invoices and store receipts for this week",
         ai: true,
       },
     },

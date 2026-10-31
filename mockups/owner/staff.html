@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Staff — LEVIII Owner</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body data-page="more">
+  <div class="app-shell">
+    <header class="page-header">
+      <h1 class="page-header__title">Staff</h1>
+      <div class="page-header__actions">
+        <a href="alerts.html" class="icon-btn" aria-label="Alerts">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 16v-5a6 6 0 10-12 0v5l-2 2h16l-2-2"/><path d="M10 20a2 2 0 004 0"/></svg>
+        </a>
+        <a href="settings.html" class="profile-circle" aria-label="Profile">E</a>
+      </div>
+    </header>
+    <main class="page-content">
+      <p class="caption" data-bind="staff.date"></p>
+
+      <section class="card area-summary">
+        <p class="section-label" style="margin-top:0">Wages vs sales</p>
+        <p class="card__number" style="font-size:1.25rem" data-bind="staff.labourShare"></p>
+        <span class="status-word status-word--fine"><span class="status-word__shape"></span> <span data-bind="staff.labourStatus"></span></span>
+      </section>
+
+      <h2 class="section-label">Today's roster</h2>
+      <ul class="plain-list" id="roster"></ul>
+
+      <div class="see-more">
+        <button type="button" class="see-more__toggle" data-see-more-toggle>
+          <span>Where the kitchen slows down</span><span class="see-more__chevron" aria-hidden="true">▼</span>
+        </button>
+        <div class="see-more__body card" id="kitchen-slow"></div>
+      </div>
+
+      <div class="see-more">
+        <button type="button" class="see-more__toggle" data-see-more-toggle>
+          <span>See more</span><span class="see-more__chevron" aria-hidden="true">▼</span>
+        </button>
+        <div class="see-more__body">
+          <h2 class="section-label">Shift attendance</h2>
+          <ul class="plain-list" id="attendance"></ul>
+          <h2 class="section-label">Who entered what today</h2>
+          <div class="card" id="activity"></div>
+        </div>
+      </div>
+    </main>
+    <nav class="nav-pill" aria-label="Main">
+      <a href="home.html" class="nav-pill__item" data-nav="home"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/></svg></span><span class="nav-pill__label">Home</span></a>
+      <a href="money.html" class="nav-pill__item" data-nav="money"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 10h4a2 2 0 110 4h-2"/></svg></span><span class="nav-pill__label">Money</span></a>
+      <a href="stock.html" class="nav-pill__item" data-nav="stock"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 8h16v12H4z"/><path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span><span class="nav-pill__label">Stock</span></a>
+      <a href="ask.html" class="nav-pill__item" data-nav="ask"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H7l-3 3V6z"/></svg></span><span class="nav-pill__label">Ask</span></a>
+      <a href="more.html" class="nav-pill__item" data-nav="more"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span><span class="nav-pill__label">More</span></a>
+    </nav>
+  </div>
+  <script src="assets/sample-data.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    (function () {
+      var D = window.LEVIII_DATA.staff;
+      D.roster.slice(0, 3).forEach(function (r) {
+        var li = document.createElement("li");
+        li.textContent = r;
+        document.getElementById("roster").appendChild(li);
+      });
+      var slow = document.getElementById("kitchen-slow");
+      D.kitchenSlowdown.forEach(function (row) {
+        var div = document.createElement("div");
+        div.className = "row";
+        div.innerHTML = '<span class="row__label">' + row.dish + '</span><span class="row__value">' + row.minutes + ' min avg</span>';
+        slow.appendChild(div);
+      });
+      D.attendance.forEach(function (a) {
+        var li = document.createElement("li");
+        li.textContent = a;
+        document.getElementById("attendance").appendChild(li);
+      });
+      var act = document.getElementById("activity");
+      D.activity.slice(0, 3).forEach(function (row) {
+        var div = document.createElement("div");
+        div.className = "row";
+        div.innerHTML = '<span class="row__label"><strong>' + row.who + '</strong><br>' + row.what + '</span><span class="row__value">' + row.when + '</span>';
+        act.appendChild(div);
+      });
+    })();
+  </script>
+</body>
+</html>

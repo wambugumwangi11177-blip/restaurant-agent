@@ -1,0 +1,525 @@
+/* eslint-disable no-unused-vars */
+window.LEVIII_DATA = {
+  formatKES(n) {
+    return "KES " + Number(n).toLocaleString("en-KE");
+  },
+
+  restaurant: {
+    name: "Eleven",
+    posLabel: "your till",
+    posIngest: "Sales sent from your till into LEVIII",
+  },
+
+  /** Freshness copy for when numbers last updated (mockup). */
+  provenance: {
+    latestTillAt: "2 minutes ago",
+    costsEnteredThrough: "Tuesday",
+    timezone: "Africa/Nairobi",
+    salesBasis: "paid_non_cancelled_orders_by_creation_time",
+  },
+
+  home: {
+    pageFreshness: "Updated just now",
+    salesToday: 64300,
+    salesCompare: "Up 8% on a usual Thursday",
+    costsCoveredTime: "3:40 pm",
+    costsCoveredFull: true,
+    cashStatus: "Fine",
+    mpesaStatus: "Fine",
+    tillFreshness: "Your till updated 2 minutes ago, costs to yesterday",
+    needsYou: {
+      text: "Approve supplier order, Fresh Farm",
+      button: "Review",
+    },
+    cashToday: {
+      expected: 24150,
+      counted: 24000,
+    },
+    leaks: [
+      {
+        id: "below-menu",
+        sentence: "Some plates sold for less than the menu price.",
+        amount: 25700,
+        period: "a month",
+        button: "See details",
+        why:
+          "We compared your menu prices with what the till actually charged over the last 30 days.\nThe gap is the total discount or undercharge on paid plates.",
+        freshness: "Includes costs entered up to Tuesday",
+      },
+      {
+        id: "quarter-chicken",
+        sentence: "Quarter chicken is priced too low.",
+        amount: 10500,
+        period: "a month",
+        button: "Raise to 435",
+        why:
+          "We worked out the true cost of one quarter chicken from store issues and kitchen yield.\nAt KES 400 you are leaving about KES 10,500 on the table this month at current sales.",
+        freshness: "Includes costs entered up to Tuesday",
+      },
+      {
+        id: "beef-gap",
+        sentence: "Missing stock: beef.",
+        amountLabel: "10 kg, about KES 6,500",
+        button: "Check kitchen",
+        why:
+          "Sales and recipes say you should have used more beef than the store and kitchen counts show.\nStart with portions, waste, and whether the last handover was counted correctly.",
+        freshness: "Not updated since Monday",
+      },
+    ],
+    health: {
+      money: { number: "KES 65,200", status: "Fine", word: "Fine", freshness: "Includes costs entered up to Tuesday" },
+      sales: { number: "+8%", status: "Fine", word: "Fine" },
+      stock: { number: "KES 7,100", status: "Check", word: "Check", freshness: "Not updated since Monday" },
+      cash: { number: "KES 150", status: "Fine", word: "Fine" },
+      people: { number: "32%", status: "Fine", word: "Fine" },
+      compliance: { number: "41 days", status: "Fine", word: "Fine" },
+    },
+    comingUp: [
+      "Rent due Friday KES 70,000",
+      "Fire licence in 41 days",
+      "2 deliveries expected today",
+    ],
+    aiRead:
+      "Lunch is running ahead of a usual Thursday. Watch beef, it is the second gap this month. Try pushing the fish fillet at dinner.",
+    day1: {
+      salesToday: 64300,
+      moneyMatch: "Money match",
+      setupCard: "Add your rent and monthly bills",
+      checklist: [
+        "Opening stock counted (Done)",
+        "Suppliers added (Done)",
+        "Recipes and costs (42 of 60 dishes)",
+        "Sales from your till (Waiting on first till link)",
+        "First money report (Day 5)",
+      ],
+    },
+  },
+
+  money: {
+    periods: {
+      today: {
+        kept: 4200,
+        keptOf100: 14,
+        sales: 64300,
+        ingredients: 20600,
+        ingredientsPct: 32,
+        leftAfterIngredients: 43700,
+        wages: 16100,
+        wagesPct: 25,
+        runningCosts: 17400,
+        runningCostsPct: 27,
+        breakEvenTime: "3:40 pm",
+        breakEvenAmount: 11765,
+      },
+      week: {
+        kept: 18200,
+        keptOf100: 15,
+        sales: 121400,
+        ingredients: 38800,
+        ingredientsPct: 32,
+        leftAfterIngredients: 82600,
+        wages: 30400,
+        wagesPct: 25,
+        runningCosts: 34000,
+        runningCostsPct: 28,
+        breakEvenTime: "2:15 pm",
+        breakEvenAmount: 82300,
+      },
+      month: {
+        kept: 65200,
+        keptOf100: 16,
+        sales: 412000,
+        ingredients: 131800,
+        ingredientsPct: 32,
+        leftAfterIngredients: 280200,
+        wages: 103000,
+        wagesPct: 25,
+        runningCosts: 112000,
+        runningCostsPct: 27,
+        breakEvenTime: "3:40 pm",
+        breakEvenAmount: 11765,
+      },
+    },
+    ingredientsWagesStatus:
+      "Fine, 57% of sales, your target is 62%",
+    heroFreshness: "Includes costs entered up to Tuesday",
+    builtFrom: {
+      lines: [
+        "Rent and bills you entered in Settings",
+        "Wages from today's roster and shift closes",
+        "Supplier invoices and store receipts through Tuesday",
+      ],
+    },
+    billRadar: [
+      { date: "Fri 1 Nov", item: "Rent", amount: 70000 },
+      { date: "Mon 4 Nov", item: "Electricity", amount: 18000 },
+      { date: "Wed 6 Nov", item: "Gas supplier", amount: 12000 },
+    ],
+    billWarning: {
+      text: "You will be KES 22,000 short on the 4th",
+      action: "See why",
+    },
+    costsGoingUp: {
+      label: "Gas and charcoal 30% above the 3-month average",
+      months: ["May", "Jun", "Jul", "Aug", "Sep", "Oct"],
+      values: [40, 42, 45, 48, 52, 65],
+    },
+    moneyIn: [
+      { method: "Cash", amount: 185000 },
+      { method: "M-Pesa", amount: 142000 },
+      { method: "Card", amount: 52000 },
+      { method: "Delivery", amount: 33000 },
+    ],
+    moneyInNote: "Card and delivery money arrives later",
+    reportFile: "Eleven_Oct_P&L.xlsx",
+  },
+
+  stock: {
+    recipeStrip: "Based on 42 of 60 dishes. Dishes without a recipe are not included.",
+    toOrder: [
+      {
+        id: "chicken",
+        item: "Chicken quarters",
+        qty: "48",
+        supplier: "Kenchic",
+        cost: 8640,
+        neededBy: "Friday",
+      },
+      {
+        id: "beef",
+        item: "Beef",
+        qty: "11 kg",
+        supplier: "Butcher, Kiambu",
+        cost: 7150,
+        neededBy: "Saturday",
+      },
+      {
+        id: "tomatoes",
+        item: "Tomatoes",
+        qty: "7 kg",
+        supplier: "Market (cash run)",
+        cost: 2100,
+        neededBy: "Saturday",
+      },
+    ],
+    runningLow: [
+      { item: "Chicken quarters", daysLeft: 2, status: "Low" },
+      { item: "Cooking oil", daysLeft: 5, status: "Fine" },
+      { item: "Rice", daysLeft: 8, status: "Fine" },
+    ],
+    chickenChartCaption: "Shelf level for chicken quarters with reorder and full-shelf lines",
+    missingStock: [
+      {
+        item: "Beef",
+        gap: "10 kg",
+        kes: 6500,
+        store: "40 kg",
+        kitchen: "40 kg",
+        initiatedBy: "Jack (Storekeeper)",
+        note: "The 10 kg gap is in the kitchen, check portions and waste first.",
+      },
+      {
+        item: "Tomatoes",
+        gap: "2 kg",
+        kes: 600,
+        store: "40 kg",
+        kitchen: "38 kg",
+        initiatedBy: "Jack (Storekeeper)",
+        confirmedBy: "Kitchen count",
+        transferStatus: "Handover doesn't match",
+        handover: true,
+        note: "Store sent 40 kg; kitchen blind count confirmed 38 kg. A gap is something to check, not proof of wrongdoing.",
+      },
+    ],
+    missingCaption: "A gap is not proof of anything. It tells you where to look.",
+    spoiled: [
+      { item: "Lettuce", kes: 800 },
+      { item: "Bread rolls", kes: 450 },
+    ],
+    suppliers: [
+      { name: "Kenchic", short: "1 short delivery this month", price: "Prices up 3% on wings" },
+      { name: "Butcher, Kiambu", short: "No short deliveries", price: "Beef price down 2%" },
+      { name: "Metro Gas", short: "On time", price: "Gas up 8%" },
+    ],
+    stockValue: 284000,
+    slowMovers: ["Lamb stew", "Veg curry", "Spaghetti"],
+    prep: {
+      day: "Saturday",
+      plates: [
+        { dish: "Pilau", qty: "90 plates" },
+        { dish: "Quarter chicken", qty: "60 plates" },
+        { dish: "Beef stew", qty: "45 plates" },
+      ],
+      market: ["Tomatoes 7 kg", "Onions 5 kg", "Coriander 2 bunches"],
+    },
+    freshness: "Updated just now",
+  },
+
+  sales: {
+    dishes: {
+      best: ["Nyama choma", "Pilau", "Chips"],
+      popularLow: ["Fried rice", "Spaghetti"],
+      earnsFew: ["Fish fillet", "Lamb stew"],
+      considerRemove: ["Veg curry"],
+    },
+    dishActions: {
+      best: "Keep these on the board and make sure you never run out at lunch.",
+      popularLow: "These sell well but keep little — try a small price rise or smaller portion.",
+      earnsFew: "Margin is good — train staff to suggest these at dinner.",
+      considerRemove: "Few orders and low margin — consider removing from the menu.",
+    },
+    priceIdeas: [
+      {
+        id: "raise-chicken",
+        sentence: "Raise quarter chicken to KES 435.",
+        amount: 10500,
+        period: "a month",
+        button: "Approve",
+        freshness: "Includes costs entered up to Tuesday",
+        why:
+          "Your recipe and store costs for quarter chicken are above the menu price at busy hours.\nRaising to KES 435 would recover about KES 10,500 a month at today's volume.",
+      },
+      {
+        id: "fish-offer",
+        sentence: "Try a 10% offer on fish fillet this week.",
+        amount: null,
+        button: "Approve",
+        freshness: "Updated just now",
+        why:
+          "Fish fillet earns well but does not sell often.\nA short offer can train staff and guests to order it without cutting margin long term.",
+      },
+    ],
+    combo: {
+      title: "Fish fillet plus Chips and chicken",
+      price: 1050,
+      was: 1200,
+      margin: 56,
+    },
+    delivery: {
+      item: "Burger",
+      restaurant: 320,
+      delivery: 170,
+      price: 600,
+    },
+    hours: [
+      { name: "Breakfast", pct: 12 },
+      { name: "Lunch", pct: 38 },
+      { name: "Afternoon", pct: 14 },
+      { name: "Dinner", pct: 28 },
+      { name: "Late night", pct: 8, weakest: true },
+    ],
+    simulator: {
+      dish: "Pilau",
+      baseLift: 6100,
+      reaction: 0.7,
+    },
+    salesToday: 64300,
+    usualLow: 52000,
+    usualHigh: 61000,
+    salesStatus: "Fine",
+    next7Days: {
+      low: 580000,
+      high: 720000,
+      note: "Based on the last few weeks and what is already booked in.",
+    },
+    dishesByKes: [
+      { dish: "Nyama choma", kes: 150000 },
+      { dish: "Pilau", kes: 89000 },
+      { dish: "Veg curry", kes: 3500 },
+    ],
+  },
+
+  cash: {
+    headline: "Is your money where it should be?",
+    overallStatus: "Fine",
+    last7: ["Fine", "Fine", "Fine", "Fine", "Fine", "Fine", "Check"],
+    till: 64300,
+    cashCounted: 24150,
+    mpesaStatement: 38200,
+    cashResult: "Cash: drawer short by KES 150, within the normal gap",
+    mpesaResult: "M-Pesa: 2 payments matched, 1 sale not found, KES 1,200, check",
+    shifts: [
+      { id: "mon-day", label: "Mon Day", sales: 28400, cashGap: 0, mpesaGap: 0, voids: 1, stockGap: 0, status: "Fine" },
+      { id: "mon-night", label: "Mon Night", sales: 22100, cashGap: 50, mpesaGap: 0, voids: 0, stockGap: 0, status: "Fine" },
+      { id: "tue-day", label: "Tue Day", sales: 30200, cashGap: 100, mpesaGap: 0, voids: 2, stockGap: 0, status: "Fine" },
+      { id: "tue-night", label: "Tue Night", sales: 26800, cashGap: 150, mpesaGap: 1200, voids: 3, stockGap: 2, status: "Check" },
+      { id: "wed-day", label: "Wed Day", sales: 29100, cashGap: 0, mpesaGap: 0, voids: 1, stockGap: 0, status: "Fine" },
+      { id: "wed-night", label: "Wed Night", sales: 24500, cashGap: 80, mpesaGap: 0, voids: 0, stockGap: 0, status: "Fine" },
+    ],
+    patternCaption: "Same shift, 4 weeks running. Worth a conversation, not a conclusion.",
+    bottomCaption: "A gap is something to check. It is never proof that a person did something wrong.",
+    ownerOnly: "Alerts for cash gaps on this page go to the owner only.",
+    allowedGap: 200,
+  },
+
+  reports: {
+    month: {
+      sales: 412000,
+      ingredients: 131800,
+      leftAfterIngredients: 280200,
+      wages: 103000,
+      runningCosts: 112000,
+      kept: 65200,
+      breakEvenDay: 19,
+      gaps: 9400,
+      menuMoves: "Fish fillet moved to Best dishes after the weekend offer.",
+      priceChanges: "Quarter chicken still below target; pilau unchanged.",
+      aiRead: "You kept more than last month but beef gaps are costing you.",
+      aiTry: "Fix the beef handover before raising prices.",
+    },
+    yearSales: [320, 340, 355, 380, 390, 412, 405, 420, 430, 412, 0, 0],
+    nextYear: ["Renew fire licence in Q1", "Renegotiate gas contract", "Add lunch combo for Branch B"],
+    downloadName: "Eleven_Year_Summary.xlsx",
+  },
+
+  alerts: {
+    policy: "Up to 5 urgent alerts a day, quiet after 10 pm. You can change this in Settings.",
+    needsYou: [
+      "Cash gap above normal on Tue Night shift",
+      "M-Pesa payment KES 1,200 not matched to a sale",
+      "Nyama choma nearly out of stock before dinner",
+      "Electricity bill due tomorrow — cash may be KES 22,000 short",
+    ],
+    today: [
+      "2 stock gaps waiting in Missing stock",
+      "Void sales up on Tue Night",
+      "3 draft orders waiting for approval",
+      "1 handover doesn't match on tomatoes",
+    ],
+    week: [
+      "2 price ideas waiting on Sales & Dishes",
+      "Veg curry flagged consider removing",
+      "Kenchic scorecard: one short delivery",
+    ],
+  },
+
+  ask: {
+    chips: [
+      { type: "What", label: "What did we sell yesterday?", key: "what" },
+      { type: "Why", label: "Why was Tuesday down?", key: "why" },
+      { type: "What if", label: "Raise pilau by KES 50?", key: "whatif" },
+      { type: "What should I do", label: "What should I fix this week?", key: "fix" },
+      { type: "Compare", label: "This month versus last", key: "compare" },
+    ],
+    answers: {
+      what: {
+        sentence: "Yesterday you sold KES 58,400 across 186 receipts.",
+        number: "KES 58,400",
+        source:
+          "Yesterday’s paid sales from your till.\nTotals are for Wed 29 Oct 2026 in Nairobi time.",
+        ai: false,
+        followUp: "Show top dishes yesterday",
+      },
+      why: {
+        sentence: "Tuesday was down mainly because of fewer walk-ins after a public holiday.",
+        ranked: [
+          "Public holiday — lunch covers 22% below usual (till export)",
+          "Chips ran out at 7 pm — lost roughly 14 orders (stock log)",
+          "One delivery tablet offline 2 hours (delivery partner)",
+        ],
+        source:
+          "Sales compared with your usual Tuesday and the low-stock log.\nCovers Tue 28 Oct 2026.",
+        ai: true,
+        followUp: "What sold well anyway?",
+      },
+      whatif: {
+        sentence: "Raising pilau by KES 50 could add about KES 6,100 a month if customers react as usual.",
+        number: "KES 6,100 a month",
+        source: "Menu costs and sales mix, updated Tuesday",
+        ai: true,
+        followUp: "Try before you change on Sales & Dishes",
+      },
+      fix: {
+        sentence: "This week, fix beef gaps, approve the Kenchic order, and match the M-Pesa sale for KES 1,200.",
+        source:
+          "Your open alerts, missing stock list, and cash match for this week.\nRanked by what costs you most if you wait.",
+        ai: true,
+        followUp: "Open Missing stock",
+      },
+      compare: {
+        sentence: "This month sales are KES 412,000 versus KES 388,000 last month.",
+        table: [
+          ["", "This month", "Last month"],
+          ["Sales", "412,000", "388,000"],
+          ["What you kept", "65,200", "58,400"],
+        ],
+        source: "Monthly money report, Oct 2026",
+        ai: false,
+        followUp: "Why did costs go up?",
+      },
+      cant: {
+        question: "How much did we spend on beef this week?",
+        reply: "I can't answer that yet. Beef purchases aren't split out in what we've received from suppliers this week.",
+        source: "Supplier invoices and store receipts for this week",
+        ai: true,
+      },
+    },
+  },
+
+  staff: {
+    date: "Thursday 30 Oct 2026",
+    roster: [
+      "Jane — Manager",
+      "Jack — Storekeeper",
+      "Peter — Kitchen",
+      "Grace — Accountant",
+      "Amina — Waiter",
+    ],
+    labourShare: "25% of sales today",
+    labourStatus: "Fine",
+    attendance: ["8 scheduled", "7 clocked in", "1 late — Amina"],
+    activity: [
+      { who: "Jack (Storekeeper)", what: "Opening stock count and Kenchic delivery receipt", when: "6:42 am" },
+      { who: "Peter (Kitchen)", what: "Confirmed tomato transfer — count differed from store send", when: "7:15 am" },
+      { who: "Jane (Manager)", what: "Shift close and petty cash entry", when: "11:05 pm Wed" },
+      { who: "Grace (Accountant)", what: "Month-end export sent", when: "Tue 3:18 pm" },
+    ],
+    kitchenSlowdown: [
+      { dish: "Pilau", minutes: 18 },
+      { dish: "Nyama choma", minutes: 16 },
+      { dish: "Beef stew", minutes: 14 },
+    ],
+  },
+
+  settings: {
+    tillConnection: {
+      headline: "Is LEVIII seeing your till?",
+      status: "Connected",
+      statusWord: "Fine",
+      lastSale: "Last sale received 2 minutes ago",
+      costsThrough: "Costs entered up to Tuesday",
+    },
+    permits: [
+      { name: "Fire safety", days: 41, status: "Fine" },
+      { name: "Food handling", days: 120, status: "Fine" },
+      { name: "Liquor", days: 12, status: "Check" },
+    ],
+    thresholds: [
+      { key: "marginFloor", label: "Margin floor", value: "40", hint: "Dishes below this margin get flagged." },
+      { key: "marginTarget", label: "Margin target", value: "55", hint: "What you aim to keep on a plate." },
+      { key: "offerLift", label: "Offer lifts orders by", value: "30", hint: "Used in offer ideas like fish fillet." },
+      { key: "priceReaction", label: "Price reaction", value: "0.7", hint: "How customers react to each 1% price change." },
+      { key: "maxPriceRise", label: "Biggest price rise", value: "15", hint: "LEVIII won't suggest more than this at once." },
+      { key: "popularCutoff", label: "Popular cut-off", value: "70", hint: "Top sellers by volume share." },
+      { key: "cashGapFlat", label: "Allowed cash gap (flat)", value: "200", hint: "Matches Cash Check normal gap." },
+      { key: "cashGapPct", label: "Allowed cash gap over 20,000", value: "1", hint: "Extra percent allowed on big tills." },
+      { key: "urgentAlerts", label: "Urgent alerts per day", value: "5", hint: "Shown at top of Alerts." },
+    ],
+  },
+
+  branches: {
+    a: { foodCost: 29 },
+    b: { foodCost: 37 },
+  },
+
+  topDishes: [
+    "Nyama choma",
+    "Pilau",
+    "Chips",
+    "Fried rice",
+    "Fish fillet",
+    "Lamb stew",
+    "Spaghetti",
+    "Veg curry",
+  ],
+};

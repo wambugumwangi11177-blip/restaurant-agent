@@ -18,10 +18,10 @@
       </div>
     </header>
     <main class="page-content">
-      <div class="dev-toggle">
-        <span>Developer:</span>
-        <label><input type="checkbox" id="day-toggle"> Day 1 view</label>
-      </div>
+      <label class="preview-corner" for="day-toggle">
+        <span>Preview</span>
+        <input type="checkbox" id="day-toggle" aria-label="Toggle Day 1 preview">
+      </label>
 
       <div id="home-full">
         <p class="freshness-line" id="global-freshness" data-bind="home.pageFreshness"></p>
@@ -30,7 +30,7 @@
           <p class="section-label" id="pulse-label" style="margin-top:0">Today's pulse</p>
           <p class="card__number" data-bind="home.salesToday" data-format="kes"></p>
           <p class="freshness-line" data-bind="home.salesCompare"></p>
-          <p style="margin:var(--space-3) 0 var(--space-1);font-size:0.875rem">Costs covered at <span data-bind="home.costsCoveredTime"></span></p>
+          <p class="hero-line" style="margin:var(--space-3) 0 var(--space-1)">Costs covered at <span data-bind="home.costsCoveredTime"></span></p>
           <div class="progress-bar" aria-hidden="true"><div class="progress-bar__fill" style="width:100%"></div></div>
           <div style="display:flex;flex-wrap:wrap;gap:var(--space-4);margin-top:var(--space-3)">
             <span class="status-word status-word--fine">Cash <span class="status-word__shape"></span> <span data-bind="home.cashStatus"></span></span>
@@ -45,15 +45,16 @@
           <a href="stock.html" class="button" data-bind="home.needsYou.button"></a>
         </section>
 
-        <div class="card">
+        <div class="card pl-card">
+          <p class="row__label" style="margin:0 0 var(--space-2);font-weight:600">Cash today</p>
           <div class="row row--stacked">
-            <div class="row__main">
-              <span class="row__label">Cash today</span>
-              <span class="row__sub">Expected in drawer vs counted</span>
-            </div>
+            <div class="row__main"><span class="row__label">Counted</span></div>
             <span class="row__value"><span data-bind="home.cashToday.counted" data-format="kes"></span></span>
           </div>
-          <p class="freshness-line" style="margin-top:var(--space-2)">Expected <span data-bind="home.cashToday.expected" data-format="kes"></span></p>
+          <div class="row row--stacked">
+            <div class="row__main"><span class="row__label">Expected</span></div>
+            <span class="row__value"><span data-bind="home.cashToday.expected" data-format="kes"></span></span>
+          </div>
         </div>
 
         <h2 class="section-label">What's costing you money</h2>
@@ -74,7 +75,7 @@
 
       <div id="home-day1" class="hidden">
         <section class="card card-hero">
-          <p class="section-label" style="color:var(--grey-300);margin-top:0">Today's pulse</p>
+          <p class="section-label" style="margin-top:0">Today's pulse</p>
           <p class="card__number" data-bind="home.day1.salesToday" data-format="kes"></p>
           <p class="freshness-line" data-bind="home.day1.moneyMatch"></p>
         </section>

@@ -18,7 +18,15 @@
       </div>
     </header>
     <main class="page-content">
-      <h2 class="section-label" style="margin-top:0">To order</h2>
+      <h2 class="section-label" style="margin-top:0">Stock value</h2>
+      <div class="card card-hero">
+        <p class="card__number" data-bind="stock.stockValue" data-format="kes"></p>
+        <p class="freshness-line" data-bind="stock.freshness"></p>
+        <p class="hero-line" style="margin-top:var(--space-3)">Slow movers</p>
+        <ul id="slow-movers"></ul>
+      </div>
+
+      <h2 class="section-label">To order</h2>
       <div class="warning-strip" data-bind="stock.recipeStrip"></div>
       <div class="card" id="to-order-list"></div>
 
@@ -47,14 +55,6 @@
 
       <h2 class="section-label">Suppliers</h2>
       <div class="card" id="supplier-scores"></div>
-
-      <h2 class="section-label">Stock value</h2>
-      <div class="card card-hero">
-        <p class="card__number" data-bind="stock.stockValue" data-format="kes"></p>
-        <p class="freshness-line" data-bind="stock.freshness"></p>
-        <p style="margin-top:var(--space-3);font-size:0.875rem">Slow movers</p>
-        <ul id="slow-movers"></ul>
-      </div>
 
       <h2 class="section-label">Tomorrow's prep</h2>
       <div class="collapsible">

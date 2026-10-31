@@ -6,11 +6,11 @@ window.LEVIII_DATA = {
 
   restaurant: {
     name: "Eleven",
-    posLabel: "Quick Sell",
-    posIngest: "MacSoft webhook push into LEVIII mirror",
+    posLabel: "your till",
+    posIngest: "Sales sent from your till into LEVIII",
   },
 
-  /** Mirrors GET /api/v1/overview/today → data_provenance (freshness copy). */
+  /** Freshness copy for when numbers last updated (mockup). */
   provenance: {
     latestTillAt: "2 minutes ago",
     costsEnteredThrough: "Tuesday",
@@ -89,7 +89,7 @@ window.LEVIII_DATA = {
         "Opening stock counted (Done)",
         "Suppliers added (Done)",
         "Recipes and costs (42 of 60 dishes)",
-        "Sales from your till (Waiting on Quick Sell)",
+        "Sales from your till (Waiting on first till link)",
         "First money report (Day 5)",
       ],
     },
@@ -387,7 +387,8 @@ window.LEVIII_DATA = {
       what: {
         sentence: "Yesterday you sold KES 58,400 across 186 receipts.",
         number: "KES 58,400",
-        source: "GET /api/v1/overview/today → revenue (paid orders), Wed 29 Oct 2026",
+        source:
+          "Yesterday’s paid sales from your till.\nTotals are for Wed 29 Oct 2026 in Nairobi time.",
         ai: false,
         followUp: "Show top dishes yesterday",
       },
@@ -398,7 +399,8 @@ window.LEVIII_DATA = {
           "Chips ran out at 7 pm — lost roughly 14 orders (stock log)",
           "One delivery tablet offline 2 hours (delivery partner)",
         ],
-        source: "Deterministic modules: revenue_forecaster + inventory low-stock log, Tue 28 Oct 2026",
+        source:
+          "Sales compared with your usual Tuesday and the low-stock log.\nCovers Tue 28 Oct 2026.",
         ai: true,
         followUp: "What sold well anyway?",
       },

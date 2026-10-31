@@ -143,6 +143,13 @@ window.LEVIII_DATA = {
     ingredientsWagesStatus:
       "Fine, 57% of sales, your target is 62%",
     heroFreshness: "Includes costs entered up to Tuesday",
+    builtFrom: {
+      lines: [
+        "Rent and bills you entered in Settings",
+        "Wages from today's roster and shift closes",
+        "Supplier invoices and store receipts through Tuesday",
+      ],
+    },
     billRadar: [
       { date: "Fri 1 Nov", item: "Rent", amount: 70000 },
       { date: "Mon 4 Nov", item: "Electricity", amount: 18000 },
@@ -309,6 +316,17 @@ window.LEVIII_DATA = {
     salesToday: 64300,
     usualLow: 52000,
     usualHigh: 61000,
+    salesStatus: "Fine",
+    next7Days: {
+      low: 580000,
+      high: 720000,
+      note: "Based on the last few weeks and what is already booked in.",
+    },
+    dishesByKes: [
+      { dish: "Nyama choma", kes: 150000 },
+      { dish: "Pilau", kes: 89000 },
+      { dish: "Veg curry", kes: 3500 },
+    ],
   },
 
   cash: {
@@ -413,7 +431,8 @@ window.LEVIII_DATA = {
       },
       fix: {
         sentence: "This week, fix beef gaps, approve the Kenchic order, and match the M-Pesa sale for KES 1,200.",
-        source: "Ranked attention cards + stock custody report + cash reconciliation report",
+        source:
+          "Your open alerts, missing stock list, and cash match for this week.\nRanked by what costs you most if you wait.",
         ai: true,
         followUp: "Open Missing stock",
       },
@@ -455,9 +474,21 @@ window.LEVIII_DATA = {
       { who: "Jane (Manager)", what: "Shift close and petty cash entry", when: "11:05 pm Wed" },
       { who: "Grace (Accountant)", what: "Month-end export sent", when: "Tue 3:18 pm" },
     ],
+    kitchenSlowdown: [
+      { dish: "Pilau", minutes: 18 },
+      { dish: "Nyama choma", minutes: 16 },
+      { dish: "Beef stew", minutes: 14 },
+    ],
   },
 
   settings: {
+    tillConnection: {
+      headline: "Is LEVIII seeing your till?",
+      status: "Connected",
+      statusWord: "Fine",
+      lastSale: "Last sale received 2 minutes ago",
+      costsThrough: "Costs entered up to Tuesday",
+    },
     permits: [
       { name: "Fire safety", days: 41, status: "Fine" },
       { name: "Food handling", days: 120, status: "Fine" },

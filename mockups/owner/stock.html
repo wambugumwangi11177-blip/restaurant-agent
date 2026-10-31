@@ -18,33 +18,12 @@
       </div>
     </header>
     <main class="page-content">
-      <h2 class="section-label" style="margin-top:0">Stock value</h2>
-      <div class="card card-hero">
-        <p class="card__number" data-bind="stock.stockValue" data-format="kes"></p>
-        <p class="freshness-line" data-bind="stock.freshness"></p>
-        <p class="hero-line" style="margin-top:var(--space-3)">Slow movers</p>
-        <ul id="slow-movers"></ul>
-      </div>
-
-      <h2 class="section-label">To order</h2>
+      <h2 class="section-label" style="margin-top:0">To order</h2>
       <div class="warning-strip" data-bind="stock.recipeStrip"></div>
       <div class="card" id="to-order-list"></div>
 
       <h2 class="section-label">Running low</h2>
       <div class="card" id="running-low"></div>
-      <div class="card">
-        <div class="chart-wrap">
-          <svg viewBox="0 0 320 100" role="img" aria-label="Chicken quarters on shelf">
-            <line x1="20" y1="25" x2="300" y2="25" stroke="#000" stroke-dasharray="4 3"/>
-            <line x1="20" y1="45" x2="300" y2="45" stroke="#757575" stroke-dasharray="4 3"/>
-            <polyline fill="none" stroke="#000" stroke-width="2" points="20,70 60,65 100,58 140,50 180,42 220,38 260,35"/>
-            <text x="22" y="22" font-size="9">Full shelf</text>
-            <text x="22" y="42" font-size="9">Reorder</text>
-          </svg>
-        </div>
-        <p class="chart-caption" data-bind="stock.chickenChartCaption"></p>
-        <p class="freshness-line" data-bind="stock.freshness"></p>
-      </div>
 
       <h2 class="section-label">Missing stock</h2>
       <p class="caption" data-bind="stock.missingCaption"></p>
@@ -53,16 +32,42 @@
       <h2 class="section-label">Spoiled and wasted this week</h2>
       <div class="card" id="spoiled-list"></div>
 
-      <h2 class="section-label">Suppliers</h2>
-      <div class="card" id="supplier-scores"></div>
+      <h2 class="section-label">Stock value</h2>
+      <div class="card card-hero">
+        <p class="card__number" data-bind="stock.stockValue" data-format="kes"></p>
+        <p class="freshness-line" data-bind="stock.freshness"></p>
+      </div>
 
-      <h2 class="section-label">Tomorrow's prep</h2>
-      <div class="collapsible">
-        <button type="button" class="collapsible__head" data-collapsible>
-          <span>Prep and market list for <span data-bind="stock.prep.day"></span></span>
-          <span aria-hidden="true">▼</span>
+      <div class="see-more">
+        <button type="button" class="see-more__toggle" data-see-more-toggle>
+          <span>See more</span><span class="see-more__chevron" aria-hidden="true">▼</span>
         </button>
-        <div class="collapsible__body" id="prep-body"></div>
+        <div class="see-more__body">
+          <p class="hero-line">Slow movers</p>
+          <ul id="slow-movers" class="card" style="list-style:disc;padding:var(--space-3) var(--space-4);margin:0 0 var(--space-3)"></ul>
+          <div class="card">
+            <div class="chart-wrap">
+              <svg viewBox="0 0 320 100" role="img" aria-label="Chicken quarters on shelf">
+                <line x1="20" y1="25" x2="300" y2="25" stroke="#000" stroke-dasharray="4 3"/>
+                <line x1="20" y1="45" x2="300" y2="45" stroke="#757575" stroke-dasharray="4 3"/>
+                <polyline fill="none" stroke="#000" stroke-width="2" points="20,70 60,65 100,58 140,50 180,42 220,38 260,35"/>
+                <text x="22" y="22" font-size="9">Full shelf</text>
+                <text x="22" y="42" font-size="9">Reorder</text>
+              </svg>
+            </div>
+            <p class="chart-caption" data-bind="stock.chickenChartCaption"></p>
+          </div>
+          <h2 class="section-label">Suppliers</h2>
+          <div class="card" id="supplier-scores"></div>
+          <h2 class="section-label">Tomorrow's prep</h2>
+          <div class="collapsible">
+            <button type="button" class="collapsible__head" data-collapsible>
+              <span>Prep and market list for <span data-bind="stock.prep.day"></span></span>
+              <span aria-hidden="true">▼</span>
+            </button>
+            <div class="collapsible__body" id="prep-body"></div>
+          </div>
+        </div>
       </div>
     </main>
     <nav class="nav-pill" aria-label="Main">
@@ -86,18 +91,20 @@
   <script>
     (function () {
       var D = window.LEVIII_DATA;
+      var UI = window.LEVIII_UI;
       var orderRoot = document.getElementById("to-order-list");
-      D.stock.toOrder.forEach(function (o) {
+      function renderOrder(o, parent) {
         var row = document.createElement("div");
         row.className = "order-row";
         row.innerHTML =
           '<div><strong>' + o.item + '</strong> ' + o.qty + '<br>' + o.supplier + ' · ' + D.formatKES(o.cost) + ' · needed by ' + o.neededBy + '</div>' +
           '<div class="order-row__actions"><button type="button" class="button" data-approve-order>Approve</button>' +
           '<button type="button" class="button button-outline hidden" data-send-supplier>Send to supplier</button></div>';
-        orderRoot.appendChild(row);
-      });
+        parent.appendChild(row);
+      }
+      UI.appendWithSeeMore(orderRoot, D.stock.toOrder, renderOrder, 2);
       var low = document.getElementById("running-low");
-      D.stock.runningLow.forEach(function (item) {
+      D.stock.runningLow.slice(0, 3).forEach(function (item) {
         var cls = item.status === "Low" ? "low" : "fine";
         var row = document.createElement("div");
         row.className = "row";
@@ -105,21 +112,18 @@
           '<span class="status-word status-word--' + cls + '"><span class="status-word__shape"></span>' + item.status + '</span>';
         low.appendChild(row);
       });
-      var miss = document.getElementById("missing-stock");
-      D.stock.missingStock.forEach(function (m) {
+      function renderMissing(m, parent) {
         var card = document.createElement("article");
         card.className = "card";
         card.innerHTML =
           '<p class="card__sentence">Missing stock: ' + m.item + '.</p>' +
           '<p class="card__number">' + m.gap + ', about ' + D.formatKES(m.kes) + '</p>' +
           '<p style="font-size:0.875rem">Store sent ' + m.store + '. Kitchen confirmed ' + m.kitchen + '.</p>' +
-          (m.initiatedBy ? '<p class="caption">' + m.initiatedBy + (m.confirmedBy ? ' → ' + m.confirmedBy : '') + '</p>' : '') +
           (m.handover ? '<p class="status-word status-word--check"><span class="status-word__shape"></span> ' + (m.transferStatus || "Handover doesn't match") + '</p>' : '') +
-          '<p class="freshness-line">' + m.note + '</p>' +
-          '<button type="button" class="button">Check this</button>' +
-          '<button type="button" class="why-link" data-why data-why-title="How this was worked out" data-why-body="We compare what recipes and sales say you should have used with what left the store and what the kitchen counted.\nHandovers that do not match are flagged so you know where to look, not who to blame.">Why?</button>';
-        miss.appendChild(card);
-      });
+          '<button type="button" class="button">Check this</button>';
+        parent.appendChild(card);
+      }
+      UI.appendWithSeeMore(document.getElementById("missing-stock"), D.stock.missingStock, renderMissing, 1);
       var sp = document.getElementById("spoiled-list");
       D.stock.spoiled.forEach(function (s) {
         var row = document.createElement("div");
@@ -135,7 +139,7 @@
         sup.appendChild(row);
       });
       var sm = document.getElementById("slow-movers");
-      D.stock.slowMovers.forEach(function (name) {
+      D.stock.slowMovers.slice(0, 3).forEach(function (name) {
         var li = document.createElement("li");
         li.textContent = name;
         sm.appendChild(li);
@@ -145,7 +149,7 @@
       D.stock.prep.plates.forEach(function (p) { html += "<li>" + p.dish + ": " + p.qty + "</li>"; });
       html += "</ul><p><strong>Market list</strong></p><ul>";
       D.stock.prep.market.forEach(function (m) { html += "<li>" + m + "</li>"; });
-      html += "</ul><p class=\"freshness-line\">Updated just now</p>";
+      html += "</ul>";
       prep.innerHTML = html;
     })();
   </script>

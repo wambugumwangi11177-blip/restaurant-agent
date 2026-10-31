@@ -52,25 +52,36 @@
       </div>
 
       <div class="tab-panel" data-panel="month">
-        <div class="card">
-          <div class="row"><span class="row__label">Sales</span><span class="row__value" data-bind="reports.month.sales" data-format="kes"></span></div>
-          <div class="row"><span class="row__label">Ingredients</span><span class="row__value" data-bind="reports.month.ingredients" data-format="kes"></span></div>
-          <div class="row"><span class="row__label">Left after ingredients</span><span class="row__value" data-bind="reports.month.leftAfterIngredients" data-format="kes"></span></div>
-          <div class="row"><span class="row__label">Wages</span><span class="row__value" data-bind="reports.month.wages" data-format="kes"></span></div>
-          <div class="row"><span class="row__label">Running costs</span><span class="row__value" data-bind="reports.month.runningCosts" data-format="kes"></span></div>
-          <div class="row"><span class="row__label">What you kept</span><span class="row__value" data-bind="reports.month.kept" data-format="kes"></span></div>
+        <div class="card area-summary">
+          <p class="section-label" style="margin-top:0">What you kept</p>
+          <p class="card__number" data-bind="reports.month.kept" data-format="kes"></p>
+          <span class="status-word status-word--fine"><span class="status-word__shape"></span> Fine</span>
           <p class="freshness-line">Includes costs entered up to Tuesday</p>
-          <p>Costs covered on day <span data-bind="reports.month.breakEvenDay"></span> of the month.</p>
-          <p data-bind="reports.month.menuMoves"></p>
-          <p data-bind="reports.month.priceChanges"></p>
-          <p>Gaps total <span data-bind="reports.month.gaps" data-format="kes"></span> — check Missing stock.</p>
         </div>
-        <div class="card ai-read">
-          <p class="ai-read__label">Written by AI</p>
-          <p><strong>My read:</strong> <span data-bind="reports.month.aiRead"></span></p>
-          <p><strong>Try this:</strong> <span data-bind="reports.month.aiTry"></span></p>
+        <div class="card pl-card">
+          <div class="row row--stacked"><div class="row__main"><span class="row__label">Sales</span></div><span class="row__value"><span data-bind="reports.month.sales" data-format="kes"></span></span></div>
+          <div class="row row--stacked"><div class="row__main"><span class="row__label">Ingredients</span></div><span class="row__value"><span data-bind="reports.month.ingredients" data-format="kes"></span></span></div>
+          <div class="row row--stacked"><div class="row__main"><span class="row__label">Wages</span></div><span class="row__value"><span data-bind="reports.month.wages" data-format="kes"></span></span></div>
         </div>
-        <button type="button" class="button button-block" id="download-accountant">Download for accountant</button>
+        <div class="see-more">
+          <button type="button" class="see-more__toggle" data-see-more-toggle><span>See more</span><span class="see-more__chevron">▼</span></button>
+          <div class="see-more__body">
+            <div class="card">
+              <div class="row"><span class="row__label">Left after ingredients</span><span class="row__value" data-bind="reports.month.leftAfterIngredients" data-format="kes"></span></div>
+              <div class="row"><span class="row__label">Running costs</span><span class="row__value" data-bind="reports.month.runningCosts" data-format="kes"></span></div>
+              <p>Costs covered on day <span data-bind="reports.month.breakEvenDay"></span> of the month.</p>
+              <p data-bind="reports.month.menuMoves"></p>
+              <p data-bind="reports.month.priceChanges"></p>
+              <p>Gaps total <span data-bind="reports.month.gaps" data-format="kes"></span> — check Missing stock.</p>
+            </div>
+            <div class="card ai-read">
+              <p class="ai-read__label">Written by AI</p>
+              <p><strong>My read:</strong> <span data-bind="reports.month.aiRead"></span></p>
+              <p><strong>Try this:</strong> <span data-bind="reports.month.aiTry"></span></p>
+            </div>
+            <button type="button" class="button button-block" id="download-accountant">Download for accountant</button>
+          </div>
+        </div>
       </div>
 
       <div class="tab-panel" data-panel="year">

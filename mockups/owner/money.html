@@ -55,6 +55,15 @@
         </div>
         <p class="chart-caption">Today's costs were covered at <span data-breakeven-time></span>. Everything after is profit.</p>
         <p class="freshness-line">Updated just now</p>
+        <div class="see-more">
+          <button type="button" class="see-more__toggle" data-see-more-toggle>
+            <span>See more</span><span class="see-more__chevron" aria-hidden="true">▼</span>
+          </button>
+          <div class="see-more__body">
+            <p class="section-label" style="margin-top:0">Built from</p>
+            <ul class="plain-list" id="built-from-list"></ul>
+          </div>
+        </div>
       </div>
 
       <h2 class="section-label">Bills coming up</h2>
@@ -65,16 +74,22 @@
         <p class="freshness-line">Includes costs entered up to Tuesday</p>
       </div>
 
-      <h2 class="section-label">Costs going up</h2>
-      <div class="card">
-        <p class="card__sentence" data-bind="money.costsGoingUp.label"></p>
-        <div class="chart-wrap" id="costs-bar-chart"></div>
-        <p class="chart-caption">Gas and charcoal spend by month, compared with your 3-month average.</p>
-        <p class="freshness-line">Not updated since Monday</p>
+      <div class="see-more">
+        <button type="button" class="see-more__toggle" data-see-more-toggle>
+          <span>See more</span><span class="see-more__chevron" aria-hidden="true">▼</span>
+        </button>
+        <div class="see-more__body">
+          <h2 class="section-label">Costs going up</h2>
+          <div class="card">
+            <p class="card__sentence" data-bind="money.costsGoingUp.label"></p>
+            <div class="chart-wrap" id="costs-bar-chart"></div>
+            <p class="chart-caption">Gas and charcoal spend by month, compared with your 3-month average.</p>
+            <p class="freshness-line">Not updated since Monday</p>
+          </div>
+          <h2 class="section-label">Money coming in</h2>
+          <div class="card" id="money-in-bars"></div>
+        </div>
       </div>
-
-      <h2 class="section-label">Money coming in</h2>
-      <div class="card" id="money-in-bars"></div>
 
       <div class="button-row">
         <a href="reports.html" class="button button-block">Open monthly report</a>
@@ -103,12 +118,20 @@
     (function () {
       var D = window.LEVIII_DATA;
       var list = document.getElementById("bill-radar");
-      D.money.billRadar.forEach(function (b) {
+      window.LEVIII_UI.appendWithSeeMore(list, D.money.billRadar, function (b, parent) {
         var row = document.createElement("div");
         row.className = "row";
         row.innerHTML = '<span class="row__label">' + b.date + " — " + b.item + '</span><span class="row__value">' + D.formatKES(b.amount) + "</span>";
-        list.appendChild(row);
-      });
+        parent.appendChild(row);
+      }, 3);
+      var bf = document.getElementById("built-from-list");
+      if (bf && D.money.builtFrom) {
+        D.money.builtFrom.lines.forEach(function (line) {
+          var li = document.createElement("li");
+          li.textContent = line;
+          bf.appendChild(li);
+        });
+      }
       var bars = document.getElementById("money-in-bars");
       var max = 0;
       D.money.moneyIn.forEach(function (m) { if (m.amount > max) max = m.amount; });

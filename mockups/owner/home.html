@@ -64,7 +64,7 @@
         <div class="health-grid" id="health-grid"></div>
 
         <h2 class="section-label">Coming up</h2>
-        <ul class="plain-list" id="coming-up"></ul>
+        <div id="coming-up-wrap"><ul class="plain-list" id="coming-up"></ul></div>
 
         <h2 class="section-label">LEVIII's read</h2>
         <div class="card ai-read">
@@ -179,12 +179,28 @@
           freshnessHtml(h.freshness);
         health.appendChild(tile);
       });
+      var upWrap = document.getElementById("coming-up-wrap");
       var up = document.getElementById("coming-up");
-      D.home.comingUp.forEach(function (line) {
+      D.home.comingUp.slice(0, 3).forEach(function (line) {
         var li = document.createElement("li");
         li.textContent = line;
         up.appendChild(li);
       });
+      if (D.home.comingUp.length > 3) {
+        var sm = document.createElement("div");
+        sm.className = "see-more";
+        sm.innerHTML =
+          '<button type="button" class="see-more__toggle" data-see-more-toggle><span>See more</span><span class="see-more__chevron">▼</span></button><div class="see-more__body"></div>';
+        var ul2 = document.createElement("ul");
+        ul2.className = "plain-list";
+        D.home.comingUp.slice(3).forEach(function (line) {
+          var li = document.createElement("li");
+          li.textContent = line;
+          ul2.appendChild(li);
+        });
+        sm.querySelector(".see-more__body").appendChild(ul2);
+        upWrap.appendChild(sm);
+      }
       var cl = document.getElementById("day1-checklist");
       D.home.day1.checklist.forEach(function (line) {
         var li = document.createElement("li");

@@ -246,6 +246,39 @@
     });
   }
 
+  function initSeeMore() {
+    document.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-see-more-toggle]");
+      if (!btn) return;
+      var wrap = btn.closest(".see-more");
+      if (wrap) wrap.classList.toggle("is-open");
+    });
+  }
+
+  /** Render up to `limit` items; remainder inside a collapsed See more block. */
+  function appendWithSeeMore(container, items, renderItem, limit) {
+    var cap = limit == null ? 3 : limit;
+    items.slice(0, cap).forEach(function (item) {
+      renderItem(item, container);
+    });
+    if (items.length <= cap) return;
+    var sm = document.createElement("div");
+    sm.className = "see-more";
+    sm.innerHTML =
+      '<button type="button" class="see-more__toggle" data-see-more-toggle>' +
+      '<span>See more</span><span class="see-more__chevron" aria-hidden="true">▼</span></button>' +
+      '<div class="see-more__body"></div>';
+    var body = sm.querySelector(".see-more__body");
+    items.slice(cap).forEach(function (item) {
+      renderItem(item, body);
+    });
+    container.appendChild(sm);
+  }
+
+  window.LEVIII_UI = {
+    appendWithSeeMore: appendWithSeeMore,
+  };
+
   function initHomeDayToggle() {
     var toggle = document.getElementById("day-toggle");
     if (!toggle) return;
@@ -381,6 +414,7 @@
     initReportTabs();
     initSettingsSave();
     initCollapsible();
+    initSeeMore();
     initHomeDayToggle();
     initAsk();
     initPriceApprove();

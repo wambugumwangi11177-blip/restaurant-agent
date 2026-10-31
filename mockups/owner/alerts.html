@@ -56,12 +56,12 @@
       var D = window.LEVIII_DATA;
       function render(id, items, urgent) {
         var root = document.getElementById(id);
-        items.forEach(function (text) {
+        window.LEVIII_UI.appendWithSeeMore(root, items, function (text, parent) {
           var div = document.createElement("div");
           div.className = "alert-item" + (urgent ? " alert-item--urgent" : "");
           div.innerHTML = '<span class="alert-item__shape"></span><span>' + text + '</span>';
-          root.appendChild(div);
-        });
+          parent.appendChild(div);
+        }, 3);
       }
       render("alerts-urgent", D.alerts.needsYou, true);
       render("alerts-today", D.alerts.today, false);

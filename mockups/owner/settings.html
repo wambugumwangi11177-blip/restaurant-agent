@@ -18,12 +18,27 @@
       </div>
     </header>
     <main class="page-content">
-      <h2 class="section-label" style="margin-top:0">Permits</h2>
+      <section class="card area-summary">
+        <p class="section-label" style="margin-top:0" data-bind="settings.tillConnection.headline"></p>
+        <p class="card__number" style="font-size:1.125rem" data-bind="settings.tillConnection.status"></p>
+        <span class="status-word status-word--fine"><span class="status-word__shape"></span> <span data-bind="settings.tillConnection.statusWord"></span></span>
+        <p class="freshness-line" data-bind="settings.tillConnection.lastSale"></p>
+        <p class="freshness-line" data-bind="settings.tillConnection.costsThrough"></p>
+      </section>
+
+      <h2 class="section-label">Permits</h2>
       <div class="card" id="permits-list"></div>
 
-      <h2 class="section-label">Your numbers</h2>
-      <div class="card" id="settings-fields"></div>
-      <p class="saved-line" id="settings-saved"></p>
+      <div class="see-more">
+        <button type="button" class="see-more__toggle" data-see-more-toggle>
+          <span>See more</span><span class="see-more__chevron" aria-hidden="true">▼</span>
+        </button>
+        <div class="see-more__body">
+          <h2 class="section-label">Your numbers</h2>
+          <div class="card" id="settings-fields"></div>
+          <p class="saved-line" id="settings-saved"></p>
+        </div>
+      </div>
     </main>
     <nav class="nav-pill" aria-label="Main">
       <a href="home.html" class="nav-pill__item" data-nav="home"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/></svg></span><span class="nav-pill__label">Home</span></a>
@@ -39,7 +54,7 @@
     (function () {
       var S = window.LEVIII_DATA.settings;
       var pl = document.getElementById("permits-list");
-      S.permits.forEach(function (p) {
+      S.permits.slice(0, 3).forEach(function (p) {
         var cls = p.status === "Check" ? "check" : "fine";
         var row = document.createElement("div");
         row.className = "row";

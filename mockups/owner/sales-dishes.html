@@ -18,18 +18,12 @@
       </div>
     </header>
     <main class="page-content">
-      <h2 class="section-label" style="margin-top:0">Sales today</h2>
-      <div class="card">
-        <div class="chart-wrap">
-          <svg viewBox="0 0 320 100" role="img" aria-label="Today versus usual weekday range">
-            <rect x="40" y="30" width="240" height="40" fill="#e0e0e0" rx="4"/>
-            <polyline fill="none" stroke="#000" stroke-width="2" points="40,55 120,48 200,42 280,38"/>
-            <text x="40" y="22" font-size="10">Usual weekday band</text>
-          </svg>
-        </div>
-        <p class="chart-caption">Today <span data-bind="sales.salesToday" data-format="kes"></span> versus usual weekday range.</p>
+      <section class="card area-summary">
+        <p class="section-label" style="margin-top:0">Sales today</p>
+        <p class="card__number" data-bind="sales.salesToday" data-format="kes"></p>
+        <span class="status-word status-word--fine"><span class="status-word__shape"></span> <span data-bind="sales.salesStatus"></span></span>
         <p class="freshness-line">Updated just now</p>
-      </div>
+      </section>
 
       <h2 class="section-label">Your dishes in four groups</h2>
       <div class="dish-grid" id="dish-grid"></div>
@@ -37,24 +31,39 @@
       <h2 class="section-label">Price ideas</h2>
       <div id="price-ideas"></div>
 
-      <h2 class="section-label">Combo idea</h2>
-      <div class="card">
-        <p class="card__sentence" id="combo-text"></p>
-        <p class="freshness-line">Updated just now</p>
-      </div>
-
-      <h2 class="section-label">Delivery</h2>
-      <div class="card" id="delivery-card"></div>
-
-      <h2 class="section-label">Best and weakest hours</h2>
-      <div class="card" id="hours-bars"></div>
-
-      <h2 class="section-label">Try before you change</h2>
-      <div class="card simulator">
-        <p>Pilau price change (%)</p>
-        <input type="range" id="pilau-slider" min="-10" max="15" value="5" step="1">
-        <p class="simulator-result" id="pilau-result"></p>
-        <p class="freshness-line">Based on: customers react by about 0.7 for each 1 percent</p>
+      <div class="see-more">
+        <button type="button" class="see-more__toggle" data-see-more-toggle>
+          <span>See more</span><span class="see-more__chevron" aria-hidden="true">▼</span>
+        </button>
+        <div class="see-more__body">
+          <div class="see-more">
+            <button type="button" class="see-more__toggle" data-see-more-toggle>
+              <span>Next 7 days</span><span class="see-more__chevron" aria-hidden="true">▼</span>
+            </button>
+            <div class="see-more__body card">
+              <p class="card__sentence" id="next-7-range"></p>
+              <p class="freshness-line" data-bind="sales.next7Days.note"></p>
+            </div>
+          </div>
+          <div class="see-more">
+            <button type="button" class="see-more__toggle" data-see-more-toggle>
+              <span>Dishes ranked by KES earned</span><span class="see-more__chevron" aria-hidden="true">▼</span>
+            </button>
+            <div class="see-more__body card" id="dishes-by-kes"></div>
+          </div>
+          <h2 class="section-label">Combo idea</h2>
+          <div class="card"><p class="card__sentence" id="combo-text"></p></div>
+          <h2 class="section-label">Delivery</h2>
+          <div class="card" id="delivery-card"></div>
+          <h2 class="section-label">Best and weakest hours</h2>
+          <div class="card" id="hours-bars"></div>
+          <h2 class="section-label">Try before you change</h2>
+          <div class="card simulator">
+            <p>Pilau price change (%)</p>
+            <input type="range" id="pilau-slider" min="-10" max="15" value="5" step="1">
+            <p class="simulator-result" id="pilau-result"></p>
+          </div>
+        </div>
       </div>
     </main>
     <nav class="nav-pill" aria-label="Main">
@@ -78,11 +87,20 @@
   <script>
     (function () {
       var D = window.LEVIII_DATA;
+      var n7 = D.sales.next7Days;
+      document.getElementById("next-7-range").textContent =
+        "Expect between " + D.formatKES(n7.low) + " and " + D.formatKES(n7.high) + " in sales.";
+      var dk = document.getElementById("dishes-by-kes");
+      D.sales.dishesByKes.forEach(function (row) {
+        var div = document.createElement("div");
+        div.className = "row";
+        div.innerHTML = '<span class="row__label">' + row.dish + '</span><span class="row__value">' + D.formatKES(row.kes) + '</span>';
+        dk.appendChild(div);
+      });
       var groups = [
         { key: "best", title: "Best dishes", action: D.sales.dishActions.best },
         { key: "popularLow", title: "Popular but earns little", action: D.sales.dishActions.popularLow },
         { key: "earnsFew", title: "Earns well but few order it", action: D.sales.dishActions.earnsFew },
-        { key: "considerRemove", title: "Consider removing", action: D.sales.dishActions.considerRemove },
       ];
       var grid = document.getElementById("dish-grid");
       groups.forEach(function (g) {
@@ -92,24 +110,20 @@
         btn.setAttribute("data-dish-group", g.key);
         btn.setAttribute("data-dish-action", g.action);
         var ul = "<ul>";
-        D.sales.dishes[g.key].forEach(function (d) { ul += "<li>" + d + "</li>"; });
+        D.sales.dishes[g.key].slice(0, 3).forEach(function (d) { ul += "<li>" + d + "</li>"; });
         ul += "</ul>";
         btn.innerHTML = '<div class="dish-box__title">' + g.title + "</div>" + ul;
         grid.appendChild(btn);
       });
       var ideas = document.getElementById("price-ideas");
-      D.sales.priceIdeas.forEach(function (idea) {
+      D.sales.priceIdeas.slice(0, 3).forEach(function (idea) {
         var card = document.createElement("article");
         card.className = "card";
         var num = idea.amount ? D.formatKES(idea.amount) + " a month" : "";
         card.innerHTML =
           '<p class="card__sentence">' + idea.sentence + '</p>' +
           (num ? '<p class="card__number">' + num + '</p>' : '') +
-          '<p class="freshness-line">' + idea.freshness + '</p>' +
-          '<div class="card__actions"><button type="button" class="button" data-price-approve>Approve</button>' +
-          '<button type="button" class="why-link" data-why data-why-body="' + idea.why + '">Why?</button></div>' +
-          '<div class="card__meta-actions"><button type="button" data-later-card>Later</button><button type="button" data-dismiss-card>Dismiss</button></div>' +
-          '<p class="freshness-line hidden" data-till-note>Change this price in your till. LEVIII never changes your till.</p>';
+          '<div class="card__actions"><button type="button" class="button" data-price-approve>Approve</button></div>';
         ideas.appendChild(card);
       });
       var c = D.sales.combo;
@@ -117,16 +131,14 @@
         c.title + " at " + D.formatKES(c.price) + " instead of " + D.formatKES(c.was) + ", margin " + c.margin + "%.";
       var del = D.sales.delivery;
       document.getElementById("delivery-card").innerHTML =
-        '<p class="card__sentence">' + del.item + " at " + D.formatKES(del.price) + " earns " + D.formatKES(del.restaurant) + " in the restaurant and " + D.formatKES(del.delivery) + " on delivery.</p>" +
-        '<div class="bar-h"><span>In restaurant</span><div class="bar-h__track"><div class="bar-h__fill" style="width:' + Math.round(del.restaurant / del.price * 100) + '%"></div></div></div>' +
-        '<div class="bar-h"><span>Delivery</span><div class="bar-h__track"><div class="bar-h__fill" style="width:' + Math.round(del.delivery / del.price * 100) + '%"></div></div></div>' +
-        '<p class="freshness-line">Updated just now</p>';
+        '<p class="card__sentence">' + del.item + " at " + D.formatKES(del.price) + " earns " + D.formatKES(del.restaurant) + " in the restaurant and " + D.formatKES(del.delivery) + " on delivery.</p>";
       var hb = document.getElementById("hours-bars");
       D.sales.hours.forEach(function (h) {
-        var label = h.name + (h.weakest ? " (weakest)" : "");
-        hb.innerHTML += '<div class="bar-h"><span>' + label + '</span><div class="bar-h__track"><div class="bar-h__fill" style="width:' + h.pct + '%"></div></div><span>' + h.pct + '%</span></div>';
+        var div = document.createElement("div");
+        div.className = "bar-h";
+        div.innerHTML = '<span>' + h.name + '</span><div class="bar-h__track"><div class="bar-h__fill" style="width:' + h.pct + '%"></div></div><span>' + h.pct + '%</span>';
+        hb.appendChild(div);
       });
-      hb.innerHTML += '<p class="freshness-line">Updated just now</p>';
     })();
   </script>
 </body>

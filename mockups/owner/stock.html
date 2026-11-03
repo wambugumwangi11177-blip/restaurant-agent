@@ -165,22 +165,24 @@
         });
       });
 
+      var missingWhyLines = [
+        "Store had 10 kg. 6 kg went to the kitchen. The chef confirmed the handover, so 4 kg should be left.",
+        "The shift-close count found 2 kg. That gap is something to check, not proof anyone did wrong.",
+      ];
       D.stock.missing.forEach(function (m) {
         var card = document.createElement("article");
         card.className = "card stock-gap-card";
         card.innerHTML =
           '<p class="card__sentence">' +
           m.headline +
+          ", " +
+          m.meta.replace(" · ", ", ").replace("Storekeeper ", "").replace("Chef ", "") +
           "</p>" +
-          '<p class="stock-gap-card__meta">' +
-          m.meta +
-          "</p>" +
-          '<div class="photo-placeholder" role="img" aria-label="Handover photo">Handover photo</div>' +
           '<button type="button" class="why-link">Why?</button>' +
           '<p class="stock-gap-card__note">' +
           m.recipeNote +
           "</p>";
-        bindWhy(card.querySelector(".why-link"), m.whyTitle, m.whyLines, null);
+        bindWhy(card.querySelector(".why-link"), m.whyTitle, missingWhyLines, null);
         document.getElementById("missing-stock").appendChild(card);
       });
 
@@ -211,8 +213,7 @@
           s.reason +
           " · " +
           s.loggedBy +
-          "</p>" +
-          (s.photo ? '<div class="photo-placeholder" role="img" aria-label="Waste photo">Waste photo</div>' : "");
+          "</p>";
         sp.appendChild(block);
       });
     })();

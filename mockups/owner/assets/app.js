@@ -156,12 +156,28 @@
   function initStockApprove() {
     document.addEventListener("click", function (e) {
       var btn = e.target.closest("[data-approve-order]");
-      if (!btn || btn.classList.contains("is-done")) return;
+      if (!btn || btn.disabled) return;
+      var card = btn.closest(".stock-order-card");
+      if (card) {
+        card.classList.add("is-sent");
+        var actions = card.querySelector(".stock-order-card__actions");
+        if (actions) actions.classList.add("hidden");
+        var status = card.querySelector(".stock-order-card__status");
+        if (status) status.classList.remove("hidden");
+        return;
+      }
+      if (btn.classList.contains("is-done")) return;
       btn.textContent = "Approved";
       btn.classList.add("is-done");
       btn.disabled = true;
       var send = btn.parentElement.querySelector("[data-send-supplier]");
       if (send) send.classList.remove("hidden");
+    });
+    document.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-order-not-now]");
+      if (!btn) return;
+      var card = btn.closest(".stock-order-card");
+      if (card) card.classList.add("hidden");
     });
   }
 

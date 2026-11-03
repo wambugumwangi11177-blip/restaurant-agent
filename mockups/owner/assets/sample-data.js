@@ -175,83 +175,92 @@ window.LEVIII_DATA = {
   },
 
   stock: {
-    recipeStrip: "Based on 42 of 60 dishes. Dishes without a recipe are not included.",
+    recipeStrip: "Reorder tips use 42 of 60 dishes at Eleven. Dishes without a recipe are not included yet.",
     toOrder: [
       {
         id: "chicken",
-        item: "Chicken quarters",
-        qty: "48",
+        headline: "Chicken: order 12 kg today",
         supplier: "Kenchic",
         cost: 8640,
-        neededBy: "Friday",
-      },
-      {
-        id: "beef",
-        item: "Beef",
-        qty: "11 kg",
-        supplier: "Butcher, Kiambu",
-        cost: 7150,
-        neededBy: "Saturday",
+        confidence: "Based on 28 days of data",
+        whyTitle: "Why order 12 kg of chicken?",
+        whyLines: [
+          "Here's what we see in your numbers: 4 kg left (storekeeper's count, Mon 6pm). Over the last 4 weeks you sold about 6 kg a day (from your till sales and the chicken recipes), more on Fri and Sat.",
+          "Your supplier usually delivers in 1 day. Chicken in the fridge keeps about 2 days, so we suggest 12 kg, not more, to avoid waste.",
+        ],
+        approveNote:
+          "When you approve, this goes to your storekeeper. They place the order with Kenchic, mark it received when it arrives and enter the amounts, then you'll see it here as done.",
       },
       {
         id: "tomatoes",
-        item: "Tomatoes",
-        qty: "7 kg",
-        supplier: "Market (cash run)",
+        headline: "Tomatoes: order 7 kg for Saturday",
+        supplier: "City Market (cash run)",
         cost: 2100,
-        neededBy: "Saturday",
+        confidence: "Based on 21 days of data",
+        whyTitle: "Why order 7 kg of tomatoes?",
+        whyLines: [
+          "You have about 3 kg left (counted today). Pilau and kachumbari use roughly 8 kg on a busy Saturday at Eleven.",
+          "Market runs usually same-day. We rounded down a little so extras don't spoil in the heat.",
+        ],
+        approveNote:
+          "When you approve, this goes to your storekeeper. They buy at the market, enter what they paid, and you'll see it marked done here.",
       },
     ],
-    runningLow: [
-      { item: "Chicken quarters", daysLeft: 2, status: "Low" },
-      { item: "Cooking oil", daysLeft: 5, status: "Fine" },
-      { item: "Rice", daysLeft: 8, status: "Fine" },
+    runningLowCritical: [
+      { item: "Chicken quarters", qty: "4 kg", location: "Fridge", daysLeft: 1, status: "Low" },
+      { item: "Cooking oil", qty: "6 L", location: "Dry store", daysLeft: 3, status: "Low" },
+      { item: "Rice", qty: "18 kg", location: "Dry store", daysLeft: 4, status: "Watch" },
     ],
-    chickenChartCaption: "Shelf level for chicken quarters with reorder and full-shelf lines",
-    missingStock: [
+    fullStockList: [
+      { item: "Chicken quarters", qty: "4 kg", location: "Fridge", expiry: "Wed" },
+      { item: "Beef stew meat", qty: "11 kg", location: "Freezer", expiry: "Dec" },
+      { item: "Cooking oil", qty: "6 L", location: "Dry store", expiry: "—" },
+      { item: "Rice", qty: "18 kg", location: "Dry store", expiry: "—" },
+      { item: "Milk", qty: "6 L", location: "Fridge", expiry: "Tomorrow" },
+      { item: "Tomatoes", qty: "3 kg", location: "Fridge", expiry: "Thu" },
+      { item: "Onions", qty: "12 kg", location: "Dry store", expiry: "—" },
+      { item: "Lettuce", qty: "2 heads", location: "Fridge", expiry: "Today" },
+    ],
+    missing: [
       {
-        item: "Beef",
-        gap: "10 kg",
-        kes: 6500,
-        store: "40 kg",
-        kitchen: "40 kg",
-        initiatedBy: "Jack (Storekeeper)",
-        note: "The 10 kg gap is in the kitchen, check portions and waste first.",
-      },
-      {
-        item: "Tomatoes",
-        gap: "2 kg",
-        kes: 600,
-        store: "40 kg",
-        kitchen: "38 kg",
-        initiatedBy: "Jack (Storekeeper)",
-        confirmedBy: "Kitchen count",
-        transferStatus: "Handover doesn't match",
-        handover: true,
-        note: "Store sent 40 kg; kitchen blind count confirmed 38 kg. A gap is something to check, not proof of wrongdoing.",
+        headline: "Chicken: 2 kg not accounted for",
+        meta: "Handover Mon 4pm · Storekeeper Jane to Chef Otieno",
+        whyTitle: "Why does 2 kg not add up?",
+        whyLines: [
+          "Store had 10 kg. 6 kg went to the kitchen (confirmed by the chef's PIN plus a handover photo of both of them with the items), so 4 kg should be left.",
+          "The shift-close count found 2 kg. That gap is something to check, not proof anyone did wrong.",
+        ],
+        recipeNote:
+          "Once recipes are set for your dishes, we also compare what the kitchen received with what your till says you sold.",
       },
     ],
     missingCaption: "A gap is not proof of anything. It tells you where to look.",
-    spoiled: [
-      { item: "Lettuce", kes: 800 },
-      { item: "Bread rolls", kes: 450 },
+    goingOffSoon: [
+      {
+        headline: "Milk: 6 L, Fridge, expires tomorrow",
+        whyTitle: "Why we flag this milk",
+        whyLines: [
+          "The expiry date came from Jane when she logged the delivery on Saturday.",
+          "Shelf-life guide (you can change these in settings): Milk, opened: about 3 days in the fridge. Raw chicken: about 2 days in the fridge, about 3 months frozen.",
+        ],
+      },
+      {
+        headline: "Lettuce: 2 heads, Fridge, use today",
+        whyTitle: "Why we flag this lettuce",
+        whyLines: [
+          "Jane marked these as best before today when they came in from Wakulima on Monday.",
+          "Shelf-life guide: Leafy greens: about 2–3 days chilled. Use or cook today to avoid waste.",
+        ],
+      },
     ],
-    suppliers: [
-      { name: "Kenchic", short: "1 short delivery this month", price: "Prices up 3% on wings" },
-      { name: "Butcher, Kiambu", short: "No short deliveries", price: "Beef price down 2%" },
-      { name: "Metro Gas", short: "On time", price: "Gas up 8%" },
-    ],
-    stockValue: 284000,
-    slowMovers: ["Lamb stew", "Veg curry", "Spaghetti"],
-    prep: {
-      day: "Saturday",
-      plates: [
-        { dish: "Pilau", qty: "90 plates" },
-        { dish: "Quarter chicken", qty: "60 plates" },
-        { dish: "Beef stew", qty: "45 plates" },
+    spoiledWeek: {
+      total: 1250,
+      entries: [
+        { item: "Lettuce", kes: 800, reason: "Wilted before service", loggedBy: "Jane (storekeeper)", photo: true },
+        { item: "Bread rolls", kes: 450, reason: "Stale after slow lunch", loggedBy: "Chef Otieno", photo: true },
       ],
-      market: ["Tomatoes 7 kg", "Onions 5 kg", "Coriander 2 bunches"],
     },
+    stockValue: 284000,
     freshness: "Updated just now",
   },
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Store & Suppliers — LEVIII Owner</title>
+  <title>Stock — LEVIII Owner</title>
   <link rel="stylesheet" href="assets/styles.css">
 </head>
 <body data-page="stock">
@@ -24,50 +24,29 @@
 
       <h2 class="section-label">Running low</h2>
       <div class="card" id="running-low"></div>
+      <button type="button" class="link-btn" id="see-all-stock">See all stock</button>
 
-      <h2 class="section-label">Missing stock</h2>
+      <h2 class="section-label">Missing</h2>
       <p class="caption" data-bind="stock.missingCaption"></p>
       <div id="missing-stock"></div>
 
-      <h2 class="section-label">Spoiled and wasted this week</h2>
-      <div class="card" id="spoiled-list"></div>
+      <h2 class="section-label">Going off soon</h2>
+      <div class="card" id="going-off-soon"></div>
+
+      <div class="see-more">
+        <button type="button" class="see-more__toggle" data-see-more-toggle>
+          <span>Spoiled and wasted this week · <span id="spoiled-total-label"></span></span>
+          <span class="see-more__chevron" aria-hidden="true">▼</span>
+        </button>
+        <div class="see-more__body">
+          <div class="card" id="spoiled-list"></div>
+        </div>
+      </div>
 
       <h2 class="section-label">Stock value</h2>
       <div class="card card-hero">
         <p class="card__number" data-bind="stock.stockValue" data-format="kes"></p>
         <p class="freshness-line" data-bind="stock.freshness"></p>
-      </div>
-
-      <div class="see-more">
-        <button type="button" class="see-more__toggle" data-see-more-toggle>
-          <span>See more</span><span class="see-more__chevron" aria-hidden="true">▼</span>
-        </button>
-        <div class="see-more__body">
-          <p class="hero-line">Slow movers</p>
-          <ul id="slow-movers" class="card" style="list-style:disc;padding:var(--space-3) var(--space-4);margin:0 0 var(--space-3)"></ul>
-          <div class="card">
-            <div class="chart-wrap">
-              <svg viewBox="0 0 320 100" role="img" aria-label="Chicken quarters on shelf">
-                <line x1="20" y1="25" x2="300" y2="25" stroke="#000" stroke-dasharray="4 3"/>
-                <line x1="20" y1="45" x2="300" y2="45" stroke="#757575" stroke-dasharray="4 3"/>
-                <polyline fill="none" stroke="#000" stroke-width="2" points="20,70 60,65 100,58 140,50 180,42 220,38 260,35"/>
-                <text x="22" y="22" font-size="9">Full shelf</text>
-                <text x="22" y="42" font-size="9">Reorder</text>
-              </svg>
-            </div>
-            <p class="chart-caption" data-bind="stock.chickenChartCaption"></p>
-          </div>
-          <h2 class="section-label">Suppliers</h2>
-          <div class="card" id="supplier-scores"></div>
-          <h2 class="section-label">Tomorrow's prep</h2>
-          <div class="collapsible">
-            <button type="button" class="collapsible__head" data-collapsible>
-              <span>Prep and market list for <span data-bind="stock.prep.day"></span></span>
-              <span aria-hidden="true">▼</span>
-            </button>
-            <div class="collapsible__body" id="prep-body"></div>
-          </div>
-        </div>
       </div>
     </main>
     <nav class="nav-pill" aria-label="Main">
@@ -92,65 +71,150 @@
     (function () {
       var D = window.LEVIII_DATA;
       var UI = window.LEVIII_UI;
-      var orderRoot = document.getElementById("to-order-list");
-      function renderOrder(o, parent) {
-        var row = document.createElement("div");
-        row.className = "order-row";
-        row.innerHTML =
-          '<div><strong>' + o.item + '</strong> ' + o.qty + '<br>' + o.supplier + ' · ' + D.formatKES(o.cost) + ' · needed by ' + o.neededBy + '</div>' +
-          '<div class="order-row__actions"><button type="button" class="button" data-approve-order>Approve</button>' +
-          '<button type="button" class="button button-outline hidden" data-send-supplier>Send to supplier</button></div>';
-        parent.appendChild(row);
+
+      function whyHtml(lines, confidence) {
+        var html = lines.map(function (line) {
+          return "<p>" + line + "</p>";
+        }).join("");
+        if (confidence) {
+          html += '<p class="freshness-line">' + confidence + "</p>";
+        }
+        return html;
       }
-      UI.appendWithSeeMore(orderRoot, D.stock.toOrder, renderOrder, 2);
+
+      function bindWhy(btn, title, lines, confidence) {
+        btn.setAttribute("data-why", "");
+        btn.setAttribute("data-why-title", title);
+        btn.setAttribute("data-why-body", lines.join("\n\n") + (confidence ? "\n\n" + confidence : ""));
+      }
+
+      var orderRoot = document.getElementById("to-order-list");
+      D.stock.toOrder.forEach(function (o) {
+        var block = document.createElement("div");
+        block.className = "stock-order-card";
+        block.innerHTML =
+          '<p class="stock-order-card__headline">' + o.headline + "</p>" +
+          '<p class="stock-order-card__meta">' + o.supplier + " · " + D.formatKES(o.cost) + "</p>" +
+          '<button type="button" class="why-link">Why?</button>' +
+          '<p class="stock-order-card__note">' + o.approveNote + "</p>" +
+          '<div class="stock-order-card__actions">' +
+          '<button type="button" class="button" data-approve-order>Approve</button>' +
+          '<button type="button" class="button button-outline" data-order-not-now>Not now</button>' +
+          "</div>" +
+          '<p class="stock-order-card__confidence">' + o.confidence + "</p>" +
+          '<div class="stock-order-card__status hidden">' +
+          '<span class="status-word status-word--check"><span class="status-word__shape"></span>Sent to storekeeper</span>' +
+          "</div>";
+        bindWhy(block.querySelector(".why-link"), o.whyTitle, o.whyLines, o.confidence);
+        orderRoot.appendChild(block);
+      });
+
       var low = document.getElementById("running-low");
-      D.stock.runningLow.slice(0, 3).forEach(function (item) {
+      D.stock.runningLowCritical.slice(0, 3).forEach(function (item) {
         var cls = item.status === "Low" ? "low" : "fine";
         var row = document.createElement("div");
         row.className = "row";
-        row.innerHTML = '<span class="row__label">' + item.item + ' · ' + item.daysLeft + ' days left</span>' +
-          '<span class="status-word status-word--' + cls + '"><span class="status-word__shape"></span>' + item.status + '</span>';
+        row.innerHTML =
+          '<span class="row__label">' +
+          item.item +
+          " · " +
+          item.qty +
+          " · " +
+          item.location +
+          " · " +
+          item.daysLeft +
+          " days left</span>" +
+          '<span class="status-word status-word--' +
+          cls +
+          '"><span class="status-word__shape"></span>' +
+          item.status +
+          "</span>";
         low.appendChild(row);
       });
-      function renderMissing(m, parent) {
+
+      document.getElementById("see-all-stock").addEventListener("click", function () {
+        var html =
+          '<label class="caption" for="stock-search">Search</label>' +
+          '<input type="search" id="stock-search" class="stock-list-search" placeholder="Search items" autocomplete="off">' +
+          '<div id="stock-sheet-list"></div>';
+        UI.openSheet("All stock at Eleven", html);
+        var listEl = document.querySelector("#sheet-overlay #stock-sheet-list");
+        var search = document.querySelector("#sheet-overlay #stock-search");
+        function renderList(filter) {
+          var q = (filter || "").trim().toLowerCase();
+          listEl.innerHTML = "";
+          D.stock.fullStockList.forEach(function (row) {
+            if (q && row.item.toLowerCase().indexOf(q) === -1) return;
+            var div = document.createElement("div");
+            div.className = "stock-list-row";
+            div.innerHTML =
+              "<div><strong>" +
+              row.item +
+              '</strong><div class="stock-list-row__meta">' +
+              row.location +
+              (row.expiry && row.expiry !== "—" ? " · Expires " + row.expiry : "") +
+              "</div></div><span>" +
+              row.qty +
+              "</span>";
+            listEl.appendChild(div);
+          });
+        }
+        renderList("");
+        search.addEventListener("input", function () {
+          renderList(search.value);
+        });
+      });
+
+      D.stock.missing.forEach(function (m) {
         var card = document.createElement("article");
-        card.className = "card";
+        card.className = "card stock-gap-card";
         card.innerHTML =
-          '<p class="card__sentence">Missing stock: ' + m.item + '.</p>' +
-          '<p class="card__number">' + m.gap + ', about ' + D.formatKES(m.kes) + '</p>' +
-          '<p style="font-size:0.875rem">Store sent ' + m.store + '. Kitchen confirmed ' + m.kitchen + '.</p>' +
-          (m.handover ? '<p class="status-word status-word--check"><span class="status-word__shape"></span> ' + (m.transferStatus || "Handover doesn't match") + '</p>' : '') +
-          '<button type="button" class="button">Check this</button>';
-        parent.appendChild(card);
-      }
-      UI.appendWithSeeMore(document.getElementById("missing-stock"), D.stock.missingStock, renderMissing, 1);
+          '<p class="card__sentence">' +
+          m.headline +
+          "</p>" +
+          '<p class="stock-gap-card__meta">' +
+          m.meta +
+          "</p>" +
+          '<div class="photo-placeholder" role="img" aria-label="Handover photo">Handover photo</div>' +
+          '<button type="button" class="why-link">Why?</button>' +
+          '<p class="stock-gap-card__note">' +
+          m.recipeNote +
+          "</p>";
+        bindWhy(card.querySelector(".why-link"), m.whyTitle, m.whyLines, null);
+        document.getElementById("missing-stock").appendChild(card);
+      });
+
+      var expiryRoot = document.getElementById("going-off-soon");
+      D.stock.goingOffSoon.forEach(function (item) {
+        var row = document.createElement("div");
+        row.className = "stock-expiry-row";
+        row.innerHTML =
+          '<p class="stock-expiry-row__headline">' +
+          item.headline +
+          '</p><button type="button" class="why-link">Why?</button>';
+        bindWhy(row.querySelector(".why-link"), item.whyTitle, item.whyLines, null);
+        expiryRoot.appendChild(row);
+      });
+
+      document.getElementById("spoiled-total-label").textContent = D.formatKES(D.stock.spoiledWeek.total);
       var sp = document.getElementById("spoiled-list");
-      D.stock.spoiled.forEach(function (s) {
-        var row = document.createElement("div");
-        row.className = "row";
-        row.innerHTML = '<span class="row__label">' + s.item + '</span><span class="row__value">' + D.formatKES(s.kes) + '</span>';
-        sp.appendChild(row);
+      D.stock.spoiledWeek.entries.forEach(function (s) {
+        var block = document.createElement("div");
+        block.className = "spoiled-entry";
+        block.innerHTML =
+          '<div class="row"><span class="row__label"><strong>' +
+          s.item +
+          '</strong></span><span class="row__value">' +
+          D.formatKES(s.kes) +
+          "</span></div>" +
+          '<p class="spoiled-entry__reason">' +
+          s.reason +
+          " · " +
+          s.loggedBy +
+          "</p>" +
+          (s.photo ? '<div class="photo-placeholder" role="img" aria-label="Waste photo">Waste photo</div>' : "");
+        sp.appendChild(block);
       });
-      var sup = document.getElementById("supplier-scores");
-      D.stock.suppliers.forEach(function (s) {
-        var row = document.createElement("div");
-        row.className = "row";
-        row.innerHTML = '<span class="row__label"><strong>' + s.name + '</strong><br><span class="caption">' + s.short + ' · ' + s.price + '</span></span>';
-        sup.appendChild(row);
-      });
-      var sm = document.getElementById("slow-movers");
-      D.stock.slowMovers.slice(0, 3).forEach(function (name) {
-        var li = document.createElement("li");
-        li.textContent = name;
-        sm.appendChild(li);
-      });
-      var prep = document.getElementById("prep-body");
-      var html = "<p><strong>Prep</strong></p><ul>";
-      D.stock.prep.plates.forEach(function (p) { html += "<li>" + p.dish + ": " + p.qty + "</li>"; });
-      html += "</ul><p><strong>Market list</strong></p><ul>";
-      D.stock.prep.market.forEach(function (m) { html += "<li>" + m + "</li>"; });
-      html += "</ul>";
-      prep.innerHTML = html;
     })();
   </script>
 </body>

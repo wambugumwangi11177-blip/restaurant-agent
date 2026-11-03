@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LEVIII Owner mockups — index</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body data-page="">
+  <div class="dev-index">
+    <h1>LEVIII owner mockups</h1>
+    <p>Developer index — open any page:</p>
+    <ul>
+      <li><a href="home.html">Home</a></li>
+      <li><a href="money.html">Money (My Money)</a></li>
+      <li><a href="stock.html">Stock (Store &amp; Suppliers)</a></li>
+      <li><a href="ask.html">Ask LEVIII</a></li>
+      <li><a href="more.html">More</a></li>
+      <li><a href="sales-dishes.html">Sales &amp; Dishes</a></li>
+      <li><a href="cash-check.html">Cash Check</a></li>
+      <li><a href="staff.html">Staff</a></li>
+      <li><a href="settings.html">Permits &amp; Settings</a></li>
+      <li><a href="reports.html">Reports</a></li>
+      <li><a href="alerts.html">Alerts</a></li>
+    </ul>
+    <div class="card" style="margin-top:24px">
+      <p class="card__sentence">Test card for Why? sheet (Sprint 0).</p>
+      <p class="card__number" data-bind="home.salesToday" data-format="kes"></p>
+      <button type="button" class="why-link" data-why data-why-title="Why this number?" data-why-body="Today’s sales are what your till recorded as paid today.\nWe compare that with yesterday’s costs to show when you covered the day.">Why?</button>
+    </div>
+  </div>
+  <div id="sheet-overlay" class="sheet-overlay" aria-hidden="true">
+    <div class="sheet" role="dialog" aria-modal="true">
+      <div class="sheet__handle"></div>
+      <h2 class="sheet__title"></h2>
+      <div class="sheet__body"></div>
+      <button type="button" class="button button-block" data-sheet-close>Close</button>
+    </div>
+  </div>
+  <script src="assets/sample-data.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

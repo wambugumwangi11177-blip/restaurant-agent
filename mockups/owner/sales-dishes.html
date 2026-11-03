@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sales & Dishes — LEVIII Owner</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body data-page="more">
+  <div class="app-shell">
+    <header class="page-header">
+      <h1 class="page-header__title">Sales & Dishes</h1>
+      <div class="page-header__actions">
+        <a href="alerts.html" class="icon-btn" aria-label="Alerts">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 16v-5a6 6 0 10-12 0v5l-2 2h16l-2-2"/><path d="M10 20a2 2 0 004 0"/></svg>
+        </a>
+        <a href="settings.html" class="profile-circle" aria-label="Profile">E</a>
+      </div>
+    </header>
+    <main class="page-content">
+      <section class="card area-summary">
+        <p class="section-label" style="margin-top:0">Sales today</p>
+        <p class="card__number" data-bind="sales.salesToday" data-format="kes"></p>
+        <span class="status-word status-word--fine"><span class="status-word__shape"></span> <span data-bind="sales.salesStatus"></span></span>
+        <p class="freshness-line">Updated just now</p>
+      </section>
+
+      <h2 class="section-label">Your dishes in four groups</h2>
+      <div class="dish-grid" id="dish-grid"></div>
+
+      <h2 class="section-label">Price ideas</h2>
+      <div id="price-ideas"></div>
+
+      <div class="see-more">
+        <button type="button" class="see-more__toggle" data-see-more-toggle>
+          <span>See more</span><span class="see-more__chevron" aria-hidden="true">▼</span>
+        </button>
+        <div class="see-more__body">
+          <div class="see-more">
+            <button type="button" class="see-more__toggle" data-see-more-toggle>
+              <span>Next 7 days</span><span class="see-more__chevron" aria-hidden="true">▼</span>
+            </button>
+            <div class="see-more__body card">
+              <p class="card__sentence" id="next-7-range"></p>
+              <p class="freshness-line" data-bind="sales.next7Days.note"></p>
+            </div>
+          </div>
+          <div class="see-more">
+            <button type="button" class="see-more__toggle" data-see-more-toggle>
+              <span>Dishes ranked by KES earned</span><span class="see-more__chevron" aria-hidden="true">▼</span>
+            </button>
+            <div class="see-more__body card" id="dishes-by-kes"></div>
+          </div>
+          <h2 class="section-label">Combo idea</h2>
+          <div class="card"><p class="card__sentence" id="combo-text"></p></div>
+          <h2 class="section-label">Delivery</h2>
+          <div class="card" id="delivery-card"></div>
+          <h2 class="section-label">Best and weakest hours</h2>
+          <div class="card" id="hours-bars"></div>
+          <h2 class="section-label">Try before you change</h2>
+          <div class="card simulator">
+            <p>Pilau price change (%)</p>
+            <input type="range" id="pilau-slider" min="-10" max="15" value="5" step="1">
+            <p class="simulator-result" id="pilau-result"></p>
+          </div>
+        </div>
+      </div>
+    </main>
+    <nav class="nav-pill" aria-label="Main">
+      <a href="home.html" class="nav-pill__item" data-nav="home"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/></svg></span><span class="nav-pill__label">Home</span></a>
+      <a href="money.html" class="nav-pill__item" data-nav="money"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 10h4a2 2 0 110 4h-2"/></svg></span><span class="nav-pill__label">Money</span></a>
+      <a href="stock.html" class="nav-pill__item" data-nav="stock"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 8h16v12H4z"/><path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span><span class="nav-pill__label">Stock</span></a>
+      <a href="ask.html" class="nav-pill__item" data-nav="ask"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H7l-3 3V6z"/></svg></span><span class="nav-pill__label">Ask</span></a>
+      <a href="more.html" class="nav-pill__item" data-nav="more"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span><span class="nav-pill__label">More</span></a>
+    </nav>
+  </div>
+  <div id="sheet-overlay" class="sheet-overlay" aria-hidden="true">
+    <div class="sheet" role="dialog" aria-modal="true">
+      <div class="sheet__handle"></div>
+      <h2 class="sheet__title"></h2>
+      <div class="sheet__body"></div>
+      <button type="button" class="button button-block" data-sheet-close>Close</button>
+    </div>
+  </div>
+  <script src="assets/sample-data.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    (function () {
+      var D = window.LEVIII_DATA;
+      var n7 = D.sales.next7Days;
+      document.getElementById("next-7-range").textContent =
+        "Expect between " + D.formatKES(n7.low) + " and " + D.formatKES(n7.high) + " in sales.";
+      var dk = document.getElementById("dishes-by-kes");
+      D.sales.dishesByKes.forEach(function (row) {
+        var div = document.createElement("div");
+        div.className = "row";
+        div.innerHTML = '<span class="row__label">' + row.dish + '</span><span class="row__value">' + D.formatKES(row.kes) + '</span>';
+        dk.appendChild(div);
+      });
+      var groups = [
+        { key: "best", title: "Best dishes", action: D.sales.dishActions.best },
+        { key: "popularLow", title: "Popular but earns little", action: D.sales.dishActions.popularLow },
+        { key: "earnsFew", title: "Earns well but few order it", action: D.sales.dishActions.earnsFew },
+      ];
+      var grid = document.getElementById("dish-grid");
+      groups.forEach(function (g) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "dish-box";
+        btn.setAttribute("data-dish-group", g.key);
+        btn.setAttribute("data-dish-action", g.action);
+        var ul = "<ul>";
+        D.sales.dishes[g.key].slice(0, 3).forEach(function (d) { ul += "<li>" + d + "</li>"; });
+        ul += "</ul>";
+        btn.innerHTML = '<div class="dish-box__title">' + g.title + "</div>" + ul;
+        grid.appendChild(btn);
+      });
+      var ideas = document.getElementById("price-ideas");
+      D.sales.priceIdeas.slice(0, 3).forEach(function (idea) {
+        var card = document.createElement("article");
+        card.className = "card";
+        var num = idea.amount ? D.formatKES(idea.amount) + " a month" : "";
+        card.innerHTML =
+          '<p class="card__sentence">' + idea.sentence + '</p>' +
+          (num ? '<p class="card__number">' + num + '</p>' : '') +
+          '<div class="card__actions"><button type="button" class="button" data-price-approve>Approve</button></div>';
+        ideas.appendChild(card);
+      });
+      var c = D.sales.combo;
+      document.getElementById("combo-text").textContent =
+        c.title + " at " + D.formatKES(c.price) + " instead of " + D.formatKES(c.was) + ", margin " + c.margin + "%.";
+      var del = D.sales.delivery;
+      document.getElementById("delivery-card").innerHTML =
+        '<p class="card__sentence">' + del.item + " at " + D.formatKES(del.price) + " earns " + D.formatKES(del.restaurant) + " in the restaurant and " + D.formatKES(del.delivery) + " on delivery.</p>";
+      var hb = document.getElementById("hours-bars");
+      D.sales.hours.forEach(function (h) {
+        var div = document.createElement("div");
+        div.className = "bar-h";
+        div.innerHTML = '<span>' + h.name + '</span><div class="bar-h__track"><div class="bar-h__fill" style="width:' + h.pct + '%"></div></div><span>' + h.pct + '%</span>';
+        hb.appendChild(div);
+      });
+    })();
+  </script>
+</body>
+</html>

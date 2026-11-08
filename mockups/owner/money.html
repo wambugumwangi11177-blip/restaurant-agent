@@ -81,7 +81,10 @@
       </div>
 
       <h2 class="section-label">Bills coming up</h2>
-      <div class="card" id="bill-radar"></div>
+      <div class="card">
+        <div class="chart-wrap chart-dark" id="bill-radar-chart"></div>
+        <div id="bill-radar"></div>
+      </div>
       <div class="card">
         <p class="card__sentence" data-bind="money.billWarning.text"></p>
         <button type="button" class="button" data-why data-why-title="Why short?" data-why-body="Rent and electricity fall in the same week as a supplier prepayment.">See why</button>
@@ -93,6 +96,8 @@
           <span>See more</span><span class="see-more__chevron" aria-hidden="true">▼</span>
         </button>
         <div class="see-more__body">
+          <h2 class="section-label" style="margin-top:0">Food cost and prime cost targets</h2>
+          <div class="card" id="cost-target-dials"></div>
           <h2 class="section-label">Costs going up</h2>
           <div class="card">
             <p class="card__sentence" data-bind="money.costsGoingUp.label"></p>
@@ -127,6 +132,7 @@
     </div>
   </div>
   <script src="assets/sample-data.js"></script>
+  <script src="assets/owner-charts.js"></script>
   <script src="assets/app.js"></script>
   <script>
     (function () {
@@ -185,6 +191,17 @@
       document.getElementById("kes100-why").addEventListener("click", function () {
         UI.openSheet("Where each KES 100 goes", "<p>" + D.money.kes100Why + "</p>");
       });
+      if (window.OWNER_CHARTS && D.money.billRadarForecast) {
+        var br = D.money.billRadarForecast;
+        document.getElementById("bill-radar-chart").innerHTML = window.OWNER_CHARTS.billRadarSvg(br.cash, br.markers);
+      }
+      var dials = document.getElementById("cost-target-dials");
+      if (dials && window.OWNER_CHARTS && D.money.costTargets) {
+        var t = D.money.costTargets;
+        dials.innerHTML =
+          window.OWNER_CHARTS.targetDialSvg("Food cost", t.foodCost.value, t.foodCost.bandLo, t.foodCost.bandHi) +
+          window.OWNER_CHARTS.targetDialSvg("Prime cost", t.primeCost.value, t.primeCost.bandLo, t.primeCost.bandHi);
+      }
       var list = document.getElementById("bill-radar");
       window.LEVIII_UI.appendWithSeeMore(list, D.money.billRadar, function (b, parent) {
         var row = document.createElement("div");

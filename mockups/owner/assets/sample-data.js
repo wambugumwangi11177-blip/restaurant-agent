@@ -182,6 +182,17 @@ window.LEVIII_DATA = {
     ],
     kes100Why:
       "For every KES 100 of sales this month at Eleven: shares from your entered costs and wages, last 30 days of till sales. Pretty sure on ingredients and wages; running costs depend on bills entered through Tuesday.",
+    costTargets: {
+      foodCost: { value: 32, bandLo: 28, bandHi: 35 },
+      primeCost: { value: 57, bandLo: 55, bandHi: 62 },
+    },
+    billRadarForecast: {
+      cash: [128, 118, 105, 72, 68, 95, 110],
+      markers: [
+        { idx: 3, label: "Rent" },
+        { idx: 5, label: "Elec" },
+      ],
+    },
   },
 
   stock: {
@@ -195,6 +206,7 @@ window.LEVIII_DATA = {
         confidence: "Based on 28 days of data",
         whyTitle: "Why order 12 kg of chicken?",
         stockHistory: "You ordered chicken every Tuesday for 6 weeks; last count gap was 2 kg on 24 Oct.",
+        parChart: { points: [11, 9, 8, 7, 5, 4], par: 14, reorder: 6 },
         orderFlow: [
           { step: "Expected dishes", detail: "92 quarter chickens, 48 pilau (Fri–Sat)" },
           { step: "Ingredients needed", detail: "18 kg chicken" },
@@ -362,11 +374,14 @@ window.LEVIII_DATA = {
           "Gap: 2 kg",
         ],
         possibleCauses: [
-          "Stock used after the send but before close count",
-          "Portions a little over recipe",
-          "Spoilage not logged yet",
-          "Weighing or typing slip — worth a calm check, not an accusation",
+          "Waste",
+          "Recipe error",
+          "Staff meals",
+          "Trim",
+          "Count error",
+          "Theft?",
         ],
+        gapCompare: { actual: 2, expected: 4 },
         recipeNote:
           "Once recipes are set for your dishes, we also compare what the kitchen received with what your till says you sold.",
       },
@@ -515,6 +530,12 @@ window.LEVIII_DATA = {
     ],
     dishRankWhy:
       "KES earned = dish price × paid plates from your till this month. Popularity = share of all plates. Margin = price minus recipe cost (costs through Tuesday). Period: Oct 2026 at Eleven.",
+    quadrantDots: [
+      { label: "Nyama", pop: 85, margin: 72 },
+      { label: "Pilau", pop: 78, margin: 65 },
+      { label: "Chips", pop: 70, margin: 88 },
+      { label: "Veg", pop: 22, margin: 28 },
+    ],
   },
 
   cash: {

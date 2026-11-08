@@ -1747,6 +1747,57 @@ body[data-page="stock"] .section-label:first-child {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.guide-chart {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin: var(--space-2) auto;
+}
+
+.target-dial {
+  margin: var(--space-3) 0;
+}
+
+.target-dial__label {
+  font-size: 0.8125rem;
+  color: #fafafa;
+  margin: 0 0 var(--space-1);
+}
+
+.target-dial__track {
+  position: relative;
+  height: 10px;
+  margin: var(--space-2) 0;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+}
+
+.target-dial__band {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: rgba(253, 230, 138, 0.25);
+  border-radius: 5px;
+}
+
+.target-dial__fill {
+  position: relative;
+  height: 100%;
+  background: #e4e4e7;
+  border-radius: 5px;
+  max-width: 100%;
+}
+
+.target-dial__fill--ok {
+  background: #fafafa;
+}
+
+.target-dial__meta {
+  font-size: 0.75rem;
+  color: #a1a1aa;
+  margin: 0;
+}
+
 .stock-expiry-row {
   padding: var(--space-3) 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);

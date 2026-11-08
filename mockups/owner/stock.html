@@ -83,6 +83,7 @@
     </div>
   </div>
   <script src="assets/sample-data.js"></script>
+  <script src="assets/owner-charts.js"></script>
   <script src="assets/app.js"></script>
   <script>
     (function () {
@@ -130,6 +131,9 @@
 
       function openOrderWhy(o) {
         var html = "";
+        if (o.parChart && window.OWNER_CHARTS) {
+          html += '<div class="chart-wrap chart-dark">' + window.OWNER_CHARTS.stockParLineSvg(o.parChart) + "</div>";
+        }
         if (o.stockHistory) {
           html += '<p class="freshness-line">' + o.stockHistory + "</p>";
         }
@@ -149,9 +153,21 @@
           '<p class="proof-pin"><strong>' +
           m.pinProof +
           "</strong></p>";
+        if (m.gapCompare && window.OWNER_CHARTS) {
+          html +=
+            '<div class="chart-wrap chart-dark">' +
+            window.OWNER_CHARTS.gapCompareSvg(m.gapCompare.actual, m.gapCompare.expected) +
+            "</div>";
+        }
         m.whyLines.forEach(function (line) {
           html += "<p>" + line + "</p>";
         });
+        if (m.possibleCauses && window.OWNER_CHARTS) {
+          html +=
+            '<div class="chart-wrap chart-dark">' +
+            window.OWNER_CHARTS.gapCausesSvg(m.possibleCauses) +
+            "</div>";
+        }
         if (m.shortageSteps) {
           html += "<p><strong>How we calculated the gap</strong></p><ol class='shortage-steps'>";
           m.shortageSteps.forEach(function (s) {
@@ -261,6 +277,12 @@
           '<div class="stock-order-card__status hidden">' +
           '<span class="status-word status-word--check"><span class="status-word__shape"></span>Sent to storekeeper</span>' +
           "</div>";
+        if (o.parChart && window.OWNER_CHARTS) {
+          var par = document.createElement("div");
+          par.className = "chart-wrap chart-dark";
+          par.innerHTML = window.OWNER_CHARTS.stockParLineSvg(o.parChart);
+          block.insertBefore(par, block.querySelector(".why-link"));
+        }
         block.querySelector(".why-link").addEventListener("click", function () {
           openOrderWhy(o);
         });
@@ -395,14 +417,25 @@
           photoThumb("Handover photo") +
           '<div class="proof-row__text"><p class="proof-pin">' +
           m.pinProof +
-          "</p></div></div>" +
-          '<button type="button" class="why-link">Why?</button>' +
-          '<p class="stock-gap-card__note">' +
-          m.recipeNote +
-          "</p>";
-        card.querySelector(".why-link").addEventListener("click", function () {
+          "</p></div></div>";
+        if (m.gapCompare && window.OWNER_CHARTS) {
+          var cmp = document.createElement("div");
+          cmp.className = "chart-wrap chart-dark";
+          cmp.innerHTML = window.OWNER_CHARTS.gapCompareSvg(m.gapCompare.actual, m.gapCompare.expected);
+          card.appendChild(cmp);
+        }
+        var whyBtn = document.createElement("button");
+        whyBtn.type = "button";
+        whyBtn.className = "why-link";
+        whyBtn.textContent = "Why?";
+        whyBtn.addEventListener("click", function () {
           openMissingWhy(m);
         });
+        card.appendChild(whyBtn);
+        var note = document.createElement("p");
+        note.className = "stock-gap-card__note";
+        note.textContent = m.recipeNote;
+        card.appendChild(note);
         document.getElementById("missing-stock").appendChild(card);
       });
 

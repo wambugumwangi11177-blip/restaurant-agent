@@ -27,6 +27,9 @@
       </section>
 
       <h2 class="section-label">The three-way match</h2>
+      <div class="card">
+        <div class="chart-wrap chart-dark" id="three-way-diagram"></div>
+      </div>
       <div class="card pl-card">
         <div class="row row--stacked"><div class="row__main"><span class="row__label">Till sales</span></div><span class="row__value"><span data-bind="cash.till" data-format="kes"></span></span></div>
         <div class="row row--stacked"><div class="row__main"><span class="row__label">Cash counted</span></div><span class="row__value"><span data-bind="cash.cashCounted" data-format="kes"></span></span></div>
@@ -69,10 +72,13 @@
     </div>
   </div>
   <script src="assets/sample-data.js"></script>
+  <script src="assets/owner-charts.js"></script>
   <script src="assets/app.js"></script>
   <script>
     (function () {
       var D = window.LEVIII_DATA;
+      var tri = document.getElementById("three-way-diagram");
+      if (tri && window.OWNER_CHARTS) tri.innerHTML = window.OWNER_CHARTS.threeWayMatchSvg();
       var sq = document.getElementById("day-squares");
       D.cash.last7.forEach(function (s, i) {
         var el = document.createElement("div");

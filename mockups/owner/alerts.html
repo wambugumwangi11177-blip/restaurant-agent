@@ -20,6 +20,7 @@
     <main class="page-content">
       <p class="caption" data-bind="alerts.policy"></p>
       <p class="caption" data-bind="alerts.handoversQuiet"></p>
+      <div class="chart-wrap chart-dark" id="alerts-pyramid"></div>
 
       <section class="alert-group">
         <h2>Needs you now</h2>
@@ -51,10 +52,13 @@
     </div>
   </div>
   <script src="assets/sample-data.js"></script>
+  <script src="assets/owner-charts.js"></script>
   <script src="assets/app.js"></script>
   <script>
     (function () {
       var D = window.LEVIII_DATA;
+      var ap = document.getElementById("alerts-pyramid");
+      if (ap && window.OWNER_CHARTS) ap.innerHTML = window.OWNER_CHARTS.alertsPyramidSvg();
       function render(id, items, urgent) {
         var root = document.getElementById(id);
         window.LEVIII_UI.appendWithSeeMore(root, items, function (text, parent) {

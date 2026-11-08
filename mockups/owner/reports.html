@@ -18,6 +18,8 @@
       </div>
     </header>
     <main class="page-content" id="reports-tabs">
+      <div class="chart-wrap chart-dark" id="report-periods"></div>
+      <p class="caption">Deeper detail as the period gets longer — day control, week performance, month books, year planning.</p>
       <div class="tabs" role="tablist">
         <button type="button" class="is-active" data-tab="today">Today's close</button>
         <button type="button" data-tab="week">This week</button>
@@ -111,17 +113,20 @@
     </div>
   </div>
   <script src="assets/sample-data.js"></script>
+  <script src="assets/owner-charts.js"></script>
   <script src="assets/app.js"></script>
   <script>
     (function () {
       var D = window.LEVIII_DATA;
+      var rp = document.getElementById("report-periods");
+      if (rp && window.OWNER_CHARTS) rp.innerHTML = window.OWNER_CHARTS.reportPeriodsSvg();
       var months = ["J","F","M","A","M","J","J","A","S","O","N","D"];
-      var svg = '<svg viewBox="0 0 320 120" role="img">';
+      var svg = '<svg class="chart-dark" viewBox="0 0 320 120" role="img">';
       D.reports.yearSales.forEach(function (v, i) {
         var h = v / 2;
         var x = 14 + i * 24;
-        svg += '<rect x="' + x + '" y="' + (100 - h) + '" width="16" height="' + h + '" fill="#000"/>';
-        svg += '<text x="' + x + '" y="115" font-size="8">' + months[i] + "</text>";
+        svg += '<rect x="' + x + '" y="' + (100 - h) + '" width="16" height="' + h + '" fill="#e4e4e7"/>';
+        svg += '<text x="' + x + '" y="115" font-size="8" fill="#a1a1aa">' + months[i] + "</text>";
       });
       svg += "</svg>";
       document.getElementById("year-chart").innerHTML = svg;

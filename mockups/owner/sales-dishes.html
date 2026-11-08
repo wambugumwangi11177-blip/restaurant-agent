@@ -33,6 +33,16 @@
         <p class="freshness-line">This month · Eleven</p>
       </div>
 
+      <div class="see-more">
+        <button type="button" class="see-more__toggle" data-see-more-toggle>
+          <span>Popularity vs margin (Fig 5.4)</span><span class="see-more__chevron" aria-hidden="true">▼</span>
+        </button>
+        <div class="see-more__body card">
+          <div class="chart-wrap chart-dark" id="dish-quadrant"></div>
+          <p class="caption">Tap a dish group below for actions — the chart is a guide, not a daily dashboard.</p>
+        </div>
+      </div>
+
       <h2 class="section-label">Your dishes in four groups</h2>
       <div class="dish-grid" id="dish-grid"></div>
 
@@ -85,10 +95,15 @@
     </div>
   </div>
   <script src="assets/sample-data.js"></script>
+  <script src="assets/owner-charts.js"></script>
   <script src="assets/app.js"></script>
   <script>
     (function () {
       var D = window.LEVIII_DATA;
+      var dq = document.getElementById("dish-quadrant");
+      if (dq && window.OWNER_CHARTS && D.sales.quadrantDots) {
+        dq.innerHTML = window.OWNER_CHARTS.dishQuadrantSvg(D.sales.quadrantDots);
+      }
       var n7 = D.sales.next7Days;
       document.getElementById("next-7-range").textContent =
         "Expect between " + D.formatKES(n7.low) + " and " + D.formatKES(n7.high) + " in sales.";

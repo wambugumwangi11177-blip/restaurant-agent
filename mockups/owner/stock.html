@@ -22,6 +22,13 @@
       <div class="warning-strip" data-bind="stock.recipeStrip"></div>
       <div class="card" id="to-order-list"></div>
 
+      <h2 class="section-label">Missing</h2>
+      <p class="caption" data-bind="stock.missingCaption"></p>
+      <div id="missing-stock"></div>
+
+      <h2 class="section-label">Going off soon</h2>
+      <div class="card" id="going-off-soon"></div>
+
       <h2 class="section-label">Coming up</h2>
       <div class="card" id="coming-up"></div>
 
@@ -31,10 +38,6 @@
       <h2 class="section-label">Running low</h2>
       <div class="card" id="running-low"></div>
       <button type="button" class="link-btn" id="see-all-stock">See all stock</button>
-
-      <h2 class="section-label">Missing</h2>
-      <p class="caption" data-bind="stock.missingCaption"></p>
-      <div id="missing-stock"></div>
 
       <div class="see-more">
         <button type="button" class="see-more__toggle" data-see-more-toggle>
@@ -46,9 +49,6 @@
           <button type="button" class="link-btn" id="see-all-handovers">See all handovers</button>
         </div>
       </div>
-
-      <h2 class="section-label">Going off soon</h2>
-      <div class="card" id="going-off-soon"></div>
 
       <div class="see-more">
         <button type="button" class="see-more__toggle" data-see-more-toggle>
@@ -113,6 +113,60 @@
           label +
           "</div>"
         );
+      }
+
+      function orderFlowHtml(flow) {
+        var html = '<div class="order-flow">';
+        flow.forEach(function (f) {
+          html +=
+            '<div class="order-flow__step"><strong>' +
+            f.step +
+            "</strong>" +
+            f.detail +
+            "</div>";
+        });
+        return html + "</div>";
+      }
+
+      function openOrderWhy(o) {
+        var html = "";
+        if (o.stockHistory) {
+          html += '<p class="freshness-line">' + o.stockHistory + "</p>";
+        }
+        if (o.orderFlow) {
+          html += orderFlowHtml(o.orderFlow);
+        }
+        o.whyLines.forEach(function (line) {
+          html += "<p>" + line + "</p>";
+        });
+        html += '<p class="freshness-line">' + o.confidence + "</p>";
+        UI.openSheet(o.whyTitle, html);
+      }
+
+      function openMissingWhy(m) {
+        var html =
+          photoThumb("Handover photo") +
+          '<p class="proof-pin"><strong>' +
+          m.pinProof +
+          "</strong></p>";
+        m.whyLines.forEach(function (line) {
+          html += "<p>" + line + "</p>";
+        });
+        if (m.shortageSteps) {
+          html += "<p><strong>How we calculated the gap</strong></p><ol class='shortage-steps'>";
+          m.shortageSteps.forEach(function (s) {
+            html += "<li>" + s + "</li>";
+          });
+          html += "</ol>";
+        }
+        if (m.possibleCauses) {
+          html += "<p><strong>Things that often explain a gap</strong></p><ul class='shortage-steps'>";
+          m.possibleCauses.forEach(function (c) {
+            html += "<li>" + c + "</li>";
+          });
+          html += "</ul>";
+        }
+        UI.openSheet(m.whyTitle, html);
       }
 
       function openWhyWithProof(title, lines, confidence, pinLine) {
@@ -207,7 +261,9 @@
           '<div class="stock-order-card__status hidden">' +
           '<span class="status-word status-word--check"><span class="status-word__shape"></span>Sent to storekeeper</span>' +
           "</div>";
-        bindWhy(block.querySelector(".why-link"), o.whyTitle, o.whyLines, o.confidence);
+        block.querySelector(".why-link").addEventListener("click", function () {
+          openOrderWhy(o);
+        });
         orderRoot.appendChild(block);
       });
 
@@ -345,7 +401,7 @@
           m.recipeNote +
           "</p>";
         card.querySelector(".why-link").addEventListener("click", function () {
-          openWhyWithProof(m.whyTitle, m.whyLines, null, m.pinProof);
+          openMissingWhy(m);
         });
         document.getElementById("missing-stock").appendChild(card);
       });

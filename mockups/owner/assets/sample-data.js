@@ -172,6 +172,16 @@ window.LEVIII_DATA = {
     ],
     moneyInNote: "Card and delivery money arrives later",
     reportFile: "Eleven_Oct_P&L.xlsx",
+    waterfallWhy:
+      "Each step is this month's till sales minus costs you entered (ingredients, wages, rent and bills through Tuesday). Same period as the P&L list below.",
+    kes100: [
+      { label: "Ingredients", pct: 32 },
+      { label: "Wages", pct: 25 },
+      { label: "Running costs", pct: 27 },
+      { label: "What you kept", pct: 16 },
+    ],
+    kes100Why:
+      "For every KES 100 of sales this month at Eleven: shares from your entered costs and wages, last 30 days of till sales. Pretty sure on ingredients and wages; running costs depend on bills entered through Tuesday.",
   },
 
   stock: {
@@ -184,6 +194,13 @@ window.LEVIII_DATA = {
         cost: 8640,
         confidence: "Based on 28 days of data",
         whyTitle: "Why order 12 kg of chicken?",
+        stockHistory: "You ordered chicken every Tuesday for 6 weeks; last count gap was 2 kg on 24 Oct.",
+        orderFlow: [
+          { step: "Expected dishes", detail: "92 quarter chickens, 48 pilau (Fri–Sat)" },
+          { step: "Ingredients needed", detail: "18 kg chicken" },
+          { step: "In stock", detail: "4 kg chicken" },
+          { step: "Buy", detail: "12 kg chicken" },
+        ],
         whyLines: [
           "Here's what we see in your numbers: 4 kg left (storekeeper's count, Mon 6pm). Over the last 4 weeks you sold about 6 kg a day (from your till sales and the chicken recipes), more on Fri and Sat.",
           "Your supplier usually delivers in 1 day. Chicken in the fridge keeps about 2 days, so we suggest 12 kg, not more, to avoid waste.",
@@ -337,6 +354,19 @@ window.LEVIII_DATA = {
           "That leaves 4 kg that should still be in store. The shift-close count at 10pm found 2 kg.",
           "The gap is something to check, not proof anyone did wrong.",
         ],
+        shortageSteps: [
+          "Store count 10 am: 10 kg",
+          "Sent to kitchen 4 pm: 6 kg (handover + PIN)",
+          "Should stay in store: 4 kg",
+          "Shift close count 10 pm: 2 kg",
+          "Gap: 2 kg",
+        ],
+        possibleCauses: [
+          "Stock used after the send but before close count",
+          "Portions a little over recipe",
+          "Spoilage not logged yet",
+          "Weighing or typing slip — worth a calm check, not an accusation",
+        ],
         recipeNote:
           "Once recipes are set for your dishes, we also compare what the kitchen received with what your till says you sold.",
       },
@@ -477,10 +507,14 @@ window.LEVIII_DATA = {
       note: "Based on the last few weeks and what is already booked in.",
     },
     dishesByKes: [
-      { dish: "Nyama choma", kes: 150000 },
-      { dish: "Pilau", kes: 89000 },
-      { dish: "Veg curry", kes: 3500 },
+      { dish: "Nyama choma", kes: 150000, popularity: "High", margin: "41%" },
+      { dish: "Pilau", kes: 89000, popularity: "High", margin: "38%" },
+      { dish: "Quarter chicken", kes: 72000, popularity: "High", margin: "22%" },
+      { dish: "Chips", kes: 41000, popularity: "Med", margin: "55%" },
+      { dish: "Veg curry", kes: 3500, popularity: "Low", margin: "12%" },
     ],
+    dishRankWhy:
+      "KES earned = dish price × paid plates from your till this month. Popularity = share of all plates. Margin = price minus recipe cost (costs through Tuesday). Period: Oct 2026 at Eleven.",
   },
 
   cash: {
@@ -527,7 +561,10 @@ window.LEVIII_DATA = {
   },
 
   alerts: {
-    policy: "Up to 5 urgent alerts a day, quiet after 10 pm. You can change this in Settings.",
+    policy:
+      "Only urgent money, stock, and safety alerts interrupt you. Handovers stay on Stock as a quiet list — no badge.",
+    handoversQuiet:
+      "Store-to-kitchen handovers are proof on Stock → Recent handovers. They do not appear here unless cash or missing stock needs you.",
     needsYou: [
       "Cash gap above normal on Tue Night shift",
       "M-Pesa payment KES 1,200 not matched to a sale",
@@ -538,7 +575,6 @@ window.LEVIII_DATA = {
       "2 stock gaps waiting in Missing stock",
       "Void sales up on Tue Night",
       "3 draft orders waiting for approval",
-      "1 handover doesn't match on tomatoes",
     ],
     week: [
       "2 price ideas waiting on Sales & Dishes",
@@ -612,6 +648,18 @@ window.LEVIII_DATA = {
 
   staff: {
     date: "Thursday 30 Oct 2026",
+    checkIns: [
+      { role: "Storekeeper", name: "Jane", status: "In today", start: "6:38 am" },
+      { role: "Accountant", name: "Grace", status: "In today", start: "8:12 am" },
+    ],
+    shiftClose: {
+      label: "Last shift close",
+      when: "Wed 11:05 pm",
+      who: "Jane (Manager)",
+      status: "Closed",
+      statusWord: "Fine",
+      detail: "Till, cash, and M-Pesa matched within your normal gap.",
+    },
     roster: [
       "Jane — Manager",
       "Jack — Storekeeper",

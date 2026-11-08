@@ -25,6 +25,14 @@
         <p class="freshness-line">Updated just now</p>
       </section>
 
+      <h2 class="section-label">Dishes ranked by KES earned</h2>
+      <div class="card">
+        <div class="dish-rank-head"><span>Dish</span><span>KES</span><span>Popularity</span><span>Margin</span></div>
+        <div id="dish-rank-list"></div>
+        <button type="button" class="why-link" id="dish-rank-why">Why?</button>
+        <p class="freshness-line">This month · Eleven</p>
+      </div>
+
       <h2 class="section-label">Your dishes in four groups</h2>
       <div class="dish-grid" id="dish-grid"></div>
 
@@ -44,12 +52,6 @@
               <p class="card__sentence" id="next-7-range"></p>
               <p class="freshness-line" data-bind="sales.next7Days.note"></p>
             </div>
-          </div>
-          <div class="see-more">
-            <button type="button" class="see-more__toggle" data-see-more-toggle>
-              <span>Dishes ranked by KES earned</span><span class="see-more__chevron" aria-hidden="true">▼</span>
-            </button>
-            <div class="see-more__body card" id="dishes-by-kes"></div>
           </div>
           <h2 class="section-label">Combo idea</h2>
           <div class="card"><p class="card__sentence" id="combo-text"></p></div>
@@ -90,12 +92,24 @@
       var n7 = D.sales.next7Days;
       document.getElementById("next-7-range").textContent =
         "Expect between " + D.formatKES(n7.low) + " and " + D.formatKES(n7.high) + " in sales.";
-      var dk = document.getElementById("dishes-by-kes");
-      D.sales.dishesByKes.forEach(function (row) {
+      var rankRoot = document.getElementById("dish-rank-list");
+      window.LEVIII_UI.appendWithSeeMore(rankRoot, D.sales.dishesByKes, function (row, parent) {
         var div = document.createElement("div");
-        div.className = "row";
-        div.innerHTML = '<span class="row__label">' + row.dish + '</span><span class="row__value">' + D.formatKES(row.kes) + '</span>';
-        dk.appendChild(div);
+        div.className = "dish-rank-row";
+        div.innerHTML =
+          "<strong>" +
+          row.dish +
+          "</strong><span>" +
+          D.formatKES(row.kes) +
+          "</span><span>" +
+          row.popularity +
+          "</span><span>" +
+          row.margin +
+          "</span>";
+        parent.appendChild(div);
+      }, 3);
+      document.getElementById("dish-rank-why").addEventListener("click", function () {
+        window.LEVIII_UI.openSheet("How we rank dishes", "<p>" + D.sales.dishRankWhy + "</p>");
       });
       var groups = [
         { key: "best", title: "Best dishes", action: D.sales.dishActions.best },

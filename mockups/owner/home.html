@@ -45,31 +45,36 @@
           <a href="stock.html" class="button" data-bind="home.needsYou.button"></a>
         </section>
 
-        <div class="card pl-card">
-          <p class="row__label" style="margin:0 0 var(--space-2);font-weight:600">Cash today</p>
-          <div class="row row--stacked">
-            <div class="row__main"><span class="row__label">Counted</span></div>
-            <span class="row__value"><span data-bind="home.cashToday.counted" data-format="kes"></span></span>
-          </div>
-          <div class="row row--stacked">
-            <div class="row__main"><span class="row__label">Expected</span></div>
-            <span class="row__value"><span data-bind="home.cashToday.expected" data-format="kes"></span></span>
-          </div>
-        </div>
-
-        <h2 class="section-label">What's costing you money</h2>
-        <div id="leak-cards"></div>
-
         <h2 class="section-label">Health strip</h2>
         <div class="health-grid" id="health-grid"></div>
 
         <h2 class="section-label">Coming up</h2>
         <div id="coming-up-wrap"><ul class="plain-list" id="coming-up"></ul></div>
 
-        <h2 class="section-label">LEVIII's read</h2>
-        <div class="card ai-read">
-          <p class="ai-read__label">Written by AI</p>
-          <p data-bind="home.aiRead"></p>
+        <div class="see-more">
+          <button type="button" class="see-more__toggle" data-see-more-toggle>
+            <span>See more</span><span class="see-more__chevron" aria-hidden="true">▼</span>
+          </button>
+          <div class="see-more__body">
+            <h2 class="section-label" style="margin-top:0">What's costing you money</h2>
+            <div id="leak-cards"></div>
+            <div class="card pl-card">
+              <p class="row__label" style="margin:0 0 var(--space-2);font-weight:600">Cash today</p>
+              <div class="row row--stacked">
+                <div class="row__main"><span class="row__label">Counted</span></div>
+                <span class="row__value"><span data-bind="home.cashToday.counted" data-format="kes"></span></span>
+              </div>
+              <div class="row row--stacked">
+                <div class="row__main"><span class="row__label">Expected</span></div>
+                <span class="row__value"><span data-bind="home.cashToday.expected" data-format="kes"></span></span>
+              </div>
+            </div>
+            <h2 class="section-label">LEVIII's read</h2>
+            <div class="card ai-read">
+              <p class="ai-read__label">Written by AI</p>
+              <p data-bind="home.aiRead"></p>
+            </div>
+          </div>
         </div>
       </div>
 

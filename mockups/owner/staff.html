@@ -20,6 +20,12 @@
     <main class="page-content">
       <p class="caption" data-bind="staff.date"></p>
 
+      <h2 class="section-label" style="margin-top:0">Who's in today</h2>
+      <div class="card" id="check-ins"></div>
+
+      <h2 class="section-label">Shift close</h2>
+      <div class="card" id="shift-close-card"></div>
+
       <section class="card area-summary">
         <p class="section-label" style="margin-top:0">Wages vs sales</p>
         <p class="card__number" style="font-size:1.25rem" data-bind="staff.labourShare"></p>
@@ -61,6 +67,37 @@
   <script>
     (function () {
       var D = window.LEVIII_DATA.staff;
+      D.checkIns.forEach(function (c) {
+        var row = document.createElement("div");
+        row.className = "row";
+        row.innerHTML =
+          '<span class="row__label"><strong>' +
+          c.role +
+          " · " +
+          c.name +
+          '</strong><br><span class="caption">Started ' +
+          c.start +
+          "</span></span>" +
+          '<span class="status-word status-word--fine"><span class="status-word__shape"></span>' +
+          c.status +
+          "</span>";
+        document.getElementById("check-ins").appendChild(row);
+      });
+      var sc = D.shiftClose;
+      document.getElementById("shift-close-card").innerHTML =
+        '<p class="card__sentence">' +
+        sc.label +
+        ": " +
+        sc.when +
+        "</p>" +
+        '<p class="freshness-line">' +
+        sc.who +
+        " · " +
+        sc.detail +
+        "</p>" +
+        '<span class="status-word status-word--fine"><span class="status-word__shape"></span>' +
+        sc.statusWord +
+        "</span>";
       D.roster.slice(0, 3).forEach(function (r) {
         var li = document.createElement("li");
         li.textContent = r;

@@ -31,6 +31,20 @@
         <p class="freshness-line" data-bind="money.heroFreshness"></p>
       </section>
 
+      <h2 class="section-label">From sales to what you kept</h2>
+      <div class="card">
+        <div id="money-waterfall"></div>
+        <p class="freshness-line">This month at Eleven</p>
+        <button type="button" class="why-link" data-why data-why-title="Why this waterfall?" id="waterfall-why">Why?</button>
+      </div>
+
+      <h2 class="section-label">Where every KES 100 goes</h2>
+      <div class="card">
+        <div class="donut-chart" id="money-donut" role="img" aria-label="Where each KES 100 of sales goes"></div>
+        <ul class="donut-legend" id="money-donut-legend"></ul>
+        <button type="button" class="why-link" id="kes100-why">Why?</button>
+      </div>
+
       <h2 class="section-label">Your profit and loss</h2>
       <div class="card pl-card">
         <div class="row row--stacked"><div class="row__main"><span class="row__label">Sales</span></div><span class="row__value">KES <span data-pl-sales></span></span></div>
@@ -45,12 +59,12 @@
 
       <h2 class="section-label">Costs covered today</h2>
       <div class="card">
-        <div class="chart-wrap">
+        <div class="chart-wrap chart-dark">
           <svg viewBox="0 0 320 120" role="img" aria-label="Sales through the day versus costs line">
-            <line x1="20" y1="95" x2="300" y2="95" stroke="#bdbdbd" stroke-width="1"/>
-            <line x1="20" y1="55" x2="300" y2="55" stroke="#000" stroke-width="1" stroke-dasharray="6 4"/>
-            <polyline fill="none" stroke="#000" stroke-width="2" points="20,90 80,82 140,70 200,58 240,50 280,42"/>
-            <text x="20" y="48" font-size="10" fill="#757575">Costs line</text>
+            <line x1="20" y1="95" x2="300" y2="95" stroke="#71717a" stroke-width="1"/>
+            <line x1="20" y1="55" x2="300" y2="55" stroke="#e4e4e7" stroke-width="1" stroke-dasharray="6 4"/>
+            <polyline fill="none" stroke="#fafafa" stroke-width="2" points="20,90 80,82 140,70 200,58 240,50 280,42"/>
+            <text x="20" y="48" font-size="10" fill="#a1a1aa">Costs line</text>
           </svg>
         </div>
         <p class="chart-caption">Today's costs were covered at <span data-breakeven-time></span>. Everything after is profit.</p>
@@ -117,6 +131,60 @@
   <script>
     (function () {
       var D = window.LEVIII_DATA;
+      var UI = window.LEVIII_UI;
+      var p = D.money.periods.month;
+      var wf = document.getElementById("money-waterfall");
+      var wfSteps = [
+        { label: "Sales", amount: p.sales, width: 100, dim: false },
+        { label: "Ingredients", amount: p.ingredients, width: (p.ingredients / p.sales) * 100, dim: true },
+        { label: "Left after ingredients", amount: p.leftAfterIngredients, width: (p.leftAfterIngredients / p.sales) * 100, dim: false },
+        { label: "Wages", amount: p.wages, width: (p.wages / p.sales) * 100, dim: true },
+        { label: "Running costs", amount: p.runningCosts, width: (p.runningCosts / p.sales) * 100, dim: true },
+        { label: "What you kept", amount: p.kept, width: (p.kept / p.sales) * 100, dim: false },
+      ];
+      wfSteps.forEach(function (s) {
+        var row = document.createElement("div");
+        row.className = "waterfall-row";
+        row.innerHTML =
+          "<span>" +
+          s.label +
+          '</span><span style="color:#fafafa">' +
+          D.formatKES(s.amount) +
+          '</span><div class="waterfall-row__bar"><div class="waterfall-row__fill' +
+          (s.dim ? " waterfall-row__fill--dim" : "") +
+          '" style="width:' +
+          Math.round(s.width) +
+          '%"></div></div>';
+        wf.appendChild(row);
+      });
+      var whyW = document.getElementById("waterfall-why");
+      whyW.setAttribute("data-why", "");
+      whyW.setAttribute("data-why-body", D.money.waterfallWhy);
+      var cols = ["#fafafa", "#d4d4d8", "#a1a1aa", "#71717a"];
+      var grad = "";
+      var acc = 0;
+      D.money.kes100.forEach(function (seg, i) {
+        grad += cols[i] + " " + acc + "% " + (acc + seg.pct) + "%" + (i < D.money.kes100.length - 1 ? ", " : "");
+        acc += seg.pct;
+      });
+      var donut = document.getElementById("money-donut");
+      donut.style.background = "conic-gradient(" + grad + ")";
+      var leg = document.getElementById("money-donut-legend");
+      D.money.kes100.forEach(function (seg, i) {
+        var li = document.createElement("li");
+        li.innerHTML =
+          '<span><span class="donut-legend__swatch" style="background:' +
+          cols[i] +
+          '"></span>' +
+          seg.label +
+          "</span><span>" +
+          seg.pct +
+          "%</span>";
+        leg.appendChild(li);
+      });
+      document.getElementById("kes100-why").addEventListener("click", function () {
+        UI.openSheet("Where each KES 100 goes", "<p>" + D.money.kes100Why + "</p>");
+      });
       var list = document.getElementById("bill-radar");
       window.LEVIII_UI.appendWithSeeMore(list, D.money.billRadar, function (b, parent) {
         var row = document.createElement("div");
@@ -147,12 +215,12 @@
       p.textContent = D.money.moneyInNote;
       bars.appendChild(p);
       var cg = D.money.costsGoingUp;
-      var svg = '<svg viewBox="0 0 320 100" role="img"><line x1="20" y1="85" x2="300" y2="85" stroke="#e0e0e0"/>';
+      var svg = '<svg class="chart-dark" viewBox="0 0 320 100" role="img"><line x1="20" y1="85" x2="300" y2="85" stroke="#71717a"/>';
       cg.values.forEach(function (v, i) {
         var h = v * 1.1;
         var x = 30 + i * 45;
-        svg += '<rect x="' + x + '" y="' + (85 - h) + '" width="28" height="' + h + '" fill="#000"/>';
-        svg += '<text x="' + x + '" y="98" font-size="9">' + cg.months[i] + "</text>";
+        svg += '<rect x="' + x + '" y="' + (85 - h) + '" width="28" height="' + h + '" fill="#e4e4e7"/>';
+        svg += '<text x="' + x + '" y="98" font-size="9" fill="#a1a1aa">' + cg.months[i] + "</text>";
       });
       svg += "</svg>";
       document.getElementById("costs-bar-chart").innerHTML = svg;

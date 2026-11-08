@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock — LEVIII Owner</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body data-page="stock">
+  <div class="app-shell">
+    <header class="page-header">
+      <h1 class="page-header__title">Stock</h1>
+      <div class="page-header__actions">
+        <a href="alerts.html" class="icon-btn" aria-label="Alerts">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 16v-5a6 6 0 10-12 0v5l-2 2h16l-2-2"/><path d="M10 20a2 2 0 004 0"/></svg>
+        </a>
+        <a href="settings.html" class="profile-circle" aria-label="Profile">E</a>
+      </div>
+    </header>
+    <main class="page-content">
+      <h2 class="section-label" style="margin-top:0">To order</h2>
+      <div class="warning-strip" data-bind="stock.recipeStrip"></div>
+      <div class="card" id="to-order-list"></div>
+
+      <h2 class="section-label">Missing</h2>
+      <p class="caption" data-bind="stock.missingCaption"></p>
+      <div id="missing-stock"></div>
+
+      <h2 class="section-label">Going off soon</h2>
+      <div class="card" id="going-off-soon"></div>
+
+      <h2 class="section-label">Coming up</h2>
+      <div class="card" id="coming-up"></div>
+
+      <h2 class="section-label">How you use stock</h2>
+      <div class="card" id="how-you-use-stock"></div>
+
+      <h2 class="section-label">Running low</h2>
+      <div class="card" id="running-low"></div>
+      <button type="button" class="link-btn" id="see-all-stock">See all stock</button>
+
+      <div class="see-more">
+        <button type="button" class="see-more__toggle" data-see-more-toggle>
+          <span>Recent handovers</span>
+          <span class="see-more__chevron" aria-hidden="true">▼</span>
+        </button>
+        <div class="see-more__body">
+          <div class="card" id="recent-handovers"></div>
+          <button type="button" class="link-btn" id="see-all-handovers">See all handovers</button>
+        </div>
+      </div>
+
+      <div class="see-more">
+        <button type="button" class="see-more__toggle" data-see-more-toggle>
+          <span>Spoiled and wasted this week · <span id="spoiled-total-label"></span></span>
+          <span class="see-more__chevron" aria-hidden="true">▼</span>
+        </button>
+        <div class="see-more__body">
+          <div class="card" id="spoiled-list"></div>
+        </div>
+      </div>
+
+      <h2 class="section-label">Stock value</h2>
+      <div class="card card-hero">
+        <p class="card__number" data-bind="stock.stockValue" data-format="kes"></p>
+        <p class="freshness-line" data-bind="stock.freshness"></p>
+      </div>
+    </main>
+    <nav class="nav-pill" aria-label="Main">
+      <a href="home.html" class="nav-pill__item" data-nav="home"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"/></svg></span><span class="nav-pill__label">Home</span></a>
+      <a href="money.html" class="nav-pill__item" data-nav="money"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9 10h4a2 2 0 110 4h-2"/></svg></span><span class="nav-pill__label">Money</span></a>
+      <a href="stock.html" class="nav-pill__item" data-nav="stock"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 8h16v12H4z"/><path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span><span class="nav-pill__label">Stock</span></a>
+      <a href="ask.html" class="nav-pill__item" data-nav="ask"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H7l-3 3V6z"/></svg></span><span class="nav-pill__label">Ask</span></a>
+      <a href="more.html" class="nav-pill__item" data-nav="more"><span class="nav-pill__icon-wrap"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></span><span class="nav-pill__label">More</span></a>
+    </nav>
+  </div>
+  <div id="sheet-overlay" class="sheet-overlay" aria-hidden="true">
+    <div class="sheet" role="dialog" aria-modal="true">
+      <div class="sheet__handle"></div>
+      <h2 class="sheet__title"></h2>
+      <div class="sheet__body"></div>
+      <button type="button" class="button button-block" data-sheet-close>Close</button>
+    </div>
+  </div>
+  <script src="assets/sample-data.js"></script>
+  <script src="assets/owner-charts.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    (function () {
+      var D = window.LEVIII_DATA;
+      var UI = window.LEVIII_UI;
+
+      function whyHtml(lines, confidence) {
+        var html = lines.map(function (line) {
+          return "<p>" + line + "</p>";
+        }).join("");
+        if (confidence) {
+          html += '<p class="freshness-line">' + confidence + "</p>";
+        }
+        return html;
+      }
+
+      function bindWhy(btn, title, lines, confidence) {
+        btn.setAttribute("data-why", "");
+        btn.setAttribute("data-why-title", title);
+        btn.setAttribute("data-why-body", lines.join("\n\n") + (confidence ? "\n\n" + confidence : ""));
+      }
+
+      function photoThumb(label) {
+        return (
+          '<div class="photo-thumb" role="img" aria-label="' +
+          label +
+          '">' +
+          label +
+          "</div>"
+        );
+      }
+
+      function orderFlowHtml(flow) {
+        var html = '<div class="order-flow">';
+        flow.forEach(function (f) {
+          html +=
+            '<div class="order-flow__step"><strong>' +
+            f.step +
+            "</strong>" +
+            f.detail +
+            "</div>";
+        });
+        return html + "</div>";
+      }
+
+      function openOrderWhy(o) {
+        var html = "";
+        if (o.parChart && window.OWNER_CHARTS) {
+          html += '<div class="chart-wrap chart-dark">' + window.OWNER_CHARTS.stockParLineSvg(o.parChart) + "</div>";
+        }
+        if (o.stockHistory) {
+          html += '<p class="freshness-line">' + o.stockHistory + "</p>";
+        }
+        if (o.orderFlow) {
+          html += orderFlowHtml(o.orderFlow);
+        }
+        o.whyLines.forEach(function (line) {
+          html += "<p>" + line + "</p>";
+        });
+        html += '<p class="freshness-line">' + o.confidence + "</p>";
+        UI.openSheet(o.whyTitle, html);
+      }
+
+      function openMissingWhy(m) {
+        var html =
+          photoThumb("Handover photo") +
+          '<p class="proof-pin"><strong>' +
+          m.pinProof +
+          "</strong></p>";
+        if (m.gapCompare && window.OWNER_CHARTS) {
+          html +=
+            '<div class="chart-wrap chart-dark">' +
+            window.OWNER_CHARTS.gapCompareSvg(m.gapCompare.actual, m.gapCompare.expected) +
+            "</div>";
+        }
+        m.whyLines.forEach(function (line) {
+          html += "<p>" + line + "</p>";
+        });
+        if (m.possibleCauses && window.OWNER_CHARTS) {
+          html +=
+            '<div class="chart-wrap chart-dark">' +
+            window.OWNER_CHARTS.gapCausesSvg(m.possibleCauses) +
+            "</div>";
+        }
+        if (m.shortageSteps) {
+          html += "<p><strong>How we calculated the gap</strong></p><ol class='shortage-steps'>";
+          m.shortageSteps.forEach(function (s) {
+            html += "<li>" + s + "</li>";
+          });
+          html += "</ol>";
+        }
+        if (m.possibleCauses) {
+          html += "<p><strong>Things that often explain a gap</strong></p><ul class='shortage-steps'>";
+          m.possibleCauses.forEach(function (c) {
+            html += "<li>" + c + "</li>";
+          });
+          html += "</ul>";
+        }
+        UI.openSheet(m.whyTitle, html);
+      }
+
+      function openWhyWithProof(title, lines, confidence, pinLine) {
+        var html =
+          photoThumb("Handover photo") +
+          (pinLine ? '<p class="proof-pin"><strong>' + pinLine + "</strong></p>" : "");
+        lines.forEach(function (line) {
+          html += "<p>" + line + "</p>";
+        });
+        if (confidence) {
+          html += '<p class="freshness-line">' + confidence + "</p>";
+        }
+        UI.openSheet(title, html);
+      }
+
+      function handoverSheetBody(h) {
+        var pinCls = h.pinWarn ? "pin-status pin-status--warn" : "pin-status";
+        return (
+          photoThumb("Handover photo") +
+          '<p class="handover-row__time">' +
+          h.time +
+          " · " +
+          h.route +
+          "</p>" +
+          '<p class="handover-row__people">' +
+          h.from +
+          " to " +
+          h.to +
+          "</p>" +
+          '<p class="handover-row__items">' +
+          h.items +
+          "</p>" +
+          '<p class="' +
+          pinCls +
+          '">' +
+          h.pinStatus +
+          "</p>" +
+          "<p>" +
+          h.detail +
+          "</p>"
+        );
+      }
+
+      function renderHandoverButton(h, parent) {
+        var pinCls = h.pinWarn ? "pin-status pin-status--warn" : "pin-status";
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "handover-row";
+        btn.innerHTML =
+          photoThumb("Handover photo") +
+          '<div class="handover-row__main">' +
+          '<p class="handover-row__route">' +
+          h.route +
+          "</p>" +
+          '<p class="handover-row__time">' +
+          h.time +
+          "</p>" +
+          '<p class="handover-row__people">' +
+          h.from +
+          " to " +
+          h.to +
+          "</p>" +
+          '<p class="handover-row__items">' +
+          h.items +
+          "</p>" +
+          '<p class="' +
+          pinCls +
+          '">' +
+          h.pinStatus +
+          "</p>" +
+          "</div>";
+        btn.addEventListener("click", function () {
+          UI.openSheet("Handover · " + h.time, handoverSheetBody(h));
+        });
+        parent.appendChild(btn);
+      }
+
+      var orderRoot = document.getElementById("to-order-list");
+      D.stock.toOrder.forEach(function (o) {
+        var block = document.createElement("div");
+        block.className = "stock-order-card";
+        block.innerHTML =
+          '<p class="stock-order-card__headline">' + o.headline + "</p>" +
+          '<p class="stock-order-card__meta">' + o.supplier + " · " + D.formatKES(o.cost) + "</p>" +
+          '<button type="button" class="why-link">Why?</button>' +
+          '<p class="stock-order-card__note">' + o.approveNote + "</p>" +
+          '<div class="stock-order-card__actions">' +
+          '<button type="button" class="button" data-approve-order>Approve</button>' +
+          '<button type="button" class="button button-outline" data-order-not-now>Not now</button>' +
+          "</div>" +
+          '<p class="stock-order-card__confidence">' + o.confidence + "</p>" +
+          '<div class="stock-order-card__status hidden">' +
+          '<span class="status-word status-word--check"><span class="status-word__shape"></span>Sent to storekeeper</span>' +
+          "</div>";
+        if (o.parChart && window.OWNER_CHARTS) {
+          var par = document.createElement("div");
+          par.className = "chart-wrap chart-dark";
+          par.innerHTML = window.OWNER_CHARTS.stockParLineSvg(o.parChart);
+          block.insertBefore(par, block.querySelector(".why-link"));
+        }
+        block.querySelector(".why-link").addEventListener("click", function () {
+          openOrderWhy(o);
+        });
+        orderRoot.appendChild(block);
+      });
+
+      var comingRoot = document.getElementById("coming-up");
+      D.stock.comingUp.forEach(function (item) {
+        var row = document.createElement("div");
+        row.className = "coming-up-row";
+        var whyBtn = document.createElement("button");
+        whyBtn.type = "button";
+        whyBtn.className = "why-link";
+        whyBtn.textContent = "Why?";
+        row.innerHTML = '<p class="coming-up-row__headline">' + item.headline + "</p>";
+        row.appendChild(whyBtn);
+        bindWhy(whyBtn, item.whyTitle, item.whyLines, item.confidence);
+        comingRoot.appendChild(row);
+      });
+
+      function renderHowYouUse(u, parent) {
+        var block = document.createElement("div");
+        block.className = "use-stock-row";
+        var trendCls =
+          u.trendKey === "up" ? "use-stock-row__trend--up" : "use-stock-row__trend--steady";
+        var barHtml = '<div class="use-bar" role="img" aria-label="Dish mix for ' + u.item + '">';
+        u.dishes.forEach(function (d, i) {
+          barHtml +=
+            '<span class="use-bar__seg use-bar__seg--' +
+            i +
+            '" style="width:' +
+            d.pct +
+            '%"></span>';
+        });
+        barHtml += "</div>";
+        block.innerHTML =
+          '<p class="use-stock-row__item">' +
+          u.item +
+          "</p>" +
+          '<p class="use-stock-row__usage">' +
+          u.usage +
+          "</p>" +
+          '<p class="use-stock-row__trend ' +
+          trendCls +
+          '">' +
+          u.trend +
+          "</p>" +
+          barHtml +
+          '<p class="use-stock-row__dishes">' +
+          u.item +
+          ": " +
+          u.dishLine +
+          "</p>";
+        var whyBtn = document.createElement("button");
+        whyBtn.type = "button";
+        whyBtn.className = "why-link";
+        whyBtn.textContent = "Why?";
+        block.appendChild(whyBtn);
+        bindWhy(whyBtn, u.whyTitle, u.whyLines, u.confidence);
+        parent.appendChild(block);
+      }
+      UI.appendWithSeeMore(document.getElementById("how-you-use-stock"), D.stock.howYouUseStock, renderHowYouUse, 3);
+
+      var low = document.getElementById("running-low");
+      D.stock.runningLowCritical.slice(0, 3).forEach(function (item) {
+        var cls = item.status === "Low" ? "low" : "fine";
+        var row = document.createElement("div");
+        row.className = "row";
+        row.innerHTML =
+          '<span class="row__label">' +
+          item.item +
+          " · " +
+          item.qty +
+          " · " +
+          item.location +
+          " · " +
+          item.daysLeft +
+          " days left</span>" +
+          '<span class="status-word status-word--' +
+          cls +
+          '"><span class="status-word__shape"></span>' +
+          item.status +
+          "</span>";
+        low.appendChild(row);
+      });
+
+      document.getElementById("see-all-stock").addEventListener("click", function () {
+        var html =
+          '<label class="caption" for="stock-search">Search</label>' +
+          '<input type="search" id="stock-search" class="stock-list-search" placeholder="Search items" autocomplete="off">' +
+          '<div id="stock-sheet-list"></div>';
+        UI.openSheet("All stock at Eleven", html);
+        var listEl = document.querySelector("#sheet-overlay #stock-sheet-list");
+        var search = document.querySelector("#sheet-overlay #stock-search");
+        function renderList(filter) {
+          var q = (filter || "").trim().toLowerCase();
+          listEl.innerHTML = "";
+          D.stock.fullStockList.forEach(function (row) {
+            if (q && row.item.toLowerCase().indexOf(q) === -1) return;
+            var div = document.createElement("div");
+            div.className = "stock-list-row";
+            div.innerHTML =
+              "<div><strong>" +
+              row.item +
+              '</strong><div class="stock-list-row__meta">' +
+              row.location +
+              (row.expiry && row.expiry !== "—" ? " · Expires " + row.expiry : "") +
+              "</div></div><span>" +
+              row.qty +
+              "</span>";
+            listEl.appendChild(div);
+          });
+        }
+        renderList("");
+        search.addEventListener("input", function () {
+          renderList(search.value);
+        });
+      });
+
+      D.stock.missing.forEach(function (m) {
+        var card = document.createElement("article");
+        card.className = "card stock-gap-card";
+        var gapLine =
+          m.headline +
+          ", " +
+          m.meta.replace(" · ", ", ").replace("Storekeeper ", "").replace("Chef ", "");
+        card.innerHTML =
+          '<p class="card__sentence">' +
+          gapLine +
+          "</p>" +
+          '<div class="proof-row">' +
+          photoThumb("Handover photo") +
+          '<div class="proof-row__text"><p class="proof-pin">' +
+          m.pinProof +
+          "</p></div></div>";
+        if (m.gapCompare && window.OWNER_CHARTS) {
+          var cmp = document.createElement("div");
+          cmp.className = "chart-wrap chart-dark";
+          cmp.innerHTML = window.OWNER_CHARTS.gapCompareSvg(m.gapCompare.actual, m.gapCompare.expected);
+          card.appendChild(cmp);
+        }
+        var whyBtn = document.createElement("button");
+        whyBtn.type = "button";
+        whyBtn.className = "why-link";
+        whyBtn.textContent = "Why?";
+        whyBtn.addEventListener("click", function () {
+          openMissingWhy(m);
+        });
+        card.appendChild(whyBtn);
+        var note = document.createElement("p");
+        note.className = "stock-gap-card__note";
+        note.textContent = m.recipeNote;
+        card.appendChild(note);
+        document.getElementById("missing-stock").appendChild(card);
+      });
+
+      var handoverRoot = document.getElementById("recent-handovers");
+      D.stock.recentHandovers.slice(0, 3).forEach(function (h) {
+        renderHandoverButton(h, handoverRoot);
+      });
+      document.getElementById("see-all-handovers").addEventListener("click", function () {
+        var html = '<div id="all-handovers-list"></div>';
+        UI.openSheet("All handovers at Eleven", html);
+        var list = document.querySelector("#sheet-overlay #all-handovers-list");
+        D.stock.recentHandovers.forEach(function (h) {
+          renderHandoverButton(h, list);
+        });
+      });
+
+      var expiryRoot = document.getElementById("going-off-soon");
+      D.stock.goingOffSoon.forEach(function (item) {
+        var row = document.createElement("div");
+        row.className = "stock-expiry-row";
+        row.innerHTML =
+          '<p class="stock-expiry-row__headline">' +
+          item.headline +
+          '</p><button type="button" class="why-link">Why?</button>';
+        bindWhy(row.querySelector(".why-link"), item.whyTitle, item.whyLines, null);
+        expiryRoot.appendChild(row);
+      });
+
+      document.getElementById("spoiled-total-label").textContent = D.formatKES(D.stock.spoiledWeek.total);
+      var sp = document.getElementById("spoiled-list");
+      D.stock.spoiledWeek.entries.forEach(function (s) {
+        var block = document.createElement("div");
+        block.className = "spoiled-entry";
+        block.innerHTML =
+          '<div class="row"><span class="row__label"><strong>' +
+          s.item +
+          '</strong></span><span class="row__value">' +
+          D.formatKES(s.kes) +
+          "</span></div>" +
+          '<p class="spoiled-entry__reason">' +
+          s.reason +
+          " · " +
+          s.loggedBy +
+          "</p>";
+        sp.appendChild(block);
+      });
+    })();
+  </script>
+</body>
+</html>

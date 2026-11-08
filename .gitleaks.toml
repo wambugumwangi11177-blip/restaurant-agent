@@ -15,8 +15,14 @@ paths = [
     '''(^|/)\.env\.example$''',
     '''(^|/)directives/''',
     '''(^|/)docs/''',
-    '''(^|/)execution/''',
     '''(^|/)graphify-out/''',
+    # NARROWED 2026-09-19. This was the whole of `execution/`, which is live
+    # Python that talks to the production database — exactly where a pasted
+    # credential would land, and it was exempt from scanning. Only the four
+    # verify_* smoke scripts actually need the exemption; they hold obvious test
+    # literals ("secretpassword", "hashed_secret"). Every other script in
+    # execution/ is scanned again.
+    '''(^|/)execution/verify_[a-z_]+\.py$''',
 ]
 
 # Common placeholder strings that pattern-match as secrets but are not.
@@ -25,4 +31,17 @@ regexes = [
     '''(?i)changeme''',
     '''(?i)example[_-]?(key|token|secret)''',
     '''xxxx+''',
+    # Test literals used by the execution/verify_* smoke scripts and by tests.
+    # Listed by value so they stay allowed wherever they appear, rather than
+    # exempting a whole directory from scanning.
+    '''secretpassword''',
+    '''hashed_secret''',
+    '''test_only_ci_key_not_a_real_secret''',
+    # gitleaks' generic-api-key rule scores long snake_case identifiers in TSX
+    # on entropy alone. This one is a metric field name rendered in the
+    # inventory dashboard, not a credential. Allowlisted by value rather than by
+    # excluding .tsx files, which would stop a real key in frontend code from
+    # ever being caught. Pre-existing; surfaced by a full-tree scan, not by the
+    # execution/ narrowing above (the CI action scans the diff, not the tree).
+    '''total_consumed_\d+d''',
 ]

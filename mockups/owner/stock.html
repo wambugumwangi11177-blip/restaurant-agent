@@ -25,6 +25,9 @@
       <h2 class="section-label">Coming up</h2>
       <div class="card" id="coming-up"></div>
 
+      <h2 class="section-label">How you use stock</h2>
+      <div class="card" id="how-you-use-stock"></div>
+
       <h2 class="section-label">Running low</h2>
       <div class="card" id="running-low"></div>
       <button type="button" class="link-btn" id="see-all-stock">See all stock</button>
@@ -221,6 +224,49 @@
         bindWhy(whyBtn, item.whyTitle, item.whyLines, item.confidence);
         comingRoot.appendChild(row);
       });
+
+      function renderHowYouUse(u, parent) {
+        var block = document.createElement("div");
+        block.className = "use-stock-row";
+        var trendCls =
+          u.trendKey === "up" ? "use-stock-row__trend--up" : "use-stock-row__trend--steady";
+        var barHtml = '<div class="use-bar" role="img" aria-label="Dish mix for ' + u.item + '">';
+        u.dishes.forEach(function (d, i) {
+          barHtml +=
+            '<span class="use-bar__seg use-bar__seg--' +
+            i +
+            '" style="width:' +
+            d.pct +
+            '%"></span>';
+        });
+        barHtml += "</div>";
+        block.innerHTML =
+          '<p class="use-stock-row__item">' +
+          u.item +
+          "</p>" +
+          '<p class="use-stock-row__usage">' +
+          u.usage +
+          "</p>" +
+          '<p class="use-stock-row__trend ' +
+          trendCls +
+          '">' +
+          u.trend +
+          "</p>" +
+          barHtml +
+          '<p class="use-stock-row__dishes">' +
+          u.item +
+          ": " +
+          u.dishLine +
+          "</p>";
+        var whyBtn = document.createElement("button");
+        whyBtn.type = "button";
+        whyBtn.className = "why-link";
+        whyBtn.textContent = "Why?";
+        block.appendChild(whyBtn);
+        bindWhy(whyBtn, u.whyTitle, u.whyLines, u.confidence);
+        parent.appendChild(block);
+      }
+      UI.appendWithSeeMore(document.getElementById("how-you-use-stock"), D.stock.howYouUseStock, renderHowYouUse, 3);
 
       var low = document.getElementById("running-low");
       D.stock.runningLowCritical.slice(0, 3).forEach(function (item) {

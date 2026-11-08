@@ -206,6 +206,35 @@ window.LEVIII_DATA = {
           "When you approve, this goes to your storekeeper. They buy at the market, enter what they paid, and you'll see it marked done here.",
       },
     ],
+    comingUp: [
+      {
+        headline: "Chicken: runs out Thu at your usual pace",
+        whyTitle: "Why we think chicken runs out Thursday",
+        whyLines: [
+          "4 kg in the fridge now (Jane's count today at 7am). Your till and recipes show about 6 kg used per day on average over the last 28 days, a bit more Fri–Sat.",
+          "We did not count tomorrow's delivery yet. If you order today, delivery usually lands Tue.",
+        ],
+        confidence: "Based on 28 days of sales and counts. Pretty sure for chicken at Eleven.",
+      },
+      {
+        headline: "Rice: enough for 9 days",
+        whyTitle: "Why rice looks fine for now",
+        whyLines: [
+          "18 kg in the dry store (counted Monday). Pilau and plain rice dishes used about 2 kg a day over the last 21 days.",
+          "No big event booked that would spike use.",
+        ],
+        confidence: "Based on 21 days of use. Sure enough to plan the next market run.",
+      },
+      {
+        headline: "Cooking oil: use is up 30% this week",
+        whyTitle: "Why oil use looks higher",
+        whyLines: [
+          "Kitchen logged 14 L used Mon–Sun this week vs about 11 L the week before. Chips and fried dishes were 18% of sales vs 12% last week (from your till).",
+          "Only 6 L left in the dry store today.",
+        ],
+        confidence: "Based on 12 days of kitchen logs and 2 full weeks of sales. Worth watching; not enough history to call it a long-term trend.",
+      },
+    ],
     runningLowCritical: [
       { item: "Chicken quarters", qty: "4 kg", location: "Fridge", daysLeft: 1, status: "Low" },
       { item: "Cooking oil", qty: "6 L", location: "Dry store", daysLeft: 3, status: "Low" },
@@ -225,13 +254,53 @@ window.LEVIII_DATA = {
       {
         headline: "Chicken: 2 kg not accounted for",
         meta: "Handover Mon 4pm · Storekeeper Jane to Chef Otieno",
+        pinProof: "Chef confirmed with PIN at 4:02pm",
         whyTitle: "Why does 2 kg not add up?",
         whyLines: [
-          "Store had 10 kg. 6 kg went to the kitchen (confirmed by the chef's PIN plus a handover photo of both of them with the items), so 4 kg should be left.",
-          "The shift-close count found 2 kg. That gap is something to check, not proof anyone did wrong.",
+          "Store had 10 kg. Jane sent 6 kg to the kitchen at 4pm. Chef Otieno confirmed with PIN at 4:02pm and the handover photo shows both of them with the batch.",
+          "That leaves 4 kg that should still be in store. The shift-close count at 10pm found 2 kg.",
+          "The gap is something to check, not proof anyone did wrong.",
         ],
         recipeNote:
           "Once recipes are set for your dishes, we also compare what the kitchen received with what your till says you sold.",
+      },
+    ],
+    recentHandovers: [
+      {
+        id: "ho-mon-chicken",
+        time: "Mon 4:02pm",
+        route: "Store to kitchen",
+        from: "Jane",
+        to: "Chef Otieno",
+        items: "Chicken quarters · 6 kg",
+        pinStatus: "PIN confirmed",
+        pinWarn: false,
+        detail:
+          "Jane logged 6 kg chicken quarters leaving the dry store. Chef Otieno entered his PIN at 4:02pm and signed for the batch. Photo taken at the kitchen door.",
+      },
+      {
+        id: "ho-mon-beef",
+        time: "Mon 11:30am",
+        route: "Store to kitchen",
+        from: "Jane",
+        to: "Chef Otieno",
+        items: "Beef stew meat · 4 kg",
+        pinStatus: "PIN confirmed",
+        pinWarn: false,
+        detail:
+          "Morning prep handover before lunch service. Store count before send: 15 kg beef. Kitchen received 4 kg for stew.",
+      },
+      {
+        id: "ho-sun-oil",
+        time: "Sun 5:18pm",
+        route: "Store to kitchen",
+        from: "Jane",
+        to: "Chef Amina",
+        items: "Cooking oil · 3 L",
+        pinStatus: "PIN confirmed after 2 wrong tries",
+        pinWarn: true,
+        detail:
+          "Chef Amina mistyped the PIN twice, then confirmed on the third try at 5:18pm. Photo shows the 3 L bottles on the pass.",
       },
     ],
     missingCaption: "A gap is not proof of anything. It tells you where to look.",

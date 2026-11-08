@@ -22,6 +22,9 @@
       <div class="warning-strip" data-bind="stock.recipeStrip"></div>
       <div class="card" id="to-order-list"></div>
 
+      <h2 class="section-label">Coming up</h2>
+      <div class="card" id="coming-up"></div>
+
       <h2 class="section-label">Running low</h2>
       <div class="card" id="running-low"></div>
       <button type="button" class="link-btn" id="see-all-stock">See all stock</button>
@@ -29,6 +32,17 @@
       <h2 class="section-label">Missing</h2>
       <p class="caption" data-bind="stock.missingCaption"></p>
       <div id="missing-stock"></div>
+
+      <div class="see-more">
+        <button type="button" class="see-more__toggle" data-see-more-toggle>
+          <span>Recent handovers</span>
+          <span class="see-more__chevron" aria-hidden="true">▼</span>
+        </button>
+        <div class="see-more__body">
+          <div class="card" id="recent-handovers"></div>
+          <button type="button" class="link-btn" id="see-all-handovers">See all handovers</button>
+        </div>
+      </div>
 
       <h2 class="section-label">Going off soon</h2>
       <div class="card" id="going-off-soon"></div>
@@ -88,6 +102,91 @@
         btn.setAttribute("data-why-body", lines.join("\n\n") + (confidence ? "\n\n" + confidence : ""));
       }
 
+      function photoThumb(label) {
+        return (
+          '<div class="photo-thumb" role="img" aria-label="' +
+          label +
+          '">' +
+          label +
+          "</div>"
+        );
+      }
+
+      function openWhyWithProof(title, lines, confidence, pinLine) {
+        var html =
+          photoThumb("Handover photo") +
+          (pinLine ? '<p class="proof-pin"><strong>' + pinLine + "</strong></p>" : "");
+        lines.forEach(function (line) {
+          html += "<p>" + line + "</p>";
+        });
+        if (confidence) {
+          html += '<p class="freshness-line">' + confidence + "</p>";
+        }
+        UI.openSheet(title, html);
+      }
+
+      function handoverSheetBody(h) {
+        var pinCls = h.pinWarn ? "pin-status pin-status--warn" : "pin-status";
+        return (
+          photoThumb("Handover photo") +
+          '<p class="handover-row__time">' +
+          h.time +
+          " · " +
+          h.route +
+          "</p>" +
+          '<p class="handover-row__people">' +
+          h.from +
+          " to " +
+          h.to +
+          "</p>" +
+          '<p class="handover-row__items">' +
+          h.items +
+          "</p>" +
+          '<p class="' +
+          pinCls +
+          '">' +
+          h.pinStatus +
+          "</p>" +
+          "<p>" +
+          h.detail +
+          "</p>"
+        );
+      }
+
+      function renderHandoverButton(h, parent) {
+        var pinCls = h.pinWarn ? "pin-status pin-status--warn" : "pin-status";
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "handover-row";
+        btn.innerHTML =
+          photoThumb("Handover photo") +
+          '<div class="handover-row__main">' +
+          '<p class="handover-row__route">' +
+          h.route +
+          "</p>" +
+          '<p class="handover-row__time">' +
+          h.time +
+          "</p>" +
+          '<p class="handover-row__people">' +
+          h.from +
+          " to " +
+          h.to +
+          "</p>" +
+          '<p class="handover-row__items">' +
+          h.items +
+          "</p>" +
+          '<p class="' +
+          pinCls +
+          '">' +
+          h.pinStatus +
+          "</p>" +
+          "</div>";
+        btn.addEventListener("click", function () {
+          UI.openSheet("Handover · " + h.time, handoverSheetBody(h));
+        });
+        parent.appendChild(btn);
+      }
+
       var orderRoot = document.getElementById("to-order-list");
       D.stock.toOrder.forEach(function (o) {
         var block = document.createElement("div");
@@ -107,6 +206,20 @@
           "</div>";
         bindWhy(block.querySelector(".why-link"), o.whyTitle, o.whyLines, o.confidence);
         orderRoot.appendChild(block);
+      });
+
+      var comingRoot = document.getElementById("coming-up");
+      D.stock.comingUp.forEach(function (item) {
+        var row = document.createElement("div");
+        row.className = "coming-up-row";
+        var whyBtn = document.createElement("button");
+        whyBtn.type = "button";
+        whyBtn.className = "why-link";
+        whyBtn.textContent = "Why?";
+        row.innerHTML = '<p class="coming-up-row__headline">' + item.headline + "</p>";
+        row.appendChild(whyBtn);
+        bindWhy(whyBtn, item.whyTitle, item.whyLines, item.confidence);
+        comingRoot.appendChild(row);
       });
 
       var low = document.getElementById("running-low");
@@ -165,25 +278,43 @@
         });
       });
 
-      var missingWhyLines = [
-        "Store had 10 kg. 6 kg went to the kitchen. The chef confirmed the handover, so 4 kg should be left.",
-        "The shift-close count found 2 kg. That gap is something to check, not proof anyone did wrong.",
-      ];
       D.stock.missing.forEach(function (m) {
         var card = document.createElement("article");
         card.className = "card stock-gap-card";
-        card.innerHTML =
-          '<p class="card__sentence">' +
+        var gapLine =
           m.headline +
           ", " +
-          m.meta.replace(" · ", ", ").replace("Storekeeper ", "").replace("Chef ", "") +
+          m.meta.replace(" · ", ", ").replace("Storekeeper ", "").replace("Chef ", "");
+        card.innerHTML =
+          '<p class="card__sentence">' +
+          gapLine +
           "</p>" +
+          '<div class="proof-row">' +
+          photoThumb("Handover photo") +
+          '<div class="proof-row__text"><p class="proof-pin">' +
+          m.pinProof +
+          "</p></div></div>" +
           '<button type="button" class="why-link">Why?</button>' +
           '<p class="stock-gap-card__note">' +
           m.recipeNote +
           "</p>";
-        bindWhy(card.querySelector(".why-link"), m.whyTitle, missingWhyLines, null);
+        card.querySelector(".why-link").addEventListener("click", function () {
+          openWhyWithProof(m.whyTitle, m.whyLines, null, m.pinProof);
+        });
         document.getElementById("missing-stock").appendChild(card);
+      });
+
+      var handoverRoot = document.getElementById("recent-handovers");
+      D.stock.recentHandovers.slice(0, 3).forEach(function (h) {
+        renderHandoverButton(h, handoverRoot);
+      });
+      document.getElementById("see-all-handovers").addEventListener("click", function () {
+        var html = '<div id="all-handovers-list"></div>';
+        UI.openSheet("All handovers at Eleven", html);
+        var list = document.querySelector("#sheet-overlay #all-handovers-list");
+        D.stock.recentHandovers.forEach(function (h) {
+          renderHandoverButton(h, list);
+        });
       });
 
       var expiryRoot = document.getElementById("going-off-soon");

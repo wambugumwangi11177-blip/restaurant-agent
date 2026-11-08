@@ -1428,6 +1428,119 @@ body[data-page="stock"] .section-label:first-child {
   font-weight: 600;
 }
 
+.photo-thumb {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  color: #e4e4e7;
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+  padding: var(--space-1);
+}
+
+.proof-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.proof-row__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.proof-pin {
+  font-size: 0.8125rem;
+  color: #e4e4e7;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.coming-up-row {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.coming-up-row:last-child {
+  border-bottom: none;
+}
+
+.coming-up-row__headline {
+  font-size: 0.9375rem;
+  color: #fafafa;
+  margin: 0 0 var(--space-2);
+}
+
+.handover-row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) 0;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  min-height: var(--min-touch);
+}
+
+.handover-row:last-child {
+  border-bottom: none;
+}
+
+.handover-row__main {
+  min-width: 0;
+}
+
+.handover-row__time {
+  font-size: 0.75rem;
+  color: #a1a1aa;
+  margin: 0 0 var(--space-1);
+}
+
+.handover-row__route {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #a1a1aa;
+  margin: 0 0 var(--space-1);
+}
+
+.handover-row__people {
+  font-size: 0.875rem;
+  color: #fafafa;
+  margin: 0 0 var(--space-1);
+}
+
+.handover-row__items {
+  font-size: 0.8125rem;
+  color: #d4d4d8;
+  margin: 0 0 var(--space-2);
+}
+
+.pin-status {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #e4e4e7;
+}
+
+.pin-status--warn {
+  color: #fde68a;
+}
+
 .stock-expiry-row {
   padding: var(--space-3) 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);

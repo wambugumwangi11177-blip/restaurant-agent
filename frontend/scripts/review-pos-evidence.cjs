@@ -22,7 +22,7 @@ async function main() {
   const checks = [];
   try {
     for (const width of [390, 1440]) {
-      for (const state of ["empty", "failed", "error"]) {
+      for (const state of ["empty", "failed", "partial", "error"]) {
         const page = await browser.newPage({ viewport: { width, height: 844 } });
         await page.addInitScript(() => sessionStorage.setItem("access_token", "synthetic-review-session"));
         await page.route("**/api/v1/**", async route => {
@@ -36,12 +36,12 @@ async function main() {
             if (state === "error") return route.fulfill({ status: 503, headers, json: { detail: "Synthetic outage" } });
             if (url.pathname.endsWith("/status")) data = {
               durable_inbox_enabled: true, source_bound: state !== "empty", receipts: state === "empty" ? 0 : 1,
-              by_status: state === "empty" ? {} : { failed: 1 }, backlog: state === "empty" ? 0 : 1,
+              by_status: state === "empty" ? {} : { [state]: 1 }, backlog: state === "empty" ? 0 : 1,
               last_receipt_at: state === "empty" ? null : "2026-11-09T10:00:00", last_successful_parse_at: null,
               completeness: "not_checked", sales_live: null, legacy_receipts: "not_counted_in_this_inbox",
               why: "Receipt and parsing are separate milestones. Parsing alone does not establish complete sales coverage.",
             };
-            else data = state === "empty" ? [] : [{ id: "synthetic-receipt-reference", received_at: "2026-11-09T10:00:00", status: "failed", attempts: 1, error_code: "mapping_failed", parser_version: "synthetic-v1", parsed_at: null, last_attempt_at: "2026-11-09T10:00:00", payload_sha256: "synthetic-only" }];
+            else data = state === "empty" ? [] : [{ id: "synthetic-receipt-reference", received_at: "2026-11-09T10:00:00", status: state, attempts: 1, error_code: state === "failed" ? "mapping_failed" : null, parser_version: "synthetic-v1", parsed_at: null, last_attempt_at: "2026-11-09T10:00:00", payload_sha256: "synthetic-only" }];
           } else data = { items: [], unread_count: 0 };
           return route.fulfill({ headers, json: data });
         });

@@ -234,7 +234,8 @@ def parse_receipt(db: Session, receipt_id: str, *, restaurant_id: int,
                     result["orders_updated"] += 1
                 db.flush()
             result["nairobi_business_days"] = sorted(days)
-        row.status = "unrecognized" if result["unmapped_records"] == len(records) else "parsed"
+        row.status = ("unrecognized" if result["unmapped_records"] == len(records)
+                      else "partial" if result["unmapped_records"] else "parsed")
         row.parsed_at = utcnow() if row.status == "parsed" else None
         row.error_code = None
         row.result = result

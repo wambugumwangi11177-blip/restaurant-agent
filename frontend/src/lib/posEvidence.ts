@@ -2,7 +2,7 @@ export type PosSourceStatus = {
   durable_inbox_enabled: boolean;
   source_bound: boolean;
   receipts: number;
-  by_status: Partial<Record<"pending" | "failed" | "unrecognized" | "parsed", number>>;
+  by_status: Partial<Record<"pending" | "failed" | "unrecognized" | "partial" | "parsed", number>>;
   last_receipt_at: string | null;
   last_successful_parse_at: string | null;
   backlog: number;
@@ -15,7 +15,7 @@ export type PosSourceStatus = {
 export type PosReceipt = {
   id: string;
   received_at: string;
-  status: "pending" | "failed" | "unrecognized" | "parsed";
+  status: "pending" | "failed" | "unrecognized" | "partial" | "parsed";
   parser_version: string | null;
   attempts: number;
   last_attempt_at: string | null;

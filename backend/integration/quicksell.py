@@ -165,9 +165,19 @@ def maybe_apply_sale(
 
 def normalize_payload(payload: Any) -> tuple[str, list[dict]]:
     """Turn any JSON value into (entity, list of dict records) for mirroring."""
-    from integration.payload_parse import records_from
-
-    entity, records = records_from(payload if isinstance(payload, (dict, list)) else {"_value": payload})
+    entity = "unknown"
+    records = []
+    if isinstance(payload, list):
+        records = payload
+    elif isinstance(payload, dict):
+        entity = str(payload.get("entity") or payload.get("type") or "unknown").strip() or "unknown"
+        records = [payload]
+        for key in ("records", "data", "items", "rows", "transactions", "sales"):
+            if isinstance(payload.get(key), list):
+                records = payload[key]
+                break
+    else:
+        records = [{"_value": payload}]
     out: list[dict] = []
     for r in records:
         if isinstance(r, dict):

@@ -49,6 +49,8 @@ export default function PosEvidence() {
         setMessage(result.data.already_parsed
           ? "This receipt was already parsed. No additional sales were created."
           : `Receipt parsed: ${result.data.orders_inserted} sales added, ${result.data.orders_updated} updated. Sales completeness still needs checking.`);
+      } else if (result.data.parse_status === "partial") {
+        setMessage(`Receipt partially parsed: ${result.data.orders_inserted} sales added, ${result.data.orders_updated} updated. Other records still need parser review.`);
       } else {
         setMessage("The original receipt is retained. This payload still needs parser review; no successful sale mapping is claimed.");
       }
@@ -80,7 +82,7 @@ export default function PosEvidence() {
         </dl>
         {source.receipts === 0 && <p className="mt-4 text-sm text-zinc-200">No envelopes recorded in this inbox yet. This does not count earlier mirror records or prove the till has sent nothing.</p>}
         <details className="mt-4 text-sm"><summary className="min-h-11 cursor-pointer py-3 font-semibold">Why these numbers?</summary>
-          <p className="mt-2 text-zinc-200">{source.why} Counts cover this restaurant’s retained inbox records across all dates. Backlog adds pending, failed and unrecognized envelopes. Repeat deliveries count as separate receipts; their mapped sales are deduplicated. Earlier mirror history is excluded.</p>
+          <p className="mt-2 text-zinc-200">{source.why} Counts cover this restaurant’s retained inbox records across all dates. Backlog adds pending, failed, unrecognized and partially parsed envelopes. Repeat deliveries count as separate receipts; their mapped sales are deduplicated. Earlier mirror history is excluded.</p>
           <p className="mt-2 text-zinc-200">Identical sales without a stable source ID cannot be distinguished reliably from retries. A successful parse does not verify payment methods, dish mapping or complete trading-day coverage.</p>
         </details>
         <button className={actionClass + " mt-3"} onClick={() => void load()}>Refresh evidence</button>

@@ -70,4 +70,14 @@ describe("QuickSell evidence states", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Retry parser" }));
     await waitFor(() => expect(screen.getByText(/Replay was not confirmed/)).toBeTruthy());
   });
+
+  it("keeps partial mappings visible and reports only actual replay counts", async () => {
+    get.mockImplementation((path: string) => Promise.resolve({ data: path.endsWith("status")
+      ? { ...source, receipts: 1, backlog: 1 } : [{ ...receipt, status: "partial", error_code: null }] }));
+    post.mockResolvedValue({ data: { parse_status: "partial", orders_inserted: 1, orders_updated: 0 } });
+    render(<PosEvidence />);
+    fireEvent.click(await screen.findByRole("button", { name: "Retry parser" }));
+    expect(await screen.findByText(/partially parsed: 1 sales added, 0 updated/)).toBeTruthy();
+    expect(screen.getByText(/Other records still need parser review/)).toBeTruthy();
+  });
 });

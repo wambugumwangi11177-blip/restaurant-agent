@@ -28,9 +28,21 @@ def pg():
     parsed = urlparse(URL)
     if parsed.hostname not in ("localhost", "127.0.0.1") or parsed.path != "/test_owner_release":
         pytest.fail("Refusing a non-local or non-test database")
-    engine = create_engine(URL, hide_parameters=True)
-    yield engine
-    engine.dispose()
+    # Each test gets its own schema: the pre-existing owner gate creates all
+    # current ORM tables, which must not mask a real 050→051 upgrade here.
+    schema = "test_pos_" + uuid.uuid4().hex
+    control = create_engine(URL, hide_parameters=True)
+    with control.begin() as connection:
+        connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+    engine = create_engine(URL, hide_parameters=True,
+                           connect_args={"options": f"-csearch_path={schema}"})
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+        with control.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+        control.dispose()
 
 
 def migrate(connection):

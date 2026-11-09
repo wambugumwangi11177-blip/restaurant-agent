@@ -142,6 +142,22 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: Synthetic till evidence browser review
+        run: |
+          npx playwright install --with-deps chromium
+          npm run start -- --hostname 127.0.0.1 --port 3000 > /tmp/till-review-server.log 2>&1 &
+          REVIEW_SERVER_PID=$!
+          trap 'kill "$REVIEW_SERVER_PID"' EXIT
+          node scripts/review-pos-evidence.cjs
+
+      - name: Upload synthetic till review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: leviii-pos-evidence
+          path: docs/leviii/evidence
+          if-no-files-found: warn
+
   gitleaks:
     # Secret scanning — catches an API key / token / password committed to the
     # repo before it reaches history. Complements pip-audit/bandit (which cover

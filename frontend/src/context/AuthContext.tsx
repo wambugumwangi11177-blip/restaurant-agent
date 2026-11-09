@@ -22,6 +22,7 @@ interface User {
   email: string;
   role: string;
   restaurant_name?: string;
+  restaurant_id?: number | null;
   // Tenant fork (Vibanda dedicated shell) — read fresh from /auth/me.
   tenant_name?: string | null;
   // Directive 015 — fine-grained tier (owner/manager/supervisor/controller/

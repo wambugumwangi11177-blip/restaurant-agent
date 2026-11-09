@@ -51,9 +51,15 @@ async function main() {
         else await page.getByRole("heading", { name: "QuickSell receipt evidence" }).waitFor();
         const overflows = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
         if (overflows) throw new Error(`${state} overflows at ${width}px`);
+        const navigation = await page.getByRole("navigation", { name: "Main", exact: true }).boundingBox();
+        if (!navigation || (width === 390
+          ? Math.abs(navigation.y + navigation.height - (844 - 12)) > 2
+          : navigation.y > 32 || navigation.x > 24)) {
+          throw new Error(`Shared navigation is not fixed to the viewport at ${width}px`);
+        }
         const file = `pos-${state}-${width}.png`;
         await page.screenshot({ path: path.join(output, file), fullPage: true });
-        checks.push({ state, width, horizontalOverflow: false, screenshot: file });
+        checks.push({ state, width, horizontalOverflow: false, fixedNavigation: true, screenshot: file });
         await page.close();
       }
     }

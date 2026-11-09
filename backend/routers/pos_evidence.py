@@ -1,7 +1,7 @@
 """Owner-scoped receipt metadata and controlled replay; never exposes raw POS PII."""
 from datetime import datetime
 from typing import Literal
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from database import get_db
 from integration import inbox
 from integration.inbox_models import PosInbox, PosParseAttempt, PosSourceBinding
 from routers.deps import get_restaurant_or_none
+from rate_limit import limiter
 
 router = APIRouter(prefix="/pos/quicksell", tags=["pos-evidence"])
 
@@ -18,7 +19,7 @@ router = APIRouter(prefix="/pos/quicksell", tags=["pos-evidence"])
 class ReceiptOut(BaseModel):
     id: str
     received_at: datetime
-    status: Literal["pending", "failed", "unrecognized", "parsed"]
+    status: Literal["pending", "failed", "unrecognized", "partial", "parsed"]
     parser_version: str | None
     attempts: int
     last_attempt_at: datetime | None
@@ -66,7 +67,7 @@ class ReplayOut(BaseModel):
     unmapped_records: int
     stale_revisions_ignored: int
     receipt_id: str
-    parse_status: Literal["pending", "failed", "unrecognized", "parsed"]
+    parse_status: Literal["pending", "failed", "unrecognized", "partial", "parsed"]
     already_parsed: bool = False
 
 
@@ -91,7 +92,7 @@ def status(db: Session = Depends(get_db),
     return dict(durable_inbox_enabled=inbox.enabled(), source_bound=binding is not None,
                 receipts=sum(counts.values()), by_status=counts,
                 last_receipt_at=latest, last_successful_parse_at=parsed,
-                backlog=sum(counts.get(s, 0) for s in ("pending", "failed", "unrecognized")),
+                backlog=sum(counts.get(s, 0) for s in ("pending", "failed", "unrecognized", "partial")),
                 completeness="not_checked", sales_live=None,
                 why="Receipt and parsing are separate milestones. Parsing alone does not establish complete sales coverage.",
                 legacy_receipts="not_counted_in_this_inbox")
@@ -99,7 +100,7 @@ def status(db: Session = Depends(get_db),
 
 @router.get("/receipts", response_model=list[ReceiptOut])
 def receipts(limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0, le=100_000),
-             state: Literal["pending", "failed", "unrecognized", "parsed"] | None = None,
+             state: Literal["pending", "failed", "unrecognized", "partial", "parsed"] | None = None,
              db: Session = Depends(get_db),
              user: models.User = Depends(auth.require_role(models.Role.ADMIN))):
     restaurant = _restaurant(db, user)
@@ -121,7 +122,8 @@ def attempts(receipt_id: str, db: Session = Depends(get_db),
 
 
 @router.post("/receipts/{receipt_id}/replay", response_model=ReplayOut)
-def replay(receipt_id: str, db: Session = Depends(get_db),
+@limiter.limit("10/minute")
+def replay(receipt_id: str, request: Request, db: Session = Depends(get_db),
            user: models.User = Depends(auth.require_role(models.Role.ADMIN))):
     restaurant = _restaurant(db, user)
     if not inbox.enabled():

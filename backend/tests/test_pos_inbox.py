@@ -218,6 +218,21 @@ def test_duplicate_json_keys_are_retained_for_review(client, db_session, eleven_
     assert db_session.query(Order).count() == 0
 
 
+def test_mixed_envelope_keeps_unmapped_records_in_review_queue(client, db_session, eleven_restaurant):
+    result = _post(client, {"entity": "sale", "records": [{"id": "mixed", "total": 10}, "unrecognized line", {"sku": "stock-only"}]})
+    assert result.json()["received"] == 3
+    assert result.json()["parse_status"] == "partial"
+    assert result.json()["unmapped_records"] == 2
+    assert db_session.query(Order).count() == 1
+    status = client.get("/api/v1/pos/quicksell/status", headers=headers(owner(db_session))).json()
+    assert status["backlog"] == 1 and status["by_status"]["partial"] == 1
+    receipt_id = result.json()["receipt_id"]
+    replay = client.post(f"/api/v1/pos/quicksell/receipts/{receipt_id}/replay", headers=headers(owner(db_session)))
+    assert replay.json()["orders_inserted"] == 0
+    assert replay.json()["parse_status"] == "partial"
+    assert db_session.query(Order).count() == 1
+
+
 @pytest.mark.parametrize("value,cents", [("1.005", 101), ("12.25", 1225), ("0", 0)])
 def test_decimal_money(value, cents):
     assert quicksell.total_cents_optional({"total": value}) == cents

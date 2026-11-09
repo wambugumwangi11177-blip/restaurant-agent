@@ -38,6 +38,10 @@ markers need a future adapter; no automatic reversal or negative-total mapping.
 Total-only orders retain existing legacy order semantics, including paid/dine-in
 defaults; these are not proof of a payment method, actual settlement or channel.
 
+Mixed envelopes keep a `partial` status and remain in the review backlog until
+every normalized record is understood. Primitive list entries are preserved as
+unrecognized records instead of being silently filtered out of receipt counts.
+
 Initial binding reuses the existing restaurant-name contract only if exactly
 one restaurant matches; ambiguity fails closed. The binding persists thereafter,
 so a rename cannot redirect the source. No tenant ID/header from the POS selects

@@ -26,7 +26,7 @@
     var(--og-bg);
 }
 
-.owner-glass-theme > * {
+.owner-glass-theme > :not(nav) {
   position: relative;
   z-index: 1;
 }

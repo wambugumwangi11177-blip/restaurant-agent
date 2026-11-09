@@ -12,7 +12,13 @@ async function main() {
   }
   const output = path.resolve(__dirname, "../../docs/leviii/evidence");
   await fs.mkdir(output, { recursive: true });
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium", headless: true });
+  let available = false;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    try { if ((await fetch(base)).ok) { available = true; break; } } catch { /* local server starting */ }
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  if (!available) throw new Error("Local review frontend did not start");
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, headless: true });
   const checks = [];
   try {
     for (const width of [390, 1440]) {

@@ -47,7 +47,7 @@ async function main() {
         });
         await page.goto(base + "/eleven/settings/till");
         await page.getByRole("heading", { name: "Till evidence", exact: true }).waitFor();
-        if (state === "error") await page.getByRole("alert").waitFor();
+        if (state === "error") await page.getByRole("main").getByRole("alert").waitFor();
         else await page.getByRole("heading", { name: "QuickSell receipt evidence" }).waitFor();
         const overflows = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
         if (overflows) throw new Error(`${state} overflows at ${width}px`);

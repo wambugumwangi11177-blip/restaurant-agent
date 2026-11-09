@@ -271,19 +271,27 @@ def _quicksell_source_system(db: Session) -> int:
 
 
 def _eleven_restaurant_id(db: Session) -> int:
-    row = (
+    from integration import inbox
+    if inbox.enabled():
+        from integration.inbox_models import PosSourceBinding
+        binding = db.query(PosSourceBinding).filter_by(slug=QUICKSELL_SOURCE_SLUG).first()
+        if binding:
+            return binding.restaurant_id
+    rows = (
         db.query(models.Restaurant.id)
         .join(models.Tenant, models.Tenant.id == models.Restaurant.tenant_id)
         .filter(models.Restaurant.name == ELEVEN_RESTAURANT_NAME)
         .order_by(models.Restaurant.id)
-        .first()
+        .limit(2).all()
     )
-    if row is None:
+    if not rows:
         raise HTTPException(
             status_code=503,
             detail=f"Eleven restaurant {ELEVEN_RESTAURANT_NAME!r} is not configured on this server.",
         )
-    return row[0]
+    if len(rows) != 1:
+        raise HTTPException(503, "Ambiguous POS restaurant — configure an explicit source binding.")
+    return rows[0][0]
 
 
 @router.post("/quicksell/data")
@@ -295,6 +303,23 @@ async def receive_quicksell_data(
 ):
     """One-way POS push for Eleven. Raw JSON is mirrored, then mapped to orders."""
     _verify_quicksell_key(x_api_key)
+
+    from integration import inbox
+    if inbox.enabled():
+        raw = await inbox.read_body(request)
+        try:
+            restaurant_id = _eleven_restaurant_id(db)
+            binding = inbox.bind_source(db, restaurant_id)
+            receipt_id = inbox.store_receipt(db, binding=binding, raw=raw)
+            source_id = _quicksell_source_system(db)
+            return inbox.parse_receipt(db, receipt_id, restaurant_id=restaurant_id,
+                                       source_system_id=source_id)
+        except HTTPException:
+            raise
+        except Exception:
+            db.rollback()
+            # Do not log SQL exceptions: they may contain raw bound parameters.
+            raise HTTPException(503, "Processing unavailable — please retry.")
 
     try:
         payload = await request.json()

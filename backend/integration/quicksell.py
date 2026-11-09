@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -82,9 +83,21 @@ def total_cents_optional(record: dict) -> int | None:
         v = record[k]
         if v is None:
             continue
-        if k.endswith("_cents") or k in ("amount_cents",):
-            return int(v)
-        return int(round(float(v) * 100))
+        if isinstance(v, bool):
+            raise ValueError("Invalid sale total")
+        try:
+            amount = Decimal(str(v))
+            if not amount.is_finite():
+                raise ValueError("Invalid sale total")
+            cents = amount if k.endswith("_cents") else amount * 100
+            if k.endswith("_cents") and cents != cents.to_integral_value():
+                raise ValueError("Fractional cents are not supported")
+            result = int(cents.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            if result < 0 or result > 2_147_483_647:
+                raise ValueError("Sale total needs review")
+            return result
+        except (InvalidOperation, OverflowError):
+            raise ValueError("Invalid sale total")
     return None
 
 

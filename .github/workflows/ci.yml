@@ -220,7 +220,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Verify migration paths and concurrent decisions on PostgreSQL
-        run: pytest -v tests/test_owner_postgres.py
+        run: pytest -v tests/test_owner_postgres.py tests/test_pos_inbox_postgres.py
       - name: Restore synthetic backup into a separate database
         run: |
           # The runner's pg_dump is newer than the Postgres 16 service. Its

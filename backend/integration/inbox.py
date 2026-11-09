@@ -68,15 +68,7 @@ def decode_body(raw: bytes) -> Any:
     try:
         def reject_constant(value):
             raise ValueError("Non-finite JSON number")
-        def unique_object(pairs):
-            value = {}
-            for key, item in pairs:
-                if key in value:
-                    raise ValueError("Duplicate JSON key")
-                value[key] = item
-            return value
-        payload = json.loads(raw.decode("utf-8"), parse_constant=reject_constant,
-                             object_pairs_hook=unique_object)
+        payload = json.loads(raw.decode("utf-8"), parse_constant=reject_constant)
     except (ValueError, UnicodeError, RecursionError):
         raise HTTPException(400, "Invalid JSON payload")
     stack = [(payload, 0)]
@@ -156,6 +148,17 @@ def _has_source_time(record: dict) -> bool:
         return False
 
 
+def _unambiguous_object(pairs):
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            # Duplicate keys are syntactically JSON. Retain the original raw
+            # envelope, but do not choose one interpretation for financial truth.
+            raise MappingReviewError("ambiguous_json_keys")
+        value[key] = item
+    return value
+
+
 def parse_receipt(db: Session, receipt_id: str, *, restaurant_id: int,
                   source_system_id: int, actor_id: int | None = None) -> dict:
     row = db.query(PosInbox).filter_by(id=receipt_id, restaurant_id=restaurant_id).first()
@@ -178,7 +181,7 @@ def parse_receipt(db: Session, receipt_id: str, *, restaurant_id: int,
         # Savepoint keeps attempt metadata after mapping rollback. Envelope was
         # already committed by store_receipt in a separate transaction.
         with db.begin_nested():
-            entity, records = qs.normalize_payload(json.loads(row.raw_body))
+            entity, records = qs.normalize_payload(json.loads(row.raw_body, object_pairs_hook=_unambiguous_object))
             result = _empty_result(entity, len(records))
             days = set()
             for record in records:

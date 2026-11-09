@@ -134,7 +134,7 @@ def test_ambiguous_initial_binding_fails_closed(client, db_session, eleven_resta
     assert db_session.query(PosInbox).count() == 0
 
 
-@pytest.mark.parametrize("raw,code", [(b'{bad', 400), (b'{"a":1,"a":2}', 400),
+@pytest.mark.parametrize("raw,code", [(b'{bad', 400),
     (b'{"a":NaN}', 400), (b'{"a":Infinity}', 400),
     (b'[' * 40 + b'0' + b']' * 40, 413),
     (b'"' + b'x' * inbox.MAX_BYTES + b'"', 413)])
@@ -204,6 +204,17 @@ def test_failed_raw_commit_is_not_acknowledged(client, db_session, eleven_restau
     monkeypatch.setattr(Session, "commit", fail_receipt_commit)
     assert _post(client, _sale()).status_code == 503
     assert db_session.query(PosInbox).count() == 0
+    assert db_session.query(Order).count() == 0
+
+
+def test_duplicate_json_keys_are_retained_for_review(client, db_session, eleven_restaurant):
+    raw = '{"id":"duplicate-keys","total":10,"total":20}'
+    result = client.post("/webhooks/quicksell/data", content=raw,
+                         headers={"x-api-key": "test-quicksell-key"})
+    assert result.status_code == 200
+    assert result.json()["parse_status"] == "failed"
+    receipt = db_session.query(PosInbox).one()
+    assert receipt.raw_body == raw and receipt.error_code == "ambiguous_json_keys"
     assert db_session.query(Order).count() == 0
 
 

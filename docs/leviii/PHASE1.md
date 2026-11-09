@@ -65,7 +65,7 @@ broader restaurant membership model is a remaining Phase 1 requirement.
 
 | Boundary / abuse | Control in this increment | Remaining limit |
 |---|---|---|
-| Forged webhook / oversized or pathological JSON | Existing constant-time key verification; 1 MiB streaming cap, depth 32, 20,000 nodes, batch 500; reject duplicate JSON keys/non-finite JSON | Key rotation and source operational ownership need review |
+| Forged webhook / oversized or pathological JSON | Existing constant-time key verification; 1 MiB streaming cap, depth 32, 20,000 nodes, batch 500; reject non-finite JSON; duplicate keys retained for review without financial mapping | Key rotation and source operational ownership need review |
 | Replayed/concurrent delivery | Source row lock on PostgreSQL; unique source/entity/ID/version mapping; transaction/savepoint | SQLite tests do not prove multiprocess concurrency |
 | Parser crash / process interruption | Raw commit precedes mapping; failed/pending queue and controlled replay | No automatic worker is claimed; operator must review backlog |
 | Cross-tenant reads/replay | Authenticated current restaurant; scoped queries/FKs, role tests | Full application isolation still requires review |

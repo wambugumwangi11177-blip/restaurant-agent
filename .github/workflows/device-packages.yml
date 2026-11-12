@@ -31,7 +31,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: android-actions/setup-android@v3
+      - name: Accept the Android SDK licenses
+        run: |
+          sdkmanager=$(find "${ANDROID_SDK_ROOT:-$ANDROID_HOME}" /usr/local/lib/android/sdk -path '*/cmdline-tools/*/bin/sdkmanager' -type f 2>/dev/null | head -1)
+          test -n "$sdkmanager"
+          yes | "$sdkmanager" --licenses >/dev/null
       - run: npm ci
       - run: npm test
       - run: npm run configure

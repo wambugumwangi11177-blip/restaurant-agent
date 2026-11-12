@@ -223,8 +223,19 @@ jobs:
         run: pytest -v tests/test_owner_postgres.py
       - name: Restore synthetic backup into a separate database
         run: |
-          pg_dump --format=custom --dbname=test_owner_release --file=/tmp/owner-release.dump
+          # The runner's pg_dump is newer than the Postgres 16 service. Its
+          # archives contain SET transaction_timeout, which 16 rejects. Dump
+          # and restore with the 16 client so the drill matches the server.
           createdb test_owner_restore
-          pg_restore --exit-on-error --no-owner --dbname=test_owner_restore /tmp/owner-release.dump
+          docker run --rm --network host \
+            -e PGPASSWORD="$PGPASSWORD" \
+            -v /tmp:/tmp \
+            postgres:16 \
+            pg_dump --format=custom --host="$PGHOST" --username="$PGUSER" --dbname=test_owner_release --file=/tmp/owner-release.dump
+          docker run --rm --network host \
+            -e PGPASSWORD="$PGPASSWORD" \
+            -v /tmp:/tmp \
+            postgres:16 \
+            pg_restore --exit-on-error --no-owner --host="$PGHOST" --username="$PGUSER" --dbname=test_owner_restore /tmp/owner-release.dump
           test "$(psql -At --dbname=test_owner_restore -c 'SELECT count(*) FROM attention_decisions')" = "1"
           test "$(psql -At --dbname=test_owner_restore -c 'SELECT sum(total) FROM orders WHERE is_paid')" = "12345"

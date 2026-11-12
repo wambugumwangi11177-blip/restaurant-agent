@@ -112,18 +112,18 @@ def test_suppliers_stock_issue_and_waste_are_quantities_only(client, db_session)
     issued = client.post(
         "/api/v1/store/issue",
         headers=_auth(_token(jack)),
-        json={"item_id": tusker["id"], "quantity": 4, "from_zone": "Bar", "to_zone": "Kitchen"},
+        json={"item_id": tusker["id"], "quantity": 4, "from_zone": "Bar", "to_zone": "Cold room"},
     )
     assert issued.status_code == 201
-    wasted = client.post(
-        "/api/v1/store/waste",
+    kitchen = client.post(
+        "/api/v1/store/issue",
         headers=_auth(_token(jack)),
-        json={"item_id": tusker["id"], "quantity": 1, "zone": "Kitchen", "note": "broken"},
+        json={"item_id": tusker["id"], "quantity": 1, "from_zone": "Bar", "to_zone": "Kitchen"},
     )
-    assert wasted.status_code == 201
+    assert kitchen.status_code == 400
     after = client.get("/api/v1/store/items", headers=_auth(_token(jack))).json()["items"]
     left = next(item for item in after if item["id"] == tusker["id"])
-    assert left["quantity"] == 23
+    assert left["quantity"] == 24
     costs = client.post(
         "/api/v1/store/costs",
         headers=_auth(_token(jack)),

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CustodyDiagram } from "@/components/store/diagrams";
-import { loadSetup, type SetupPayload } from "@/lib/storeSetup";
+import { hasModule, loadSetup, type SetupPayload } from "@/lib/storeSetup";
 
 export default function StoreHomePage() {
   const [setup, setSetup] = useState<SetupPayload | null>(null);
@@ -36,6 +36,18 @@ export default function StoreHomePage() {
         </section>
       )}
       {error && <p className="text-sm text-red-300">{error}</p>}
+      {setup?.app_unlocked && (
+        <section className="owner-glass-panel rounded-3xl p-4">
+          <h2 className="font-semibold">Today</h2>
+          <ul className="mt-3 space-y-2 text-sm">
+            <li><Link href="/store/chefs" className="underline">Chefs</Link></li>
+            {hasModule(setup, "deliveries") && <li><Link href="/store/deliveries" className="underline">Deliveries</Link></li>}
+            {hasModule(setup, "store-issue") && <li><Link href="/store/issue" className="underline">Hand to the kitchen</Link></li>}
+            {hasModule(setup, "waste") && <li><Link href="/store/waste" className="underline">Thrown away</Link></li>}
+            {hasModule(setup, "day-close") && <li><Link href="/store/close" className="underline">Close the day</Link></li>}
+          </ul>
+        </section>
+      )}
       {!setup ? (
         <p className="text-sm text-zinc-400">Loading your steps…</p>
       ) : (

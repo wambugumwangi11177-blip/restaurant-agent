@@ -11,7 +11,7 @@ import "@/styles/owner-glass.css";
 const NAV = [
   { href: "/store", label: "Home", icon: Home, match: (p: string) => p === "/store" || p.startsWith("/store/questions") },
   { href: "/store/deliveries", label: "In", icon: Truck, match: (p: string) => p.startsWith("/store/deliveries") || p.startsWith("/store/suppliers") },
-  { href: "/store/stock", label: "Stock", icon: Package, match: (p: string) => p.startsWith("/store/stock") || p.startsWith("/store/issue") || p.startsWith("/store/waste") },
+  { href: "/store/stock", label: "Stock", icon: Package, match: (p: string) => ["/store/stock", "/store/issue", "/store/waste", "/store/close", "/store/chefs"].some((prefix) => p.startsWith(prefix)) },
   { href: "/store/account", label: "Account", icon: UserRound, match: (p: string) => p.startsWith("/store/account") || p.startsWith("/store/costs") || p.startsWith("/store/recipes") },
 ] as const;
 

@@ -66,6 +66,7 @@ export default function StoreStockPage() {
   }
 
   const recipes = stepById(setup, "recipes");
+  if (!setup && !error) return <p className="text-sm text-zinc-400">Loading stock…</p>;
   if (setup && !setup.app_unlocked) {
     return (
       <section className="owner-glass-panel rounded-3xl p-4">
@@ -127,6 +128,7 @@ export default function StoreStockPage() {
           <button type="submit" className="min-h-11 w-full rounded-full bg-white font-semibold text-black">Save opening count</button>
         </form>
       )}
+      {items.length === 0 && <p className="text-sm text-zinc-400">Nothing is in stock yet.</p>}
       <ul className="space-y-2">
         {items.map((item) => (
           <li key={item.id} className="owner-glass-panel rounded-3xl px-4 py-3 text-sm">
@@ -142,9 +144,11 @@ export default function StoreStockPage() {
           </li>
         ))}
       </ul>
-      <div className="flex gap-3 text-sm text-zinc-400">
+      <div className="flex flex-wrap gap-3 text-sm text-zinc-400">
         <Link href="/store/issue">Hand to kitchen</Link>
         <Link href="/store/waste">Thrown away</Link>
+        <Link href="/store/close">Close the day</Link>
+        <Link href="/store/chefs">Chefs</Link>
       </div>
     </div>
   );

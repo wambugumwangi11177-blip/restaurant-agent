@@ -56,9 +56,9 @@ Use `assembleRelease` only in that future job. Never print the passwords.
 
 To publish a new APK:
 
-1. Bump `version` and `versionCode` together in `packaging/version.json` and `frontend/src/lib/leviii-store-version.json`. The packaging test fails if they differ.
+1. Bump `version` and `versionCode` together in `packaging/version.json` and `frontend/src/lib/leviii-store-version.json`. The packaging test fails if they differ. A push to `feat/jack-storekeeper` runs this workflow, and it can still be started by hand. The Windows installer is not built here: electron-builder's NSIS target needs Wine on the Linux runner, which is not a reliable job. `/get` keeps the honest "coming soon" until a real installer exists.
 2. Run the **Device packages (LEVIII Store debug APK)** workflow on the branch you want packaged. It builds the debug APK, uploads the `LEVIII-Store-debug` artifact, and replaces the `leviii-store` GitHub Release asset `LEVIII-Store.apk`.
-3. Deploy the frontend so `/api/app/version` returns the new version. An installed APK reads that endpoint on launch. When the number is higher than the copy stamped into the app (`LEVIIIStore/1.0.0` in the WebView user agent, and `versionName` in the Android build), it offers **Download the update**. The offer is the same APK link. If the version request fails, the app stays quiet.
+3. Deploy the frontend so `/api/app/version` returns the new version. An installed APK reads that endpoint on launch. When the number is higher than the copy stamped into the app (`LEVIIIStore/` plus the version from `packaging/version.json` in the WebView user agent, and `versionName` in the Android build), it offers **Download the update**. The offer is the same APK link. If the version request fails, the app stays quiet.
 
 The release is the stable URL. The Actions artifact expires after 14 days and is only a build log of the same file. Windows has no installer in this workflow, so `/get` says it is coming soon and does not show a download button.
 

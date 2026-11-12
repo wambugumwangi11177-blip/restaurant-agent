@@ -67,13 +67,6 @@ class MoveIn(StrictModel):
     note: str = ""
 
 
-class WasteIn(StrictModel):
-    item_id: int
-    quantity: float = Field(gt=0)
-    zone: str = "Main store"
-    note: str = ""
-
-
 class CostIn(StrictModel):
     kind: str
     label: str = Field(min_length=1, max_length=80)
@@ -416,6 +409,8 @@ async def issue_to_kitchen(
         raise HTTPException(status_code=404, detail="Item not found")
     source = _zone(db, restaurant.id, body.from_zone)
     dest = _zone(db, restaurant.id, body.to_zone)
+    if dest.kind == "kitchen":
+        raise HTTPException(status_code=400, detail="The chef confirms a handover.")
     origin = _balance(db, restaurant.id, item.id, source.id)
     if origin.quantity < body.quantity:
         raise HTTPException(status_code=400, detail=f"Only {origin.quantity} {item.unit} is in {source.name}.")
@@ -426,7 +421,7 @@ async def issue_to_kitchen(
         inventory_item_id=item.id,
         movement_type=models.StockMovementType.OUT,
         quantity=body.quantity,
-        reason="issued to kitchen",
+        reason="moved",
         created_at=utcnow(),
         performed_by_user_id=user.id,
     ))
@@ -437,45 +432,6 @@ async def issue_to_kitchen(
     )
     db.commit()
     return {"item_name": item.item_name, "quantity": body.quantity, "unit": item.unit, "to_zone": dest.name}
-
-
-@router.post("/waste", status_code=201)
-async def record_waste(
-    body: WasteIn,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user),
-):
-    require_module(db, current_user, "waste")
-    restaurant = get_or_create_restaurant(db, current_user)
-    user = db.query(models.User).filter(models.User.id == current_user.id).first()
-    item = db.query(models.InventoryItem).filter(
-        models.InventoryItem.id == body.item_id,
-        models.InventoryItem.restaurant_id == restaurant.id,
-    ).first()
-    if item is None:
-        raise HTTPException(status_code=404, detail="Item not found")
-    zone = _zone(db, restaurant.id, body.zone)
-    bal = _balance(db, restaurant.id, item.id, zone.id)
-    if bal.quantity < body.quantity:
-        raise HTTPException(status_code=400, detail=f"Only {bal.quantity} {item.unit} is in {zone.name}.")
-    bal.quantity -= body.quantity
-    _sync_total(db, item)
-    db.add(models.StockMovement(
-        inventory_item_id=item.id,
-        movement_type=models.StockMovementType.OUT,
-        quantity=body.quantity,
-        reason="waste",
-        created_at=utcnow(),
-        performed_by_user_id=user.id,
-    ))
-    record_entry(
-        db, restaurant.id, user, "waste_recorded", "inventory_item",
-        f"{user.email} wrote off {body.quantity} {item.unit} of {item.item_name} from {zone.name}.",
-        entity_id=item.id,
-        detail={"note": body.note[:200]},
-    )
-    db.commit()
-    return {"item_name": item.item_name, "quantity": body.quantity, "unit": item.unit}
 
 
 @router.get("/costs")

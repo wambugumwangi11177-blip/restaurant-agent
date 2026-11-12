@@ -37,7 +37,8 @@ test("configure names LEVIII Store and points the WebView at the given origin", 
   assert.equal(config.server.url, "https://frontend-production-e251.up.railway.app");
   assert.equal(config.server.errorPath, "offline.html");
   assert.equal(config.server.cleartext, false);
-  assert.equal(config.android.appendUserAgent, "LEVIIIStore/1.0.0");
+  const release = JSON.parse(fs.readFileSync(path.join(__dirname, "version.json"), "utf8"));
+  assert.equal(config.android.appendUserAgent, `LEVIIIStore/${release.version}`);
   assert.equal(config.plugins.SplashScreen.backgroundColor, "#070708");
   const inline = fs.readFileSync(path.join(dir, "android", "www", "app-config.js"), "utf8");
   assert.match(inline, /frontend-production-e251\.up\.railway\.app/);

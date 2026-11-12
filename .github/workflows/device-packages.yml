@@ -1,5 +1,8 @@
 name: Device packages (LEVIII Store debug APK)
 on:
+  push:
+    branches:
+      - feat/jack-storekeeper
   workflow_dispatch:
     inputs:
       app_url:
@@ -16,7 +19,7 @@ jobs:
       run:
         working-directory: packaging
     env:
-      LEVIII_APP_URL: ${{ inputs.app_url }}
+      LEVIII_APP_URL: ${{ inputs.app_url || 'https://frontend-production-e251.up.railway.app' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

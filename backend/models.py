@@ -1837,6 +1837,164 @@ class DeliveryVisionCheck(Base):
     receipt = relationship("DeliveryReceipt", back_populates="vision_checks")
 
 
+class StoreChef(Base):
+    """A chef who confirms handovers and spoilage on Jack's phone.
+    There is no login. The PIN hash is the only secret, and it never leaves the server."""
+    __tablename__ = "store_chefs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    photo_storage_key = Column(String, nullable=True)
+    photo_content_type = Column(String, nullable=True)
+    hashed_pin = Column(String, nullable=False)
+    failed_pin_attempts = Column(Integer, nullable=False, default=0, server_default="0")
+    pin_locked_until = Column(DateTime, nullable=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+class KitchenHandover(Base):
+    """Stock Jack handed to the kitchen after a chef typed their PIN."""
+    __tablename__ = "kitchen_handovers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    chef_id = Column(Integer, ForeignKey("store_chefs.id"), nullable=False)
+    photo_storage_key = Column(String, nullable=True)
+    photo_content_type = Column(String, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    lines = relationship("KitchenHandoverLine", back_populates="handover")
+
+
+class KitchenHandoverLine(Base):
+    __tablename__ = "kitchen_handover_lines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    handover_id = Column(Integer, ForeignKey("kitchen_handovers.id", ondelete="CASCADE"), nullable=False, index=True)
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id"), nullable=False)
+    item_name = Column(String, nullable=False)
+    quantity = Column(Float, nullable=False)
+    unit = Column(String, nullable=False, default="")
+    from_zone = Column(String, nullable=False, default="Main store")
+
+    handover = relationship("KitchenHandover", back_populates="lines")
+
+
+class HandoverVisionCheck(Base):
+    """Async read of an optional handover photo. Status is updated once. The row is not a public note."""
+    __tablename__ = "handover_vision_checks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    handover_id = Column(Integer, ForeignKey("kitchen_handovers.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String, nullable=False, default="pending")
+    model_name = Column(String, nullable=True)
+    result_json = Column(Text, nullable=True)
+    compared_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+class SpoilageRecord(Base):
+    """Food written off. Quantity is final. Approval only acknowledges a large loss."""
+    __tablename__ = "spoilage_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    chef_id = Column(Integer, ForeignKey("store_chefs.id"), nullable=False)
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id"), nullable=False)
+    item_name = Column(String, nullable=False)
+    quantity = Column(Float, nullable=False)
+    unit = Column(String, nullable=False, default="")
+    zone_name = Column(String, nullable=False)
+    reason_code = Column(String, nullable=False)
+    reason_text = Column(Text, nullable=False, default="")
+    photo_storage_key = Column(String, nullable=False)
+    photo_content_type = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="reported")
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    approved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+
+
+class DayClose(Base):
+    """End-of-day count. working_alone is stored on its own so the owner can see it."""
+    __tablename__ = "day_closes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    chef_id = Column(Integer, ForeignKey("store_chefs.id"), nullable=True)
+    working_alone = Column(Boolean, nullable=False, default=False, server_default="0")
+    status = Column(String, nullable=False, default="reported")
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    approved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+
+    lines = relationship("DayCloseLine", back_populates="close")
+
+
+class DayCloseLine(Base):
+    __tablename__ = "day_close_lines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    close_id = Column(Integer, ForeignKey("day_closes.id", ondelete="CASCADE"), nullable=False, index=True)
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id"), nullable=False)
+    item_name = Column(String, nullable=False)
+    unit = Column(String, nullable=False, default="")
+    expected_qty = Column(Float, nullable=False)
+    counted_qty = Column(Float, nullable=False)
+
+    close = relationship("DayClose", back_populates="lines")
+
+
+def _immutable_change(target, allowed: set[str]) -> None:
+    from sqlalchemy import inspect as sa_inspect
+
+    state = sa_inspect(target)
+    for attr in state.mapper.column_attrs:
+        if attr.key in allowed:
+            continue
+        if attr.key == "id":
+            continue
+        if state.attrs[attr.key].history.has_changes():
+            raise ValueError("This record is append-only")
+
+
+@event.listens_for(StoreChef, "before_update")
+def _chef_guard(mapper, connection, target):
+    _immutable_change(target, {"failed_pin_attempts", "pin_locked_until"})
+
+
+@event.listens_for(StoreChef, "before_delete")
+def _chef_no_delete(mapper, connection, target):
+    raise ValueError("Chef rows are append-only")
+
+
+@event.listens_for(KitchenHandover, "before_update")
+@event.listens_for(KitchenHandoverLine, "before_update")
+@event.listens_for(DayCloseLine, "before_update")
+def _control_no_update(mapper, connection, target):
+    raise ValueError("This record is append-only")
+
+
+@event.listens_for(KitchenHandover, "before_delete")
+@event.listens_for(KitchenHandoverLine, "before_delete")
+@event.listens_for(SpoilageRecord, "before_delete")
+@event.listens_for(DayClose, "before_delete")
+@event.listens_for(DayCloseLine, "before_delete")
+def _control_no_delete(mapper, connection, target):
+    raise ValueError("This record is append-only")
+
+
+@event.listens_for(SpoilageRecord, "before_update")
+@event.listens_for(DayClose, "before_update")
+def _approval_only(mapper, connection, target):
+    _immutable_change(target, {"status", "approved_by_user_id", "approved_at"})
+
+
 @event.listens_for(StaffEntryAudit, "before_update")
 def _staff_entry_audit_no_update(mapper, connection, target):
     raise ValueError("Staff entry audit rows are append-only")

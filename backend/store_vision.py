@@ -45,9 +45,17 @@ _COMPARE_PROMPT = (
 )
 
 
-def ask_model(images: list[tuple[str, bytes]]) -> dict:
+_HANDOVER_PROMPT = (
+    "Read this photo of goods handed from a store to a kitchen. Reply with JSON only, no markdown. "
+    "Use this shape: "
+    '{"supplier":"","invoice_items":[],"goods_items":[{"name":"","quantity":0,"unit":"","weight":""}]}. '
+    "quantity is a number. If you cannot read the photo, use an empty goods_items list."
+)
+
+
+def ask_model(images: list[tuple[str, bytes]], prompt: str = _READ_PROMPT) -> dict:
     """Vision step only. Raises if the reply is not a JSON object."""
-    text = chat_with_images(_READ_PROMPT, images, model=vision_model())
+    text = chat_with_images(prompt, images, model=vision_model())
     return _object(text)
 
 
@@ -193,6 +201,112 @@ def run_check(db, receipt_id: int) -> None:
             entity_id=receipt.id,
             detail={"label": "AI", "note": result["note"]},
         )
+
+
+def run_handover_check(db, handover_id: int) -> None:
+    """Same two models as a delivery. The handover row itself is not updated."""
+    import storage
+
+    handover = db.query(models.KitchenHandover).filter(models.KitchenHandover.id == handover_id).first()
+    if handover is None or not handover.photo_storage_key:
+        return
+    lines = (
+        db.query(models.KitchenHandoverLine)
+        .filter(models.KitchenHandoverLine.handover_id == handover.id)
+        .all()
+    )
+    keyed = [{"item_name": line.item_name, "quantity": line.quantity, "unit": line.unit} for line in lines]
+    user = db.query(models.User).filter(models.User.id == handover.created_by_user_id).first()
+    check = (
+        db.query(models.HandoverVisionCheck)
+        .filter(models.HandoverVisionCheck.handover_id == handover.id)
+        .order_by(models.HandoverVisionCheck.id.desc())
+        .first()
+    )
+    if check is None:
+        check = models.HandoverVisionCheck(handover_id=handover.id, status="pending", created_at=utcnow())
+        db.add(check)
+        db.flush()
+    vision = vision_model()
+    try:
+        images = [(handover.photo_content_type or "image/jpeg", storage.load(handover.photo_storage_key))]
+        reading = ask_model(images, prompt=_HANDOVER_PROMPT)
+        explained = explain_difference(reading, keyed)
+        status = "mismatch" if (explained["mismatches"] or not explained["match"]) else "match"
+        result = {
+            "label": "AI",
+            "note": explained["note"],
+            "mismatches": explained["mismatches"],
+            "vision_model": vision,
+            "compare_model": explained["model"],
+            "compare_fallback": explained["fell_back"],
+            "ungrounded": explained["ungrounded"],
+        }
+        compare_name = explained["model"]
+    except Exception as exc:
+        logger.warning("handover vision check failed for handover %s: %s", handover_id, type(exc).__name__)
+        status = "unavailable"
+        result = {"label": "AI", "message": "AI check unavailable", "vision_model": vision}
+        compare_name = ""
+    check.status = status
+    check.model_name = f"{vision} + {compare_name}".strip(" +")
+    check.result_json = json.dumps(result)
+    check.compared_at = utcnow()
+    if user is None:
+        return
+    if status == "mismatch":
+        names = ", ".join(item["item_name"] for item in result["mismatches"]) or "the handover"
+        record_entry(
+            db, handover.restaurant_id, user, "handover_ai_mismatch", "kitchen_handover",
+            f"AI: {names} on handover {handover.id} do not match the photo.",
+            entity_id=handover.id,
+            detail={"label": "AI", "note": result["note"], "mismatches": result["mismatches"]},
+        )
+    elif status == "unavailable":
+        record_entry(
+            db, handover.restaurant_id, user, "handover_ai_unavailable", "kitchen_handover",
+            f"AI check unavailable for handover {handover.id}.",
+            entity_id=handover.id,
+            detail={"label": "AI", "message": "AI check unavailable"},
+        )
+    else:
+        record_entry(
+            db, handover.restaurant_id, user, "handover_ai_match", "kitchen_handover",
+            f"AI: handover {handover.id} matches the photo.",
+            entity_id=handover.id,
+            detail={"label": "AI", "note": result["note"]},
+        )
+
+
+def run_handover_check_safe(handover_id: int) -> None:
+    import database
+
+    db = database.SessionLocal()
+    try:
+        run_handover_check(db, handover_id)
+        db.commit()
+    except Exception:
+        logger.exception("handover vision task failed for handover %s", handover_id)
+        db.rollback()
+        try:
+            check = (
+                db.query(models.HandoverVisionCheck)
+                .filter(models.HandoverVisionCheck.handover_id == handover_id)
+                .order_by(models.HandoverVisionCheck.id.desc())
+                .first()
+            )
+            if check is None:
+                check = models.HandoverVisionCheck(handover_id=handover_id, status="unavailable", created_at=utcnow())
+                db.add(check)
+            check.status = "unavailable"
+            check.model_name = vision_model()
+            check.result_json = json.dumps({"label": "AI", "message": "AI check unavailable"})
+            check.compared_at = utcnow()
+            db.commit()
+        except Exception:
+            db.rollback()
+    finally:
+        db.close()
 
 
 def run_check_safe(receipt_id: int) -> None:

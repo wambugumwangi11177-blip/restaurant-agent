@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/eleven/staff", title: "Staff", desc: "Logins and setup progress" },
   { href: "/eleven/import", title: "Import", desc: "Bring in items, suppliers, recipes, and an opening count" },
   { href: "/eleven/deliveries", title: "Deliveries", desc: "Photos, AI mismatches, and invoice prices" },
+  { href: "/eleven/approvals", title: "Approvals", desc: "Large spoilage and counts that do not match" },
   { href: "/eleven/settings", title: "Permits & Settings", desc: "Licences and your thresholds" },
   { href: "/eleven/reports", title: "Reports", desc: "Close, week, month, and year" },
   { href: "/eleven/alerts", title: "Alerts", desc: "What needs you now" },

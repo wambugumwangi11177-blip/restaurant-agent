@@ -4,7 +4,7 @@
 // change: `activate` deletes every cache whose key differs, so the bump is what
 // evicts the previous version's entries. It stayed at 'chakula-v1' across every
 // deploy, which meant nothing was ever evicted.
-const CACHE_NAME = 'chakula-v2';
+const CACHE_NAME = 'chakula-v3';
 
 // Deliberately empty — see below. Kept as a named constant so it's obvious this
 // is a decision, not an omission.
@@ -64,7 +64,8 @@ self.addEventListener('fetch', (event) => {
     const isStaticAsset =
         url.pathname.startsWith('/_next/static/') ||
         url.pathname.startsWith('/icon-') ||
-        url.pathname === '/manifest.json';
+        url.pathname === '/manifest.json' ||
+        url.pathname === '/store-manifest.json';
 
     event.respondWith(
         fetch(event.request)

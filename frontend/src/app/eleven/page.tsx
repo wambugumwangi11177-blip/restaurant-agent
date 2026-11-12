@@ -2,6 +2,7 @@
 
 import OwnerShell from "@/components/eleven/OwnerShell";
 import { DayOneChecklist, GlassCard, SectionLabel, SolidNumberCard, WaitingNotice } from "@/components/eleven/EmptyPanels";
+import { StoreStockStatus } from "@/components/eleven/StoreStockStatus";
 import { useElevenEmpty } from "@/components/eleven/useElevenEmpty";
 
 export default function ElevenHomePage() {
@@ -29,6 +30,7 @@ export default function ElevenHomePage() {
           {provenance?.notice && (
             <p className="mt-4 text-xs text-zinc-500">{provenance.notice}</p>
           )}
+          <StoreStockStatus />
         </>
       ) : (
         <>
@@ -41,6 +43,7 @@ export default function ElevenHomePage() {
           <GlassCard>
             <WaitingNotice>LEVIII will surface leaks here once enough sales and costs are recorded.</WaitingNotice>
           </GlassCard>
+          <StoreStockStatus />
         </>
       )}
     </OwnerShell>

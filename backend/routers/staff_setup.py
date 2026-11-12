@@ -1,9 +1,10 @@
-"""Step gate for the storekeeper: account, recipes, then questions (next run)."""
+"""Step gate for the storekeeper: account, recipes, then the question file."""
 import json
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 import auth
@@ -14,6 +15,7 @@ from routers.auth import LOCKOUT_MINUTES, MAX_FAILED_ATTEMPTS
 from routers.deps import get_or_create_restaurant
 from schemas import StrictModel
 from staff_audit import record_entry
+from store_access import latest_answers, stock_followup, unlocked_modules
 from time_utils import utcnow
 
 router = APIRouter(prefix="/staff-setup", tags=["staff-setup"])
@@ -27,6 +29,26 @@ class AccountStep(StrictModel):
     pin: str = Field(min_length=4, max_length=4)
 
 
+_ARRIVALS = {
+    "phone": "Phone order",
+    "scheduled": "Scheduled delivery",
+    "pickup": "Pickup",
+    "other": "Other",
+}
+
+
+class SupplierSeed(StrictModel):
+    name: str = Field(min_length=1, max_length=120)
+    brings: str = Field(min_length=1, max_length=80)
+    arrival: str
+
+
+class QuestionStep(StrictModel):
+    question_id: str
+    value: str
+    suppliers: list[SupplierSeed] = []
+
+
 def load_questions() -> dict:
     raw = json.loads(_QUESTIONS.read_text(encoding="utf-8"))
     questions = []
@@ -34,11 +56,17 @@ def load_questions() -> dict:
         questions.append({
             "id": item["id"],
             "prompt": item["prompt"],
+            "kind": item.get("kind") or "choice",
+            "brings": item.get("brings") or [],
+            "arrivals": item.get("arrivals") or [],
             "answers": [
                 {
                     "value": answer["value"],
+                    "label": answer.get("label") or answer["value"],
                     "opens": answer.get("opens"),
                     "unlocks": answer.get("unlocks"),
+                    "delegate": bool(answer.get("delegate")),
+                    "delegate_to": answer.get("delegate_to"),
                 }
                 for answer in item.get("answers", [])
             ],
@@ -74,15 +102,16 @@ def _step_state(progress: models.StaffSetupProgress | None, user: models.User) -
         account_done = False
     recipes_done = bool(progress and progress.recipes_completed_at)
     questions = load_questions()
-    if account_done and recipes_done:
-        question_state = "locked"
-        question_reason = (
-            "Each answer opens a page or unlocks a module. The questions are saved. "
-            "Answering them is the next release."
-        )
+    questions_done = bool(progress and progress.questionnaire_completed_at)
+    if questions_done:
+        question_state = "done"
+        question_reason = None
+    elif account_done and recipes_done:
+        question_state = "open"
+        question_reason = None
     elif account_done:
         question_state = "locked"
-        question_reason = "Save at least one recipe from the chefs. That unlocks this step's questions."
+        question_reason = "Save at least one recipe from the chefs. That unlocks these questions."
     else:
         question_state = "locked"
         question_reason = "Change the password you were given and set your own 4-digit PIN first."
@@ -113,12 +142,50 @@ def _step_state(progress: models.StaffSetupProgress | None, user: models.User) -
                 "state": question_state,
                 "unlocks": "A specific page or module for each answer",
                 "locked_reason": question_reason,
-                "completed_at": None,
-                "runnable": False,
+                "completed_at": progress.questionnaire_completed_at.isoformat() if progress and progress.questionnaire_completed_at else None,
+                "runnable": question_state in ("open", "done"),
                 "questions": questions["questions"],
             },
         ],
     }
+
+
+def _save_suppliers(db: Session, user: models.User, restaurant: models.Restaurant, seeds: list[SupplierSeed]) -> None:
+    for seed in seeds:
+        name = seed.name.strip()
+        existing = (
+            db.query(models.Supplier)
+            .filter(
+                models.Supplier.restaurant_id == restaurant.id,
+                func.lower(models.Supplier.name) == name.lower(),
+            )
+            .first()
+        )
+        if existing is None:
+            existing = models.Supplier(
+                restaurant_id=restaurant.id,
+                name=name,
+                contact_phone="",
+                brings=seed.brings.strip(),
+                arrival=seed.arrival,
+                notes="",
+            )
+            db.add(existing)
+            db.flush()
+            action = "supplier_added"
+            summary = f"{user.email} named supplier {name} ({seed.brings.strip()}, {_ARRIVALS[seed.arrival]})."
+        else:
+            existing.brings = seed.brings.strip()
+            existing.arrival = seed.arrival
+            existing.is_active = True
+            action = "supplier_prefilled"
+            summary = f"{user.email} updated supplier {name} ({seed.brings.strip()}, {_ARRIVALS[seed.arrival]})."
+        record_entry(
+            db, restaurant.id, user, action, "supplier",
+            summary,
+            entity_id=existing.id,
+            detail={"brings": seed.brings.strip(), "arrival": seed.arrival},
+        )
 
 
 def _notify_owners(db: Session, user: models.User, restaurant: models.Restaurant, title: str, body: str) -> None:
@@ -153,6 +220,25 @@ async def get_setup(
     # makes the login, or when this person finishes a step.
     payload = _step_state(progress, current_user)
     payload["restaurant_id"] = restaurant.id
+    answers = latest_answers(db, current_user.id)
+    payload["unlocked_modules"] = sorted(unlocked_modules(db, current_user) - {"*"}) if current_user.role not in (models.Role.ADMIN, models.Role.SUPERADMIN) else sorted({
+        answer.get("unlocks")
+        for question in load_questions()["questions"]
+        for answer in question["answers"]
+        if answer.get("unlocks")
+    })
+    payload["stock_followup"] = stock_followup(answers)
+    payload["answers"] = [
+        {
+            "question_id": row.question_id,
+            "value": row.value,
+            "label": row.label,
+            "opens": row.opens,
+            "unlocks": row.unlocks,
+            "delegated": bool(row.delegated),
+        }
+        for row in answers.values()
+    ]
     return payload
 
 
@@ -259,6 +345,90 @@ async def complete_recipes(
     return _step_state(progress, user)
 
 
+@router.post("/questionnaire")
+async def answer_question(
+    body: QuestionStep,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    if user.staff_role != models.StaffRole.STOCKKEEPER and user.role not in (
+        models.Role.ADMIN, models.Role.SUPERADMIN,
+    ):
+        raise HTTPException(status_code=403, detail="This step is for the storekeeper.")
+    restaurant = get_or_create_restaurant(db, user)
+    progress = db.query(models.StaffSetupProgress).filter(
+        models.StaffSetupProgress.user_id == user.id
+    ).first()
+    if user.role not in (models.Role.ADMIN, models.Role.SUPERADMIN):
+        if progress is None or progress.recipes_completed_at is None:
+            raise HTTPException(status_code=403, detail="recipes_required")
+    questions = load_questions()["questions"]
+    question = next((item for item in questions if item["id"] == body.question_id), None)
+    if question is None:
+        raise HTTPException(status_code=404, detail="That question is not in the list.")
+    answer = next((item for item in question["answers"] if item["value"] == body.value), None)
+    if answer is None:
+        raise HTTPException(status_code=400, detail="That is not one of the answers.")
+    if question["id"] == "supplier_list" and answer["value"] == "listed":
+        if not body.suppliers:
+            raise HTTPException(status_code=400, detail="Name at least one supplier.")
+        for seed in body.suppliers:
+            if seed.arrival not in _ARRIVALS:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Say how the supplies arrive: phone order, scheduled delivery, pickup, or other.",
+                )
+    if progress is None:
+        progress = _progress(db, user, restaurant.id)
+    row = models.StaffSetupAnswer(
+        user_id=user.id,
+        restaurant_id=restaurant.id,
+        question_id=question["id"],
+        value=answer["value"],
+        label=answer["label"],
+        opens=answer.get("opens"),
+        unlocks=answer.get("unlocks"),
+        delegated=bool(answer.get("delegate")),
+        delegate_to=answer.get("delegate_to"),
+        created_at=utcnow(),
+    )
+    db.add(row)
+    db.flush()
+    if question["id"] == "supplier_list" and answer["value"] == "listed":
+        _save_suppliers(db, user, restaurant, body.suppliers)
+    if row.delegated:
+        who = "the accountant" if row.delegate_to == "accountant" else "the owner"
+        summary = f"{user.email} answered '{question['prompt']}' with {row.label}. Sent to {who}."
+        action = "question_delegated"
+    else:
+        summary = f"{user.email} answered '{question['prompt']}' with {row.label}."
+        action = "question_answered"
+    record_entry(
+        db, restaurant.id, user, action, "staff_setup_answer",
+        summary,
+        entity_id=row.id,
+        detail={"question_id": question["id"], "value": row.value, "unlocks": row.unlocks},
+    )
+    answered = {item.question_id for item in latest_answers(db, user.id).values()}
+    if progress.questionnaire_completed_at is None and answered >= {item["id"] for item in questions}:
+        progress.questionnaire_completed_at = utcnow()
+        progress.updated_at = utcnow()
+        record_entry(
+            db, restaurant.id, user, "questions_ready", "staff_setup",
+            f"{user.email} finished the questions.",
+        )
+    db.commit()
+    if row.delegated:
+        _notify_owners(db, user, restaurant, "Question needs an answer", summary)
+    payload = _step_state(progress, user)
+    payload["opens"] = row.opens
+    payload["unlocks"] = row.unlocks
+    payload["delegated"] = bool(row.delegated)
+    payload["unlocked_modules"] = sorted(unlocked_modules(db, user) - {"*"})
+    return payload
+
+
 @router.get("/activity")
 async def setup_activity(
     db: Session = Depends(get_db),
@@ -285,6 +455,18 @@ async def setup_activity(
             "app_unlocked": state["app_unlocked"],
             "account_completed_at": state["steps"][0]["completed_at"],
             "recipes_completed_at": state["steps"][1]["completed_at"],
+            "answers": [
+                {
+                    "question_id": answer.question_id,
+                    "value": answer.value,
+                    "label": answer.label,
+                    "delegated": bool(answer.delegated),
+                    "delegate_to": answer.delegate_to,
+                    "unlocks": answer.unlocks,
+                }
+                for answer in latest_answers(db, person.id).values()
+            ],
+            "stock_followup": stock_followup(latest_answers(db, person.id)),
         })
     audits = (
         db.query(models.StaffEntryAudit)

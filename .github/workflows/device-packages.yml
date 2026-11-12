@@ -8,7 +8,7 @@ on:
         default: 'https://frontend-production-e251.up.railway.app'
         type: string
 permissions:
-  contents: read
+  contents: write
 jobs:
   android:
     runs-on: ubuntu-latest
@@ -43,3 +43,16 @@ jobs:
           path: packaging/android/android/app/build/outputs/apk/debug/*.apk
           retention-days: 14
           if-no-files-found: error
+      - name: Publish the stable APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          apk=$(find packaging/android/android/app/build/outputs/apk/debug -name '*.apk' -print -quit)
+          cp "$apk" "$RUNNER_TEMP/LEVIII-Store.apk"
+          notes="Debug build of LEVIII Store. The /get page and the in-app update check use this file. Running this workflow again replaces it."
+          if gh release view leviii-store >/dev/null 2>&1; then
+            gh release upload leviii-store "$RUNNER_TEMP/LEVIII-Store.apk" --clobber
+          else
+            gh release create leviii-store "$RUNNER_TEMP/LEVIII-Store.apk" --title "LEVIII Store" --notes "$notes"
+          fi

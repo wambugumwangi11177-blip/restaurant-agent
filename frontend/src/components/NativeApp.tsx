@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { OfflineMark } from "@/components/store/diagrams";
+import { shouldOfferStoreUpdate, versionFromUserAgent, type StoreRelease } from "@/lib/storeRelease";
 import "@/styles/owner-glass.css";
 
 type CapacitorApp = {
@@ -11,6 +12,7 @@ type CapacitorApp = {
       addListener: (event: string, handler: (event: { canGoBack: boolean }) => void) => Promise<{ remove: () => void }> | { remove: () => void };
       minimizeApp?: () => void;
       exitApp?: () => void;
+      getInfo?: () => Promise<{ version?: string }>;
     };
   };
 };
@@ -41,8 +43,61 @@ export function OfflineScreen({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+async function installedVersion(): Promise<string | null> {
+  const info = capacitor()?.Plugins?.App?.getInfo?.();
+  if (info) {
+    try {
+      const resolved = await info;
+      if (resolved?.version && /^\d+\.\d+\.\d+$/.test(resolved.version)) return resolved.version;
+    } catch {
+      // The user-agent stamp is the fallback the APK always sends.
+    }
+  }
+  return versionFromUserAgent(navigator.userAgent);
+}
+
+export function StoreUpdateBanner({ url }: { url: string }) {
+  return (
+    <div className="owner-glass-theme px-4 pt-4">
+      <div className="owner-glass-panel mx-auto flex max-w-lg flex-col gap-3 rounded-3xl p-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm font-semibold">A newer LEVIII Store is ready.</p>
+        <a href={url} className="inline-flex min-h-11 items-center justify-center rounded-full bg-white px-4 text-sm font-semibold text-black">
+          Download the update
+        </a>
+      </div>
+    </div>
+  );
+}
+
 export default function NativeApp({ children }: { children: React.ReactNode }) {
   const [offline, setOffline] = useState(false);
+  const [updateUrl, setUpdateUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const native = Boolean(capacitor()?.isNativePlatform?.()) || /LEVIIIStore\/\d+\.\d+\.\d+/.test(navigator.userAgent);
+    if (!native) return;
+    let live = true;
+    (async () => {
+      const current = await installedVersion();
+      const response = await fetch("/api/app/version", { cache: "no-store" });
+      if (!response.ok) return;
+      const latest = (await response.json()) as StoreRelease;
+      if (!live) return;
+      if (shouldOfferStoreUpdate({
+        userAgent: navigator.userAgent,
+        native: Boolean(capacitor()?.isNativePlatform?.()),
+        current,
+        latest: latest.version,
+        androidUrl: latest.android?.url ?? "",
+        androidAvailable: Boolean(latest.android?.available),
+      })) {
+        setUpdateUrl(latest.android.url);
+      }
+    })().catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
 
   useEffect(() => {
     const sync = () => setOffline(typeof navigator !== "undefined" && navigator.onLine === false);
@@ -76,5 +131,10 @@ export default function NativeApp({ children }: { children: React.ReactNode }) {
   if (offline) {
     return <OfflineScreen onRetry={() => window.location.reload()} />;
   }
-  return <>{children}</>;
+  return (
+    <>
+      {updateUrl && <StoreUpdateBanner url={updateUrl} />}
+      {children}
+    </>
+  );
 }

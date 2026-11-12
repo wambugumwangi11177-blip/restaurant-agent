@@ -8,6 +8,12 @@ const TITLES: Record<string, string> = {
   "/store/recipes": "Recipes",
   "/store/stock": "Stock",
   "/store/account": "Account",
+  "/store/questions": "Questions",
+  "/store/deliveries": "Deliveries",
+  "/store/suppliers": "Suppliers",
+  "/store/issue": "To the kitchen",
+  "/store/waste": "Thrown away",
+  "/store/costs": "Bills",
 };
 
 export default function StoreLayout({ children }: { children: React.ReactNode }) {

@@ -406,6 +406,20 @@ class KitchenIncident(Base):
 # ──────────────────────────────────────────────
 # INVENTORY (Enhanced for AI)
 # ──────────────────────────────────────────────
+class StockZone(Base):
+    """A real place stock sits: main store, cold room, bar, kitchen."""
+    __tablename__ = "stock_zones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    kind = Column(String, nullable=False, default="store")
+
+    __table_args__ = (
+        UniqueConstraint("restaurant_id", "name", name="uq_stock_zone_name"),
+    )
+
+
 class InventoryItem(Base):
     __tablename__ = "inventory_items"
     id = Column(Integer, primary_key=True, index=True)
@@ -435,6 +449,15 @@ class InventoryItem(Base):
     # never auto-drafted, not defaulted to a guessed number.
     par_level          = Column(Float, nullable=True)
     default_supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
+    # How the goods arrive, versus `unit` which is how they are counted.
+    # 1 buying unit contains `units_per_buy` of `unit`. yield_fraction is the
+    # share that is still usable after prep (1 means nothing is lost).
+    buying_unit = Column(String, nullable=True)
+    units_per_buy = Column(Float, nullable=True)
+    yield_fraction = Column(Float, nullable=False, default=1, server_default="1")
+    zone_id = Column(Integer, ForeignKey("stock_zones.id"), nullable=True)
+
+    zone = relationship("StockZone")
 
     restaurant = relationship("Restaurant", back_populates="inventory_items")
     # passive_deletes=True: same reasoning as MenuItem.order_items above — let
@@ -1055,6 +1078,10 @@ class Supplier(Base):
     requires_approval = Column(Boolean, nullable=True)
     is_active         = Column(Boolean, default=True)
     notes             = Column(Text, default="")
+    # What this supplier brings: main food, alcohol, both, or a short note.
+    brings            = Column(String, nullable=False, default="", server_default="")
+    # How the goods arrive: phone, scheduled, pickup, or other.
+    arrival           = Column(String, nullable=False, default="", server_default="")
     created_at        = Column(DateTime, default=utcnow)
 
     restaurant     = relationship("Restaurant")
@@ -1645,6 +1672,55 @@ class StaffSetupProgress(Base):
 
     user = relationship("User")
     restaurant = relationship("Restaurant")
+
+
+class StaffSetupAnswer(Base):
+    """One row each time a setup question is answered. The latest row for a
+    question is the current answer. Older rows stay."""
+    __tablename__ = "staff_setup_answers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    question_id = Column(String, nullable=False)
+    value = Column(String, nullable=False)
+    label = Column(String, nullable=False, default="")
+    opens = Column(String, nullable=True)
+    unlocks = Column(String, nullable=True)
+    delegated = Column(Boolean, nullable=False, default=False, server_default="0")
+    delegate_to = Column(String, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    user = relationship("User")
+
+
+class RunningCost(Base):
+    """A bill the storekeeper typed once. The amount is for the owner.
+    Storekeeper responses have amount_cents removed."""
+    __tablename__ = "running_costs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    kind = Column(String, nullable=False)
+    label = Column(String, nullable=False)
+    amount_cents = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+class StockBalance(Base):
+    """Quantity of one item in one zone. InventoryItem.quantity is the sum."""
+    __tablename__ = "stock_balances"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id", ondelete="CASCADE"), nullable=False)
+    zone_id = Column(Integer, ForeignKey("stock_zones.id"), nullable=False)
+    quantity = Column(Float, nullable=False, default=0)
+
+    __table_args__ = (
+        UniqueConstraint("inventory_item_id", "zone_id", name="uq_stock_balance_item_zone"),
+    )
 
 
 class StaffEntryAudit(Base):

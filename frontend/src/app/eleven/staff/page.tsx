@@ -13,6 +13,8 @@ type Person = {
   recipes: string;
   questionnaire: string;
   app_unlocked: boolean;
+  answers?: { question_id: string; label: string; delegated: boolean; delegate_to: string | null; unlocks: string | null }[];
+  stock_followup?: { status: string; label: string; pending: string | null } | null;
 };
 
 type Entry = { id: number; at: string | null; email: string | null; action: string; summary: string };
@@ -109,6 +111,17 @@ export default function ElevenStaffPage() {
               <p className="font-semibold">{person.email}</p>
               <p className="mt-1 text-zinc-400">{person.staff_role}</p>
               <p className="mt-2">Account {person.account} · Recipes {person.recipes} · Questions {person.questionnaire}</p>
+              {person.stock_followup && <p className="mt-2 text-zinc-300">{person.stock_followup.label}</p>}
+              {(person.answers ?? []).length > 0 && (
+                <ul className="mt-2 space-y-1 text-zinc-300">
+                  {person.answers?.map((answer) => (
+                    <li key={answer.question_id}>
+                      {answer.label}{answer.delegated ? ` — sent to the ${answer.delegate_to === "accountant" ? "accountant" : "owner"}` : ""}
+                      {answer.unlocks ? ` · opens ${answer.unlocks}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
         </ul>

@@ -4,6 +4,7 @@
  */
 const fs = require("node:fs");
 const path = require("node:path");
+const { readRelease, stampGradle } = require("./version.cjs");
 
 const root = __dirname;
 const android = path.join(root, "android", "android");
@@ -63,7 +64,19 @@ if (fs.existsSync(manifestPath)) {
   if (!manifest.includes("android:hardwareAccelerated")) {
     manifest = manifest.replace("<application", '<application android:hardwareAccelerated="true"');
   }
+  if (!manifest.includes("android.permission.CAMERA")) {
+    manifest = manifest.replace(
+      "</manifest>",
+      '    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />\n</manifest>',
+    );
+  }
   fs.writeFileSync(manifestPath, manifest);
+}
+
+const gradle = path.join(android, "app", "build.gradle");
+if (fs.existsSync(gradle)) {
+  const release = readRelease(root);
+  fs.writeFileSync(gradle, stampGradle(fs.readFileSync(gradle, "utf8"), release));
 }
 
 console.log("LEVIII Store native shell applied. Debug signing stays the Android debug keystore.");

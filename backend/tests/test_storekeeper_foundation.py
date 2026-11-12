@@ -401,10 +401,15 @@ def test_delivery_evidence_stores_a_private_key_and_questions_are_config(client,
     setup = client.get("/api/v1/staff-setup", headers=_auth(_token(owner)))
     questions = setup.json()["steps"][2]["questions"]
     assert questions[0]["id"] == "receives_deliveries"
-    assert questions[0]["answers"][0]["opens"] == "/store/stock"
+    assert questions[0]["answers"][0]["opens"] == "/store/deliveries"
+    assert questions[0]["answers"][0]["unlocks"] == "deliveries"
     assert setup.json()["steps"][2]["runnable"] is False
-    missing = client.post("/api/v1/staff-setup/questionnaire", headers=_auth(_token(owner)))
-    assert missing.status_code in (404, 405)
+    missing = client.post(
+        "/api/v1/staff-setup/questionnaire",
+        headers=_auth(_token(owner)),
+        json={"question_id": "not-a-question", "value": "yes"},
+    )
+    assert missing.status_code == 404
     activity = client.get("/api/v1/staff-setup/activity", headers=_auth(_token(owner)))
     assert activity.status_code == 200
     jack = _add_staff(db_session, tenant, restaurant, "jack-activity@eleven.leviii", models.StaffRole.STOCKKEEPER)

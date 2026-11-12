@@ -3,16 +3,16 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { BookOpen, Home, Package, UserRound } from "lucide-react";
+import { Home, Package, Truck, UserRound } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { homeFor } from "@/lib/tenantHome";
 import "@/styles/owner-glass.css";
 
 const NAV = [
-  { href: "/store", label: "Home", icon: Home, match: (p: string) => p === "/store" },
-  { href: "/store/recipes", label: "Recipes", icon: BookOpen, match: (p: string) => p.startsWith("/store/recipes") },
-  { href: "/store/stock", label: "Stock", icon: Package, match: (p: string) => p.startsWith("/store/stock") },
-  { href: "/store/account", label: "Account", icon: UserRound, match: (p: string) => p.startsWith("/store/account") },
+  { href: "/store", label: "Home", icon: Home, match: (p: string) => p === "/store" || p.startsWith("/store/questions") },
+  { href: "/store/deliveries", label: "In", icon: Truck, match: (p: string) => p.startsWith("/store/deliveries") || p.startsWith("/store/suppliers") },
+  { href: "/store/stock", label: "Stock", icon: Package, match: (p: string) => p.startsWith("/store/stock") || p.startsWith("/store/issue") || p.startsWith("/store/waste") },
+  { href: "/store/account", label: "Account", icon: UserRound, match: (p: string) => p.startsWith("/store/account") || p.startsWith("/store/costs") || p.startsWith("/store/recipes") },
 ] as const;
 
 export default function StoreShell({
@@ -26,6 +26,18 @@ export default function StoreShell({
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const allowed = user?.staff_role === "stockkeeper" || user?.role === "admin" || user?.role === "superadmin";
+
+  useEffect(() => {
+    const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+    if (link) link.href = "/store-manifest.json";
+    let apple = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
+    if (!apple) {
+      apple = document.createElement("meta");
+      apple.name = "apple-mobile-web-app-title";
+      document.head.appendChild(apple);
+    }
+    apple.content = "LEVIII Store";
+  }, []);
 
   useEffect(() => {
     if (isLoading) return;

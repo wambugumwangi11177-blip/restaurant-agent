@@ -1,9 +1,26 @@
 import api from "@/lib/api";
 
+export type SetupAnswerChoice = {
+  value: string;
+  label?: string;
+  opens: string | null;
+  unlocks: string | null;
+  delegate?: boolean;
+};
+
 export type SetupQuestion = {
   id: string;
   prompt: string;
-  answers: { value: string; opens: string | null; unlocks: string | null }[];
+  kind?: string;
+  brings?: string[];
+  arrivals?: { value: string; label: string }[];
+  answers: SetupAnswerChoice[];
+};
+
+export type StockFollowup = {
+  status: "waiting_on_pos" | "count_when_live" | "unknown" | string;
+  label: string;
+  pending: string | null;
 };
 
 export type SetupStep = {
@@ -17,10 +34,22 @@ export type SetupStep = {
   questions?: SetupQuestion[];
 };
 
+export type GivenAnswer = {
+  question_id: string;
+  value: string;
+  label: string;
+  opens: string | null;
+  unlocks: string | null;
+  delegated: boolean;
+};
+
 export type SetupPayload = {
   must_change_password: boolean;
   has_pin: boolean;
   app_unlocked: boolean;
+  unlocked_modules?: string[];
+  answers?: GivenAnswer[];
+  stock_followup?: StockFollowup | null;
   steps: SetupStep[];
 };
 
@@ -31,4 +60,8 @@ export async function loadSetup(): Promise<SetupPayload> {
 
 export function stepById(payload: SetupPayload | null, id: string): SetupStep | undefined {
   return payload?.steps.find((step) => step.id === id);
+}
+
+export function hasModule(payload: SetupPayload | null, module: string): boolean {
+  return Boolean(payload?.unlocked_modules?.includes(module));
 }

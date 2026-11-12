@@ -1,10 +1,12 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { appUrl } = require("./url-policy.cjs");
+const { readRelease, storeUserAgent } = require("./version.cjs");
 
 const origin = appUrl(process.env.LEVIII_APP_URL);
 const host = new URL(origin).hostname;
 const root = __dirname;
+const release = readRelease(root);
 
 const capacitor = {
   appId: "com.leviii.store",
@@ -22,7 +24,7 @@ const capacitor = {
     webContentsDebuggingEnabled: false,
     backgroundColor: "#070708",
     captureInput: true,
-    appendUserAgent: "LEVIIIStore",
+    appendUserAgent: storeUserAgent(release.version),
   },
   plugins: {
     SplashScreen: {

@@ -22,7 +22,7 @@ test("desktop navigation cannot escape to a lookalike origin", () => {
 
 test("configure names LEVIII Store and points the WebView at the given origin", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leviii-store-"));
-  for (const file of ["configure.cjs", "url-policy.cjs"]) {
+  for (const file of ["configure.cjs", "url-policy.cjs", "version.cjs", "version.json"]) {
     fs.copyFileSync(path.join(__dirname, file), path.join(dir, file));
   }
   fs.mkdirSync(path.join(dir, "android", "www"), { recursive: true });
@@ -37,10 +37,25 @@ test("configure names LEVIII Store and points the WebView at the given origin", 
   assert.equal(config.server.url, "https://frontend-production-e251.up.railway.app");
   assert.equal(config.server.errorPath, "offline.html");
   assert.equal(config.server.cleartext, false);
-  assert.equal(config.android.appendUserAgent, "LEVIIIStore");
+  assert.equal(config.android.appendUserAgent, "LEVIIIStore/1.0.0");
   assert.equal(config.plugins.SplashScreen.backgroundColor, "#070708");
   const inline = fs.readFileSync(path.join(dir, "android", "www", "app-config.js"), "utf8");
   assert.match(inline, /frontend-production-e251\.up\.railway\.app/);
+});
+
+test("the website version matches the APK and the download URL stays put", () => {
+  const { stampGradle, storeUserAgent } = require("./version.cjs");
+  const packaged = JSON.parse(fs.readFileSync(path.join(__dirname, "version.json"), "utf8"));
+  const site = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "frontend", "src", "lib", "leviii-store-version.json"), "utf8"));
+  assert.equal(site.version, packaged.version);
+  assert.equal(site.versionCode, packaged.versionCode);
+  assert.equal(site.android.available, true);
+  assert.equal(site.windows.available, false);
+  assert.equal(site.android.url, "https://github.com/wambugumwangi11177-blip/restaurant-agent/releases/download/leviii-store/LEVIII-Store.apk");
+  assert.equal(storeUserAgent(packaged.version), `LEVIIIStore/${packaged.version}`);
+  const stamped = stampGradle('versionCode 1\nversionName "1.0"\n', packaged);
+  assert.match(stamped, new RegExp(`versionCode ${packaged.versionCode}`));
+  assert.match(stamped, new RegExp(`versionName "${packaged.version}"`));
 });
 
 test("offline page is friendly and does not look like a browser error", () => {

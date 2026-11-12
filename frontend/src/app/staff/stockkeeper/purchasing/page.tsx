@@ -1,7 +1,5 @@
-"use client";
-
-import PurchasingWorkspace from "@/components/features/purchasing/PurchasingWorkspace";
+import { redirect } from "next/navigation";
 
 export default function StaffStockkeeperPurchasingPage() {
-    return <PurchasingWorkspace />;
+  redirect("/store/stock");
 }

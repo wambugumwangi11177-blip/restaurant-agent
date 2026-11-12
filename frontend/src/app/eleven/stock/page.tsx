@@ -9,15 +9,12 @@ export default function ElevenStockPage() {
   return (
     <OwnerShell title="Stock">
       <SectionLabel>To order</SectionLabel>
-      <div className="owner-glass-panel mb-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300">
-        Based on 0 of 0 dishes. Dishes without a recipe are not included.
-      </div>
       {loading ? (
         <p className="text-sm text-zinc-400">Loading…</p>
       ) : (
         <GlassCard>
           <WaitingNotice>
-            No draft orders yet. When Jack (storekeeper) adds suppliers and opening stock, LEVIII will suggest what to order here.
+            No draft orders yet. Suggestions appear after recipes and an opening count are recorded.
           </WaitingNotice>
           <p className="mt-3 text-xs text-zinc-500">
             Handover gaps will show as &quot;Check this&quot; — never as proof of wrongdoing.

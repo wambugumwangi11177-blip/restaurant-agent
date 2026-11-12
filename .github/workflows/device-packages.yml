@@ -1,0 +1,45 @@
+name: Device packages (LEVIII Store debug APK)
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: 'Public HTTPS origin of the Railway frontend, no path. Production default is the leviii frontend service.'
+        required: true
+        default: 'https://frontend-production-e251.up.railway.app'
+        type: string
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packaging
+    env:
+      LEVIII_APP_URL: ${{ inputs.app_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: packaging/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npm test
+      - run: npm run configure
+      - run: npm run android:init
+      - run: npm run android:sync
+      - run: npm run android:apply
+      - run: ./gradlew assembleDebug
+        working-directory: packaging/android/android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LEVIII-Store-debug
+          path: packaging/android/android/app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+          if-no-files-found: error

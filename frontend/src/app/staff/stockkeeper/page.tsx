@@ -1,7 +1,5 @@
-"use client";
-
-import InventoryWorkspace from "@/components/features/inventory/InventoryWorkspace";
+import { redirect } from "next/navigation";
 
 export default function StaffStockkeeperPage() {
-    return <InventoryWorkspace />;
+  redirect("/store");
 }

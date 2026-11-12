@@ -38,6 +38,8 @@ interface User {
   // models.User.is_email_verified docstring). Drives the dashboard's
   // dismissible "verify your email" banner.
   is_email_verified: boolean;
+  must_change_password?: boolean;
+  has_pin?: boolean;
 }
 
 interface AuthContextType {

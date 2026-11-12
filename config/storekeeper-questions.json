@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "note": "Each answer opens a page or unlocks a module. The walk-through that asks these questions is the next release. Edit this file to change the questions.",
+  "questions": [
+    {
+      "id": "receives_deliveries",
+      "prompt": "Do you receive supplier deliveries yourself?",
+      "answers": [
+        {"value": "yes", "opens": "/store/stock", "unlocks": "goods-receiving"},
+        {"value": "no", "opens": "/store", "unlocks": null}
+      ]
+    },
+    {
+      "id": "counts_the_shelf",
+      "prompt": "Do you count what is on the shelf?",
+      "answers": [
+        {"value": "yes", "opens": "/store/stock", "unlocks": "shelf-counts"},
+        {"value": "no", "opens": "/store/recipes", "unlocks": null}
+      ]
+    },
+    {
+      "id": "writes_recipes",
+      "prompt": "Are you the person who writes down what the chefs cook?",
+      "answers": [
+        {"value": "yes", "opens": "/store/recipes", "unlocks": "recipes"},
+        {"value": "no", "opens": "/store", "unlocks": null}
+      ]
+    }
+  ]
+}

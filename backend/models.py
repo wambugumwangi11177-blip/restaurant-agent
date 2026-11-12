@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum as SqEnum, DateTime, Float, Text, Date, Time, Index, UniqueConstraint, CheckConstraint, text
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum as SqEnum, DateTime, Float, Text, Date, Time, Index, UniqueConstraint, CheckConstraint, text, event
 from sqlalchemy.orm import relationship, declarative_base
 import enum
 from time_utils import utcnow
@@ -153,6 +153,10 @@ class User(Base):
     # (directive: don't lock out staff invited without email access to their
     # own inbox at signup time).
     is_email_verified = Column(Boolean, default=False, nullable=False)
+    # Set when an owner creates a storekeeper login with a temporary password.
+    # Cleared only after that person changes the password and sets their own
+    # 4-digit PIN (POST /staff-setup/account). Existing accounts stay False.
+    must_change_password = Column(Boolean, default=False, nullable=False, server_default="0")
     # Which of the tenant's restaurants this user is currently viewing (audit
     # remediation, Tier 5 item 11 — multi-restaurant switcher). NULL for the
     # overwhelming majority of tenants (single restaurant, nothing to pick)
@@ -732,13 +736,25 @@ class MenuIngredient(Base):
     inventory_item_id   = Column(Integer, ForeignKey("inventory_items.id", ondelete="CASCADE"), nullable=False)
     quantity_per_serving = Column(Float, nullable=False, default=1.0)
     is_critical         = Column(Boolean, default=True)   # False = garnish, can be skipped
+    # Share of the raw ingredient that remains usable after prep. 1.0 means
+    # nothing is lost. Raw stock used is quantity_per_serving / yield_fraction.
+    yield_fraction = Column(Float, nullable=False, default=1.0, server_default="1")
+    # Unit the chef stated, kept even when it matches the stock item's unit.
+    recipe_unit = Column(String, nullable=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, nullable=True)
 
     menu_item       = relationship("MenuItem")
     inventory_item  = relationship("InventoryItem")
+    created_by      = relationship("User")
 
     __table_args__ = (
         UniqueConstraint("menu_item_id", "inventory_item_id", name="uq_menu_ingredient"),
         Index("ix_menu_ingredients_inventory", "inventory_item_id"),
+        CheckConstraint(
+            "yield_fraction > 0 AND yield_fraction <= 1",
+            name="ck_menu_ingredients_yield",
+        ),
     )
 
 
@@ -1606,3 +1622,150 @@ class Region(Base):
     created_at      = Column(DateTime, default=utcnow)
 
     organization = relationship("Organization")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STOREKEEPER FOUNDATION (Jack / Eleven) — setup gate, append-only entries,
+# private delivery evidence. Photo upload and the vision comparison are later
+# runs; the rows exist now so those runs do not invent a second schema.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class StaffSetupProgress(Base):
+    """One row per person walking the store setup. Steps are timestamps, not
+    booleans, so the owner can see when each one actually happened."""
+    __tablename__ = "staff_setup_progress"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    account_completed_at = Column(DateTime, nullable=True)
+    recipes_completed_at = Column(DateTime, nullable=True)
+    questionnaire_completed_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=utcnow, nullable=False)
+
+    user = relationship("User")
+    restaurant = relationship("Restaurant")
+
+
+class StaffEntryAudit(Base):
+    """Append-only record of who entered what, and when. ORM updates and
+    deletes are rejected. There is no HTTP route that edits these rows."""
+    __tablename__ = "staff_entry_audits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    action = Column(String, nullable=False)
+    entity_type = Column(String, nullable=False)
+    entity_id = Column(Integer, nullable=True)
+    summary = Column(Text, nullable=False)
+    detail_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    user = relationship("User")
+    restaurant = relationship("Restaurant")
+
+    __table_args__ = (
+        Index("ix_staff_entry_audits_restaurant_created", "restaurant_id", "created_at"),
+    )
+
+
+class ImportAppliedKey(Base):
+    """Natural key of a row the Eleven import has already inserted. A second
+    confirm of the same file skips these instead of duplicating them."""
+    __tablename__ = "import_applied_keys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    sheet = Column(String, nullable=False)
+    natural_key = Column(String, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("restaurant_id", "sheet", "natural_key", name="uq_import_applied_key"),
+    )
+
+
+class DeliveryReceipt(Base):
+    """A goods-in event. Run B builds the screen; the quantities and the two
+    photos (invoice and goods) hang off this row."""
+    __tablename__ = "delivery_receipts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True)
+    received_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    received_at = Column(DateTime, default=utcnow, nullable=False)
+    notes = Column(Text, default="")
+    status = Column(String, nullable=False, default="draft")  # draft | keyed | checked
+
+    supplier = relationship("Supplier")
+    received_by = relationship("User")
+    photos = relationship("DeliveryEvidencePhoto", back_populates="receipt")
+    lines = relationship("DeliveryReceiptLine", back_populates="receipt")
+    vision_checks = relationship("DeliveryVisionCheck", back_populates="receipt")
+
+
+class DeliveryEvidencePhoto(Base):
+    """Private evidence. `storage_key` is an object-storage key, never a
+    public URL. Nothing in this run serves the bytes without an auth check,
+    and no route serves them yet."""
+    __tablename__ = "delivery_evidence_photos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    receipt_id = Column(Integer, ForeignKey("delivery_receipts.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind = Column(String, nullable=False)  # invoice | goods
+    storage_key = Column(String, nullable=False)
+    content_type = Column(String, nullable=False, default="image/jpeg")
+    byte_size = Column(Integer, nullable=False, default=0)
+    sha256 = Column(String, nullable=False, default="")
+    uploaded_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    uploaded_at = Column(DateTime, default=utcnow, nullable=False)
+
+    receipt = relationship("DeliveryReceipt", back_populates="photos")
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('invoice', 'goods')", name="ck_delivery_photo_kind"),
+    )
+
+
+class DeliveryReceiptLine(Base):
+    """Quantity Jack keys in. The vision check later compares this to the photos."""
+    __tablename__ = "delivery_receipt_lines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    receipt_id = Column(Integer, ForeignKey("delivery_receipts.id", ondelete="CASCADE"), nullable=False, index=True)
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id", ondelete="SET NULL"), nullable=True)
+    item_name = Column(String, nullable=False)
+    quantity = Column(Float, nullable=False)
+    unit = Column(String, nullable=False, default="")
+    keyed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    keyed_at = Column(DateTime, default=utcnow, nullable=False)
+
+    receipt = relationship("DeliveryReceipt", back_populates="lines")
+
+
+class DeliveryVisionCheck(Base):
+    """Reserved for the later photo-vs-quantity comparison. No model is called
+    from this run. `status` stays `pending` until that comparison is stored."""
+    __tablename__ = "delivery_vision_checks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    receipt_id = Column(Integer, ForeignKey("delivery_receipts.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String, nullable=False, default="pending")
+    model_name = Column(String, nullable=True)
+    result_json = Column(Text, nullable=True)
+    compared_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    receipt = relationship("DeliveryReceipt", back_populates="vision_checks")
+
+
+@event.listens_for(StaffEntryAudit, "before_update")
+def _staff_entry_audit_no_update(mapper, connection, target):
+    raise ValueError("Staff entry audit rows are append-only")
+
+
+@event.listens_for(StaffEntryAudit, "before_delete")
+def _staff_entry_audit_no_delete(mapper, connection, target):
+    raise ValueError("Staff entry audit rows are append-only")

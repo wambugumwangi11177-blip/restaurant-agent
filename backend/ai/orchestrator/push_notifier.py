@@ -172,14 +172,14 @@ _TIER_URLS: dict[str, dict[StaffRole, str]] = {
         StaffRole.OWNER: "/dashboard/inventory",
         StaffRole.MANAGER: "/staff/manager/inventory",
         StaffRole.CONTROLLER: "/staff/controller",
-        StaffRole.STOCKKEEPER: "/staff/stockkeeper",
+        StaffRole.STOCKKEEPER: "/store",
         StaffRole.KITCHEN: "/staff/kitchen/stock",
     },
     "purchasing": {
         StaffRole.OWNER: "/dashboard/purchasing",
         StaffRole.MANAGER: "/staff/manager/purchasing",
         StaffRole.CONTROLLER: "/staff/controller/purchasing",
-        StaffRole.STOCKKEEPER: "/staff/stockkeeper/purchasing",
+        StaffRole.STOCKKEEPER: "/store/stock",
         StaffRole.SUPERVISOR: "/staff/supervisor/purchasing",
     },
     "reservations": {
@@ -235,7 +235,7 @@ _TIER_HOME: dict[StaffRole, str] = {
     StaffRole.MANAGER: "/staff/manager",
     StaffRole.SUPERVISOR: "/staff/supervisor",
     StaffRole.CONTROLLER: "/staff/controller",
-    StaffRole.STOCKKEEPER: "/staff/stockkeeper",
+    StaffRole.STOCKKEEPER: "/store",
     StaffRole.KITCHEN: "/staff/kitchen",
     StaffRole.WAITER: "/staff/waiter",
 }
@@ -939,7 +939,6 @@ def _on_order_created(payload: dict) -> None:
     restaurant_id = payload.get("restaurant_id")
     order_id = payload.get("order_id")
     customer_name = payload.get("customer_name") or ""
-    total_cents = payload.get("total_cents", 0)
 
     db = SessionLocal()
     try:
@@ -947,9 +946,9 @@ def _on_order_created(payload: dict) -> None:
         if not restaurant:
             return
         who = f" from {customer_name}" if customer_name else ""
-        total_note = f" — KES {total_cents // 100:,}" if total_cents else ""
         title = f"New online order: #{order_id}" if order_id else "New online order"
-        body = f"An online order{who} just came in{total_note}. Start preparing it."
+        # Kitchen receives this notification. The sale amount stays off the text.
+        body = f"An online order{who} just came in. Start preparing it."
         _fan_out(db, restaurant, EventType.ORDER_CREATED, title, body, "orders")
     except Exception as exc:
         logger.error(f"[PushNotifier] order_created failed: {exc}")

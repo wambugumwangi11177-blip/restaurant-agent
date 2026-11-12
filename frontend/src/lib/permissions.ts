@@ -83,7 +83,7 @@ export const TIER_HOME: Record<Exclude<StaffTier, "owner">, string> = {
     manager: "/staff/manager",
     supervisor: "/staff/supervisor",
     controller: "/staff/controller",
-    stockkeeper: "/staff/stockkeeper",
+    stockkeeper: "/store",
     kitchen: "/staff/kitchen",
     waiter: "/staff/waiter",
 };

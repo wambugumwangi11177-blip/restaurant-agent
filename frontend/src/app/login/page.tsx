@@ -21,8 +21,13 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [showGeneralLoginOptions, setShowGeneralLoginOptions] = useState(false);
 
+    const [nativeStore, setNativeStore] = useState(false);
+
     useEffect(() => {
         setShowGeneralLoginOptions(window.location.hostname !== "vibandavillage.vercel.app");
+        const native = navigator.userAgent.includes("LEVIIIStore");
+        setNativeStore(native);
+        if (native) setUseEmailLogin(true);
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -43,7 +48,7 @@ export default function LoginPage() {
                 : useEmailLogin
                     ? await login(email, password)
                     : await loginWithRestaurant(restaurantName, password);
-            router.replace(homeFor(signedIn?.tenant_name));
+            router.replace(homeFor(signedIn?.tenant_name, signedIn?.staff_role));
         } catch (err: unknown) {
             let message = "Authentication failed";
             if (err && typeof err === "object" && "response" in err) {
@@ -107,11 +112,13 @@ export default function LoginPage() {
                                 <label htmlFor="email" className="block text-sm text-[#737373] mb-1.5">Email</label>
                                 <input
                                     id="email"
-                                    type="email"
+                                    type="text"
+                                    inputMode="email"
+                                    autoComplete="username"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[var(--accent)] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm"
-                                    placeholder="you@restaurant.com"
+                                    placeholder={nativeStore ? "jack@eleven.leviii" : "you@restaurant.com"}
                                     required
                                 />
                             </div>

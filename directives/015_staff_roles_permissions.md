@@ -195,6 +195,13 @@ just disabled — absence is intentional, see Edge Cases).
   cover for a shortfall). Don't collapse Controller into Manager for
   convenience later.
 
+## As-built: storekeeper home and money (2026-11-12)
+
+- A stockkeeper's home is `/store` (`homeFor`, `TIER_HOME`, and push links). The older `/staff/stockkeeper` pages redirect there. Kitchen stays on its own staff shell.
+- Stockkeeper and kitchen JSON responses are scrubbed of money keys (`cost_per_unit`, prices, order totals, and the rest of `money_visibility.MONEY_KEYS`). Admin and superadmin responses are unchanged. Those two roles also cannot write a price onto inventory.
+- A stockkeeper created with a login must change the temporary password and set a 4-digit PIN before anything else, then record at least one recipe line. `StaffSetupProgress` tracks that. Until both are done, `setup_gate` limits that account to the account and recipe routes. Legacy stockkeepers with no progress row are not trapped.
+- Owner-only Eleven import and the delivery-evidence tables are outside this matrix. They do not grant the storekeeper a money column.
+
 ## Explicitly out of scope for this directive (separate, future directives)
 
 - Supplier → store → kitchen stock movement/chain-of-custody.

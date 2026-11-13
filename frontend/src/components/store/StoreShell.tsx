@@ -54,7 +54,7 @@ export default function StoreShell({
   }
 
   return (
-    <div className="owner-glass-theme pb-28">
+    <div className="owner-glass-theme">
       <header className="owner-glass-panel mx-auto mt-3 flex max-w-md items-center justify-between rounded-full px-4 py-2.5">
         <div>
           <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-400">LEVIII Store</p>
@@ -64,7 +64,7 @@ export default function StoreShell({
       <main className="mx-auto max-w-md px-4 py-4">{children}</main>
       <nav
         aria-label="Store"
-        className="owner-glass-panel fixed bottom-3 left-1/2 z-50 flex h-[72px] w-[calc(100%-24px)] max-w-[420px] -translate-x-1/2 items-center justify-around rounded-full px-2"
+        className="owner-glass-panel owner-nav fixed left-1/2 z-50 flex h-[72px] w-[calc(100%-24px)] max-w-[420px] -translate-x-1/2 items-center justify-around rounded-full px-2"
       >
         {NAV.map(({ href, label, icon: Icon, match }) => {
           const active = match(pathname);

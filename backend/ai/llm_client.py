@@ -300,6 +300,7 @@ _OPENROUTER_BODY = {
 
 def _require_openrouter() -> None:
     if _PROVIDER != "openrouter":
+        logger.warning("Photo check skipped: OPENROUTER_API_KEY is not set.")
         raise RuntimeError("Photo check needs OpenRouter.")
 
 

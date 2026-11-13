@@ -17,7 +17,7 @@ const NAV = [
     icon: MoreHorizontal,
     match: (p: string) =>
       p.startsWith("/eleven/more") ||
-      ["/eleven/sales-dishes", "/eleven/cash-check", "/eleven/staff", "/eleven/settings", "/eleven/reports", "/eleven/alerts", "/eleven/approvals", "/eleven/deliveries", "/eleven/import"].some(
+      ["/eleven/sales-dishes", "/eleven/cash-check", "/eleven/staff", "/eleven/settings", "/eleven/reports", "/eleven/alerts", "/eleven/approvals", "/eleven/activity", "/eleven/deliveries", "/eleven/import"].some(
         (x) => p.startsWith(x),
       ),
   },
@@ -33,7 +33,7 @@ export default function OwnerShell({
   const pathname = usePathname() ?? "";
 
   return (
-    <div className="owner-glass-theme pb-24 md:pl-[104px] md:pb-8">
+    <div className="owner-glass-theme owner-desktop-nav">
       <header className="owner-glass-panel mx-auto mt-3 flex max-w-3xl items-center justify-between rounded-full px-4 py-2.5 md:ml-6 md:mr-auto">
         <h1 className="text-base font-semibold tracking-wide">{title}</h1>
         <div className="flex items-center gap-2">
@@ -51,7 +51,7 @@ export default function OwnerShell({
 
       <nav
         aria-label="Main"
-        className="owner-glass-panel fixed bottom-3 left-1/2 z-50 flex h-[72px] w-[calc(100%-24px)] max-w-[420px] -translate-x-1/2 items-center justify-around rounded-full px-2 md:bottom-auto md:left-4 md:top-6 md:h-auto md:w-[88px] md:max-w-none md:translate-x-0 md:flex-col md:gap-2 md:py-4"
+        className="owner-glass-panel owner-nav owner-nav-desktop fixed left-1/2 z-50 flex h-[72px] w-[calc(100%-24px)] max-w-[420px] -translate-x-1/2 items-center justify-around rounded-full px-2 md:left-4 md:h-auto md:w-[88px] md:max-w-none md:translate-x-0 md:flex-col md:gap-2 md:py-4"
       >
         {NAV.map(({ href, label, icon: Icon, match }) => {
           const active = match(pathname);

@@ -33,6 +33,8 @@ PIN_ATTEMPTS = 5
 PIN_LOCK_MINUTES = 15
 SPOILAGE_APPROVAL_AT = 5
 REASONS = ("spoiled", "broken", "expired", "spilled", "other")
+# No tenant timezone column exists. Reports, the till, and this feed share Nairobi.
+RESTAURANT_TIMEZONE = "Africa/Nairobi"
 
 
 class CloseLineIn(StrictModel):
@@ -96,6 +98,44 @@ def _user(db, current) -> models.User:
 
 def _when(value) -> str | None:
     return value.isoformat() if value else None
+
+
+def _count_needs(count: int) -> str:
+    if count == 0:
+        return "Nothing needs you."
+    if count == 1:
+        return "1 thing needs you."
+    return f"{count} things need you."
+
+
+def _feed_ai(ai) -> dict | None:
+    """A chip only when the check wrote a real note. A missing key stays off the owner feed."""
+    if not isinstance(ai, dict):
+        return None
+    status = ai.get("status")
+    note = str(ai.get("note") or "").strip()
+    if status not in ("match", "mismatch") or not note or note.lower() == "ai check unavailable":
+        return None
+    return {"label": "AI", "status": status, "note": note}
+
+
+def _action_label(item: dict) -> str:
+    kind = item.get("kind")
+    if kind == "waste":
+        name = str(item.get("item_name") or "stock").strip().lower()
+        quantity = item.get("quantity")
+        unit = str(item.get("unit") or "").strip()
+        if quantity is None:
+            return "Approve a write-off"
+        return f"Approve {quantity:g} {unit} {name} waste".replace("  ", " ").strip()
+    if kind == "cost":
+        label = str(item.get("label") or "bill").strip().lower()
+        if not label.endswith("bill"):
+            label = f"{label} bill"
+        return f"Approve {label}"
+    if kind == "close":
+        return "Approve the day close"
+    return "Approve this"
 
 
 def _pin_ok(pin: str) -> bool:
@@ -827,6 +867,8 @@ async def list_approvals(
         item = _spoilage_public(db, row)
         item["kind"] = "waste"
         item["headline"] = f"{item['person_name']} wrote off {row.quantity:g} {row.unit} of {row.item_name}."
+        item["emphasis"] = f"{row.quantity:g} {row.unit}"
+        item["action"] = _action_label(item)
         events.append(item)
     for row in closes:
         item = _close_public(db, row)
@@ -839,13 +881,20 @@ async def list_approvals(
         else:
             item["headline"] = f"{item['person_name']} closed the day."
         if gap:
-            item["headline"] += f" {gap['item_name']} is {abs(gap['difference']):g} {gap['unit']} off the books."
+            item["emphasis"] = f"{abs(gap['difference']):g} {gap['unit']}"
+            item["headline"] += f" {gap['item_name']} is {item['emphasis']} off the books."
+        item["action"] = _action_label(item)
         events.append(item)
     for row in handovers:
         item = _handover_public(db, row, current_user)
         item["kind"] = "handover"
         moved = ", ".join(f"{line['quantity']:g} {line['unit']} {line['item_name']}" for line in item["lines"])
         item["headline"] = f"{item['person_name']} handed {moved} to {item['chef_name']}."
+        if item["lines"]:
+            first = item["lines"][0]
+            item["emphasis"] = f"{first['quantity']:g} {first['unit']}"
+        item["ai"] = _feed_ai(item.get("ai"))
+        item["action"] = _action_label(item)
         events.append(item)
     for row in costs:
         creator = db.query(models.User).filter(models.User.id == row.user_id).first()
@@ -867,6 +916,8 @@ async def list_approvals(
             "due_day": row.due_day,
             "amount_cents": row.amount_cents if row.status != "unknown" else None,
             "headline": headline,
+            "emphasis": row.label if row.status != "unknown" else None,
+            "action": _action_label({"kind": "cost", "label": row.label}),
             "created_at": _when(row.created_at),
             "owner_note": row.owner_note or "",
             "photo_path": f"/api/v1/store/costs/{row.id}/receipt" if row.receipt_storage_key else None,
@@ -891,13 +942,15 @@ async def list_approvals(
             except json.JSONDecodeError:
                 note = None
         goods = ", ".join(f"{line.quantity:g} {line.unit} {line.item_name}" for line in lines) or "a delivery"
+        emphasis = f"{lines[0].quantity:g} {lines[0].unit}" if lines else None
         events.append({
             "id": row.id,
             "kind": "delivery",
             "headline": f"{who['person_name']} received {goods}" + (f" from {supplier.name}." if supplier else "."),
+            "emphasis": emphasis,
             "created_at": _when(row.received_at),
             "photo_path": f"/api/v1/store/deliveries/{row.id}/photos/{photo.id}" if photo else None,
-            "ai": {"label": "AI", "status": check.status if check else None, "note": note} if check else None,
+            "ai": _feed_ai({"status": check.status, "note": note} if check else None),
             **who,
         })
     events.sort(key=lambda item: item.get("created_at") or "", reverse=True)
@@ -912,36 +965,38 @@ async def list_approvals(
     else:
         money = "Waiting for the till."
     stock_line = "Nothing is in stock yet."
+    stock_figure = None
+    stock_quiet = True
     latest_close = closes[0] if closes else None
     if latest_close is not None:
         public = next(item for item in events if item["kind"] == "close" and item["id"] == latest_close.id)
-        stock_line = public["headline"]
+        stock_figure = public.get("emphasis")
+        if stock_figure:
+            who = public["person_name"]
+            if public.get("working_alone"):
+                stock_line = f"{who} closed the day working alone."
+            elif public.get("confirmer_name"):
+                stock_line = f"{who} closed the day with {public['confirmer_name']}."
+            else:
+                stock_line = f"{who} closed the day."
+            stock_quiet = False
+        else:
+            stock_line = public["headline"]
     elif db.query(models.InventoryItem).filter(
         models.InventoryItem.restaurant_id == restaurant.id,
         models.InventoryItem.quantity > 0,
     ).first():
         stock_line = "Stock is in the store. No count is waiting."
     waste_line = "No waste has been written off."
+    waste_figure = None
+    waste_quiet = True
     if spoilage:
-        waste_line = next(item["headline"] for item in events if item["kind"] == "waste" and item["id"] == spoilage[0].id)
+        latest_waste = next(item for item in events if item["kind"] == "waste" and item["id"] == spoilage[0].id)
+        waste_figure = latest_waste.get("emphasis")
+        waste_line = f"{latest_waste['person_name']} wrote off {spoilage[0].item_name}."
+        waste_quiet = False
     count = len(pending)
-    attention = "Nothing needs you." if count == 0 else f"{count} thing{'s' if count != 1 else ''} need you."
-    waiting = []
-    for item in pending:
-        if item.get("kind") == "waste":
-            waiting.append("a write-off")
-        elif item.get("kind") == "close":
-            waiting.append("the day close")
-        elif item.get("kind") == "cost":
-            waiting.append(str(item.get("label") or "a bill"))
-        else:
-            waiting.append("an item")
-    if not waiting:
-        approval_line = "Nothing is waiting for approval."
-    elif len(waiting) == 1:
-        approval_line = f"{waiting[0][:1].upper()}{waiting[0][1:]} is waiting."
-    else:
-        approval_line = f"{', '.join(waiting[:-1])} and {waiting[-1]} are waiting."
+    attention = _count_needs(count)
     dishes = db.query(models.MenuItem).filter(models.MenuItem.restaurant_id == restaurant.id).all()
     missing_recipes = 0
     for dish in dishes:
@@ -950,12 +1005,18 @@ async def list_approvals(
     return {
         "pending": pending,
         "events": events,
+        "timezone": RESTAURANT_TIMEZONE,
         "attention": {"count": count, "sentence": attention},
         "cards": [
-            {"id": "stock", "title": "Stock", "sentence": stock_line},
-            {"id": "waste", "title": "Missing and waste", "sentence": waste_line},
-            {"id": "approvals", "title": "Needs you", "sentence": approval_line},
-            {"id": "money", "title": "Money", "sentence": money},
+            {"id": "stock", "title": "Stock", "figure": stock_figure, "sentence": stock_line, "quiet": stock_quiet},
+            {"id": "waste", "title": "Missing and waste", "figure": waste_figure, "sentence": waste_line, "quiet": waste_quiet},
+            {
+                "id": "money",
+                "title": "Money",
+                "figure": "Till live" if orders else None,
+                "sentence": money,
+                "quiet": not orders,
+            },
         ],
         "unknown_costs": unknown,
         "recipes_missing": missing_recipes,

@@ -105,7 +105,7 @@ export default function ElevenStaffPage() {
       <SectionLabel>Recipes</SectionLabel>
       <GlassCard>
         <p className="text-sm text-zinc-300">
-          {missingRecipes == null ? "Loading…" : missingRecipes === 0 ? "No dish is waiting for a recipe." : `${missingRecipes} dishes still have no recipe.`}
+          {missingRecipes == null ? "Loading…" : missingRecipes === 0 ? "No dish is waiting for a recipe." : missingRecipes === 1 ? "1 dish still has no recipe." : `${missingRecipes} dishes still have no recipe.`}
         </p>
       </GlassCard>
       <SectionLabel>Setup progress</SectionLabel>

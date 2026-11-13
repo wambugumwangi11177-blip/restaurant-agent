@@ -349,6 +349,10 @@ def test_close_shows_a_quantity_difference_and_marks_working_alone(client, db_se
     assert alone_event["working_alone"] is True
     pending = [item for item in owner_view["pending"] if item["kind"] == "close"]
     assert len(pending) == 1
+    assert owner_view["attention"]["sentence"] == "1 thing needs you."
+    assert owner_view["timezone"] == "Africa/Nairobi"
+    assert pending[0]["action"] == "Approve the day close"
+    assert all(item.get("ai") is None or item["ai"]["status"] in ("match", "mismatch") for item in owner_view["events"])
     approved = client.post(
         "/api/v1/store/approvals",
         headers=_auth(_token(owner)),

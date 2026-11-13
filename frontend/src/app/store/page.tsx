@@ -40,7 +40,7 @@ export default function StoreHomePage() {
         <section className="owner-glass-panel rounded-3xl p-4">
           <h2 className="font-semibold">Today</h2>
           <ul className="mt-3 space-y-2 text-sm">
-            <li><Link href="/store/recipes" className="underline">Recipes{setup.recipe_gap ? ` · ${setup.recipe_gap.missing_count} dishes still have no recipe` : ""}</Link></li>
+            <li><Link href="/store/recipes" className="underline">Recipes{setup.recipe_gap?.missing_count ? ` · ${setup.recipe_gap.missing_count === 1 ? "1 dish still has no recipe" : `${setup.recipe_gap.missing_count} dishes still have no recipe`}` : ""}</Link></li>
             <li><Link href="/store/chefs" className="underline">Chefs</Link></li>
             {hasModule(setup, "deliveries") && <li><Link href="/store/deliveries" className="underline">Deliveries</Link></li>}
             {hasModule(setup, "store-issue") && <li><Link href="/store/issue" className="underline">Hand to the kitchen</Link></li>}
@@ -71,7 +71,7 @@ export default function StoreHomePage() {
                   <p className="mt-2 text-xs text-zinc-400">
                     {setup.recipe_gap.dish_count === 0
                       ? "Optional. Add a dish when you know it."
-                      : `${setup.recipe_gap.missing_count} of ${setup.recipe_gap.dish_count} dishes still have no recipe.`}
+                      : `${setup.recipe_gap.missing_count} of ${setup.recipe_gap.dish_count} ${setup.recipe_gap.dish_count === 1 ? "dish still has" : "dishes still have"} no recipe.`}
                   </p>
                 )}
                 {step.id === "questionnaire" && step.state === "locked" && step.questions && (

@@ -67,10 +67,15 @@ class MoveIn(StrictModel):
     note: str = ""
 
 
-class CostIn(StrictModel):
-    kind: str
-    label: str = Field(min_length=1, max_length=80)
-    amount_kes: float = Field(ge=0)
+COST_KINDS = {
+    "rent": "Rent",
+    "gas": "Gas",
+    "electricity": "Electricity",
+    "water": "Water",
+    "salaries": "Salaries",
+    "other": "Other regular bills",
+}
+CADENCES = ("weekly", "monthly", "yearly")
 
 
 class PriceLine(StrictModel):
@@ -434,6 +439,33 @@ async def issue_to_kitchen(
     return {"item_name": item.item_name, "quantity": body.quantity, "unit": item.unit, "to_zone": dest.name}
 
 
+def _sees_cost_amounts(user: models.User) -> bool:
+    return user.role in (models.Role.SUPERADMIN, models.Role.ADMIN)
+
+
+def _cost_public(row: models.RunningCost, viewer: models.User) -> dict:
+    body = {
+        "id": row.id,
+        "kind": row.kind,
+        "label": row.label,
+        "cadence": row.cadence,
+        "due_day": row.due_day,
+        "status": row.status,
+        "delegated_to": row.delegated_to,
+        "has_receipt": bool(row.receipt_storage_key),
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+    }
+    if _sees_cost_amounts(viewer) and row.status != "unknown":
+        body["amount_cents"] = row.amount_cents
+    elif row.status == "needs_approval":
+        body["message"] = "Sent to the owner."
+    elif row.status == "unknown":
+        body["message"] = "Marked unknown."
+    else:
+        body["message"] = "With the owner."
+    return body
+
+
 @router.get("/costs")
 async def list_costs(
     db: Session = Depends(get_db),
@@ -447,45 +479,96 @@ async def list_costs(
         .order_by(models.RunningCost.id.asc())
         .all()
     )
-    total = sum(row.amount_cents for row in rows)
-    return {
-        "total_cents": total,
-        "costs": [
-            {"id": row.id, "kind": row.kind, "label": row.label, "amount_cents": row.amount_cents}
-            for row in rows
-        ],
-    }
+    payload = {"costs": [_cost_public(row, current_user) for row in rows]}
+    if _sees_cost_amounts(current_user):
+        payload["total_cents"] = sum(row.amount_cents for row in rows if row.status == "approved")
+    return payload
 
 
 @router.post("/costs", status_code=201)
 async def add_cost(
-    body: CostIn,
+    kind: str = Form(),
+    label: str = Form(""),
+    known: str = Form("yes"),
+    amount_kes: float = Form(0),
+    cadence: str = Form("monthly"),
+    due_day: int | None = Form(None),
+    delegate_to: str = Form(""),
+    receipt: UploadFile | None = File(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
     require_module(db, current_user, "running-costs")
-    if body.kind not in ("rent", "internet", "other"):
-        raise HTTPException(status_code=400, detail="Kind is rent, internet, or other.")
+    if kind not in COST_KINDS:
+        raise HTTPException(status_code=400, detail="Pick rent, gas, electricity, water, salaries, or other.")
+    if cadence not in CADENCES:
+        raise HTTPException(status_code=400, detail="Say how often: weekly, monthly, or yearly.")
+    if due_day is not None and not 1 <= due_day <= 31:
+        raise HTTPException(status_code=400, detail="The due day is from 1 to 31.")
     restaurant = get_or_create_restaurant(db, current_user)
     user = db.query(models.User).filter(models.User.id == current_user.id).first()
-    row = models.RunningCost(
-        restaurant_id=restaurant.id,
-        user_id=user.id,
-        kind=body.kind,
-        label=body.label.strip(),
-        amount_cents=int(round(body.amount_kes * 100)),
-        created_at=utcnow(),
-    )
-    db.add(row)
-    db.flush()
-    record_entry(
-        db, restaurant.id, user, "running_cost_added", "running_cost",
-        f"{user.email} entered {row.label}. The amount stays with the owner.",
-        entity_id=row.id,
-        detail={"kind": row.kind},
-    )
-    db.commit()
-    return {"id": row.id, "kind": row.kind, "label": row.label, "amount_cents": row.amount_cents}
+    cleaned = label.strip() or COST_KINDS[kind]
+    is_known = known.strip().lower() in ("yes", "true", "1", "know")
+    picture = None
+    if receipt is not None and receipt.filename:
+        picture = _photo_bytes(receipt)
+    if is_known:
+        if amount_kes <= 0:
+            raise HTTPException(status_code=400, detail="Enter the amount.")
+        status = "needs_approval"
+        amount_cents = int(round(amount_kes * 100))
+        delegated = None
+    else:
+        if delegate_to not in ("owner", "accountant", "storekeeper"):
+            raise HTTPException(status_code=400, detail="Send the unknown bill to the owner or the other manager.")
+        if user.staff_role == models.StaffRole.STOCKKEEPER and delegate_to == "storekeeper":
+            raise HTTPException(status_code=400, detail="Send it to the accountant or the owner.")
+        if user.staff_role == models.StaffRole.CONTROLLER and delegate_to == "accountant":
+            raise HTTPException(status_code=400, detail="Send it to the storekeeper or the owner.")
+        status = "unknown"
+        amount_cents = 0
+        delegated = delegate_to
+    photo_key = None
+    photo_type = None
+    if picture:
+        data, photo_type = picture
+        photo_key = storage.save(data, content_type=photo_type)
+    try:
+        row = models.RunningCost(
+            restaurant_id=restaurant.id,
+            user_id=user.id,
+            kind=kind,
+            label=cleaned,
+            amount_cents=amount_cents,
+            cadence=cadence,
+            due_day=due_day,
+            receipt_storage_key=photo_key,
+            receipt_content_type=photo_type,
+            status=status,
+            delegated_to=delegated,
+            created_at=utcnow(),
+        )
+        db.add(row)
+        db.flush()
+        record_entry(
+            db, restaurant.id, user, "running_cost_added", "running_cost",
+            f"{user.email} answered {cleaned}."
+            + (" The amount is with the owner." if is_known else f" They do not know it. Sent to the {delegated}."),
+            entity_id=row.id,
+            detail={"kind": kind, "status": status, "cadence": cadence},
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        if photo_key:
+            storage.delete(photo_key)
+        raise
+    if status == "needs_approval":
+        from routers.store_control import tell_owners
+        tell_owners(db, user, restaurant, f"{cleaned} needs you", f"{cleaned} was sent for approval.")
+    body = _cost_public(row, user)
+    body["message"] = "Sent to the owner. You will not see the total." if is_known else "Marked unknown. The owner can see that."
+    return body
 
 
 @router.get("/deliveries")

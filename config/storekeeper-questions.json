@@ -65,7 +65,7 @@
     },
     {
       "id": "knows_running_costs",
-      "prompt": "Do you know the rent, internet, and other bills?",
+      "prompt": "Do you know what we pay for rent, gas, electricity, water, salaries, and other regular bills?",
       "answers": [
         {"value": "yes", "label": "Yes", "opens": "/store/costs", "unlocks": "running-costs"},
         {"value": "no", "label": "No", "opens": "/store"},

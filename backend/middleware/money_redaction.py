@@ -50,7 +50,7 @@ class MoneyRedactionMiddleware(BaseHTTPMiddleware):
         if "application/json" not in content_type:
             return response
         user = _user_for_request(request)
-        if user is None or not hides_money(user):
+        if user is None or not hides_money(user, request.url.path):
             return response
         body = b""
         async for chunk in response.body_iterator:

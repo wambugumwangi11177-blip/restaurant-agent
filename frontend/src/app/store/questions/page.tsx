@@ -50,8 +50,8 @@ export default function QuestionsPage() {
       <section className="owner-glass-panel rounded-3xl p-4">
         <h2 className="font-semibold">Questions are locked</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-300">{step.locked_reason}</p>
-        <Link href="/store/recipes" className="mt-4 inline-flex min-h-11 items-center rounded-full bg-white px-4 font-semibold text-black">
-          Open recipes
+        <Link href="/store/account" className="mt-4 inline-flex min-h-11 items-center rounded-full bg-white px-4 font-semibold text-black">
+          Open account
         </Link>
       </section>
     );

@@ -126,14 +126,17 @@ async def create_staff(
             role=models.Role.STAFF,
             staff_role=target_role,
             tenant_id=current_user.tenant_id,
-            # The storekeeper's first sign-in must replace this temporary
-            # password and set their own PIN before the store opens.
-            must_change_password=target_role == models.StaffRole.STOCKKEEPER,
+            # The storekeeper and the accountant replace this temporary
+            # password and set a PIN before the store opens.
+            must_change_password=target_role in (
+                models.StaffRole.STOCKKEEPER,
+                models.StaffRole.CONTROLLER,
+            ),
         )
         db.add(linked_user)
         db.commit()
         db.refresh(linked_user)
-        if target_role == models.StaffRole.STOCKKEEPER:
+        if target_role in (models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER):
             from time_utils import utcnow
             db.add(models.StaffSetupProgress(
                 user_id=linked_user.id,

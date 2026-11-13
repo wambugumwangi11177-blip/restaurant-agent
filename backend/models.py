@@ -195,6 +195,9 @@ class Restaurant(Base):
     # default_supplier_id in directive 018).
     latitude        = Column(Float, nullable=True)
     longitude       = Column(Float, nullable=True)
+    # Units of spoilage or of a close difference that wait for the owner.
+    # Smaller gaps are reported and do not wait. Default is 5.
+    spoilage_approval_qty = Column(Float, nullable=False, default=5, server_default="5")
 
     tenant = relationship("Tenant", back_populates="restaurants")
     menu_items = relationship("MenuItem", back_populates="restaurant")
@@ -1695,8 +1698,8 @@ class StaffSetupAnswer(Base):
 
 
 class RunningCost(Base):
-    """A bill the storekeeper typed once. The amount is for the owner.
-    Storekeeper responses have amount_cents removed."""
+    """A regular bill a manager answered. The amount waits for the owner.
+    Store screens never return the amount to the storekeeper or the accountant."""
     __tablename__ = "running_costs"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -1704,7 +1707,16 @@ class RunningCost(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     kind = Column(String, nullable=False)
     label = Column(String, nullable=False)
-    amount_cents = Column(Integer, nullable=False)
+    amount_cents = Column(Integer, nullable=False, default=0, server_default="0")
+    cadence = Column(String, nullable=False, default="monthly", server_default="monthly")
+    due_day = Column(Integer, nullable=True)
+    receipt_storage_key = Column(String, nullable=True)
+    receipt_content_type = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="needs_approval", server_default="needs_approval")
+    delegated_to = Column(String, nullable=True)
+    owner_note = Column(Text, nullable=False, default="", server_default="")
+    approved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utcnow, nullable=False)
 
 
@@ -1917,6 +1929,7 @@ class SpoilageRecord(Base):
     created_at = Column(DateTime, default=utcnow, nullable=False)
     approved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     approved_at = Column(DateTime, nullable=True)
+    owner_note = Column(Text, nullable=False, default="", server_default="")
 
 
 class DayClose(Base):
@@ -1927,11 +1940,13 @@ class DayClose(Base):
     restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     chef_id = Column(Integer, ForeignKey("store_chefs.id"), nullable=True)
+    confirmer_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     working_alone = Column(Boolean, nullable=False, default=False, server_default="0")
     status = Column(String, nullable=False, default="reported")
     created_at = Column(DateTime, default=utcnow, nullable=False)
     approved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     approved_at = Column(DateTime, nullable=True)
+    owner_note = Column(Text, nullable=False, default="", server_default="")
 
     lines = relationship("DayCloseLine", back_populates="close")
 
@@ -1992,7 +2007,7 @@ def _control_no_delete(mapper, connection, target):
 @event.listens_for(SpoilageRecord, "before_update")
 @event.listens_for(DayClose, "before_update")
 def _approval_only(mapper, connection, target):
-    _immutable_change(target, {"status", "approved_by_user_id", "approved_at"})
+    _immutable_change(target, {"status", "approved_by_user_id", "approved_at", "owner_note"})
 
 
 @event.listens_for(StaffEntryAudit, "before_update")

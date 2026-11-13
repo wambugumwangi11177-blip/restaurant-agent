@@ -8,6 +8,7 @@ import api from "@/lib/api";
 type Person = {
   user_id: number;
   email: string;
+  name?: string;
   staff_role: string | null;
   account: string;
   recipes: string;
@@ -24,6 +25,7 @@ const ROLES = ["stockkeeper", "kitchen", "manager", "supervisor", "controller", 
 export default function ElevenStaffPage() {
   const [people, setPeople] = useState<Person[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [missingRecipes, setMissingRecipes] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,6 +37,7 @@ export default function ElevenStaffPage() {
     const response = await api.get("/api/v1/staff-setup/activity");
     setPeople(response.data.people ?? []);
     setEntries(response.data.entries ?? []);
+    setMissingRecipes(response.data.recipe_gap?.missing_count ?? 0);
   }
 
   useEffect(() => {
@@ -55,7 +58,7 @@ export default function ElevenStaffPage() {
         staff_role: staffRole,
       });
       setMessage(
-        staffRole === "stockkeeper"
+        staffRole === "stockkeeper" || staffRole === "controller"
           ? "Login created. They must change this password and set a 4-digit PIN on first sign-in."
           : "Login created.",
       );
@@ -99,6 +102,12 @@ export default function ElevenStaffPage() {
           </button>
         </form>
       </GlassCard>
+      <SectionLabel>Recipes</SectionLabel>
+      <GlassCard>
+        <p className="text-sm text-zinc-300">
+          {missingRecipes == null ? "Loading…" : missingRecipes === 0 ? "No dish is waiting for a recipe." : `${missingRecipes} dishes still have no recipe.`}
+        </p>
+      </GlassCard>
       <SectionLabel>Setup progress</SectionLabel>
       {people.length === 0 ? (
         <GlassCard>
@@ -108,7 +117,8 @@ export default function ElevenStaffPage() {
         <ul className="space-y-3">
           {people.map((person) => (
             <li key={person.user_id} className="owner-glass-panel rounded-3xl p-4 text-sm">
-              <p className="font-semibold">{person.email}</p>
+              <p className="font-semibold">{person.name || person.email}</p>
+              <p className="text-[11px] text-zinc-500">{person.email}</p>
               <p className="mt-1 text-zinc-400">{person.staff_role}</p>
               <p className="mt-2">Account {person.account} · Recipes {person.recipes} · Questions {person.questionnaire}</p>
               {person.stock_followup && <p className="mt-2 text-zinc-300">{person.stock_followup.label}</p>}

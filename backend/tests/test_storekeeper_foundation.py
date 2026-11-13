@@ -168,7 +168,10 @@ def test_recipe_lines_are_append_only_and_unlock_the_store(client, db_session):
     progress.recipes_completed_at = None
     db_session.commit()
     headers = _auth(_token(jack))
-    assert client.get("/api/v1/inventory/", headers=headers).status_code == 403
+    # Recipes are optional. The store is open once the password and PIN are saved.
+    opened_early = client.get("/api/v1/inventory/", headers=headers)
+    assert opened_early.status_code == 200
+    assert money_keys_in(opened_early.json()) == []
     saved = client.post(
         "/api/v1/store/recipes",
         headers=headers,

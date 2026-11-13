@@ -127,7 +127,7 @@ def test_suppliers_stock_issue_and_waste_are_quantities_only(client, db_session)
     costs = client.post(
         "/api/v1/store/costs",
         headers=_auth(_token(jack)),
-        json={"kind": "rent", "label": "Rent", "amount_kes": 15000},
+        data={"kind": "rent", "label": "Rent", "amount_kes": "15000", "known": "yes", "cadence": "monthly", "due_day": "5"},
     )
     assert costs.status_code == 201
     hidden = client.get("/api/v1/store/costs", headers=_auth(_token(jack)))

@@ -52,7 +52,11 @@ export default function IssuePage() {
     body.set("chef_id", chefId);
     body.set("pin", pin);
     body.set("from_zone", "Main store");
-    if (photo) body.set("photo", photo);
+    if (!photo) {
+      setError("Photograph what the kitchen received.");
+      return;
+    }
+    body.set("photo", photo);
     try {
       const response = await api.post("/api/v1/store/handover", body, { headers: { "Content-Type": "multipart/form-data" } });
       const moved = (response.data.lines ?? []).map((line: { quantity: number; unit: string; item_name: string }) => (
@@ -79,7 +83,7 @@ export default function IssuePage() {
 
   return (
     <form onSubmit={save} className="owner-glass-panel space-y-3 rounded-3xl p-4">
-      <p className="text-sm text-zinc-300">Pick the items and quantities. The chef types their own 4-digit PIN. A photo is optional.</p>
+      <p className="text-sm text-zinc-300">Pick the items and quantities. The person who takes the goods types their PIN on this phone and photographs what they received.</p>
       {items.length === 0 && <p className="text-sm text-zinc-400">Nothing is in the main store yet.</p>}
       {lines.map((line) => (
         <div key={line.key} className="grid grid-cols-[1fr_6rem] gap-2">
@@ -108,7 +112,7 @@ export default function IssuePage() {
       <label className="block text-sm">Chef PIN
         <input required inputMode="numeric" autoComplete="off" maxLength={4} value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3 tracking-[0.4em]" />
       </label>
-      <PhotoField label="Photo of the goods" file={photo} onFile={setPhoto} optional />
+      <PhotoField label="Photo of what they received" file={photo} onFile={setPhoto} />
       {error && <p className="text-sm text-red-300">{error}</p>}
       {saved && <p className="text-sm text-zinc-200">{saved}</p>}
       <button type="submit" className="min-h-11 w-full rounded-full bg-white font-semibold text-black" disabled={chefs.length === 0}>Hand it over</button>

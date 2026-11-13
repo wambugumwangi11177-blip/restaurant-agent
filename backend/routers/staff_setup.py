@@ -15,6 +15,7 @@ from routers.auth import LOCKOUT_MINUTES, MAX_FAILED_ATTEMPTS
 from routers.deps import get_or_create_restaurant
 from schemas import StrictModel
 from staff_audit import record_entry
+from people import person_of
 from store_access import latest_answers, stock_followup, unlocked_modules
 from time_utils import utcnow
 
@@ -106,33 +107,30 @@ def _step_state(progress: models.StaffSetupProgress | None, user: models.User) -
     if questions_done:
         question_state = "done"
         question_reason = None
-    elif account_done and recipes_done:
+    elif account_done:
         question_state = "open"
         question_reason = None
-    elif account_done:
-        question_state = "locked"
-        question_reason = "Save at least one recipe from the chefs. That unlocks these questions."
     else:
         question_state = "locked"
         question_reason = "Change the password you were given and set your own 4-digit PIN first."
     return {
         "must_change_password": bool(user.must_change_password),
         "has_pin": bool(user.hashed_pin),
-        "app_unlocked": bool(account_done and recipes_done),
+        "app_unlocked": bool(account_done),
         "steps": [
             {
                 "id": "account",
                 "title": "Your login",
                 "state": "done" if account_done else "open",
-                "unlocks": "Recipe entry, then the rest of the store",
+                "unlocks": "The questions, then the store",
                 "locked_reason": None if account_done else "Sign in, replace the temporary password, and choose a 4-digit PIN.",
                 "completed_at": progress.account_completed_at.isoformat() if progress and progress.account_completed_at else None,
             },
             {
                 "id": "recipes",
-                "title": "Recipes from the chefs",
+                "title": "Recipes",
                 "state": "done" if recipes_done else ("open" if account_done else "locked"),
-                "unlocks": "Stock counts and the question step",
+                "unlocks": "Optional. Fill dishes in over time.",
                 "locked_reason": None if (account_done or recipes_done) else "Unlocks after your password and PIN are saved.",
                 "completed_at": progress.recipes_completed_at.isoformat() if progress and progress.recipes_completed_at else None,
             },
@@ -188,6 +186,16 @@ def _save_suppliers(db: Session, user: models.User, restaurant: models.Restauran
         )
 
 
+def _recipe_gap(db: Session, restaurant_id: int) -> dict:
+    dishes = db.query(models.MenuItem).filter(models.MenuItem.restaurant_id == restaurant_id).all()
+    missing = []
+    for dish in dishes:
+        line = db.query(models.MenuIngredient).filter(models.MenuIngredient.menu_item_id == dish.id).first()
+        if line is None:
+            missing.append(dish.name)
+    return {"dish_count": len(dishes), "missing_count": len(missing), "missing_names": missing[:8]}
+
+
 def _notify_owners(db: Session, user: models.User, restaurant: models.Restaurant, title: str, body: str) -> None:
     owners = db.query(models.User).filter(
         models.User.tenant_id == user.tenant_id,
@@ -228,6 +236,7 @@ async def get_setup(
         if answer.get("unlocks")
     })
     payload["stock_followup"] = stock_followup(answers)
+    payload["recipe_gap"] = _recipe_gap(db, restaurant.id)
     payload["answers"] = [
         {
             "question_id": row.question_id,
@@ -352,7 +361,10 @@ async def answer_question(
     current_user: models.User = Depends(auth.get_current_user),
 ):
     user = db.query(models.User).filter(models.User.id == current_user.id).first()
-    if user.staff_role != models.StaffRole.STOCKKEEPER and user.role not in (
+    if user.staff_role not in (
+        models.StaffRole.STOCKKEEPER,
+        models.StaffRole.CONTROLLER,
+    ) and user.role not in (
         models.Role.ADMIN, models.Role.SUPERADMIN,
     ):
         raise HTTPException(status_code=403, detail="This step is for the storekeeper.")
@@ -361,8 +373,8 @@ async def answer_question(
         models.StaffSetupProgress.user_id == user.id
     ).first()
     if user.role not in (models.Role.ADMIN, models.Role.SUPERADMIN):
-        if progress is None or progress.recipes_completed_at is None:
-            raise HTTPException(status_code=403, detail="recipes_required")
+        if progress is None or progress.account_completed_at is None:
+            raise HTTPException(status_code=403, detail="password_change_required")
     questions = load_questions()["questions"]
     question = next((item for item in questions if item["id"] == body.question_id), None)
     if question is None:
@@ -445,9 +457,11 @@ async def setup_activity(
     people = []
     for progress, person in rows:
         state = _step_state(progress, person)
+        who = person_of(db, person)
         people.append({
             "user_id": person.id,
             "email": person.email,
+            "name": who["person_name"],
             "staff_role": person.staff_role.value if person.staff_role else None,
             "account": state["steps"][0]["state"],
             "recipes": state["steps"][1]["state"],
@@ -481,13 +495,18 @@ async def setup_activity(
             models.User.id.in_({row.user_id for row in audits})
         ).all()
         names = {item.id: item.email for item in users}
+    named = {}
+    for item in db.query(models.User).filter(models.User.id.in_({row.user_id for row in audits} or {0})).all():
+        named[item.id] = person_of(db, item)
     return {
         "people": people,
+        "recipe_gap": _recipe_gap(db, restaurant.id),
         "entries": [
             {
                 "id": row.id,
                 "at": row.created_at.isoformat() if row.created_at else None,
                 "email": names.get(row.user_id),
+                "name": named.get(row.user_id, {}).get("person_name"),
                 "action": row.action,
                 "summary": row.summary,
             }

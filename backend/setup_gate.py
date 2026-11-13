@@ -1,6 +1,7 @@
-"""Block a new storekeeper until the account step, then until recipes, are done.
+"""Block a new store manager until the password and PIN are saved.
 
-Existing staff (no setup row, must_change_password false) are unchanged.
+Recipes do not lock the rest of the store. The questionnaire routes the work.
+Existing staff with no setup row are unchanged.
 """
 from fastapi import HTTPException, status
 import models
@@ -22,11 +23,7 @@ _ACCOUNT_ONLY = (
     ("POST", "/staff-setup/account"),
 )
 
-_UNTIL_RECIPES = _ACCOUNT_ONLY + (
-    ("GET", "/store/recipes"),
-    ("POST", "/store/recipes"),
-    ("POST", "/staff-setup/recipes"),
-)
+_STORE_ROLES = (models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER)
 
 
 def enforce_storekeeper_setup(user: models.User, request, db) -> None:
@@ -38,24 +35,17 @@ def enforce_storekeeper_setup(user: models.User, request, db) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="password_change_required",
         )
-    if user.staff_role != models.StaffRole.STOCKKEEPER:
+    if user.staff_role not in _STORE_ROLES:
         return
     progress = (
         db.query(models.StaffSetupProgress)
         .filter(models.StaffSetupProgress.user_id == user.id)
         .first()
     )
-    if progress is None or progress.recipes_completed_at is not None:
+    if progress is None or progress.account_completed_at is not None:
         return
-    if progress.account_completed_at is None:
-        if not _matches(method, path, _ACCOUNT_ONLY):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="password_change_required",
-            )
-        return
-    if not _matches(method, path, _UNTIL_RECIPES):
+    if not _matches(method, path, _ACCOUNT_ONLY):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="recipes_required",
+            detail="password_change_required",
         )

@@ -50,6 +50,7 @@ export type SetupPayload = {
   unlocked_modules?: string[];
   answers?: GivenAnswer[];
   stock_followup?: StockFollowup | null;
+  recipe_gap?: { dish_count: number; missing_count: number; missing_names: string[] };
   steps: SetupStep[];
 };
 

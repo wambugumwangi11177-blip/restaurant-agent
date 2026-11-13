@@ -14,20 +14,34 @@ def latest_answers(db, user_id: int) -> dict[str, models.StaffSetupAnswer]:
     return {row.question_id: row for row in rows}
 
 
+_STORE_ROLES = (models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER)
+
+
 def unlocked_modules(db, user: models.User) -> set[str]:
     if user.role in (models.Role.SUPERADMIN, models.Role.ADMIN):
         return {"*"}
+    user_ids = [user.id]
+    if user.staff_role in _STORE_ROLES:
+        user_ids = [
+            row.id
+            for row in db.query(models.User).filter(
+                models.User.tenant_id == user.tenant_id,
+                models.User.staff_role.in_(_STORE_ROLES),
+                models.User.is_active.is_(True),
+            ).all()
+        ]
     found = set()
-    for row in latest_answers(db, user.id).values():
-        if row.unlocks:
-            found.add(row.unlocks)
+    for user_id in user_ids:
+        for row in latest_answers(db, user_id).values():
+            if row.unlocks:
+                found.add(row.unlocks)
     return found
 
 
 def require_store_role(user: models.User) -> None:
     if user.role in (models.Role.SUPERADMIN, models.Role.ADMIN):
         return
-    if user.staff_role != models.StaffRole.STOCKKEEPER:
+    if user.staff_role not in _STORE_ROLES:
         raise HTTPException(status_code=403, detail="Insufficient permissions for this action")
 
 

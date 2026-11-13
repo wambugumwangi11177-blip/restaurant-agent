@@ -20,6 +20,8 @@ from database import get_db
 from routers.deps import get_or_create_restaurant
 from routers.store_intake import _balance, _photo_bytes, _sync_total, _zone
 from schemas import StrictModel
+from ai.notify import notify_users
+from people import person_of
 from staff_audit import record_entry
 from store_access import require_module, require_store_role
 from store_vision import run_handover_check_safe
@@ -41,13 +43,18 @@ class CloseLineIn(StrictModel):
 class CloseIn(StrictModel):
     lines: list[CloseLineIn]
     working_alone: bool = False
-    chef_id: int | None = None
     pin: str = ""
 
 
 class ApprovalIn(StrictModel):
     kind: str
     id: int
+    decision: str = "approve"
+    note: str = ""
+
+
+class PolicyIn(StrictModel):
+    spoilage_approval_qty: float = Field(gt=0, le=100000)
 
 
 def _owner(user: models.User) -> bool:
@@ -57,6 +64,30 @@ def _owner(user: models.User) -> bool:
 def _require_owner(user: models.User) -> None:
     if not _owner(user):
         raise HTTPException(status_code=403, detail="The owner approves this.")
+
+
+def tell_owners(db, user, restaurant, title: str, body: str) -> None:
+    """A new item that needs the owner. The note does not include an amount."""
+    owners = db.query(models.User).filter(
+        models.User.tenant_id == user.tenant_id,
+        models.User.role.in_((models.Role.ADMIN, models.Role.SUPERADMIN)),
+        models.User.is_active.is_(True),
+    ).all()
+    if not owners:
+        return
+    notify_users(
+        db,
+        [owner.id for owner in owners],
+        title,
+        body,
+        "store.approval",
+        url="/eleven/approvals",
+    )
+
+
+def _threshold(restaurant) -> float:
+    value = restaurant.spoilage_approval_qty
+    return float(value if value is not None else SPOILAGE_APPROVAL_AT)
 
 
 def _user(db, current) -> models.User:
@@ -119,6 +150,53 @@ def _confirm_pin(db, restaurant, user, chef: models.StoreChef, pin: str) -> None
         raise HTTPException(status_code=400, detail="That PIN is wrong.")
     chef.failed_pin_attempts = 0
     chef.pin_locked_until = None
+
+
+def _confirm_manager(db, restaurant, user, pin: str) -> models.User:
+    """The other manager types their own PIN. Chefs are not accepted."""
+    if user.staff_role not in (models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER):
+        raise HTTPException(status_code=403, detail="The storekeeper and the accountant close the day.")
+    now = utcnow()
+    if user.pin_locked_until and user.pin_locked_until > now:
+        record_entry(
+            db, restaurant.id, user, "close_pin_locked", "day_close",
+            f"{user.email} tried a close PIN while it was locked.",
+        )
+        db.commit()
+        minutes = _minutes_left(user.pin_locked_until, now)
+        raise HTTPException(status_code=423, detail=f"This PIN is locked. Try again in {minutes} minutes.")
+    other = (
+        models.StaffRole.CONTROLLER
+        if user.staff_role == models.StaffRole.STOCKKEEPER
+        else models.StaffRole.STOCKKEEPER
+    )
+    candidates = db.query(models.User).filter(
+        models.User.tenant_id == user.tenant_id,
+        models.User.staff_role == other,
+        models.User.is_active.is_(True),
+        models.User.hashed_pin.isnot(None),
+    ).all()
+    if not candidates:
+        raise HTTPException(status_code=400, detail="The other manager needs a PIN before they can confirm.")
+    match = next((person for person in candidates if _pin_ok(pin) and auth.verify_pin(pin, person.hashed_pin)), None)
+    if match is None:
+        user.pin_failed_attempts = (user.pin_failed_attempts or 0) + 1
+        locked = user.pin_failed_attempts >= PIN_ATTEMPTS
+        if locked:
+            user.pin_locked_until = now + timedelta(minutes=PIN_LOCK_MINUTES)
+        record_entry(
+            db, restaurant.id, user, "close_pin_locked" if locked else "close_pin_failed", "day_close",
+            f"{user.email} entered the wrong PIN for the day close."
+            + (" It is locked for 15 minutes." if locked else ""),
+            detail={"attempts": user.pin_failed_attempts},
+        )
+        db.commit()
+        if locked:
+            raise HTTPException(status_code=423, detail="This PIN is locked. Try again in 15 minutes.")
+        raise HTTPException(status_code=400, detail="That PIN is wrong.")
+    user.pin_failed_attempts = 0
+    user.pin_locked_until = None
+    return match
 
 
 def _item(db, restaurant_id: int, item_id: int) -> models.InventoryItem:
@@ -199,11 +277,16 @@ def _handover_public(db, handover: models.KitchenHandover, viewer: models.User) 
         .order_by(models.HandoverVisionCheck.id.desc())
         .first()
     )
+    who = person_of(db, creator)
     body = {
         "id": handover.id,
         "chef_name": chef.name if chef else None,
         "created_by": creator.email if creator else None,
+        "person_name": who["person_name"],
+        "person_email": who["person_email"],
+        "initial": who["initial"],
         "created_at": _when(handover.created_at),
+        "photo_path": f"/api/v1/store/handovers/{handover.id}/photo" if handover.photo_storage_key else None,
         "has_photo": bool(handover.photo_storage_key),
         "lines": [
             {
@@ -233,6 +316,7 @@ def _handover_public(db, handover: models.KitchenHandover, viewer: models.User) 
 def _spoilage_public(db, row: models.SpoilageRecord) -> dict:
     chef = db.query(models.StoreChef).filter(models.StoreChef.id == row.chef_id).first()
     creator = db.query(models.User).filter(models.User.id == row.user_id).first()
+    who = person_of(db, creator)
     return {
         "id": row.id,
         "item_name": row.item_name,
@@ -244,28 +328,38 @@ def _spoilage_public(db, row: models.SpoilageRecord) -> dict:
         "chef_name": chef.name if chef else None,
         "status": row.status,
         "created_by": creator.email if creator else None,
+        "person_name": who["person_name"],
+        "person_email": who["person_email"],
+        "initial": who["initial"],
         "created_at": _when(row.created_at),
         "approved_at": _when(row.approved_at),
+        "owner_note": row.owner_note or "",
+        "photo_path": f"/api/v1/store/spoilage/{row.id}/photo",
     }
 
 
 def _close_public(db, row: models.DayClose) -> dict:
     creator = db.query(models.User).filter(models.User.id == row.user_id).first()
-    chef = db.query(models.StoreChef).filter(models.StoreChef.id == row.chef_id).first() if row.chef_id else None
+    confirmer = db.query(models.User).filter(models.User.id == row.confirmer_user_id).first() if row.confirmer_user_id else None
     lines = (
         db.query(models.DayCloseLine)
         .filter(models.DayCloseLine.close_id == row.id)
         .order_by(models.DayCloseLine.id.asc())
         .all()
     )
+    who = person_of(db, creator)
     return {
         "id": row.id,
         "working_alone": bool(row.working_alone),
-        "chef_name": chef.name if chef else None,
+        "confirmer_name": person_of(db, confirmer)["person_name"] if confirmer else None,
         "status": row.status,
         "created_by": creator.email if creator else None,
+        "person_name": who["person_name"],
+        "person_email": who["person_email"],
+        "initial": who["initial"],
         "created_at": _when(row.created_at),
         "approved_at": _when(row.approved_at),
+        "owner_note": row.owner_note or "",
         "lines": [
             {
                 "item_name": line.item_name,
@@ -377,6 +471,8 @@ async def hand_to_kitchen(
     chef = _chef(db, restaurant.id, chef_id)
     _confirm_pin(db, restaurant, user, chef, pin)
     picture = _optional_photo(photo)
+    if picture is None:
+        raise HTTPException(status_code=422, detail="Photograph what the kitchen received.")
     saved_keys = []
     photo_key = None
     photo_type = None
@@ -504,7 +600,7 @@ async def record_spoilage(
     key = storage.save(data, content_type=content_type)
     try:
         place = _move(db, restaurant, item, quantity, zone, None, user, "spoilage")
-        status = "needs_approval" if quantity >= SPOILAGE_APPROVAL_AT else "reported"
+        status = "needs_approval" if quantity >= _threshold(restaurant) else "reported"
         row = models.SpoilageRecord(
             restaurant_id=restaurant.id,
             user_id=user.id,
@@ -536,6 +632,8 @@ async def record_spoilage(
         raise
     body = _spoilage_public(db, row)
     body["message"] = "The owner will look at this." if status == "needs_approval" else "Saved."
+    if status == "needs_approval":
+        tell_owners(db, user, restaurant, "Waste needs you", f"{quantity:g} {item.unit} of {item.item_name} was written off.")
     return body
 
 
@@ -603,15 +701,16 @@ async def close_day(
     require_module(db, current_user, "day-close")
     restaurant = get_or_create_restaurant(db, current_user)
     user = _user(db, current_user)
-    chef = None
+    confirmer = None
+    if user.staff_role == models.StaffRole.KITCHEN:
+        raise HTTPException(status_code=403, detail="Chefs do not close the day.")
     if body.working_alone:
-        if body.chef_id or body.pin:
+        if body.pin:
             raise HTTPException(status_code=400, detail="Working alone does not use a second PIN.")
     else:
-        if body.chef_id is None or not body.pin:
-            raise HTTPException(status_code=400, detail="A second person confirms the close with their PIN.")
-        chef = _chef(db, restaurant.id, body.chef_id)
-        _confirm_pin(db, restaurant, user, chef, body.pin)
+        if not body.pin:
+            raise HTTPException(status_code=400, detail="The other manager confirms the close with their PIN.")
+        confirmer = _confirm_manager(db, restaurant, user, body.pin)
     expected = {
         item.id: item
         for item in db.query(models.InventoryItem).filter(
@@ -628,7 +727,7 @@ async def close_day(
     close = models.DayClose(
         restaurant_id=restaurant.id,
         user_id=user.id,
-        chef_id=chef.id if chef else None,
+        confirmer_user_id=confirmer.id if confirmer else None,
         working_alone=body.working_alone,
         status="reported",
         created_at=utcnow(),
@@ -637,7 +736,7 @@ async def close_day(
     db.flush()
     for line in body.lines:
         item = expected[line.item_id]
-        if abs(line.counted_qty - item.quantity) > 1e-6:
+        if abs(line.counted_qty - item.quantity) >= _threshold(restaurant):
             differs = True
         db.add(models.DayCloseLine(
             close_id=close.id,
@@ -648,10 +747,10 @@ async def close_day(
             counted_qty=line.counted_qty,
         ))
     close.status = "needs_approval" if differs else "reported"
-    alone = " Working alone." if body.working_alone else f" {chef.name} confirmed."
+    who = " Working alone." if body.working_alone else f" {person_of(db, confirmer)['person_name']} confirmed."
     record_entry(
         db, restaurant.id, user, "day_closed", "day_close",
-        f"{user.email} closed the day.{alone}"
+        f"{user.email} closed the day.{who}"
         + (" The count differs from the books." if differs else " The count matches."),
         entity_id=close.id,
         detail={"working_alone": body.working_alone, "status": close.status, "lines": len(body.lines)},
@@ -659,6 +758,8 @@ async def close_day(
     db.commit()
     payload = _close_public(db, close)
     payload["message"] = "The owner will look at the difference." if differs else "Saved."
+    if differs:
+        tell_owners(db, user, restaurant, "The day close needs you", "The count differs from the books.")
     return payload
 
 
@@ -707,22 +808,160 @@ async def list_approvals(
         .limit(40)
         .all()
     )
+    costs = (
+        db.query(models.RunningCost)
+        .filter(models.RunningCost.restaurant_id == restaurant.id)
+        .order_by(models.RunningCost.id.desc())
+        .limit(40)
+        .all()
+    )
+    deliveries = (
+        db.query(models.DeliveryReceipt)
+        .filter(models.DeliveryReceipt.restaurant_id == restaurant.id)
+        .order_by(models.DeliveryReceipt.id.desc())
+        .limit(20)
+        .all()
+    )
     events = []
     for row in spoilage:
         item = _spoilage_public(db, row)
-        item["kind"] = "spoilage"
+        item["kind"] = "waste"
+        item["headline"] = f"{item['person_name']} wrote off {row.quantity:g} {row.unit} of {row.item_name}."
         events.append(item)
     for row in closes:
         item = _close_public(db, row)
         item["kind"] = "close"
+        gap = next((line for line in item["lines"] if abs(line["difference"]) > 1e-6), None)
+        if item["working_alone"]:
+            item["headline"] = f"{item['person_name']} closed the day working alone."
+        elif item.get("confirmer_name"):
+            item["headline"] = f"{item['person_name']} closed the day with {item['confirmer_name']}."
+        else:
+            item["headline"] = f"{item['person_name']} closed the day."
+        if gap:
+            item["headline"] += f" {gap['item_name']} is {abs(gap['difference']):g} {gap['unit']} off the books."
         events.append(item)
     for row in handovers:
         item = _handover_public(db, row, current_user)
         item["kind"] = "handover"
+        moved = ", ".join(f"{line['quantity']:g} {line['unit']} {line['item_name']}" for line in item["lines"])
+        item["headline"] = f"{item['person_name']} handed {moved} to {item['chef_name']}."
         events.append(item)
-    events.sort(key=lambda item: item["created_at"] or "", reverse=True)
+    for row in costs:
+        creator = db.query(models.User).filter(models.User.id == row.user_id).first()
+        who = person_of(db, creator)
+        if row.status == "unknown":
+            headline = f"{who['person_name']} does not know {row.label}."
+        elif row.status == "approved":
+            headline = f"{who['person_name']} sent {row.label}. You approved it."
+        elif row.status == "declined":
+            headline = f"{who['person_name']} sent {row.label}. You declined it."
+        else:
+            headline = f"{who['person_name']} sent {row.label} for approval."
+        events.append({
+            "id": row.id,
+            "kind": "cost",
+            "status": row.status,
+            "label": row.label,
+            "cadence": row.cadence,
+            "due_day": row.due_day,
+            "amount_cents": row.amount_cents if row.status != "unknown" else None,
+            "headline": headline,
+            "created_at": _when(row.created_at),
+            "owner_note": row.owner_note or "",
+            "photo_path": f"/api/v1/store/costs/{row.id}/receipt" if row.receipt_storage_key else None,
+            **who,
+        })
+    for row in deliveries:
+        creator = db.query(models.User).filter(models.User.id == row.received_by_user_id).first()
+        who = person_of(db, creator)
+        supplier = db.query(models.Supplier).filter(models.Supplier.id == row.supplier_id).first()
+        lines = db.query(models.DeliveryReceiptLine).filter(models.DeliveryReceiptLine.receipt_id == row.id).all()
+        photo = db.query(models.DeliveryEvidencePhoto).filter(models.DeliveryEvidencePhoto.receipt_id == row.id).first()
+        check = (
+            db.query(models.DeliveryVisionCheck)
+            .filter(models.DeliveryVisionCheck.receipt_id == row.id)
+            .order_by(models.DeliveryVisionCheck.id.desc())
+            .first()
+        )
+        note = None
+        if check and check.result_json:
+            try:
+                note = json.loads(check.result_json).get("note")
+            except json.JSONDecodeError:
+                note = None
+        goods = ", ".join(f"{line.quantity:g} {line.unit} {line.item_name}" for line in lines) or "a delivery"
+        events.append({
+            "id": row.id,
+            "kind": "delivery",
+            "headline": f"{who['person_name']} received {goods}" + (f" from {supplier.name}." if supplier else "."),
+            "created_at": _when(row.received_at),
+            "photo_path": f"/api/v1/store/deliveries/{row.id}/photos/{photo.id}" if photo else None,
+            "ai": {"label": "AI", "status": check.status if check else None, "note": note} if check else None,
+            **who,
+        })
+    events.sort(key=lambda item: item.get("created_at") or "", reverse=True)
     pending = [item for item in events if item.get("status") == "needs_approval"]
-    return {"pending": pending, "events": events}
+    unknown = [row.label for row in costs if row.status == "unknown"]
+    orders = db.query(models.Order).filter(models.Order.restaurant_id == restaurant.id).count()
+    approved_bills = [row.label for row in costs if row.status == "approved"]
+    if orders:
+        money = "The till has sales. Approved bills sit with them on Money."
+    elif approved_bills:
+        money = "Waiting for the till. " + ", ".join(approved_bills) + " will be in the profit and loss."
+    else:
+        money = "Waiting for the till."
+    stock_line = "Nothing is in stock yet."
+    latest_close = closes[0] if closes else None
+    if latest_close is not None:
+        public = next(item for item in events if item["kind"] == "close" and item["id"] == latest_close.id)
+        stock_line = public["headline"]
+    elif db.query(models.InventoryItem).filter(
+        models.InventoryItem.restaurant_id == restaurant.id,
+        models.InventoryItem.quantity > 0,
+    ).first():
+        stock_line = "Stock is in the store. No count is waiting."
+    waste_line = "No waste has been written off."
+    if spoilage:
+        waste_line = next(item["headline"] for item in events if item["kind"] == "waste" and item["id"] == spoilage[0].id)
+    count = len(pending)
+    attention = "Nothing needs you." if count == 0 else f"{count} thing{'s' if count != 1 else ''} need you."
+    waiting = []
+    for item in pending:
+        if item.get("kind") == "waste":
+            waiting.append("a write-off")
+        elif item.get("kind") == "close":
+            waiting.append("the day close")
+        elif item.get("kind") == "cost":
+            waiting.append(str(item.get("label") or "a bill"))
+        else:
+            waiting.append("an item")
+    if not waiting:
+        approval_line = "Nothing is waiting for approval."
+    elif len(waiting) == 1:
+        approval_line = f"{waiting[0][:1].upper()}{waiting[0][1:]} is waiting."
+    else:
+        approval_line = f"{', '.join(waiting[:-1])} and {waiting[-1]} are waiting."
+    dishes = db.query(models.MenuItem).filter(models.MenuItem.restaurant_id == restaurant.id).all()
+    missing_recipes = 0
+    for dish in dishes:
+        if db.query(models.MenuIngredient).filter(models.MenuIngredient.menu_item_id == dish.id).first() is None:
+            missing_recipes += 1
+    return {
+        "pending": pending,
+        "events": events,
+        "attention": {"count": count, "sentence": attention},
+        "cards": [
+            {"id": "stock", "title": "Stock", "sentence": stock_line},
+            {"id": "waste", "title": "Missing and waste", "sentence": waste_line},
+            {"id": "approvals", "title": "Needs you", "sentence": approval_line},
+            {"id": "money", "title": "Money", "sentence": money},
+        ],
+        "unknown_costs": unknown,
+        "recipes_missing": missing_recipes,
+        "approved_bills": approved_bills,
+        "till_live": orders > 0,
+    }
 
 
 @router.post("/approvals")
@@ -735,34 +974,98 @@ async def approve(
     restaurant = get_or_create_restaurant(db, current_user)
     user = _user(db, current_user)
     now = utcnow()
-    if body.kind == "spoilage":
+    if body.decision not in ("approve", "decline"):
+        raise HTTPException(status_code=400, detail="Approve or decline.")
+    verb = "approved" if body.decision == "approve" else "declined"
+    if body.kind in ("spoilage", "waste"):
         row = db.query(models.SpoilageRecord).filter(
             models.SpoilageRecord.id == body.id,
             models.SpoilageRecord.restaurant_id == restaurant.id,
         ).first()
-        action = "spoilage_approved"
-        summary = f"{user.email} approved the spoilage of {row.item_name}." if row else ""
+        action = f"spoilage_{verb}"
+        summary = f"{user.email} {verb} the spoilage of {row.item_name}." if row else ""
     elif body.kind == "close":
         row = db.query(models.DayClose).filter(
             models.DayClose.id == body.id,
             models.DayClose.restaurant_id == restaurant.id,
         ).first()
-        action = "day_close_approved"
-        summary = f"{user.email} approved the day close." if row else ""
+        action = f"day_close_{verb}"
+        summary = f"{user.email} {verb} the day close." if row else ""
+    elif body.kind == "cost":
+        row = db.query(models.RunningCost).filter(
+            models.RunningCost.id == body.id,
+            models.RunningCost.restaurant_id == restaurant.id,
+        ).first()
+        action = f"running_cost_{verb}"
+        summary = f"{user.email} {verb} {row.label}." if row else ""
     else:
-        raise HTTPException(status_code=400, detail="Choose spoilage or a day close.")
+        raise HTTPException(status_code=400, detail="Choose waste, a day close, or a bill.")
     if row is None:
         raise HTTPException(status_code=404, detail="Not found")
     if row.status != "needs_approval":
         raise HTTPException(status_code=400, detail="This one does not need approval.")
-    row.status = "approved"
+    row.status = "approved" if body.decision == "approve" else "declined"
     row.approved_by_user_id = user.id
     row.approved_at = now
+    row.owner_note = body.note.strip()
     record_entry(
         db, restaurant.id, user, action, body.kind,
         summary,
         entity_id=row.id,
-        detail={"approved_at": _when(now)},
+        detail={"approved_at": _when(now), "decision": body.decision},
     )
     db.commit()
-    return {"id": row.id, "kind": body.kind, "status": row.status, "approved_by": user.email, "approved_at": _when(now)}
+    return {
+        "id": row.id,
+        "kind": body.kind,
+        "status": row.status,
+        "approved_by": user.email,
+        "approved_at": _when(now),
+        "owner_note": row.owner_note,
+    }
+
+
+@router.get("/policy")
+async def get_policy(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    _require_owner(current_user)
+    restaurant = get_or_create_restaurant(db, current_user)
+    return {"spoilage_approval_qty": _threshold(restaurant)}
+
+
+@router.put("/policy")
+async def save_policy(
+    body: PolicyIn,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    _require_owner(current_user)
+    restaurant = get_or_create_restaurant(db, current_user)
+    restaurant.spoilage_approval_qty = body.spoilage_approval_qty
+    record_entry(
+        db, restaurant.id, _user(db, current_user), "approval_threshold", "restaurant",
+        f"The owner set the approval line at {body.spoilage_approval_qty:g}.",
+        entity_id=restaurant.id,
+        detail={"spoilage_approval_qty": body.spoilage_approval_qty},
+    )
+    db.commit()
+    return {"spoilage_approval_qty": restaurant.spoilage_approval_qty}
+
+
+@router.get("/costs/{cost_id}/receipt")
+async def cost_receipt(
+    cost_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    _require_owner(current_user)
+    restaurant = get_or_create_restaurant(db, current_user)
+    row = db.query(models.RunningCost).filter(
+        models.RunningCost.id == cost_id,
+        models.RunningCost.restaurant_id == restaurant.id,
+    ).first()
+    if row is None or not row.receipt_storage_key or row.receipt_storage_key.startswith("http"):
+        raise HTTPException(status_code=404, detail="Photo not found")
+    return Response(content=storage.load(row.receipt_storage_key), media_type=row.receipt_content_type or "image/jpeg")

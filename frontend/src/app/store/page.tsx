@@ -40,11 +40,13 @@ export default function StoreHomePage() {
         <section className="owner-glass-panel rounded-3xl p-4">
           <h2 className="font-semibold">Today</h2>
           <ul className="mt-3 space-y-2 text-sm">
+            <li><Link href="/store/recipes" className="underline">Recipes{setup.recipe_gap ? ` · ${setup.recipe_gap.missing_count} dishes still have no recipe` : ""}</Link></li>
             <li><Link href="/store/chefs" className="underline">Chefs</Link></li>
             {hasModule(setup, "deliveries") && <li><Link href="/store/deliveries" className="underline">Deliveries</Link></li>}
             {hasModule(setup, "store-issue") && <li><Link href="/store/issue" className="underline">Hand to the kitchen</Link></li>}
             {hasModule(setup, "waste") && <li><Link href="/store/waste" className="underline">Thrown away</Link></li>}
             {hasModule(setup, "day-close") && <li><Link href="/store/close" className="underline">Close the day</Link></li>}
+            {hasModule(setup, "running-costs") && <li><Link href="/store/costs" className="underline">Regular bills</Link></li>}
           </ul>
         </section>
       )}
@@ -65,8 +67,15 @@ export default function StoreHomePage() {
                 </div>
                 <p className="mt-2 text-sm text-zinc-300">Unlocks: {step.unlocks}</p>
                 {step.locked_reason && <p className="mt-2 text-xs leading-5 text-zinc-400">{step.locked_reason}</p>}
+                {step.id === "recipes" && setup.recipe_gap && (
+                  <p className="mt-2 text-xs text-zinc-400">
+                    {setup.recipe_gap.dish_count === 0
+                      ? "Optional. Add a dish when you know it."
+                      : `${setup.recipe_gap.missing_count} of ${setup.recipe_gap.dish_count} dishes still have no recipe.`}
+                  </p>
+                )}
                 {step.id === "questionnaire" && step.state === "locked" && step.questions && (
-                  <p className="mt-2 text-xs text-zinc-500">{step.questions.length} short questions. They open after the recipes.</p>
+                  <p className="mt-2 text-xs text-zinc-500">{step.questions.length} short questions. They open after your password and PIN. Recipes can wait.</p>
                 )}
               </>
             );

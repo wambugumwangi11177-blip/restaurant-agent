@@ -25,7 +25,7 @@ export default function StoreShell({
   const pathname = usePathname() ?? "";
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const allowed = user?.staff_role === "stockkeeper" || user?.role === "admin" || user?.role === "superadmin";
+  const allowed = user?.staff_role === "stockkeeper" || user?.staff_role === "controller" || user?.role === "admin" || user?.role === "superadmin";
 
   useEffect(() => {
     const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');

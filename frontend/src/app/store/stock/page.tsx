@@ -72,9 +72,7 @@ export default function StoreStockPage() {
       <section className="owner-glass-panel rounded-3xl p-4">
         <h2 className="font-semibold">Stock is locked</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-300">
-          {recipes?.state === "open"
-            ? "Unlocks after you save at least one recipe from the chefs and mark that step done."
-            : "Unlocks after your password, PIN, and the chefs' recipes are saved."}
+          Unlocks after your password and PIN are saved. Recipes can wait.
         </p>
         <Link href={recipes?.state === "open" ? "/store/recipes" : "/store/account"} className="mt-4 inline-flex min-h-11 items-center rounded-full bg-white px-4 font-semibold text-black">
           {recipes?.state === "open" ? "Open recipes" : "Open account"}

@@ -40,12 +40,16 @@ HIDDEN_STAFF_ROLES = frozenset({
 })
 
 
-def hides_money(user: models.User) -> bool:
+def hides_money(user: models.User, path: str = "") -> bool:
     if user is None:
         return False
     if user.role in (models.Role.SUPERADMIN, models.Role.ADMIN):
         return False
-    return user.staff_role in HIDDEN_STAFF_ROLES
+    if user.staff_role in HIDDEN_STAFF_ROLES:
+        return True
+    # The accountant uses the store app. Those screens stay free of money.
+    # Pages outside the store keep whatever that role could already read.
+    return user.staff_role == models.StaffRole.CONTROLLER and "/store" in (path or "")
 
 
 def scrub_money(value):

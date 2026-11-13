@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 from sqlalchemy import create_engine, inspect, text
 
+import auth
 import models
 from money_visibility import money_keys_in
 from tests.test_store_intake import JPEG, _unlock
@@ -276,7 +277,7 @@ def test_spoilage_drops_stock_and_a_large_loss_waits_for_the_owner(client, db_se
     assert jack_queue.status_code == 403
     pending = client.get("/api/v1/store/approvals", headers=_auth(_token(owner))).json()["pending"]
     assert len(pending) == 1
-    assert pending[0]["kind"] == "spoilage"
+    assert pending[0]["kind"] == "waste"
     assert pending[0]["quantity"] == 5
     approved = client.post(
         "/api/v1/store/approvals",
@@ -297,7 +298,9 @@ def test_close_shows_a_quantity_difference_and_marks_working_alone(client, db_se
     _unlock(client, jack)
     rice = _open(client, owner, "Rice", 8)
     oil = _open(client, owner, "Oil", 2, unit="litre")
-    chef = _chef(client, jack)
+    accountant = _add_staff(db_session, tenant, restaurant, "books-close@eleven.leviii", models.StaffRole.CONTROLLER)
+    accountant.hashed_pin = auth.get_pin_hash("9753")
+    db_session.commit()
     expected = client.get("/api/v1/store/close/expected", headers=_auth(_token(jack)))
     assert expected.status_code == 200
     assert money_keys_in(expected.json()) == []
@@ -322,10 +325,9 @@ def test_close_shows_a_quantity_difference_and_marks_working_alone(client, db_se
         headers=_auth(_token(jack)),
         json={
             "working_alone": False,
-            "chef_id": chef["id"],
-            "pin": PIN,
+            "pin": "9753",
             "lines": [
-                {"item_id": rice["id"], "counted_qty": 7},
+                {"item_id": rice["id"], "counted_qty": 3},
                 {"item_id": oil["id"], "counted_qty": 2},
             ],
         },
@@ -333,12 +335,13 @@ def test_close_shows_a_quantity_difference_and_marks_working_alone(client, db_se
     assert short.status_code == 201, short.text
     assert short.json()["status"] == "needs_approval"
     rice_line = next(line for line in short.json()["lines"] if line["item_name"] == "Rice")
-    assert rice_line["difference"] == -1
+    assert rice_line["difference"] == -5
+    assert short.json()["confirmer_name"]
     assert "cost" not in json.dumps(short.json())
     both = client.post(
         "/api/v1/store/close",
         headers=_auth(_token(jack)),
-        json={"working_alone": True, "chef_id": chef["id"], "pin": PIN, "lines": []},
+        json={"working_alone": True, "pin": PIN, "lines": []},
     )
     assert both.status_code == 400
     owner_view = client.get("/api/v1/store/approvals", headers=_auth(_token(owner))).json()
@@ -370,6 +373,7 @@ def test_control_rows_refuse_update_and_delete(client, db_session):
         "/api/v1/store/handover",
         headers=_auth(_token(jack)),
         data={"lines": json.dumps([{"item_id": item_id, "quantity": 1}]), "chef_id": str(chef["id"]), "pin": PIN},
+        files={"photo": ("goods.jpg", JPEG, "image/jpeg")},
     )
     assert saved.status_code == 201, saved.text
     spoiled = client.post(

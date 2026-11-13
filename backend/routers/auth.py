@@ -163,6 +163,8 @@ class MeOut(StrictModel):
     role: str
     staff_role: str | None = None
     is_email_verified: bool
+    must_change_password: bool = False
+    has_pin: bool = False
     restaurant_name: str | None = None
     restaurant_id: int | None = None
     # Vibanda dedicated-dashboard routing (plan 2026-09-12): the frontend
@@ -405,6 +407,8 @@ async def read_users_me(
         # instead of only after their token expires/refreshes.
         "staff_role": current_user.staff_role,
         "is_email_verified": current_user.is_email_verified,
+        "must_change_password": bool(current_user.must_change_password),
+        "has_pin": bool(current_user.hashed_pin),
         "restaurant_name": restaurant.name if restaurant else None,
         "restaurant_id": restaurant.id if restaurant else None,
         "tenant_name": current_user.tenant.name if current_user.tenant else None,

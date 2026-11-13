@@ -16,7 +16,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from logging_config import configure_logging
-from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support, tables, attendance, fraud, cash_reconciliation, restaurants, overview, reports, ai_ask, creative, observer
+from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support, tables, attendance, fraud, cash_reconciliation, restaurants, overview, reports, ai_ask, creative, observer, staff_setup, store_recipes, eleven_import, store_intake, store_control, pos_evidence
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
@@ -596,6 +596,8 @@ app.add_middleware(BodySizeLimitMiddleware)
 app.add_middleware(CorrelationIdMiddleware)
 from observer_mode import ObserverModeMiddleware
 app.add_middleware(ObserverModeMiddleware)
+from middleware.money_redaction import MoneyRedactionMiddleware
+app.add_middleware(MoneyRedactionMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 #
@@ -620,6 +622,8 @@ _VERSIONED_ROUTERS = [
     suppliers.router, purchase_orders.router, notifications.router, support.router,
     tables.router, attendance.router, fraud.router, cash_reconciliation.router,
     restaurants.router, overview.router, reports.router, ai_ask.router, creative.router, observer.router, demo.router,
+    staff_setup.router, store_recipes.router, eleven_import.router, store_intake.router, store_control.router,
+    pos_evidence.router,
     ]
 
 app.include_router(auth.router)

@@ -18,7 +18,9 @@ export const ELEVEN_TENANT = "Eleven";
 export function isEleven(tenantName?: string | null): boolean {
   return (tenantName ?? "").trim().toLowerCase() === ELEVEN_TENANT.toLowerCase();
 }
-export function homeFor(tenantName?: string | null): string {
+export function homeFor(tenantName?: string | null, staffRole?: string | null): string {
+  const role = (staffRole ?? "").trim().toLowerCase();
+  if (role === "stockkeeper" || role === "controller") return "/store";
   if (isDemoRestaurant(tenantName)) return "/demo";
   if (isEleven(tenantName)) return "/eleven";
   return isVibanda(tenantName) ? "/vibanda" : "/dashboard";

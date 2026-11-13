@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum as SqEnum, DateTime, Float, Text, Date, Time, Index, UniqueConstraint, CheckConstraint, text
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum as SqEnum, DateTime, Float, Text, Date, Time, Index, UniqueConstraint, CheckConstraint, text, event
 from sqlalchemy.orm import relationship, declarative_base
 import enum
 from time_utils import utcnow
@@ -153,6 +153,10 @@ class User(Base):
     # (directive: don't lock out staff invited without email access to their
     # own inbox at signup time).
     is_email_verified = Column(Boolean, default=False, nullable=False)
+    # Set when an owner creates a storekeeper login with a temporary password.
+    # Cleared only after that person changes the password and sets their own
+    # 4-digit PIN (POST /staff-setup/account). Existing accounts stay False.
+    must_change_password = Column(Boolean, default=False, nullable=False, server_default="0")
     # Which of the tenant's restaurants this user is currently viewing (audit
     # remediation, Tier 5 item 11 — multi-restaurant switcher). NULL for the
     # overwhelming majority of tenants (single restaurant, nothing to pick)
@@ -191,6 +195,9 @@ class Restaurant(Base):
     # default_supplier_id in directive 018).
     latitude        = Column(Float, nullable=True)
     longitude       = Column(Float, nullable=True)
+    # Units of spoilage or of a close difference that wait for the owner.
+    # Smaller gaps are reported and do not wait. Default is 5.
+    spoilage_approval_qty = Column(Float, nullable=False, default=5, server_default="5")
 
     tenant = relationship("Tenant", back_populates="restaurants")
     menu_items = relationship("MenuItem", back_populates="restaurant")
@@ -402,6 +409,20 @@ class KitchenIncident(Base):
 # ──────────────────────────────────────────────
 # INVENTORY (Enhanced for AI)
 # ──────────────────────────────────────────────
+class StockZone(Base):
+    """A real place stock sits: main store, cold room, bar, kitchen."""
+    __tablename__ = "stock_zones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    kind = Column(String, nullable=False, default="store")
+
+    __table_args__ = (
+        UniqueConstraint("restaurant_id", "name", name="uq_stock_zone_name"),
+    )
+
+
 class InventoryItem(Base):
     __tablename__ = "inventory_items"
     id = Column(Integer, primary_key=True, index=True)
@@ -431,6 +452,15 @@ class InventoryItem(Base):
     # never auto-drafted, not defaulted to a guessed number.
     par_level          = Column(Float, nullable=True)
     default_supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
+    # How the goods arrive, versus `unit` which is how they are counted.
+    # 1 buying unit contains `units_per_buy` of `unit`. yield_fraction is the
+    # share that is still usable after prep (1 means nothing is lost).
+    buying_unit = Column(String, nullable=True)
+    units_per_buy = Column(Float, nullable=True)
+    yield_fraction = Column(Float, nullable=False, default=1, server_default="1")
+    zone_id = Column(Integer, ForeignKey("stock_zones.id"), nullable=True)
+
+    zone = relationship("StockZone")
 
     restaurant = relationship("Restaurant", back_populates="inventory_items")
     # passive_deletes=True: same reasoning as MenuItem.order_items above — let
@@ -732,13 +762,25 @@ class MenuIngredient(Base):
     inventory_item_id   = Column(Integer, ForeignKey("inventory_items.id", ondelete="CASCADE"), nullable=False)
     quantity_per_serving = Column(Float, nullable=False, default=1.0)
     is_critical         = Column(Boolean, default=True)   # False = garnish, can be skipped
+    # Share of the raw ingredient that remains usable after prep. 1.0 means
+    # nothing is lost. Raw stock used is quantity_per_serving / yield_fraction.
+    yield_fraction = Column(Float, nullable=False, default=1.0, server_default="1")
+    # Unit the chef stated, kept even when it matches the stock item's unit.
+    recipe_unit = Column(String, nullable=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, nullable=True)
 
     menu_item       = relationship("MenuItem")
     inventory_item  = relationship("InventoryItem")
+    created_by      = relationship("User")
 
     __table_args__ = (
         UniqueConstraint("menu_item_id", "inventory_item_id", name="uq_menu_ingredient"),
         Index("ix_menu_ingredients_inventory", "inventory_item_id"),
+        CheckConstraint(
+            "yield_fraction > 0 AND yield_fraction <= 1",
+            name="ck_menu_ingredients_yield",
+        ),
     )
 
 
@@ -1039,6 +1081,10 @@ class Supplier(Base):
     requires_approval = Column(Boolean, nullable=True)
     is_active         = Column(Boolean, default=True)
     notes             = Column(Text, default="")
+    # What this supplier brings: main food, alcohol, both, or a short note.
+    brings            = Column(String, nullable=False, default="", server_default="")
+    # How the goods arrive: phone, scheduled, pickup, or other.
+    arrival           = Column(String, nullable=False, default="", server_default="")
     created_at        = Column(DateTime, default=utcnow)
 
     restaurant     = relationship("Restaurant")
@@ -1606,3 +1652,369 @@ class Region(Base):
     created_at      = Column(DateTime, default=utcnow)
 
     organization = relationship("Organization")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STOREKEEPER FOUNDATION (Jack / Eleven) — setup gate, append-only entries,
+# private delivery evidence. Photo upload and the vision comparison are later
+# runs; the rows exist now so those runs do not invent a second schema.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class StaffSetupProgress(Base):
+    """One row per person walking the store setup. Steps are timestamps, not
+    booleans, so the owner can see when each one actually happened."""
+    __tablename__ = "staff_setup_progress"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    account_completed_at = Column(DateTime, nullable=True)
+    recipes_completed_at = Column(DateTime, nullable=True)
+    questionnaire_completed_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=utcnow, nullable=False)
+
+    user = relationship("User")
+    restaurant = relationship("Restaurant")
+
+
+class StaffSetupAnswer(Base):
+    """One row each time a setup question is answered. The latest row for a
+    question is the current answer. Older rows stay."""
+    __tablename__ = "staff_setup_answers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    question_id = Column(String, nullable=False)
+    value = Column(String, nullable=False)
+    label = Column(String, nullable=False, default="")
+    opens = Column(String, nullable=True)
+    unlocks = Column(String, nullable=True)
+    delegated = Column(Boolean, nullable=False, default=False, server_default="0")
+    delegate_to = Column(String, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    user = relationship("User")
+
+
+class RunningCost(Base):
+    """A regular bill a manager answered. The amount waits for the owner.
+    Store screens never return the amount to the storekeeper or the accountant."""
+    __tablename__ = "running_costs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    kind = Column(String, nullable=False)
+    label = Column(String, nullable=False)
+    amount_cents = Column(Integer, nullable=False, default=0, server_default="0")
+    cadence = Column(String, nullable=False, default="monthly", server_default="monthly")
+    due_day = Column(Integer, nullable=True)
+    receipt_storage_key = Column(String, nullable=True)
+    receipt_content_type = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="needs_approval", server_default="needs_approval")
+    delegated_to = Column(String, nullable=True)
+    owner_note = Column(Text, nullable=False, default="", server_default="")
+    approved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+class StockBalance(Base):
+    """Quantity of one item in one zone. InventoryItem.quantity is the sum."""
+    __tablename__ = "stock_balances"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id", ondelete="CASCADE"), nullable=False)
+    zone_id = Column(Integer, ForeignKey("stock_zones.id"), nullable=False)
+    quantity = Column(Float, nullable=False, default=0)
+
+    __table_args__ = (
+        UniqueConstraint("inventory_item_id", "zone_id", name="uq_stock_balance_item_zone"),
+    )
+
+
+class StaffEntryAudit(Base):
+    """Append-only record of who entered what, and when. ORM updates and
+    deletes are rejected. There is no HTTP route that edits these rows."""
+    __tablename__ = "staff_entry_audits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    action = Column(String, nullable=False)
+    entity_type = Column(String, nullable=False)
+    entity_id = Column(Integer, nullable=True)
+    summary = Column(Text, nullable=False)
+    detail_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    user = relationship("User")
+    restaurant = relationship("Restaurant")
+
+    __table_args__ = (
+        Index("ix_staff_entry_audits_restaurant_created", "restaurant_id", "created_at"),
+    )
+
+
+class ImportAppliedKey(Base):
+    """Natural key of a row the Eleven import has already inserted. A second
+    confirm of the same file skips these instead of duplicating them."""
+    __tablename__ = "import_applied_keys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False)
+    sheet = Column(String, nullable=False)
+    natural_key = Column(String, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("restaurant_id", "sheet", "natural_key", name="uq_import_applied_key"),
+    )
+
+
+class DeliveryReceipt(Base):
+    """A goods-in event. Run B builds the screen; the quantities and the two
+    photos (invoice and goods) hang off this row."""
+    __tablename__ = "delivery_receipts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True)
+    received_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    received_at = Column(DateTime, default=utcnow, nullable=False)
+    notes = Column(Text, default="")
+    status = Column(String, nullable=False, default="draft")  # draft | keyed | checked
+
+    supplier = relationship("Supplier")
+    received_by = relationship("User")
+    photos = relationship("DeliveryEvidencePhoto", back_populates="receipt")
+    lines = relationship("DeliveryReceiptLine", back_populates="receipt")
+    vision_checks = relationship("DeliveryVisionCheck", back_populates="receipt")
+
+
+class DeliveryEvidencePhoto(Base):
+    """Private evidence. `storage_key` is an object-storage key, never a
+    public URL. Nothing in this run serves the bytes without an auth check,
+    and no route serves them yet."""
+    __tablename__ = "delivery_evidence_photos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    receipt_id = Column(Integer, ForeignKey("delivery_receipts.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind = Column(String, nullable=False)  # invoice | goods
+    storage_key = Column(String, nullable=False)
+    content_type = Column(String, nullable=False, default="image/jpeg")
+    byte_size = Column(Integer, nullable=False, default=0)
+    sha256 = Column(String, nullable=False, default="")
+    uploaded_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    uploaded_at = Column(DateTime, default=utcnow, nullable=False)
+
+    receipt = relationship("DeliveryReceipt", back_populates="photos")
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('invoice', 'goods')", name="ck_delivery_photo_kind"),
+    )
+
+
+class DeliveryReceiptLine(Base):
+    """Quantity Jack keys in. The vision check later compares this to the photos."""
+    __tablename__ = "delivery_receipt_lines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    receipt_id = Column(Integer, ForeignKey("delivery_receipts.id", ondelete="CASCADE"), nullable=False, index=True)
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id", ondelete="SET NULL"), nullable=True)
+    item_name = Column(String, nullable=False)
+    quantity = Column(Float, nullable=False)
+    unit = Column(String, nullable=False, default="")
+    keyed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    keyed_at = Column(DateTime, default=utcnow, nullable=False)
+
+    receipt = relationship("DeliveryReceipt", back_populates="lines")
+
+
+class DeliveryVisionCheck(Base):
+    """Reserved for the later photo-vs-quantity comparison. No model is called
+    from this run. `status` stays `pending` until that comparison is stored."""
+    __tablename__ = "delivery_vision_checks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    receipt_id = Column(Integer, ForeignKey("delivery_receipts.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String, nullable=False, default="pending")
+    model_name = Column(String, nullable=True)
+    result_json = Column(Text, nullable=True)
+    compared_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    receipt = relationship("DeliveryReceipt", back_populates="vision_checks")
+
+
+class StoreChef(Base):
+    """A chef who confirms handovers and spoilage on Jack's phone.
+    There is no login. The PIN hash is the only secret, and it never leaves the server."""
+    __tablename__ = "store_chefs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    photo_storage_key = Column(String, nullable=True)
+    photo_content_type = Column(String, nullable=True)
+    hashed_pin = Column(String, nullable=False)
+    failed_pin_attempts = Column(Integer, nullable=False, default=0, server_default="0")
+    pin_locked_until = Column(DateTime, nullable=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+class KitchenHandover(Base):
+    """Stock Jack handed to the kitchen after a chef typed their PIN."""
+    __tablename__ = "kitchen_handovers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    chef_id = Column(Integer, ForeignKey("store_chefs.id"), nullable=False)
+    photo_storage_key = Column(String, nullable=True)
+    photo_content_type = Column(String, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    lines = relationship("KitchenHandoverLine", back_populates="handover")
+
+
+class KitchenHandoverLine(Base):
+    __tablename__ = "kitchen_handover_lines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    handover_id = Column(Integer, ForeignKey("kitchen_handovers.id", ondelete="CASCADE"), nullable=False, index=True)
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id"), nullable=False)
+    item_name = Column(String, nullable=False)
+    quantity = Column(Float, nullable=False)
+    unit = Column(String, nullable=False, default="")
+    from_zone = Column(String, nullable=False, default="Main store")
+
+    handover = relationship("KitchenHandover", back_populates="lines")
+
+
+class HandoverVisionCheck(Base):
+    """Async read of an optional handover photo. Status is updated once. The row is not a public note."""
+    __tablename__ = "handover_vision_checks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    handover_id = Column(Integer, ForeignKey("kitchen_handovers.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String, nullable=False, default="pending")
+    model_name = Column(String, nullable=True)
+    result_json = Column(Text, nullable=True)
+    compared_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+class SpoilageRecord(Base):
+    """Food written off. Quantity is final. Approval only acknowledges a large loss."""
+    __tablename__ = "spoilage_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    chef_id = Column(Integer, ForeignKey("store_chefs.id"), nullable=False)
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id"), nullable=False)
+    item_name = Column(String, nullable=False)
+    quantity = Column(Float, nullable=False)
+    unit = Column(String, nullable=False, default="")
+    zone_name = Column(String, nullable=False)
+    reason_code = Column(String, nullable=False)
+    reason_text = Column(Text, nullable=False, default="")
+    photo_storage_key = Column(String, nullable=False)
+    photo_content_type = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="reported")
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    approved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    owner_note = Column(Text, nullable=False, default="", server_default="")
+
+
+class DayClose(Base):
+    """End-of-day count. working_alone is stored on its own so the owner can see it."""
+    __tablename__ = "day_closes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    chef_id = Column(Integer, ForeignKey("store_chefs.id"), nullable=True)
+    confirmer_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    working_alone = Column(Boolean, nullable=False, default=False, server_default="0")
+    status = Column(String, nullable=False, default="reported")
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    approved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    owner_note = Column(Text, nullable=False, default="", server_default="")
+
+    lines = relationship("DayCloseLine", back_populates="close")
+
+
+class DayCloseLine(Base):
+    __tablename__ = "day_close_lines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    close_id = Column(Integer, ForeignKey("day_closes.id", ondelete="CASCADE"), nullable=False, index=True)
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id"), nullable=False)
+    item_name = Column(String, nullable=False)
+    unit = Column(String, nullable=False, default="")
+    expected_qty = Column(Float, nullable=False)
+    counted_qty = Column(Float, nullable=False)
+
+    close = relationship("DayClose", back_populates="lines")
+
+
+def _immutable_change(target, allowed: set[str]) -> None:
+    from sqlalchemy import inspect as sa_inspect
+
+    state = sa_inspect(target)
+    for attr in state.mapper.column_attrs:
+        if attr.key in allowed:
+            continue
+        if attr.key == "id":
+            continue
+        if state.attrs[attr.key].history.has_changes():
+            raise ValueError("This record is append-only")
+
+
+@event.listens_for(StoreChef, "before_update")
+def _chef_guard(mapper, connection, target):
+    _immutable_change(target, {"failed_pin_attempts", "pin_locked_until"})
+
+
+@event.listens_for(StoreChef, "before_delete")
+def _chef_no_delete(mapper, connection, target):
+    raise ValueError("Chef rows are append-only")
+
+
+@event.listens_for(KitchenHandover, "before_update")
+@event.listens_for(KitchenHandoverLine, "before_update")
+@event.listens_for(DayCloseLine, "before_update")
+def _control_no_update(mapper, connection, target):
+    raise ValueError("This record is append-only")
+
+
+@event.listens_for(KitchenHandover, "before_delete")
+@event.listens_for(KitchenHandoverLine, "before_delete")
+@event.listens_for(SpoilageRecord, "before_delete")
+@event.listens_for(DayClose, "before_delete")
+@event.listens_for(DayCloseLine, "before_delete")
+def _control_no_delete(mapper, connection, target):
+    raise ValueError("This record is append-only")
+
+
+@event.listens_for(SpoilageRecord, "before_update")
+@event.listens_for(DayClose, "before_update")
+def _approval_only(mapper, connection, target):
+    _immutable_change(target, {"status", "approved_by_user_id", "approved_at", "owner_note"})
+
+
+@event.listens_for(StaffEntryAudit, "before_update")
+def _staff_entry_audit_no_update(mapper, connection, target):
+    raise ValueError("Staff entry audit rows are append-only")
+
+
+@event.listens_for(StaffEntryAudit, "before_delete")
+def _staff_entry_audit_no_delete(mapper, connection, target):
+    raise ValueError("Staff entry audit rows are append-only")

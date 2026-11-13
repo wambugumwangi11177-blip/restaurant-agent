@@ -11,7 +11,7 @@ from typing import Optional
 import jwt
 from jwt.exceptions import PyJWTError as JWTError
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 import os
 from dotenv import load_dotenv
@@ -178,6 +178,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 async def get_current_user(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> models.User:
@@ -245,6 +246,11 @@ async def get_current_user(
         }
     else:
         user.impersonated_by = None
+
+    # Storekeeper first-login gate. Imported here so auth stays loadable
+    # even if a router that depends on auth is still importing.
+    from setup_gate import enforce_storekeeper_setup
+    enforce_storekeeper_setup(user, request, db)
 
     return user
 

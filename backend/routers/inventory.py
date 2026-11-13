@@ -8,7 +8,13 @@ from database import get_db
 import models
 import schemas
 import auth
+from money_visibility import hides_money
 from routers.deps import get_or_create_restaurant
+
+
+def _refuse_price(user: models.User, fields: set[str]) -> None:
+    if hides_money(user) and "cost_per_unit" in fields:
+        raise HTTPException(status_code=422, detail="Prices are not entered by this role.")
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
@@ -38,13 +44,14 @@ async def create_inventory_item(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
 ):
+    _refuse_price(current_user, item.model_fields_set)
     restaurant = get_or_create_restaurant(db, current_user)
     db_item = models.InventoryItem(
         restaurant_id=restaurant.id,
         item_name=item.item_name,
         quantity=item.quantity,
         unit=item.unit,
-        cost_per_unit=item.cost_per_unit,
+        cost_per_unit=0 if hides_money(current_user) else item.cost_per_unit,
         low_stock_threshold=item.low_stock_threshold,
         expiry_days=item.expiry_days,
     )
@@ -69,7 +76,11 @@ async def update_inventory_item(
     if not db_item:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    for key, value in item_update.dict(exclude_unset=True).items():
+    updates = item_update.dict(exclude_unset=True)
+    _refuse_price(current_user, set(updates))
+    if hides_money(current_user):
+        updates.pop("cost_per_unit", None)
+    for key, value in updates.items():
         setattr(db_item, key, value)
 
     db.commit()
@@ -95,6 +106,8 @@ async def receive_stock(
 
     db_item.quantity += receive.quantity
     if receive.cost_per_unit is not None:
+        if hides_money(current_user):
+            raise HTTPException(status_code=422, detail="Prices are not entered by this role.")
         db_item.cost_per_unit = receive.cost_per_unit
 
     movement = models.StockMovement(

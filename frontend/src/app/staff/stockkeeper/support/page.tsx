@@ -1,7 +1,5 @@
-"use client";
-
-import SupportView from "@/components/features/support/SupportView";
+import { redirect } from "next/navigation";
 
 export default function StaffStockkeeperSupportPage() {
-    return <SupportView />;
+  redirect("/store");
 }

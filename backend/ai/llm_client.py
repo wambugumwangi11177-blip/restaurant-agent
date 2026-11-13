@@ -27,6 +27,7 @@ Anthropic-path-only for now (matches its current commented-out state in
 requirements.txt — "uncomment when client has paid").
 """
 
+import base64
 import json
 import logging
 import os
@@ -276,6 +277,72 @@ def chat_with_usage(
             output_tokens=response.usage.completion_tokens,
         ),
     )
+
+
+def vision_model() -> str:
+    """Photo reading only. Swap models with OPENROUTER_VISION_MODEL. No fallback."""
+    return os.getenv("OPENROUTER_VISION_MODEL", "qwen/qwen3.7-flash")
+
+
+def compare_model() -> str:
+    return os.getenv("OPENROUTER_COMPARE_MODEL", "deepseek/deepseek-v4-flash")
+
+
+def compare_fallback_model() -> str:
+    return os.getenv("OPENROUTER_COMPARE_FALLBACK", "qwen/qwen3.7-flash")
+
+
+_OPENROUTER_BODY = {
+    "reasoning": {"enabled": False},
+    "provider": {"data_collection": "deny"},
+}
+
+
+def _require_openrouter() -> None:
+    if _PROVIDER != "openrouter":
+        logger.warning("Photo check skipped: OPENROUTER_API_KEY is not set.")
+        raise RuntimeError("Photo check needs OpenRouter.")
+
+
+def chat_with_images(
+    prompt: str,
+    images: list[tuple[str, bytes]],
+    *,
+    model: str | None = None,
+    max_tokens: int = 800,
+) -> str:
+    """Read photos through OpenRouter. Reasoning is off and data collection is denied.
+
+    Uses OPENROUTER_VISION_MODEL. There is no second vision model. If OpenRouter
+    is not the active provider, or the call fails, the exception propagates.
+    """
+    _require_openrouter()
+    content: list[dict] = [{"type": "text", "text": prompt}]
+    for mime, data in images:
+        encoded = base64.b64encode(data).decode("ascii")
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:{mime};base64,{encoded}"},
+        })
+    response = _get_client().chat.completions.create(
+        model=model or vision_model(),
+        max_tokens=max_tokens,
+        messages=[{"role": "user", "content": content}],
+        extra_body=_OPENROUTER_BODY,
+    )
+    return response.choices[0].message.content or ""
+
+
+def chat_plain(prompt: str, *, model: str, max_tokens: int = 500) -> str:
+    """One text completion on an explicit model. No image input and no model swap."""
+    _require_openrouter()
+    response = _get_client().chat.completions.create(
+        model=model,
+        max_tokens=max_tokens,
+        messages=[{"role": "user", "content": prompt}],
+        extra_body=_OPENROUTER_BODY,
+    )
+    return response.choices[0].message.content or ""
 
 
 def chat(

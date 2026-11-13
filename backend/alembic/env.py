@@ -39,6 +39,7 @@ backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(backend_dir)
 
 from models import Base
+import integration.inbox_models  # noqa: F401
 target_metadata = Base.metadata
 
 load_dotenv()

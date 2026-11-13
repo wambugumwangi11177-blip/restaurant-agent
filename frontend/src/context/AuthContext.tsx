@@ -22,6 +22,7 @@ interface User {
   email: string;
   role: string;
   restaurant_name?: string;
+  restaurant_id?: number | null;
   // Tenant fork (Vibanda dedicated shell) — read fresh from /auth/me.
   tenant_name?: string | null;
   // Directive 015 — fine-grained tier (owner/manager/supervisor/controller/
@@ -38,6 +39,8 @@ interface User {
   // models.User.is_email_verified docstring). Drives the dashboard's
   // dismissible "verify your email" banner.
   is_email_verified: boolean;
+  must_change_password?: boolean;
+  has_pin?: boolean;
 }
 
 interface AuthContextType {

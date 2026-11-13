@@ -82,8 +82,8 @@ export function domainsFor(tier: StaffTier | null): Domain[] {
 export const TIER_HOME: Record<Exclude<StaffTier, "owner">, string> = {
     manager: "/staff/manager",
     supervisor: "/staff/supervisor",
-    controller: "/staff/controller",
-    stockkeeper: "/staff/stockkeeper",
+    controller: "/store",
+    stockkeeper: "/store",
     kitchen: "/staff/kitchen",
     waiter: "/staff/waiter",
 };

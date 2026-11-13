@@ -216,7 +216,7 @@ def test_on_stock_transfer_requested_notifies_stockkeeper_and_gives_kitchen_link
 
     sk_notif = db_session.query(models.Notification).filter(models.Notification.user_id == stockkeeper.id).first()
     assert sk_notif is not None
-    assert sk_notif.url == "/staff/stockkeeper"
+    assert sk_notif.url == "/store"
     sup_notif = db_session.query(models.Notification).filter(models.Notification.user_id == supervisor.id).first()
     assert sup_notif is not None  # Supervisor "sees the log" (directive 017)
     assert db_session.query(models.Notification).filter(models.Notification.user_id == kitchen.id).count() == 0
@@ -294,7 +294,7 @@ def test_on_purchase_order_delivered_reaches_stockkeeper(db_session):
     })
     notif = db_session.query(models.Notification).filter(models.Notification.user_id == stockkeeper.id).first()
     assert notif is not None
-    assert notif.url == "/staff/stockkeeper/purchasing"
+    assert notif.url == "/store/stock"
 
 
 def test_on_recommendation_approved_notifies_waiter_with_menu_link(db_session):
@@ -508,7 +508,7 @@ def test_on_purchase_order_approved_reaches_stockkeeper(db_session):
 
     notif = db_session.query(models.Notification).filter(models.Notification.user_id == stockkeeper.id).first()
     assert notif is not None
-    assert notif.url == "/staff/stockkeeper/purchasing"
+    assert notif.url == "/store/stock"
     assert db_session.query(models.Notification).filter(models.Notification.user_id == waiter.id).count() == 0
 
 

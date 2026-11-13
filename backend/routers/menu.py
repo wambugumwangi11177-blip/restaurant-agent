@@ -8,6 +8,7 @@ import schemas
 import auth
 from rate_limit import limiter
 from routers.deps import get_or_create_restaurant
+from time_utils import utcnow
 
 router = APIRouter(prefix="/menu", tags=["menu"])
 
@@ -133,8 +134,10 @@ def _ingredient_out(row: models.MenuIngredient, item: models.InventoryItem | Non
         "inventory_item_id": row.inventory_item_id,
         "quantity_per_serving": row.quantity_per_serving,
         "is_critical": row.is_critical,
+        "yield_fraction": row.yield_fraction if row.yield_fraction is not None else 1.0,
+        "recipe_unit": row.recipe_unit,
         "item_name": item.item_name if item else None,
-        "unit": item.unit if item else None,
+        "unit": row.recipe_unit or (item.unit if item else None),
     }
 
 
@@ -198,6 +201,10 @@ async def add_ingredient(
         inventory_item_id=body.inventory_item_id,
         quantity_per_serving=body.quantity_per_serving,
         is_critical=body.is_critical,
+        yield_fraction=body.yield_fraction,
+        recipe_unit=body.recipe_unit,
+        created_by_user_id=current_user.id,
+        created_at=utcnow(),
     )
     db.add(row)
     db.commit()

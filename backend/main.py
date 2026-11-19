@@ -636,8 +636,7 @@ app.include_router(auth.router)
 app.include_router(health.router)
 app.include_router(webhooks.router)
 for _r in _VERSIONED_ROUTERS:
-    app.include_router(_r, prefix="/api/v1")          # canonical, documented
-    app.include_router(_r, include_in_schema=False)   # legacy path, still works
+    app.include_router(_r, prefix="/api/v1")
 
 
 @app.get("/")

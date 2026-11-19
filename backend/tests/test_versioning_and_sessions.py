@@ -8,9 +8,9 @@ import models
 from tests.factories import seed_owner
 
 
-def test_legacy_and_versioned_data_paths_both_resolve(client):
-    assert client.get("/staff/").status_code == 401
+def test_versioned_staff_path_requires_auth(client):
     assert client.get("/api/v1/staff/").status_code == 401
+    assert client.get("/staff/").status_code == 404
 
 
 def test_health_and_webhooks_are_not_versioned(client):
@@ -23,6 +23,7 @@ def test_health_and_webhooks_are_not_versioned(client):
 def test_openapi_documents_versioned_and_hides_legacy(client):
     paths = client.get("/openapi.json").json()["paths"]
     assert "/api/v1/staff/" in paths
+    assert "/staff/" not in paths
     assert "/orders/" not in paths
 
 

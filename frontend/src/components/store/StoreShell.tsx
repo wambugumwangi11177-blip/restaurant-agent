@@ -61,7 +61,7 @@ export default function StoreShell({
           <h1 className="text-base font-semibold">{title}</h1>
         </div>
       </header>
-      <main className="mx-auto max-w-md px-4 py-4">{children}</main>
+      <main className="owner-main-pad mx-auto max-w-md px-4 py-4">{children}</main>
       <nav
         aria-label="Store"
         className="owner-glass-panel owner-nav fixed left-1/2 z-50 flex h-[72px] w-[calc(100%-24px)] max-w-[420px] -translate-x-1/2 items-center justify-around rounded-full px-2"

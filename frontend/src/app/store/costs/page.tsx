@@ -6,6 +6,7 @@ import PhotoField from "@/components/store/PhotoField";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { hasModule, loadSetup, type SetupPayload } from "@/lib/storeSetup";
+import { formatNairobiDateTime } from "@/lib/formatEastAfrica";
 
 const BILLS = [
   { kind: "rent", label: "Rent" },
@@ -26,7 +27,12 @@ type Saved = {
   next_due_on?: string | null;
   reminder?: string | null;
   payment_state?: string;
+  created_at?: string | null;
 };
+
+function rowsForKind(rows: Saved[], kind: string) {
+  return rows.filter((row) => row.kind === kind).sort((a, b) => a.id - b.id);
+}
 
 export default function CostsPage() {
   const { user } = useAuth();
@@ -120,46 +126,85 @@ export default function CostsPage() {
         </p>
       </section>
       {BILLS.map((bill) => {
-        const saved = rows.filter((row) => row.kind === bill.kind);
+        const saved = rowsForKind(rows, bill.kind);
+        const pending = saved.filter((row) => row.status === "needs_approval");
+        const latestPending = pending[pending.length - 1];
+        const earlierPending = pending.slice(0, -1);
+        const approved = saved.filter((row) => row.status === "approved");
+        const activeApproved = approved[approved.length - 1];
+        const unknown = saved.filter((row) => row.status === "unknown");
+        const latestUnknown = unknown[unknown.length - 1];
         const active = open === bill.kind;
         return (
           <section key={bill.kind} className="owner-glass-panel rounded-3xl p-4">
             <button type="button" className="min-h-11 w-full text-left font-semibold" onClick={() => setOpen(bill.kind)}>
               {bill.label}
             </button>
-            {saved.map((row) => (
-              <div key={row.id} className="mt-2 space-y-2 border-t border-white/10 pt-2">
-                <p className="text-sm text-zinc-400">{row.message || row.status}</p>
-                {row.next_due_on && (
-                  <p className={`text-xs ${row.reminder === "overdue" ? "text-red-300" : "text-zinc-500"}`}>
-                    Due {row.next_due_on}
-                    {row.reminder === "due_soon" ? " · due soon" : ""}
-                    {row.reminder === "overdue" ? " · overdue" : ""}
+            {(latestPending || activeApproved || latestUnknown) && (
+              <div className="mt-2 space-y-2 border-t border-white/10 pt-2">
+                {latestPending && (
+                  <p className="text-sm text-zinc-400">
+                    Sent to the owner on {formatNairobiDateTime(latestPending.created_at)}.
                   </p>
                 )}
-                {row.can_mark_paid && (
+                {earlierPending.length > 0 && (
+                  <details className="text-xs text-zinc-500">
+                    <summary className="cursor-pointer">
+                      {earlierPending.length} earlier submission{earlierPending.length === 1 ? "" : "s"}
+                    </summary>
+                    <ul className="mt-1 list-inside list-disc space-y-0.5 pl-1">
+                      {earlierPending.map((row) => (
+                        <li key={row.id}>{formatNairobiDateTime(row.created_at) || "Earlier"}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+                {latestUnknown && !latestPending && (
+                  <p className="text-sm text-zinc-400">Marked unknown.</p>
+                )}
+                {activeApproved && (
                   <>
-                    <label className="block text-sm">
-                      M-Pesa code
-                      <input
-                        value={payCode[row.id] || ""}
-                        onChange={(event) => setPayCode((prev) => ({ ...prev, [row.id]: event.target.value }))}
-                        className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3"
-                      />
-                    </label>
-                    <PhotoField
-                      label="Payment receipt"
-                      file={payPhoto[row.id] ?? null}
-                      onFile={(file) => setPayPhoto((prev) => ({ ...prev, [row.id]: file }))}
-                      optional
-                    />
-                    <button type="button" onClick={() => markPaid(row)} className="min-h-11 w-full rounded-full border border-white/25 text-sm font-semibold">
-                      Mark paid
-                    </button>
+                    {activeApproved.payment_state === "paid" ? (
+                      <p className="text-sm text-zinc-400">Marked paid.</p>
+                    ) : (
+                      <p className="text-sm text-zinc-400">Approved by the owner.</p>
+                    )}
+                    {activeApproved.next_due_on && (
+                      <p className={`text-xs ${activeApproved.reminder === "overdue" ? "text-red-300" : "text-zinc-500"}`}>
+                        Due {activeApproved.next_due_on}
+                        {activeApproved.reminder === "due_soon" ? " · due soon" : ""}
+                        {activeApproved.reminder === "overdue" ? " · overdue" : ""}
+                      </p>
+                    )}
+                    {activeApproved.can_mark_paid && (
+                      <>
+                        <label className="block text-sm">
+                          M-Pesa code
+                          <input
+                            value={payCode[activeApproved.id] || ""}
+                            onChange={(event) => setPayCode((prev) => ({ ...prev, [activeApproved.id]: event.target.value }))}
+                            className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3"
+                          />
+                        </label>
+                        <PhotoField
+                          label="Payment receipt"
+                          file={payPhoto[activeApproved.id] ?? null}
+                          onFile={(file) => setPayPhoto((prev) => ({ ...prev, [activeApproved.id]: file }))}
+                          optional
+                        />
+                        <button
+                          type="button"
+                          onClick={() => markPaid(activeApproved)}
+                          className="min-h-11 w-full rounded-full border border-white/25 text-sm font-semibold"
+                        >
+                          Mark paid
+                        </button>
+                      </>
+                    )}
                   </>
                 )}
               </div>
-            ))}
+            )}
             {active && (
               <div className="mt-3 space-y-3">
                 {bill.kind === "other" && (

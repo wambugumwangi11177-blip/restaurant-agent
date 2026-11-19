@@ -280,7 +280,12 @@ def chat_with_usage(
 
 
 def vision_model() -> str:
-    """Photo reading only. Swap models with OPENROUTER_VISION_MODEL. No fallback."""
+    """Photo reading only. Swap models with OPENROUTER_VISION_MODEL. No fallback.
+
+    Default ``nex-agi/nex-n2.5-mini`` is verified on OpenRouter's models API
+    (``architecture.input_modalities`` includes ``image``) and is among the
+    cheapest image-capable paid routes as of 2026-11.
+    """
     return os.getenv("OPENROUTER_VISION_MODEL", "nex-agi/nex-n2.5-mini")
 
 

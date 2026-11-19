@@ -28,6 +28,7 @@ def seed(credentials_path: Path) -> None:
     db = SessionLocal()
     try:
         owner_password = secrets.token_urlsafe(12)
+        owner_password_line = f"OWNER_PASSWORD={owner_password}"
         tenant = db.query(models.Tenant).filter(models.Tenant.name == "Eleven").first()
         if tenant is None:
             tenant = models.Tenant(name="Eleven")
@@ -50,6 +51,8 @@ def seed(credentials_path: Path) -> None:
                 is_email_verified=True,
             )
             db.add(owner)
+        else:
+            owner_password_line = "OWNER_PASSWORD=(unchanged — existing account)"
         for email, role, name in (
             ("jack@eleven.leviii", StaffRole.STOCKKEEPER, "Jack"),
             ("amina@eleven.leviii", StaffRole.CONTROLLER, "Amina"),
@@ -85,7 +88,7 @@ def seed(credentials_path: Path) -> None:
                     "# Jack test site owner login (do not commit)",
                     "RESTAURANT=Eleven",
                     f"OWNER_EMAIL=owner@eleven.leviii",
-                    f"OWNER_PASSWORD={owner_password}",
+                    owner_password_line,
                     "JACK_EMAIL=jack@eleven.leviii",
                     "JACK_PASSWORD=set on first sign-in",
                     "ACCOUNTANT_EMAIL=amina@eleven.leviii",
@@ -106,6 +109,12 @@ if __name__ == "__main__":
         "--credentials",
         default="/opt/cursor/artifacts/leviii-jack-test-credentials.env",
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print the credentials path (file is still written).",
+    )
     args = parser.parse_args()
     seed(Path(args.credentials))
-    print(f"Wrote {args.credentials}")
+    if not args.quiet:
+        sys.stdout.write(f"credentials written: {args.credentials}\n")

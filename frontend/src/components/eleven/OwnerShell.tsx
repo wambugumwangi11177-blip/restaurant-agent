@@ -47,7 +47,7 @@ export default function OwnerShell({
           </Link>
         </div>
       </header>
-      <main className="mx-auto max-w-3xl px-4 py-4 md:px-6">{children}</main>
+      <main className="owner-main-pad mx-auto max-w-3xl px-4 py-4 md:px-6 md:pb-4">{children}</main>
 
       <nav
         aria-label="Main"

@@ -8,11 +8,13 @@
   --og-border: rgba(255, 255, 255, 0.16);
   --og-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
   --og-nav: 72px;
+  --og-nav-inset: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  --og-nav-clearance: calc(var(--og-nav) + var(--og-nav-inset) + 5.5rem);
   min-height: 100vh;
   color: var(--og-text);
   background: var(--og-bg);
   position: relative;
-  padding-bottom: calc(var(--og-nav) + 3.5rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: var(--og-nav-clearance);
 }
 
 @media (min-width: 768px) {
@@ -112,7 +114,13 @@
 }
 
 .owner-nav {
-  bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  bottom: var(--og-nav-inset);
+}
+
+@media (max-width: 767px) {
+  .owner-main-pad {
+    padding-bottom: calc(var(--og-nav) + var(--og-nav-inset) + 2.5rem);
+  }
 }
 
 @media (min-width: 768px) {

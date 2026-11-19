@@ -12,11 +12,12 @@ import re
 import models
 
 
-def _register(client, email="reset@e.com", password="GoodPass1"):
-    r = client.post("/api/v1/auth/register",
-                     json={"email": email, "password": password, "tenant_name": "T"})
-    assert r.status_code == 201
-    return r.json()["access_token"]
+from tests.factories import seed_owner
+
+
+def _token(db_session, email="reset@e.com", password="GoodPass1"):
+    _, _, headers = seed_owner(db_session, email=email, password=password, tenant_name="T")
+    return headers["Authorization"].removeprefix("Bearer ")
 
 
 def _capture_sent_email(monkeypatch):
@@ -49,7 +50,7 @@ def test_request_reset_returns_generic_response_for_unknown_email(client, db_ses
 
 def test_full_reset_flow_changes_password_and_revokes_sessions(client, db_session, monkeypatch):
     email = "reset2@e.com"
-    old_token = _register(client, email=email)
+    old_token = _token(db_session, email=email)
     sent = _capture_sent_email(monkeypatch)
 
     resp = client.post("/api/v1/auth/password-reset/request", json={"email": email})
@@ -75,7 +76,7 @@ def test_full_reset_flow_changes_password_and_revokes_sessions(client, db_sessio
 
 def test_reset_token_is_single_use(client, db_session, monkeypatch):
     email = "reset3@e.com"
-    _register(client, email=email)
+    _token(db_session, email=email)
     sent = _capture_sent_email(monkeypatch)
     client.post("/api/v1/auth/password-reset/request", json={"email": email})
     raw = _extract_token(sent[0][2])
@@ -97,7 +98,7 @@ def test_garbage_token_rejected(client, db_session):
 
 def test_reset_enforces_password_strength(client, db_session, monkeypatch):
     email = "reset4@e.com"
-    _register(client, email=email)
+    _token(db_session, email=email)
     sent = _capture_sent_email(monkeypatch)
     client.post("/api/v1/auth/password-reset/request", json={"email": email})
     raw = _extract_token(sent[0][2])

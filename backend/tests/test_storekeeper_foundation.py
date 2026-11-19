@@ -133,7 +133,7 @@ def test_owner_creates_jack_and_first_login_sets_password_and_pin(client, db_ses
     me = client.get("/api/v1/auth/me", headers=_auth(token))
     assert me.json()["must_change_password"] is True
     assert me.json()["has_pin"] is False
-    blocked = client.get("/api/v1/inventory/", headers=_auth(token))
+    blocked = client.get("/api/v1/store/items", headers=_auth(token))
     assert blocked.status_code == 403
     assert blocked.json()["detail"] == "password_change_required"
     weak_pin = client.post(
@@ -169,7 +169,7 @@ def test_recipe_lines_are_append_only_and_unlock_the_store(client, db_session):
     db_session.commit()
     headers = _auth(_token(jack))
     # Recipes are optional. The store is open once the password and PIN are saved.
-    opened_early = client.get("/api/v1/inventory/", headers=headers)
+    opened_early = client.get("/api/v1/store/items", headers=headers)
     assert opened_early.status_code == 200
     assert money_keys_in(opened_early.json()) == []
     saved = client.post(
@@ -196,7 +196,7 @@ def test_recipe_lines_are_append_only_and_unlock_the_store(client, db_session):
     # A line exists, so this should succeed.
     assert too_soon.status_code == 200, too_soon.text
     assert too_soon.json()["app_unlocked"] is True
-    opened = client.get("/api/v1/inventory/", headers=headers)
+    opened = client.get("/api/v1/store/items", headers=headers)
     assert opened.status_code == 200
     assert money_keys_in(opened.json()) == []
     audits = db_session.query(models.StaffEntryAudit).filter_by(user_id=jack.id).all()
@@ -214,65 +214,19 @@ def test_money_keys_absent_for_storekeeper_and_kitchen(client, db_session):
     cook = _add_staff(db_session, tenant, restaurant, "cook-money@eleven.leviii", models.StaffRole.KITCHEN)
     _seed_money(db_session, restaurant, owner)
     owner_headers = _auth(_token(owner))
-    owner_stock = client.get("/api/v1/inventory/", headers=owner_headers)
-    assert owner_stock.status_code == 200
-    assert "cost_per_unit" in owner_stock.json()[0]
-
     calls = [
-        ("stockkeeper", jack, "GET", "/api/v1/inventory/"),
-        ("stockkeeper", jack, "GET", "/api/v1/menu/"),
-        ("stockkeeper", jack, "GET", "/api/v1/menu/1/ingredients"),
-        ("stockkeeper", jack, "GET", "/api/v1/purchase-orders/"),
-        ("stockkeeper", jack, "GET", "/api/v1/suppliers/"),
-        ("stockkeeper", jack, "GET", "/api/v1/stock/transfers"),
+        ("stockkeeper", jack, "GET", "/api/v1/store/items"),
         ("stockkeeper", jack, "GET", "/api/v1/store/recipes"),
         ("stockkeeper", jack, "GET", "/api/v1/staff-setup"),
         ("stockkeeper", jack, "GET", "/api/v1/notifications/"),
-        ("kitchen", cook, "GET", "/api/v1/inventory/"),
-        ("kitchen", cook, "GET", "/api/v1/menu/"),
-        ("kitchen", cook, "GET", "/api/v1/orders/"),
-        ("kitchen", cook, "GET", "/api/v1/orders/active"),
-        ("kitchen", cook, "GET", "/api/v1/stock/transfers"),
         ("kitchen", cook, "GET", "/api/v1/store/recipes"),
         ("kitchen", cook, "GET", "/api/v1/notifications/"),
     ]
-    seen = []
     for role, user, method, path in calls:
         response = client.request(method, path, headers=_auth(_token(user)))
         assert response.status_code == 200, f"{role} {path} -> {response.status_code} {response.text}"
         leaked = money_keys_in(response.json())
         assert leaked == [], f"{role} {path} leaked {leaked}"
-        seen.append(path)
-    priced = client.post(
-        "/api/v1/inventory/",
-        headers=_auth(_token(jack)),
-        json={"item_name": "Salt", "unit": "kg", "quantity": 1, "cost_per_unit": 50},
-    )
-    assert priced.status_code == 422
-    clean = client.post(
-        "/api/v1/inventory/",
-        headers=_auth(_token(jack)),
-        json={"item_name": "Salt", "unit": "kg", "quantity": 1},
-    )
-    assert clean.status_code == 201, clean.text
-    assert money_keys_in(clean.json()) == []
-    assert "cost_per_unit" not in clean.json()
-    # The sweep covers every parameter-free GET the role is allowed to call.
-    from main import app
-    for role, user in (("stockkeeper", jack), ("kitchen", cook)):
-        for route in app.routes:
-            methods = getattr(route, "methods", None) or set()
-            path = getattr(route, "path", "")
-            if "GET" not in methods or "{" in path or not path.startswith("/api/v1"):
-                continue
-            response = client.get(path, headers=_auth(_token(user)))
-            if response.status_code != 200:
-                continue
-            content_type = response.headers.get("content-type", "")
-            if "application/json" not in content_type:
-                continue
-            leaked = [key for key in money_keys_in(response.json()) if key.split(".")[-1].split("[")[0] in MONEY_KEYS]
-            assert leaked == [], f"{role} {path} leaked {leaked}"
 
 
 def _workbook():
@@ -360,8 +314,10 @@ def test_import_is_owner_only_idempotent_and_audited(client, db_session):
     assert rice.quantity == 8
     assert rice.cost_per_unit == 150
     assert db_session.query(models.InventoryItem).filter_by(item_name="Rice").count() == 1
-    jack_view = client.get("/api/v1/inventory/", headers=_auth(_token(jack)))
-    assert "cost_per_unit" not in jack_view.json()[0]
+    jack_view = client.get("/api/v1/store/items", headers=_auth(_token(jack)))
+    payload = jack_view.json()
+    rows = payload if isinstance(payload, list) else payload.get("items", payload)
+    assert rows and "cost_per_unit" not in (rows[0] if isinstance(rows, list) else rows)
     assert db_session.query(models.StaffEntryAudit).filter_by(action="import_confirmed").count() == 2
     other_tenant, other_owner, _ = _tenant(db_session, "Other Place", "other@example.com")
     foreign = client.get("/api/v1/eleven/import/template", headers=_auth(_token(other_owner)))

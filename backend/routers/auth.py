@@ -4,9 +4,7 @@ backend/routers/auth.py
 Authentication router.
 
 FIXES:
-  - register() now auto-creates a Restaurant + 4 default Tables so that
-    every AI endpoint finds a restaurant on first login. Without this,
-    _get_restaurant() returned 404 and the frontend fell back to Lavy demo data.
+  - Public self-service register removed for LEVIII (provisioning is env/ops only).
   - Added /me endpoint returns restaurant_name so the frontend can
     personalise without an extra round-trip.
   - Added /restaurant PUT so the owner can update their name/address
@@ -206,80 +204,6 @@ class EmailVerifyConfirm(StrictModel):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
-@router.post("/register", response_model=Token, status_code=201)
-@limiter.limit("5/hour")
-async def register(request: Request, user_data: UserCreate, db: Session = Depends(get_db)):
-    # Enforce minimum password strength before anything else.
-    auth.require_strong_password(user_data.password)
-
-    # Guard: duplicate email
-    if db.query(models.User).filter(models.User.email == user_data.email).first():
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    # 1. Tenant
-    tenant = models.Tenant(name=user_data.tenant_name)
-    db.add(tenant)
-    db.commit()
-    db.refresh(tenant)
-
-    # 2. User
-    hashed_password = auth.get_password_hash(user_data.password)
-    new_user = models.User(
-        email=user_data.email,
-        hashed_password=hashed_password,
-        role=models.Role.ADMIN,
-        # A fresh signup is always the Owner of their own restaurant —
-        # matches the migration 025 backfill for pre-existing ADMIN users
-        # (directive 015: Owner maps 1:1 onto Role.ADMIN).
-        staff_role=models.StaffRole.OWNER,
-        tenant_id=tenant.id,
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    # 3. Restaurant — THE MISSING PIECE.
-    #    Without this every /ai/* endpoint returns 404 and the frontend
-    #    falls back to the hardcoded "Lavy" demo data.
-    restaurant = models.Restaurant(
-        name=user_data.tenant_name,
-        address="",
-        tenant_id=tenant.id,
-    )
-    db.add(restaurant)
-    db.commit()
-    db.refresh(restaurant)
-
-    # 4. Seed 5 tables so the POS and reservations work immediately.
-    for i in range(1, 6):
-        db.add(models.Table(
-            restaurant_id=restaurant.id,
-            table_number=i,
-            capacity=4,
-            status=models.TableStatus.AVAILABLE,
-        ))
-    db.commit()
-
-    # 5. Email verification link — best-effort; a mail-server hiccup must
-    #    never fail the signup itself (see email_utils.send_email).
-    verify_token = _issue_auth_token(
-        db, new_user, models.AuthTokenPurpose.EMAIL_VERIFY,
-        timedelta(hours=EMAIL_VERIFY_TOKEN_EXPIRE_HOURS),
-    )
-    email_utils.send_email(
-        new_user.email,
-        "Verify your email",
-        f"Welcome to LEVIII! Verify your email address here:\n"
-        f"{FRONTEND_BASE_URL}/verify-email?token={verify_token}\n\n"
-        f"This link expires in {EMAIL_VERIFY_TOKEN_EXPIRE_HOURS} hours.",
-    )
-
-    access_token = auth.create_access_token(
-        data={"sub": new_user.email, "ver": new_user.token_version or 0}
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
-
-
 def _authenticate_password_user(
     db: Session,
     user: models.User | None,
@@ -441,33 +365,6 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
     user = db.query(models.User).filter(models.User.email == login_data.email).first()
     return _authenticate_password_user(
         db, user, login_data.password, login_data.mfa_code, "Incorrect email or password"
-    )
-
-
-@router.post("/login/restaurant", response_model=Token)
-@limiter.limit("10/minute")
-async def login_by_restaurant(
-    request: Request,
-    login_data: RestaurantLoginRequest,
-    db: Session = Depends(get_db),
-):
-    """Resolve one active Owner for the named restaurant before checking its password."""
-    restaurant_name = login_data.restaurant_name.strip().lower()
-    owners = (
-        db.query(models.User)
-        .join(models.Restaurant, models.Restaurant.tenant_id == models.User.tenant_id)
-        .filter(
-            func.lower(models.Restaurant.name) == restaurant_name,
-            models.User.role == models.Role.ADMIN,
-            models.User.staff_role == models.StaffRole.OWNER,
-            models.User.is_active.is_(True),
-        )
-        .distinct()
-        .all()
-    )
-    user = owners[0] if len(owners) == 1 else None
-    return _authenticate_password_user(
-        db, user, login_data.password, login_data.mfa_code, "Incorrect restaurant or password"
     )
 
 

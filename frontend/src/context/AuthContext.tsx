@@ -4,7 +4,6 @@
  * AuthContext.tsx — Authentication state management
  *
  * Fixes vs original:
- *   BUG 1 — register was posting to /auth/register (404). Fixed to /api/v1/auth/register.
  *   BUG 6 — login was pointlessly building URLSearchParams then pulling values back out.
  *            Cleaned to send {email, password} JSON directly.
  */
@@ -84,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Returns the freshly-fetched user (or null on failure) as well as setting
-  // it. Callers that need to route on the result — login/register — must use
+  // it. Callers that need to route on the result — login — must use
   // the RETURN value: `user` state is not committed until React re-renders, so
   // reading it in the same handler yields the PREVIOUS value (null on a first
   // login), which is what sent every Vibanda owner to /dashboard first and only

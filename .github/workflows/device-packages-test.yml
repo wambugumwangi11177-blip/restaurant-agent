@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       app_url:
-        description: Public HTTPS origin of the Jack test Railway frontend, no path.
+        description: Jack test Railway frontend origin only (hostname must contain frontend-test).
         required: false
-        default: https://frontend-production-e251.up.railway.app
+        default: https://frontend-test-production-752b1b7c.up.railway.app
         type: string
 permissions:
   contents: write
@@ -19,11 +19,24 @@ jobs:
       run:
         working-directory: packaging
     env:
-      LEVIII_APP_URL: ${{ inputs.app_url || 'https://frontend-production-e251.up.railway.app' }}
+      # Never point the test APK at production (master / Chakula). Override only with another *frontend-test* host.
+      LEVIII_APP_URL: ${{ inputs.app_url || 'https://frontend-test-production-752b1b7c.up.railway.app' }}
       LEVIII_APP_NAME: LEVIII Store Test
       LEVIII_APP_ID: com.leviii.store.test
     steps:
       - uses: actions/checkout@v4
+      - name: Refuse non-test frontend for test APK
+        run: |
+          host=$(node -e "console.log(new URL(process.env.LEVIII_APP_URL).hostname)")
+          case "$host" in
+            *frontend-test*) ;;
+            *)
+              echo "LEVIII_APP_URL must be the Jack test frontend (hostname must contain 'frontend-test'). Got: ${LEVIII_APP_URL}" >&2
+              exit 1
+              ;;
+          esac
+        env:
+          LEVIII_APP_URL: ${{ env.LEVIII_APP_URL }}
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -54,7 +67,7 @@ jobs:
           test -n "$LEVIII_APP_URL"
           apk=$(find packaging/android/android/app/build/outputs/apk/debug -name '*.apk' -print -quit)
           cp "$apk" "$RUNNER_TEMP/LEVIII-Store-Test.apk"
-          notes="Test build of LEVIII Store. It opens the Jack test frontend only."
+          notes="Test build of LEVIII Store. WebView opens ${LEVIII_APP_URL} only."
           if gh release view leviii-store-test >/dev/null 2>&1; then
             gh release upload leviii-store-test "$RUNNER_TEMP/LEVIII-Store-Test.apk" --clobber
           else

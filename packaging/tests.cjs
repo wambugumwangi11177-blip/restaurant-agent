@@ -75,3 +75,37 @@ test("offline page is friendly and does not look like a browser error", () => {
   assert.match(html, /backButton/);
   assert.doesNotMatch(html, /ERR_/);
 });
+
+const LEVIII_TEST_FRONTEND = "https://frontend-test-production-752b1b7c.up.railway.app";
+
+test("test APK workflow targets Jack frontend-test, not production", () => {
+  const workflow = fs.readFileSync(
+    path.join(__dirname, "..", ".github", "workflows", "device-packages-test.yml"),
+    "utf8",
+  );
+  assert.match(workflow, new RegExp(LEVIII_TEST_FRONTEND.replace(/\./g, "\\.")));
+  assert.match(workflow, /frontend-test/);
+  assert.doesNotMatch(workflow, /frontend-production-e251/);
+});
+
+test("configure test APK id points WebView at frontend-test", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "leviii-store-test-"));
+  for (const file of ["configure.cjs", "url-policy.cjs", "version.cjs", "version.json"]) {
+    fs.copyFileSync(path.join(__dirname, file), path.join(dir, file));
+  }
+  fs.mkdirSync(path.join(dir, "android", "www"), { recursive: true });
+  const result = spawnSync(process.execPath, ["configure.cjs"], {
+    cwd: dir,
+    env: {
+      ...process.env,
+      LEVIII_APP_URL: LEVIII_TEST_FRONTEND,
+      LEVIII_APP_NAME: "LEVIII Store Test",
+      LEVIII_APP_ID: "com.leviii.store.test",
+    },
+  });
+  assert.equal(result.status, 0, result.stderr.toString());
+  const config = JSON.parse(fs.readFileSync(path.join(dir, "android", "capacitor.config.json"), "utf8"));
+  assert.equal(config.appId, "com.leviii.store.test");
+  assert.equal(config.server.url, LEVIII_TEST_FRONTEND);
+  assert.deepEqual(config.server.allowNavigation, ["frontend-test-production-752b1b7c.up.railway.app"]);
+});

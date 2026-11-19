@@ -8,6 +8,7 @@ The Android app is a Capacitor WebView of the hosted frontend. It is an installe
 npm ci
 npm test
 LEVIII_APP_URL=https://frontend-production-e251.up.railway.app npm run configure
+# Test APK (Jack): LEVIII_APP_URL=https://frontend-test-production-752b1b7c.up.railway.app LEVIII_APP_ID=com.leviii.store.test
 ```
 
 `LEVIII_APP_URL` is the public HTTPS origin of the Railway frontend (no path, port, query, or password). The production frontend service is `https://frontend-production-e251.up.railway.app`. Change the GitHub Actions input `app_url` when that host changes. Configuration refuses HTTP, embedded credentials, and local addresses.

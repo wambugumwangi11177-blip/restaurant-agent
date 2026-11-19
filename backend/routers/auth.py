@@ -155,6 +155,7 @@ class PasswordResetConfirm(StrictModel):
 class InitialPasswordSet(StrictModel):
     email: str
     new_password: str
+    handover_code: str | None = None
 
 
 class ImpersonationBanner(StrictModel):
@@ -300,9 +301,12 @@ def _authenticate_password_user(
         # doesn't reveal whether the account exists (user-enumeration oracle).
         auth.verify_password(password, auth.get_password_hash("timing-equalizer"))
     if user and not user.hashed_password:
+        detail = {"code": "FIRST_PASSWORD_REQUIRED", "email": user.email}
+        if user.password_reset_required:
+            detail["handover_code_required"] = True
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "FIRST_PASSWORD_REQUIRED", "email": user.email},
+            detail=detail,
         )
     if not user or not user.hashed_password or not auth.verify_password(password, user.hashed_password):
         if user:
@@ -369,7 +373,11 @@ def _env_truthy(name: str) -> bool:
 
 
 def _may_set_initial_password(user: models.User) -> bool:
+    if user.password_reset_required:
+        return True
     if user.staff_role in (models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER):
+        return True
+    if not user.hashed_password and user.must_change_password:
         return True
     if user.staff_role == models.StaffRole.OWNER and user.role in (models.Role.ADMIN, models.Role.SUPERADMIN):
         return _env_truthy("ALLOW_OWNER_FIRST_PASSWORD")
@@ -383,17 +391,45 @@ async def set_initial_password(
     body: InitialPasswordSet,
     db: Session = Depends(get_db),
 ):
-    """Storekeeper, accountant, or (test-only) owner sets their own password before first sign-in."""
+    """Storekeeper, accountant, handover reset, or (test-seed) owner sets password before sign-in."""
+    import handover
+    from staff_audit import record_entry
+
     user = db.query(models.User).filter(models.User.email == body.email).first()
-    if user is None or not user.is_active or user.hashed_password:
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=400, detail="This login is not waiting for a first password.")
+    if user.hashed_password and not user.password_reset_required:
         raise HTTPException(status_code=400, detail="This login is not waiting for a first password.")
     if not _may_set_initial_password(user):
         raise HTTPException(status_code=400, detail="This login is not waiting for a first password.")
+    if user.password_reset_required:
+        if not body.handover_code:
+            raise HTTPException(status_code=400, detail="Handover code is required.")
+        handover.verify_handover_code(db, user, body.handover_code.strip())
     auth.require_strong_password(body.new_password)
+    was_handover = bool(user.password_reset_required)
     user.hashed_password = auth.get_password_hash(body.new_password)
-    user.must_change_password = False
     user.failed_login_attempts = 0
     user.locked_until = None
+    restaurant = get_restaurant_or_none(db, user)
+    if was_handover and restaurant:
+        handover.clear_handover_after_password_set(
+            db, user, restaurant_id=restaurant.id, via_email=user.email
+        )
+    else:
+        user.must_change_password = False
+        user.password_reset_required = False
+        if restaurant:
+            record_entry(
+                db,
+                restaurant.id,
+                user,
+                "initial_password_set",
+                "user",
+                f"First password set for {user.email}",
+                entity_id=user.id,
+                detail={"email": user.email},
+            )
     db.commit()
     access_token = auth.create_access_token(data={"sub": user.email, "ver": user.token_version or 0})
     return {"access_token": access_token, "token_type": "bearer"}

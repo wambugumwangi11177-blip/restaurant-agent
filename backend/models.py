@@ -157,6 +157,12 @@ class User(Base):
     # Cleared only after that person changes the password and sets their own
     # 4-digit PIN (POST /staff-setup/account). Existing accounts stay False.
     must_change_password = Column(Boolean, default=False, nullable=False, server_default="0")
+    # Handover: owner/admin resets sign-in; new user needs 6-digit code + password.
+    password_reset_required = Column(Boolean, default=False, nullable=False, server_default="0")
+    handover_code_hash = Column(String, nullable=True)
+    handover_code_expires_at = Column(DateTime, nullable=True)
+    handover_failed_attempts = Column(Integer, default=0, nullable=False)
+    handover_locked_until = Column(DateTime, nullable=True)
     # Which of the tenant's restaurants this user is currently viewing (audit
     # remediation, Tier 5 item 11 — multi-restaurant switcher). NULL for the
     # overwhelming majority of tenants (single restaurant, nothing to pick)

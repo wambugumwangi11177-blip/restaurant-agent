@@ -17,6 +17,8 @@ export default function LoginPage() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [firstPassword, setFirstPassword] = useState(false);
+    const [handoverCodeRequired, setHandoverCodeRequired] = useState(false);
+    const [handoverCode, setHandoverCode] = useState("");
     const [nativeStore, setNativeStore] = useState(false);
 
     useEffect(() => {
@@ -29,7 +31,7 @@ export default function LoginPage() {
         setLoading(true);
         try {
             const signedIn = firstPassword
-                ? await setInitialPassword(email, password)
+                ? await setInitialPassword(email, password, handoverCodeRequired ? handoverCode : undefined)
                 : await login(email, password);
             router.replace(homeFor(signedIn?.tenant_name, signedIn?.staff_role));
         } catch (err: unknown) {
@@ -46,7 +48,16 @@ export default function LoginPage() {
                     if (typeof rawDetail === "object" && rawDetail.email) {
                         setEmail(rawDetail.email);
                     }
-                    setError("Choose your own password. This is your first sign-in.");
+                    const needsCode =
+                        typeof rawDetail === "object" &&
+                        "handover_code_required" in rawDetail &&
+                        Boolean((rawDetail as { handover_code_required?: boolean }).handover_code_required);
+                    setHandoverCodeRequired(needsCode);
+                    setError(
+                        needsCode
+                            ? "Enter the 6-digit handover code and choose a new password."
+                            : "Choose your own password. This is your first sign-in.",
+                    );
                     return;
                 }
             } else if (err instanceof Error) {
@@ -100,8 +111,29 @@ export default function LoginPage() {
                             />
                         </div>
 
+                        {handoverCodeRequired && (
+                            <div>
+                                <label htmlFor="handover" className="block text-sm text-[#737373] mb-1.5">Handover code (6 digits)</label>
+                                <input
+                                    id="handover"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]{6}"
+                                    maxLength={6}
+                                    autoComplete="one-time-code"
+                                    value={handoverCode}
+                                    onChange={(e) => setHandoverCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                    className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[var(--accent)] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm tracking-widest"
+                                    placeholder="123456"
+                                    required
+                                />
+                            </div>
+                        )}
+
                         <div>
-                            <label htmlFor="password" className="block text-sm text-[#737373] mb-1.5">Password</label>
+                            <label htmlFor="password" className="block text-sm text-[#737373] mb-1.5">
+                                {firstPassword ? "New password" : "Password"}
+                            </label>
                             <div className="relative">
                                 <input
                                     id="password"

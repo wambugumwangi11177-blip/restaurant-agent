@@ -47,7 +47,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<User | null>;
-  setInitialPassword: (email: string, password: string) => Promise<User | null>;
+  setInitialPassword: (email: string, password: string, handoverCode?: string) => Promise<User | null>;
   logout: () => void;
   isLoading: boolean;
   startImpersonation: (staffId: number) => Promise<string>;
@@ -115,8 +115,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
 
-  const setInitialPassword = async (email: string, password: string) => {
-    const res = await api.post("/api/v1/auth/set-initial-password", { email, new_password: password });
+  const setInitialPassword = async (email: string, password: string, handoverCode?: string) => {
+    const res = await api.post("/api/v1/auth/set-initial-password", {
+      email,
+      new_password: password,
+      handover_code: handoverCode || undefined,
+    });
     const accessToken = res.data.access_token;
     setAccessToken(accessToken);
     setToken(accessToken);

@@ -36,7 +36,7 @@ export default function GlobalError({
             >
                 <div style={{ maxWidth: 380, textAlign: "center" }}>
                     <h1 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
-                        Chakula hit a problem
+                        LEVIII hit a problem
                     </h1>
                     <p style={{ fontSize: 14, color: "#a3a3a3", marginBottom: 20 }}>
                         Something went wrong loading the app. Try reloading — if it

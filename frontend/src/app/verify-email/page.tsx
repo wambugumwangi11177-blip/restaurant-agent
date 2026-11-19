@@ -6,6 +6,7 @@ import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import api from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 function VerifyEmailContent() {
     const searchParams = useSearchParams();
@@ -36,7 +37,7 @@ function VerifyEmailContent() {
                 className="w-full max-w-sm"
             >
                 <div className="text-center mb-10">
-                    <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">Chakula</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">{PRODUCT_NAME}</h1>
                 </div>
 
                 <div className="bg-[#141414] border border-[#262626] rounded-xl p-6 text-center space-y-3">
@@ -61,8 +62,8 @@ function VerifyEmailContent() {
                         </>
                     )}
 
-                    <a href="/dashboard" className="block mt-4 text-sm text-[var(--accent)] hover:underline">
-                        Go to dashboard
+                    <a href="/login" className="block mt-4 text-sm text-[var(--accent)] hover:underline">
+                        Sign in
                     </a>
                 </div>
             </motion.div>

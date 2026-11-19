@@ -1,5 +1,4 @@
-/** Vibanda Village gets a dedicated 3-page experience; every other tenant
- * keeps the full generic dashboard. Single source of truth for that fork. */
+/** Vibanda Village — dedicated demo shell under /vibanda (internal QA only). */
 export const VIBANDA_TENANT = "Vibanda Village";
 export const VIBANDA_SYNTHETIC_TENANT = "Vibanda Village — Synthetic";
 export function isVibanda(tenantName?: string | null): boolean {
@@ -7,8 +6,7 @@ export function isVibanda(tenantName?: string | null): boolean {
   return normalized === VIBANDA_TENANT.toLowerCase()
     || (process.env.NEXT_PUBLIC_SYNTHETIC_DEMO === "true" && normalized === VIBANDA_SYNTHETIC_TENANT.toLowerCase());
 }
-/** Demo Restaurant: a clone of the Vibanda shell under /demo that records its
- * data directly — it never waits on MacSoft or any external data push. */
+/** Demo Restaurant tenants reuse the Vibanda shell (backend demo API unchanged). */
 export const DEMO_TENANT = "Demo Restaurant";
 export function isDemoRestaurant(tenantName?: string | null): boolean {
   return (tenantName ?? "").trim().toLowerCase() === DEMO_TENANT.toLowerCase();
@@ -21,7 +19,8 @@ export function isEleven(tenantName?: string | null): boolean {
 export function homeFor(tenantName?: string | null, staffRole?: string | null): string {
   const role = (staffRole ?? "").trim().toLowerCase();
   if (role === "stockkeeper" || role === "controller") return "/store";
-  if (isDemoRestaurant(tenantName)) return "/demo";
+  if (isDemoRestaurant(tenantName)) return "/vibanda";
   if (isEleven(tenantName)) return "/eleven";
-  return isVibanda(tenantName) ? "/vibanda" : "/dashboard";
+  if (isVibanda(tenantName)) return "/vibanda";
+  return "/eleven";
 }

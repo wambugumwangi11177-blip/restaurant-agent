@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Loader2, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import api from "@/lib/api";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 function ResetPasswordForm() {
     const searchParams = useSearchParams();
@@ -49,7 +50,7 @@ function ResetPasswordForm() {
                 className="w-full max-w-sm"
             >
                 <div className="text-center mb-10">
-                    <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">Chakula</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">{PRODUCT_NAME}</h1>
                     <p className="text-sm text-[#737373] mt-1">Set a new password</p>
                 </div>
 

@@ -20,13 +20,13 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Chakula — Restaurant Manager",
-  description: "Simple restaurant management for Kenyan restaurants",
+  title: "LEVIII",
+  description: "Owner and store operations for Eleven",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Chakula",
+    title: "LEVIII",
   },
 };
 

@@ -1,7 +1,7 @@
 {
   "name": "LEVIII Store",
-  "version": "1.0.6",
-  "versionCode": 7,
+  "version": "1.0.7",
+  "versionCode": 8,
   "android": {
     "available": true,
     "filename": "LEVIII-Store.apk",

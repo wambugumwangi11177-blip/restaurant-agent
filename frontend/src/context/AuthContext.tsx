@@ -47,8 +47,6 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<User | null>;
-  loginWithRestaurant: (restaurantName: string, password: string) => Promise<User | null>;
-  register: (email: string, password: string, tenantName: string) => Promise<User | null>;
   setInitialPassword: (email: string, password: string) => Promise<User | null>;
   logout: () => void;
   isLoading: boolean;
@@ -116,29 +114,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return await fetchUser(accessToken);
   };
 
-  const loginWithRestaurant = async (restaurantName: string, password: string) => {
-    const res = await api.post("/api/v1/auth/login/restaurant", {
-      restaurant_name: restaurantName,
-      password,
-    });
-    const accessToken = res.data.access_token;
-    setAccessToken(accessToken);
-    setToken(accessToken);
-    return await fetchUser(accessToken);
-  };
-
-  // BUG 1 FIX: was /auth/register (404) — corrected to /api/v1/auth/register
-  const register = async (email: string, password: string, tenantName: string) => {
-    const res = await api.post("/api/v1/auth/register", {
-      email,
-      password,
-      tenant_name: tenantName,
-    });
-    const accessToken = res.data.access_token;
-    setAccessToken(accessToken);
-    setToken(accessToken);
-    return await fetchUser(accessToken);
-  };
 
   const setInitialPassword = async (email: string, password: string) => {
     const res = await api.post("/api/v1/auth/set-initial-password", { email, new_password: password });
@@ -228,8 +203,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         token,
         login,
-        loginWithRestaurant,
-        register,
         setInitialPassword,
         logout,
         isLoading,

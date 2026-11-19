@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import PhotoField from "@/components/store/PhotoField";
 import api from "@/lib/api";
 
@@ -27,15 +27,15 @@ export default function DayPhotosPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     const response = await api.get("/api/v1/store/day-photos/status");
     setStatus(response.data);
     if (!zoneId && response.data.zones?.[0]) setZoneId(response.data.zones[0].id);
-  }
+  }, [zoneId]);
 
   useEffect(() => {
     refresh().catch(() => setError("Day photos could not be loaded."));
-  }, []);
+  }, [refresh]);
 
   async function send() {
     if (!photo || zoneId == null) {

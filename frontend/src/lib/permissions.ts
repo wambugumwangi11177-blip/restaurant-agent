@@ -80,12 +80,12 @@ export function domainsFor(tier: StaffTier | null): Domain[] {
 
 /** Where a staff-tier account should land after login / off a disallowed route. */
 export const TIER_HOME: Record<Exclude<StaffTier, "owner">, string> = {
-    manager: "/vibanda",
-    supervisor: "/vibanda",
+    manager: "/store",
+    supervisor: "/store",
     controller: "/store",
     stockkeeper: "/store",
-    kitchen: "/vibanda",
-    waiter: "/vibanda",
+    kitchen: "/store",
+    waiter: "/store",
 };
 
 export function tierHome(tier: StaffTier | null): string {

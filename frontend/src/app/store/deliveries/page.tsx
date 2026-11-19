@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
 import { takePhoto } from "@/lib/capturePhoto";
 import { hasModule, loadSetup, type SetupPayload } from "@/lib/storeSetup";
@@ -28,7 +28,7 @@ export default function DeliveriesPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     const next = await loadSetup();
     setSetup(next);
     if (!hasModule(next, "deliveries")) return;
@@ -39,11 +39,11 @@ export default function DeliveriesPage() {
     setSuppliers(supplierResponse.data);
     setRows(deliveryResponse.data);
     if (!supplierId && supplierResponse.data[0]) setSupplierId(String(supplierResponse.data[0].id));
-  }
+  }, [supplierId]);
 
   useEffect(() => {
     refresh().catch(() => setError("Deliveries could not be loaded."));
-  }, []);
+  }, [refresh]);
 
   async function useCamera(which: "invoice" | "goods", input: HTMLInputElement) {
     const photo = await takePhoto().catch(() => null);

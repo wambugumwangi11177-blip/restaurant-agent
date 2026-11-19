@@ -10,6 +10,7 @@ const eslintConfig = defineConfig([
       // Data loads on mount are intentional across store/eleven pages; the rule
       // flags every refresh().catch(setError) pattern without improving safety.
       "react-hooks/set-state-in-effect": "off",
+      "@next/next/no-img-element": "off",
     },
   },
   // Override default ignores of eslint-config-next.

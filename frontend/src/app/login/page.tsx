@@ -139,16 +139,6 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    {!firstPassword && (
-                        <div className="mt-5 text-center">
-                            <a
-                                href="/forgot-password"
-                                className="text-sm text-[#525252] hover:text-[var(--accent)]"
-                            >
-                                Forgot password?
-                            </a>
-                        </div>
-                    )}
                 </div>
             </motion.div>
         </div>

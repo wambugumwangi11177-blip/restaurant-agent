@@ -1,17 +1,81 @@
 "use client";
 
+import Link from "next/link";
 import OwnerShell from "@/components/eleven/OwnerShell";
-import { GlassCard, WaitingNotice } from "@/components/eleven/EmptyPanels";
+import { useOwnerFeed, type FeedEvent } from "@/components/eleven/OwnerFeed";
+
+function AlertRow({ title, detail, href }: { title: string; detail?: string; href?: string }) {
+  return (
+    <li className="owner-glass-panel rounded-2xl p-4">
+      <p className="text-[0.9375rem] font-medium leading-6">{title}</p>
+      {detail && <p className="mt-1 text-sm text-zinc-400">{detail}</p>}
+      {href && (
+        <Link href={href} className="mt-2 inline-block text-sm text-[var(--accent)] hover:underline">
+          Open
+        </Link>
+      )}
+    </li>
+  );
+}
+
+function mismatchAlerts(events: FeedEvent[]) {
+  return events.filter((e) => e.ai?.status === "mismatch" && e.ai?.note);
+}
 
 export default function ElevenAlertsPage() {
+  const { data, error } = useOwnerFeed();
   return (
     <OwnerShell title="Alerts">
-      <p className="mb-3 text-xs text-zinc-400">
-        Up to 5 urgent alerts a day, quiet after 10 pm. You can change this in Settings.
-      </p>
-      <GlassCard>
-        <WaitingNotice>No urgent alerts — nothing needs you right now.</WaitingNotice>
-      </GlassCard>
+      <p className="mb-3 text-xs text-zinc-400">Stock, waste, bills, and photo checks that need your attention.</p>
+      {error && <p className="text-sm text-red-300">{error}</p>}
+      {!data && !error && <p className="text-sm text-zinc-400">Loading…</p>}
+      {data && (
+        <ul className="space-y-3">
+          {(data.attention?.count ?? 0) > 0 && (
+            <AlertRow title={data.attention?.sentence || "Something needs you."} href="/eleven/approvals" />
+          )}
+          {data.pending.map((item) => (
+            <AlertRow
+              key={`p-${item.kind}-${item.id}`}
+              title={item.action || item.headline || "Needs approval"}
+              detail={item.headline}
+              href="/eleven/approvals"
+            />
+          ))}
+          {(data.bill_reminders ?? []).map((item) => (
+            <AlertRow
+              key={`b-${item.id}-${item.status}`}
+              title={item.headline || item.label || "Bill due"}
+              href="/eleven/money"
+            />
+          ))}
+          {(data.cards ?? [])
+            .filter((c) => c.overdue || (c.id === "money" && !c.quiet))
+            .map((c) => (
+              <AlertRow
+                key={c.id}
+                title={c.title}
+                detail={c.sentence}
+                href={c.id === "money" ? "/eleven/money" : c.id === "stock" ? "/eleven/stock" : "/eleven/approvals"}
+              />
+            ))}
+          {mismatchAlerts(data.events).map((item) => (
+            <AlertRow
+              key={`ai-${item.kind}-${item.id}`}
+              title={item.headline || "Photo check mismatch"}
+              detail={`AI · ${item.ai?.note}`}
+              href={item.kind === "delivery" ? "/eleven/deliveries" : "/eleven/activity"}
+            />
+          ))}
+          {data.pending.length === 0 &&
+            (data.bill_reminders?.length ?? 0) === 0 &&
+            mismatchAlerts(data.events).length === 0 &&
+            (data.attention?.count ?? 0) === 0 &&
+            !(data.cards ?? []).some((c) => c.overdue) && (
+              <li className="owner-glass-panel rounded-2xl p-4 text-sm text-zinc-400">No urgent alerts right now.</li>
+            )}
+        </ul>
+      )}
     </OwnerShell>
   );
 }

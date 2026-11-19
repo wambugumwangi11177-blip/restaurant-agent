@@ -32,7 +32,6 @@ api.interceptors.response.use(
       // redirect here used to loop the page into itself forever.
       const isAuthPath =
         window.location.pathname === "/login" ||
-        window.location.pathname === "/register" ||
         (error.config?.url ?? "").includes("/auth/");
       if (!isAuthPath) {
         clearAccessToken();

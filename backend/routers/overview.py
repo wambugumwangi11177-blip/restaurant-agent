@@ -371,7 +371,7 @@ def _performance(db: Session, rid: int) -> dict:
 # MacSoft delivery or any other API push: what is recorded here IS the data, so
 # there is no external source to reconcile against. Keyed on tenant name, the
 # same way the frontend forks its owner shells (frontend/src/lib/tenantHome.ts).
-DIRECT_SOURCE_TENANTS = frozenset({"demo restaurant"})
+DIRECT_SOURCE_TENANTS = frozenset({"demo restaurant", "eleven"})
 
 
 def records_directly(db: Session, tenant_id: int | None) -> bool:

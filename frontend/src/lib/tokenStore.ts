@@ -20,18 +20,8 @@
  */
 
 const TOKEN_KEY = "access_token";
-// Non-sensitive UI preference only — never the bearer token.
-const UI_PREF_KEY = "sidebar_collapsed";
 
 let _token: string | null = null;
-
-function _sessionAvailable(): boolean {
-  try {
-    return typeof window !== "undefined" && !!window.sessionStorage;
-  } catch {
-    return false;
-  }
-}
 
 export function getAccessToken(): string | null {
   if (_token !== null) return _token;

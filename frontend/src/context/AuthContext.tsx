@@ -98,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       clearAccessToken();
       setToken(null);
+      setUser(null);
       return null;
     } finally {
       setIsLoading(false);

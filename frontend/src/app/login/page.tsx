@@ -9,7 +9,7 @@ import { motion } from "framer-motion";
 import { Loader2, Eye, EyeOff, ArrowRight } from "lucide-react";
 
 export default function LoginPage() {
-    const { login, setInitialPassword } = useAuth();
+    const { user, isLoading, login, setInitialPassword } = useAuth();
     const router = useRouter();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -25,8 +25,15 @@ export default function LoginPage() {
         setNativeStore(navigator.userAgent.includes("LEVIIIStore"));
     }, []);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    useEffect(() => {
+        if (isLoading) return;
+        if (user) {
+            router.replace(homeFor(user.tenant_name, user.staff_role));
+        }
+    }, [user, isLoading, router]);
+
+    const handleSubmit = async (e?: React.FormEvent) => {
+        e?.preventDefault();
         setError("");
         setLoading(true);
         try {
@@ -69,43 +76,63 @@ export default function LoginPage() {
         }
     };
 
+    if (isLoading) {
+        return (
+            <div className="flex min-h-dvh items-center justify-center bg-[#0a0a0a] px-4">
+                <Loader2 className="h-6 w-6 animate-spin text-[#e8bd68]" aria-label="Checking sign-in" />
+            </div>
+        );
+    }
+
+    if (user) {
+        return (
+            <div className="flex min-h-dvh items-center justify-center bg-[#0a0a0a] px-4">
+                <Loader2 className="h-6 w-6 animate-spin text-[#e8bd68]" aria-label="Opening home" />
+            </div>
+        );
+    }
+
     return (
-        <div className="min-h-screen flex items-center justify-center px-4 bg-[#0a0a0a]">
+        <div className="min-h-dvh overflow-y-auto overscroll-y-contain bg-[#0a0a0a] px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
             <motion.div
-                initial={{ opacity: 0, y: 16 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="w-full max-w-sm"
+                transition={{ duration: 0.35 }}
+                className="mx-auto w-full max-w-sm"
             >
-                <div className="text-center mb-10">
+                <div className="mb-8 text-center">
                     <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">
                         {PRODUCT_NAME}
                     </h1>
-                    <p className="text-sm text-[#737373] mt-1">{PRODUCT_TAGLINE}</p>
+                    <p className="mt-1 text-sm text-[#737373]">{PRODUCT_TAGLINE}</p>
                 </div>
 
-                <div className="bg-[#141414] border border-[#262626] rounded-xl p-6">
-                    <h2 className="text-lg font-semibold mb-5 text-[#e5e5e5]">
+                <div className="rounded-xl border border-[#262626] bg-[#141414] p-6">
+                    <h2 className="mb-5 text-lg font-semibold text-[#e5e5e5]">
                         {firstPassword ? "Set your password" : "Sign in"}
                     </h2>
 
                     {error && (
-                        <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                        <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
                             {error}
                         </div>
                     )}
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label htmlFor="email" className="block text-sm text-[#737373] mb-1.5">Email</label>
+                            <label htmlFor="email" className="mb-1.5 block text-sm text-[#737373]">Email</label>
                             <input
                                 id="email"
-                                type="text"
+                                name="username"
+                                type="email"
                                 inputMode="email"
                                 autoComplete="username"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[var(--accent)] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm"
+                                className="w-full rounded-lg border border-[#262626] bg-[#0a0a0a] px-3 py-2.5 text-sm text-[#e5e5e5] outline-none placeholder-[#525252] focus:border-[var(--accent)]"
                                 placeholder={nativeStore ? "jack@eleven.leviii" : "you@eleven.leviii"}
                                 required
                             />
@@ -113,7 +140,7 @@ export default function LoginPage() {
 
                         {handoverCodeRequired && (
                             <div>
-                                <label htmlFor="handover" className="block text-sm text-[#737373] mb-1.5">Handover code (6 digits)</label>
+                                <label htmlFor="handover" className="mb-1.5 block text-sm text-[#737373]">Handover code (6 digits)</label>
                                 <input
                                     id="handover"
                                     type="text"
@@ -121,9 +148,10 @@ export default function LoginPage() {
                                     pattern="[0-9]{6}"
                                     maxLength={6}
                                     autoComplete="one-time-code"
+                                    enterKeyHint="next"
                                     value={handoverCode}
                                     onChange={(e) => setHandoverCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                                    className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[var(--accent)] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm tracking-widest"
+                                    className="w-full rounded-lg border border-[#262626] bg-[#0a0a0a] px-3 py-2.5 text-sm tracking-widest text-[#e5e5e5] outline-none placeholder-[#525252] focus:border-[var(--accent)]"
                                     placeholder="123456"
                                     required
                                 />
@@ -131,16 +159,24 @@ export default function LoginPage() {
                         )}
 
                         <div>
-                            <label htmlFor="password" className="block text-sm text-[#737373] mb-1.5">
+                            <label htmlFor="password" className="mb-1.5 block text-sm text-[#737373]">
                                 {firstPassword ? "New password" : "Password"}
                             </label>
                             <div className="relative">
                                 <input
                                     id="password"
+                                    name="password"
                                     type={showPassword ? "text" : "password"}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[var(--accent)] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm pr-10"
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            e.preventDefault();
+                                            void handleSubmit();
+                                        }
+                                    }}
+                                    enterKeyHint="go"
+                                    className="w-full rounded-lg border border-[#262626] bg-[#0a0a0a] py-2.5 pl-3 pr-10 text-sm text-[#e5e5e5] outline-none placeholder-[#525252] focus:border-[var(--accent)]"
                                     placeholder="••••••••"
                                     autoComplete={firstPassword ? "new-password" : "current-password"}
                                     required
@@ -151,7 +187,7 @@ export default function LoginPage() {
                                     aria-label={showPassword ? "Hide password" : "Show password"}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-[#525252] hover:text-[#737373]"
                                 >
-                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                 </button>
                             </div>
                         </div>
@@ -159,18 +195,17 @@ export default function LoginPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full min-h-11 py-2.5 rounded-lg bg-[#e8bd68] hover:bg-[#f3cf84] text-[#17120a] font-semibold text-sm flex items-center justify-center gap-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8bd68] disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#e8bd68] py-2.5 text-sm font-semibold text-[#17120a] transition-colors hover:bg-[#f3cf84] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8bd68] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {loading ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <Loader2 className="h-4 w-4 animate-spin" />
                             ) : firstPassword ? (
                                 "Set password and sign in"
                             ) : (
-                                <>Sign in <ArrowRight className="w-4 h-4" aria-hidden="true" /></>
+                                <>Sign in <ArrowRight className="h-4 w-4" aria-hidden="true" /></>
                             )}
                         </button>
                     </form>
-
                 </div>
             </motion.div>
         </div>

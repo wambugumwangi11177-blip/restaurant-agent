@@ -3,7 +3,7 @@
 // CACHE_NAME is versioned and MUST be bumped whenever the caching rules below
 // change: `activate` deletes every cache whose key differs, so the bump is what
 // evicts the previous version's entries.
-const CACHE_NAME = 'leviii-v4';
+const CACHE_NAME = 'leviii-v5';
 
 const PRECACHE_URLS = [];
 
@@ -41,10 +41,24 @@ self.addEventListener('fetch', (event) => {
         url.pathname === '/manifest.json' ||
         url.pathname === '/store-manifest.json';
 
+    const isDocument =
+        event.request.mode === 'navigate' ||
+        (event.request.headers.get('accept') || '').includes('text/html');
+
+    if (isDocument && !isStaticAsset) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+
+    if (!isStaticAsset) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+
     event.respondWith(
         fetch(event.request)
             .then((response) => {
-                if (response.status === 200 && isStaticAsset) {
+                if (response.status === 200) {
                     const clone = response.clone();
                     caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
                 }

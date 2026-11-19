@@ -54,9 +54,9 @@ body {
   color: var(--accent);
 }
 
-/* Smooth transitions */
+/* Smooth transitions — avoid global opacity transitions (WebView/APK can stick at 0). */
 * {
-  transition-property: background-color, border-color, color, opacity;
+  transition-property: background-color, border-color, color;
   transition-duration: 150ms;
   transition-timing-function: ease;
 }

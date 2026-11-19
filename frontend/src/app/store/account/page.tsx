@@ -6,6 +6,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { AccountDiagram } from "@/components/store/diagrams";
 import { loadSetup, stepById, type SetupPayload } from "@/lib/storeSetup";
+import ChangePinPanel from "@/components/auth/ChangePinPanel";
 
 export default function StoreAccountPage() {
   const router = useRouter();
@@ -55,9 +56,11 @@ export default function StoreAccountPage() {
         </p>
       </section>
       {done ? (
-        <p className="owner-glass-panel rounded-3xl p-4 text-sm text-zinc-200">
-          Your password and PIN are already saved. Recipe entry is open.
-        </p>
+        <section className="owner-glass-panel space-y-3 rounded-3xl p-4">
+          <p className="text-sm text-zinc-200">Your password and PIN are already saved. Recipe entry is open.</p>
+          <h2 className="text-sm font-semibold">Change PIN</h2>
+          <ChangePinPanel />
+        </section>
       ) : (
         <form onSubmit={onSubmit} className="owner-glass-panel space-y-3 rounded-3xl p-4">
           <label className="block text-sm">

@@ -7,6 +7,7 @@ import { GlassCard, SectionLabel, WaitingNotice } from "@/components/eleven/Empt
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
+import ChangePinPanel from "@/components/auth/ChangePinPanel";
 
 type LoginRow = {
   id: number;
@@ -102,6 +103,10 @@ export default function ElevenSettingsPage() {
           ))}
         </ul>
         {logins.length === 0 && <WaitingNotice>No logins listed yet.</WaitingNotice>}
+      </GlassCard>
+      <SectionLabel>App lock</SectionLabel>
+      <GlassCard>
+        <ChangePinPanel />
       </GlassCard>
       <SectionLabel>Your till</SectionLabel>
       <GlassCard>

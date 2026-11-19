@@ -290,6 +290,8 @@ async def complete_account(
     user.locked_until = None
     user.pin_failed_attempts = 0
     user.pin_locked_until = None
+    user.last_login_at = utcnow()
+    user.password_authenticated_at = utcnow()
     progress = _progress(db, user, restaurant.id)
     progress.account_completed_at = utcnow()
     progress.updated_at = utcnow()

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Loader2, MailCheck } from "lucide-react";
-import { motion } from "framer-motion";
 import api from "@/lib/api";
 import { PRODUCT_NAME } from "@/lib/brand";
 
@@ -31,12 +30,7 @@ export default function ForgotPasswordPage() {
 
     return (
         <div className="min-h-screen flex items-center justify-center px-4 bg-[#0a0a0a]">
-            <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="w-full max-w-sm"
-            >
+            <div className="w-full max-w-sm">
                 <div className="text-center mb-10">
                     <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">{PRODUCT_NAME}</h1>
                     <p className="text-sm text-[#737373] mt-1">Reset your password</p>
@@ -95,7 +89,7 @@ export default function ForgotPasswordPage() {
                         </a>
                     </div>
                 </div>
-            </motion.div>
+            </div>
         </div>
     );
 }

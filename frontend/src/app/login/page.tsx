@@ -5,7 +5,6 @@ import { useAuth } from "@/context/AuthContext";
 import { homeFor } from "@/lib/tenantHome";
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from "@/lib/brand";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { Loader2, Eye, EyeOff, ArrowRight } from "lucide-react";
 
 export default function LoginPage() {
@@ -94,12 +93,7 @@ export default function LoginPage() {
 
     return (
         <div className="min-h-dvh overflow-y-auto overscroll-y-contain bg-[#0a0a0a] px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
-            <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.35 }}
-                className="mx-auto w-full max-w-sm"
-            >
+            <div className="mx-auto w-full max-w-sm">
                 <div className="mb-8 text-center">
                     <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">
                         {PRODUCT_NAME}
@@ -207,7 +201,7 @@ export default function LoginPage() {
                         </button>
                     </form>
                 </div>
-            </motion.div>
+            </div>
         </div>
     );
 }

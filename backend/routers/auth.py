@@ -34,6 +34,32 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 # (per-IP), lockout is the second (per-account, survives IP rotation).
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
+PASSWORD_AUTH_MAX_DAYS = 30
+
+
+def _mark_password_authenticated(user: models.User, db: Session) -> None:
+    user.password_authenticated_at = utcnow()
+    db.add(user)
+
+
+def _password_auth_fresh(user: models.User) -> bool:
+    at = user.password_authenticated_at
+    if at is None:
+        return False
+    return at > utcnow() - timedelta(days=PASSWORD_AUTH_MAX_DAYS)
+
+
+def _staff_display_name(db: Session, user: models.User) -> str | None:
+    row = (
+        db.query(models.StaffMember.name)
+        .filter(models.StaffMember.user_id == user.id)
+        .first()
+    )
+    if row and row[0]:
+        return row[0]
+    if user.tenant and user.tenant.name:
+        return user.tenant.name
+    return user.email.split("@")[0] if user.email else None
 
 # Password reset / email verification (security pass 2026-07-17: neither
 # existed at all — see audit). Tokens are single-use and short-lived; see
@@ -161,6 +187,15 @@ class ImpersonationBanner(StrictModel):
     impersonator_email: str
 
 
+class PinUnlockBody(StrictModel):
+    pin: str
+
+
+class PinUnlockOut(StrictModel):
+    status: str
+    display_name: str | None = None
+
+
 class MeOut(StrictModel):
     id: int
     email: str
@@ -169,6 +204,8 @@ class MeOut(StrictModel):
     is_email_verified: bool
     must_change_password: bool = False
     has_pin: bool = False
+    display_name: str | None = None
+    password_auth_valid: bool = False
     restaurant_name: str | None = None
     restaurant_id: int | None = None
     # Vibanda dedicated-dashboard routing (plan 2026-09-12): the frontend
@@ -284,6 +321,7 @@ def _authenticate_password_user(
     user.failed_login_attempts = 0
     user.locked_until = None
     user.last_login_at = utcnow()
+    _mark_password_authenticated(user, db)
     db.commit()
 
     access_token = auth.create_access_token(
@@ -354,6 +392,8 @@ async def set_initial_password(
                 entity_id=user.id,
                 detail={"email": user.email},
             )
+    user.last_login_at = utcnow()
+    _mark_password_authenticated(user, db)
     db.commit()
     access_token = auth.create_access_token(data={"sub": user.email, "ver": user.token_version or 0})
     return {"access_token": access_token, "token_type": "bearer"}
@@ -387,6 +427,8 @@ async def read_users_me(
         "is_email_verified": current_user.is_email_verified,
         "must_change_password": bool(current_user.must_change_password),
         "has_pin": bool(current_user.hashed_pin),
+        "display_name": _staff_display_name(db, current_user),
+        "password_auth_valid": _password_auth_fresh(current_user),
         "restaurant_name": restaurant.name if restaurant else None,
         "restaurant_id": restaurant.id if restaurant else None,
         "tenant_name": current_user.tenant.name if current_user.tenant else None,
@@ -589,14 +631,89 @@ async def pin_set(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Self-service opt-in: set or change your own quick-switch PIN. Requires
-    only being logged in already — same trust level as changing your own MFA
-    enrollment, no separate re-auth demanded."""
+    """Self-service: set or change the 4–6 digit PIN (app lock + quick-switch)."""
+    from staff_audit import record_entry
+
     auth.require_valid_pin_format(body.pin)
     user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    had_pin = bool(user.hashed_pin)
     user.hashed_pin = auth.get_pin_hash(body.pin)
+    user.pin_failed_attempts = 0
+    user.pin_locked_until = None
+    restaurant = get_restaurant_or_none(db, user)
+    if restaurant:
+        record_entry(
+            db,
+            restaurant.id,
+            user,
+            "pin_changed" if had_pin else "pin_set",
+            "user",
+            f"{user.email} {'changed' if had_pin else 'set'} app-lock PIN.",
+            entity_id=user.id,
+            detail={"pin_length": len(body.pin)},
+        )
     db.commit()
     return {"status": "pin_set"}
+
+
+@router.post("/pin/unlock", response_model=PinUnlockOut)
+@limiter.limit("30/minute")
+async def pin_unlock(
+    request: Request,
+    body: PinUnlockBody,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Verify the current user's PIN to unlock the app shell (same hash as quick-switch)."""
+    from staff_audit import record_entry
+
+    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    if not user or not user.hashed_pin:
+        raise HTTPException(status_code=400, detail="PIN is not set.")
+    if not _password_auth_fresh(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "PASSWORD_REQUIRED", "message": "Full sign-in required."},
+        )
+    if user.pin_locked_until and user.pin_locked_until > utcnow():
+        remaining = int((user.pin_locked_until - utcnow()).total_seconds() / 60) + 1
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Account temporarily locked due to repeated failed PIN attempts. Try again in {remaining} minute(s).",
+        )
+
+    if not auth.verify_pin(body.pin, user.hashed_pin):
+        user.pin_failed_attempts = (user.pin_failed_attempts or 0) + 1
+        restaurant = get_restaurant_or_none(db, user)
+        if user.pin_failed_attempts >= MAX_FAILED_ATTEMPTS:
+            user.token_version = (user.token_version or 0) + 1
+            user.pin_failed_attempts = 0
+            user.pin_locked_until = None
+            if restaurant:
+                record_entry(
+                    db,
+                    restaurant.id,
+                    user,
+                    "pin_lockout",
+                    "user",
+                    f"{user.email} signed out after repeated failed PIN unlock attempts.",
+                    entity_id=user.id,
+                )
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"code": "PIN_LOCKOUT", "message": "Too many wrong PINs. Sign in with password."},
+            )
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect PIN")
+
+    user.pin_failed_attempts = 0
+    user.pin_locked_until = None
+    db.commit()
+    return {
+        "status": "unlocked",
+        "display_name": _staff_display_name(db, user),
+    }
 
 
 @router.post("/pin/clear", response_model=StatusMessageOut)

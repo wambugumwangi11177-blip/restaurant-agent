@@ -22,7 +22,10 @@ const ownerMe = {
   impersonation: null,
   is_email_verified: true,
   must_change_password: false,
-  has_pin: false,
+  has_pin: true,
+  password_auth_valid: true,
+  display_name: "Wambugu",
+  must_change_password: false,
 };
 
 const jackMe = {
@@ -31,6 +34,7 @@ const jackMe = {
   email: "jack@eleven.leviii",
   role: "staff",
   staff_role: "stockkeeper",
+  display_name: "Jack",
 };
 
 async function mockAuthed(page: import("@playwright/test").Page, me: typeof ownerMe) {
@@ -69,6 +73,70 @@ async function mockAuthed(page: import("@playwright/test").Page, me: typeof owne
 }
 
 test.describe("mobile LEVIII shell", () => {
+  test("login card stays opaque with reduced motion and frozen rAF", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.addInitScript(() => {
+      window.requestAnimationFrame = () => 0;
+    });
+    await page.route("**/api/v1/**", async (route) => {
+      if (route.request().url().includes("/auth/me")) {
+        await route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ detail: "Unauthorized" }) });
+        return;
+      }
+      await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+    });
+    await page.goto("/login");
+    await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
+    const titleOpacity = await page.getByRole("heading", { level: 1 }).evaluate((el) => getComputedStyle(el).opacity);
+    expect(Number(titleOpacity)).toBeGreaterThan(0.95);
+    const buttonOpacity = await page.getByRole("button", { name: /sign in/i }).evaluate((el) => getComputedStyle(el).opacity);
+    expect(Number(buttonOpacity)).toBeGreaterThan(0.95);
+    await page.screenshot({ path: path.join(ARTIFACTS, "login-no-motion-fade.png"), fullPage: true });
+  });
+
+  test("set PIN and lock screens", async ({ page }) => {
+    const needsPin = { ...ownerMe, has_pin: false };
+    await page.route("**/api/v1/**", async (route) => {
+      const url = route.request().url();
+      if (url.includes("/auth/me")) {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(needsPin) });
+        return;
+      }
+      if (url.includes("/auth/pin/set")) {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ status: "pin_set" }) });
+        return;
+      }
+      await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+    });
+    await page.addInitScript(() => {
+      sessionStorage.setItem("access_token", "playwright-pin-token");
+    });
+    await page.goto("/eleven");
+    await expect(page.getByText(/Choose a PIN/i)).toBeVisible();
+    await page.screenshot({ path: path.join(ARTIFACTS, "pin-set-mobile.png"), fullPage: true });
+
+    const locked = { ...ownerMe };
+    await page.route("**/api/v1/**", async (route) => {
+      const url = route.request().url();
+      if (url.includes("/auth/me")) {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(locked) });
+        return;
+      }
+      if (url.includes("/auth/pin/unlock")) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ status: "unlocked", display_name: "Wambugu" }),
+        });
+        return;
+      }
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(emptyFeed) });
+    });
+    await page.goto("/eleven");
+    await expect(page.getByText(/Enter your 4-digit PIN/i)).toBeVisible();
+    await page.screenshot({ path: path.join(ARTIFACTS, "pin-lock-mobile.png"), fullPage: true });
+  });
+
   test("login layout with short viewport (keyboard)", async ({ page }) => {
     await page.route("**/api/v1/**", async (route) => {
       if (route.request().url().includes("/auth/me")) {
@@ -94,6 +162,8 @@ test.describe("mobile LEVIII shell", () => {
     await mockAuthed(page, ownerMe);
     await page.addInitScript(() => {
       sessionStorage.setItem("access_token", "playwright-owner-token");
+      sessionStorage.setItem("app_pin_unlocked", "1");
+      sessionStorage.setItem("app_last_activity", String(Date.now()));
     });
     await page.setViewportSize({ width: 360, height: 740 });
     await page.goto("/eleven");
@@ -105,6 +175,8 @@ test.describe("mobile LEVIII shell", () => {
     await mockAuthed(page, jackMe);
     await page.addInitScript(() => {
       sessionStorage.setItem("access_token", "playwright-jack-token");
+      sessionStorage.setItem("app_pin_unlocked", "1");
+      sessionStorage.setItem("app_last_activity", String(Date.now()));
     });
     await page.setViewportSize({ width: 360, height: 740 });
     await page.goto("/store");

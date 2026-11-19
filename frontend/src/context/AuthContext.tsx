@@ -40,6 +40,8 @@ interface User {
   is_email_verified: boolean;
   must_change_password?: boolean;
   has_pin?: boolean;
+  display_name?: string | null;
+  password_auth_valid?: boolean;
 }
 
 interface AuthContextType {
@@ -52,6 +54,7 @@ interface AuthContextType {
   startImpersonation: (staffId: number) => Promise<string>;
   endImpersonation: () => Promise<void>;
   loginWithPin: (userId: number, pin: string) => Promise<void>;
+  refreshUser: () => Promise<User | null>;
 }
 
 // FE-101: the bearer token lives in the in-memory tokenStore (with a
@@ -62,6 +65,7 @@ import {
   setAccessToken,
   clearAccessToken,
 } from "@/lib/tokenStore";
+import { clearPinUnlock } from "@/lib/appLock";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -109,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const res = await api.post("/api/v1/auth/login", { email, password });
     const accessToken = res.data.access_token;
+    clearPinUnlock();
     setAccessToken(accessToken);
     setToken(accessToken);
     return await fetchUser(accessToken);
@@ -122,9 +127,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       handover_code: handoverCode || undefined,
     });
     const accessToken = res.data.access_token;
+    clearPinUnlock();
     setAccessToken(accessToken);
     setToken(accessToken);
     return await fetchUser(accessToken);
+  };
+
+  const refreshUser = async () => {
+    const accessToken = getAccessToken();
+    if (!accessToken) return null;
+    return fetchUser(accessToken);
   };
 
   // Shared-device quick-switch (audit remediation, Tier 5 item 12) — mirrors
@@ -142,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     clearAccessToken();
+    clearPinUnlock();
     setToken(null);
     setUser(null);
     // Shared-device hygiene: the offline order queue carries customer
@@ -213,6 +226,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         startImpersonation,
         endImpersonation,
         loginWithPin,
+        refreshUser,
       }}
     >
       {children}

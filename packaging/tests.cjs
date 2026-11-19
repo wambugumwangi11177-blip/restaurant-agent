@@ -26,14 +26,21 @@ test("configure names LEVIII Store and points the WebView at the given origin", 
     fs.copyFileSync(path.join(__dirname, file), path.join(dir, file));
   }
   fs.mkdirSync(path.join(dir, "android", "www"), { recursive: true });
+  const appName = "LEVIII Store";
+  const appId = "com.leviii.store";
   const result = spawnSync(process.execPath, ["configure.cjs"], {
     cwd: dir,
-    env: { ...process.env, LEVIII_APP_URL: "https://frontend-production-e251.up.railway.app" },
+    env: {
+      ...process.env,
+      LEVIII_APP_URL: "https://frontend-production-e251.up.railway.app",
+      LEVIII_APP_NAME: appName,
+      LEVIII_APP_ID: appId,
+    },
   });
   assert.equal(result.status, 0, result.stderr.toString());
   const config = JSON.parse(fs.readFileSync(path.join(dir, "android", "capacitor.config.json"), "utf8"));
-  assert.equal(config.appName, "LEVIII Store");
-  assert.equal(config.appId, "com.leviii.store");
+  assert.equal(config.appName, appName);
+  assert.equal(config.appId, appId);
   assert.equal(config.server.url, "https://frontend-production-e251.up.railway.app");
   assert.equal(config.server.errorPath, "offline.html");
   assert.equal(config.server.cleartext, false);

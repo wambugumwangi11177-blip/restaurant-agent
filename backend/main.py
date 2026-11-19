@@ -98,6 +98,9 @@ def on_startup():
     from tenant_provisioning import provision_demo_from_env
     provision_demo_from_env()
 
+    from leviii_test_seed import provision_test_data_from_env
+    provision_test_data_from_env()
+
     from observer_mode import observer_mode_enabled
     if observer_mode_enabled():
         logger.warning("Observer mode enabled: operational subscribers and scheduler are disabled")

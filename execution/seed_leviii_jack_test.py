@@ -13,81 +13,32 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
 os.environ.setdefault("SECRET_KEY", os.environ.get("SECRET_KEY", "leviii-test-seed-key"))
 
-import auth
 import models
 from database import SessionLocal
-from models import Base, Role, StaffRole, StaffSetupProgress
+from leviii_test_seed import ensure_eleven_test_data
+from models import Base
 
 
-def seed(credentials_path: Path) -> None:
-    # Railway jack-test runs alembic before this script. Local sqlite bootstrap only.
+def seed(credentials_path: Path, owner_password: str | None = None) -> None:
     from database import engine
 
     if str(engine.url).startswith("sqlite"):
         Base.metadata.create_all(bind=engine)
+    password = owner_password or secrets.token_urlsafe(12)
+    owner_password_line = f"OWNER_PASSWORD={password}"
     db = SessionLocal()
     try:
-        owner_password = secrets.token_urlsafe(12)
-        owner_password_line = f"OWNER_PASSWORD={owner_password}"
-        tenant = db.query(models.Tenant).filter(models.Tenant.name == "Eleven").first()
-        if tenant is None:
-            tenant = models.Tenant(name="Eleven")
-            db.add(tenant)
-            db.flush()
-        restaurant = db.query(models.Restaurant).filter(models.Restaurant.tenant_id == tenant.id).first()
-        if restaurant is None:
-            restaurant = models.Restaurant(tenant_id=tenant.id, name="Eleven", address="Ngong Road")
-            db.add(restaurant)
-            db.flush()
-        owner = db.query(models.User).filter(models.User.email == "owner@eleven.leviii").first()
-        if owner is None:
-            owner = models.User(
-                email="owner@eleven.leviii",
-                hashed_password=auth.get_password_hash(owner_password),
-                role=Role.ADMIN,
-                staff_role=StaffRole.OWNER,
-                tenant_id=tenant.id,
-                must_change_password=False,
-                is_email_verified=True,
-            )
-            db.add(owner)
-        else:
+        existed = db.query(models.User).filter(models.User.email == "owner@eleven.leviii").first() is not None
+        ensure_eleven_test_data(db, password)
+        if existed and owner_password is None:
             owner_password_line = "OWNER_PASSWORD=(unchanged — existing account)"
-        for email, role, name in (
-            ("jack@eleven.leviii", StaffRole.STOCKKEEPER, "Jack"),
-            ("amina@eleven.leviii", StaffRole.CONTROLLER, "Amina"),
-        ):
-            user = db.query(models.User).filter(models.User.email == email).first()
-            if user is None:
-                user = models.User(
-                    email=email,
-                    hashed_password=None,
-                    role=Role.STAFF,
-                    staff_role=role,
-                    tenant_id=tenant.id,
-                    must_change_password=True,
-                )
-                db.add(user)
-                db.flush()
-                db.add(
-                    StaffSetupProgress(
-                        user_id=user.id,
-                        restaurant_id=restaurant.id,
-                    )
-                )
-            if db.query(models.StaffMember).filter(
-                models.StaffMember.restaurant_id == restaurant.id,
-                models.StaffMember.user_id == user.id,
-            ).first() is None:
-                db.add(models.StaffMember(restaurant_id=restaurant.id, user_id=user.id, name=name, role_title=role.value))
-        db.commit()
         credentials_path.parent.mkdir(parents=True, exist_ok=True)
         credentials_path.write_text(
             "\n".join(
                 [
                     "# Jack test site owner login (do not commit)",
                     "RESTAURANT=Eleven",
-                    f"OWNER_EMAIL=owner@eleven.leviii",
+                    "OWNER_EMAIL=owner@eleven.leviii",
                     owner_password_line,
                     "JACK_EMAIL=jack@eleven.leviii",
                     "JACK_PASSWORD=set on first sign-in",
@@ -114,7 +65,13 @@ if __name__ == "__main__":
         action="store_true",
         help="Do not print the credentials path (file is still written).",
     )
+    parser.add_argument(
+        "--owner-password",
+        default="",
+        help="Use a fixed owner password instead of generating one (not logged).",
+    )
     args = parser.parse_args()
-    seed(Path(args.credentials))
+    fixed = args.owner_password.strip() or None
+    seed(Path(args.credentials), owner_password=fixed)
     if not args.quiet:
         sys.stdout.write(f"credentials written: {args.credentials}\n")

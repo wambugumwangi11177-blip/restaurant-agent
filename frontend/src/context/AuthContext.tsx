@@ -49,6 +49,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<User | null>;
   loginWithRestaurant: (restaurantName: string, password: string) => Promise<User | null>;
   register: (email: string, password: string, tenantName: string) => Promise<User | null>;
+  setInitialPassword: (email: string, password: string) => Promise<User | null>;
   logout: () => void;
   isLoading: boolean;
   startImpersonation: (staffId: number) => Promise<string>;
@@ -139,6 +140,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return await fetchUser(accessToken);
   };
 
+  const setInitialPassword = async (email: string, password: string) => {
+    const res = await api.post("/api/v1/auth/set-initial-password", { email, new_password: password });
+    const accessToken = res.data.access_token;
+    setAccessToken(accessToken);
+    setToken(accessToken);
+    return await fetchUser(accessToken);
+  };
+
   // Shared-device quick-switch (audit remediation, Tier 5 item 12) — mirrors
   // login()'s shape exactly (same token-storage/fetchUser flow), just a
   // different endpoint and no password. Fully replaces the current session
@@ -215,7 +224,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, login, loginWithRestaurant, register, logout, isLoading, startImpersonation, endImpersonation, loginWithPin }}
+      value={{
+        user,
+        token,
+        login,
+        loginWithRestaurant,
+        register,
+        setInitialPassword,
+        logout,
+        isLoading,
+        startImpersonation,
+        endImpersonation,
+        loginWithPin,
+      }}
     >
       {children}
     </AuthContext.Provider>

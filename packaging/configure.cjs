@@ -5,12 +5,14 @@ const { readRelease, storeUserAgent } = require("./version.cjs");
 
 const origin = appUrl(process.env.LEVIII_APP_URL);
 const host = new URL(origin).hostname;
+const appName = process.env.LEVIII_APP_NAME || "LEVIII Store";
+const appId = process.env.LEVIII_APP_ID || "com.leviii.store";
 const root = __dirname;
 const release = readRelease(root);
 
 const capacitor = {
-  appId: "com.leviii.store",
-  appName: "LEVIII Store",
+  appId,
+  appName,
   webDir: "www",
   server: {
     url: origin,
@@ -39,10 +41,10 @@ const capacitor = {
   },
 };
 
-fs.writeFileSync(path.join(root, "app-config.json"), JSON.stringify({ origin, appName: "LEVIII Store" }, null, 2));
+fs.writeFileSync(path.join(root, "app-config.json"), JSON.stringify({ origin, appName }, null, 2));
 fs.writeFileSync(path.join(root, "android", "capacitor.config.json"), JSON.stringify(capacitor, null, 2));
 fs.writeFileSync(
   path.join(root, "android", "www", "app-config.js"),
   `window.LEVIII_APP_ORIGIN = ${JSON.stringify(origin)};\n`,
 );
-console.log("Packaging configured for " + origin + " as LEVIII Store. This does not deploy the website.");
+console.log("Packaging configured for " + origin + " as " + appName + ". This does not deploy the website.");

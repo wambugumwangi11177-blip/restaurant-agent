@@ -152,6 +152,11 @@ class PasswordResetConfirm(StrictModel):
     new_password: str
 
 
+class InitialPasswordSet(StrictModel):
+    email: str
+    new_password: str
+
+
 class ImpersonationBanner(StrictModel):
     session_id: int
     impersonator_email: str
@@ -294,7 +299,12 @@ def _authenticate_password_user(
         # Burn the same Argon2 work a real verification costs so response time
         # doesn't reveal whether the account exists (user-enumeration oracle).
         auth.verify_password(password, auth.get_password_hash("timing-equalizer"))
-    if not user or not auth.verify_password(password, user.hashed_password):
+    if user and not user.hashed_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="FIRST_PASSWORD_REQUIRED",
+        )
+    if not user or not user.hashed_password or not auth.verify_password(password, user.hashed_password):
         if user:
             user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
             just_locked = user.failed_login_attempts >= MAX_FAILED_ATTEMPTS
@@ -351,6 +361,29 @@ def _authenticate_password_user(
     access_token = auth.create_access_token(
         data={"sub": user.email, "ver": user.token_version or 0}
     )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/set-initial-password", response_model=Token)
+@limiter.limit("10/minute")
+async def set_initial_password(
+    request: Request,
+    body: InitialPasswordSet,
+    db: Session = Depends(get_db),
+):
+    """Storekeeper or accountant sets their own password before the first sign-in."""
+    user = db.query(models.User).filter(models.User.email == body.email).first()
+    if user is None or not user.is_active or user.hashed_password:
+        raise HTTPException(status_code=400, detail="This login is not waiting for a first password.")
+    if user.staff_role not in (models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER):
+        raise HTTPException(status_code=400, detail="This login is not waiting for a first password.")
+    auth.require_strong_password(body.new_password)
+    user.hashed_password = auth.get_password_hash(body.new_password)
+    user.must_change_password = False
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    db.commit()
+    access_token = auth.create_access_token(data={"sub": user.email, "ver": user.token_version or 0})
     return {"access_token": access_token, "token_type": "bearer"}
 
 

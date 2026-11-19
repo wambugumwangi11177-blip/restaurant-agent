@@ -1,0 +1,61 @@
+name: Device packages (LEVIII Store Test APK)
+on:
+  push:
+    branches:
+      - feat/jack-storekeeper
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: Public HTTPS origin of the Jack test Railway frontend, no path.
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  android-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packaging
+    env:
+      LEVIII_APP_URL: ${{ inputs.app_url }}
+      LEVIII_APP_NAME: LEVIII Store Test
+      LEVIII_APP_ID: com.leviii.store.test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: packaging/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Accept the Android SDK licenses
+        run: |
+          sdkmanager=$(find "${ANDROID_SDK_ROOT:-$ANDROID_HOME}" /usr/local/lib/android/sdk -path '*/cmdline-tools/*/bin/sdkmanager' -type f 2>/dev/null | head -1)
+          test -n "$sdkmanager"
+          yes | "$sdkmanager" --licenses >/dev/null
+      - run: npm ci
+      - run: npm test
+      - run: npm run configure
+      - run: npm run android:init
+      - run: npm run android:sync
+      - run: npm run android:apply
+      - run: ./gradlew assembleDebug
+        working-directory: packaging/android/android
+      - name: Publish the test APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          test -n "$LEVIII_APP_URL"
+          apk=$(find packaging/android/android/app/build/outputs/apk/debug -name '*.apk' -print -quit)
+          cp "$apk" "$RUNNER_TEMP/LEVIII-Store-Test.apk"
+          notes="Test build of LEVIII Store. It opens the Jack test frontend only."
+          if gh release view leviii-store-test >/dev/null 2>&1; then
+            gh release upload leviii-store-test "$RUNNER_TEMP/LEVIII-Store-Test.apk" --clobber
+          else
+            gh release create leviii-store-test "$RUNNER_TEMP/LEVIII-Store-Test.apk" --title "LEVIII Store Test" --notes "$notes"
+          fi

@@ -625,6 +625,9 @@ async def record_spoilage(
 ):
     require_module(db, current_user, "waste")
     restaurant = get_or_create_restaurant(db, current_user)
+    from day_photo_gate import require_open_photos
+
+    require_open_photos(db, restaurant.id)
     user = _user(db, current_user)
     if reason_code not in REASONS:
         raise HTTPException(status_code=400, detail="Pick a reason.")
@@ -740,6 +743,9 @@ async def close_day(
 ):
     require_module(db, current_user, "day-close")
     restaurant = get_or_create_restaurant(db, current_user)
+    from day_photo_gate import require_close_photos
+
+    require_close_photos(db, restaurant.id)
     user = _user(db, current_user)
     confirmer = None
     if user.staff_role == models.StaffRole.KITCHEN:
@@ -923,6 +929,42 @@ async def list_approvals(
             "photo_path": f"/api/v1/store/costs/{row.id}/receipt" if row.receipt_storage_key else None,
             **who,
         })
+    zone_rows = (
+        db.query(models.StoreZoneDayPhoto)
+        .filter(models.StoreZoneDayPhoto.restaurant_id == restaurant.id)
+        .order_by(models.StoreZoneDayPhoto.id.desc())
+        .limit(40)
+        .all()
+    )
+    for row in zone_rows:
+        creator = db.query(models.User).filter(models.User.id == row.user_id).first()
+        who = person_of(db, creator)
+        zone = db.query(models.StockZone).filter(models.StockZone.id == row.zone_id).first()
+        check = (
+            db.query(models.StoreZoneDayPhotoCheck)
+            .filter(models.StoreZoneDayPhotoCheck.photo_id == row.id)
+            .order_by(models.StoreZoneDayPhotoCheck.id.desc())
+            .first()
+        )
+        note = None
+        if check and check.result_json:
+            try:
+                note = json.loads(check.result_json).get("note")
+            except json.JSONDecodeError:
+                note = None
+        phase_label = "opening" if row.phase == "open" else "closing"
+        events.append({
+            "id": row.id,
+            "kind": "zone_photo",
+            "phase": row.phase,
+            "zone_name": zone.name if zone else "",
+            "headline": f"{who['person_name']} photographed {zone.name if zone else 'a zone'} at {phase_label}.",
+            "emphasis": zone.name if zone else None,
+            "created_at": _when(row.created_at),
+            "photo_path": f"/api/v1/store/day-photos/{row.id}/photo",
+            "ai": _feed_ai({"status": check.status if check else None, "note": note} if check else None),
+            **who,
+        })
     for row in deliveries:
         creator = db.query(models.User).filter(models.User.id == row.received_by_user_id).first()
         who = person_of(db, creator)
@@ -955,10 +997,47 @@ async def list_approvals(
         })
     events.sort(key=lambda item: item.get("created_at") or "", reverse=True)
     pending = [item for item in events if item.get("status") == "needs_approval"]
+    from bill_schedule import business_today, reminder_bucket
+
+    today = business_today()
+    overdue_bills: list[str] = []
+    for row in costs:
+        bucket = reminder_bucket(row.next_due_on, row.payment_state, row.status, today, row.remind_days or 3)
+        if bucket != "overdue":
+            continue
+        overdue_bills.append(row.label)
+        pending.append({
+            "id": row.id,
+            "kind": "bill_due",
+            "status": "overdue",
+            "label": row.label,
+            "next_due_on": row.next_due_on.isoformat() if row.next_due_on else None,
+            "headline": f"{row.label} is overdue.",
+            "emphasis": row.label,
+            "action": f"Pay {row.label.lower()}" if not row.label.lower().endswith("bill") else f"Pay {row.label.lower()}",
+            "created_at": _when(row.next_due_on),
+        })
+    for row in costs:
+        bucket = reminder_bucket(row.next_due_on, row.payment_state, row.status, today, row.remind_days or 3)
+        if bucket != "due_soon":
+            continue
+        pending.append({
+            "id": row.id,
+            "kind": "bill_due",
+            "status": "due_soon",
+            "label": row.label,
+            "next_due_on": row.next_due_on.isoformat() if row.next_due_on else None,
+            "headline": f"{row.label} is due soon.",
+            "emphasis": row.label,
+            "action": f"Pay {row.label.lower()}" if not row.label.lower().endswith("bill") else f"Pay {row.label.lower()}",
+            "created_at": _when(row.next_due_on),
+        })
     unknown = [row.label for row in costs if row.status == "unknown"]
     orders = db.query(models.Order).filter(models.Order.restaurant_id == restaurant.id).count()
     approved_bills = [row.label for row in costs if row.status == "approved"]
-    if orders:
+    if overdue_bills:
+        money = ", ".join(overdue_bills) + (" is overdue." if len(overdue_bills) == 1 else " are overdue.")
+    elif orders:
         money = "The till has sales. Approved bills sit with them on Money."
     elif approved_bills:
         money = "Waiting for the till. " + ", ".join(approved_bills) + " will be in the profit and loss."
@@ -1015,12 +1094,14 @@ async def list_approvals(
                 "title": "Money",
                 "figure": "Till live" if orders else None,
                 "sentence": money,
-                "quiet": not orders,
+                "quiet": not orders and not overdue_bills,
+                "overdue": bool(overdue_bills),
             },
         ],
         "unknown_costs": unknown,
         "recipes_missing": missing_recipes,
         "approved_bills": approved_bills,
+        "overdue_bills": overdue_bills,
         "till_live": orders > 0,
     }
 
@@ -1069,6 +1150,13 @@ async def approve(
     row.approved_by_user_id = user.id
     row.approved_at = now
     row.owner_note = body.note.strip()
+    if body.kind == "cost" and body.decision == "approve":
+        from bill_schedule import business_today, compute_next_due
+
+        row.payment_state = "unpaid"
+        row.next_due_on = compute_next_due(business_today(), row.cadence, row.due_day)
+    elif body.kind == "cost" and body.decision == "decline":
+        row.payment_state = "none"
     record_entry(
         db, restaurant.id, user, action, body.kind,
         summary,

@@ -405,6 +405,9 @@ async def issue_to_kitchen(
 ):
     require_module(db, current_user, "store-issue")
     restaurant = get_or_create_restaurant(db, current_user)
+    from day_photo_gate import require_open_photos
+
+    require_open_photos(db, restaurant.id)
     user = db.query(models.User).filter(models.User.id == current_user.id).first()
     item = db.query(models.InventoryItem).filter(
         models.InventoryItem.id == body.item_id,
@@ -444,6 +447,8 @@ def _sees_cost_amounts(user: models.User) -> bool:
 
 
 def _cost_public(row: models.RunningCost, viewer: models.User) -> dict:
+    from bill_schedule import business_today, reminder_bucket
+
     body = {
         "id": row.id,
         "kind": row.kind,
@@ -454,6 +459,16 @@ def _cost_public(row: models.RunningCost, viewer: models.User) -> dict:
         "delegated_to": row.delegated_to,
         "has_receipt": bool(row.receipt_storage_key),
         "created_at": row.created_at.isoformat() if row.created_at else None,
+        "payment_state": row.payment_state,
+        "next_due_on": row.next_due_on.isoformat() if row.next_due_on else None,
+        "reminder": reminder_bucket(
+            row.next_due_on,
+            row.payment_state,
+            row.status,
+            business_today(),
+            row.remind_days or 3,
+        ),
+        "can_mark_paid": row.status == "approved" and row.payment_state == "unpaid",
     }
     if _sees_cost_amounts(viewer) and row.status != "unknown":
         body["amount_cents"] = row.amount_cents
@@ -515,6 +530,8 @@ async def add_cost(
     if is_known:
         if amount_kes <= 0:
             raise HTTPException(status_code=400, detail="Enter the amount.")
+        if due_day is None:
+            raise HTTPException(status_code=400, detail="Pick the due day.")
         status = "needs_approval"
         amount_cents = int(round(amount_kes * 100))
         delegated = None
@@ -600,6 +617,9 @@ async def receive_delivery(
 ):
     require_module(db, current_user, "deliveries")
     restaurant = get_or_create_restaurant(db, current_user)
+    from day_photo_gate import require_open_photos
+
+    require_open_photos(db, restaurant.id)
     user = db.query(models.User).filter(models.User.id == current_user.id).first()
     supplier = db.query(models.Supplier).filter(
         models.Supplier.id == supplier_id,
@@ -771,3 +791,53 @@ async def confirm_prices(
     )
     db.commit()
     return {"updated": updated}
+
+
+@router.post("/costs/{cost_id}/pay")
+async def mark_cost_paid(
+    cost_id: int,
+    mpesa_code: str = Form(""),
+    receipt: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    require_module(db, current_user, "running-costs")
+    restaurant = get_or_create_restaurant(db, current_user)
+    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    row = db.query(models.RunningCost).filter(
+        models.RunningCost.id == cost_id,
+        models.RunningCost.restaurant_id == restaurant.id,
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Bill not found.")
+    if row.status != "approved" or row.payment_state != "unpaid":
+        raise HTTPException(status_code=400, detail="This bill is not waiting to be paid.")
+    cleaned = mpesa_code.strip()
+    picture = _photo_bytes(receipt) if receipt is not None and receipt.filename else None
+    if not cleaned and not picture:
+        raise HTTPException(status_code=400, detail="Add an M-Pesa code or a payment receipt photo.")
+    pay_key = None
+    pay_type = None
+    if picture:
+        data, pay_type = picture
+        pay_key = storage.save(data, content_type=pay_type)
+    from bill_schedule import compute_next_due, business_today
+
+    now = utcnow()
+    row.mpesa_code = cleaned or None
+    row.payment_receipt_storage_key = pay_key
+    row.payment_receipt_content_type = pay_type
+    row.payment_state = "paid"
+    row.paid_at = now
+    row.paid_by_user_id = user.id
+    row.next_due_on = compute_next_due(row.next_due_on or business_today(), row.cadence, row.due_day)
+    record_entry(
+        db, restaurant.id, user, "running_cost_paid", "running_cost",
+        f"{user.email} marked {row.label} as paid.",
+        entity_id=row.id,
+        detail={"mpesa_code": bool(cleaned), "has_receipt": bool(pay_key)},
+    )
+    db.commit()
+    body = _cost_public(row, current_user)
+    body["message"] = "Marked paid."
+    return body

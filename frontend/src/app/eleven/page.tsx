@@ -19,10 +19,11 @@ function recipeLine(count: number) {
 function Tile({ card }: { card: FeedCard }) {
   const Icon = ICONS[card.id as keyof typeof ICONS] ?? Package;
   if (card.quiet || !card.figure) {
-    return <p className="owner-quiet">{card.title}. {card.sentence}</p>;
+    const tone = card.id === "money" && card.overdue ? "text-red-300" : "text-zinc-400";
+    return <p className={`owner-quiet ${tone}`}>{card.title}. {card.sentence}</p>;
   }
   return (
-    <article className="owner-glass-panel owner-tile">
+    <article className={`owner-glass-panel owner-tile ${card.id === "money" && card.overdue ? "ring-1 ring-red-400/40" : ""}`}>
       <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-zinc-400">
         <Icon size={14} strokeWidth={1.75} aria-hidden />
         {card.title}

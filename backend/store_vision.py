@@ -309,6 +309,102 @@ def run_handover_check_safe(handover_id: int) -> None:
         db.close()
 
 
+_ZONE_STOCK_PROMPT = (
+    "Read this photo of stock in a store zone. Reply with JSON only, no markdown. "
+    'Use this shape: {"goods_items":[{"name":"","quantity":0,"unit":"","weight":""}]}. '
+    "quantity is a number. If you cannot read the photo, use an empty goods_items list."
+)
+
+
+def run_zone_photo_check(db, photo_id: int) -> None:
+    import storage
+
+    photo = db.query(models.StoreZoneDayPhoto).filter(models.StoreZoneDayPhoto.id == photo_id).first()
+    if photo is None:
+        return
+    zone = db.query(models.StockZone).filter(models.StockZone.id == photo.zone_id).first()
+    balances = (
+        db.query(models.StockBalance, models.InventoryItem)
+        .join(models.InventoryItem, models.InventoryItem.id == models.StockBalance.inventory_item_id)
+        .filter(
+            models.StockBalance.restaurant_id == photo.restaurant_id,
+            models.StockBalance.zone_id == photo.zone_id,
+            models.StockBalance.quantity > 0,
+        )
+        .all()
+    )
+    keyed = [
+        {"item_name": item.item_name, "quantity": bal.quantity, "unit": item.unit or ""}
+        for bal, item in balances
+    ]
+    user = db.query(models.User).filter(models.User.id == photo.user_id).first()
+    check = (
+        db.query(models.StoreZoneDayPhotoCheck)
+        .filter(models.StoreZoneDayPhotoCheck.photo_id == photo.id)
+        .order_by(models.StoreZoneDayPhotoCheck.id.desc())
+        .first()
+    )
+    if check is None:
+        check = models.StoreZoneDayPhotoCheck(photo_id=photo.id, status="pending", created_at=utcnow())
+        db.add(check)
+        db.flush()
+    vision = vision_model()
+    zone_name = zone.name if zone else "the zone"
+    try:
+        images = [(photo.photo_content_type or "image/jpeg", storage.load(photo.photo_storage_key))]
+        reading = ask_model(images, prompt=_ZONE_STOCK_PROMPT)
+        explained = explain_difference(reading, keyed)
+        status = "mismatch" if (explained["mismatches"] or not explained["match"]) else "match"
+        result = {
+            "label": "AI",
+            "zone": zone_name,
+            "phase": photo.phase,
+            "note": explained["note"],
+            "mismatches": explained["mismatches"],
+            "vision_model": vision,
+            "compare_model": explained["model"],
+            "compare_fallback": explained["fell_back"],
+            "ungrounded": explained["ungrounded"],
+        }
+        compare_name = explained["model"]
+    except Exception as exc:
+        logger.warning("zone photo check failed for photo %s: %s", photo_id, type(exc).__name__)
+        status = "unavailable"
+        result = {"label": "AI", "message": "AI check unavailable", "zone": zone_name, "phase": photo.phase, "vision_model": vision}
+        compare_name = ""
+    check.status = status
+    check.model_name = f"{vision} + {compare_name}".strip(" +")
+    check.result_json = json.dumps(result)
+    check.compared_at = utcnow()
+    if user is None:
+        return
+    action = f"zone_{photo.phase}_ai_{'mismatch' if status == 'mismatch' else 'match' if status == 'match' else 'unavailable'}"
+    record_entry(
+        db,
+        photo.restaurant_id,
+        user,
+        action,
+        "store_zone_day_photo",
+        f"{zone_name} {photo.phase} photo check: {result.get('note') or result.get('message', 'done')}.",
+        entity_id=photo.id,
+        detail=result,
+    )
+
+
+def run_zone_photo_check_safe(photo_id: int) -> None:
+    import database
+
+    db = database.SessionLocal()
+    try:
+        run_zone_photo_check(db, photo_id)
+        db.commit()
+    except Exception:
+        logger.exception("zone photo vision task failed for photo %s", photo_id)
+        db.rollback()
+    finally:
+        db.close()
+
+
 def run_check_safe(receipt_id: int) -> None:
     import database
 

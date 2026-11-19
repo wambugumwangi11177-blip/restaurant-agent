@@ -36,6 +36,22 @@ def _unlock(client, jack):
         assert response.status_code == 200, response.text
 
 
+def _day_photos(client, jack, phase="open"):
+    status = client.get("/api/v1/store/day-photos/status", headers=_auth(_token(jack))).json()
+    for zone in status["zones"]:
+        if phase == "open" and zone["open_done"]:
+            continue
+        if phase == "close" and zone["close_done"]:
+            continue
+        response = client.post(
+            "/api/v1/store/day-photos",
+            headers=_auth(_token(jack)),
+            data={"zone_id": str(zone["id"]), "phase": phase},
+            files={"photo": ("zone.jpg", JPEG, "image/jpeg")},
+        )
+        assert response.status_code == 201, response.text
+
+
 def test_questions_route_delegate_and_show_on_the_owner_feed(client, db_session):
     tenant, owner, restaurant = _tenant(db_session, "Eleven", "owner-q@eleven.leviii")
     jack = _add_staff(db_session, tenant, restaurant, "jack-q@eleven.leviii", models.StaffRole.STOCKKEEPER)
@@ -97,6 +113,7 @@ def test_suppliers_stock_issue_and_waste_are_quantities_only(client, db_session)
         },
     )
     assert opening.status_code == 201, opening.text
+    _day_photos(client, jack, "open")
     again = client.post(
         "/api/v1/store/items/opening",
         headers=_auth(_token(owner)),
@@ -146,6 +163,7 @@ def test_delivery_needs_both_photos_and_ai_mismatch_stays_with_the_owner(client,
     jack = _add_staff(db_session, tenant, restaurant, "jack-del@eleven.leviii", models.StaffRole.STOCKKEEPER)
     cook = _add_staff(db_session, tenant, restaurant, "cook-del@eleven.leviii", models.StaffRole.KITCHEN)
     _unlock(client, jack)
+    _day_photos(client, jack, "open")
     supplier = client.post(
         "/api/v1/store/suppliers",
         headers=_auth(_token(jack)),
@@ -260,6 +278,7 @@ def test_ai_failure_is_named_and_the_call_does_not_change_model(client, db_sessi
         called["text"] = True
         raise RuntimeError("should not run")
 
+    _day_photos(client, jack, "open")
     with patch("store_vision.ask_model", side_effect=RuntimeError("down")), patch("store_vision.explain_difference", side_effect=text_model):
         saved = client.post(
             "/api/v1/store/deliveries",
@@ -289,7 +308,7 @@ def test_ai_failure_is_named_and_the_call_does_not_change_model(client, db_sessi
     monkeypatch.setattr("ai.llm_client._get_client", lambda: fake)
     from ai.llm_client import chat_with_images
     chat_with_images("read this", [("image/jpeg", JPEG)])
-    assert captured["model"] == "qwen/qwen3.7-flash"
+    assert captured["model"] == "nex-agi/nex-n2.5-mini"
     assert captured["extra_body"]["reasoning"] == {"enabled": False}
     assert captured["extra_body"]["provider"] == {"data_collection": "deny"}
     assert captured["messages"][0]["content"][1]["type"] == "image_url"

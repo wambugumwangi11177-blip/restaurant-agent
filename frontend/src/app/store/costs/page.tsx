@@ -16,7 +16,17 @@ const BILLS = [
   { kind: "other", label: "Other regular bills" },
 ];
 
-type Saved = { id: number; kind: string; label: string; status: string; message?: string };
+type Saved = {
+  id: number;
+  kind: string;
+  label: string;
+  status: string;
+  message?: string;
+  can_mark_paid?: boolean;
+  next_due_on?: string | null;
+  reminder?: string | null;
+  payment_state?: string;
+};
 
 export default function CostsPage() {
   const { user } = useAuth();
@@ -30,7 +40,29 @@ export default function CostsPage() {
   const [photo, setPhoto] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [payCode, setPayCode] = useState<Record<number, string>>({});
+  const [payPhoto, setPayPhoto] = useState<Record<number, File | null>>({});
   const otherManager = user?.staff_role === "controller" ? "storekeeper" : "accountant";
+
+  async function markPaid(row: Saved) {
+    setError("");
+    setMessage("");
+    const body = new FormData();
+    const code = (payCode[row.id] || "").trim();
+    if (code) body.set("mpesa_code", code);
+    const proof = payPhoto[row.id];
+    if (proof) body.set("receipt", proof);
+    try {
+      const response = await api.post(`/api/v1/store/costs/${row.id}/pay`, body, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setMessage(response.data.message || "Marked paid.");
+      await refresh();
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(typeof detail === "string" ? detail : "That payment was not saved.");
+    }
+  }
 
   async function refresh() {
     const next = await loadSetup();
@@ -96,7 +128,37 @@ export default function CostsPage() {
               {bill.label}
             </button>
             {saved.map((row) => (
-              <p key={row.id} className="mt-1 text-sm text-zinc-400">{row.message || row.status}</p>
+              <div key={row.id} className="mt-2 space-y-2 border-t border-white/10 pt-2">
+                <p className="text-sm text-zinc-400">{row.message || row.status}</p>
+                {row.next_due_on && (
+                  <p className={`text-xs ${row.reminder === "overdue" ? "text-red-300" : "text-zinc-500"}`}>
+                    Due {row.next_due_on}
+                    {row.reminder === "due_soon" ? " · due soon" : ""}
+                    {row.reminder === "overdue" ? " · overdue" : ""}
+                  </p>
+                )}
+                {row.can_mark_paid && (
+                  <>
+                    <label className="block text-sm">
+                      M-Pesa code
+                      <input
+                        value={payCode[row.id] || ""}
+                        onChange={(event) => setPayCode((prev) => ({ ...prev, [row.id]: event.target.value }))}
+                        className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3"
+                      />
+                    </label>
+                    <PhotoField
+                      label="Payment receipt"
+                      file={payPhoto[row.id] ?? null}
+                      onFile={(file) => setPayPhoto((prev) => ({ ...prev, [row.id]: file }))}
+                      optional
+                    />
+                    <button type="button" onClick={() => markPaid(row)} className="min-h-11 w-full rounded-full border border-white/25 text-sm font-semibold">
+                      Mark paid
+                    </button>
+                  </>
+                )}
+              </div>
             ))}
             {active && (
               <div className="mt-3 space-y-3">

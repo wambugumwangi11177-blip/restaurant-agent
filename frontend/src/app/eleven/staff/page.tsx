@@ -49,17 +49,18 @@ export default function ElevenStaffPage() {
     setError("");
     setMessage("");
     try {
+      const manager = staffRole === "stockkeeper" || staffRole === "controller";
       await api.post("/api/v1/staff/", {
         name,
         role_title: staffRole,
         create_login: true,
         email,
-        password,
+        ...(password ? { password } : {}),
         staff_role: staffRole,
       });
       setMessage(
-        staffRole === "stockkeeper" || staffRole === "controller"
-          ? "Login created. They must change this password and set a 4-digit PIN on first sign-in."
+        manager
+          ? "Login created. They choose their own password on first sign-in, then set a 4-digit PIN."
           : "Login created.",
       );
       setName("");
@@ -85,10 +86,15 @@ export default function ElevenStaffPage() {
             Email
             <input required inputMode="email" autoComplete="off" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="jack@eleven.leviii" className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
           </label>
-          <label className="block text-sm">
-            Temporary password
-            <input required type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
-          </label>
+          {(staffRole !== "stockkeeper" && staffRole !== "controller") && (
+            <label className="block text-sm">
+              Temporary password
+              <input required type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
+            </label>
+          )}
+          {(staffRole === "stockkeeper" || staffRole === "controller") && (
+            <p className="text-sm text-zinc-400">No preset password. They set one at first sign-in.</p>
+          )}
           <label className="block text-sm">
             Role
             <select value={staffRole} onChange={(event) => setStaffRole(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/40 px-3">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRightLeft, ClipboardCheck, Receipt, Settings2, Trash2, Truck } from "lucide-react";
+import { ArrowRightLeft, Camera, ClipboardCheck, Receipt, Settings2, Trash2, Truck } from "lucide-react";
 import api from "@/lib/api";
 
 export type FeedEvent = {
@@ -32,6 +32,7 @@ export type FeedCard = {
   sentence: string;
   figure?: string | null;
   quiet?: boolean;
+  overdue?: boolean;
 };
 
 export type FeedPayload = {
@@ -60,6 +61,7 @@ const ICONS = {
   waste: Trash2,
   close: ClipboardCheck,
   cost: Receipt,
+  zone_photo: Camera,
   setup: Settings2,
 } as const;
 

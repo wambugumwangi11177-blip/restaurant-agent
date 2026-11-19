@@ -281,7 +281,7 @@ def chat_with_usage(
 
 def vision_model() -> str:
     """Photo reading only. Swap models with OPENROUTER_VISION_MODEL. No fallback."""
-    return os.getenv("OPENROUTER_VISION_MODEL", "qwen/qwen3.7-flash")
+    return os.getenv("OPENROUTER_VISION_MODEL", "nex-agi/nex-n2.5-mini")
 
 
 def compare_model() -> str:
@@ -317,8 +317,11 @@ def chat_with_images(
     is not the active provider, or the call fails, the exception propagates.
     """
     _require_openrouter()
+    from image_prep import downscale_image
+
     content: list[dict] = [{"type": "text", "text": prompt}]
     for mime, data in images:
+        data, mime = downscale_image(data, mime)
         encoded = base64.b64encode(data).decode("ascii")
         content.append({
             "type": "image_url",

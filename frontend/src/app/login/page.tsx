@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { Loader2, Eye, EyeOff, ArrowRight } from "lucide-react";
 
 export default function LoginPage() {
-    const { login, loginWithRestaurant, register } = useAuth();
+    const { login, loginWithRestaurant, register, setInitialPassword } = useAuth();
     const router = useRouter();
     const [isRegister, setIsRegister] = useState(false);
     const [useEmailLogin, setUseEmailLogin] = useState(false);
@@ -20,6 +20,7 @@ export default function LoginPage() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [showGeneralLoginOptions, setShowGeneralLoginOptions] = useState(false);
+    const [firstPassword, setFirstPassword] = useState(false);
 
     const [nativeStore, setNativeStore] = useState(false);
 
@@ -43,17 +44,25 @@ export default function LoginPage() {
             // including Vibanda — the generic dashboard would paint, then its
             // layout's isVibanda() effect bounced to /vibanda. That flash is
             // the "it shows the old dashboard first, then the new one".
-            const signedIn = isRegister
-                ? await register(email, password, tenantName)
-                : useEmailLogin
-                    ? await login(email, password)
-                    : await loginWithRestaurant(restaurantName, password);
+            const signedIn = firstPassword
+                ? await setInitialPassword(email, password)
+                : isRegister
+                    ? await register(email, password, tenantName)
+                    : useEmailLogin
+                        ? await login(email, password)
+                        : await loginWithRestaurant(restaurantName, password);
             router.replace(homeFor(signedIn?.tenant_name, signedIn?.staff_role));
         } catch (err: unknown) {
             let message = "Authentication failed";
             if (err && typeof err === "object" && "response" in err) {
                 const axiosErr = err as { response?: { data?: { detail?: string } }; message?: string };
                 message = axiosErr.response?.data?.detail || axiosErr.message || message;
+                if (axiosErr.response?.data?.detail === "FIRST_PASSWORD_REQUIRED") {
+                    setFirstPassword(true);
+                    setUseEmailLogin(true);
+                    setError("Choose your own password. This is your first sign-in.");
+                    return;
+                }
             } else if (err instanceof Error) {
                 message = err.message;
             }
@@ -171,6 +180,8 @@ export default function LoginPage() {
                                 <Loader2 className="w-4 h-4 animate-spin" />
                             ) : isRegister ? (
                                 "Create Account"
+                            ) : firstPassword ? (
+                                "Set password and sign in"
                             ) : (
                                 <>Sign In <ArrowRight className="w-4 h-4" aria-hidden="true" /></>
                             )}

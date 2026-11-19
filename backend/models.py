@@ -1718,6 +1718,46 @@ class RunningCost(Base):
     approved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     approved_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utcnow, nullable=False)
+    next_due_on = Column(Date, nullable=True)
+    remind_days = Column(Integer, nullable=False, default=3, server_default="3")
+    payment_state = Column(String, nullable=False, default="none", server_default="none")
+    paid_at = Column(DateTime, nullable=True)
+    paid_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    mpesa_code = Column(String, nullable=True)
+    payment_receipt_storage_key = Column(String, nullable=True)
+    payment_receipt_content_type = Column(String, nullable=True)
+
+
+class StoreZoneDayPhoto(Base):
+    """One required photo per storage zone at day open and day close."""
+    __tablename__ = "store_zone_day_photos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    zone_id = Column(Integer, ForeignKey("stock_zones.id"), nullable=False, index=True)
+    business_date = Column(Date, nullable=False)
+    phase = Column(String, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    photo_storage_key = Column(String, nullable=False)
+    photo_content_type = Column(String, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("restaurant_id", "zone_id", "business_date", "phase", name="uq_store_zone_day_photo"),
+        CheckConstraint("phase IN ('open', 'close')", name="ck_store_zone_day_phase"),
+    )
+
+
+class StoreZoneDayPhotoCheck(Base):
+    __tablename__ = "store_zone_day_photo_checks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    photo_id = Column(Integer, ForeignKey("store_zone_day_photos.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String, nullable=False, default="pending")
+    model_name = Column(String, nullable=True)
+    result_json = Column(Text, nullable=True)
+    compared_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
 
 
 class StockBalance(Base):

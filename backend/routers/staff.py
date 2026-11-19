@@ -108,30 +108,32 @@ async def create_staff(
 
     linked_user = None
     if body.create_login:
-        if not body.email or not body.password or not body.staff_role:
+        if not body.email or not body.staff_role:
             raise HTTPException(
                 status_code=400,
-                detail="email, password, and staff_role are all required when create_login is true.",
+                detail="email and staff_role are required when create_login is true.",
             )
-        auth.require_strong_password(body.password)
         target_role = _parse_staff_role(body.staff_role)
         _require_grant_allowed(current_user, target_role)
+        manager_self_setup = target_role in (
+            models.StaffRole.STOCKKEEPER,
+            models.StaffRole.CONTROLLER,
+        )
+        if not manager_self_setup and not body.password:
+            raise HTTPException(status_code=400, detail="A password is required for this login.")
+        if body.password:
+            auth.require_strong_password(body.password)
 
         if db.query(models.User).filter(models.User.email == body.email).first():
             raise HTTPException(status_code=400, detail="Email already registered")
 
         linked_user = models.User(
             email=body.email,
-            hashed_password=auth.get_password_hash(body.password),
+            hashed_password=auth.get_password_hash(body.password) if body.password else None,
             role=models.Role.STAFF,
             staff_role=target_role,
             tenant_id=current_user.tenant_id,
-            # The storekeeper and the accountant replace this temporary
-            # password and set a PIN before the store opens.
-            must_change_password=target_role in (
-                models.StaffRole.STOCKKEEPER,
-                models.StaffRole.CONTROLLER,
-            ),
+            must_change_password=manager_self_setup,
         )
         db.add(linked_user)
         db.commit()

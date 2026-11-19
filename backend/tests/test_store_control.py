@@ -36,6 +36,22 @@ def _chef(client, jack, name="Asha", pin=PIN, photo=False):
     return response.json()
 
 
+def _day_photos(client, jack, phase="open"):
+    status = client.get("/api/v1/store/day-photos/status", headers=_auth(_token(jack))).json()
+    for zone in status["zones"]:
+        if phase == "open" and zone["open_done"]:
+            continue
+        if phase == "close" and zone["close_done"]:
+            continue
+        response = client.post(
+            "/api/v1/store/day-photos",
+            headers=_auth(_token(jack)),
+            data={"zone_id": str(zone["id"]), "phase": phase},
+            files={"photo": ("zone.jpg", JPEG, "image/jpeg")},
+        )
+        assert response.status_code == 201, response.text
+
+
 def _open(client, owner, name, quantity, unit="kg", zone="Main store"):
     response = client.post(
         "/api/v1/store/items/opening",
@@ -226,6 +242,7 @@ def test_spoilage_drops_stock_and_a_large_loss_waits_for_the_owner(client, db_se
     cook = _add_staff(db_session, tenant, restaurant, "cook-spoil@eleven.leviii", models.StaffRole.KITCHEN)
     _unlock(client, jack)
     _open(client, owner, "Rice", 10)
+    _day_photos(client, jack, "open")
     chef = _chef(client, jack)
     item_id = client.get("/api/v1/store/items", headers=_auth(_token(jack))).json()["items"][0]["id"]
 
@@ -301,6 +318,8 @@ def test_close_shows_a_quantity_difference_and_marks_working_alone(client, db_se
     accountant = _add_staff(db_session, tenant, restaurant, "books-close@eleven.leviii", models.StaffRole.CONTROLLER)
     accountant.hashed_pin = auth.get_pin_hash("9753")
     db_session.commit()
+    _day_photos(client, jack, "open")
+    _day_photos(client, jack, "close")
     expected = client.get("/api/v1/store/close/expected", headers=_auth(_token(jack)))
     assert expected.status_code == 200
     assert money_keys_in(expected.json()) == []
@@ -371,6 +390,7 @@ def test_control_rows_refuse_update_and_delete(client, db_session):
     jack = _add_staff(db_session, tenant, restaurant, "jack-audit@eleven.leviii", models.StaffRole.STOCKKEEPER)
     _unlock(client, jack)
     _open(client, owner, "Rice", 3)
+    _day_photos(client, jack, "open")
     chef = _chef(client, jack)
     item_id = client.get("/api/v1/store/items", headers=_auth(_token(jack))).json()["items"][0]["id"]
     saved = client.post(

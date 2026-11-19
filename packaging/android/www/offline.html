@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LEVIII Store</title>
+  <style>
+    html, body { margin: 0; min-height: 100%; background: #070708; color: #f4f4f5; font-family: sans-serif; }
+    main { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    section { width: min(360px, 100%); text-align: center; }
+    h1 { font-size: 1.4rem; margin: 12px 0 8px; }
+    p { color: #a1a1aa; line-height: 1.5; }
+    button { margin-top: 20px; min-height: 44px; width: 100%; border: 0; border-radius: 999px; background: #fff; color: #111; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <section>
+      <svg viewBox="0 0 120 80" width="96" height="64" aria-hidden="true">
+        <path d="M28 52h56a16 16 0 0 0 0-32 22 22 0 0 0-42-4A14 14 0 0 0 28 52z" fill="none" stroke="#f4f4f5" stroke-width="2"></path>
+        <path d="M46 58 H74" stroke="#f4f4f5" stroke-width="2" stroke-dasharray="4 4"></path>
+      </svg>
+      <h1>No internet</h1>
+      <p>LEVIII Store needs a connection to open the restaurant. Your records stay on the server. Try again when you are back online.</p>
+      <button type="button" id="retry">Try again</button>
+    </section>
+  </main>
+  <script src="app-config.js"></script>
+  <script>
+    document.getElementById("retry").addEventListener("click", function () {
+      var origin = window.LEVIII_APP_ORIGIN || "";
+      if (origin) location.replace(origin + "/login");
+      else location.reload();
+    });
+    var cap = window.Capacitor;
+    if (cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.App) {
+      cap.Plugins.App.addListener("backButton", function () {
+        if (cap.Plugins.App.minimizeApp) cap.Plugins.App.minimizeApp();
+        else if (cap.Plugins.App.exitApp) cap.Plugins.App.exitApp();
+      });
+    }
+  </script>
+</body>
+</html>

@@ -473,10 +473,14 @@ class MenuIngredientCreate(StrictModel):
     inventory_item_id: int
     quantity_per_serving: float = Field(gt=0)
     is_critical: bool = True
+    yield_fraction: float = Field(default=1.0, gt=0, le=1)
+    recipe_unit: Optional[str] = None
 
 class MenuIngredientUpdate(StrictModel):
     quantity_per_serving: Optional[float] = Field(default=None, gt=0)
     is_critical: Optional[bool] = None
+    yield_fraction: Optional[float] = Field(default=None, gt=0, le=1)
+    recipe_unit: Optional[str] = None
 
 class MenuIngredientOut(StrictModel):
     id: int
@@ -484,6 +488,8 @@ class MenuIngredientOut(StrictModel):
     inventory_item_id: int
     quantity_per_serving: float
     is_critical: bool
+    yield_fraction: float = 1.0
+    recipe_unit: Optional[str] = None
     # Denormalized for the editor UI so it doesn't need a second round-trip
     # per ingredient just to show a name/unit next to the quantity.
     item_name: Optional[str] = None

@@ -15,7 +15,7 @@ gitignored) for outbound sales, unrelated to the running product:
 
 They previously sat in `execution/` alongside the actual product's
 deterministic tooling (`init_db.py`, `deploy_schema.py`, etc.), which read as
-unfinished product scope on an audit — "document delivery" isn't a Chakula
+unfinished product scope on an audit — "document delivery" isn't a LEVIII
 feature; this is prospect outreach for the business itself. No code
 elsewhere imports these (verified via grep before the move) — moving them
 here is a pure relocation, not a behavior change.

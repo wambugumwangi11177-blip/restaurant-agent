@@ -16,7 +16,7 @@ export default function ElevenLayout({ children }: { children: React.ReactNode }
     if (isLoading) return;
     if (!user) router.replace("/login");
     else if (!owner) router.replace(tierHome(user.staff_role as StaffTier | null));
-    else if (!allowed) router.replace("/dashboard");
+    else if (!allowed) router.replace("/login");
   }, [user, isLoading, owner, allowed, router]);
 
   if (isLoading || !allowed) {

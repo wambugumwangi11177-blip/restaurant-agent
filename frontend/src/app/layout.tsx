@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Outfit, DM_Sans, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import "@/styles/owner-glass.css";
 import { Providers } from "./providers";
 
 const outfit = Outfit({
@@ -20,13 +21,13 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Chakula — Restaurant Manager",
-  description: "Simple restaurant management for Kenyan restaurants",
+  title: "LEVIII",
+  description: "Owner and store operations for Eleven",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Chakula",
+    title: "LEVIII",
   },
 };
 
@@ -48,17 +49,6 @@ export default function RootLayout({
       </head>
       <body className={`${outfit.variable} ${dmSans.variable} ${spaceGrotesk.variable} font-sans antialiased bg-[#0a0a0a] text-[#e5e5e5]`}>
         <Providers>{children}</Providers>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                  navigator.serviceWorker.register('/sw.js').catch(() => {});
-                });
-              }
-            `,
-          }}
-        />
       </body>
     </html>
   );

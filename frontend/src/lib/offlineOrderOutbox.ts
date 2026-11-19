@@ -18,7 +18,7 @@
  * without either depending on the other's lifecycle.
  */
 
-const DB_NAME = "chakula-offline";
+const DB_NAME = "leviii-offline";
 const DB_VERSION = 1;
 const STORE_NAME = "pending-orders";
 

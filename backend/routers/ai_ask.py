@@ -33,10 +33,19 @@ from time_utils import utcnow
 import models
 from database import get_db
 from auth import require_staff_role
-from routers.reports import _grounded_reply
 from routers.overview import _restaurant_id, _eat_now
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+
+def _grounded_reply(text: str, evidence: str) -> str | None:
+    """Keep deterministic output when an optional narrative invents figures."""
+    from ai.reasoning.grounding import verify
+    from ai.owner_narrative import strip_reasoning_leak
+
+    cleaned = strip_reasoning_leak(text)
+    checked = verify({"headline": cleaned}, evidence)
+    return cleaned if cleaned and checked["verified"] else None
 
 from rate_limit import limiter
 from ai.owner_narrative import narrate as narrate_owner

@@ -4,9 +4,7 @@ backend/routers/auth.py
 Authentication router.
 
 FIXES:
-  - register() now auto-creates a Restaurant + 4 default Tables so that
-    every AI endpoint finds a restaurant on first login. Without this,
-    _get_restaurant() returned 404 and the frontend fell back to Lavy demo data.
+  - Public self-service register removed for LEVIII (provisioning is env/ops only).
   - Added /me endpoint returns restaurant_name so the frontend can
     personalise without an extra round-trip.
   - Added /restaurant PUT so the owner can update their name/address
@@ -36,6 +34,32 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 # (per-IP), lockout is the second (per-account, survives IP rotation).
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
+PASSWORD_AUTH_MAX_DAYS = 30
+
+
+def _mark_password_authenticated(user: models.User, db: Session) -> None:
+    user.password_authenticated_at = utcnow()
+    db.add(user)
+
+
+def _password_auth_fresh(user: models.User) -> bool:
+    at = user.password_authenticated_at
+    if at is None:
+        return False
+    return at > utcnow() - timedelta(days=PASSWORD_AUTH_MAX_DAYS)
+
+
+def _staff_display_name(db: Session, user: models.User) -> str | None:
+    row = (
+        db.query(models.StaffMember.name)
+        .filter(models.StaffMember.user_id == user.id)
+        .first()
+    )
+    if row and row[0]:
+        return row[0]
+    if user.tenant and user.tenant.name:
+        return user.tenant.name
+    return user.email.split("@")[0] if user.email else None
 
 # Password reset / email verification (security pass 2026-07-17: neither
 # existed at all — see audit). Tokens are single-use and short-lived; see
@@ -152,9 +176,24 @@ class PasswordResetConfirm(StrictModel):
     new_password: str
 
 
+class InitialPasswordSet(StrictModel):
+    email: str
+    new_password: str
+    handover_code: str | None = None
+
+
 class ImpersonationBanner(StrictModel):
     session_id: int
     impersonator_email: str
+
+
+class PinUnlockBody(StrictModel):
+    pin: str
+
+
+class PinUnlockOut(StrictModel):
+    status: str
+    display_name: str | None = None
 
 
 class MeOut(StrictModel):
@@ -163,6 +202,10 @@ class MeOut(StrictModel):
     role: str
     staff_role: str | None = None
     is_email_verified: bool
+    must_change_password: bool = False
+    has_pin: bool = False
+    display_name: str | None = None
+    password_auth_valid: bool = False
     restaurant_name: str | None = None
     restaurant_id: int | None = None
     # Vibanda dedicated-dashboard routing (plan 2026-09-12): the frontend
@@ -198,80 +241,6 @@ class EmailVerifyConfirm(StrictModel):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
-@router.post("/register", response_model=Token, status_code=201)
-@limiter.limit("5/hour")
-async def register(request: Request, user_data: UserCreate, db: Session = Depends(get_db)):
-    # Enforce minimum password strength before anything else.
-    auth.require_strong_password(user_data.password)
-
-    # Guard: duplicate email
-    if db.query(models.User).filter(models.User.email == user_data.email).first():
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    # 1. Tenant
-    tenant = models.Tenant(name=user_data.tenant_name)
-    db.add(tenant)
-    db.commit()
-    db.refresh(tenant)
-
-    # 2. User
-    hashed_password = auth.get_password_hash(user_data.password)
-    new_user = models.User(
-        email=user_data.email,
-        hashed_password=hashed_password,
-        role=models.Role.ADMIN,
-        # A fresh signup is always the Owner of their own restaurant —
-        # matches the migration 025 backfill for pre-existing ADMIN users
-        # (directive 015: Owner maps 1:1 onto Role.ADMIN).
-        staff_role=models.StaffRole.OWNER,
-        tenant_id=tenant.id,
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    # 3. Restaurant — THE MISSING PIECE.
-    #    Without this every /ai/* endpoint returns 404 and the frontend
-    #    falls back to the hardcoded "Lavy" demo data.
-    restaurant = models.Restaurant(
-        name=user_data.tenant_name,
-        address="",
-        tenant_id=tenant.id,
-    )
-    db.add(restaurant)
-    db.commit()
-    db.refresh(restaurant)
-
-    # 4. Seed 5 tables so the POS and reservations work immediately.
-    for i in range(1, 6):
-        db.add(models.Table(
-            restaurant_id=restaurant.id,
-            table_number=i,
-            capacity=4,
-            status=models.TableStatus.AVAILABLE,
-        ))
-    db.commit()
-
-    # 5. Email verification link — best-effort; a mail-server hiccup must
-    #    never fail the signup itself (see email_utils.send_email).
-    verify_token = _issue_auth_token(
-        db, new_user, models.AuthTokenPurpose.EMAIL_VERIFY,
-        timedelta(hours=EMAIL_VERIFY_TOKEN_EXPIRE_HOURS),
-    )
-    email_utils.send_email(
-        new_user.email,
-        "Verify your email",
-        f"Welcome to Chakula! Verify your email address here:\n"
-        f"{FRONTEND_BASE_URL}/verify-email?token={verify_token}\n\n"
-        f"This link expires in {EMAIL_VERIFY_TOKEN_EXPIRE_HOURS} hours.",
-    )
-
-    access_token = auth.create_access_token(
-        data={"sub": new_user.email, "ver": new_user.token_version or 0}
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
-
-
 def _authenticate_password_user(
     db: Session,
     user: models.User | None,
@@ -292,7 +261,15 @@ def _authenticate_password_user(
         # Burn the same Argon2 work a real verification costs so response time
         # doesn't reveal whether the account exists (user-enumeration oracle).
         auth.verify_password(password, auth.get_password_hash("timing-equalizer"))
-    if not user or not auth.verify_password(password, user.hashed_password):
+    if user and not user.hashed_password:
+        detail = {"code": "FIRST_PASSWORD_REQUIRED", "email": user.email}
+        if user.password_reset_required:
+            detail["handover_code_required"] = True
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=detail,
+        )
+    if not user or not user.hashed_password or not auth.verify_password(password, user.hashed_password):
         if user:
             user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
             just_locked = user.failed_login_attempts >= MAX_FAILED_ATTEMPTS
@@ -344,11 +321,81 @@ def _authenticate_password_user(
     user.failed_login_attempts = 0
     user.locked_until = None
     user.last_login_at = utcnow()
+    _mark_password_authenticated(user, db)
     db.commit()
 
     access_token = auth.create_access_token(
         data={"sub": user.email, "ver": user.token_version or 0}
     )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+def _env_truthy(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in ("1", "true", "yes")
+
+
+def _may_set_initial_password(user: models.User) -> bool:
+    if user.password_reset_required:
+        return True
+    if user.staff_role in (models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER):
+        return True
+    if not user.hashed_password and user.must_change_password:
+        return True
+    if user.staff_role == models.StaffRole.OWNER and user.role in (models.Role.ADMIN, models.Role.SUPERADMIN):
+        return _env_truthy("ALLOW_OWNER_FIRST_PASSWORD")
+    return False
+
+
+@router.post("/set-initial-password", response_model=Token)
+@limiter.limit("10/minute")
+async def set_initial_password(
+    request: Request,
+    body: InitialPasswordSet,
+    db: Session = Depends(get_db),
+):
+    """Storekeeper, accountant, handover reset, or (test-seed) owner sets password before sign-in."""
+    import handover
+    from staff_audit import record_entry
+
+    user = db.query(models.User).filter(models.User.email == body.email).first()
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=400, detail="This login is not waiting for a first password.")
+    if user.hashed_password and not user.password_reset_required:
+        raise HTTPException(status_code=400, detail="This login is not waiting for a first password.")
+    if not _may_set_initial_password(user):
+        raise HTTPException(status_code=400, detail="This login is not waiting for a first password.")
+    if user.password_reset_required:
+        if not body.handover_code:
+            raise HTTPException(status_code=400, detail="Handover code is required.")
+        handover.verify_handover_code(db, user, body.handover_code.strip())
+    auth.require_strong_password(body.new_password)
+    was_handover = bool(user.password_reset_required)
+    user.hashed_password = auth.get_password_hash(body.new_password)
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    restaurant = get_restaurant_or_none(db, user)
+    if was_handover and restaurant:
+        handover.clear_handover_after_password_set(
+            db, user, restaurant_id=restaurant.id, via_email=user.email
+        )
+    else:
+        user.must_change_password = False
+        user.password_reset_required = False
+        if restaurant:
+            record_entry(
+                db,
+                restaurant.id,
+                user,
+                "initial_password_set",
+                "user",
+                f"First password set for {user.email}",
+                entity_id=user.id,
+                detail={"email": user.email},
+            )
+    user.last_login_at = utcnow()
+    _mark_password_authenticated(user, db)
+    db.commit()
+    access_token = auth.create_access_token(data={"sub": user.email, "ver": user.token_version or 0})
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -358,33 +405,6 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
     user = db.query(models.User).filter(models.User.email == login_data.email).first()
     return _authenticate_password_user(
         db, user, login_data.password, login_data.mfa_code, "Incorrect email or password"
-    )
-
-
-@router.post("/login/restaurant", response_model=Token)
-@limiter.limit("10/minute")
-async def login_by_restaurant(
-    request: Request,
-    login_data: RestaurantLoginRequest,
-    db: Session = Depends(get_db),
-):
-    """Resolve one active Owner for the named restaurant before checking its password."""
-    restaurant_name = login_data.restaurant_name.strip().lower()
-    owners = (
-        db.query(models.User)
-        .join(models.Restaurant, models.Restaurant.tenant_id == models.User.tenant_id)
-        .filter(
-            func.lower(models.Restaurant.name) == restaurant_name,
-            models.User.role == models.Role.ADMIN,
-            models.User.staff_role == models.StaffRole.OWNER,
-            models.User.is_active.is_(True),
-        )
-        .distinct()
-        .all()
-    )
-    user = owners[0] if len(owners) == 1 else None
-    return _authenticate_password_user(
-        db, user, login_data.password, login_data.mfa_code, "Incorrect restaurant or password"
     )
 
 
@@ -405,6 +425,10 @@ async def read_users_me(
         # instead of only after their token expires/refreshes.
         "staff_role": current_user.staff_role,
         "is_email_verified": current_user.is_email_verified,
+        "must_change_password": bool(current_user.must_change_password),
+        "has_pin": bool(current_user.hashed_pin),
+        "display_name": _staff_display_name(db, current_user),
+        "password_auth_valid": _password_auth_fresh(current_user),
         "restaurant_name": restaurant.name if restaurant else None,
         "restaurant_id": restaurant.id if restaurant else None,
         "tenant_name": current_user.tenant.name if current_user.tenant else None,
@@ -607,14 +631,89 @@ async def pin_set(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Self-service opt-in: set or change your own quick-switch PIN. Requires
-    only being logged in already — same trust level as changing your own MFA
-    enrollment, no separate re-auth demanded."""
+    """Self-service: set or change the 4–6 digit PIN (app lock + quick-switch)."""
+    from staff_audit import record_entry
+
     auth.require_valid_pin_format(body.pin)
     user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    had_pin = bool(user.hashed_pin)
     user.hashed_pin = auth.get_pin_hash(body.pin)
+    user.pin_failed_attempts = 0
+    user.pin_locked_until = None
+    restaurant = get_restaurant_or_none(db, user)
+    if restaurant:
+        record_entry(
+            db,
+            restaurant.id,
+            user,
+            "pin_changed" if had_pin else "pin_set",
+            "user",
+            f"{user.email} {'changed' if had_pin else 'set'} app-lock PIN.",
+            entity_id=user.id,
+            detail={"pin_length": len(body.pin)},
+        )
     db.commit()
     return {"status": "pin_set"}
+
+
+@router.post("/pin/unlock", response_model=PinUnlockOut)
+@limiter.limit("30/minute")
+async def pin_unlock(
+    request: Request,
+    body: PinUnlockBody,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Verify the current user's PIN to unlock the app shell (same hash as quick-switch)."""
+    from staff_audit import record_entry
+
+    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    if not user or not user.hashed_pin:
+        raise HTTPException(status_code=400, detail="PIN is not set.")
+    if not _password_auth_fresh(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "PASSWORD_REQUIRED", "message": "Full sign-in required."},
+        )
+    if user.pin_locked_until and user.pin_locked_until > utcnow():
+        remaining = int((user.pin_locked_until - utcnow()).total_seconds() / 60) + 1
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Account temporarily locked due to repeated failed PIN attempts. Try again in {remaining} minute(s).",
+        )
+
+    if not auth.verify_pin(body.pin, user.hashed_pin):
+        user.pin_failed_attempts = (user.pin_failed_attempts or 0) + 1
+        restaurant = get_restaurant_or_none(db, user)
+        if user.pin_failed_attempts >= MAX_FAILED_ATTEMPTS:
+            user.token_version = (user.token_version or 0) + 1
+            user.pin_failed_attempts = 0
+            user.pin_locked_until = None
+            if restaurant:
+                record_entry(
+                    db,
+                    restaurant.id,
+                    user,
+                    "pin_lockout",
+                    "user",
+                    f"{user.email} signed out after repeated failed PIN unlock attempts.",
+                    entity_id=user.id,
+                )
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"code": "PIN_LOCKOUT", "message": "Too many wrong PINs. Sign in with password."},
+            )
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect PIN")
+
+    user.pin_failed_attempts = 0
+    user.pin_locked_until = None
+    db.commit()
+    return {
+        "status": "unlocked",
+        "display_name": _staff_display_name(db, user),
+    }
 
 
 @router.post("/pin/clear", response_model=StatusMessageOut)

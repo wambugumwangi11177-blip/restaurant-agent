@@ -1,5 +1,10 @@
 # Leviii AI — System Architecture
 
+> Historical baseline: sections below include retired integrations and unverified
+> operational assumptions. For the current LEVIII Phase 1 continuation, see
+> [scope and data flow](leviii/PHASE1.md) and [delivery traceability](leviii/TRACEABILITY.md).
+> Neither document is proof of deployed configuration or compliance.
+
 | | |
 |---|---|
 | **Reference** | LAI-ARCH-001 |

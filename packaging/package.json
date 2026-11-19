@@ -1,0 +1,45 @@
+{
+  "name": "leviii-store-packaging",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LEVIII Store Android debug APK and desktop shell",
+  "author": "LEVIII",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "configure": "node configure.cjs",
+    "test": "node --test tests.cjs",
+    "android:init": "cd android && npx cap add android",
+    "android:sync": "cd android && npx cap sync android",
+    "android:apply": "node apply-native.cjs",
+    "desktop:pack": "electron-builder --dir"
+  },
+  "build": {
+    "appId": "com.leviii.store",
+    "productName": "LEVIII Store",
+    "files": [
+      "desktop/**/*",
+      "app-config.json",
+      "url-policy.cjs",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "linux": { "target": ["AppImage"], "category": "Office" },
+    "win": { "target": ["nsis"] },
+    "mac": { "target": ["dmg"], "category": "public.app-category.business" }
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/camera": "^8.0.0",
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/splash-screen": "^8.0.0",
+    "electron": "^42.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "workspaces": [
+    "android"
+  ]
+}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { Check, AlertTriangle } from "lucide-react";
 
 export type ToastType = "success" | "error";
@@ -25,25 +24,18 @@ export function useToast() {
         setTimeout(() => setToast((current) => (current?.message === message ? null : current)), 3000);
     }, []);
 
-    const toastNode = (
-        <AnimatePresence>
-            {toast && (
-                <motion.div
-                    role="status"
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    className={`fixed top-4 right-4 z-50 rounded-xl border px-5 py-3 flex items-center gap-2 ${VARIANTS[toast.type].className}`}
-                >
-                    {(() => {
-                        const Icon = VARIANTS[toast.type].icon;
-                        return <Icon className="w-4 h-4" />;
-                    })()}
-                    <span className="text-sm">{toast.message}</span>
-                </motion.div>
-            )}
-        </AnimatePresence>
-    );
+    const toastNode = toast ? (
+        <div
+            role="status"
+            className={`fixed top-4 right-4 z-50 rounded-xl border px-5 py-3 flex items-center gap-2 ${VARIANTS[toast.type].className}`}
+        >
+            {(() => {
+                const Icon = VARIANTS[toast.type].icon;
+                return <Icon className="w-4 h-4" />;
+            })()}
+            <span className="text-sm">{toast.message}</span>
+        </div>
+    ) : null;
 
     return { showToast, toastNode };
 }

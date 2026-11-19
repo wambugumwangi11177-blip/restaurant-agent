@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Bell, Check } from "lucide-react";
 import { useNotifications, NotificationItem } from "@/lib/useNotifications";
 import api from "@/lib/api";
-import { isVerifiedVibandaSource } from "@/lib/vibandaSource";
 import { isDirectSource } from "@/lib/directSource";
 
 function timeAgo(iso: string): string {
@@ -72,12 +71,16 @@ export default function NotificationBell({ ownerHome }: { ownerHome?: string } =
 
     useEffect(() => {
         if (!ownerHome) return;
+        if (ownerHome === "/eleven") {
+            setSourceVerified(true);
+            return;
+        }
         let active = true;
         api.get<{ data_provenance?: { source_connection?: { state?: string; reconciled?: boolean } } }>("/api/v1/overview/today?period=today", { timeout: 15000 })
             .then((r) => {
                 if (!active) return;
                 const source = r.data?.data_provenance?.source_connection;
-                setSourceVerified(isVerifiedVibandaSource(source) || isDirectSource(source));
+                setSourceVerified(isDirectSource(source));
             })
             .catch(() => { if (active) setSourceVerified(false); });
         return () => { active = false; };
@@ -207,7 +210,7 @@ export default function NotificationBell({ ownerHome }: { ownerHome?: string } =
                             {isIOSNotStandalone ? (
                                 <p className="text-[11px] text-[#a3a3a3] leading-relaxed">
                                     To get notifications on iPhone: tap Share, then{" "}
-                                    <span className="text-[#e5e5e5]">Add to Home Screen</span>, then open Chakula from
+                                    <span className="text-[#e5e5e5]">Add to Home Screen</span>, then open LEVIII from
                                     there.
                                 </p>
                             ) : permission === "denied" ? (

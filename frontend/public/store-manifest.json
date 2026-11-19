@@ -1,0 +1,25 @@
+{
+  "name": "LEVIII Store",
+  "short_name": "LEVIII Store",
+  "description": "Storekeeper app for receiving deliveries and keeping stock",
+  "start_url": "/store",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#070708",
+  "theme_color": "#070708",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

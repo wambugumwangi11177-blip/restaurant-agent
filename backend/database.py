@@ -53,5 +53,6 @@ def get_db():
 # Call this explicitly to create tables (don't run at import time)
 def init_db():
     from models import Base
+    import integration.inbox_models  # noqa: F401 — register additive POS tables
     Base.metadata.create_all(bind=engine)
 

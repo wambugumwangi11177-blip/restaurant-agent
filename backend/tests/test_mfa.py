@@ -32,15 +32,12 @@ def test_totp_roundtrip_and_rejects_wrong_code():
     assert auth.verify_totp(secret, "") is False
 
 
-def _register(client, email="mfa@e.com"):
-    r = client.post("/api/v1/auth/register",
-                    json={"email": email, "password": "GoodPass1", "tenant_name": "T"})
-    assert r.status_code == 201
-    return r.json()["access_token"]
+from tests.factories import seed_owner
 
 
 def test_full_mfa_enrollment_and_login_enforcement(client, db_session):
-    token = _register(client)
+    user, _, headers = seed_owner(db_session, email="mfa@e.com", password="GoodPass1", tenant_name="T")
+    token = headers["Authorization"].removeprefix("Bearer ")
     hdr = {"Authorization": f"Bearer {token}"}
 
     # Login works without a code before MFA is enabled.
@@ -72,7 +69,8 @@ def test_full_mfa_enrollment_and_login_enforcement(client, db_session):
 
 
 def test_disable_requires_valid_code(client, db_session):
-    token = _register(client, "mfa2@e.com")
+    _, _, headers = seed_owner(db_session, email="mfa2@e.com", password="GoodPass1", tenant_name="T")
+    token = headers["Authorization"].removeprefix("Bearer ")
     hdr = {"Authorization": f"Bearer {token}"}
     secret = client.post("/api/v1/auth/mfa/setup", headers=hdr).json()["secret"]
     client.post("/api/v1/auth/mfa/enable", headers=hdr, json={"code": _current_code(secret)})

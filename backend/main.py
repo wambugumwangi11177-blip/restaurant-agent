@@ -16,7 +16,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from logging_config import configure_logging
-from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support, tables, attendance, fraud, cash_reconciliation, restaurants, overview, reports, ai_ask, creative, observer
+from routers import health, webhooks, auth, staff, notifications, overview, ai_ask, staff_setup, store_recipes, eleven_import, store_intake, store_control, store_day, pos_evidence, eleven_handover
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
@@ -97,6 +97,9 @@ def on_startup():
     #     when DEMO_RESTAURANT_OWNER_EMAIL/_PASSWORD are set. No-op otherwise.
     from tenant_provisioning import provision_demo_from_env
     provision_demo_from_env()
+
+    from leviii_test_seed import provision_test_data_from_env
+    provision_test_data_from_env()
 
     from observer_mode import observer_mode_enabled
     if observer_mode_enabled():
@@ -596,6 +599,8 @@ app.add_middleware(BodySizeLimitMiddleware)
 app.add_middleware(CorrelationIdMiddleware)
 from observer_mode import ObserverModeMiddleware
 app.add_middleware(ObserverModeMiddleware)
+from middleware.money_redaction import MoneyRedactionMiddleware
+app.add_middleware(MoneyRedactionMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 #
@@ -611,23 +616,27 @@ app.add_middleware(ObserverModeMiddleware)
 #   • webhooks — MacSoft POSTs to a fixed, externally-registered URL; versioning
 #     it would break the push endpoint they have already been given.
 #   • health — conventionally unversioned (probes/uptime checks hit /health).
-from routers import demo
-
+# LEVIII Eleven owner + store surfaces only (webhooks + scheduler use DB/ai directly).
 _VERSIONED_ROUTERS = [
-    menu.router, orders.router, inventory.router, analytics.router,
-    reservations.router, ai.router, export.router, flags.router, events.router,
-    billing.router, enterprise.router, staff.router, stock_custody.router,
-    suppliers.router, purchase_orders.router, notifications.router, support.router,
-    tables.router, attendance.router, fraud.router, cash_reconciliation.router,
-    restaurants.router, overview.router, reports.router, ai_ask.router, creative.router, observer.router, demo.router,
-    ]
+    staff.router,
+    overview.router,
+    notifications.router,
+    ai_ask.router,
+    staff_setup.router,
+    store_recipes.router,
+    eleven_import.router,
+    store_intake.router,
+    store_control.router,
+    store_day.router,
+    pos_evidence.router,
+    eleven_handover.router,
+]
 
 app.include_router(auth.router)
 app.include_router(health.router)
 app.include_router(webhooks.router)
 for _r in _VERSIONED_ROUTERS:
-    app.include_router(_r, prefix="/api/v1")          # canonical, documented
-    app.include_router(_r, include_in_schema=False)   # legacy path, still works
+    app.include_router(_r, prefix="/api/v1")
 
 
 @app.get("/")

@@ -31,92 +31,49 @@ def _user_with_role(db_session, role, suffix):
     return token
 
 
-# ── RBAC enforcement (admin-only route: data export) ──────────────────────────
+# ── RBAC enforcement (platform admin list Eleven logins) ─────────────────────
 
 def test_staff_forbidden_on_admin_route(client, db_session):
     token = _user_with_role(db_session, models.Role.STAFF, "staff")
-    r = client.get("/data/export/orders.csv", headers={"Authorization": f"Bearer {token}"})
+    r = client.get("/api/v1/eleven/logins/admin", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 403
 
 
-def test_admin_allowed_on_admin_route(client, db_session):
+def test_admin_forbidden_on_superadmin_route(client, db_session):
     token = _user_with_role(db_session, models.Role.ADMIN, "admin")
-    r = client.get("/data/export/orders.csv", headers={"Authorization": f"Bearer {token}"})
-    assert r.status_code == 200
+    r = client.get("/api/v1/eleven/logins/admin", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 403
 
 
 def test_superadmin_allowed_on_admin_route(client, db_session):
     token = _user_with_role(db_session, models.Role.SUPERADMIN, "super")
-    r = client.get("/data/export/orders.csv", headers={"Authorization": f"Bearer {token}"})
+    r = client.get("/api/v1/eleven/logins/admin", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
 
 
-# ── RBAC coverage on the AI / management routes (P2, 2026-07-11) ──────────────
-# Before this pass, every /ai/* route and menu/inventory writes used only
-# get_current_user, so any authenticated STAFF token could approve price changes
-# (mutates menu prices) and trigger real customer marketing sends. These prove
-# the money-moving and management routes are now ADMIN-gated, while owners
-# (who register as ADMIN) are not locked out.
-
-def test_staff_forbidden_approving_pricing(client, db_session):
-    """The most severe pre-fix gap: STAFF could approve a price change."""
-    token = _user_with_role(db_session, models.Role.STAFF, "staffprice")
-    r = client.post("/ai/pricing/1/approve", headers={"Authorization": f"Bearer {token}"})
-    assert r.status_code == 403
+def test_legacy_chakula_routes_not_mounted(client):
+    for path in ("/menu/", "/orders/", "/api/v1/menu/", "/api/v1/demo/home"):
+        assert client.get(path).status_code == 404
 
 
-def test_admin_not_forbidden_approving_pricing(client, db_session):
-    """Owners (ADMIN) still reach the route — a missing rec is a 4xx that is NOT 403."""
-    token = _user_with_role(db_session, models.Role.ADMIN, "adminprice")
-    r = client.post("/ai/pricing/999999/approve", headers={"Authorization": f"Bearer {token}"})
-    assert r.status_code != 403
-
-
-def test_staff_forbidden_sending_promo(client, db_session):
-    """STAFF could previously trigger a real customer marketing broadcast."""
-    token = _user_with_role(db_session, models.Role.STAFF, "staffpromo")
-    r = client.post(
-        "/ai/marketing/promo",
-        json={"offer_text": "15% off"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert r.status_code == 403
-
-
-def test_staff_forbidden_creating_menu_item(client, db_session):
-    """Menu definition (price-bearing) is management, not a POS action."""
-    token = _user_with_role(db_session, models.Role.STAFF, "staffmenu")
-    r = client.post(
-        "/menu/",
-        json={"name": "Ugali", "price": 200, "category": "mains"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert r.status_code == 403
-
-
-def test_staff_forbidden_on_ai_usage(client, db_session):
-    """AIOps cost data is ADMIN-only (corrects a stale 'owners are STAFF' comment)."""
-    token = _user_with_role(db_session, models.Role.STAFF, "staffusage")
-    r = client.get("/ai/usage", headers={"Authorization": f"Bearer {token}"})
-    assert r.status_code == 403
-
-
-# ── Password policy at registration ───────────────────────────────────────────
-
-def test_register_rejects_weak_passwords(client, db_session):
-    # too short, no digit, no letter — each must be rejected with 400.
-    for pw in ["short1", "alllettershere", "12345678"]:
-        r = client.post(
-            "/api/v1/auth/register",
-            json={"email": f"{pw}@e.com", "password": pw, "tenant_name": "X"},
-        )
-        assert r.status_code == 400, (pw, r.status_code, r.text)
-
-
-def test_register_accepts_strong_password(client, db_session):
-    r = client.post(
+def test_public_register_endpoint_removed(client):
+    assert client.post(
         "/api/v1/auth/register",
         json={"email": "strong@e.com", "password": "GoodPass1", "tenant_name": "X"},
+    ).status_code == 404
+
+
+def test_weak_password_rejected_on_set_initial_password(client, db_session):
+    from tests.factories import seed_owner
+    user, _, _ = seed_owner(
+        db_session,
+        email="jack@weak.example",
+        password=None,
+        tenant_name="Eleven",
     )
-    assert r.status_code == 201
-    assert "access_token" in r.json()
+    user.must_change_password = True
+    user.role = models.Role.STAFF
+    user.staff_role = models.StaffRole.STOCKKEEPER
+    db_session.commit()
+    r = client.post("/api/v1/auth/set-initial-password", json={"email": user.email, "new_password": "weak"})
+    assert r.status_code == 400

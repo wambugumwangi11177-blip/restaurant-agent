@@ -37,6 +37,7 @@ export type FeedCard = {
 
 export type FeedPayload = {
   pending: FeedEvent[];
+  bill_reminders?: FeedEvent[];
   events: FeedEvent[];
   timezone?: string;
   attention?: { count: number; sentence: string };
@@ -229,6 +230,22 @@ export default function OwnerFeed({
               <button key={type.id} type="button" className={`owner-chip ${kind === type.id ? "is-on" : ""}`} onClick={() => setKind(type.id)}>{type.label}</button>
             ))}
           </div>
+        </>
+      )}
+
+      {mode === "approvals" && (data.bill_reminders?.length ?? 0) > 0 && (
+        <>
+          <h2 className="owner-label">Bills due</h2>
+          <ul className="owner-glass-panel divide-y divide-white/10 rounded-2xl px-4">
+            {(data.bill_reminders ?? []).map((event) => (
+              <li key={`bill-${event.id}-${event.status}`} className="py-3 text-[0.9375rem]">
+                <p>{event.headline}</p>
+                <a href="/eleven/money" className="mt-1 inline-block text-sm text-[var(--accent)] hover:underline">
+                  Open money
+                </a>
+              </li>
+            ))}
+          </ul>
         </>
       )}
 

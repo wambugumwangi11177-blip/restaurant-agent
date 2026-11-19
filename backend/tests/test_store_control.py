@@ -481,6 +481,37 @@ def test_j03_upgrade_is_idempotent_and_merges_with_the_pos_inbox():
     engine.dispose()
 
 
+def test_overdue_bills_are_reminders_not_approvals(client, db_session):
+    from datetime import timedelta
+
+    from bill_schedule import business_today
+
+    tenant, owner, restaurant = _tenant(db_session, "Eleven", "owner-bill@eleven.leviii")
+    jack = _add_staff(db_session, tenant, restaurant, "jack-bill@eleven.leviii", models.StaffRole.STOCKKEEPER)
+    _unlock(client, jack)
+    added = client.post(
+        "/api/v1/store/costs",
+        headers=_auth(_token(jack)),
+        data={"kind": "rent", "label": "Rent", "amount_kes": "12000", "known": "yes", "cadence": "monthly", "due_day": "5"},
+    )
+    assert added.status_code == 201
+    pending = client.get("/api/v1/store/approvals", headers=_auth(_token(owner))).json()["pending"]
+    cost_wait = next(p for p in pending if p["kind"] == "cost")
+    approved = client.post(
+        "/api/v1/store/approvals",
+        headers=_auth(_token(owner)),
+        json={"kind": "cost", "id": cost_wait["id"], "decision": "approve"},
+    )
+    assert approved.status_code == 200
+    row = db_session.query(models.RunningCost).one()
+    row.payment_state = "unpaid"
+    row.next_due_on = business_today() - timedelta(days=5)
+    db_session.commit()
+    feed = client.get("/api/v1/store/approvals", headers=_auth(_token(owner))).json()
+    assert any(r["kind"] == "bill_due" and r["status"] == "overdue" for r in feed["bill_reminders"])
+    assert not any(p.get("kind") == "bill_due" for p in feed["pending"])
+
+
 def test_postgres_audit_trigger_rejects_a_change():
     """The service guard covers SQLite. This checks the trigger when Postgres is the database."""
     import os

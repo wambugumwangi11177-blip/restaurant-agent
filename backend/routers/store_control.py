@@ -1001,12 +1001,13 @@ async def list_approvals(
 
     today = business_today()
     overdue_bills: list[str] = []
+    bill_reminders: list[dict] = []
     for row in costs:
         bucket = reminder_bucket(row.next_due_on, row.payment_state, row.status, today, row.remind_days or 3)
         if bucket != "overdue":
             continue
         overdue_bills.append(row.label)
-        pending.append({
+        bill_reminders.append({
             "id": row.id,
             "kind": "bill_due",
             "status": "overdue",
@@ -1021,7 +1022,7 @@ async def list_approvals(
         bucket = reminder_bucket(row.next_due_on, row.payment_state, row.status, today, row.remind_days or 3)
         if bucket != "due_soon":
             continue
-        pending.append({
+        bill_reminders.append({
             "id": row.id,
             "kind": "bill_due",
             "status": "due_soon",
@@ -1083,6 +1084,7 @@ async def list_approvals(
             missing_recipes += 1
     return {
         "pending": pending,
+        "bill_reminders": bill_reminders,
         "events": events,
         "timezone": RESTAURANT_TIMEZONE,
         "attention": {"count": count, "sentence": attention},

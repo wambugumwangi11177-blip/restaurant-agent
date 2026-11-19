@@ -33,7 +33,6 @@ api.interceptors.response.use(
       const isAuthPath =
         window.location.pathname === "/login" ||
         window.location.pathname === "/register" ||
-        window.location.pathname === "/order" ||
         (error.config?.url ?? "").includes("/auth/");
       if (!isAuthPath) {
         clearAccessToken();

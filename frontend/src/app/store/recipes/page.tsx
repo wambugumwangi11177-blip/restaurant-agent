@@ -76,8 +76,8 @@ export default function StoreRecipesPage() {
   async function finishStep() {
     setError("");
     try {
-      const response = await api.post("/api/v1/staff-setup/recipes");
-      setSetup(response.data);
+      await api.post("/api/v1/staff-setup/recipes");
+      setSetup(await loadSetup());
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setError(typeof detail === "string" ? detail : "The recipe step is not finished yet.");

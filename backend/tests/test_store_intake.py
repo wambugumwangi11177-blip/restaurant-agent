@@ -264,6 +264,9 @@ def test_delivery_needs_both_photos_and_ai_mismatch_stays_with_the_owner(client,
     notes = db_session.query(models.Notification).all()
     assert all("AI" not in (note.title or "") and "AI" not in (note.body or "") for note in notes)
     assert db_session.query(models.StaffEntryAudit).filter_by(action="delivery_ai_mismatch").count() == 1
+    owner_feed = client.get("/api/v1/store/approvals", headers=_auth(_token(owner))).json()
+    assert any(event["kind"] == "delivery" for event in owner_feed["events"])
+    assert not any(item.get("kind") == "bill_due" for item in owner_feed["pending"])
 
 
 def test_ai_failure_is_named_and_the_call_does_not_change_model(client, db_session, monkeypatch):

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { OfflineMark } from "@/components/store/diagrams";
 import { shouldOfferStoreUpdate, versionFromUserAgent, type StoreRelease } from "@/lib/storeRelease";
+import { isLeviiiStoreClient } from "@/lib/nativeStore";
 import "@/styles/owner-glass.css";
 
 type CapacitorApp = {
@@ -74,7 +75,13 @@ export default function NativeApp({ children }: { children: React.ReactNode }) {
   const [updateUrl, setUpdateUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const native = Boolean(capacitor()?.isNativePlatform?.()) || /LEVIIIStore\/\d+\.\d+\.\d+/.test(navigator.userAgent);
+    if (isLeviiiStoreClient()) {
+      document.documentElement.dataset.leviiiApk = "true";
+    }
+  }, []);
+
+  useEffect(() => {
+    const native = isLeviiiStoreClient();
     if (!native) return;
     let live = true;
     (async () => {

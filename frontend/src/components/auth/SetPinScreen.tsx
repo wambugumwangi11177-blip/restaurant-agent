@@ -5,7 +5,6 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { markPinUnlocked } from "@/lib/appLock";
 import PinKeypad from "@/components/auth/PinKeypad";
-import "@/styles/owner-glass.css";
 
 export default function SetPinScreen({
   displayName,
@@ -63,8 +62,8 @@ export default function SetPinScreen({
   }, [pin, step, confirm, first, refreshUser, onDone]);
 
   return (
-    <div className="owner-glass-theme fixed inset-0 z-[200] flex min-h-dvh flex-col items-center justify-center bg-[#0a0a0a] px-4">
-      <div className="owner-glass-panel w-full max-w-sm rounded-3xl p-6">
+    <div className="fixed inset-0 z-[200] flex min-h-dvh flex-col items-center justify-center bg-[#0a0a0a] px-4">
+      <div className="w-full max-w-sm rounded-3xl border border-white/15 bg-[#16161a] p-6 shadow-lg">
         <h1 className="text-center text-xl font-semibold text-white">Choose a PIN for {displayName}</h1>
         <p className="mt-2 text-center text-sm text-zinc-400">
           {step === "enter" ? "Pick 4 digits only you know." : "Enter it again to confirm."}

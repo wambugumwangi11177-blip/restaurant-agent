@@ -25,7 +25,7 @@ const capacitor = {
     allowMixedContent: false,
     webContentsDebuggingEnabled: false,
     backgroundColor: "#070708",
-    captureInput: true,
+    captureInput: false,
     appendUserAgent: storeUserAgent(release.version),
   },
   plugins: {

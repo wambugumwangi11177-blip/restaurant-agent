@@ -25,7 +25,6 @@ const ownerMe = {
   has_pin: true,
   password_auth_valid: true,
   display_name: "Wambugu",
-  must_change_password: false,
 };
 
 const jackMe = {
@@ -169,6 +168,48 @@ test.describe("mobile LEVIII shell", () => {
     await page.goto("/eleven");
     await expect(page.getByRole("heading", { name: "Needs you" })).toBeVisible({ timeout: 15_000 });
     await page.screenshot({ path: path.join(ARTIFACTS, "owner-home-mobile.png"), fullPage: true });
+  });
+
+  test("logged-in LEVIIIStore /login does not leave login #password over glass", async ({ browser }) => {
+    const context = await browser.newContext({
+      userAgent:
+        "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 LEVIIIStore/1.0.8",
+      viewport: { width: 412, height: 915 },
+    });
+    const page = await context.newPage();
+    await mockAuthed(page, ownerMe);
+    await page.addInitScript(() => {
+      sessionStorage.setItem("access_token", "playwright-logged-in");
+      document.documentElement.dataset.leviiiApk = "true";
+    });
+    await page.goto("/login");
+    await page.waitForURL(/\/eleven/, { timeout: 15_000 });
+    await expect(page.locator("#password")).toHaveCount(0);
+    await expect(page.getByText(/Enter your 4-digit PIN/i)).toBeVisible({ timeout: 15_000 });
+    await page.screenshot({ path: path.join(ARTIFACTS, "logged-in-login-handoff-lock.png"), fullPage: true });
+    await context.close();
+  });
+
+  test("logged-in Jack on root lands on visible store or lock", async ({ browser }) => {
+    const context = await browser.newContext({
+      userAgent:
+        "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 LEVIIIStore/1.0.8",
+      viewport: { width: 412, height: 915 },
+    });
+    const page = await context.newPage();
+    await mockAuthed(page, jackMe);
+    await page.addInitScript(() => {
+      sessionStorage.setItem("access_token", "playwright-jack");
+      document.documentElement.dataset.leviiiApk = "true";
+    });
+    await page.goto("/");
+    await page.waitForURL(/\/store/, { timeout: 15_000 });
+    await expect(page.locator("#password")).toHaveCount(0);
+    await expect(
+      page.getByText(/Enter your 4-digit PIN/i).or(page.getByText(/How a delivery is kept/i)),
+    ).toBeVisible({ timeout: 15_000 });
+    await page.screenshot({ path: path.join(ARTIFACTS, "logged-in-jack-first-screen.png"), fullPage: true });
+    await context.close();
   });
 
   test("store home after session", async ({ page }) => {

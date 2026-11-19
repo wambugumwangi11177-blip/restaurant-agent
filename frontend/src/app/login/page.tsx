@@ -6,9 +6,12 @@ import { homeFor } from "@/lib/tenantHome";
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from "@/lib/brand";
 import { useRouter } from "next/navigation";
 import { Loader2, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { isLeviiiStoreClient } from "@/lib/nativeStore";
+
+const AUTH_WAIT_MS = 6000;
 
 export default function LoginPage() {
-    const { user, isLoading, login, setInitialPassword } = useAuth();
+    const { user, isLoading, login, setInitialPassword, logout } = useAuth();
     const router = useRouter();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -19,15 +22,29 @@ export default function LoginPage() {
     const [handoverCodeRequired, setHandoverCodeRequired] = useState(false);
     const [handoverCode, setHandoverCode] = useState("");
     const [nativeStore, setNativeStore] = useState(false);
+    const [authStuck, setAuthStuck] = useState(false);
 
     useEffect(() => {
-        setNativeStore(navigator.userAgent.includes("LEVIIIStore"));
+        setNativeStore(isLeviiiStoreClient());
     }, []);
 
     useEffect(() => {
+        if (!isLoading) {
+            setAuthStuck(false);
+            return;
+        }
+        const t = window.setTimeout(() => setAuthStuck(true), AUTH_WAIT_MS);
+        return () => window.clearTimeout(t);
+    }, [isLoading]);
+
+    useEffect(() => {
         if (isLoading) return;
-        if (user) {
-            router.replace(homeFor(user.tenant_name, user.staff_role));
+        if (!user) return;
+        const dest = homeFor(user.tenant_name, user.staff_role);
+        if (isLeviiiStoreClient()) {
+            window.location.replace(dest);
+        } else {
+            router.replace(dest);
         }
     }, [user, isLoading, router]);
 
@@ -75,18 +92,14 @@ export default function LoginPage() {
         }
     };
 
-    if (isLoading) {
+    if (user) {
+        return <div className="min-h-dvh bg-[#0a0a0a]" role="status" aria-label="Opening home" />;
+    }
+
+    if (isLoading && !authStuck) {
         return (
             <div className="flex min-h-dvh items-center justify-center bg-[#0a0a0a] px-4">
                 <Loader2 className="h-6 w-6 animate-spin text-[#e8bd68]" aria-label="Checking sign-in" />
-            </div>
-        );
-    }
-
-    if (user) {
-        return (
-            <div className="flex min-h-dvh items-center justify-center bg-[#0a0a0a] px-4">
-                <Loader2 className="h-6 w-6 animate-spin text-[#e8bd68]" aria-label="Opening home" />
             </div>
         );
     }
@@ -109,6 +122,22 @@ export default function LoginPage() {
                     {error && (
                         <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
                             {error}
+                        </div>
+                    )}
+
+                    {authStuck && isLoading && (
+                        <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-200">
+                            Sign-in is taking longer than expected. You can clear this device and try again.
+                            <button
+                                type="button"
+                                className="mt-3 flex min-h-11 w-full items-center justify-center rounded-lg border border-amber-400/40 px-3 font-semibold text-amber-100"
+                                onClick={() => {
+                                    logout();
+                                    setAuthStuck(false);
+                                }}
+                            >
+                                Sign out and try again
+                            </button>
                         </div>
                     )}
 

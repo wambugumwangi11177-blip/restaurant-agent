@@ -7,7 +7,8 @@ on:
     inputs:
       app_url:
         description: Public HTTPS origin of the Jack test Railway frontend, no path.
-        required: true
+        required: false
+        default: https://frontend-production-e251.up.railway.app
         type: string
 permissions:
   contents: write
@@ -18,7 +19,7 @@ jobs:
       run:
         working-directory: packaging
     env:
-      LEVIII_APP_URL: ${{ inputs.app_url }}
+      LEVIII_APP_URL: ${{ inputs.app_url || 'https://frontend-production-e251.up.railway.app' }}
       LEVIII_APP_NAME: LEVIII Store Test
       LEVIII_APP_ID: com.leviii.store.test
     steps:

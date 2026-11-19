@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Outfit, DM_Sans, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import "@/styles/owner-glass.css";
 import { Providers } from "./providers";
 
 const outfit = Outfit({

@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { homeFor } from "@/lib/tenantHome";
+import { isLeviiiStoreClient } from "@/lib/nativeStore";
 import LockScreen from "@/components/auth/LockScreen";
 import SetPinScreen from "@/components/auth/SetPinScreen";
 import {
@@ -17,8 +19,10 @@ const PUBLIC = ["/login", "/forgot-password", "/reset-password", "/verify-email"
 
 export default function AppLockGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
+  const router = useRouter();
   const { user, isLoading, logout } = useAuth();
   const [locked, setLocked] = useState(true);
+  const [routeHandoff, setRouteHandoff] = useState(false);
 
   const isPublic = PUBLIC.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
@@ -27,9 +31,36 @@ export default function AppLockGate({ children }: { children: React.ReactNode })
     setLocked(true);
   }, []);
 
+  // Logged-in users must leave / and /login even when the lock overlay blocks {children} (Home never mounts).
+  useEffect(() => {
+    if (isLoading || !user) return;
+    const dest = homeFor(user.tenant_name, user.staff_role);
+    if (pathname === dest) return;
+    if (pathname === "/login" && isPublic) {
+      if (isLeviiiStoreClient()) window.location.replace(dest);
+      else router.replace(dest);
+      return;
+    }
+    if (pathname === "/") {
+      if (isLeviiiStoreClient()) window.location.replace(dest);
+      else router.replace(dest);
+    }
+  }, [user, isLoading, isPublic, pathname, router]);
+
+  useEffect(() => {
+    if (isPublic) {
+      setRouteHandoff(false);
+      setLocked(false);
+      return;
+    }
+    setRouteHandoff(true);
+    const settle = window.setTimeout(() => setRouteHandoff(false), 350);
+    return () => window.clearTimeout(settle);
+  }, [pathname, isPublic]);
+
   useEffect(() => {
     if (isPublic || !user) {
-      setLocked(false);
+      if (isPublic) setLocked(false);
       return;
     }
     if (user.password_auth_valid === false) {
@@ -78,8 +109,8 @@ export default function AppLockGate({ children }: { children: React.ReactNode })
 
   if (!user) return <>{children}</>;
 
-  if (isLoading) {
-    return <div className="min-h-dvh bg-[#0a0a0a]" role="status" aria-label="Loading session" />;
+  if (isLoading || routeHandoff) {
+    return <div className="min-h-dvh bg-[#0a0a0a]" role="status" aria-label="Opening" />;
   }
 
   if (user.password_auth_valid === false) {

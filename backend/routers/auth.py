@@ -302,7 +302,7 @@ def _authenticate_password_user(
     if user and not user.hashed_password:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="FIRST_PASSWORD_REQUIRED",
+            detail={"code": "FIRST_PASSWORD_REQUIRED", "email": user.email},
         )
     if not user or not user.hashed_password or not auth.verify_password(password, user.hashed_password):
         if user:
@@ -364,6 +364,18 @@ def _authenticate_password_user(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+def _env_truthy(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in ("1", "true", "yes")
+
+
+def _may_set_initial_password(user: models.User) -> bool:
+    if user.staff_role in (models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER):
+        return True
+    if user.staff_role == models.StaffRole.OWNER and user.role in (models.Role.ADMIN, models.Role.SUPERADMIN):
+        return _env_truthy("ALLOW_OWNER_FIRST_PASSWORD")
+    return False
+
+
 @router.post("/set-initial-password", response_model=Token)
 @limiter.limit("10/minute")
 async def set_initial_password(
@@ -371,11 +383,11 @@ async def set_initial_password(
     body: InitialPasswordSet,
     db: Session = Depends(get_db),
 ):
-    """Storekeeper or accountant sets their own password before the first sign-in."""
+    """Storekeeper, accountant, or (test-only) owner sets their own password before first sign-in."""
     user = db.query(models.User).filter(models.User.email == body.email).first()
     if user is None or not user.is_active or user.hashed_password:
         raise HTTPException(status_code=400, detail="This login is not waiting for a first password.")
-    if user.staff_role not in (models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER):
+    if not _may_set_initial_password(user):
         raise HTTPException(status_code=400, detail="This login is not waiting for a first password.")
     auth.require_strong_password(body.new_password)
     user.hashed_password = auth.get_password_hash(body.new_password)

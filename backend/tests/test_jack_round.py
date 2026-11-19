@@ -33,7 +33,7 @@ def test_initial_password_login(client, db_session):
     db_session.commit()
     blocked = client.post("/api/v1/auth/login", json={"email": "jack@pw.eleven", "password": "anything"})
     assert blocked.status_code == 403
-    assert blocked.json()["detail"] == "FIRST_PASSWORD_REQUIRED"
+    assert blocked.json()["detail"]["code"] == "FIRST_PASSWORD_REQUIRED"
     set_pw = client.post(
         "/api/v1/auth/set-initial-password",
         json={"email": "jack@pw.eleven", "new_password": "JackPass12"},

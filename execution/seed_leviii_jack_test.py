@@ -19,18 +19,32 @@ from leviii_test_seed import ensure_eleven_test_data
 from models import Base
 
 
+def _truthy(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in ("1", "true", "yes")
+
+
 def seed(credentials_path: Path, owner_password: str | None = None) -> None:
     from database import engine
 
     if str(engine.url).startswith("sqlite"):
         Base.metadata.create_all(bind=engine)
-    password = owner_password or secrets.token_urlsafe(12)
-    owner_password_line = f"OWNER_PASSWORD={password}"
+    owner_first = _truthy("SEED_OWNER_FIRST_LOGIN")
+    password = owner_password or ("" if owner_first else secrets.token_urlsafe(12))
+    owner_password_line = (
+        "OWNER_PASSWORD=set on first sign-in"
+        if owner_first
+        else f"OWNER_PASSWORD={password}"
+    )
     db = SessionLocal()
     try:
         existed = db.query(models.User).filter(models.User.email == "owner@eleven.leviii").first() is not None
-        ensure_eleven_test_data(db, password)
-        if existed and owner_password is None:
+        ensure_eleven_test_data(
+            db,
+            password,
+            owner_first_login=owner_first,
+            owner_reset_first_login=_truthy("SEED_OWNER_RESET_FIRST_LOGIN"),
+        )
+        if not owner_first and existed and owner_password is None:
             owner_password_line = "OWNER_PASSWORD=(unchanged — existing account)"
         credentials_path.parent.mkdir(parents=True, exist_ok=True)
         credentials_path.write_text(

@@ -55,11 +55,18 @@ export default function LoginPage() {
         } catch (err: unknown) {
             let message = "Authentication failed";
             if (err && typeof err === "object" && "response" in err) {
-                const axiosErr = err as { response?: { data?: { detail?: string } }; message?: string };
-                message = axiosErr.response?.data?.detail || axiosErr.message || message;
-                if (axiosErr.response?.data?.detail === "FIRST_PASSWORD_REQUIRED") {
+                const axiosErr = err as { response?: { data?: { detail?: string | { code?: string; email?: string } } }; message?: string };
+                const rawDetail = axiosErr.response?.data?.detail;
+                message = (typeof rawDetail === "string" ? rawDetail : rawDetail?.code) || axiosErr.message || message;
+                const firstRequired =
+                    rawDetail === "FIRST_PASSWORD_REQUIRED" ||
+                    (typeof rawDetail === "object" && rawDetail?.code === "FIRST_PASSWORD_REQUIRED");
+                if (firstRequired) {
                     setFirstPassword(true);
                     setUseEmailLogin(true);
+                    if (typeof rawDetail === "object" && rawDetail.email) {
+                        setEmail(rawDetail.email);
+                    }
                     setError("Choose your own password. This is your first sign-in.");
                     return;
                 }

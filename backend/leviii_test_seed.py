@@ -1,7 +1,6 @@
 """Idempotent Eleven test stack for Jack deployments (env-gated).
 
-Set SEED_TEST_DATA=1 and SEED_OWNER_PASSWORD on test stacks only. Production
-leaves both unset — this module is a no-op.
+Set SEED_TEST_DATA=1 on test stacks only. Production leaves it unset — no-op.
 """
 from __future__ import annotations
 
@@ -14,11 +13,13 @@ from fastapi import HTTPException
 from models import Role, StaffRole, StaffSetupProgress
 from routers.store_intake import ensure_zones
 from sqlalchemy.orm import Session
+from staff_audit import record_entry
 
 logger = logging.getLogger("leviii_test_seed")
 
 ELEVEN = "Eleven"
 OWNER_EMAIL = "owner@eleven.leviii"
+OWNER_RESET_MARKER = "eleven_test_owner_first_login_reset"
 STAFF = (
     ("jack@eleven.leviii", StaffRole.STOCKKEEPER, "Jack"),
     ("amina@eleven.leviii", StaffRole.CONTROLLER, "Amina"),
@@ -29,12 +30,35 @@ class SeedError(Exception):
     pass
 
 
-def ensure_eleven_test_data(db: Session, owner_password: str) -> list[str]:
+def _truthy(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in ("1", "true", "yes")
+
+
+def _reset_marker_applied(db: Session, owner_id: int) -> bool:
+    return (
+        db.query(models.StaffEntryAudit)
+        .filter(
+            models.StaffEntryAudit.action == OWNER_RESET_MARKER,
+            models.StaffEntryAudit.entity_id == owner_id,
+        )
+        .first()
+        is not None
+    )
+
+
+def ensure_eleven_test_data(
+    db: Session,
+    owner_password: str,
+    *,
+    owner_first_login: bool = False,
+    owner_reset_first_login: bool = False,
+) -> list[str]:
     """Create Eleven owner, Jack, accountant, zones, and a little stock if missing."""
-    try:
-        auth.require_strong_password(owner_password)
-    except HTTPException as exc:
-        raise SeedError(exc.detail) from exc
+    if not owner_first_login and owner_password:
+        try:
+            auth.require_strong_password(owner_password)
+        except HTTPException as exc:
+            raise SeedError(exc.detail) from exc
 
     log: list[str] = []
     tenant = db.query(models.Tenant).filter(models.Tenant.name == ELEVEN).first()
@@ -57,23 +81,52 @@ def ensure_eleven_test_data(db: Session, owner_password: str) -> list[str]:
 
     owner = db.query(models.User).filter(models.User.email == OWNER_EMAIL).first()
     if owner is None:
+        if owner_first_login:
+            hashed = None
+            must_change = True
+            log.append(f"[CREATED] owner {OWNER_EMAIL} (first login — no password)")
+        else:
+            if not owner_password:
+                raise SeedError("SEED_OWNER_PASSWORD is required when SEED_OWNER_FIRST_LOGIN is off")
+            hashed = auth.get_password_hash(owner_password)
+            must_change = False
+            log.append(f"[CREATED] owner {OWNER_EMAIL}")
         owner = models.User(
             email=OWNER_EMAIL,
-            hashed_password=auth.get_password_hash(owner_password),
+            hashed_password=hashed,
             role=Role.ADMIN,
             staff_role=StaffRole.OWNER,
             tenant_id=tenant.id,
-            must_change_password=False,
+            must_change_password=must_change,
             is_email_verified=True,
             is_active=True,
         )
         db.add(owner)
-        log.append(f"[CREATED] owner {OWNER_EMAIL}")
+        db.flush()
     else:
         owner.role = Role.ADMIN
         owner.staff_role = StaffRole.OWNER
         owner.is_active = True
-        log.append(f"[EXISTS] owner {OWNER_EMAIL} (password unchanged)")
+        if (
+            owner_reset_first_login
+            and owner.hashed_password
+            and not _reset_marker_applied(db, owner.id)
+        ):
+            owner.hashed_password = None
+            owner.must_change_password = True
+            record_entry(
+                db,
+                restaurant.id,
+                owner,
+                OWNER_RESET_MARKER,
+                "system",
+                "Owner password cleared once for Jack test first-login.",
+                entity_id=owner.id,
+                detail={"email": OWNER_EMAIL},
+            )
+            log.append(f"[RESET] owner {OWNER_EMAIL} (first login, one-time)")
+        else:
+            log.append(f"[EXISTS] owner {OWNER_EMAIL} (password unchanged)")
     owner.active_restaurant_id = restaurant.id
 
     for email, role, name in STAFF:
@@ -150,19 +203,28 @@ def ensure_eleven_test_data(db: Session, owner_password: str) -> list[str]:
 
 
 def provision_test_data_from_env() -> None:
-    flag = os.getenv("SEED_TEST_DATA", "").strip().lower()
-    if flag not in ("1", "true", "yes"):
+    if not _truthy("SEED_TEST_DATA"):
         return
+    owner_first = _truthy("SEED_OWNER_FIRST_LOGIN")
+    owner_reset = _truthy("SEED_OWNER_RESET_FIRST_LOGIN")
     password = os.getenv("SEED_OWNER_PASSWORD", "")
-    if not password:
-        logger.warning("[eleven-seed] SEED_TEST_DATA is set but SEED_OWNER_PASSWORD is missing — skipped")
+    if not owner_first and not password:
+        logger.warning(
+            "[eleven-seed] SEED_TEST_DATA is set but SEED_OWNER_PASSWORD is missing "
+            "(and SEED_OWNER_FIRST_LOGIN is off) — skipped"
+        )
         return
 
     from database import SessionLocal
 
     db = SessionLocal()
     try:
-        for line in ensure_eleven_test_data(db, password):
+        for line in ensure_eleven_test_data(
+            db,
+            password,
+            owner_first_login=owner_first,
+            owner_reset_first_login=owner_reset,
+        ):
             logger.info("[eleven-seed] %s", line)
     except Exception as exc:
         db.rollback()

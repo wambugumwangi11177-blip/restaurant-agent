@@ -826,6 +826,60 @@ async def list_closes(
     return {"closes": [_close_public(db, row) for row in rows]}
 
 
+@router.get("/my-requests")
+async def my_requests(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """Jack: deliveries and write-offs they started — no money fields."""
+    require_store_role(current_user)
+    restaurant = get_or_create_restaurant(db, current_user)
+    spoilage = (
+        db.query(models.SpoilageRecord)
+        .filter(
+            models.SpoilageRecord.restaurant_id == restaurant.id,
+            models.SpoilageRecord.user_id == current_user.id,
+        )
+        .order_by(models.SpoilageRecord.created_at.desc())
+        .limit(30)
+        .all()
+    )
+    deliveries = (
+        db.query(models.DeliveryReceipt)
+        .filter(
+            models.DeliveryReceipt.restaurant_id == restaurant.id,
+            models.DeliveryReceipt.received_by_user_id == current_user.id,
+        )
+        .order_by(models.DeliveryReceipt.received_at.desc())
+        .limit(30)
+        .all()
+    )
+    return {
+        "items": [
+            *[
+                {
+                    "kind": "waste",
+                    "id": row.id,
+                    "label": row.item_name,
+                    "status": row.status,
+                    "created_at": row.created_at.isoformat() if row.created_at else None,
+                }
+                for row in spoilage
+            ],
+            *[
+                {
+                    "kind": "delivery",
+                    "id": row.id,
+                    "label": f"Delivery #{row.id}",
+                    "status": row.status,
+                    "created_at": row.received_at.isoformat() if row.received_at else None,
+                }
+                for row in deliveries
+            ],
+        ]
+    }
+
+
 @router.get("/approvals")
 async def list_approvals(
     db: Session = Depends(get_db),

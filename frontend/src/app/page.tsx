@@ -13,7 +13,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!isLoading) {
       if (user) {
-        const dest = homeFor(user.tenant_name, user.staff_role);
+        const dest = homeFor(user.tenant_name, user.staff_role, user.role);
         if (isLeviiiStoreClient()) {
           window.location.replace(dest);
         } else {

@@ -16,11 +16,23 @@ router = APIRouter(prefix="/eleven/import", tags=["eleven-import"])
 _MAX_BYTES = 2_000_000
 
 
-def _eleven_restaurant(db: Session, user: models.User) -> models.Restaurant:
+def _import_restaurant(db: Session, user: models.User) -> models.Restaurant:
+    if user.role == models.Role.SUPERADMIN:
+        from restaurant_scope import get_restaurant_or_none
+
+        restaurant = get_restaurant_or_none(db, user)
+        if not restaurant:
+            raise HTTPException(status_code=409, detail="Open a client first from the super-admin screen.")
+        return restaurant
     restaurant = get_or_create_restaurant(db, user)
+    if user.role != models.Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Import is for owners or super-admin.")
     tenant = db.query(models.Tenant).filter(models.Tenant.id == user.tenant_id).first()
     if not tenant or (tenant.name or "").strip().lower() != "eleven":
-        raise HTTPException(status_code=403, detail="This import only writes into the Eleven restaurant.")
+        raise HTTPException(
+            status_code=403,
+            detail="Import for this client is done from the super-admin screen.",
+        )
     return restaurant
 
 
@@ -47,10 +59,10 @@ def _parse(filename: str, data: bytes, sheet: str | None):
 
 @router.get("/template")
 async def download_template(
-    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(auth.require_role(models.Role.SUPERADMIN, models.Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
-    _eleven_restaurant(db, current_user)
+    _import_restaurant(db, current_user)
     return Response(
         content=build_template(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -63,9 +75,9 @@ async def preview_import(
     file: UploadFile = File(...),
     sheet: str | None = Form(default=None),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(auth.require_role(models.Role.SUPERADMIN, models.Role.ADMIN)),
 ):
-    _eleven_restaurant(db, current_user)
+    _import_restaurant(db, current_user)
     parsed = _parse(file.filename or "", await _read_upload(file), sheet)
     return preview_payload(parsed)
 
@@ -75,17 +87,35 @@ async def confirm_import(
     file: UploadFile = File(...),
     sheet: str | None = Form(default=None),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_role(models.Role.ADMIN)),
+    current_user: models.User = Depends(auth.require_role(models.Role.SUPERADMIN, models.Role.ADMIN)),
 ):
-    restaurant = _eleven_restaurant(db, current_user)
+    restaurant = _import_restaurant(db, current_user)
     parsed = _parse(file.filename or "", await _read_upload(file), sheet)
+    failed_rows: list[dict] = []
     try:
         summary = apply_import(db, restaurant.id, current_user, parsed)
     except ValueError as exc:
         db.rollback()
+        failed_rows.append({"error": str(exc)})
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     inserted = sum(part["inserted"] for part in summary.values())
     skipped = sum(part["skipped"] for part in summary.values())
+    for sheet_name, part in summary.items():
+        for fail in part.get("failed") or []:
+            failed_rows.append({"sheet": sheet_name, **fail})
+    import json
+
+    db.add(
+        models.ImportRun(
+            restaurant_id=restaurant.id,
+            uploaded_by_user_id=current_user.id,
+            filename=file.filename or "upload",
+            inserted=inserted,
+            skipped=skipped,
+            failed_json=json.dumps(failed_rows),
+            summary_json=json.dumps(summary),
+        )
+    )
     record_entry(
         db,
         restaurant.id,

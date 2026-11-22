@@ -18,6 +18,9 @@ from staff_audit import record_entry
 logger = logging.getLogger("leviii_test_seed")
 
 ELEVEN = "Eleven"
+TEST_TENANT = "Test Restaurant"
+SUPERADMIN_EMAIL = "wambugu@leviii.ai"
+TEST_OWNER_EMAIL = "owner@test.restaurant.leviii"
 OWNER_EMAIL = "owner@eleven.leviii"
 OWNER_RESET_MARKER = "eleven_test_owner_first_login_reset"
 STAFF = (
@@ -197,6 +200,65 @@ def ensure_eleven_test_data(
             )
         )
         log.append("[CREATED] sample supplier")
+
+    db.commit()
+
+    # Test Restaurant — proves the data wall (no shared stock with Eleven).
+    test_tenant = db.query(models.Tenant).filter(models.Tenant.name == TEST_TENANT).first()
+    if test_tenant is None:
+        test_tenant = models.Tenant(name=TEST_TENANT)
+        db.add(test_tenant)
+        db.flush()
+        log.append(f"[CREATED] tenant {TEST_TENANT!r}")
+    test_restaurant = (
+        db.query(models.Restaurant).filter(models.Restaurant.tenant_id == test_tenant.id).first()
+    )
+    if test_restaurant is None:
+        test_restaurant = models.Restaurant(
+            tenant_id=test_tenant.id,
+            name=TEST_TENANT,
+            address="Wall test only",
+        )
+        db.add(test_restaurant)
+        db.flush()
+        log.append("[CREATED] restaurant Test Restaurant")
+    test_owner = db.query(models.User).filter(models.User.email == TEST_OWNER_EMAIL).first()
+    if test_owner is None:
+        test_owner = models.User(
+            email=TEST_OWNER_EMAIL,
+            hashed_password=None,
+            role=Role.ADMIN,
+            staff_role=StaffRole.OWNER,
+            tenant_id=test_tenant.id,
+            must_change_password=True,
+            is_active=True,
+            is_email_verified=True,
+        )
+        db.add(test_owner)
+        db.flush()
+        log.append(f"[CREATED] test owner {TEST_OWNER_EMAIL} (first login)")
+    test_owner.active_restaurant_id = test_restaurant.id
+
+    super_user = db.query(models.User).filter(models.User.email == SUPERADMIN_EMAIL).first()
+    if super_user is None:
+        if not owner_password and not owner_first_login:
+            log.append(f"[SKIP] super-admin {SUPERADMIN_EMAIL} (needs SEED_OWNER_PASSWORD on first run)")
+        else:
+            super_user = models.User(
+                email=SUPERADMIN_EMAIL,
+                hashed_password=auth.get_password_hash(owner_password) if owner_password else None,
+                role=Role.SUPERADMIN,
+                staff_role=StaffRole.OWNER,
+                tenant_id=tenant.id,
+                must_change_password=bool(owner_first_login and not owner_password),
+                is_active=True,
+                is_email_verified=True,
+            )
+            db.add(super_user)
+            log.append(f"[CREATED] super-admin {SUPERADMIN_EMAIL}")
+    else:
+        super_user.role = Role.SUPERADMIN
+        log.append(f"[EXISTS] super-admin {SUPERADMIN_EMAIL}")
 
     db.commit()
     return log

@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import api from "@/lib/api";
 import OwnerShell from "@/components/eleven/OwnerShell";
 import { dayLabel, useOwnerFeed, type FeedEvent } from "@/components/eleven/OwnerFeed";
 
@@ -25,10 +26,22 @@ function countByKind(events: FeedEvent[], sinceMs: number) {
   return counts;
 }
 
+type SalesSummary = {
+  has_sales_data: boolean;
+  empty_message?: string | null;
+  sales?: { tickets: number; revenue_kes: number | null; voids: number };
+  stock?: { value_kes: number | null; needs_cost: string[]; state: string };
+};
+
 export default function ElevenReportsPage() {
   const { data, error } = useOwnerFeed();
+  const [sales, setSales] = useState<SalesSummary | null>(null);
   const zone = data?.timezone;
   const [now] = useState(() => Date.now());
+
+  useEffect(() => {
+    api.get<SalesSummary>("/api/v1/eleven/summary?period=7d").then((r) => setSales(r.data)).catch(() => undefined);
+  }, []);
   const dayStart = now - 86_400_000;
   const weekStart = now - 7 * 86_400_000;
 
@@ -58,6 +71,25 @@ export default function ElevenReportsPage() {
       <p className="mb-4 text-xs text-zinc-400">Summaries from store deliveries, handovers, waste, closes, bills, and zone photos.</p>
       {error && <p className="text-sm text-red-300">{error}</p>}
       {!data && !error && <p className="text-sm text-zinc-400">Loading…</p>}
+      {sales && (
+        <section className="owner-glass-panel mb-4 rounded-2xl p-4">
+          <h2 className="owner-label">Sales (7 days)</h2>
+          {!sales.has_sales_data ? (
+            <p className="mt-2 text-sm text-zinc-400">{sales.empty_message}</p>
+          ) : (
+            <p className="mt-2 text-sm">
+              {sales.sales?.tickets ?? 0} tickets
+              {sales.sales?.revenue_kes != null ? ` · KES ${sales.sales.revenue_kes.toLocaleString()}` : ""}
+              {sales.sales?.voids ? ` · ${sales.sales.voids} void(s)` : ""}
+            </p>
+          )}
+          {sales.stock?.state === "needs_cost" && (
+            <p className="mt-2 text-xs text-amber-200/90">
+              Stock value needs cost on: {sales.stock.needs_cost.join(", ")}
+            </p>
+          )}
+        </section>
+      )}
       {data && (
         <div className="space-y-6">
           <section className="owner-glass-panel rounded-2xl p-4">

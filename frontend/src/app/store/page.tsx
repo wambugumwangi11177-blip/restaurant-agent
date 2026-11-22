@@ -43,6 +43,7 @@ export default function StoreHomePage() {
             <li><Link href="/store/day-photos" className="underline">Zone photos · day open and close</Link></li>
             <li><Link href="/store/recipes" className="underline">Recipes{setup.recipe_gap?.missing_count ? ` · ${setup.recipe_gap.missing_count === 1 ? "1 dish still has no recipe" : `${setup.recipe_gap.missing_count} dishes still have no recipe`}` : ""}</Link></li>
             <li><Link href="/store/chefs" className="underline">Chefs</Link></li>
+            <li><Link href="/store/requests" className="underline">My requests</Link></li>
             {hasModule(setup, "deliveries") && <li><Link href="/store/deliveries" className="underline">Deliveries</Link></li>}
             {hasModule(setup, "store-issue") && <li><Link href="/store/issue" className="underline">Hand to the kitchen</Link></li>}
             {hasModule(setup, "waste") && <li><Link href="/store/waste" className="underline">Thrown away</Link></li>}

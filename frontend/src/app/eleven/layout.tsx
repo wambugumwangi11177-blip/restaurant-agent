@@ -10,7 +10,7 @@ export default function ElevenLayout({ children }: { children: React.ReactNode }
   const { user, isLoading } = useAuth();
   const router = useRouter();
   const owner = user?.role === "admin" || user?.role === "superadmin";
-  const allowed = owner && isEleven(user?.tenant_name);
+  const allowed = user?.role === "superadmin" || (owner && isEleven(user?.tenant_name));
 
   useEffect(() => {
     if (isLoading) return;

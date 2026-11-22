@@ -34,7 +34,7 @@ export default function AppLockGate({ children }: { children: React.ReactNode })
   // Logged-in users must leave / and /login even when the lock overlay blocks {children} (Home never mounts).
   useEffect(() => {
     if (isLoading || !user) return;
-    const dest = homeFor(user.tenant_name, user.staff_role);
+    const dest = homeFor(user.tenant_name, user.staff_role, user.role);
     if (pathname === dest) return;
     if (pathname === "/login" && isPublic) {
       if (isLeviiiStoreClient()) window.location.replace(dest);

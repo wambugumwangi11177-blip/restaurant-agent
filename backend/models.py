@@ -1822,6 +1822,24 @@ class ImportAppliedKey(Base):
     )
 
 
+class ImportRun(Base):
+    """One confirmed workbook upload — audit log for super-admin and owners."""
+    __tablename__ = "import_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False, index=True)
+    uploaded_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    filename = Column(String, nullable=False, default="")
+    inserted = Column(Integer, nullable=False, default=0)
+    skipped = Column(Integer, nullable=False, default=0)
+    failed_json = Column(Text, nullable=False, default="[]")
+    summary_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    restaurant = relationship("Restaurant")
+    uploaded_by = relationship("User")
+
+
 class DeliveryReceipt(Base):
     """A goods-in event. Run B builds the screen; the quantities and the two
     photos (invoice and goods) hang off this row."""

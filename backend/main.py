@@ -16,7 +16,25 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from logging_config import configure_logging
-from routers import health, webhooks, auth, staff, notifications, overview, ai_ask, staff_setup, store_recipes, eleven_import, store_intake, store_control, store_day, pos_evidence, eleven_handover
+from routers import (
+    health,
+    webhooks,
+    auth,
+    staff,
+    notifications,
+    overview,
+    ai_ask,
+    staff_setup,
+    store_recipes,
+    eleven_import,
+    store_intake,
+    store_control,
+    store_day,
+    pos_evidence,
+    eleven_handover,
+    super_clients,
+    eleven_owner,
+)
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
@@ -630,6 +648,8 @@ _VERSIONED_ROUTERS = [
     store_day.router,
     pos_evidence.router,
     eleven_handover.router,
+    super_clients.router,
+    eleven_owner.router,
 ]
 
 app.include_router(auth.router)

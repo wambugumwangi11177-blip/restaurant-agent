@@ -10,6 +10,7 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+import handover
 import models
 from admin_platform_auth import require_platform_admin
 from database import get_db
@@ -300,3 +301,94 @@ async def platform_import_confirm(
     )
     db.commit()
     return {"inserted": inserted, "skipped": skipped, "sheets": summary}
+
+
+class StaffRow(BaseModel):
+    user_id: int
+    email: str
+    staff_role: str | None
+    display_name: str
+    password_reset_required: bool
+    has_password: bool
+    is_active: bool
+
+
+class ResetSignInOut(BaseModel):
+    handover_code: str
+    expires_at: str
+    email: str
+
+
+def _staff_display_name(db: Session, user: models.User, restaurant_id: int) -> str:
+    member = (
+        db.query(models.StaffMember)
+        .filter(
+            models.StaffMember.restaurant_id == restaurant_id,
+            models.StaffMember.user_id == user.id,
+        )
+        .first()
+    )
+    if member and member.name:
+        return member.name
+    return user.email.split("@")[0]
+
+
+@router.get("/restaurants/{restaurant_id}/staff", response_model=list[StaffRow])
+def list_staff(
+    restaurant_id: int,
+    db: Session = Depends(get_db),
+    _actor: models.User = Depends(require_platform_admin),
+):
+    restaurant = get_restaurant_by_id(db, restaurant_id)
+    users = (
+        db.query(models.User)
+        .filter(
+            models.User.tenant_id == restaurant.tenant_id,
+            models.User.role != models.Role.SUPERADMIN,
+        )
+        .order_by(models.User.email)
+        .all()
+    )
+    return [
+        StaffRow(
+            user_id=user.id,
+            email=user.email,
+            staff_role=user.staff_role.value if user.staff_role else None,
+            display_name=_staff_display_name(db, user, restaurant.id),
+            password_reset_required=bool(user.password_reset_required or user.must_change_password),
+            has_password=user.hashed_password is not None,
+            is_active=bool(user.is_active),
+        )
+        for user in users
+    ]
+
+
+@router.post("/restaurants/{restaurant_id}/staff/{user_id}/reset-sign-in", response_model=ResetSignInOut)
+def reset_staff_sign_in(
+    restaurant_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    actor: models.User = Depends(require_platform_admin),
+):
+    restaurant = get_restaurant_by_id(db, restaurant_id)
+    target = db.query(models.User).filter(models.User.id == user_id).first()
+    if (
+        target is None
+        or target.tenant_id != restaurant.tenant_id
+        or target.role == models.Role.SUPERADMIN
+    ):
+        raise HTTPException(status_code=404, detail="Staff login not found on this client.")
+    code = handover.reset_sign_in(
+        db,
+        actor=actor,
+        target=target,
+        restaurant_id=restaurant.id,
+        allow_platform=True,
+    )
+    db.commit()
+    expires = target.handover_code_expires_at
+    return ResetSignInOut(
+        handover_code=code,
+        expires_at=expires.isoformat() if expires else "",
+        email=target.email,
+    )

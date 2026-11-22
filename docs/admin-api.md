@@ -20,6 +20,8 @@ Restaurant users and Eleven owners get **403** on every route below.
 | GET | `/restaurants` | List restaurants: tenant name, `restaurant_id`, staff login count, `last_import_at`, `setup_complete` |
 | POST | `/restaurants` | Create tenant + first restaurant (`tenant_name`, `restaurant_name`, `address`) |
 | POST | `/restaurants/{restaurant_id}/staff` | Create staff login (`email`, `staff_role`, `display_name`) |
+| GET | `/restaurants/{restaurant_id}/staff` | List staff logins for that restaurant (email, role, reset status; no secrets) |
+| POST | `/restaurants/{restaurant_id}/staff/{user_id}/reset-sign-in` | Handover reset: clears the password and returns a one-time 6-digit code (shown once) |
 | GET | `/restaurants/{restaurant_id}/import-runs` | Import audit log for that restaurant |
 | GET | `/import/template` | Download `.xlsx` template |
 | POST | `/restaurants/{restaurant_id}/import/preview` | Multipart file → preview JSON |

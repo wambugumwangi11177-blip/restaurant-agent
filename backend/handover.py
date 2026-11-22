@@ -59,8 +59,9 @@ def reset_sign_in(
     actor: models.User,
     target: models.User,
     restaurant_id: int,
+    allow_platform: bool = False,
 ) -> str:
-    if not may_reset_sign_in(actor, target):
+    if not allow_platform and not may_reset_sign_in(actor, target):
         raise HTTPException(status_code=403, detail="Not allowed to reset this login.")
     code = f"{secrets.randbelow(1_000_000):06d}"
     now = utcnow()

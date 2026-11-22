@@ -32,8 +32,8 @@ from routers import (
     store_day,
     pos_evidence,
     eleven_handover,
-    super_clients,
     eleven_owner,
+    admin_platform,
 )
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
@@ -648,8 +648,8 @@ _VERSIONED_ROUTERS = [
     store_day.router,
     pos_evidence.router,
     eleven_handover.router,
-    super_clients.router,
     eleven_owner.router,
+    admin_platform.router,
 ]
 
 app.include_router(auth.router)

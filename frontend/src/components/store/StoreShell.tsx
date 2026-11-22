@@ -42,7 +42,7 @@ export default function StoreShell({
   useEffect(() => {
     if (isLoading) return;
     if (!user) router.replace("/login");
-    else if (!allowed) router.replace(homeFor(user.tenant_name, user.staff_role, user.role));
+    else if (!allowed) router.replace(homeFor(user.tenant_name, user.staff_role));
   }, [user, isLoading, allowed, router]);
 
   if (isLoading || !allowed) {

@@ -20,8 +20,6 @@ _PERIODS = {"today": None, "7d": timedelta(days=7), "30d": timedelta(days=30)}
 
 
 def _require_owner(user: models.User) -> None:
-    if user.role == models.Role.SUPERADMIN:
-        return
     if user.role != models.Role.ADMIN or user.staff_role != models.StaffRole.OWNER:
         raise HTTPException(status_code=403, detail="Owner access only.")
     tenant = (user.tenant.name or "").strip().lower()

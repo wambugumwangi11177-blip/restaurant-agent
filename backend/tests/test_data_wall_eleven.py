@@ -1,4 +1,6 @@
 """Data wall: Test Restaurant cannot touch Eleven rows; Jack cannot see owner sales APIs."""
+import os
+
 import auth
 import models
 from tests.factories import seed_owner
@@ -65,9 +67,9 @@ def _seed_pair(db_session):
     return eleven_o, jack, test_o, eleven_r, test_r
 
 
-def test_test_owner_cannot_list_super_clients(client, db_session):
+def test_restaurant_owner_cannot_list_platform_restaurants(client, db_session):
     _, _, test_o, _, _ = _seed_pair(db_session)
-    r = client.get("/api/v1/super/clients", headers=_token(test_o))
+    r = client.get("/api/v1/admin/platform/restaurants", headers=_token(test_o))
     assert r.status_code == 403
 
 
@@ -92,13 +94,13 @@ def test_jack_forbidden_on_overview_and_eleven_summary(client, db_session):
     assert client.get("/api/v1/eleven/summary", headers=_token(jack)).status_code == 403
 
 
-def test_eleven_owner_forbidden_on_super_clients(client, db_session):
+def test_eleven_owner_forbidden_on_platform_api(client, db_session):
     owner, _, _, _, _ = _seed_pair(db_session)
-    assert client.get("/api/v1/super/clients", headers=_token(owner)).status_code == 403
+    assert client.get("/api/v1/admin/platform/restaurants", headers=_token(owner)).status_code == 403
 
 
-def test_superadmin_open_client_scopes_import_context(client, db_session):
-    owner, _, test_o, eleven_r, test_r = _seed_pair(db_session)
+def test_superadmin_lists_restaurants_on_platform_api(client, db_session, monkeypatch):
+    owner, _, _, _, test_r = _seed_pair(db_session)
     super_u = models.User(
         email="wall-super@leviii.ai",
         hashed_password=auth.get_password_hash("SuperPass123"),
@@ -109,10 +111,19 @@ def test_superadmin_open_client_scopes_import_context(client, db_session):
     )
     db_session.add(super_u)
     db_session.commit()
-    h = _token(super_u)
-    listed = client.get("/api/v1/super/clients", headers=h)
+    listed = client.get("/api/v1/admin/platform/restaurants", headers=_token(super_u))
     assert listed.status_code == 200
-    assert any(row["tenant_name"] == "Eleven" for row in listed.json())
-    assert client.post(f"/api/v1/super/open/{test_r.id}", headers=h).status_code == 200
-    ctx = client.get("/api/v1/super/context", headers=h).json()
-    assert ctx.get("restaurant_id") == test_r.id
+    names = {row["tenant_name"] for row in listed.json()}
+    assert "Eleven" in names
+    assert "Test Restaurant" in names
+
+
+def test_platform_service_token_lists_restaurants(client, db_session, monkeypatch):
+    owner, _, _, _, _ = _seed_pair(db_session)
+    monkeypatch.setenv("COMPANY_OS_SERVICE_TOKEN", "test-platform-token")
+    monkeypatch.setenv("COMPANY_OS_ACTOR_EMAIL", owner.email)
+    r = client.get(
+        "/api/v1/admin/platform/restaurants",
+        headers={"X-Company-OS-Token": "test-platform-token"},
+    )
+    assert r.status_code == 200

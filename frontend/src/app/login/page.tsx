@@ -40,7 +40,7 @@ export default function LoginPage() {
     useEffect(() => {
         if (isLoading) return;
         if (!user) return;
-        const dest = homeFor(user.tenant_name, user.staff_role, user.role);
+        const dest = homeFor(user.tenant_name, user.staff_role);
         if (isLeviiiStoreClient()) {
             window.location.replace(dest);
         } else {
@@ -56,7 +56,7 @@ export default function LoginPage() {
             const signedIn = firstPassword
                 ? await setInitialPassword(email, password, handoverCodeRequired ? handoverCode : undefined)
                 : await login(email, password);
-            router.replace(homeFor(signedIn?.tenant_name, signedIn?.staff_role, signedIn?.role));
+            router.replace(homeFor(signedIn?.tenant_name, signedIn?.staff_role));
         } catch (err: unknown) {
             let message = "Authentication failed";
             if (err && typeof err === "object" && "response" in err) {

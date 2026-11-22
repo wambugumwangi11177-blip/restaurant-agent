@@ -50,16 +50,18 @@ def _restaurant_id(db: Session, user) -> int:
 
     restaurant = get_restaurant_or_none(db, user)
     if restaurant is None:
-        if user.role == models.Role.SUPERADMIN:
-            raise HTTPException(status_code=409, detail="Open a client first.")
         if user.active_restaurant_id is not None:
             raise HTTPException(status_code=404, detail="Restaurant not found")
         return 0
-    if user.role != models.Role.SUPERADMIN and user.active_restaurant_id is not None:
-        foreign = db.query(models.Restaurant).filter(
-            models.Restaurant.id == user.active_restaurant_id,
-            models.Restaurant.tenant_id != user.tenant_id,
-        ).first()
+    if user.active_restaurant_id is not None:
+        foreign = (
+            db.query(models.Restaurant)
+            .filter(
+                models.Restaurant.id == user.active_restaurant_id,
+                models.Restaurant.tenant_id != user.tenant_id,
+            )
+            .first()
+        )
         if foreign:
             raise HTTPException(status_code=404, detail="Restaurant not found")
     return restaurant.id

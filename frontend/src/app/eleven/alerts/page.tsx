@@ -34,7 +34,9 @@ export default function ElevenAlertsPage() {
           {(data.attention?.count ?? 0) > 0 && (
             <AlertRow title={data.attention?.sentence || "Something needs you."} href="/eleven/approvals" />
           )}
-          {data.pending.map((item) => (
+          {data.pending
+            .filter((item) => (item.action || item.headline || "").trim())
+            .map((item) => (
             <AlertRow
               key={`p-${item.kind}-${item.id}`}
               title={item.action || item.headline || "Needs approval"}

@@ -105,7 +105,8 @@ html[data-leviii-apk] .owner-glass-theme .owner-glass-panel {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--og-muted);
+  color: var(--og-text);
+  opacity: 0.85;
 }
 
 .owner-label:first-child {
@@ -130,6 +131,30 @@ html[data-leviii-apk] .owner-glass-theme .owner-glass-panel {
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.1;
+  color: var(--og-text);
+}
+
+.owner-oat-highlight {
+  border-radius: 1rem;
+  padding: 1rem 1.125rem;
+  background: rgba(233, 223, 207, 0.14);
+  border: 1px solid rgba(233, 223, 207, 0.32);
+  color: var(--og-text);
+  box-shadow: var(--og-shadow), inset 0 1px 0 rgba(233, 223, 207, 0.16);
+}
+
+html[data-leviii-apk] .owner-oat-highlight {
+  background: rgba(233, 223, 207, 0.16);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.owner-shell-header {
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 0.75rem;
+  width: calc(100% - 24px);
+  max-width: 420px;
 }
 
 .owner-chip {

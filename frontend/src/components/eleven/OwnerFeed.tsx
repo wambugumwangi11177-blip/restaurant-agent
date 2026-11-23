@@ -35,6 +35,10 @@ export type FeedCard = {
   overdue?: boolean;
 };
 
+export function feedEventLine(event: Pick<FeedEvent, "action" | "headline">) {
+  return (event.action || event.headline || "").trim();
+}
+
 export type FeedPayload = {
   pending: FeedEvent[];
   bill_reminders?: FeedEvent[];
@@ -216,7 +220,7 @@ export default function OwnerFeed({
 
   return (
     <div className="space-y-4">
-      {mode === "feed" && (
+      {mode === "feed" && data.events.length > 0 && (
         <>
           <div className="flex flex-wrap gap-2">
             <button type="button" className={`owner-chip ${person === "all" ? "is-on" : ""}`} onClick={() => setPerson("all")}>Everyone</button>
@@ -252,13 +256,15 @@ export default function OwnerFeed({
       {mode === "approvals" && (
         <>
           <h2 className="owner-label">Needs you</h2>
-          {data.pending.length === 0 ? (
-            <p className="owner-quiet">Nothing needs you.</p>
+          {data.pending.filter((event) => feedEventLine(event)).length === 0 ? (
+            <p className="owner-quiet">Nothing needs you right now.</p>
           ) : (
             <ul className="space-y-3">
-              {data.pending.map((event) => (
+              {data.pending
+                .filter((event) => feedEventLine(event))
+                .map((event) => (
                 <li key={`wait-${event.kind}-${event.id}`} id={`${event.kind}-${event.id}`} className="owner-glass-panel rounded-2xl p-4">
-                  <p className="text-[0.9375rem] font-medium leading-6">{event.action || event.headline}</p>
+                  <p className="text-[0.9375rem] font-medium leading-6 text-[var(--text)]">{feedEventLine(event)}</p>
                   {event.amount_cents != null && (
                     <p className="owner-figure">{(event.amount_cents / 100).toLocaleString("en-KE")} KES</p>
                   )}

@@ -16,7 +16,7 @@ export default function StoreHomePage() {
   return (
     <div className="space-y-4">
       <section className="owner-glass-panel rounded-3xl p-4">
-        <h2 className="text-sm font-semibold">How a delivery is kept</h2>
+        <h2 className="text-sm font-semibold text-[var(--text)]">How a delivery is kept</h2>
         <p className="mt-1 text-xs leading-5 text-zinc-400">
           Photograph the invoice and the goods, then key the quantities. Prices stay with the owner.
         </p>
@@ -37,8 +37,8 @@ export default function StoreHomePage() {
       )}
       {error && <p className="text-sm text-red-300">{error}</p>}
       {setup?.app_unlocked && (
-        <section className="owner-glass-panel rounded-3xl p-4">
-          <h2 className="font-semibold">Today</h2>
+        <section className="owner-oat-highlight rounded-3xl">
+          <h2 className="font-semibold text-[var(--text)]">Today</h2>
           <ul className="mt-3 space-y-2 text-sm">
             <li><Link href="/store/day-photos" className="underline">Zone photos · day open and close</Link></li>
             <li><Link href="/store/recipes" className="underline">Recipes{setup.recipe_gap?.missing_count ? ` · ${setup.recipe_gap.missing_count === 1 ? "1 dish still has no recipe" : `${setup.recipe_gap.missing_count} dishes still have no recipe`}` : ""}</Link></li>

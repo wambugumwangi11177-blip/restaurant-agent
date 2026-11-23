@@ -9,6 +9,7 @@ const emptyFeed = {
   cards: [],
   recipes_missing: 0,
   till_live: true,
+  attention: { count: 0, sentence: "Nothing needs you right now." },
 };
 
 const ownerMe = {
@@ -240,7 +241,7 @@ const setupPayload = {
   recipe_gap: { dish_count: 0, missing_count: 0, missing_names: [] },
 };
 
-async function mockThemeOwnerApis(page: import("@playwright/test").Page) {
+async function mockThemeOwnerApis(page: import("@playwright/test").Page, feed: typeof emptyFeed = emptyFeed) {
   await mockAuthed(page, ownerMe);
   await page.route("**/api/v1/**", async (route) => {
     const url = route.request().url();
@@ -252,18 +253,7 @@ async function mockThemeOwnerApis(page: import("@playwright/test").Page) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({
-          ...emptyFeed,
-          pending: [
-            {
-              id: 1,
-              kind: "delivery",
-              title: "Supplier delivery",
-              subtitle: "Awaiting your OK",
-              created_at: new Date().toISOString(),
-            },
-          ],
-        }),
+        body: JSON.stringify(feed),
       });
       return;
     }
@@ -338,7 +328,7 @@ test.describe("warm earthy theme screenshots", () => {
     });
     await page.goto("/login");
     await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
-    await page.screenshot({ path: path.join(ARTIFACTS, "theme-login-390.png"), fullPage: true });
+    await page.screenshot({ path: path.join(ARTIFACTS, "theme-login-390.png") });
 
     await mockThemeOwnerApis(page);
     await page.addInitScript(() => {
@@ -349,15 +339,29 @@ test.describe("warm earthy theme screenshots", () => {
 
     await page.goto("/eleven");
     await expect(page.getByRole("heading", { name: "Needs you" })).toBeVisible({ timeout: 15_000 });
-    await page.screenshot({ path: path.join(ARTIFACTS, "theme-owner-home-390.png"), fullPage: true });
+    await page.screenshot({ path: path.join(ARTIFACTS, "theme-owner-home-390.png") });
 
+    const approvalsFeed = {
+      ...emptyFeed,
+      attention: { count: 1, sentence: "1 thing needs you." },
+      pending: [
+        {
+          id: 1,
+          kind: "delivery",
+          action: "Approve supplier delivery",
+          headline: "Tomatoes delivery",
+          created_at: new Date().toISOString(),
+        },
+      ],
+    };
+    await mockThemeOwnerApis(page, approvalsFeed);
     await page.goto("/eleven/approvals");
     await expect(page.getByRole("heading", { name: "Approvals" })).toBeVisible({ timeout: 15_000 });
-    await page.screenshot({ path: path.join(ARTIFACTS, "theme-approvals-390.png"), fullPage: true });
+    await page.screenshot({ path: path.join(ARTIFACTS, "theme-approvals-390.png") });
 
     await page.goto("/eleven/staff");
     await expect(page.getByRole("heading", { name: "Staff" })).toBeVisible({ timeout: 15_000 });
-    await page.screenshot({ path: path.join(ARTIFACTS, "theme-staff-390.png"), fullPage: true });
+    await page.screenshot({ path: path.join(ARTIFACTS, "theme-staff-390.png") });
 
     await mockThemeJackApis(page);
     await page.addInitScript(() => {
@@ -365,10 +369,10 @@ test.describe("warm earthy theme screenshots", () => {
     });
     await page.goto("/store");
     await expect(page.getByText(/How a delivery is kept/i)).toBeVisible({ timeout: 15_000 });
-    await page.screenshot({ path: path.join(ARTIFACTS, "theme-jack-home-390.png"), fullPage: true });
+    await page.screenshot({ path: path.join(ARTIFACTS, "theme-jack-home-390.png") });
 
     await page.goto("/store/stock");
     await expect(page.getByText(/Quantities only/i)).toBeVisible({ timeout: 15_000 });
-    await page.screenshot({ path: path.join(ARTIFACTS, "theme-stock-390.png"), fullPage: true });
+    await page.screenshot({ path: path.join(ARTIFACTS, "theme-stock-390.png") });
   });
 });

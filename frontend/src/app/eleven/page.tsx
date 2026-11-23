@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Package, Trash2, Wallet } from "lucide-react";
 import OwnerShell from "@/components/eleven/OwnerShell";
-import OwnerFeed, { useOwnerFeed, type FeedCard } from "@/components/eleven/OwnerFeed";
+import OwnerFeed, { feedEventLine, useOwnerFeed, type FeedCard, type FeedEvent } from "@/components/eleven/OwnerFeed";
 
 const ICONS = {
   stock: Package,
@@ -18,10 +18,15 @@ function recipeLine(count: number) {
 
 function Tile({ card }: { card: FeedCard }) {
   const Icon = ICONS[card.id as keyof typeof ICONS] ?? Package;
-  if (card.quiet || !card.figure) {
+  const figure = card.figure != null ? String(card.figure).trim() : "";
+  const sentence = (card.sentence || "").trim();
+  if (card.quiet || !figure) {
+    const line = [card.title, sentence].filter(Boolean).join(". ");
+    if (!line) return null;
     const tone = card.id === "money" && card.overdue ? "text-red-300" : "text-zinc-400";
-    return <p className={`owner-quiet ${tone}`}>{card.title}. {card.sentence}</p>;
+    return <p className={`owner-quiet ${tone}`}>{line}</p>;
   }
+  if (!sentence && !figure) return null;
   return (
     <article className={`owner-glass-panel owner-tile ${card.id === "money" && card.overdue ? "ring-1 ring-red-400/40" : ""}`}>
       <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-zinc-400">
@@ -36,6 +41,7 @@ function Tile({ card }: { card: FeedCard }) {
 
 export default function ElevenHomePage() {
   const { data, error, refresh } = useOwnerFeed();
+  const pendingVisible = (data?.pending ?? []).filter((item) => feedEventLine(item));
 
   return (
     <OwnerShell title="Home">
@@ -44,14 +50,23 @@ export default function ElevenHomePage() {
       {data && (
         <div className="space-y-1">
           <h2 className="owner-label">Needs you</h2>
-          {data.pending.length === 0 ? (
-            <p className="owner-quiet">{data.attention?.sentence || "Nothing needs you."}</p>
+          {pendingVisible.length === 0 ? (
+            <div className="owner-oat-highlight mb-3">
+              <p className="text-[0.9375rem] leading-6 text-[var(--text)]">
+                {data.attention?.count === 0
+                  ? "Nothing needs you right now."
+                  : data.attention?.sentence || "Nothing needs you right now."}
+              </p>
+            </div>
           ) : (
-            <ul className="owner-glass-panel mb-3 divide-y divide-white/10 rounded-2xl px-4">
-              {data.pending.map((item) => (
+            <ul className="owner-oat-highlight mb-3 divide-y divide-white/10 rounded-2xl px-1">
+              {pendingVisible.map((item: FeedEvent) => (
                 <li key={`${item.kind}-${item.id}`}>
-                  <Link href={`/eleven/approvals#${item.kind}-${item.id}`} className="flex min-h-11 items-center text-[0.9375rem]">
-                    {item.action || item.headline}
+                  <Link
+                    href={`/eleven/approvals#${item.kind}-${item.id}`}
+                    className="flex min-h-11 items-center px-3 text-[0.9375rem] text-[var(--text)]"
+                  >
+                    {feedEventLine(item)}
                   </Link>
                 </li>
               ))}

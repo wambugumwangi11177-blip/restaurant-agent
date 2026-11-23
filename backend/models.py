@@ -806,6 +806,7 @@ class StaffMember(Base):
     name          = Column(String, nullable=False)
     role_title    = Column(String, default="")   # "Head Chef", "Waiter", "Cashier"
     hourly_rate   = Column(Integer, default=0)   # In cents
+    daily_pay_rate_cents = Column(Integer, nullable=True)   # Flat day rate; owner/controller only
     # E.164 phone (directive 016). Nullable — many roster entries (see
     # user_id above) have no way to reach them electronically at all. Lets a
     # staff member with no dashboard login still receive/confirm a stock
@@ -928,6 +929,91 @@ class LaborShift(Base):
 
     __table_args__ = (
         Index("ix_labor_shifts_restaurant_date", "restaurant_id", "shift_date"),
+    )
+
+
+class StaffWeeklyShift(Base):
+    """Regular weekly shift template (no login required for floor staff)."""
+    __tablename__ = "staff_weekly_shifts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    staff_member_id = Column(Integer, ForeignKey("staff_members.id"), nullable=False, index=True)
+    weekday = Column(Integer, nullable=False)  # 0=Monday … 6=Sunday
+    start_time = Column(String, nullable=False)  # HH:MM 24h
+    end_time = Column(String, nullable=False)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    staff_member = relationship("StaffMember")
+    restaurant = relationship("Restaurant")
+
+    __table_args__ = (
+        UniqueConstraint("staff_member_id", "weekday", name="uq_staff_weekly_member_day"),
+        CheckConstraint("weekday >= 0 AND weekday <= 6", name="ck_staff_weekly_weekday"),
+    )
+
+
+class StaffShiftOverride(Base):
+    """One-off missed or swapped shift for a calendar day."""
+    __tablename__ = "staff_shift_overrides"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    staff_member_id = Column(Integer, ForeignKey("staff_members.id"), nullable=False, index=True)
+    shift_date = Column(Date, nullable=False, index=True)
+    kind = Column(String, nullable=False)  # missed | swap
+    swap_staff_member_id = Column(Integer, ForeignKey("staff_members.id"), nullable=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=utcnow)
+
+    staff_member = relationship("StaffMember", foreign_keys=[staff_member_id])
+    swap_staff = relationship("StaffMember", foreign_keys=[swap_staff_member_id])
+
+
+class TeamRules(Base):
+    """Owner-configured labour guardrails (Team rules in settings)."""
+    __tablename__ = "team_rules"
+
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), primary_key=True)
+    alerts_enabled = Column(Boolean, nullable=False, default=True, server_default="1")
+    max_hours_per_week = Column(Float, nullable=False, default=52.0, server_default="52")
+    max_consecutive_days = Column(Integer, nullable=False, default=6, server_default="6")
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class ScheduleChangeRequest(Base):
+    """Manager-proposed schedule that breaks Team rules — owner must approve."""
+    __tablename__ = "schedule_change_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    proposed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    payload_json = Column(Text, nullable=False, default="{}")
+    status = Column(String, nullable=False, default="needs_approval", server_default="needs_approval")
+    owner_note = Column(Text, default="")
+    decided_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+    decided_at = Column(DateTime, nullable=True)
+
+
+class ApprovalReminder(Base):
+    """Tracks escalation schedule for a pending approval (feed + Web Push)."""
+    __tablename__ = "approval_reminders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    kind = Column(String, nullable=False)
+    entity_id = Column(Integer, nullable=False)
+    requester_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    actor_staff_role = Column(String, nullable=False, default="owner")
+    stage = Column(Integer, nullable=False, default=0)
+    last_sent_at = Column(DateTime, nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("restaurant_id", "kind", "entity_id", name="uq_approval_reminder_entity"),
     )
 
 

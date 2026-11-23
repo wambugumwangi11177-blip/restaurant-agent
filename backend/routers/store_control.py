@@ -68,6 +68,21 @@ def _require_owner(user: models.User) -> None:
         raise HTTPException(status_code=403, detail="The owner approves this.")
 
 
+def _can_see_approval_feed(user: models.User) -> bool:
+    if _owner(user):
+        return True
+    return user.staff_role in (
+        models.StaffRole.MANAGER,
+        models.StaffRole.STOCKKEEPER,
+        models.StaffRole.CONTROLLER,
+    )
+
+
+def _require_approval_feed(user: models.User) -> None:
+    if not _can_see_approval_feed(user):
+        raise HTTPException(status_code=403, detail="You cannot view approvals.")
+
+
 def tell_owners(db, user, restaurant, title: str, body: str) -> None:
     """A new item that needs the owner. The note does not include an amount."""
     owners = db.query(models.User).filter(
@@ -885,7 +900,7 @@ async def list_approvals(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    _require_owner(current_user)
+    _require_approval_feed(current_user)
     restaurant = get_or_create_restaurant(db, current_user)
     spoilage = (
         db.query(models.SpoilageRecord)
@@ -925,6 +940,8 @@ async def list_approvals(
     events = []
     for row in spoilage:
         item = _spoilage_public(db, row)
+        item["user_id"] = row.user_id
+        item["requester_user_id"] = row.user_id
         item["kind"] = "waste"
         item["headline"] = f"{item['person_name']} wrote off {row.quantity:g} {row.unit} of {row.item_name}."
         item["emphasis"] = f"{row.quantity:g} {row.unit}"
@@ -1049,8 +1066,41 @@ async def list_approvals(
             "ai": _feed_ai({"status": check.status, "note": note} if check else None),
             **who,
         })
+    for row in db.query(models.ScheduleChangeRequest).filter(
+        models.ScheduleChangeRequest.restaurant_id == restaurant.id,
+        models.ScheduleChangeRequest.status == "needs_approval",
+    ).all():
+        proposer = db.query(models.User).filter(models.User.id == row.proposed_by_user_id).first()
+        who = person_of(db, proposer) if proposer else {"person_name": "Manager", "person_email": ""}
+        events.append({
+            "id": row.id,
+            "kind": "schedule",
+            "status": "needs_approval",
+            "headline": "A manager changed the team schedule.",
+            "action": "Review schedule change",
+            "requester_user_id": row.proposed_by_user_id,
+            "created_at": _when(row.created_at),
+            **who,
+        })
     events.sort(key=lambda item: item.get("created_at") or "", reverse=True)
     pending = [item for item in events if item.get("status") == "needs_approval"]
+    from services.approval_workflow import (
+        enrich_approval_item,
+        ensure_reminder_row,
+        notify_requester_outcome,
+        process_due_reminders,
+    )
+    process_due_reminders(db, restaurant.id)
+    for item in pending:
+        requester = item.get("requester_user_id") or item.get("user_id")
+        ensure_reminder_row(
+            db,
+            restaurant.id,
+            item.get("kind") or "waste",
+            int(item["id"]),
+            requester,
+        )
+        item.update(enrich_approval_item(item, current_user))
     from bill_schedule import business_today, reminder_bucket
 
     today = business_today()
@@ -1189,6 +1239,55 @@ async def approve(
         ).first()
         action = f"day_close_{verb}"
         summary = f"{user.email} {verb} the day close." if row else ""
+    elif body.kind == "schedule":
+        row = db.query(models.ScheduleChangeRequest).filter(
+            models.ScheduleChangeRequest.id == body.id,
+            models.ScheduleChangeRequest.restaurant_id == restaurant.id,
+        ).first()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Not found")
+        if row.status != "needs_approval":
+            raise HTTPException(status_code=400, detail="This one does not need approval.")
+        if body.decision == "approve":
+            import json
+            from services.labor_schedule import materialize_week
+            from datetime import date
+
+            payload = json.loads(row.payload_json or "{}")
+            db.query(models.StaffWeeklyShift).filter(
+                models.StaffWeeklyShift.restaurant_id == restaurant.id,
+            ).delete(synchronize_session=False)
+            for slot in payload.get("slots", []):
+                db.add(
+                    models.StaffWeeklyShift(
+                        restaurant_id=restaurant.id,
+                        staff_member_id=slot["staff_member_id"],
+                        weekday=slot["weekday"],
+                        start_time=slot["start_time"],
+                        end_time=slot["end_time"],
+                    )
+                )
+            row.status = "approved"
+            week_start = date.today()
+            week_start -= __import__("datetime").timedelta(days=week_start.weekday())
+            materialize_week(db, restaurant.id, week_start)
+        else:
+            row.status = "declined"
+        row.decided_by_user_id = user.id
+        row.decided_at = now
+        row.owner_note = body.note.strip()
+        from services.approval_workflow import resolve_reminder, notify_requester_outcome
+
+        resolve_reminder(db, restaurant.id, "schedule", row.id)
+        notify_requester_outcome(
+            db,
+            row.proposed_by_user_id,
+            title="Schedule decision",
+            body=f"The owner {verb} your schedule change.",
+            url="/eleven/schedule",
+        )
+        db.commit()
+        return {"id": row.id, "kind": "schedule", "status": row.status}
     elif body.kind == "cost":
         row = db.query(models.RunningCost).filter(
             models.RunningCost.id == body.id,
@@ -1206,6 +1305,17 @@ async def approve(
     row.approved_by_user_id = user.id
     row.approved_at = now
     row.owner_note = body.note.strip()
+    requester_id = getattr(row, "user_id", None)
+    from services.approval_workflow import resolve_reminder, notify_requester_outcome
+
+    resolve_reminder(db, restaurant.id, body.kind if body.kind != "spoilage" else "waste", row.id)
+    if requester_id:
+        notify_requester_outcome(
+            db,
+            requester_id,
+            title="Decision recorded",
+            body=f"The owner {verb} your request.",
+        )
     if body.kind == "cost" and body.decision == "approve":
         from bill_schedule import business_today, compute_next_due
 
@@ -1228,6 +1338,19 @@ async def approve(
         "approved_at": _when(now),
         "owner_note": row.owner_note,
     }
+
+
+@router.get("/approval-inbox")
+async def approval_inbox(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """Pending approvals with This needs you / Waiting on labels for the signed-in user."""
+    restaurant = get_or_create_restaurant(db, current_user)
+    feed = await list_approvals(db=db, current_user=current_user)
+    pending = feed.get("pending") or []
+    enriched = [item for item in pending if item.get("approval_card_title")]
+    return {"pending": enriched, "timezone": feed.get("timezone")}
 
 
 @router.get("/policy")

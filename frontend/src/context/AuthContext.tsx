@@ -157,12 +157,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearPinUnlock();
     setToken(null);
     setUser(null);
-    // Shared-device hygiene: the offline order queue carries customer
-    // PII, and the service worker holds cached pages — neither may survive
-    // into the next user's session on this device.
-    import("@/lib/offlineOrderOutbox")
-      .then(({ clearPendingOrders }) => clearPendingOrders())
-      .catch(() => undefined);
     if (typeof navigator !== "undefined" && navigator.serviceWorker?.controller) {
       navigator.serviceWorker.controller.postMessage({ type: "PURGE_CACHES" });
     }

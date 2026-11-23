@@ -9,8 +9,9 @@ export type StaffTier =
     | "kitchen"
     | "waiter";
 
+import { homeFor } from "@/lib/tenantHome";
+
+/** @deprecated Use homeFor — single post-login router. */
 export function tierHome(tier: StaffTier | null): string {
-    if (!tier || tier === "owner") return "/eleven";
-    if (tier === "stockkeeper" || tier === "controller") return "/store";
-    return "/store";
+    return homeFor(null, tier);
 }

@@ -3,10 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRightLeft, Camera, ClipboardCheck, Receipt, Settings2, Trash2, Truck } from "lucide-react";
 import api from "@/lib/api";
+import ApprovalCard from "@/components/approvals/ApprovalCard";
 
 export type FeedEvent = {
   kind: string;
   id: number;
+  approval_card_title?: string;
+  approval_card_subtitle?: string;
+  approval_viewer_is_actor?: boolean;
+  approval_waiting_on?: string | null;
   headline?: string;
   emphasis?: string | null;
   action?: string;
@@ -256,15 +261,21 @@ export default function OwnerFeed({
       {mode === "approvals" && (
         <>
           <h2 className="owner-label">Needs you</h2>
-          {data.pending.filter((event) => feedEventLine(event)).length === 0 ? (
+          {data.pending.filter((event) => feedEventLine(event) || event.approval_card_title).length === 0 ? (
             <p className="owner-quiet">Nothing needs you right now.</p>
           ) : (
             <ul className="space-y-3">
               {data.pending
-                .filter((event) => feedEventLine(event))
+                .filter((event) => feedEventLine(event) || event.approval_card_title)
                 .map((event) => (
-                <li key={`wait-${event.kind}-${event.id}`} id={`${event.kind}-${event.id}`} className="owner-glass-panel rounded-2xl p-4">
-                  <p className="text-[0.9375rem] font-medium leading-6 text-[var(--text)]">{feedEventLine(event)}</p>
+                <li key={`wait-${event.kind}-${event.id}`} id={`${event.kind}-${event.id}`} className="space-y-3">
+                  {event.approval_card_title ? (
+                    <ApprovalCard item={event} />
+                  ) : (
+                    <p className="owner-glass-panel rounded-2xl p-4 text-[0.9375rem] font-medium leading-6 text-[var(--text)]">
+                      {feedEventLine(event)}
+                    </p>
+                  )}
                   {event.amount_cents != null && (
                     <p className="owner-figure">{(event.amount_cents / 100).toLocaleString("en-KE")} KES</p>
                   )}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Wallet, Package, MessageCircle, MoreHorizontal } from "lucide-react";
+import { Home, Wallet, Package, Users, MoreHorizontal } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import "@/styles/owner-glass.css";
 
@@ -10,14 +10,14 @@ const NAV = [
   { href: "/eleven", label: "Home", icon: Home, match: (p: string) => p === "/eleven" },
   { href: "/eleven/money", label: "Money", icon: Wallet, match: (p: string) => p.startsWith("/eleven/money") },
   { href: "/eleven/stock", label: "Stock", icon: Package, match: (p: string) => p.startsWith("/eleven/stock") },
-  { href: "/eleven/ask", label: "Ask", icon: MessageCircle, match: (p: string) => p.startsWith("/eleven/ask") },
+  { href: "/eleven/team", label: "Team", icon: Users, match: (p: string) => p.startsWith("/eleven/team") || p.startsWith("/eleven/schedule") },
   {
     href: "/eleven/more",
     label: "More",
     icon: MoreHorizontal,
     match: (p: string) =>
       p.startsWith("/eleven/more") ||
-      ["/eleven/sales-dishes", "/eleven/cash-check", "/eleven/staff", "/eleven/settings", "/eleven/reports", "/eleven/alerts", "/eleven/approvals", "/eleven/activity", "/eleven/deliveries", "/eleven/import"].some(
+      ["/eleven/sales-dishes", "/eleven/cash-check", "/eleven/staff", "/eleven/settings", "/eleven/ask", "/eleven/reports", "/eleven/alerts", "/eleven/approvals", "/eleven/activity", "/eleven/deliveries", "/eleven/import", "/eleven/settings/team-rules"].some(
         (x) => p.startsWith(x),
       ),
   },
@@ -59,8 +59,8 @@ export default function OwnerShell({
             <Link
               key={href}
               href={href}
-              className={`flex min-h-11 min-w-[56px] flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-semibold md:min-w-0 md:w-full ${
-                active ? "text-[var(--bg)]" : "text-zinc-400"
+              className={`flex min-h-11 min-w-[56px] flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-medium md:min-w-0 md:w-full ${
+                active ? "text-[var(--text)]" : "text-zinc-400"
               }`}
             >
               <span

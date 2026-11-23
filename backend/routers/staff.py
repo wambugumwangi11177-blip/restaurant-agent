@@ -30,6 +30,18 @@ from time_utils import utcnow
 
 router = APIRouter(prefix="/staff", tags=["staff"])
 
+# Login accounts: floor staff (waiter/kitchen/supervisor) are roster-only — no dashboard.
+LOGIN_STAFF_ROLES = {
+    models.StaffRole.MANAGER,
+    models.StaffRole.STOCKKEEPER,
+    models.StaffRole.CONTROLLER,
+}
+NO_LOGIN_STAFF_ROLES = {
+    models.StaffRole.WAITER,
+    models.StaffRole.KITCHEN,
+    models.StaffRole.SUPERVISOR,
+}
+
 # Tiers a Manager (not Owner) is allowed to grant. Manager and Owner
 # themselves are excluded — see module docstring.
 _MANAGER_GRANTABLE = {
@@ -41,7 +53,13 @@ _MANAGER_GRANTABLE = {
 }
 
 
-def _staff_out(member: models.StaffMember, db: Session) -> dict:
+def _can_see_pay(user: models.User) -> bool:
+    if user.role in (models.Role.SUPERADMIN, models.Role.ADMIN):
+        return True
+    return user.staff_role == models.StaffRole.CONTROLLER
+
+
+def _staff_out(member: models.StaffMember, db: Session, viewer: models.User | None = None) -> dict:
     linked_role = None
     if member.user_id:
         linked_user = db.query(models.User).filter(models.User.id == member.user_id).first()
@@ -54,9 +72,11 @@ def _staff_out(member: models.StaffMember, db: Session) -> dict:
         "name": member.name,
         "role_title": member.role_title,
         "hourly_rate": member.hourly_rate,
+        "daily_pay_rate_cents": member.daily_pay_rate_cents if (viewer is None or _can_see_pay(viewer)) else None,
         "phone": member.phone,
         "is_active": member.is_active,
         "staff_role": linked_role,
+        "has_login": member.user_id is not None,
     }
 
 
@@ -93,7 +113,7 @@ async def list_staff(
     members = db.query(models.StaffMember).filter(
         models.StaffMember.restaurant_id == restaurant.id
     ).order_by(models.StaffMember.name).offset(offset).limit(limit).all()
-    return [_staff_out(m, db) for m in members]
+    return [_staff_out(m, db, current_user) for m in members]
 
 
 @router.post("/", response_model=schemas.StaffMemberOut, status_code=201)
@@ -114,6 +134,13 @@ async def create_staff(
                 detail="email and staff_role are required when create_login is true.",
             )
         target_role = _parse_staff_role(body.staff_role)
+        if target_role in NO_LOGIN_STAFF_ROLES:
+            raise HTTPException(
+                status_code=400,
+                detail="Waiter, kitchen, and supervisor have no login. Add them on the roster without a login.",
+            )
+        if target_role not in LOGIN_STAFF_ROLES:
+            raise HTTPException(status_code=400, detail="That role cannot receive a login from here.")
         _require_grant_allowed(current_user, target_role)
         manager_self_setup = target_role in (
             models.StaffRole.STOCKKEEPER,
@@ -153,6 +180,7 @@ async def create_staff(
         name=body.name,
         role_title=body.role_title,
         hourly_rate=body.hourly_rate,
+        daily_pay_rate_cents=body.daily_pay_rate_cents,
         # Normalized on write so it matches the normalized inbound WhatsApp/SMS
         # number at compare time (same reasoning as RestaurantUpdate.owner_phone
         # in routers/auth.py — storing the raw form would silently break
@@ -194,7 +222,7 @@ async def create_staff(
             approved_by=current_user.email,
         )
 
-    return _staff_out(member, db)
+    return _staff_out(member, db, current_user)
 
 
 @router.put("/{staff_id}", response_model=schemas.StaffMemberOut)
@@ -309,7 +337,7 @@ async def update_staff(
             detail="A staff member with this phone number already exists at this restaurant.",
         )
     db.refresh(member)
-    return _staff_out(member, db)
+    return _staff_out(member, db, current_user)
 
 
 @router.post("/{staff_id}/assign-role", response_model=schemas.StaffMemberOut)
@@ -376,7 +404,7 @@ async def assign_role(
     })
 
     db.refresh(member)
-    return _staff_out(member, db)
+    return _staff_out(member, db, current_user)
 
 
 # ── Owner "view as" — real impersonation, not a UI-only preview ─────────────

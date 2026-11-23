@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Package, Trash2, Wallet } from "lucide-react";
 import OwnerShell from "@/components/eleven/OwnerShell";
+import ApprovalCard from "@/components/approvals/ApprovalCard";
 import OwnerFeed, { feedEventLine, useOwnerFeed, type FeedCard, type FeedEvent } from "@/components/eleven/OwnerFeed";
 
 const ICONS = {
@@ -59,14 +60,17 @@ export default function ElevenHomePage() {
               </p>
             </div>
           ) : (
-            <ul className="owner-oat-highlight mb-3 divide-y divide-white/10 rounded-2xl px-1">
+            <ul className="mb-3 space-y-3">
               {pendingVisible.map((item: FeedEvent) => (
                 <li key={`${item.kind}-${item.id}`}>
-                  <Link
-                    href={`/eleven/approvals#${item.kind}-${item.id}`}
-                    className="flex min-h-11 items-center px-3 text-[0.9375rem] text-[var(--text)]"
-                  >
-                    {feedEventLine(item)}
+                  <Link href={`/eleven/approvals#${item.kind}-${item.id}`} className="block">
+                    {item.approval_card_title ? (
+                      <ApprovalCard item={item} />
+                    ) : (
+                      <div className="owner-oat-highlight flex min-h-11 items-center px-3 text-[0.9375rem] text-[var(--text)]">
+                        {feedEventLine(item)}
+                      </div>
+                    )}
                   </Link>
                 </li>
               ))}

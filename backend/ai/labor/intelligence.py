@@ -48,17 +48,23 @@ def get_labor_intelligence(db: Session, restaurant_id: int) -> dict:
     if not shifts:
         return _empty_response(revenue_30d)
 
+    def _shift_hours(s: models.LaborShift) -> float:
+        if s.actual_hours is not None:
+            return float(s.actual_hours)
+        if s.scheduled_hours is not None:
+            return float(s.scheduled_hours)
+        return 0.0
+
     # ── Core metrics ──────────────────────────────────────────────────────────
     total_labor_cost  = sum(s.labor_cost or 0 for s in shifts)
-    total_hours       = sum(s.actual_hours or s.scheduled_hours or 0 for s in shifts)
+    total_hours       = sum(_shift_hours(s) for s in shifts)
     labor_pct         = (total_labor_cost / max(revenue_30d, 1)) * 100
     sales_per_hour    = revenue_30d / max(total_hours, 1)
 
-    # ── Overtime analysis ─────────────────────────────────────────────────────
-    overtime_shifts   = [s for s in shifts if (s.actual_hours or 0) > OVERTIME_HOURS_DAILY]
-    overtime_hours    = sum(max(0, (s.actual_hours or 0) - OVERTIME_HOURS_DAILY) for s in overtime_shifts)
-    overtime_cost     = sum(s.labor_cost or 0 for s in overtime_shifts
-                            if (s.actual_hours or 0) > OVERTIME_HOURS_DAILY)
+    # ── Overtime analysis (scheduled hours when actual not clocked yet) ───────
+    overtime_shifts = [s for s in shifts if _shift_hours(s) > OVERTIME_HOURS_DAILY]
+    overtime_hours = sum(max(0, _shift_hours(s) - OVERTIME_HOURS_DAILY) for s in overtime_shifts)
+    overtime_cost = sum(s.labor_cost or 0 for s in overtime_shifts if _shift_hours(s) > OVERTIME_HOURS_DAILY)
 
     # ── Daily labor vs revenue ─────────────────────────────────────────────────
     daily_data: dict[date, dict] = defaultdict(lambda: {"labor": 0, "hours": 0, "revenue": 0})

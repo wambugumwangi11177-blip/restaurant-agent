@@ -72,8 +72,8 @@ export default function StoreShell({
             <Link
               key={href}
               href={href}
-              className={`flex min-h-11 min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-semibold ${
-                active ? "text-[var(--bg)]" : "text-zinc-400"
+              className={`flex min-h-11 min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-medium ${
+                active ? "text-[var(--text)]" : "text-zinc-400"
               }`}
             >
               <span className={`flex h-10 w-10 items-center justify-center rounded-full ${active ? "nav-pill-active" : ""}`}>

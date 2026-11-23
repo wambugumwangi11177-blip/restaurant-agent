@@ -34,6 +34,7 @@ from routers import (
     eleven_handover,
     eleven_owner,
     admin_platform,
+    team as team_router,
 )
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
@@ -650,6 +651,7 @@ _VERSIONED_ROUTERS = [
     eleven_handover.router,
     eleven_owner.router,
     admin_platform.router,
+    team_router.router,
 ]
 
 app.include_router(auth.router)

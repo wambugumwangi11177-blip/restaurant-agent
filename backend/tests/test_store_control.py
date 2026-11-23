@@ -291,7 +291,15 @@ def test_spoilage_drops_stock_and_a_large_loss_waits_for_the_owner(client, db_se
     db_session.expire_all()
     assert db_session.query(models.InventoryItem).filter_by(item_name="Rice").one().quantity == 4
     jack_queue = client.get("/api/v1/store/approvals", headers=_auth(_token(jack)))
-    assert jack_queue.status_code == 403
+    assert jack_queue.status_code == 200
+    jack_pending = [p for p in jack_queue.json()["pending"] if p.get("status") == "needs_approval"]
+    assert len(jack_pending) == 1
+    assert jack_pending[0].get("approval_card_title") == "Waiting on Owner"
+    assert client.post(
+        "/api/v1/store/approvals",
+        headers=_auth(_token(jack)),
+        json={"kind": "spoilage", "id": large.json()["id"]},
+    ).status_code == 403
     pending = client.get("/api/v1/store/approvals", headers=_auth(_token(owner))).json()["pending"]
     assert len(pending) == 1
     assert pending[0]["kind"] == "waste"

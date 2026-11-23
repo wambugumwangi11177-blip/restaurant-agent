@@ -316,6 +316,7 @@ class StaffMemberCreate(StrictModel):
     name: str
     role_title: str = ""
     hourly_rate: int = Field(default=0, ge=0)
+    daily_pay_rate_cents: Optional[int] = Field(default=None, ge=0)
     phone: Optional[str] = None
     # If set, a User account is created and linked. staff_role is required
     # whenever a login is granted — no default that silently grants more
@@ -339,9 +340,11 @@ class StaffMemberOut(StrictModel):
     name: str
     role_title: str
     hourly_rate: int
+    daily_pay_rate_cents: Optional[int] = None
     phone: Optional[str]
     is_active: bool
     staff_role: Optional[str] = None   # from the linked User, if any
+    has_login: bool = False
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 

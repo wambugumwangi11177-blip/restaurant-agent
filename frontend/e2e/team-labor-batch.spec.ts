@@ -113,11 +113,17 @@ async function mockOwner(page: import("@playwright/test").Page) {
               id: 1,
               kind: "waste",
               status: "needs_approval",
-              action: "Approve write-off",
-              approval_card_title: "This needs you",
-              approval_card_subtitle: "Tomatoes — 3 kg",
-              approval_detail_bullets: ["Tomatoes — 3 kg", "Asked by Jack", "When: 01 Jan 10:00"],
-              photo_path: "/api/v1/store/spoilage/1/photo",
+              item_name: "Tomatoes",
+              quantity: 3,
+              unit: "kg",
+              reason_text: "Spoiled",
+              person_name: "Jack",
+              created_at: "2026-11-23T10:00:00",
+              approval_card_title: "Write-off",
+              approval_needs_you: true,
+              approval_reason_line: "Spoiled",
+              approval_when_label: "Today 10:00",
+              approval_detail_bullets: ["Tomatoes — 3 kg", "Asked by Jack", "Today 10:00"],
               approval_viewer_is_actor: true,
             },
           ],
@@ -159,7 +165,7 @@ test.describe("team labor batch screenshots", () => {
     await page.screenshot({ path: path.join(ARTIFACTS, "manager-schedule-390.png") });
 
     await page.goto("/eleven/approvals");
-    await expect(page.getByText("This needs you")).toBeVisible();
+    await expect(page.getByText("Write-off")).toBeVisible();
     await page.screenshot({ path: path.join(ARTIFACTS, "needs-you-card-390.png") });
 
     await page.route("**/api/v1/**", async (route) => {
@@ -178,7 +184,8 @@ test.describe("team labor batch screenshots", () => {
                 id: 2,
                 kind: "waste",
                 approval_card_title: "Waiting on Owner",
-                approval_card_subtitle: "Tomatoes write-off",
+                approval_card_subtitle: "Write-off",
+                approval_type_label: "Write-off",
                 approval_viewer_is_actor: false,
               },
             ],

@@ -181,12 +181,20 @@ def run_check(db, receipt_id: int) -> None:
     if status == "mismatch":
         names = ", ".join(item["item_name"] for item in result["mismatches"]) or "the delivery"
         fallback = " Qwen wrote the note after DeepSeek failed." if result.get("compare_fallback") else ""
+        receipt.owner_review_status = "needs_approval"
         record_entry(
             db, receipt.restaurant_id, user, "delivery_ai_mismatch", "delivery_receipt",
             f"AI: {names} on delivery {receipt.id} do not match the photos.{fallback}",
             entity_id=receipt.id,
             detail={"label": "AI", "note": result["note"], "mismatches": result["mismatches"], "compare_fallback": bool(result.get("compare_fallback"))},
         )
+        from routers.store_control import tell_owners
+        from services.approval_workflow import ensure_reminder_row
+
+        restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == receipt.restaurant_id).first()
+        if restaurant:
+            tell_owners(db, user, restaurant, "Delivery needs you", f"Delivery {receipt.id} did not match the photos.")
+        ensure_reminder_row(db, receipt.restaurant_id, "delivery", receipt.id, receipt.received_by_user_id)
     elif status == "unavailable":
         record_entry(
             db, receipt.restaurant_id, user, "delivery_ai_unavailable", "delivery_receipt",
@@ -256,12 +264,19 @@ def run_handover_check(db, handover_id: int) -> None:
         return
     if status == "mismatch":
         names = ", ".join(item["item_name"] for item in result["mismatches"]) or "the handover"
+        handover.owner_review_status = "needs_approval"
         record_entry(
             db, handover.restaurant_id, user, "handover_ai_mismatch", "kitchen_handover",
             f"AI: {names} on handover {handover.id} do not match the photo.",
             entity_id=handover.id,
             detail={"label": "AI", "note": result["note"], "mismatches": result["mismatches"]},
         )
+        from routers.store_control import tell_owners
+        from services.approval_workflow import ensure_reminder_row
+
+        restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == handover.restaurant_id).first()
+        tell_owners(db, user, restaurant, "Handover needs you", f"Handover {handover.id} did not match the photo.")
+        ensure_reminder_row(db, handover.restaurant_id, "handover", handover.id, handover.created_by_user_id)
     elif status == "unavailable":
         record_entry(
             db, handover.restaurant_id, user, "handover_ai_unavailable", "kitchen_handover",

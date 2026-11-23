@@ -27,6 +27,18 @@ _ACTOR_ROLE: dict[str, str] = {
 
 _REMINDER_STAGE_COUNT = 4  # immediate, +30m, +2h, next day 09:00 Nairobi
 
+_TYPE_LABEL: dict[str, str] = {
+    "waste": "Write-off",
+    "spoilage": "Write-off",
+    "restock": "Restock",
+    "handover": "Handover",
+    "delivery": "Delivery",
+    "close": "Day close",
+    "cost": "New cost",
+    "schedule": "Schedule change",
+    "zone_photo": "Zone photo",
+}
+
 
 def _next_day_9am_nairobi_after(created_naive_utc: datetime) -> datetime:
     local = created_naive_utc.replace(tzinfo=timezone.utc).astimezone(NAIROBI)
@@ -69,18 +81,41 @@ def _viewer_sees_money(user: models.User) -> bool:
     return user.staff_role == models.StaffRole.CONTROLLER
 
 
-def _format_when(iso: str | None) -> str | None:
+def format_relative_nairobi(iso: str | None) -> str | None:
     if not iso:
         return None
     try:
         raw = iso.replace("Z", "+00:00")
-        if "T" in raw:
-            dt = datetime.fromisoformat(raw)
-            local = dt.replace(tzinfo=timezone.utc).astimezone(NAIROBI) if dt.tzinfo is None else dt.astimezone(NAIROBI)
-            return local.strftime("%d %b %H:%M")
+        if "T" not in raw:
+            return iso
+        dt = datetime.fromisoformat(raw)
+        local = dt.replace(tzinfo=timezone.utc).astimezone(NAIROBI) if dt.tzinfo is None else dt.astimezone(NAIROBI)
+        today = datetime.now(NAIROBI).date()
+        if local.date() == today:
+            return f"Today {local.strftime('%H:%M')}"
+        if local.date() == today - timedelta(days=1):
+            return f"Yesterday {local.strftime('%H:%M')}"
+        return local.strftime("%d %b %H:%M")
     except ValueError:
         return iso[:16] if len(iso) > 16 else iso
-    return iso
+
+
+def approval_type_label(kind: str) -> str:
+    return _TYPE_LABEL.get(kind, kind.replace("_", " ").title() or "Request")
+
+
+def approval_reason_line(item: dict) -> str | None:
+    kind = item.get("kind") or ""
+    if kind in ("waste", "spoilage"):
+        reason = (item.get("reason_text") or "").strip() or (item.get("reason_code") or "").strip()
+        return reason or None
+    ai = item.get("ai") or {}
+    note = (ai.get("note") or "").strip() if isinstance(ai, dict) else None
+    if note:
+        return note
+    if kind == "restock":
+        return (item.get("headline") or "").strip() or None
+    return None
 
 
 def approval_detail_bullets(item: dict, viewer: models.User) -> list[str]:
@@ -111,9 +146,9 @@ def approval_detail_bullets(item: dict, viewer: models.User) -> list[str]:
     who = item.get("person_name") or item.get("created_by")
     if who:
         lines.append(f"Asked by {who}")
-    when = _format_when(item.get("created_at"))
+    when = format_relative_nairobi(item.get("created_at"))
     if when:
-        lines.append(f"When: {when}")
+        lines.append(when)
     return lines
 
 
@@ -122,13 +157,15 @@ def enrich_approval_item(item: dict, viewer: models.User) -> dict:
     actor_role = _ACTOR_ROLE.get(kind, "owner")
     is_actor = viewer_is_actor(viewer, actor_role)
     waiting = _actor_label(actor_role)
+    type_label = approval_type_label(kind if kind != "spoilage" else "waste")
+    reason = approval_reason_line(item)
     bullets = approval_detail_bullets(item, viewer)
     if is_actor and item.get("status") == "needs_approval":
-        card_title = "This needs you"
+        card_title = type_label
         card_subtitle = bullets[0] if bullets else (item.get("action") or "")
     elif item.get("status") == "needs_approval":
         card_title = f"Waiting on {waiting}"
-        card_subtitle = bullets[0] if bullets else (item.get("action") or "")
+        card_subtitle = type_label
     else:
         card_title = ""
         card_subtitle = ""
@@ -137,11 +174,15 @@ def enrich_approval_item(item: dict, viewer: models.User) -> dict:
         for key in money_keys_in(out):
             if key in out:
                 out.pop(key, None)
+    out["approval_type_label"] = type_label
+    out["approval_reason_line"] = reason
+    out["approval_needs_you"] = bool(is_actor and item.get("status") == "needs_approval")
     out["approval_card_title"] = card_title
     out["approval_card_subtitle"] = card_subtitle
     out["approval_detail_bullets"] = bullets
     out["approval_viewer_is_actor"] = is_actor
     out["approval_waiting_on"] = waiting if item.get("status") == "needs_approval" else None
+    out["approval_when_label"] = format_relative_nairobi(item.get("created_at"))
     return out
 
 

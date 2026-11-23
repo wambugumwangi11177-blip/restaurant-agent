@@ -976,6 +976,9 @@ async def list_approvals(
     for row in handovers:
         item = _handover_public(db, row, current_user)
         item["kind"] = "handover"
+        item["requester_user_id"] = row.created_by_user_id
+        item["user_id"] = row.created_by_user_id
+        item["status"] = "needs_approval" if row.owner_review_status == "needs_approval" else row.owner_review_status
         moved = ", ".join(f"{line['quantity']:g} {line['unit']} {line['item_name']}" for line in item["lines"])
         item["headline"] = f"{item['person_name']} handed {moved} to {item['chef_name']}."
         if item["lines"]:
@@ -1069,14 +1072,18 @@ async def list_approvals(
                 note = None
         goods = ", ".join(f"{line.quantity:g} {line.unit} {line.item_name}" for line in lines) or "a delivery"
         emphasis = f"{lines[0].quantity:g} {lines[0].unit}" if lines else None
+        review = getattr(row, "owner_review_status", "none") or "none"
         events.append({
             "id": row.id,
             "kind": "delivery",
+            "status": "needs_approval" if review == "needs_approval" else review,
             "headline": f"{who['person_name']} received {goods}" + (f" from {supplier.name}." if supplier else "."),
             "emphasis": emphasis,
             "created_at": _when(row.received_at),
             "photo_path": f"/api/v1/store/deliveries/{row.id}/photos/{photo.id}" if photo else None,
             "ai": _feed_ai({"status": check.status, "note": note} if check else None),
+            "requester_user_id": row.received_by_user_id,
+            "user_id": row.received_by_user_id,
             **who,
         })
     for row in db.query(models.PurchaseOrder).filter(
@@ -1326,8 +1333,71 @@ async def approve(
         ).first()
         action = f"running_cost_{verb}"
         summary = f"{user.email} {verb} {row.label}." if row else ""
+    elif body.kind == "restock":
+        row = db.query(models.PurchaseOrder).filter(
+            models.PurchaseOrder.id == body.id,
+            models.PurchaseOrder.restaurant_id == restaurant.id,
+        ).first()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Not found")
+        if row.status != "PENDING":
+            raise HTTPException(status_code=400, detail="This one does not need approval.")
+        row.status = "SENT" if body.decision == "approve" else "DECLINED"
+        from services.approval_workflow import resolve_reminder
+
+        resolve_reminder(db, restaurant.id, "restock", row.id)
+        db.commit()
+        return {"id": row.id, "kind": "restock", "status": row.status}
+    elif body.kind == "handover":
+        row = db.query(models.KitchenHandover).filter(
+            models.KitchenHandover.id == body.id,
+            models.KitchenHandover.restaurant_id == restaurant.id,
+        ).first()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Not found")
+        if row.owner_review_status != "needs_approval":
+            raise HTTPException(status_code=400, detail="This one does not need approval.")
+        row.owner_review_status = "approved" if body.decision == "approve" else "declined"
+        row.reviewed_by_user_id = user.id
+        row.reviewed_at = now
+        row.owner_note = body.note.strip()
+        from services.approval_workflow import resolve_reminder, notify_requester_outcome
+
+        resolve_reminder(db, restaurant.id, "handover", row.id)
+        notify_requester_outcome(
+            db,
+            row.created_by_user_id,
+            title="Handover decision",
+            body=f"The owner {verb} the handover discrepancy.",
+        )
+        db.commit()
+        return {"id": row.id, "kind": "handover", "status": row.owner_review_status}
+    elif body.kind == "delivery":
+        row = db.query(models.DeliveryReceipt).filter(
+            models.DeliveryReceipt.id == body.id,
+            models.DeliveryReceipt.restaurant_id == restaurant.id,
+        ).first()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Not found")
+        if row.owner_review_status != "needs_approval":
+            raise HTTPException(status_code=400, detail="This one does not need approval.")
+        row.owner_review_status = "approved" if body.decision == "approve" else "declined"
+        row.reviewed_by_user_id = user.id
+        row.reviewed_at = now
+        row.owner_note = body.note.strip()
+        from services.approval_workflow import resolve_reminder, notify_requester_outcome
+
+        resolve_reminder(db, restaurant.id, "delivery", row.id)
+        notify_requester_outcome(
+            db,
+            row.received_by_user_id,
+            title="Delivery decision",
+            body=f"The owner {verb} the delivery discrepancy.",
+        )
+        db.commit()
+        return {"id": row.id, "kind": "delivery", "status": row.owner_review_status}
     else:
-        raise HTTPException(status_code=400, detail="Choose waste, a day close, or a bill.")
+        raise HTTPException(status_code=400, detail="Choose a supported approval kind.")
     if row is None:
         raise HTTPException(status_code=404, detail="Not found")
     if row.status != "needs_approval":

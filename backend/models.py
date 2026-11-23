@@ -1938,9 +1938,14 @@ class DeliveryReceipt(Base):
     received_at = Column(DateTime, default=utcnow, nullable=False)
     notes = Column(Text, default="")
     status = Column(String, nullable=False, default="draft")  # draft | keyed | checked
+    owner_review_status = Column(String, nullable=False, default="none", server_default="none")
+    owner_note = Column(Text, nullable=False, default="", server_default="")
+    reviewed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
 
     supplier = relationship("Supplier")
-    received_by = relationship("User")
+    received_by = relationship("User", foreign_keys=[received_by_user_id])
+    reviewed_by = relationship("User", foreign_keys=[reviewed_by_user_id])
     photos = relationship("DeliveryEvidencePhoto", back_populates="receipt")
     lines = relationship("DeliveryReceiptLine", back_populates="receipt")
     vision_checks = relationship("DeliveryVisionCheck", back_populates="receipt")
@@ -2029,6 +2034,10 @@ class KitchenHandover(Base):
     photo_storage_key = Column(String, nullable=True)
     photo_content_type = Column(String, nullable=True)
     created_at = Column(DateTime, default=utcnow, nullable=False)
+    owner_review_status = Column(String, nullable=False, default="none", server_default="none")
+    owner_note = Column(Text, nullable=False, default="", server_default="")
+    reviewed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
 
     lines = relationship("KitchenHandoverLine", back_populates="handover")
 

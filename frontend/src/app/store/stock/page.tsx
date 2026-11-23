@@ -74,7 +74,7 @@ export default function StoreStockPage() {
         <p className="mt-2 text-sm leading-6 text-zinc-300">
           Unlocks after your password and PIN are saved. Recipes can wait.
         </p>
-        <Link href={recipes?.state === "open" ? "/store/recipes" : "/store/account"} className="mt-4 inline-flex min-h-11 items-center rounded-full bg-white px-4 font-semibold text-black">
+        <Link href={recipes?.state === "open" ? "/store/recipes" : "/store/account"} className="mt-4 inline-flex min-h-11 items-center leviii-btn-primary px-4">
           {recipes?.state === "open" ? "Open recipes" : "Open account"}
         </Link>
       </section>
@@ -123,7 +123,7 @@ export default function StoreStockPage() {
             <input required inputMode="decimal" value={yieldFraction} onChange={(event) => setYieldFraction(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
           </label>
           {error && <p className="text-sm text-red-300">{error}</p>}
-          <button type="submit" className="min-h-11 w-full rounded-full bg-white font-semibold text-black">Save opening count</button>
+          <button type="submit" className="min-h-11 w-full leviii-btn-primary">Save opening count</button>
         </form>
       )}
       {items.length === 0 && <p className="text-sm text-zinc-400">Nothing is in stock yet.</p>}

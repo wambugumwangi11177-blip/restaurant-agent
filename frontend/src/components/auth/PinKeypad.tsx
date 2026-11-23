@@ -34,7 +34,7 @@ export default function PinKeypad({
             type="button"
             disabled={disabled || (key !== "⌫" && value.length >= 4)}
             onClick={() => press(key)}
-            className="flex min-h-14 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-xl font-semibold text-[var(--text)] active:bg-[var(--accent-hover)] disabled:opacity-40"
+            className="owner-glass-inner flex min-h-14 items-center justify-center text-xl font-normal text-[var(--text)] active:bg-[var(--accent-hover)] disabled:opacity-40"
           >
             {key}
           </button>

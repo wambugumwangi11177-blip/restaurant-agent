@@ -11,9 +11,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const VARIANT_CLASSES: Record<Variant, string> = {
-    primary: "bg-[var(--accent)] text-[var(--bg)] font-semibold hover:bg-[var(--accent-hover)]",
-    secondary: "bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] hover:bg-[var(--surface-hover)]",
-    ghost: "text-[var(--text-muted)] hover:text-[var(--text)]",
+    primary: "leviii-btn-primary hover:bg-[var(--accent-hover)]",
+    secondary: "leviii-btn-ghost",
+    ghost: "leviii-btn-ghost border-transparent bg-transparent text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[rgba(233,223,207,0.06)]",
     danger: "bg-[var(--danger)]/10 border border-[var(--danger)]/30 text-[var(--danger)] hover:bg-[var(--danger)]/20",
 };
 
@@ -32,7 +32,7 @@ export default function Button({
     return (
         <button
             type={type}
-            className={`rounded-lg transition-colors disabled:opacity-60 ${VARIANT_CLASSES[variant]} ${SIZE_CLASSES[size]} ${className}`}
+            className={`rounded-full transition-colors disabled:opacity-60 ${VARIANT_CLASSES[variant]} ${SIZE_CLASSES[size]} ${className}`}
             {...rest}
         />
     );

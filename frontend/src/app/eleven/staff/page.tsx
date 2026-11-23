@@ -103,7 +103,7 @@ export default function ElevenStaffPage() {
           </label>
           {error && <p className="text-sm text-red-300">{error}</p>}
           {message && <p className="text-sm text-zinc-200">{message}</p>}
-          <button type="submit" className="min-h-11 w-full rounded-full bg-white font-semibold text-black">
+          <button type="submit" className="min-h-11 w-full leviii-btn-primary">
             Create login
           </button>
         </form>

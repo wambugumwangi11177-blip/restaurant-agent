@@ -44,7 +44,7 @@ export default function StoreRecipesPage() {
         <p className="mt-2 text-sm leading-6 text-zinc-300">
           Unlocks after you change the password you were given and set your own 4-digit PIN.
         </p>
-        <Link href="/store/account" className="mt-4 inline-flex min-h-11 items-center rounded-full bg-white px-4 font-semibold text-black">
+        <Link href="/store/account" className="mt-4 inline-flex min-h-11 items-center leviii-btn-primary px-4">
           Open account
         </Link>
       </section>
@@ -120,7 +120,7 @@ export default function StoreRecipesPage() {
           <input required inputMode="decimal" min="0.01" max="1" step="0.01" value={yieldFraction} onChange={(event) => setYieldFraction(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
         </label>
         {error && <p className="text-sm text-red-300">{error}</p>}
-        <button type="submit" disabled={saving} className="min-h-11 w-full rounded-full bg-white font-semibold text-black disabled:opacity-60">
+        <button type="submit" disabled={saving} className="min-h-11 w-full leviii-btn-primary disabled:opacity-60">
           {saving ? "Saving…" : "Save recipe line"}
         </button>
       </form>

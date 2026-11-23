@@ -62,8 +62,8 @@ export default function SetPinScreen({
   }, [pin, step, confirm, first, refreshUser, onDone]);
 
   return (
-    <div className="fixed inset-0 z-[200] flex min-h-dvh flex-col items-center justify-center bg-[var(--bg)] px-4">
-      <div className="w-full max-w-sm rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-lg">
+    <div className="leviii-hearth-bg fixed inset-0 z-[200] flex min-h-dvh flex-col items-center justify-center px-4">
+      <div className="owner-glass-panel w-full max-w-sm p-6">
         <h1 className="text-center text-xl font-semibold text-white">Choose a PIN for {displayName}</h1>
         <p className="mt-2 text-center text-sm text-zinc-400">
           {step === "enter" ? "Pick 4 digits only you know." : "Enter it again to confirm."}

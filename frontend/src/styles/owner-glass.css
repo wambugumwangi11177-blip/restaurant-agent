@@ -1,12 +1,17 @@
-/* Eleven + store shell — warm espresso glass */
-.owner-glass-theme {
+/* Hearth & Grain — premium warm glass (owner / store / auth) */
+.owner-glass-theme,
+.leviii-hearth-bg {
   --og-bg: var(--leviii-espresso, #2b1d16);
   --og-text: var(--leviii-oat, #e9dfcf);
-  --og-muted: var(--text-muted, #c4b8a8);
-  --og-glass: rgba(233, 223, 207, 0.11);
-  --og-glass-solid: rgba(61, 46, 36, 0.92);
-  --og-border: rgba(233, 223, 207, 0.2);
-  --og-shadow: 0 12px 40px rgba(20, 12, 8, 0.45);
+  --og-muted: rgba(233, 223, 207, 0.65);
+  --og-glass: rgba(43, 29, 22, 0.58);
+  --og-glass-fallback: rgba(43, 29, 22, 0.72);
+  --og-glass-solid: rgba(52, 38, 30, 0.96);
+  --og-border: rgba(233, 223, 207, 0.15);
+  --og-border-strong: rgba(233, 223, 207, 0.22);
+  --og-inner: rgba(233, 223, 207, 0.09);
+  --og-shadow: 0 24px 64px rgba(8, 4, 2, 0.55), 0 8px 24px rgba(8, 4, 2, 0.35);
+  --og-radius: 24px;
   --og-nav: 72px;
   --og-nav-inset: max(0.75rem, env(safe-area-inset-bottom, 0px));
   --og-nav-clearance: calc(var(--og-nav) + var(--og-nav-inset) + 5.5rem);
@@ -14,7 +19,14 @@
   color: var(--og-text);
   background: var(--og-bg);
   position: relative;
+}
+
+.owner-glass-theme {
   padding-bottom: var(--og-nav-clearance);
+}
+
+.leviii-hearth-bg {
+  min-height: 100dvh;
 }
 
 @media (min-width: 768px) {
@@ -24,69 +36,137 @@
   }
 }
 
-.owner-glass-theme::before {
+.owner-glass-theme::before,
+.leviii-hearth-bg::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 85% 55% at 12% 8%, rgba(233, 223, 207, 0.12), transparent 58%),
-    radial-gradient(ellipse 70% 45% at 88% 18%, rgba(156, 175, 136, 0.14), transparent 52%),
-    radial-gradient(ellipse 75% 60% at 55% 92%, rgba(212, 165, 116, 0.08), transparent 55%),
+    radial-gradient(ellipse 95% 70% at 18% 6%, rgba(233, 223, 207, 0.14), transparent 52%),
+    radial-gradient(ellipse 80% 55% at 92% 12%, rgba(156, 175, 136, 0.1), transparent 48%),
+    radial-gradient(ellipse 130% 90% at 50% 105%, rgba(20, 12, 8, 0.65), transparent 58%),
+    radial-gradient(ellipse 100% 80% at 50% 50%, transparent 35%, rgba(12, 8, 5, 0.42) 100%),
+    repeating-linear-gradient(
+      90deg,
+      rgba(233, 223, 207, 0.028) 0,
+      rgba(233, 223, 207, 0.028) 1px,
+      transparent 1px,
+      transparent 16px
+    ),
     var(--og-bg);
 }
 
-.owner-glass-theme > :not(nav) {
+.owner-glass-theme > :not(nav),
+.leviii-hearth-bg > * {
   position: relative;
   z-index: 1;
 }
 
+.owner-glass-theme > nav {
+  z-index: 50;
+}
+
 .owner-glass-panel {
-  background: var(--og-glass-solid);
+  border-radius: var(--og-radius);
+  background: var(--og-glass-fallback);
   border: 1px solid var(--og-border);
-  box-shadow: var(--og-shadow), inset 0 1px 0 rgba(233, 223, 207, 0.12);
+  box-shadow: var(--og-shadow), inset 0 1px 0 rgba(233, 223, 207, 0.14);
 }
 
 @supports (backdrop-filter: blur(20px)) {
   .owner-glass-panel {
     background: var(--og-glass);
-    backdrop-filter: blur(26px) saturate(1.2);
-    -webkit-backdrop-filter: blur(26px) saturate(1.2);
+    backdrop-filter: blur(28px) saturate(1.35);
+    -webkit-backdrop-filter: blur(28px) saturate(1.35);
   }
 }
 
-html[data-leviii-apk] .owner-glass-theme::before {
+html[data-leviii-apk] .owner-glass-theme::before,
+html[data-leviii-apk] .leviii-hearth-bg::before {
   display: none;
 }
 
 html[data-leviii-apk] .owner-glass-panel,
-html[data-leviii-apk] .owner-glass-theme .owner-glass-panel {
+html[data-leviii-apk] .owner-glass-theme .owner-glass-panel,
+html[data-leviii-apk] .leviii-hearth-bg .owner-glass-panel {
   background: var(--og-glass-solid) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  box-shadow: var(--og-shadow), inset 0 1px 0 rgba(233, 223, 207, 0.14) !important;
 }
 
 .shell-panel-solid {
+  border-radius: var(--og-radius);
   background: var(--og-glass-solid);
   border: 1px solid var(--og-border);
-  box-shadow: var(--og-shadow);
+  box-shadow: var(--og-shadow), inset 0 1px 0 rgba(233, 223, 207, 0.14);
 }
 
 .owner-solid-card {
-  background: var(--surface);
+  border-radius: var(--og-radius);
+  background: var(--og-glass-solid);
   border: 1px solid var(--og-border);
-  box-shadow: var(--og-shadow);
+  box-shadow: var(--og-shadow), inset 0 1px 0 rgba(233, 223, 207, 0.12);
   color: var(--og-text);
 }
 
+.owner-glass-inner {
+  border-radius: 20px;
+  padding: 1rem 1.25rem;
+  background: var(--og-inner);
+  border: 1px solid rgba(233, 223, 207, 0.12);
+  box-shadow: inset 0 1px 0 rgba(233, 223, 207, 0.1), 0 12px 32px rgba(8, 4, 2, 0.25);
+}
+
+@supports (backdrop-filter: blur(12px)) {
+  .owner-glass-inner {
+    backdrop-filter: blur(18px) saturate(1.25);
+    -webkit-backdrop-filter: blur(18px) saturate(1.25);
+  }
+}
+
+html[data-leviii-apk] .owner-glass-inner {
+  background: rgba(233, 223, 207, 0.1);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.owner-oat-highlight {
+  border-radius: 22px;
+  padding: 1.125rem 1.35rem;
+  background: var(--og-inner);
+  border: 1px solid var(--og-border-strong);
+  color: var(--og-text);
+  box-shadow: inset 0 1px 0 rgba(233, 223, 207, 0.14), 0 16px 40px rgba(8, 4, 2, 0.28);
+}
+
+@supports (backdrop-filter: blur(12px)) {
+  .owner-oat-highlight {
+    backdrop-filter: blur(22px) saturate(1.3);
+    -webkit-backdrop-filter: blur(22px) saturate(1.3);
+  }
+}
+
+html[data-leviii-apk] .owner-oat-highlight {
+  background: rgba(233, 223, 207, 0.11);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .owner-glass-theme .text-zinc-400,
-.owner-glass-theme .text-zinc-500 {
+.owner-glass-theme .text-zinc-500,
+.leviii-hearth-bg .text-zinc-400,
+.leviii-hearth-bg .text-zinc-500 {
   color: var(--og-muted);
 }
 
 .owner-glass-theme .text-zinc-300,
-.owner-glass-theme .text-zinc-200 {
+.owner-glass-theme .text-zinc-200,
+.owner-glass-theme .text-zinc-100,
+.leviii-hearth-bg .text-zinc-300,
+.leviii-hearth-bg .text-zinc-200 {
   color: var(--og-text);
 }
 
@@ -100,13 +180,12 @@ html[data-leviii-apk] .owner-glass-theme .owner-glass-panel {
 }
 
 .owner-label {
-  margin: 24px 0 12px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  margin: 1.75rem 0 0.875rem;
+  font-size: 1.125rem;
+  font-weight: 300;
+  letter-spacing: 0.03em;
+  line-height: 1.35;
   color: var(--og-text);
-  opacity: 0.85;
 }
 
 .owner-label:first-child {
@@ -114,39 +193,46 @@ html[data-leviii-apk] .owner-glass-theme .owner-glass-panel {
 }
 
 .owner-quiet {
-  margin: 0 0 12px;
+  margin: 0 0 1rem;
   font-size: 0.9375rem;
-  line-height: 1.45;
+  font-weight: 400;
+  line-height: 1.55;
   color: var(--og-muted);
 }
 
 .owner-tile {
-  border-radius: 16px;
-  padding: 16px;
+  border-radius: var(--og-radius);
+  padding: 1.25rem 1.375rem;
 }
 
 .owner-figure {
-  margin: 4px 0 8px;
-  font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  margin: 0.35rem 0 0.5rem;
+  font-size: 2rem;
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
   color: var(--og-text);
 }
 
-.owner-oat-highlight {
-  border-radius: 1rem;
-  padding: 1rem 1.125rem;
-  background: rgba(233, 223, 207, 0.14);
-  border: 1px solid rgba(233, 223, 207, 0.32);
-  color: var(--og-text);
-  box-shadow: var(--og-shadow), inset 0 1px 0 rgba(233, 223, 207, 0.16);
+.owner-glass-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  border: 1px solid var(--og-border);
+  background: rgba(233, 223, 207, 0.06);
+  color: var(--og-muted);
 }
 
-html[data-leviii-apk] .owner-oat-highlight {
-  background: rgba(233, 223, 207, 0.16);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+@supports (backdrop-filter: blur(8px)) {
+  .owner-glass-tag {
+    backdrop-filter: blur(14px) saturate(1.2);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  }
 }
 
 .owner-shell-header {
@@ -155,6 +241,12 @@ html[data-leviii-apk] .owner-oat-highlight {
   margin-top: 0.75rem;
   width: calc(100% - 24px);
   max-width: 420px;
+  border-radius: 999px;
+}
+
+.owner-shell-header h1 {
+  font-weight: 300;
+  letter-spacing: 0.04em;
 }
 
 .owner-chip {
@@ -163,25 +255,42 @@ html[data-leviii-apk] .owner-oat-highlight {
   align-items: center;
   border-radius: 999px;
   border: 1px solid var(--og-border);
-  background: rgba(233, 223, 207, 0.06);
-  padding: 8px 12px;
+  background: rgba(233, 223, 207, 0.05);
+  padding: 8px 14px;
   font-size: 0.8125rem;
+  font-weight: 400;
   color: var(--og-text);
 }
 
+@supports (backdrop-filter: blur(8px)) {
+  .owner-chip {
+    backdrop-filter: blur(16px) saturate(1.2);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  }
+}
+
 .owner-chip.is-on {
-  border-color: var(--accent);
+  border-color: rgba(156, 175, 136, 0.55);
   background: var(--accent);
   color: var(--bg);
+  box-shadow: 0 6px 20px rgba(156, 175, 136, 0.28);
 }
 
 .owner-nav {
   bottom: var(--og-nav-inset);
+  border-radius: 999px;
+}
+
+.owner-premium-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
 }
 
 @media (max-width: 767px) {
   .owner-main-pad {
     padding-bottom: calc(var(--og-nav) + var(--og-nav-inset) + 2.5rem);
+    padding-top: 1.25rem;
   }
 }
 
@@ -189,5 +298,10 @@ html[data-leviii-apk] .owner-oat-highlight {
   .owner-nav.owner-nav-desktop {
     bottom: auto;
     top: 1.5rem;
+  }
+
+  .owner-main-pad {
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
   }
 }

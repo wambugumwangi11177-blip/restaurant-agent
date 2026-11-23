@@ -59,8 +59,8 @@ export default function LockScreen({
   }
 
   return (
-    <div className="fixed inset-0 z-[200] flex min-h-dvh flex-col items-center justify-center bg-[var(--bg)] px-4 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
-      <div className="w-full max-w-sm rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-lg">
+    <div className="leviii-hearth-bg fixed inset-0 z-[200] flex min-h-dvh flex-col items-center justify-center px-4 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
+      <div className="owner-glass-panel w-full max-w-sm p-6">
         <p className="text-center text-xs uppercase tracking-[0.2em] text-zinc-500">LEVIII</p>
         <h1 className="mt-2 text-center text-2xl font-semibold text-white">{displayName}</h1>
         <p className="mt-1 text-center text-sm text-zinc-400">Enter your 4-digit PIN</p>

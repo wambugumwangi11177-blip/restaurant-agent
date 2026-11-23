@@ -87,7 +87,7 @@ export default function DeliveriesPage() {
       <section className="owner-glass-panel rounded-3xl p-4">
         <h2 className="font-semibold">Deliveries are locked</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-300">Answer the delivery question first. Then you can key quantities and take the two photos.</p>
-        <Link href="/store/questions" className="mt-4 inline-flex min-h-11 items-center rounded-full bg-white px-4 font-semibold text-black">Open questions</Link>
+        <Link href="/store/questions" className="mt-4 inline-flex min-h-11 items-center leviii-btn-primary px-4">Open questions</Link>
       </section>
     );
   }
@@ -117,7 +117,7 @@ export default function DeliveriesPage() {
         <PhotoField label="Invoice photo" file={invoice} onFile={setInvoice} onCamera={useCamera.bind(null, "invoice")} />
         <PhotoField label="Goods photo" file={goods} onFile={setGoods} onCamera={useCamera.bind(null, "goods")} />
         {error && <p className="text-sm text-red-300">{error}</p>}
-        <button type="submit" disabled={saving} className="min-h-11 w-full rounded-full bg-white font-semibold text-black disabled:opacity-50">
+        <button type="submit" disabled={saving} className="min-h-11 w-full leviii-btn-primary disabled:opacity-50">
           {saving ? "Saving…" : "Receive delivery"}
         </button>
       </form>

@@ -29,7 +29,7 @@ function Tile({ card }: { card: FeedCard }) {
   if (!sentence && !figure) return null;
   return (
     <article className={`owner-glass-panel owner-tile ${card.id === "money" && card.overdue ? "ring-1 ring-red-400/40" : ""}`}>
-      <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-zinc-400">
+      <p className="owner-glass-tag">
         <Icon size={14} strokeWidth={1.75} aria-hidden />
         {card.title}
       </p>
@@ -48,7 +48,7 @@ export default function ElevenHomePage() {
       {!data && !error && <p className="text-sm text-zinc-400">Loading…</p>}
       {error && <p className="text-sm text-red-300">{error}</p>}
       {data && (
-        <div className="space-y-1">
+        <div className="owner-premium-stack">
           <h2 className="owner-label">Needs you</h2>
           {pendingVisible.length === 0 ? (
             <div className="owner-oat-highlight mb-3">

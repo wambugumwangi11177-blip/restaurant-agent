@@ -61,7 +61,7 @@ export default function ChefsPage() {
         <PhotoField label="Photo" file={photo} onFile={setPhoto} optional />
         {error && <p className="text-sm text-red-300">{error}</p>}
         {saved && <p className="text-sm text-zinc-200">{saved}</p>}
-        <button type="submit" className="min-h-11 w-full rounded-full bg-white font-semibold text-black">Add chef</button>
+        <button type="submit" className="min-h-11 w-full leviii-btn-primary">Add chef</button>
       </form>
       {chefs === null ? (
         <p className="text-sm text-zinc-400">Loading chefs…</p>

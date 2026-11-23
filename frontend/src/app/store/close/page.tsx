@@ -56,7 +56,7 @@ export default function ClosePage() {
       <section className="owner-glass-panel rounded-3xl p-4">
         <h2 className="font-semibold">The day close is locked</h2>
         <p className="mt-2 text-sm text-zinc-300">It opens when the questions say you close the day.</p>
-        <Link href="/store/questions" className="mt-4 inline-flex min-h-11 items-center rounded-full bg-white px-4 font-semibold text-black">Open questions</Link>
+        <Link href="/store/questions" className="mt-4 inline-flex min-h-11 items-center leviii-btn-primary px-4">Open questions</Link>
       </section>
     );
   }
@@ -89,7 +89,7 @@ export default function ClosePage() {
       )}
       {error && <p className="text-sm text-red-300">{error}</p>}
       {saved && <p className="text-sm text-zinc-200">{saved}</p>}
-      <button type="submit" className="min-h-11 w-full rounded-full bg-white font-semibold text-black">Close the day</button>
+      <button type="submit" className="min-h-11 w-full leviii-btn-primary">Close the day</button>
     </form>
   );
 }

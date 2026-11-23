@@ -98,7 +98,7 @@ export default function OwnerDeliveriesPage() {
                 const url = photos[`${delivery.id}-${photo.id}`];
                 return url ? <img key={url} src={url} alt={photo.kind} className="max-h-48 w-full rounded-2xl object-cover" /> : null;
               })}
-              <button type="button" onClick={() => confirm(delivery)} className="min-h-11 w-full rounded-full bg-white font-semibold text-black">
+              <button type="button" onClick={() => confirm(delivery)} className="min-h-11 w-full leviii-btn-primary">
                 Confirm prices
               </button>
             </li>

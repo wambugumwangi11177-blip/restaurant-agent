@@ -107,7 +107,7 @@ export default function DayPhotosPage() {
         ) : (
           <>
             <PhotoField label="Zone photo" file={photo} onFile={setPhoto} />
-            <button type="button" onClick={send} className="min-h-11 w-full rounded-full bg-white font-semibold text-black">
+            <button type="button" onClick={send} className="min-h-11 w-full leviii-btn-primary">
               Save {phase} photo
             </button>
           </>

@@ -28,7 +28,7 @@ function VerifyEmailContent() {
     }, [token]);
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-4 bg-[var(--bg)]">
+        <div className="leviii-hearth-bg min-h-screen flex items-center justify-center px-4">
             <div className="w-full max-w-sm">
                 <div className="text-center mb-10">
                     <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">{PRODUCT_NAME}</h1>

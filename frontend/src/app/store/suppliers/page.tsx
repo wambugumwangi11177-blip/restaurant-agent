@@ -56,7 +56,7 @@ export default function SuppliersPage() {
       <section className="owner-glass-panel rounded-3xl p-4">
         <h2 className="font-semibold">Suppliers are locked</h2>
         <p className="mt-2 text-sm text-zinc-300">Answer the supplier question first.</p>
-        <Link href="/store/questions" className="mt-4 inline-flex min-h-11 items-center rounded-full bg-white px-4 font-semibold text-black">Open questions</Link>
+        <Link href="/store/questions" className="mt-4 inline-flex min-h-11 items-center leviii-btn-primary px-4">Open questions</Link>
       </section>
     );
   }
@@ -81,7 +81,7 @@ export default function SuppliersPage() {
           </select>
         </label>
         {error && <p className="text-sm text-red-300">{error}</p>}
-        <button type="submit" className="min-h-11 w-full rounded-full bg-white font-semibold text-black">Save supplier</button>
+        <button type="submit" className="min-h-11 w-full leviii-btn-primary">Save supplier</button>
       </form>
       <ul className="space-y-2">
         {rows.map((row) => (

@@ -15,12 +15,14 @@ export default function StoreHomePage() {
 
   return (
     <div className="space-y-4">
-      <section className="owner-glass-panel rounded-3xl p-4">
-        <h2 className="text-sm font-semibold text-[var(--text)]">How a delivery is kept</h2>
-        <p className="mt-1 text-xs leading-5 text-zinc-400">
+      <section className="owner-glass-panel p-5">
+        <h2 className="text-xl font-light tracking-wide text-[var(--text)]">How a delivery is kept</h2>
+        <p className="mt-2 text-sm leading-6 text-zinc-400">
           Photograph the invoice and the goods, then key the quantities. Prices stay with the owner.
         </p>
-        <CustodyDiagram />
+        <div className="owner-glass-inner mt-4">
+          <CustodyDiagram />
+        </div>
       </section>
       {setup?.stock_followup?.status === "waiting_on_pos" && (
         <section className="owner-glass-panel rounded-3xl p-4">

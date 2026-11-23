@@ -270,11 +270,11 @@ export default function OwnerFeed({
                   )}
                   <label className="mt-3 block text-sm text-zinc-300">
                     Note, if you want one
-                    <input value={note} onChange={(event) => setNote(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
+                    <input value={note} onChange={(event) => setNote(event.target.value)} className="leviii-input mt-1 min-h-11 w-full rounded-2xl px-3" />
                   </label>
                   <div className="mt-3 grid grid-cols-2 gap-2">
-                    <button type="button" disabled={busy === `${event.kind}-${event.id}`} onClick={() => decide(event, "approve")} className="min-h-11 rounded-full bg-white font-semibold text-black">Approve</button>
-                    <button type="button" disabled={busy === `${event.kind}-${event.id}`} onClick={() => decide(event, "decline")} className="min-h-11 rounded-full border border-white/20">Decline</button>
+                    <button type="button" disabled={busy === `${event.kind}-${event.id}`} onClick={() => decide(event, "approve")} className="leviii-btn-primary min-h-11 px-4">Approve</button>
+                    <button type="button" disabled={busy === `${event.kind}-${event.id}`} onClick={() => decide(event, "decline")} className="leviii-btn-ghost min-h-11 px-4">Decline</button>
                   </div>
                 </li>
               ))}
@@ -314,7 +314,7 @@ export default function OwnerFeed({
                       <time className="shrink-0 text-xs text-zinc-400">{clockLabel(event.created_at, zone)}</time>
                     </div>
                     <button type="button" className="mt-1 flex items-center gap-2 text-left" onClick={() => setWho(event)}>
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-[10px] font-semibold text-black">{event.initial || "?"}</span>
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--glass-border)] bg-[var(--accent)] text-[10px] font-medium text-[var(--bg)]">{event.initial || "?"}</span>
                       <span className="text-sm text-zinc-300">{event.person_name || "Someone"}</span>
                     </button>
                     {event.working_alone && <p className="mt-1 text-[11px] uppercase tracking-wide text-zinc-400">Working alone</p>}
@@ -365,7 +365,7 @@ export default function OwnerFeed({
           <div className="owner-glass-panel w-full max-w-md rounded-2xl p-4 text-left" onClick={(event) => event.stopPropagation()} role="dialog" aria-label="Who did this">
             <p className="text-lg font-semibold">{who.person_name || "Someone"}</p>
             <p className="mt-1 text-sm text-zinc-400">{who.person_email || "No email on file."}</p>
-            <button type="button" className="mt-4 min-h-11 w-full rounded-full bg-white font-semibold text-black" onClick={() => setWho(null)}>Close</button>
+            <button type="button" className="leviii-btn-primary mt-4 min-h-11 w-full" onClick={() => setWho(null)}>Close</button>
           </div>
         </button>
       )}

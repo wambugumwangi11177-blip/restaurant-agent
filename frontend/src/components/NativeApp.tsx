@@ -35,7 +35,7 @@ export function OfflineScreen({ onRetry }: { onRetry: () => void }) {
         <button
           type="button"
           onClick={onRetry}
-          className="mt-5 min-h-11 w-full rounded-full bg-white font-semibold text-black"
+          className="mt-5 min-h-11 w-full leviii-btn-primary"
         >
           Try again
         </button>

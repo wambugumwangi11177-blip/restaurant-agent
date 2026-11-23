@@ -35,7 +35,7 @@ export default function OwnerShell({
   return (
     <div className="owner-glass-theme owner-desktop-nav">
       <header className="owner-glass-panel owner-shell-header flex max-w-3xl items-center justify-between rounded-full px-5 py-3 md:ml-6 md:mr-auto md:w-auto md:max-w-3xl">
-        <h1 className="min-w-0 truncate pl-0.5 text-base font-semibold tracking-wide text-[var(--text)]">{title}</h1>
+        <h1 className="min-w-0 truncate pl-0.5 text-lg text-[var(--text)]">{title}</h1>
         <div className="flex items-center gap-2">
           <NotificationBell ownerHome="/eleven" />
           <Link

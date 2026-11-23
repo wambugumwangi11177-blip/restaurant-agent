@@ -76,7 +76,7 @@ export default function IssuePage() {
     return (
       <section className="owner-glass-panel rounded-3xl p-4">
         <h2 className="font-semibold">Handing stock to the kitchen is locked</h2>
-        <Link href="/store/questions" className="mt-4 inline-flex min-h-11 items-center rounded-full bg-white px-4 font-semibold text-black">Open questions</Link>
+        <Link href="/store/questions" className="mt-4 inline-flex min-h-11 items-center leviii-btn-primary px-4">Open questions</Link>
       </section>
     );
   }
@@ -115,7 +115,7 @@ export default function IssuePage() {
       <PhotoField label="Photo of what they received" file={photo} onFile={setPhoto} />
       {error && <p className="text-sm text-red-300">{error}</p>}
       {saved && <p className="text-sm text-zinc-200">{saved}</p>}
-      <button type="submit" className="min-h-11 w-full rounded-full bg-white font-semibold text-black" disabled={chefs.length === 0}>Hand it over</button>
+      <button type="submit" className="min-h-11 w-full leviii-btn-primary" disabled={chefs.length === 0}>Hand it over</button>
     </form>
   );
 }

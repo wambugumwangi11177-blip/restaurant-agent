@@ -109,7 +109,7 @@ export default function ElevenImportPage() {
           </label>
         )}
         {error && <p className="text-sm text-red-300">{error}</p>}
-        <button type="submit" disabled={busy || !file} className="min-h-11 w-full rounded-full bg-white font-semibold text-black disabled:opacity-50">
+        <button type="submit" disabled={busy || !file} className="min-h-11 w-full leviii-btn-primary disabled:opacity-50">
           {busy ? "Working…" : "Preview"}
         </button>
       </form>
@@ -136,7 +136,7 @@ export default function ElevenImportPage() {
             type="button"
             disabled={busy || preview.error_count > 0}
             onClick={confirm}
-            className="min-h-11 w-full rounded-full bg-white font-semibold text-black disabled:opacity-40"
+            className="min-h-11 w-full leviii-btn-primary disabled:opacity-40"
           >
             Confirm import
           </button>

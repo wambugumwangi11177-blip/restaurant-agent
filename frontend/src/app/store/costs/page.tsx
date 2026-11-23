@@ -112,7 +112,7 @@ export default function CostsPage() {
       <section className="owner-glass-panel rounded-3xl p-4">
         <h2 className="font-semibold">Bills are locked</h2>
         <p className="mt-2 text-sm text-zinc-300">They open when the questions say you know the regular bills.</p>
-        <Link href="/store/questions" className="mt-4 inline-flex min-h-11 items-center rounded-full bg-white px-4 font-semibold text-black">Open questions</Link>
+        <Link href="/store/questions" className="mt-4 inline-flex min-h-11 items-center leviii-btn-primary px-4">Open questions</Link>
       </section>
     );
   }
@@ -226,7 +226,7 @@ export default function CostsPage() {
                   <input inputMode="numeric" value={dueDay} onChange={(event) => setDueDay(event.target.value.replace(/\D/g, "").slice(0, 2))} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
                 </label>
                 <PhotoField label="Receipt" file={photo} onFile={setPhoto} optional />
-                <button type="button" onClick={() => send(true)} className="min-h-11 w-full rounded-full bg-white font-semibold text-black">I know it</button>
+                <button type="button" onClick={() => send(true)} className="min-h-11 w-full leviii-btn-primary">I know it</button>
                 <div className="grid grid-cols-2 gap-2">
                   <button type="button" onClick={() => send(false, "owner")} className="min-h-11 rounded-full border border-white/20 text-sm">I don&apos;t know — owner</button>
                   <button type="button" onClick={() => send(false, otherManager)} className="min-h-11 rounded-full border border-white/20 text-sm">I don&apos;t know — {otherManager}</button>

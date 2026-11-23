@@ -375,4 +375,17 @@ test.describe("warm earthy theme screenshots", () => {
     await expect(page.getByText(/Quantities only/i)).toBeVisible({ timeout: 15_000 });
     await page.screenshot({ path: path.join(ARTIFACTS, "theme-stock-390.png") });
   });
+
+  test("desktop owner home 1440x900", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockThemeOwnerApis(page);
+    await page.addInitScript(() => {
+      sessionStorage.setItem("access_token", "theme-owner-desktop");
+      sessionStorage.setItem("app_pin_unlocked", "1");
+      sessionStorage.setItem("app_last_activity", String(Date.now()));
+    });
+    await page.goto("/eleven");
+    await expect(page.getByRole("heading", { name: "Needs you" })).toBeVisible({ timeout: 15_000 });
+    await page.screenshot({ path: path.join(ARTIFACTS, "theme-owner-home-1440.png") });
+  });
 });

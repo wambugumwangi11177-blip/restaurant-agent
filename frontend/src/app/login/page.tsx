@@ -93,22 +93,22 @@ export default function LoginPage() {
     };
 
     if (user) {
-        return <div className="min-h-dvh bg-[var(--bg)]" role="status" aria-label="Opening home" />;
+        return <div className="leviii-hearth-bg min-h-dvh" role="status" aria-label="Opening home" />;
     }
 
     if (isLoading && !authStuck) {
         return (
-            <div className="flex min-h-dvh items-center justify-center bg-[var(--bg)] px-4">
+            <div className="leviii-hearth-bg flex min-h-dvh items-center justify-center px-4">
                 <Loader2 className="h-6 w-6 animate-spin text-[var(--accent)]" aria-label="Checking sign-in" />
             </div>
         );
     }
 
     return (
-        <div className="min-h-dvh overflow-y-auto overscroll-y-contain bg-[var(--bg)] px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
+        <div className="leviii-hearth-bg min-h-dvh overflow-y-auto overscroll-y-contain px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
             <div className="mx-auto w-full max-w-sm">
                 <div className="mb-8 text-center">
-                    <h1 className="text-3xl font-bold tracking-tight text-[var(--text)]">
+                    <h1 className="text-3xl font-light tracking-wide text-[var(--text)]">
                         {PRODUCT_NAME}
                     </h1>
                     <p className="mt-1 text-sm text-[var(--text-muted)]">{PRODUCT_TAGLINE}</p>

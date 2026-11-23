@@ -99,7 +99,7 @@ export default function StoreAccountPage() {
             />
           </label>
           {error && <p className="text-sm text-red-300">{error}</p>}
-          <button type="submit" disabled={saving} className="min-h-11 w-full rounded-full bg-white font-semibold text-black disabled:opacity-60">
+          <button type="submit" disabled={saving} className="min-h-11 w-full leviii-btn-primary disabled:opacity-60">
             {saving ? "Saving…" : "Save password and PIN"}
           </button>
         </form>

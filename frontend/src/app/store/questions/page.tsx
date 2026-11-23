@@ -50,7 +50,7 @@ export default function QuestionsPage() {
       <section className="owner-glass-panel rounded-3xl p-4">
         <h2 className="font-semibold">Questions are locked</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-300">{step.locked_reason}</p>
-        <Link href="/store/account" className="mt-4 inline-flex min-h-11 items-center rounded-full bg-white px-4 font-semibold text-black">
+        <Link href="/store/account" className="mt-4 inline-flex min-h-11 items-center leviii-btn-primary px-4">
           Open account
         </Link>
       </section>
@@ -166,7 +166,7 @@ function SupplierNames({
         Add another supplier
       </button>
       {localError && <p className="text-sm text-red-300">{localError}</p>}
-      <button type="submit" disabled={saving} className="min-h-11 w-full rounded-full bg-white font-semibold text-black disabled:opacity-50">
+      <button type="submit" disabled={saving} className="min-h-11 w-full leviii-btn-primary disabled:opacity-50">
         Save suppliers
       </button>
       {question.answers.filter((answer) => answer.delegate).map((answer) => (

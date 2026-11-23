@@ -3,7 +3,13 @@ from datetime import date, timedelta
 
 import auth
 import models
-from services.labor_schedule import check_team_rules, materialize_week, weekly_hours_for_member
+from services.labor_schedule import (
+    check_team_rules,
+    compact_schedule_labels,
+    longest_consecutive_run,
+    materialize_week,
+    weekly_hours_for_member,
+)
 from tests.test_storekeeper_foundation import _auth, _tenant, _token
 
 
@@ -86,3 +92,31 @@ def test_team_rules_weekly_hours_warning(db_session):
         },
     )
     assert any("hours" in w.lower() for w in warnings)
+
+
+def test_compact_schedule_labels_group_days():
+    slots = [{"weekday": i, "start_time": "09:00", "end_time": "17:00"} for i in range(4)]
+    labels = compact_schedule_labels(slots)
+    assert labels == ["Mon–Thu 09:00–17:00"]
+    hours = sum(8 for _ in slots)
+    assert hours == 32
+
+
+def test_longest_consecutive_run():
+    assert longest_consecutive_run({0, 1, 2, 3}) == 4
+    assert longest_consecutive_run({0, 2, 4}) == 1
+
+
+def test_consecutive_streak_rule_warning(db_session):
+    _, _, restaurant = _tenant(db_session, "Eleven", "owner3@eleven.leviii")
+    member = models.StaffMember(restaurant_id=restaurant.id, name="Busy", role_title="waiter")
+    db_session.add(member)
+    db_session.commit()
+    warnings = check_team_rules(
+        db_session,
+        restaurant.id,
+        {
+            member.id: [{"weekday": i, "start_time": "09:00", "end_time": "17:00"} for i in range(7)],
+        },
+    )
+    assert any("in a row" in w for w in warnings)

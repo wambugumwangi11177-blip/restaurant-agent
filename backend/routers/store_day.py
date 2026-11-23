@@ -90,6 +90,10 @@ async def upload_zone_photo(
         detail={"zone": zone.name, "phase": phase, "day": day.isoformat()},
     )
     db.commit()
+    if phase == "open":
+        from services.labor_schedule import touch_login_staff_shift
+
+        touch_login_staff_shift(db, restaurant.id, user.id)
     background_tasks.add_task(run_zone_photo_check_safe, row.id)
     return {"id": row.id, "zone": zone.name, "phase": phase, "photo_path": f"/api/v1/store/day-photos/{row.id}/photo"}
 

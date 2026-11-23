@@ -33,14 +33,14 @@ const jackMe = { ...ownerMe, id: 2, email: "jack@eleven.leviii", role: "staff", 
 const teamOverview = {
   today: "2026-01-01",
   week_start: "2025-12-29",
-  on_shift_today: [{ staff_member_id: 1, name: "Joy", role_title: "waiter" }],
+  on_shift_now: [{ staff_member_id: 1, name: "Joy", role_title: "waiter", window: "09:00–17:00" }],
   week_schedule: [
     {
       staff_member_id: 1,
       name: "Joy",
       role_title: "waiter",
       weekly_hours: 32,
-      slots: [{ weekday: 0, day_name: "Monday", start_time: "09:00", end_time: "17:00" }],
+      compact_lines: ["Mon–Thu 09:00–17:00"],
     },
   ],
   overwork_warnings: [],
@@ -73,7 +73,33 @@ async function mockOwner(page: import("@playwright/test").Page) {
       return;
     }
     if (url.includes("/team/weekly-slots")) {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          slots: [
+            { staff_member_id: 1, weekday: 0, start_time: "09:00", end_time: "17:00" },
+            { staff_member_id: 1, weekday: 1, start_time: "09:00", end_time: "17:00" },
+            { staff_member_id: 1, weekday: 2, start_time: "09:00", end_time: "17:00" },
+            { staff_member_id: 1, weekday: 3, start_time: "09:00", end_time: "17:00" },
+          ],
+          roster: [{ id: 1, name: "Joy", role_title: "waiter" }],
+          members: [
+            {
+              staff_member_id: 1,
+              name: "Joy",
+              role_title: "waiter",
+              compact_lines: ["Mon–Thu 09:00–17:00"],
+              weekly_hours: 32,
+              weekdays: [0, 1, 2, 3],
+            },
+          ],
+          today_weekday: 0,
+          scheduled_today_ids: [1],
+          today: "2026-01-01",
+          timezone: "Africa/Nairobi",
+        }),
+      });
       return;
     }
     if (url.includes("/store/approvals")) {
@@ -89,7 +115,9 @@ async function mockOwner(page: import("@playwright/test").Page) {
               status: "needs_approval",
               action: "Approve write-off",
               approval_card_title: "This needs you",
-              approval_card_subtitle: "Approve write-off",
+              approval_card_subtitle: "Tomatoes — 3 kg",
+              approval_detail_bullets: ["Tomatoes — 3 kg", "Asked by Jack", "When: 01 Jan 10:00"],
+              photo_path: "/api/v1/store/spoilage/1/photo",
               approval_viewer_is_actor: true,
             },
           ],
@@ -119,7 +147,7 @@ test.describe("team labor batch screenshots", () => {
     });
 
     await page.goto("/eleven/team");
-    await expect(page.getByRole("heading", { name: "On shift today" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "On shift now" })).toBeVisible({ timeout: 15_000 });
     await page.screenshot({ path: path.join(ARTIFACTS, "team-tab-390.png") });
 
     await page.goto("/eleven/settings/team-rules");

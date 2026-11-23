@@ -6,8 +6,13 @@ import OwnerShell from "@/components/eleven/OwnerShell";
 import api from "@/lib/api";
 
 type Overview = {
-  on_shift_today: { name: string; role_title: string }[];
-  week_schedule: { name: string; role_title: string; weekly_hours: number; slots: { day_name: string; start_time: string; end_time: string }[] }[];
+  on_shift_now: { name: string; role_title: string; window?: string }[];
+  week_schedule: {
+    name: string;
+    role_title: string;
+    weekly_hours: number;
+    compact_lines: string[];
+  }[];
   overwork_warnings: string[];
   labour_cost_today_cents: number | null;
   shift_sales_status: string;
@@ -25,23 +30,28 @@ export default function ElevenTeamPage() {
     <OwnerShell title="Team">
       <div className="owner-premium-stack">
         <p className="text-sm text-zinc-400">
-          Who is on today, the week&apos;s hours, and labour guardrails. Sales per shift:{" "}
-          <span className="text-[var(--text)]">{data?.shift_sales_status === "coming" ? "Coming" : "Live"}</span> until POS receipts land.
+          Who is on the floor right now and this week&apos;s hours. Sales per shift:{" "}
+          <span className="text-[var(--text)]">
+            {data?.shift_sales_status === "coming" ? "coming once your till is connected." : "shown from receipts."}
+          </span>
         </p>
         {error && <p className="text-sm text-red-300">{error}</p>}
         {!data && !error && <p className="text-sm text-zinc-400">Loading…</p>}
         {data && (
           <>
             <section className="owner-glass-panel p-5">
-              <h2 className="text-lg font-light text-[var(--text)]">On shift today</h2>
-              {data.on_shift_today.length === 0 ? (
-                <p className="mt-2 text-sm text-zinc-400">Nobody is scheduled on the floor right now.</p>
+              <h2 className="text-lg font-light text-[var(--text)]">On shift now</h2>
+              {data.on_shift_now.length === 0 ? (
+                <p className="mt-2 text-sm text-zinc-400">Nobody is in their scheduled window right now.</p>
               ) : (
                 <ul className="mt-3 space-y-2 text-sm">
-                  {data.on_shift_today.map((row) => (
+                  {data.on_shift_now.map((row) => (
                     <li key={row.name} className="owner-glass-inner flex justify-between gap-2">
                       <span className="text-[var(--text)]">{row.name}</span>
-                      <span className="text-zinc-400">{row.role_title}</span>
+                      <span className="text-zinc-400">
+                        {row.role_title}
+                        {row.window ? ` · ${row.window}` : ""}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -49,7 +59,7 @@ export default function ElevenTeamPage() {
             </section>
             {data.overwork_warnings.length > 0 && (
               <section className="owner-oat-highlight">
-                <h2 className="text-base font-light text-[var(--warning)]">Overwork warnings</h2>
+                <h2 className="text-base font-light text-[var(--warning)]">Hours warnings</h2>
                 <ul className="mt-2 space-y-1 text-sm text-zinc-300">
                   {data.overwork_warnings.map((w) => (
                     <li key={w}>{w}</li>
@@ -76,12 +86,10 @@ export default function ElevenTeamPage() {
                       {person.name} · {person.role_title}
                     </p>
                     <p className="text-xs text-zinc-400">{person.weekly_hours}h scheduled</p>
-                    {person.slots.length > 0 ? (
+                    {person.compact_lines?.length ? (
                       <ul className="mt-2 space-y-1 text-zinc-300">
-                        {person.slots.map((s) => (
-                          <li key={`${person.name}-${s.day_name}`}>
-                            {s.day_name} {s.start_time}–{s.end_time}
-                          </li>
+                        {person.compact_lines.map((line) => (
+                          <li key={line}>{line}</li>
                         ))}
                       </ul>
                     ) : (

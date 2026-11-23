@@ -582,7 +582,10 @@ async def add_cost(
         raise
     if status == "needs_approval":
         from routers.store_control import tell_owners
+        from services.approval_workflow import ensure_reminder_row
+
         tell_owners(db, user, restaurant, f"{cleaned} needs you", f"{cleaned} was sent for approval.")
+        ensure_reminder_row(db, restaurant.id, "cost", row.id, user.id)
     body = _cost_public(row, user)
     body["message"] = "Sent to the owner. You will not see the total." if is_known else "Marked unknown. The owner can see that."
     return body

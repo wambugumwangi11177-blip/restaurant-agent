@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
@@ -11,6 +12,8 @@ import models
 from time_utils import utcnow
 
 WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+DAY_ABBR = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+NAIROBI = ZoneInfo("Africa/Nairobi")
 
 
 def _parse_hhmm(value: str) -> time:
@@ -47,6 +50,200 @@ def weekly_hours_for_member(db: Session, restaurant_id: int, staff_member_id: in
     return sum(_slot_hours(s.start_time, s.end_time) for s in slots)
 
 
+def nairobi_now() -> datetime:
+    return utcnow().replace(tzinfo=timezone.utc).astimezone(NAIROBI)
+
+
+def nairobi_today() -> date:
+    return nairobi_now().date()
+
+
+def longest_consecutive_run(weekdays: set[int]) -> int:
+    if not weekdays:
+        return 0
+    sorted_days = sorted(weekdays)
+    best = cur = 1
+    for i in range(1, len(sorted_days)):
+        if sorted_days[i] == sorted_days[i - 1] + 1:
+            cur += 1
+        else:
+            best = max(best, cur)
+            cur = 1
+    return max(best, cur)
+
+
+def compact_schedule_labels(slots: list[dict]) -> list[str]:
+    """e.g. Mon–Thu 09:00–17:00 from per-weekday slot rows."""
+    if not slots:
+        return []
+    groups: dict[tuple[str, str], list[int]] = defaultdict(list)
+    for s in slots:
+        groups[(s["start_time"], s["end_time"])].append(int(s["weekday"]))
+    labels: list[str] = []
+    for (start, end), days in groups.items():
+        days = sorted(set(days))
+        ranges: list[str] = []
+        i = 0
+        while i < len(days):
+            j = i
+            while j + 1 < len(days) and days[j + 1] == days[j] + 1:
+                j += 1
+            ranges.append(DAY_ABBR[days[i]] if i == j else f"{DAY_ABBR[days[i]]}–{DAY_ABBR[days[j]]}")
+            i = j + 1
+        time_part = f" {start}–{end}"
+        labels.extend(f"{r}{time_part}" for r in ranges)
+    return sorted(labels, key=lambda x: x[:3])
+
+
+def _time_in_shift(now_local: datetime, start_str: str, end_str: str) -> bool:
+    s = _parse_hhmm(start_str)
+    e = _parse_hhmm(end_str)
+    start_dt = datetime.combine(now_local.date(), s, tzinfo=NAIROBI)
+    end_dt = datetime.combine(now_local.date(), e, tzinfo=NAIROBI)
+    if end_dt <= start_dt:
+        end_dt += timedelta(days=1)
+    return start_dt <= now_local <= end_dt
+
+
+def people_on_shift_now(db: Session, restaurant_id: int, now_local: datetime | None = None) -> list[dict]:
+    """Floor staff whose weekly slot window contains now (Africa/Nairobi)."""
+    now_local = now_local or nairobi_now()
+    weekday = now_local.weekday()
+    today = now_local.date()
+    members = {
+        m.id: m
+        for m in db.query(models.StaffMember).filter(
+            models.StaffMember.restaurant_id == restaurant_id,
+            models.StaffMember.is_active.is_(True),
+        ).all()
+    }
+    slots = db.query(models.StaffWeeklyShift).filter(
+        models.StaffWeeklyShift.restaurant_id == restaurant_id,
+        models.StaffWeeklyShift.weekday == weekday,
+    ).all()
+    overrides = {
+        (o.staff_member_id, o.shift_date): o
+        for o in db.query(models.StaffShiftOverride).filter(
+            models.StaffShiftOverride.restaurant_id == restaurant_id,
+            models.StaffShiftOverride.shift_date == today,
+        ).all()
+    }
+    active: dict[int, tuple[models.StaffWeeklyShift, int]] = {}
+    for slot in slots:
+        ov = overrides.get((slot.staff_member_id, today))
+        if ov and ov.kind == "missed":
+            continue
+        staff_id = slot.staff_member_id
+        if ov and ov.kind == "swap" and ov.swap_staff_member_id:
+            staff_id = ov.swap_staff_member_id
+        if _time_in_shift(now_local, slot.start_time, slot.end_time):
+            active[staff_id] = (slot, staff_id)
+    rows: list[dict] = []
+    for staff_id, (slot, _) in active.items():
+        member = members.get(staff_id)
+        if not member:
+            continue
+        rows.append(
+            {
+                "staff_member_id": member.id,
+                "name": member.name,
+                "role_title": member.role_title,
+                "window": f"{slot.start_time}–{slot.end_time}",
+            }
+        )
+    rows.sort(key=lambda r: r["name"].lower())
+    return rows
+
+
+def build_schedule_board(db: Session, restaurant_id: int) -> dict:
+    today = nairobi_today()
+    weekday = today.weekday()
+    members = db.query(models.StaffMember).filter(
+        models.StaffMember.restaurant_id == restaurant_id,
+        models.StaffMember.is_active.is_(True),
+    ).order_by(models.StaffMember.name).all()
+    slot_rows = db.query(models.StaffWeeklyShift).filter(
+        models.StaffWeeklyShift.restaurant_id == restaurant_id,
+    ).all()
+    slots_by_member: dict[int, list] = defaultdict(list)
+    for s in slot_rows:
+        slots_by_member[s.staff_member_id].append(s)
+    flat_slots = [
+        {
+            "id": s.id,
+            "staff_member_id": s.staff_member_id,
+            "weekday": s.weekday,
+            "start_time": s.start_time,
+            "end_time": s.end_time,
+        }
+        for s in slot_rows
+    ]
+    roster: list[dict] = []
+    member_summaries: list[dict] = []
+    scheduled_today: list[int] = []
+    for m in members:
+        raw = [
+            {"weekday": s.weekday, "start_time": s.start_time, "end_time": s.end_time}
+            for s in slots_by_member.get(m.id, [])
+        ]
+        hours = round(sum(_slot_hours(s["start_time"], s["end_time"]) for s in raw), 1)
+        compact = compact_schedule_labels(raw)
+        weekdays = sorted({int(s["weekday"]) for s in raw})
+        if weekday in weekdays:
+            scheduled_today.append(m.id)
+        roster.append({"id": m.id, "name": m.name, "role_title": m.role_title, "has_login": m.user_id is not None})
+        member_summaries.append(
+            {
+                "staff_member_id": m.id,
+                "name": m.name,
+                "role_title": m.role_title,
+                "compact_lines": compact,
+                "weekly_hours": hours,
+                "weekdays": weekdays,
+            }
+        )
+    return {
+        "slots": flat_slots,
+        "roster": roster,
+        "members": member_summaries,
+        "today_weekday": weekday,
+        "scheduled_today_ids": scheduled_today,
+        "timezone": "Africa/Nairobi",
+        "today": str(today),
+    }
+
+
+def touch_login_staff_shift(db: Session, restaurant_id: int, user_id: int, when: datetime | None = None) -> None:
+    """Managers/logging staff: record actual start on day open or handover."""
+    when = when or utcnow()
+    member = db.query(models.StaffMember).filter(
+        models.StaffMember.restaurant_id == restaurant_id,
+        models.StaffMember.user_id == user_id,
+        models.StaffMember.is_active.is_(True),
+    ).first()
+    if member is None:
+        return
+    day = when.date()
+    shift = db.query(models.LaborShift).filter(
+        models.LaborShift.restaurant_id == restaurant_id,
+        models.LaborShift.staff_member_id == member.id,
+        models.LaborShift.shift_date == day,
+    ).first()
+    if shift is None:
+        db.add(
+            models.LaborShift(
+                restaurant_id=restaurant_id,
+                staff_member_id=member.id,
+                shift_date=day,
+                actual_start=when,
+                notes="floor",
+            )
+        )
+    elif shift.actual_start is None:
+        shift.actual_start = when
+    db.commit()
+
+
 def scheduled_weekdays(db: Session, restaurant_id: int, staff_member_id: int) -> set[int]:
     rows = db.query(models.StaffWeeklyShift).filter(
         models.StaffWeeklyShift.restaurant_id == restaurant_id,
@@ -71,12 +268,13 @@ def check_team_rules(
             name = member.name if member else f"Staff #{staff_id}"
             warnings.append(f"{name} is scheduled for {hours:.1f} hours this week (max {rules.max_hours_per_week:g}).")
         days = {int(s["weekday"]) for s in slots}
-        if len(days) > rules.max_consecutive_days:
+        streak = longest_consecutive_run(days)
+        if streak > rules.max_consecutive_days:
             member = db.query(models.StaffMember).filter(models.StaffMember.id == staff_id).first()
             name = member.name if member else f"Staff #{staff_id}"
             warnings.append(
-                f"{name} is scheduled {len(days)} days with no rest in the week "
-                f"(max {rules.max_consecutive_days} days in a row — check against your staff contracts)."
+                f"{name} is scheduled {streak} days in a row "
+                f"(max {rules.max_consecutive_days} — check against your staff contracts)."
             )
     return warnings
 
@@ -149,7 +347,8 @@ def materialize_week(
     return created
 
 
-def team_overview(db: Session, restaurant_id: int, today: date) -> dict:
+def team_overview(db: Session, restaurant_id: int, today: date | None = None) -> dict:
+    today = today or nairobi_today()
     rules = get_or_create_team_rules(db, restaurant_id)
     week_start = today - timedelta(days=today.weekday())
     members = db.query(models.StaffMember).filter(
@@ -162,22 +361,11 @@ def team_overview(db: Session, restaurant_id: int, today: date) -> dict:
     slots_by_member: dict[int, list] = defaultdict(list)
     for s in slots:
         slots_by_member[s.staff_member_id].append(s)
+    on_shift = people_on_shift_now(db, restaurant_id)
     shifts_today = db.query(models.LaborShift).filter(
         models.LaborShift.restaurant_id == restaurant_id,
         models.LaborShift.shift_date == today,
     ).all()
-    on_shift = []
-    for shift in shifts_today:
-        member = next((m for m in members if m.id == shift.staff_member_id), None)
-        if member:
-            on_shift.append(
-                {
-                    "staff_member_id": member.id,
-                    "name": member.name,
-                    "role_title": member.role_title,
-                    "scheduled_hours": shift.scheduled_hours,
-                }
-            )
     week_grid = []
     for m in members:
         rows = []
@@ -190,13 +378,18 @@ def team_overview(db: Session, restaurant_id: int, today: date) -> dict:
                     "end_time": s.end_time,
                 }
             )
+        compact = compact_schedule_labels(
+            [{"weekday": s.weekday, "start_time": s.start_time, "end_time": s.end_time} for s in slots_by_member.get(m.id, [])]
+        )
+        hours = round(sum(_slot_hours(s.start_time, s.end_time) for s in slots_by_member.get(m.id, [])), 1)
         week_grid.append(
             {
                 "staff_member_id": m.id,
                 "name": m.name,
                 "role_title": m.role_title,
                 "slots": sorted(rows, key=lambda r: r["weekday"]),
-                "weekly_hours": round(weekly_hours_for_member(db, restaurant_id, m.id), 1),
+                "compact_lines": compact,
+                "weekly_hours": hours,
             }
         )
     warnings = check_team_rules(
@@ -214,6 +407,7 @@ def team_overview(db: Session, restaurant_id: int, today: date) -> dict:
     return {
         "today": str(today),
         "week_start": str(week_start),
+        "on_shift_now": on_shift,
         "on_shift_today": on_shift,
         "week_schedule": week_grid,
         "overwork_warnings": warnings,

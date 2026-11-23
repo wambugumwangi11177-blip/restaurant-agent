@@ -15,9 +15,11 @@ import schemas
 from database import get_db
 from routers.deps import get_or_create_restaurant
 from services.labor_schedule import (
+    build_schedule_board,
     check_team_rules,
     get_or_create_team_rules,
     materialize_week,
+    nairobi_today,
     team_overview,
 )
 from time_utils import utcnow
@@ -86,8 +88,7 @@ async def get_overview(
     current_user: models.User = Depends(auth.require_staff_role(models.StaffRole.MANAGER)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
-    today = date.today()
-    payload = team_overview(db, restaurant.id, today)
+    payload = team_overview(db, restaurant.id, nairobi_today())
     if not _can_see_pay(current_user):
         payload["labour_cost_today_cents"] = None
     return payload
@@ -130,19 +131,7 @@ async def list_weekly_slots(
     current_user: models.User = Depends(auth.require_staff_role(models.StaffRole.MANAGER)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
-    rows = db.query(models.StaffWeeklyShift).filter(
-        models.StaffWeeklyShift.restaurant_id == restaurant.id,
-    ).all()
-    return [
-        {
-            "id": r.id,
-            "staff_member_id": r.staff_member_id,
-            "weekday": r.weekday,
-            "start_time": r.start_time,
-            "end_time": r.end_time,
-        }
-        for r in rows
-    ]
+    return build_schedule_board(db, restaurant.id)
 
 
 @router.put("/weekly-slots")

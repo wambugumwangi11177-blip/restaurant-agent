@@ -278,6 +278,13 @@ def _start_scheduler():
             replace_existing=True,
         )
 
+        scheduler.add_job(
+            _run_approval_reminders_job,
+            IntervalTrigger(minutes=5),
+            id="approval_reminders",
+            replace_existing=True,
+        )
+
         # Audit remediation, Tier 2 item 6 — purge AgentAuditLog rows older
         # than 90 days, closing the gap docs/compliance-matrix.md flagged as
         # open ("Append-only (no auto-purge today) — reconcile vs DPA
@@ -424,6 +431,20 @@ def _run_fraud_check_job():
             db.close()
     except Exception as exc:
         logger.error(f"[Fraud Check] Scheduler job failed: {exc}")
+
+
+def _run_approval_reminders_job():
+    try:
+        from database import SessionLocal
+        from services.approval_workflow import process_all_due_reminders
+
+        db = SessionLocal()
+        try:
+            process_all_due_reminders(db)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Approval Reminders] Scheduler job failed: {exc}")
 
 
 def _run_escalation_sweep_job():

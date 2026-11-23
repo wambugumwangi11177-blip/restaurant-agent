@@ -577,6 +577,9 @@ async def hand_to_kitchen(
             entity_id=handover.id,
             detail={"chef_id": chef.id, "chef_name": chef.name, "lines": len(parsed), "photo": picture is not None},
         )
+        from services.labor_schedule import touch_login_staff_shift
+
+        touch_login_staff_shift(db, restaurant.id, user.id)
         db.commit()
     except Exception:
         db.rollback()
@@ -692,6 +695,9 @@ async def record_spoilage(
     body["message"] = "The owner will look at this." if status == "needs_approval" else "Saved."
     if status == "needs_approval":
         tell_owners(db, user, restaurant, "Waste needs you", f"{quantity:g} {item.unit} of {item.item_name} was written off.")
+        from services.approval_workflow import ensure_reminder_row
+
+        ensure_reminder_row(db, restaurant.id, "waste", row.id, user.id)
     return body
 
 
@@ -821,6 +827,9 @@ async def close_day(
     payload["message"] = "The owner will look at the difference." if differs else "Saved."
     if differs:
         tell_owners(db, user, restaurant, "The day close needs you", "The count differs from the books.")
+        from services.approval_workflow import ensure_reminder_row
+
+        ensure_reminder_row(db, restaurant.id, "close", close.id, user.id)
     return payload
 
 
@@ -949,6 +958,8 @@ async def list_approvals(
         events.append(item)
     for row in closes:
         item = _close_public(db, row)
+        item["user_id"] = row.user_id
+        item["requester_user_id"] = row.user_id
         item["kind"] = "close"
         gap = next((line for line in item["lines"] if abs(line["difference"]) > 1e-6), None)
         if item["working_alone"]:
@@ -998,6 +1009,8 @@ async def list_approvals(
             "created_at": _when(row.created_at),
             "owner_note": row.owner_note or "",
             "photo_path": f"/api/v1/store/costs/{row.id}/receipt" if row.receipt_storage_key else None,
+            "requester_user_id": row.user_id,
+            "user_id": row.user_id,
             **who,
         })
     zone_rows = (
@@ -1065,6 +1078,24 @@ async def list_approvals(
             "photo_path": f"/api/v1/store/deliveries/{row.id}/photos/{photo.id}" if photo else None,
             "ai": _feed_ai({"status": check.status, "note": note} if check else None),
             **who,
+        })
+    for row in db.query(models.PurchaseOrder).filter(
+        models.PurchaseOrder.restaurant_id == restaurant.id,
+        models.PurchaseOrder.status == "PENDING",
+    ).all():
+        item = db.query(models.InventoryItem).filter(models.InventoryItem.id == row.inventory_item_id).first()
+        item_name = item.item_name if item else "stock"
+        events.append({
+            "id": row.id,
+            "kind": "restock",
+            "status": "needs_approval",
+            "item_name": item_name,
+            "quantity": row.quantity_ordered,
+            "unit": row.unit or "",
+            "headline": f"Restock {row.quantity_ordered:g} {row.unit} {item_name}".strip(),
+            "action": f"Approve restock for {item_name}",
+            "created_at": _when(row.ordered_at),
+            "person_name": "Manager",
         })
     for row in db.query(models.ScheduleChangeRequest).filter(
         models.ScheduleChangeRequest.restaurant_id == restaurant.id,

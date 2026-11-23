@@ -24,7 +24,7 @@ const capacitor = {
   android: {
     allowMixedContent: false,
     webContentsDebuggingEnabled: false,
-    backgroundColor: "#070708",
+    backgroundColor: "#2B1D16",
     captureInput: false,
     appendUserAgent: storeUserAgent(release.version),
   },
@@ -32,7 +32,7 @@ const capacitor = {
     SplashScreen: {
       launchShowDuration: 1200,
       launchAutoHide: true,
-      backgroundColor: "#070708",
+      backgroundColor: "#2B1D16",
       androidScaleType: "CENTER_CROP",
       showSpinner: false,
       splashFullScreen: true,

@@ -97,7 +97,7 @@ export default function ElevenStaffPage() {
           )}
           <label className="block text-sm">
             Role
-            <select value={staffRole} onChange={(event) => setStaffRole(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/40 px-3">
+            <select value={staffRole} onChange={(event) => setStaffRole(event.target.value)} className="leviii-input mt-1 min-h-11 w-full rounded-2xl px-3">
               {ROLES.map((role) => <option key={role}>{role}</option>)}
             </select>
           </label>

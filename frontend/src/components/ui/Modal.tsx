@@ -66,7 +66,7 @@ export default function Modal({ label, onClose, children, className = "" }: Moda
                 role="dialog"
                 aria-modal="true"
                 aria-label={label}
-                className={`w-full max-w-md rounded-xl border border-[var(--border)] bg-[#0f0f0f] p-5 space-y-4 ${className}`}
+                className={`w-full max-w-md rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 space-y-4 ${className}`}
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-start justify-between gap-3">

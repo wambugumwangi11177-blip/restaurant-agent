@@ -166,7 +166,7 @@ export default function NotificationBell({ ownerHome }: { ownerHome?: string } =
                     <Bell className="w-5 h-5" />
                 </button>
                 {open && (
-                    <div className="absolute right-0 mt-2 w-80 bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg shadow-xl z-50">
+                    <div className="absolute right-0 mt-2 w-80 bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-xl z-50">
                         <div className="px-3 py-2 border-b border-[#1a1a1a] text-xs font-medium text-[#e5e5e5]">Notifications</div>
                         <p className="px-3 py-6 text-center text-xs text-[#737373]">Notifications will appear after verified restaurant data arrives.</p>
                     </div>
@@ -192,8 +192,8 @@ export default function NotificationBell({ ownerHome }: { ownerHome?: string } =
             </button>
 
             {open && (
-                <div className="absolute right-0 mt-2 w-80 max-h-[28rem] overflow-y-auto bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg shadow-xl z-50">
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-[#1a1a1a] sticky top-0 bg-[#0f0f0f]">
+                <div className="absolute right-0 mt-2 w-80 max-h-[28rem] overflow-y-auto bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-xl z-50">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border)] sticky top-0 bg-[var(--surface)]">
                         <span className="text-xs font-medium text-[#e5e5e5]">Notifications</span>
                         {unreadCount > 0 && (
                             <button
@@ -240,7 +240,7 @@ export default function NotificationBell({ ownerHome }: { ownerHome?: string } =
                     )}
 
                     {stale && (
-                        <p className="px-3 py-2 text-[10px] text-[#525252] border-t border-[#1a1a1a] sticky bottom-0 bg-[#0f0f0f]">
+                        <p className="px-3 py-2 text-[10px] text-[var(--text-dim)] border-t border-[var(--border)] sticky bottom-0 bg-[var(--surface)]">
                             Refreshed a while ago — check your connection for the latest.
                         </p>
                     )}

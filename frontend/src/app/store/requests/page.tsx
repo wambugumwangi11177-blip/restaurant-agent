@@ -25,7 +25,7 @@ export default function StoreRequestsPage() {
       )}
       <ul className="space-y-2">
         {items.map((row) => (
-          <li key={`${row.kind}-${row.id}`} className="rounded-3xl border border-white/15 bg-[#16161a] px-4 py-3 text-sm">
+          <li key={`${row.kind}-${row.id}`} className="owner-glass-panel rounded-3xl px-4 py-3 text-sm">
             <p className="font-medium">{row.label}</p>
             <p className="text-xs text-zinc-500 capitalize">
               {row.kind} · {row.status.replace(/_/g, " ")}

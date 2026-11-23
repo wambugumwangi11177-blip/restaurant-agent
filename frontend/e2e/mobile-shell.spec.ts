@@ -225,3 +225,150 @@ test.describe("mobile LEVIII shell", () => {
     await page.screenshot({ path: path.join(ARTIFACTS, "store-home-mobile.png"), fullPage: true });
   });
 });
+
+const setupPayload = {
+  must_change_password: false,
+  has_pin: true,
+  app_unlocked: true,
+  unlocked_modules: ["opening-count", "stock"],
+  steps: [
+    { id: "account", title: "Account", state: "done", unlocks: "recipes", locked_reason: null, completed_at: null },
+    { id: "recipes", title: "Recipes", state: "done", unlocks: "questionnaire", locked_reason: null, completed_at: null },
+    { id: "questionnaire", title: "Questions", state: "done", unlocks: "stock", locked_reason: null, completed_at: null },
+    { id: "stock", title: "Stock", state: "done", unlocks: "app", locked_reason: null, completed_at: null },
+  ],
+  recipe_gap: { dish_count: 0, missing_count: 0, missing_names: [] },
+};
+
+async function mockThemeOwnerApis(page: import("@playwright/test").Page) {
+  await mockAuthed(page, ownerMe);
+  await page.route("**/api/v1/**", async (route) => {
+    const url = route.request().url();
+    if (url.includes("/auth/me")) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(ownerMe) });
+      return;
+    }
+    if (url.includes("/store/approvals")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ...emptyFeed,
+          pending: [
+            {
+              id: 1,
+              kind: "delivery",
+              title: "Supplier delivery",
+              subtitle: "Awaiting your OK",
+              created_at: new Date().toISOString(),
+            },
+          ],
+        }),
+      });
+      return;
+    }
+    if (url.includes("/staff-setup")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          people: [
+            {
+              user_id: 2,
+              email: "jack@eleven.leviii",
+              name: "Jack",
+              staff_role: "stockkeeper",
+              account: "done",
+              recipes: "done",
+              questionnaire: "done",
+              app_unlocked: true,
+            },
+          ],
+          entries: [],
+          recipe_gap: { missing_count: 0 },
+        }),
+      });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+  });
+}
+
+async function mockThemeJackApis(page: import("@playwright/test").Page) {
+  await mockAuthed(page, jackMe);
+  await page.route("**/api/v1/**", async (route) => {
+    const url = route.request().url();
+    if (url.includes("/auth/me")) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(jackMe) });
+      return;
+    }
+    if (url.includes("/staff-setup")) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(setupPayload) });
+      return;
+    }
+    if (url.includes("/store/items")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: [{ id: 1, item_name: "Tomatoes", quantity: 12, unit: "kg", buying_unit: "crate", units_per_buy: 20, yield_fraction: 1, zone: "Main store" }],
+          zones: [{ name: "Main store" }],
+        }),
+      });
+      return;
+    }
+    if (url.includes("/store/approvals")) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(emptyFeed) });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+  });
+}
+
+test.describe("warm earthy theme screenshots", () => {
+  test("390px palette verification", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.route("**/api/v1/**", async (route) => {
+      if (route.request().url().includes("/auth/me")) {
+        await route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ detail: "Unauthorized" }) });
+        return;
+      }
+      await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+    });
+    await page.goto("/login");
+    await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
+    await page.screenshot({ path: path.join(ARTIFACTS, "theme-login-390.png"), fullPage: true });
+
+    await mockThemeOwnerApis(page);
+    await page.addInitScript(() => {
+      sessionStorage.setItem("access_token", "theme-owner");
+      sessionStorage.setItem("app_pin_unlocked", "1");
+      sessionStorage.setItem("app_last_activity", String(Date.now()));
+    });
+
+    await page.goto("/eleven");
+    await expect(page.getByRole("heading", { name: "Needs you" })).toBeVisible({ timeout: 15_000 });
+    await page.screenshot({ path: path.join(ARTIFACTS, "theme-owner-home-390.png"), fullPage: true });
+
+    await page.goto("/eleven/approvals");
+    await expect(page.getByRole("heading", { name: "Approvals" })).toBeVisible({ timeout: 15_000 });
+    await page.screenshot({ path: path.join(ARTIFACTS, "theme-approvals-390.png"), fullPage: true });
+
+    await page.goto("/eleven/staff");
+    await expect(page.getByRole("heading", { name: "Staff" })).toBeVisible({ timeout: 15_000 });
+    await page.screenshot({ path: path.join(ARTIFACTS, "theme-staff-390.png"), fullPage: true });
+
+    await mockThemeJackApis(page);
+    await page.addInitScript(() => {
+      sessionStorage.setItem("access_token", "theme-jack");
+    });
+    await page.goto("/store");
+    await expect(page.getByText(/How a delivery is kept/i)).toBeVisible({ timeout: 15_000 });
+    await page.screenshot({ path: path.join(ARTIFACTS, "theme-jack-home-390.png"), fullPage: true });
+
+    await page.goto("/store/stock");
+    await expect(page.getByText(/Quantities only/i)).toBeVisible({ timeout: 15_000 });
+    await page.screenshot({ path: path.join(ARTIFACTS, "theme-stock-390.png"), fullPage: true });
+  });
+});

@@ -104,17 +104,17 @@ export default function AppLockGate({ children }: { children: React.ReactNode })
   if (isPublic) return <>{children}</>;
 
   if (!user && isLoading) {
-    return <div className="min-h-dvh bg-[#0a0a0a]" aria-busy />;
+    return <div className="min-h-dvh bg-[var(--bg)]" aria-busy />;
   }
 
   if (!user) return <>{children}</>;
 
   if (isLoading || routeHandoff) {
-    return <div className="min-h-dvh bg-[#0a0a0a]" role="status" aria-label="Opening" />;
+    return <div className="min-h-dvh bg-[var(--bg)]" role="status" aria-label="Opening" />;
   }
 
   if (user.password_auth_valid === false) {
-    return <div className="min-h-dvh bg-[#0a0a0a] text-zinc-400" />;
+    return <div className="min-h-dvh bg-[var(--bg)] text-[var(--text-muted)]" />;
   }
 
   if (!user.must_change_password && !user.has_pin) {

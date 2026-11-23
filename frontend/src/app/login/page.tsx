@@ -93,44 +93,44 @@ export default function LoginPage() {
     };
 
     if (user) {
-        return <div className="min-h-dvh bg-[#0a0a0a]" role="status" aria-label="Opening home" />;
+        return <div className="min-h-dvh bg-[var(--bg)]" role="status" aria-label="Opening home" />;
     }
 
     if (isLoading && !authStuck) {
         return (
-            <div className="flex min-h-dvh items-center justify-center bg-[#0a0a0a] px-4">
-                <Loader2 className="h-6 w-6 animate-spin text-[#e8bd68]" aria-label="Checking sign-in" />
+            <div className="flex min-h-dvh items-center justify-center bg-[var(--bg)] px-4">
+                <Loader2 className="h-6 w-6 animate-spin text-[var(--accent)]" aria-label="Checking sign-in" />
             </div>
         );
     }
 
     return (
-        <div className="min-h-dvh overflow-y-auto overscroll-y-contain bg-[#0a0a0a] px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
+        <div className="min-h-dvh overflow-y-auto overscroll-y-contain bg-[var(--bg)] px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
             <div className="mx-auto w-full max-w-sm">
                 <div className="mb-8 text-center">
-                    <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">
+                    <h1 className="text-3xl font-bold tracking-tight text-[var(--text)]">
                         {PRODUCT_NAME}
                     </h1>
-                    <p className="mt-1 text-sm text-[#737373]">{PRODUCT_TAGLINE}</p>
+                    <p className="mt-1 text-sm text-[var(--text-muted)]">{PRODUCT_TAGLINE}</p>
                 </div>
 
-                <div className="rounded-xl border border-[#262626] bg-[#141414] p-6">
-                    <h2 className="mb-5 text-lg font-semibold text-[#e5e5e5]">
+                <div className="leviii-auth-card p-6">
+                    <h2 className="mb-5 text-lg font-semibold text-[var(--text)]">
                         {firstPassword ? "Set your password" : "Sign in"}
                     </h2>
 
                     {error && (
-                        <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
+                        <div className="mb-4 rounded-lg border border-[var(--danger)]/30 bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]">
                             {error}
                         </div>
                     )}
 
                     {authStuck && isLoading && (
-                        <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-200">
+                        <div className="mb-4 rounded-lg border border-[var(--warning)]/30 bg-[var(--warning)]/10 p-3 text-sm text-[var(--warning)]">
                             Sign-in is taking longer than expected. You can clear this device and try again.
                             <button
                                 type="button"
-                                className="mt-3 flex min-h-11 w-full items-center justify-center rounded-lg border border-amber-400/40 px-3 font-semibold text-amber-100"
+                                className="mt-3 flex min-h-11 w-full items-center justify-center rounded-full border border-[var(--warning)]/40 px-3 font-semibold text-[var(--text)]"
                                 onClick={() => {
                                     logout();
                                     setAuthStuck(false);
@@ -143,7 +143,7 @@ export default function LoginPage() {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label htmlFor="email" className="mb-1.5 block text-sm text-[#737373]">Email</label>
+                            <label htmlFor="email" className="mb-1.5 block text-sm text-[var(--text-muted)]">Email</label>
                             <input
                                 id="email"
                                 name="username"
@@ -155,7 +155,7 @@ export default function LoginPage() {
                                 spellCheck={false}
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full rounded-lg border border-[#262626] bg-[#0a0a0a] px-3 py-2.5 text-sm text-[#e5e5e5] outline-none placeholder-[#525252] focus:border-[var(--accent)]"
+                                className="leviii-input w-full rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
                                 placeholder={nativeStore ? "jack@eleven.leviii" : "you@eleven.leviii"}
                                 required
                             />
@@ -163,7 +163,7 @@ export default function LoginPage() {
 
                         {handoverCodeRequired && (
                             <div>
-                                <label htmlFor="handover" className="mb-1.5 block text-sm text-[#737373]">Handover code (6 digits)</label>
+                                <label htmlFor="handover" className="mb-1.5 block text-sm text-[var(--text-muted)]">Handover code (6 digits)</label>
                                 <input
                                     id="handover"
                                     type="text"
@@ -174,7 +174,7 @@ export default function LoginPage() {
                                     enterKeyHint="next"
                                     value={handoverCode}
                                     onChange={(e) => setHandoverCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                                    className="w-full rounded-lg border border-[#262626] bg-[#0a0a0a] px-3 py-2.5 text-sm tracking-widest text-[#e5e5e5] outline-none placeholder-[#525252] focus:border-[var(--accent)]"
+                                    className="leviii-input w-full rounded-lg px-3 py-2.5 text-sm tracking-widest outline-none focus:border-[var(--accent)]"
                                     placeholder="123456"
                                     required
                                 />
@@ -182,7 +182,7 @@ export default function LoginPage() {
                         )}
 
                         <div>
-                            <label htmlFor="password" className="mb-1.5 block text-sm text-[#737373]">
+                            <label htmlFor="password" className="mb-1.5 block text-sm text-[var(--text-muted)]">
                                 {firstPassword ? "New password" : "Password"}
                             </label>
                             <div className="relative">
@@ -199,7 +199,7 @@ export default function LoginPage() {
                                         }
                                     }}
                                     enterKeyHint="go"
-                                    className="w-full rounded-lg border border-[#262626] bg-[#0a0a0a] py-2.5 pl-3 pr-10 text-sm text-[#e5e5e5] outline-none placeholder-[#525252] focus:border-[var(--accent)]"
+                                    className="leviii-input w-full rounded-lg py-2.5 pl-3 pr-10 text-sm outline-none focus:border-[var(--accent)]"
                                     placeholder="••••••••"
                                     autoComplete={firstPassword ? "new-password" : "current-password"}
                                     required
@@ -208,7 +208,7 @@ export default function LoginPage() {
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
                                     aria-label={showPassword ? "Hide password" : "Show password"}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#525252] hover:text-[#737373]"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                                 >
                                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                 </button>
@@ -218,7 +218,7 @@ export default function LoginPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#e8bd68] py-2.5 text-sm font-semibold text-[#17120a] transition-colors hover:bg-[#f3cf84] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8bd68] disabled:cursor-not-allowed disabled:opacity-50"
+                            className="leviii-btn-primary flex min-h-11 w-full items-center justify-center gap-2 rounded-full py-2.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {loading ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />

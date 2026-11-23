@@ -4,8 +4,8 @@
     "description": "Owner and store operations for Eleven",
     "start_url": "/eleven",
     "display": "standalone",
-    "background_color": "#0a0a0a",
-    "theme_color": "#0a0a0a",
+    "background_color": "#2B1D16",
+    "theme_color": "#2B1D16",
     "orientation": "any",
     "icons": [
         {

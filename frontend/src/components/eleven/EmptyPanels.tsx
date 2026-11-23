@@ -20,7 +20,7 @@ export function SolidNumberCard({
   hint?: string;
 }) {
   return (
-    <div className="owner-solid-card rounded-2xl p-4 text-white">
+    <div className="owner-solid-card rounded-2xl p-4">
       <p className="text-sm text-zinc-300">{title}</p>
       <p className="mt-2 text-2xl font-bold tracking-tight">{body}</p>
       {hint && <p className="mt-2 text-xs text-zinc-400">{hint}</p>}

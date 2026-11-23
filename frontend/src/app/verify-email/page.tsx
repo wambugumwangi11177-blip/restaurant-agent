@@ -28,13 +28,13 @@ function VerifyEmailContent() {
     }, [token]);
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-4 bg-[#0a0a0a]">
+        <div className="min-h-screen flex items-center justify-center px-4 bg-[var(--bg)]">
             <div className="w-full max-w-sm">
                 <div className="text-center mb-10">
                     <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">{PRODUCT_NAME}</h1>
                 </div>
 
-                <div className="bg-[#141414] border border-[#262626] rounded-xl p-6 text-center space-y-3">
+                <div className="leviii-auth-card p-6 text-center space-y-3">
                     {status === "verifying" && (
                         <>
                             <Loader2 className="w-8 h-8 text-[var(--accent)] mx-auto animate-spin" />

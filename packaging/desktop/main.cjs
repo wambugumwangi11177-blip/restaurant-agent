@@ -10,7 +10,7 @@ function open() {
     minWidth: 390,
     minHeight: 640,
     title: "LEVIII Store",
-    backgroundColor: "#070708",
+    backgroundColor: "#2B1D16",
     autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: false,

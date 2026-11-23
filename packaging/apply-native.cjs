@@ -33,10 +33,10 @@ write(path.join(res, "values", "styles.xml"), `<?xml version="1.0" encoding="utf
     <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
-        <item name="android:statusBarColor">#070708</item>
-        <item name="android:navigationBarColor">#070708</item>
-        <item name="android:windowBackground">#070708</item>
-        <item name="android:windowSplashScreenBackground">#070708</item>
+        <item name="android:statusBarColor">#2B1D16</item>
+        <item name="android:navigationBarColor">#2B1D16</item>
+        <item name="android:windowBackground">#2B1D16</item>
+        <item name="android:windowSplashScreenBackground">#2B1D16</item>
         <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
     </style>
     <style name="AppTheme.NoActionBar" parent="AppTheme">

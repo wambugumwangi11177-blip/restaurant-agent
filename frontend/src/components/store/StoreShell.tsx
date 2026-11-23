@@ -73,10 +73,10 @@ export default function StoreShell({
               key={href}
               href={href}
               className={`flex min-h-11 min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-semibold ${
-                active ? "text-black" : "text-zinc-400"
+                active ? "text-[var(--bg)]" : "text-zinc-400"
               }`}
             >
-              <span className={`flex h-10 w-10 items-center justify-center rounded-full ${active ? "bg-white/95 text-black shadow-lg" : ""}`}>
+              <span className={`flex h-10 w-10 items-center justify-center rounded-full ${active ? "nav-pill-active" : ""}`}>
                 <Icon size={20} strokeWidth={1.75} />
               </span>
               {label}

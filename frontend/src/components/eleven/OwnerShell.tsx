@@ -40,7 +40,7 @@ export default function OwnerShell({
           <NotificationBell ownerHome="/eleven" />
           <Link
             href="/eleven/settings"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/90 text-xs font-bold text-black"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--accent)] text-xs font-bold text-[var(--bg)]"
             aria-label="Settings"
           >
             E
@@ -60,12 +60,12 @@ export default function OwnerShell({
               key={href}
               href={href}
               className={`flex min-h-11 min-w-[56px] flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-semibold md:min-w-0 md:w-full ${
-                active ? "text-black" : "text-zinc-400"
+                active ? "text-[var(--bg)]" : "text-zinc-400"
               }`}
             >
               <span
                 className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                  active ? "bg-white/95 text-black shadow-lg" : ""
+                  active ? "nav-pill-active" : ""
                 }`}
               >
                 <Icon size={22} strokeWidth={1.75} />

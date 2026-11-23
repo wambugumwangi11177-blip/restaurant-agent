@@ -29,14 +29,14 @@ export default function ForgotPasswordPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-4 bg-[#0a0a0a]">
+        <div className="min-h-screen flex items-center justify-center px-4 bg-[var(--bg)]">
             <div className="w-full max-w-sm">
                 <div className="text-center mb-10">
                     <h1 className="text-3xl font-bold tracking-tight text-[#e5e5e5]">{PRODUCT_NAME}</h1>
                     <p className="text-sm text-[#737373] mt-1">Reset your password</p>
                 </div>
 
-                <div className="bg-[#141414] border border-[#262626] rounded-xl p-6">
+                <div className="leviii-auth-card p-6">
                     {sent ? (
                         <div className="text-center space-y-3 py-2">
                             <MailCheck className="w-8 h-8 text-[var(--accent)] mx-auto" />
@@ -66,7 +66,7 @@ export default function ForgotPasswordPage() {
                                         type="email"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
-                                        className="w-full px-3 py-2.5 rounded-lg bg-[#0a0a0a] border border-[#262626] focus:border-[var(--accent)] outline-none text-[#e5e5e5] placeholder-[#525252] text-sm"
+                                        className="leviii-input w-full px-3 py-2.5 rounded-lg text-sm outline-none focus:border-[var(--accent)]"
                                         placeholder="you@restaurant.com"
                                         required
                                     />
@@ -75,7 +75,7 @@ export default function ForgotPasswordPage() {
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className="w-full py-2.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[#0a0a0a] font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="leviii-btn-primary w-full py-2.5 rounded-full text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send reset link"}
                                 </button>

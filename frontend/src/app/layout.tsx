@@ -26,13 +26,13 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
     title: "LEVIII",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: "#2B1D16",
   width: "device-width",
   initialScale: 1,
 };
@@ -47,7 +47,7 @@ export default function RootLayout({
       <head>
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
-      <body className={`${outfit.variable} ${dmSans.variable} ${spaceGrotesk.variable} font-sans antialiased bg-[#0a0a0a] text-[#e5e5e5]`}>
+      <body className={`${outfit.variable} ${dmSans.variable} ${spaceGrotesk.variable} font-sans antialiased bg-[var(--bg)] text-[var(--text)]`}>
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -242,7 +242,7 @@ def ensure_eleven_test_data(
     amina_user = db.query(models.User).filter(models.User.email == STAFF[1][0]).first()
     staff_pass = os.getenv("SEED_STAFF_PASSWORD", "JackTestPass1!")
     for user in (jack_user, amina_user):
-        if user and staff_pass and (user.must_change_password or not user.hashed_password):
+        if user and staff_pass:
             user.hashed_password = auth.get_password_hash(staff_pass)
             user.must_change_password = False
             log.append(f"[SET] password for {user.email}")
@@ -328,11 +328,45 @@ def ensure_eleven_test_data(
     return log
 
 
+def sync_test_stack_credentials(db: Session) -> list[str]:
+    """Re-sync known test passwords and clear login lockouts (backend-test only)."""
+    if not _truthy("SEED_TEST_DATA"):
+        return []
+    if _truthy("SEED_OWNER_FIRST_LOGIN"):
+        return []
+    log: list[str] = []
+    owner_pass = os.getenv("SEED_OWNER_PASSWORD", "").strip()
+    staff_pass = os.getenv("SEED_STAFF_PASSWORD", "JackTestPass1!").strip()
+    for email in (OWNER_EMAIL, *(s[0] for s in STAFF)):
+        user = db.query(models.User).filter(models.User.email == email).first()
+        if not user:
+            continue
+        if user.locked_until or user.failed_login_attempts:
+            user.locked_until = None
+            user.failed_login_attempts = 0
+            log.append(f"[UNLOCK] {email}")
+        if email == OWNER_EMAIL and owner_pass:
+            user.hashed_password = auth.get_password_hash(owner_pass)
+            user.must_change_password = False
+            log.append("[SYNC] owner password from SEED_OWNER_PASSWORD")
+        elif staff_pass:
+            user.hashed_password = auth.get_password_hash(staff_pass)
+            user.must_change_password = False
+            log.append(f"[SYNC] password for {email}")
+    if log:
+        db.commit()
+    return log
+
+
 def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, pilau, log: list[str]) -> None:
     """Rich [DEMO] rows so owner/jack screens are not empty on backend-test."""
+    from datetime import timedelta
+
+    from bill_schedule import business_today
     from time_utils import utcnow
 
     now = utcnow()
+    today = business_today()
     if jack:
         prog = db.query(StaffSetupProgress).filter(StaffSetupProgress.user_id == jack.id).first()
         if prog:
@@ -363,7 +397,9 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
                 approved_at=now,
                 approved_by_user_id=owner.id,
                 cadence="monthly",
-                due_day=1,
+                due_day=today.day,
+                next_due_on=today + timedelta(days=2),
+                payment_state="unpaid",
             )
         )
         db.add(
@@ -379,27 +415,14 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
             )
         )
         log.append("[CREATED] demo bills for Money / approvals")
-
-    if rice and supplier and not db.query(models.PurchaseOrder).filter(
-        models.PurchaseOrder.restaurant_id == restaurant.id,
-        models.PurchaseOrder.notes.contains("[DEMO]")
-    ).first():
-        db.add(
-            models.PurchaseOrder(
-                restaurant_id=restaurant.id,
-                supplier_id=supplier.id,
-                inventory_item_id=rice.id,
-                quantity_ordered=8,
-                unit="kg",
-                cost_per_unit=12000,
-                total_cost=96000,
-                status="PENDING",
-                notes="[DEMO] Auto restock — Rice",
-                ordered_at=now,
-                requested_by_user_id=jack.id if jack else owner.id,
-            )
-        )
-        log.append("[CREATED] demo pending restock PO")
+    else:
+        rent = db.query(models.RunningCost).filter(
+            models.RunningCost.restaurant_id == restaurant.id,
+            models.RunningCost.label.contains("[DEMO] Rent"),
+        ).first()
+        if rent:
+            rent.next_due_on = today + timedelta(days=2)
+            rent.payment_state = rent.payment_state or "unpaid"
 
     if jack and rice and not db.query(models.KitchenHandover).filter(
         models.KitchenHandover.restaurant_id == restaurant.id,
@@ -454,6 +477,40 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
         db.add(models.OrderItem(order_id=extra.id, menu_item_id=pilau.id, quantity=2, unit_price=45000))
         log.append("[CREATED] extra demo order with dish lines")
 
+    if rice:
+        rice.quantity = min(float(rice.quantity or 0), 1.5)
+        rice.low_stock_threshold = max(float(rice.low_stock_threshold or 5), 5)
+        log.append("[REFRESH] low stock demo for alerts")
+
+    if jack and supplier and rice:
+        po = (
+            db.query(models.PurchaseOrder)
+            .filter(
+                models.PurchaseOrder.restaurant_id == restaurant.id,
+                models.PurchaseOrder.notes.contains("[DEMO]"),
+            )
+            .first()
+        )
+        if po is None:
+            po = models.PurchaseOrder(
+                restaurant_id=restaurant.id,
+                supplier_id=supplier.id,
+                inventory_item_id=rice.id,
+                quantity_ordered=8,
+                unit="kg",
+                cost_per_unit=12000,
+                total_cost=96000,
+                status="PENDING",
+                notes="[DEMO] Auto restock — Rice",
+                ordered_at=now,
+                requested_by_user_id=jack.id,
+            )
+            db.add(po)
+            log.append("[CREATED] demo pending restock PO")
+        elif po.status != "PENDING":
+            po.status = "PENDING"
+            log.append("[REFRESH] demo restock PO back to pending")
+
 
 def provision_test_data_from_env() -> None:
     if not _truthy("SEED_TEST_DATA"):
@@ -479,6 +536,10 @@ def provision_test_data_from_env() -> None:
             owner_reset_first_login=owner_reset,
         ):
             logger.info("[eleven-seed] %s", line)
+        sync_flag = os.getenv("SEED_SYNC_TEST_CREDENTIALS", "1").strip().lower()
+        if not owner_first and sync_flag in ("1", "true", "yes"):
+            for line in sync_test_stack_credentials(db):
+                logger.info("[eleven-seed] %s", line)
     except Exception as exc:
         db.rollback()
         logger.warning("[eleven-seed] skipped: %s", exc)

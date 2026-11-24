@@ -22,9 +22,9 @@ def test_seed_creates_owner_jack_and_sample_once(client, db_session, monkeypatch
     owner = db_session.query(models.User).filter_by(email="owner@eleven.leviii").one()
     assert auth.verify_password("ElevenOwner9", owner.hashed_password)
     jack = db_session.query(models.User).filter_by(email="jack@eleven.leviii").one()
-    assert jack.hashed_password is None
+    assert auth.verify_password("JackTestPass1!", jack.hashed_password)
     amina = db_session.query(models.User).filter_by(email="amina@eleven.leviii").one()
-    assert amina.hashed_password is None
+    assert auth.verify_password("JackTestPass1!", amina.hashed_password)
     restaurant = db_session.query(models.Restaurant).filter_by(tenant_id=owner.tenant_id).one()
     assert db_session.query(models.StockZone).filter_by(restaurant_id=restaurant.id).count() == 4
     assert db_session.query(models.InventoryItem).filter_by(restaurant_id=restaurant.id, item_name="Rice").one()
@@ -68,6 +68,26 @@ def test_owner_reset_first_login_runs_once(client, db_session, monkeypatch):
     leviii_test_seed.provision_test_data_from_env()
     db_session.expire_all()
     assert auth.verify_password("RestoredPass9", db_session.query(models.User).filter_by(email="owner@eleven.leviii").one().hashed_password)
+
+
+def test_sync_clears_lockout_and_resets_owner_password(client, db_session, monkeypatch):
+    _tenant(db_session, "Eleven", "owner@eleven.leviii", password="WrongPass9!")
+    owner = db_session.query(models.User).filter_by(email="owner@eleven.leviii").one()
+    from datetime import timedelta
+
+    from time_utils import utcnow
+
+    owner.failed_login_attempts = 5
+    owner.locked_until = utcnow() + timedelta(minutes=15)
+    db_session.commit()
+    monkeypatch.setenv("SEED_TEST_DATA", "1")
+    monkeypatch.setenv("SEED_OWNER_PASSWORD", "ElevenOwner9")
+    leviii_test_seed.provision_test_data_from_env()
+    db_session.expire_all()
+    owner = db_session.query(models.User).filter_by(email="owner@eleven.leviii").one()
+    assert owner.locked_until is None
+    assert owner.failed_login_attempts == 0
+    assert auth.verify_password("ElevenOwner9", owner.hashed_password)
 
 
 def test_owner_set_initial_password_gated(client, db_session, monkeypatch):

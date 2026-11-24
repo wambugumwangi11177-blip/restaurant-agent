@@ -63,7 +63,14 @@ async function login(page: import("@playwright/test").Page, email: string, passw
   await page.locator('input[type="email"]').fill(email);
   await page.locator('input[type="password"]').fill(password);
   await page.locator('button[type="submit"]').click();
-  await page.waitForURL((url) => !url.pathname.includes("/login"), { timeout: 20000 });
+  const loginError = page.getByText(/incorrect email|temporarily locked/i);
+  const left = page.waitForURL((url) => !url.pathname.includes("/login"), { timeout: 25000 });
+  const failed = loginError.waitFor({ state: "visible", timeout: 25000 }).then(() => "error" as const);
+  const outcome = await Promise.race([left.then(() => "ok" as const), failed]);
+  if (outcome === "error") {
+    const msg = (await loginError.textContent())?.trim() || "login failed";
+    throw new Error(msg);
+  }
 }
 
 async function assertNoRibs(page: import("@playwright/test").Page) {
@@ -141,10 +148,20 @@ test("capture frontend-test screenshots", async () => {
     await assertNoRibs(page);
     await page.screenshot({ path: path.join(ARTIFACTS, "jack-wizard-step-1.png"), fullPage: true });
 
-    for (const [qid, value] of JACK_UNLOCK) {
-      await page.request.post("/api/v1/staff-setup/questionnaire", {
-        data: { question_id: qid, value, suppliers: qid === "supplier_list" ? [{ name: "Fresh Farm", brings: "Main food", arrival: "phone" }] : undefined },
-      });
+    for (let i = 0; i < 24; i++) {
+      await page.waitForTimeout(400);
+      const primary = page.getByRole("button", { name: /approve|Yes|I'll name|Main store|Chef signs|Before lunch|no — I use photos|Owner|Daily with|I'll set each|Accountant pays|Yes — I'll name|Measured/i }).first();
+      const saveSuppliers = page.getByRole("button", { name: /Save suppliers/i });
+      if (await saveSuppliers.isVisible()) {
+        await page.locator('input').first().fill("Fresh Farm");
+        await saveSuppliers.click();
+        continue;
+      }
+      if (await primary.isVisible()) {
+        await primary.click();
+        continue;
+      }
+      break;
     }
     await page.goto(ROUTES["jack-restock-whatsapp"], { waitUntil: "networkidle" });
     await assertNoRibs(page);

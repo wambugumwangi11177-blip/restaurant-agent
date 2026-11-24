@@ -515,9 +515,9 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
             )
             db.add(po)
             log.append("[CREATED] demo pending restock PO")
-        elif po.status != "PENDING":
-            po.status = "PENDING"
-            log.append("[REFRESH] demo restock PO back to pending")
+        elif po.status not in ("PENDING", "APPROVED"):
+            po.status = "APPROVED"
+            log.append("[REFRESH] demo restock PO approved for Jack WhatsApp")
 
 
 def provision_test_data_from_env() -> None:

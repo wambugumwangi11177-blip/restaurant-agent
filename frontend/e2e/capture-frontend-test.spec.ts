@@ -43,9 +43,9 @@ const PAGE_MARKERS: Partial<Record<(typeof TARGETS)[number], RegExp>> = {
   "owner-money": /till|Profit|Money|Rent/i,
   "owner-alerts": /Alert|attention|approval/i,
   "owner-handover-timeline": /Handover|Chef|kitchen/i,
-  "jack-wizard-step-1": /who orders|restock|supplier|question/i,
-  "jack-restock-whatsapp": /restock|WhatsApp|supplier|Fresh Farm/i,
-  "store-prep-list": /Prep|ingredient|Pilau/i,
+  "jack-wizard-step-1": /order stock|deliveries|question|1 of/i,
+  "jack-restock-whatsapp": /WhatsApp|Fresh Farm|Rice|restock waiting/i,
+  "store-prep-list": /Prep for|ingredient|Pilau|prep quantities/i,
   "accountant-invoice-prices": /invoice|price|supplier/i,
 };
 
@@ -226,6 +226,7 @@ async function assertAuthedPage(page: import("@playwright/test").Page, key: (typ
   expect(page.url(), `${key} should not be login`).not.toContain("/login");
   const token = await page.evaluate(() => window.sessionStorage.getItem("access_token"));
   expect(token && token.length > 20, `${key} missing access_token`).toBeTruthy();
+  await expect(page.locator("body")).not.toContainText(/could not be loaded|could not load/i);
   const marker = PAGE_MARKERS[key];
   if (marker) {
     await expect(page.locator("body")).toContainText(marker, { timeout: 20000 });

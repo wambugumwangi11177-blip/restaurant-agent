@@ -21,7 +21,19 @@ from time_utils import utcnow
 
 router = APIRouter(prefix="/staff-setup", tags=["staff-setup"])
 
-_QUESTIONS = Path(__file__).resolve().parents[2] / "config" / "storekeeper-questions.json"
+def _questions_file() -> Path:
+    base = Path(__file__).resolve().parent.parent
+    candidates = (
+        base / "config" / "storekeeper-questions.json",
+        Path(__file__).resolve().parents[2] / "config" / "storekeeper-questions.json",
+    )
+    for path in candidates:
+        if path.is_file():
+            return path
+    raise FileNotFoundError("storekeeper-questions.json is missing from the backend image")
+
+
+_QUESTIONS = _questions_file()
 
 
 class AccountStep(StrictModel):

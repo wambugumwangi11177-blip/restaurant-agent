@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Home, Package, Truck, UserRound } from "lucide-react";
+import { Home, Package, Truck, UserRound, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { homeFor } from "@/lib/tenantHome";
 import "@/styles/owner-glass.css";
 
 const NAV = [
-  { href: "/store", label: "Home", icon: Home, match: (p: string) => p === "/store" || p.startsWith("/store/questions") },
-  { href: "/store/deliveries", label: "In", icon: Truck, match: (p: string) => p.startsWith("/store/deliveries") || p.startsWith("/store/suppliers") },
+  { href: "/store", label: "Shift", icon: Home, match: (p: string) => p === "/store" || p.startsWith("/store/questions") },
+  { href: "/store/deliveries", label: "In", icon: Truck, match: (p: string) => p.startsWith("/store/deliveries") || p.startsWith("/store/suppliers") || p.startsWith("/store/invoice-prices") },
   { href: "/store/stock", label: "Stock", icon: Package, match: (p: string) => ["/store/stock", "/store/issue", "/store/waste", "/store/close", "/store/chefs"].some((prefix) => p.startsWith(prefix)) },
-  { href: "/store/account", label: "Account", icon: UserRound, match: (p: string) => p.startsWith("/store/account") || p.startsWith("/store/costs") || p.startsWith("/store/recipes") },
+  { href: "/store/team", label: "Team", icon: Users, match: (p: string) => p.startsWith("/store/team") || p.startsWith("/store/schedule") },
+  { href: "/store/account", label: "Me", icon: UserRound, match: (p: string) => p.startsWith("/store/account") || p.startsWith("/store/costs") || p.startsWith("/store/recipes") || p.startsWith("/store/requests") },
 ] as const;
 
 export default function StoreShell({
@@ -25,7 +26,12 @@ export default function StoreShell({
   const pathname = usePathname() ?? "";
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const allowed = user?.staff_role === "stockkeeper" || user?.staff_role === "controller" || user?.role === "admin" || user?.role === "superadmin";
+  const allowed =
+    user?.staff_role === "stockkeeper" ||
+    user?.staff_role === "controller" ||
+    user?.staff_role === "manager" ||
+    user?.role === "admin" ||
+    user?.role === "superadmin";
 
   useEffect(() => {
     const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');

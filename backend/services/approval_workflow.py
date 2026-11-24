@@ -23,6 +23,7 @@ _ACTOR_ROLE: dict[str, str] = {
     "delivery": "owner",
     "zone_photo": "owner",
     "restock": "owner",
+    "cost_unknown": "owner",
 }
 
 _REMINDER_STAGE_COUNT = 4  # immediate, +30m, +2h, next day 09:00 Nairobi
@@ -37,6 +38,7 @@ _TYPE_LABEL: dict[str, str] = {
     "cost": "New cost",
     "schedule": "Schedule change",
     "zone_photo": "Zone photo",
+    "cost_unknown": "Unknown bill",
 }
 
 
@@ -132,8 +134,10 @@ def approval_detail_bullets(item: dict, viewer: models.User) -> list[str]:
             lines.append(f"Reason: {reason}")
     elif kind == "close":
         lines.append(item.get("headline") or "Day close with a count difference")
-    elif kind == "cost":
+    elif kind in ("cost", "cost_unknown"):
         lines.append(item.get("label") or item.get("headline") or "Bill")
+        if kind == "cost_unknown":
+            lines.append("Key the amount from the bill photo.")
         if _viewer_sees_money(viewer) and item.get("amount_cents") is not None:
             lines.append(f"Amount: {(item['amount_cents'] / 100):,.0f} KES")
     elif kind == "schedule":
@@ -152,9 +156,16 @@ def approval_detail_bullets(item: dict, viewer: models.User) -> list[str]:
     return lines
 
 
+def _actor_role_for_item(item: dict) -> str:
+    custom = item.get("actor_staff_role")
+    if custom:
+        return str(custom)
+    return _ACTOR_ROLE.get(item.get("kind") or "", "owner")
+
+
 def enrich_approval_item(item: dict, viewer: models.User) -> dict:
     kind = item.get("kind") or ""
-    actor_role = _ACTOR_ROLE.get(kind, "owner")
+    actor_role = _actor_role_for_item(item)
     is_actor = viewer_is_actor(viewer, actor_role)
     waiting = _actor_label(actor_role)
     type_label = approval_type_label(kind if kind != "spoilage" else "waste")
@@ -202,8 +213,9 @@ def _dispatch_reminder(db: Session, row: models.ApprovalReminder, stage_index: i
     else:
         title = "Still needs a decision"
         body = f"A {plain_kind} item is still waiting."
+    inbox_url = "/store/requests" if (row.actor_staff_role or "owner") != "owner" else "/eleven/approvals"
     for u in actor_users:
-        notify_user(db, u.id, title, body, "approval_reminder", url="/eleven/approvals")
+        notify_user(db, u.id, title, body, "approval_reminder", url=inbox_url)
 
 
 def ensure_reminder_row(

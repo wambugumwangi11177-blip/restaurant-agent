@@ -586,6 +586,41 @@ async def add_cost(
 
         tell_owners(db, user, restaurant, f"{cleaned} needs you", f"{cleaned} was sent for approval.")
         ensure_reminder_row(db, restaurant.id, "cost", row.id, user.id)
+    elif status == "unknown" and delegated:
+        from ai.notify import notify_users
+        from routers.store_control import tell_owners
+        from services.approval_workflow import ensure_reminder_row
+
+        actor = {"owner": "owner", "accountant": "controller", "storekeeper": "stockkeeper"}[delegated]
+        ensure_reminder_row(db, restaurant.id, "cost_unknown", row.id, user.id, actor_role=actor)
+        title = f"{cleaned} needs you"
+        body = f"{user.email} does not know {cleaned}. Fill in the amount."
+        if delegated == "owner":
+            tell_owners(db, user, restaurant, title, body)
+        else:
+            role = (
+                models.StaffRole.CONTROLLER
+                if delegated == "accountant"
+                else models.StaffRole.STOCKKEEPER
+            )
+            peers = (
+                db.query(models.User)
+                .filter(
+                    models.User.tenant_id == user.tenant_id,
+                    models.User.staff_role == role,
+                    models.User.is_active.is_(True),
+                )
+                .all()
+            )
+            if peers:
+                notify_users(
+                    db,
+                    [peer.id for peer in peers],
+                    title,
+                    body,
+                    "store.approval",
+                    url="/store/requests",
+                )
     body = _cost_public(row, user)
     body["message"] = "Sent to the owner. You will not see the total." if is_known else "Marked unknown. The owner can see that."
     return body
@@ -766,7 +801,7 @@ async def confirm_prices(
     current_user: models.User = Depends(auth.get_current_user),
 ):
     if not can_see_prices(current_user):
-        raise HTTPException(status_code=403, detail="Prices are confirmed by the owner.")
+        raise HTTPException(status_code=403, detail="Only the accountant can confirm invoice prices.")
     restaurant = get_or_create_restaurant(db, current_user)
     user = db.query(models.User).filter(models.User.id == current_user.id).first()
     receipt = db.query(models.DeliveryReceipt).filter(

@@ -10,7 +10,17 @@ from services.labor_schedule import (
     materialize_week,
     weekly_hours_for_member,
 )
-from tests.test_storekeeper_foundation import _auth, _tenant, _token
+from tests.test_storekeeper_foundation import _add_staff, _auth, _tenant, _token
+
+
+def test_floor_managers_can_read_team_overview(client, db_session):
+    tenant, _owner, restaurant = _tenant(db_session, "Eleven", "owner-team@eleven.leviii")
+    jack = _add_staff(db_session, tenant, restaurant, "jack-team@eleven.leviii", models.StaffRole.STOCKKEEPER)
+    response = client.get("/api/v1/team/overview", headers=_auth(_token(jack)))
+    assert response.status_code == 200
+    body = response.json()
+    assert "on_shift_now" in body
+    assert body.get("labour_cost_today_cents") is None
 
 
 def test_no_login_staff_roles_rejected(client, db_session):

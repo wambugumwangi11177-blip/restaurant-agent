@@ -30,6 +30,15 @@ const ownerMe = {
 
 const jackMe = { ...ownerMe, id: 2, email: "jack@eleven.leviii", role: "staff", staff_role: "stockkeeper", display_name: "Jack" };
 
+const accountantMe = {
+  ...ownerMe,
+  id: 3,
+  email: "acc@eleven.leviii",
+  role: "staff",
+  staff_role: "controller",
+  display_name: "Accountant",
+};
+
 const teamOverview = {
   today: "2026-01-01",
   week_start: "2025-12-29",
@@ -152,6 +161,10 @@ test.describe("team labor batch screenshots", () => {
       sessionStorage.setItem("app_last_activity", String(Date.now()));
     });
 
+    await page.goto("/eleven");
+    await expect(page.getByText(/Needs you|Activity|Eleven/i).first()).toBeVisible({ timeout: 15_000 });
+    await page.screenshot({ path: path.join(ARTIFACTS, "owner-home-390.png") });
+
     await page.goto("/eleven/team");
     await expect(page.getByRole("heading", { name: "On shift now" })).toBeVisible({ timeout: 15_000 });
     await page.screenshot({ path: path.join(ARTIFACTS, "team-tab-390.png") });
@@ -166,12 +179,36 @@ test.describe("team labor batch screenshots", () => {
 
     await page.goto("/eleven/approvals");
     await expect(page.getByText("Write-off")).toBeVisible();
-    await page.screenshot({ path: path.join(ARTIFACTS, "needs-you-card-390.png") });
+    await page.screenshot({ path: path.join(ARTIFACTS, "approvals-card-390.png") });
 
     await page.route("**/api/v1/**", async (route) => {
       const url = route.request().url();
       if (url.includes("/auth/me")) {
         await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(jackMe) });
+        return;
+      }
+      if (url.includes("/team/weekly-slots")) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            slots: [{ staff_member_id: 1, weekday: 0, start_time: "09:00", end_time: "17:00" }],
+            roster: [{ id: 1, name: "Joy", role_title: "waiter" }],
+            members: [
+              {
+                staff_member_id: 1,
+                name: "Joy",
+                role_title: "waiter",
+                compact_lines: ["Mon 09:00–17:00"],
+                weekly_hours: 8,
+                weekdays: [0],
+              },
+            ],
+            today_weekday: 0,
+            scheduled_today_ids: [1],
+            today: "2026-01-01",
+          }),
+        });
         return;
       }
       if (url.includes("/approval-inbox")) {
@@ -207,9 +244,44 @@ test.describe("team labor batch screenshots", () => {
       }
       await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
     });
+    await page.goto("/store");
+    await expect(page.getByText(/delivery|Today/i).first()).toBeVisible({ timeout: 15_000 });
+    await page.screenshot({ path: path.join(ARTIFACTS, "jack-store-home-390.png") });
+
+    await page.goto("/store/schedule");
+    await expect(page.getByText(/Save schedule/i)).toBeVisible({ timeout: 15_000 });
+    await page.screenshot({ path: path.join(ARTIFACTS, "manager-schedule-jack-390.png") });
+
     await page.goto("/store/requests");
     await expect(page.getByText("Waiting on Owner")).toBeVisible({ timeout: 15_000 });
     await page.screenshot({ path: path.join(ARTIFACTS, "waiting-on-owner-390.png") });
+
+    await page.route("**/api/v1/**", async (route) => {
+      const url = route.request().url();
+      if (url.includes("/auth/me")) {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(accountantMe) });
+        return;
+      }
+      if (url.includes("/store/deliveries") && !url.includes("/photos")) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify([
+            {
+              id: 9,
+              supplier: "Fresh Farm",
+              lines: [{ id: 1, item_name: "Rice", quantity: 8, unit: "kg" }],
+              photos: [{ id: 1, kind: "invoice" }],
+            },
+          ]),
+        });
+        return;
+      }
+      await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+    });
+    await page.goto("/store/invoice-prices");
+    await expect(page.getByText(/Confirm prices/i)).toBeVisible({ timeout: 15_000 });
+    await page.screenshot({ path: path.join(ARTIFACTS, "accountant-price-confirm-390.png") });
 
     await mockOwner(page);
     await page.goto("/eleven/staff");

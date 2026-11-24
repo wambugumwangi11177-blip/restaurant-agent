@@ -143,6 +143,11 @@ def _action_label(item: dict) -> str:
         if quantity is None:
             return "Approve a write-off"
         return f"Approve {quantity:g} {unit} {name} waste".replace("  ", " ").strip()
+    if kind == "cost_unknown":
+        label = str(item.get("label") or "bill").strip().lower()
+        if not label.endswith("bill"):
+            label = f"{label} bill"
+        return f"Fill in {label}"
     if kind == "cost":
         label = str(item.get("label") or "bill").strip().lower()
         if not label.endswith("bill"):
@@ -990,6 +995,32 @@ async def list_approvals(
     for row in costs:
         creator = db.query(models.User).filter(models.User.id == row.user_id).first()
         who = person_of(db, creator)
+        if row.status == "unknown" and row.delegated_to:
+            actor = {
+                "owner": "owner",
+                "accountant": "controller",
+                "storekeeper": "stockkeeper",
+            }.get(row.delegated_to, "owner")
+            events.append({
+                "id": row.id,
+                "kind": "cost_unknown",
+                "status": "needs_approval",
+                "label": row.label,
+                "cadence": row.cadence,
+                "due_day": row.due_day,
+                "amount_cents": None,
+                "headline": f"{who['person_name']} does not know {row.label}.",
+                "emphasis": row.label,
+                "action": _action_label({"kind": "cost_unknown", "label": row.label}),
+                "created_at": _when(row.created_at),
+                "owner_note": row.owner_note or "",
+                "photo_path": f"/api/v1/store/costs/{row.id}/receipt" if row.receipt_storage_key else None,
+                "requester_user_id": row.user_id,
+                "user_id": row.user_id,
+                "actor_staff_role": actor,
+                **who,
+            })
+            continue
         if row.status == "unknown":
             headline = f"{who['person_name']} does not know {row.label}."
         elif row.status == "approved":
@@ -1127,6 +1158,7 @@ async def list_approvals(
         ensure_reminder_row,
         notify_requester_outcome,
         process_due_reminders,
+        _actor_role_for_item,
     )
     process_due_reminders(db, restaurant.id)
     for item in pending:
@@ -1137,6 +1169,7 @@ async def list_approvals(
             item.get("kind") or "waste",
             int(item["id"]),
             requester,
+            actor_role=_actor_role_for_item(item),
         )
         item.update(enrich_approval_item(item, current_user))
     from bill_schedule import business_today, reminder_bucket

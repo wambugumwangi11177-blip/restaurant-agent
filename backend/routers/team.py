@@ -32,6 +32,12 @@ LOGIN_STAFF_ROLES = {
     models.StaffRole.CONTROLLER,
 }
 
+TEAM_FLOOR_MANAGERS = (
+    models.StaffRole.MANAGER,
+    models.StaffRole.STOCKKEEPER,
+    models.StaffRole.CONTROLLER,
+)
+
 
 class WeeklySlotIn(BaseModel):
     staff_member_id: int
@@ -85,7 +91,7 @@ def _member_out(member: models.StaffMember, user: models.User, db: Session) -> d
 @router.get("/overview")
 async def get_overview(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_staff_role(models.StaffRole.MANAGER)),
+    current_user: models.User = Depends(auth.require_staff_role(*TEAM_FLOOR_MANAGERS)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     payload = team_overview(db, restaurant.id, nairobi_today())
@@ -128,7 +134,7 @@ async def put_rules(
 @router.get("/weekly-slots")
 async def list_weekly_slots(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_staff_role(models.StaffRole.MANAGER)),
+    current_user: models.User = Depends(auth.require_staff_role(*TEAM_FLOOR_MANAGERS)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     return build_schedule_board(db, restaurant.id)
@@ -138,7 +144,7 @@ async def list_weekly_slots(
 async def save_weekly_slots(
     body: WeeklyScheduleSave,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_staff_role(models.StaffRole.MANAGER)),
+    current_user: models.User = Depends(auth.require_staff_role(*TEAM_FLOOR_MANAGERS)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     by_member: dict[int, list[dict]] = {}
@@ -179,7 +185,7 @@ async def save_weekly_slots(
 async def day_override(
     body: ShiftOverrideIn,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_staff_role(models.StaffRole.MANAGER)),
+    current_user: models.User = Depends(auth.require_staff_role(*TEAM_FLOOR_MANAGERS)),
 ):
     if body.kind not in ("missed", "swap"):
         raise HTTPException(status_code=400, detail="Choose missed or swap.")
@@ -206,7 +212,7 @@ async def day_override(
 async def create_roster_member(
     body: RosterStaffIn,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_staff_role(models.StaffRole.MANAGER)),
+    current_user: models.User = Depends(auth.require_staff_role(*TEAM_FLOOR_MANAGERS)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     member = models.StaffMember(
@@ -227,7 +233,7 @@ async def create_roster_member(
 @router.get("/roster")
 async def list_roster(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_staff_role(models.StaffRole.MANAGER)),
+    current_user: models.User = Depends(auth.require_staff_role(*TEAM_FLOOR_MANAGERS)),
 ):
     restaurant = get_or_create_restaurant(db, current_user)
     rows = db.query(models.StaffMember).filter(

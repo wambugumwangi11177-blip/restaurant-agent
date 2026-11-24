@@ -1,30 +1,36 @@
 @import "tailwindcss";
 
-/* LEVIII earthy palette — Espresso / Oat / Sage (single source of truth) */
+/* Warm charcoal + pewter glass (Colour fix — single source of truth) */
 :root {
   --leviii-espresso: #2b1d16;
   --leviii-oat: #e9dfcf;
   --leviii-sage: #9caf88;
 
-  --bg: var(--leviii-espresso);
-  --surface: #3d2e24;
-  --surface-hover: #4a382c;
-  --border: rgba(233, 223, 207, 0.22);
-  --text: var(--leviii-oat);
-  --text-muted: rgba(233, 223, 207, 0.65);
-  --text-dim: rgba(233, 223, 207, 0.45);
-  --accent: var(--leviii-sage);
+  --bg-deep: #2a2726;
+  --bg: #3a3431;
+  --surface: rgba(120, 112, 106, 0.3);
+  --surface-warm: rgba(95, 78, 68, 0.55);
+  --surface-hover: rgba(140, 132, 125, 0.34);
+  --border: rgba(236, 229, 221, 0.16);
+  --glass-border: rgba(236, 229, 221, 0.16);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --glass-shadow: 0 18px 48px rgba(10, 8, 7, 0.45);
+
+  --text: #eee5dd;
+  --text-muted: #b0a8a0;
+  --text-dim: rgba(238, 229, 221, 0.45);
+  --accent: #9caf88;
   --accent-hover: #a8bb94;
+  --on-accent: #2b1d16;
+
   --success: #8baf74;
-  --warning: #d4a574;
+  --warning: #d9a65a;
   --danger: #c46854;
   --info: #a8b5c4;
 
-  --panel-solid: rgba(52, 38, 30, 0.96);
-  --panel-glass: rgba(43, 29, 22, 0.58);
-  --glass-border: rgba(233, 223, 207, 0.15);
-  --glass-highlight: inset 0 1px 0 rgba(233, 223, 207, 0.14);
-  --glass-shadow: 0 24px 64px rgba(8, 4, 2, 0.55), 0 8px 24px rgba(8, 4, 2, 0.35);
+  --panel-solid: #4a433f;
+  --panel-solid-warm: #4f423a;
+  --panel-glass: var(--surface);
 }
 
 @theme {
@@ -44,7 +50,7 @@
 }
 
 body {
-  background-color: var(--bg);
+  background-color: var(--bg-deep);
   color: var(--text);
   font-weight: 400;
 }
@@ -58,23 +64,33 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(233, 223, 207, 0.25);
+  background: rgba(236, 229, 221, 0.25);
   border-radius: 2px;
 }
 
 .card {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--surface-warm);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
 }
 
 .glass {
-  background: var(--panel-glass);
-  backdrop-filter: blur(24px) saturate(1.35);
-  -webkit-backdrop-filter: blur(24px) saturate(1.35);
+  background: var(--surface);
+  backdrop-filter: blur(22px) saturate(1.1);
+  -webkit-backdrop-filter: blur(22px) saturate(1.1);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow), var(--glass-highlight);
   border-radius: 24px;
+}
+
+html[data-leviii-apk] .glass {
+  background: var(--panel-solid);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-leviii-apk] .glass-warm {
+  background: var(--panel-solid-warm);
 }
 
 .text-accent {
@@ -83,13 +99,13 @@ body {
 
 .nav-pill-active {
   background: var(--accent);
-  color: var(--bg);
+  color: var(--on-accent);
   box-shadow: 0 8px 22px rgba(156, 175, 136, 0.38);
 }
 
 .leviii-btn-primary {
   background: var(--accent);
-  color: var(--bg);
+  color: var(--on-accent);
   font-weight: 500;
   border-radius: 9999px;
   box-shadow: 0 10px 28px rgba(156, 175, 136, 0.32);
@@ -101,22 +117,22 @@ body {
 
 .leviii-btn-ghost {
   border-radius: 9999px;
-  border: 1px solid rgba(233, 223, 207, 0.38);
-  background: rgba(233, 223, 207, 0.06);
+  border: 1px solid rgba(236, 229, 221, 0.38);
+  background: rgba(236, 229, 221, 0.06);
   color: var(--text);
   font-weight: 500;
 }
 
 @supports (backdrop-filter: blur(8px)) {
   .leviii-btn-ghost {
-    backdrop-filter: blur(14px) saturate(1.2);
-    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    backdrop-filter: blur(14px) saturate(1.1);
+    -webkit-backdrop-filter: blur(14px) saturate(1.1);
   }
 }
 
 .leviii-btn-ghost:hover:not(:disabled) {
-  border-color: rgba(233, 223, 207, 0.5);
-  background: rgba(233, 223, 207, 0.1);
+  border-color: rgba(236, 229, 221, 0.5);
+  background: rgba(236, 229, 221, 0.1);
 }
 
 .leviii-status-sage {
@@ -133,15 +149,15 @@ body {
 
 .leviii-input {
   border: 1px solid var(--glass-border);
-  background: rgba(43, 29, 22, 0.55);
+  background: var(--surface);
   color: var(--text);
   border-radius: 16px;
 }
 
 @supports (backdrop-filter: blur(8px)) {
   .leviii-input {
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px) saturate(1.1);
+    -webkit-backdrop-filter: blur(12px) saturate(1.1);
   }
 }
 
@@ -156,15 +172,15 @@ body {
 
 .leviii-auth-card {
   border: 1px solid var(--glass-border);
-  background: var(--panel-glass);
+  background: var(--surface-warm);
   border-radius: 26px;
   box-shadow: var(--glass-shadow), var(--glass-highlight);
 }
 
 @supports (backdrop-filter: blur(20px)) {
   .leviii-auth-card {
-    backdrop-filter: blur(28px) saturate(1.35);
-    -webkit-backdrop-filter: blur(28px) saturate(1.35);
+    backdrop-filter: blur(28px) saturate(1.1);
+    -webkit-backdrop-filter: blur(28px) saturate(1.1);
   }
 }
 

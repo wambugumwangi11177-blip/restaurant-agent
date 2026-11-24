@@ -489,6 +489,37 @@ def test_j03_upgrade_is_idempotent_and_merges_with_the_pos_inbox():
     engine.dispose()
 
 
+def test_unknown_bill_delegate_gets_needs_you_card(client, db_session):
+    from tests.test_store_intake import _unlock
+
+    tenant, owner, restaurant = _tenant(db_session, "Eleven", "owner-unk@eleven.leviii")
+    jack = _add_staff(db_session, tenant, restaurant, "jack-unk@eleven.leviii", models.StaffRole.STOCKKEEPER)
+    accountant = _add_staff(
+        db_session, tenant, restaurant, "acc-unk@eleven.leviii", models.StaffRole.CONTROLLER,
+    )
+    _unlock(client, jack)
+    added = client.post(
+        "/api/v1/store/costs",
+        headers=_auth(_token(jack)),
+        data={
+            "kind": "electricity",
+            "label": "KPLC",
+            "known": "no",
+            "delegate_to": "accountant",
+            "cadence": "monthly",
+        },
+    )
+    assert added.status_code == 201, added.text
+    inbox = client.get("/api/v1/store/approval-inbox", headers=_auth(_token(accountant))).json()
+    pending = inbox.get("pending") or []
+    match = next((p for p in pending if p.get("kind") == "cost_unknown"), None)
+    assert match is not None
+    assert match.get("approval_needs_you") is True
+    assert match.get("approval_card_title") == "Unknown bill"
+    notifs = db_session.query(models.Notification).filter(models.Notification.user_id == accountant.id).all()
+    assert any("KPLC" in (n.title or "") for n in notifs)
+
+
 def test_overdue_bills_are_reminders_not_approvals(client, db_session):
     from datetime import timedelta
 

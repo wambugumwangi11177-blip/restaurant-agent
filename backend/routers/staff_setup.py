@@ -257,10 +257,33 @@ async def get_setup(
             "opens": row.opens,
             "unlocks": row.unlocks,
             "delegated": bool(row.delegated),
+            "delegate_to": row.delegate_to,
         }
         for row in answers.values()
     ]
     return payload
+
+
+@router.post("/questionnaire/reset-self")
+async def reset_own_questionnaire(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """Test stacks only — clear questionnaire answers so capture can show step 1."""
+    import os
+
+    if os.getenv("SEED_TEST_DATA", "").strip().lower() not in ("1", "true", "yes"):
+        raise HTTPException(status_code=403, detail="Not available.")
+    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    if user.staff_role not in (models.StaffRole.STOCKKEEPER, models.StaffRole.CONTROLLER):
+        raise HTTPException(status_code=403, detail="This step is for the store team.")
+    db.query(models.StaffSetupAnswer).filter(models.StaffSetupAnswer.user_id == user.id).delete()
+    progress = db.query(models.StaffSetupProgress).filter(models.StaffSetupProgress.user_id == user.id).first()
+    if progress:
+        progress.questionnaire_completed_at = None
+        progress.updated_at = utcnow()
+    db.commit()
+    return {"status": "reset"}
 
 
 @router.post("/account")

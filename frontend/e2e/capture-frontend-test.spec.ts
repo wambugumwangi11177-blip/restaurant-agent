@@ -20,6 +20,8 @@ const TARGETS = [
   "owner-alerts",
   "owner-handover-timeline",
   "jack-wizard-step-1",
+  "jack-wizard-step-2",
+  "jack-setup-answers",
   "jack-restock-whatsapp",
   "store-prep-list",
   "accountant-invoice-prices",
@@ -32,6 +34,8 @@ const ROUTES: Record<(typeof TARGETS)[number], string> = {
   "owner-alerts": "/eleven/alerts",
   "owner-handover-timeline": "/eleven/handovers",
   "jack-wizard-step-1": "/store/questions",
+  "jack-wizard-step-2": "/store/questions",
+  "jack-setup-answers": "/store/questions",
   "jack-restock-whatsapp": "/store/restock",
   "store-prep-list": "/store/prep",
   "accountant-invoice-prices": "/store/invoice-prices",
@@ -40,13 +44,15 @@ const ROUTES: Record<(typeof TARGETS)[number], string> = {
 const PAGE_MARKERS: Partial<Record<(typeof TARGETS)[number], RegExp>> = {
   "owner-home": /needs you|Stock|Money|Eleven/i,
   "owner-dishes": /Dish|Pilau|recipe/i,
-  "owner-money": /till|Profit|Money|Rent/i,
+  "owner-money": /till|Profit|Money|Rent|Net|margin/i,
   "owner-alerts": /Alert|attention|approval/i,
   "owner-handover-timeline": /Handover|Chef|kitchen/i,
-  "jack-wizard-step-1": /order stock|deliveries|question|1 of/i,
+  "jack-wizard-step-1": /How do you order stock today/i,
+  "jack-wizard-step-2": /suppliers arrive|How supplies arrive/i,
+  "jack-setup-answers": /Your answers|How do you order stock/i,
   "jack-restock-whatsapp": /WhatsApp|wa\.me|Fresh Farm|8 kg Rice/i,
-  "store-prep-list": /Prep for|ingredient|Pilau|prep quantities/i,
-  "accountant-invoice-prices": /invoice|price|supplier/i,
+  "store-prep-list": /Prep for|ingredient|Pilau|prep quantities|Nothing to issue/i,
+  "accountant-invoice-prices": /invoice|price|supplier|Fresh Farm/i,
 };
 
 type SavedSession = {
@@ -145,6 +151,29 @@ const JACK_UNLOCK: [string, string][] = [
   ["prep_ahead", "yes"],
   ["portions", "measured"],
 ];
+
+async function resetJackQuestionnaire(page: import("@playwright/test").Page) {
+  const token = await page.evaluate(() => window.sessionStorage.getItem("access_token") || "");
+  const response = await page.request.post(`${API_URL}/api/v1/staff-setup/questionnaire/reset-self`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok()) {
+    throw new Error(`reset questionnaire: ${response.status()} ${await response.text()}`);
+  }
+}
+
+async function postJackAnswer(page: import("@playwright/test").Page, question_id: string, value: string, suppliers?: object[]) {
+  const token = await page.evaluate(() => window.sessionStorage.getItem("access_token") || "");
+  const body: Record<string, unknown> = { question_id, value };
+  if (suppliers) body.suppliers = suppliers;
+  const response = await page.request.post(`${API_URL}/api/v1/staff-setup/questionnaire`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: body,
+  });
+  if (!response.ok() && response.status() !== 409) {
+    throw new Error(`questionnaire ${question_id}: ${response.status()} ${await response.text()}`);
+  }
+}
 
 async function completeJackQuestionnaire(page: import("@playwright/test").Page) {
   const token = await page.evaluate(() => window.sessionStorage.getItem("access_token") || "");
@@ -307,14 +336,33 @@ test("capture frontend-test screenshots", async () => {
     const ctx = await contextWith(jackState);
     const page = await ctx.newPage();
     await primeSession(page, jackState);
+    await resetJackQuestionnaire(page);
+
     await page.goto(ROUTES["jack-wizard-step-1"], { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1200);
     await settleAppLock(page);
-    await assertAuthedPage(page, "jack-wizard-step-1");
+    await expect(page.getByRole("heading", { name: /How do you order stock today/i })).toBeVisible({ timeout: 15000 });
     await assertNoRibs(page);
     await page.screenshot({ path: path.join(ARTIFACTS, "jack-wizard-step-1.png"), fullPage: false });
 
+    await page.getByRole("button", { name: /owner approves/i }).click();
+    await page.waitForTimeout(600);
+    await page.getByRole("button", { name: /^Yes$/i }).click();
+    await page.waitForTimeout(800);
+    await page.goto(ROUTES["jack-wizard-step-2"], { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1000);
+    await expect(page.getByText(/How supplies arrive/i)).toBeVisible({ timeout: 15000 });
+    await assertNoRibs(page);
+    await page.screenshot({ path: path.join(ARTIFACTS, "jack-wizard-step-2.png"), fullPage: false });
+
     await completeJackQuestionnaire(page);
+    await page.goto(ROUTES["jack-setup-answers"], { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1200);
+    await settleAppLock(page);
+    await expect(page.getByRole("heading", { name: /Your answers/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("body")).not.toContainText(/\/store\/|\/eleven\//);
+    await assertNoRibs(page);
+    await page.screenshot({ path: path.join(ARTIFACTS, "jack-setup-answers.png"), fullPage: false });
 
     await page.goto(ROUTES["jack-restock-whatsapp"], { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1200);

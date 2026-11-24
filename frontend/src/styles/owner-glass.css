@@ -278,7 +278,7 @@ html[data-leviii-apk] .owner-oat-highlight {
 }
 
 .owner-nav.owner-glass-panel {
-  background: var(--og-glass-solid);
+  background: color-mix(in srgb, var(--og-glass-solid) 97%, black);
   border-color: var(--og-border-strong);
   box-shadow: var(--og-shadow), 0 0 0 1px rgba(10, 8, 7, 0.35);
 }

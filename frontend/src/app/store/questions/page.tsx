@@ -1,26 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
-import { loadSetup, stepById, type SetupPayload, type SetupQuestion } from "@/lib/storeSetup";
+import { loadSetup, stepById, type SetupPayload, type SetupQuestion, type GivenAnswer } from "@/lib/storeSetup";
 
 type Seed = { name: string; brings: string; arrival: string };
+
+function answerDisplay(answer: GivenAnswer): string {
+  if (answer.delegated) {
+    const who = answer.delegate_to === "accountant" ? "the accountant" : "the owner";
+    return `${answer.label} (sent to ${who})`;
+  }
+  return answer.label;
+}
 
 export default function QuestionsPage() {
   const router = useRouter();
   const [setup, setSetup] = useState<SetupPayload | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
 
   useEffect(() => {
     loadSetup().then(setSetup).catch(() => setError("The questions could not be loaded."));
   }, []);
 
   const step = stepById(setup, "questionnaire");
-  const answered = new Set((setup?.answers ?? []).map((answer) => answer.question_id));
-  const next = (step?.questions ?? []).find((question) => !answered.has(question.id));
+  const answered = useMemo(() => new Set((setup?.answers ?? []).map((answer) => answer.question_id)), [setup]);
+  const questions = step?.questions ?? [];
+  const editingQuestion = editingQuestionId ? questions.find((q) => q.id === editingQuestionId) : undefined;
+  const nextUnanswered = questions.find((question) => !answered.has(question.id));
+  const activeQuestion = editingQuestion ?? nextUnanswered;
+  const showSummary = setup && !activeQuestion;
 
   async function choose(question: SetupQuestion, value: string, suppliers?: Seed[]) {
     setSaving(true);
@@ -32,6 +45,7 @@ export default function QuestionsPage() {
         suppliers: suppliers ?? [],
       });
       const opens = response.data.opens as string | null;
+      setEditingQuestionId(null);
       if (opens && opens !== "/store") {
         router.push(opens);
         return;
@@ -57,15 +71,27 @@ export default function QuestionsPage() {
     );
   }
 
-  if (!next) {
+  if (showSummary) {
+    const ordered = questions
+      .map((q) => ({ q, answer: (setup?.answers ?? []).find((a) => a.question_id === q.id) }))
+      .filter((row): row is { q: SetupQuestion; answer: GivenAnswer } => Boolean(row.answer));
+
     return (
-      <section className="owner-glass-panel owner-form-clearance space-y-3 rounded-3xl p-4">
-        <h2 className="font-semibold">{setup ? "Those are the questions" : "Loading…"}</h2>
-        <ul className="space-y-2 text-sm text-zinc-300">
-          {(setup?.answers ?? []).map((answer) => (
-            <li key={answer.question_id}>
-              {answer.label}{answer.delegated ? " — sent on" : ""}
-              {answer.opens && answer.opens !== "/store" ? ` · opens ${answer.opens}` : ""}
+      <section className="owner-glass-panel owner-form-clearance space-y-4 rounded-3xl p-4">
+        <h2 className="font-semibold">Your answers</h2>
+        <p className="text-sm text-zinc-400">You can change any answer. The owner sees these on Staff.</p>
+        <ul className="space-y-4">
+          {ordered.map(({ q, answer }) => (
+            <li key={q.id} className="rounded-2xl border border-white/10 p-3">
+              <p className="text-sm font-medium leading-6 text-zinc-100">{q.prompt}</p>
+              <p className="mt-1 text-sm text-zinc-300">{answerDisplay(answer)}</p>
+              <button
+                type="button"
+                className="mt-2 text-xs font-semibold text-[var(--accent)] underline-offset-2 hover:underline"
+                onClick={() => setEditingQuestionId(q.id)}
+              >
+                Change
+              </button>
             </li>
           ))}
         </ul>
@@ -74,23 +100,33 @@ export default function QuestionsPage() {
     );
   }
 
+  if (!activeQuestion) {
+    return (
+      <section className="owner-glass-panel rounded-3xl p-4 text-sm text-zinc-400">
+        {setup ? "Loading the next question…" : "Loading…"}
+      </section>
+    );
+  }
+
+  const progressIndex = questions.findIndex((q) => q.id === activeQuestion.id);
+
   return (
     <section className="owner-glass-panel owner-form-clearance space-y-3 rounded-3xl p-4">
       <p className="text-xs uppercase tracking-[0.14em] text-zinc-500">
-        {(setup?.answers?.length ?? 0) + 1} of {step?.questions?.length ?? 0}
+        {progressIndex + 1} of {questions.length}
       </p>
-      <h2 className="text-lg font-semibold leading-7">{next.prompt}</h2>
+      <h2 className="text-lg font-semibold leading-7">{activeQuestion.prompt}</h2>
       {error && <p className="text-sm text-red-300">{error}</p>}
-      {next.kind === "suppliers" ? (
-        <SupplierNames question={next} saving={saving} onSubmit={choose} />
+      {activeQuestion.kind === "suppliers" ? (
+        <SupplierNames question={activeQuestion} saving={saving} onSubmit={choose} />
       ) : (
         <div className="space-y-2">
-          {next.answers.map((answer) => (
+          {activeQuestion.answers.map((answer) => (
             <button
               key={answer.value}
               type="button"
               disabled={saving}
-              onClick={() => choose(next, answer.value)}
+              onClick={() => choose(activeQuestion, answer.value)}
               className="min-h-11 w-full rounded-full border border-white/20 px-4 text-sm font-semibold disabled:opacity-50"
             >
               {answer.label || answer.value}
@@ -143,17 +179,38 @@ function SupplierNames({
     >
       {rows.map((row, index) => (
         <div key={index} className="space-y-2 rounded-2xl border border-white/10 p-3">
-          <label className="block text-sm">Name
-            <input value={row.name} onChange={(event) => update(index, { name: event.target.value })} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
+          <label className="block text-sm">
+            Name
+            <input
+              value={row.name}
+              onChange={(event) => update(index, { name: event.target.value })}
+              className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3"
+            />
           </label>
-          <label className="block text-sm">What they bring
-            <select value={row.brings} onChange={(event) => update(index, { brings: event.target.value })} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/40 px-3">
-              {brings.map((option) => <option key={option}>{option}</option>)}
+          <label className="block text-sm">
+            What they bring
+            <select
+              value={row.brings}
+              onChange={(event) => update(index, { brings: event.target.value })}
+              className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/40 px-3"
+            >
+              {brings.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
             </select>
           </label>
-          <label className="block text-sm">How supplies arrive
-            <select value={row.arrival} onChange={(event) => update(index, { arrival: event.target.value })} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/40 px-3">
-              {arrivals.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          <label className="block text-sm">
+            How supplies arrive
+            <select
+              value={row.arrival}
+              onChange={(event) => update(index, { arrival: event.target.value })}
+              className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/40 px-3"
+            >
+              {arrivals.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </label>
         </div>

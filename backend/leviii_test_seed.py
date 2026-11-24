@@ -377,6 +377,61 @@ def sync_test_stack_credentials(db: Session) -> list[str]:
     return log
 
 
+def _seed_demo_sales_month(db, restaurant, pilau, log: list[str]) -> None:
+    """Spread Pilau sales across 30 days so owner Money P&L matches bill cadence."""
+    from datetime import timedelta
+
+    from time_utils import utcnow
+
+    if pilau is None:
+        return
+    marker = "[DEMO-SALES-30D]"
+    now = utcnow()
+    for day in range(30):
+        when = now - timedelta(days=day)
+        exists = (
+            db.query(models.Order.id)
+            .filter(
+                models.Order.restaurant_id == restaurant.id,
+                models.Order.notes == f"{marker} day-{day}",
+            )
+            .first()
+        )
+        if exists:
+            continue
+        qty = 10 + (day % 5)
+        line_total = qty * 45000
+        order = models.Order(
+            restaurant_id=restaurant.id,
+            status=models.OrderStatus.SERVED,
+            order_type=models.OrderType.DINE_IN,
+            is_paid=True,
+            total=line_total,
+            notes=f"{marker} day-{day}",
+            created_at=when,
+        )
+        db.add(order)
+        db.flush()
+        db.add(
+            models.OrderItem(
+                order_id=order.id,
+                menu_item_id=pilau.id,
+                quantity=qty,
+                unit_price=45000,
+            )
+        )
+    created = (
+        db.query(models.Order)
+        .filter(
+            models.Order.restaurant_id == restaurant.id,
+            models.Order.notes.contains(marker),
+        )
+        .count()
+    )
+    if created:
+        log.append(f"[REFRESH] demo sales across {created} days for Money P&L")
+
+
 def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, pilau, log: list[str]) -> None:
     """Rich [DEMO] rows so owner/jack screens are not empty on backend-test."""
     from datetime import timedelta
@@ -583,23 +638,7 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
         )
         log.append("[CREATED] demo delivery with invoice photo for accountant")
 
-    if pilau and db.query(models.Order).filter(
-        models.Order.restaurant_id == restaurant.id,
-        models.Order.notes.contains("[DEMO]")
-    ).count() < 2:
-        extra = models.Order(
-            restaurant_id=restaurant.id,
-            status=models.OrderStatus.SERVED,
-            order_type=models.OrderType.DINE_IN,
-            is_paid=True,
-            total=90000,
-            notes="[DEMO] lunch service",
-            created_at=now,
-        )
-        db.add(extra)
-        db.flush()
-        db.add(models.OrderItem(order_id=extra.id, menu_item_id=pilau.id, quantity=2, unit_price=45000))
-        log.append("[CREATED] extra demo order with dish lines")
+    _seed_demo_sales_month(db, restaurant, pilau, log)
 
     if rice:
         rice.quantity = min(float(rice.quantity or 0), 1.5)

@@ -41,6 +41,7 @@ export type GivenAnswer = {
   opens: string | null;
   unlocks: string | null;
   delegated: boolean;
+  delegate_to?: string | null;
 };
 
 export type SetupPayload = {

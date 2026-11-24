@@ -24,6 +24,19 @@ def _seed_pair(db_session):
     )
     db_session.add(jack)
     db_session.flush()
+    from time_utils import utcnow
+
+    done = utcnow()
+    db_session.add(
+        models.StaffSetupProgress(
+            user_id=jack.id,
+            restaurant_id=eleven_r.id,
+            updated_at=done,
+            account_completed_at=done,
+            questionnaire_completed_at=done,
+            recipes_completed_at=done,
+        )
+    )
     db_session.add(
         models.InventoryItem(
             restaurant_id=eleven_r.id,

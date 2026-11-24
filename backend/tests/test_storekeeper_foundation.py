@@ -19,6 +19,33 @@ def _auth(token):
     return {"Authorization": f"Bearer {token}"}
 
 
+def _answer(client, user, question_id, value, suppliers=None):
+    body = {"question_id": question_id, "value": value}
+    if suppliers is not None:
+        body["suppliers"] = suppliers
+    return client.post(
+        "/api/v1/staff-setup/questionnaire",
+        headers=_auth(_token(user)),
+        json=body,
+    )
+
+
+def _unlock(client, jack):
+    steps = (
+        ("ordering_method", "owner_approves", None),
+        ("receives_deliveries", "yes", None),
+        ("supplier_list", "listed", [{"name": "Unlock Supply", "brings": "Main food", "arrival": "phone"}]),
+        ("stock_in_pos", "no", None),
+        ("issues_to_kitchen", "yes", None),
+        ("records_waste", "yes", None),
+        ("closes_the_day", "me", None),
+        ("knows_running_costs", "yes", None),
+    )
+    for question_id, value, suppliers in steps:
+        response = _answer(client, jack, question_id, value, suppliers)
+        assert response.status_code == 200, response.text
+
+
 def _tenant(db, name, email, role=models.Role.ADMIN, staff_role=models.StaffRole.OWNER, password="Ownerpass1"):
     tenant = models.Tenant(name=name)
     db.add(tenant)
@@ -60,12 +87,14 @@ def _add_staff(db, tenant, restaurant, email, staff_role, password="TempPass1", 
         role_title=staff_role.value,
     ))
     if staff_role == models.StaffRole.STOCKKEEPER:
+        done = None if must_change else utcnow()
         db.add(models.StaffSetupProgress(
             user_id=user.id,
             restaurant_id=restaurant.id,
             updated_at=utcnow(),
-            account_completed_at=None if must_change else utcnow(),
-            recipes_completed_at=None if must_change else utcnow(),
+            account_completed_at=done,
+            questionnaire_completed_at=done,
+            recipes_completed_at=done,
         ))
     db.commit()
     return user
@@ -359,9 +388,10 @@ def test_delivery_evidence_stores_a_private_key_and_questions_are_config(client,
     assert not any("delivery-evidence" in path or path.endswith("/receipts") for path in paths)
     setup = client.get("/api/v1/staff-setup", headers=_auth(_token(owner)))
     questions = setup.json()["steps"][2]["questions"]
-    assert questions[0]["id"] == "receives_deliveries"
-    assert questions[0]["answers"][0]["opens"] == "/store/deliveries"
-    assert questions[0]["answers"][0]["unlocks"] == "deliveries"
+    receives = next(q for q in questions if q["id"] == "receives_deliveries")
+    assert receives["answers"][0]["opens"] == "/store/deliveries"
+    assert receives["answers"][0]["unlocks"] == "deliveries"
+    assert questions[0]["id"] == "ordering_method"
     assert setup.json()["steps"][2]["runnable"] is False
     missing = client.post(
         "/api/v1/staff-setup/questionnaire",

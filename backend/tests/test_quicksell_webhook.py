@@ -72,6 +72,54 @@ def test_duplicate_idempotent(client, db_session, eleven_restaurant):
     assert db_session.query(Order).filter(Order.restaurant_id == eleven_restaurant.id).count() == 1
 
 
+def test_sale_with_dish_lines_creates_order_items(client, db_session, eleven_restaurant):
+    owner = db_session.query(User).filter(User.tenant_id == eleven_restaurant.tenant_id).first()
+    item = __import__("models", fromlist=["InventoryItem"]).InventoryItem(
+        restaurant_id=eleven_restaurant.id,
+        item_name="Rice",
+        quantity=20,
+        unit="kg",
+        low_stock_threshold=2,
+        cost_per_unit=100,
+    )
+    dish = __import__("models", fromlist=["MenuItem"]).MenuItem(
+        restaurant_id=eleven_restaurant.id,
+        name="Pilau",
+        category="Mains",
+        price=50000,
+        cost_price=10000,
+        is_available=True,
+    )
+    db_session.add_all([item, dish])
+    db_session.flush()
+    db_session.add(
+        __import__("models", fromlist=["MenuIngredient"]).MenuIngredient(
+            menu_item_id=dish.id,
+            inventory_item_id=item.id,
+            quantity_per_serving=0.2,
+            yield_fraction=1.0,
+            recipe_unit="kg",
+            created_by_user_id=owner.id,
+        )
+    )
+    db_session.commit()
+    body = {
+        "entity": "sale",
+        "records": [{
+            "source_id": "QS-LINES-1",
+            "occurred_at": "2026-09-19T14:30:00+03:00",
+            "total_cents": 50000,
+            "lines": [{"name": "Pilau", "quantity": 2, "unit_price_cents": 25000}],
+        }],
+    }
+    assert _post(client, body).status_code == 200
+    order = db_session.query(Order).one()
+    assert len(order.items) == 1
+    assert order.items[0].menu_item_id == dish.id
+    assert order.items[0].quantity == 2
+    assert item.quantity < 20
+
+
 def test_stores_order_with_nairobi_day(client, db_session, eleven_restaurant):
     res = _post(client, _sale(occurred_at="2026-09-19T23:30:00+03:00"))
     assert res.status_code == 200

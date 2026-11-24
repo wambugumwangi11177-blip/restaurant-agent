@@ -5,35 +5,9 @@ from unittest.mock import patch
 
 import models
 from money_visibility import money_keys_in
-from tests.test_storekeeper_foundation import _add_staff, _auth, _tenant, _token
+from tests.test_storekeeper_foundation import _add_staff, _auth, _tenant, _token, _unlock, _answer
 
 JPEG = b"\xff\xd8\xff\xd9"
-
-
-def _answer(client, user, question_id, value, suppliers=None):
-    body = {"question_id": question_id, "value": value}
-    if suppliers is not None:
-        body["suppliers"] = suppliers
-    return client.post(
-        "/api/v1/staff-setup/questionnaire",
-        headers=_auth(_token(user)),
-        json=body,
-    )
-
-
-def _unlock(client, jack):
-    steps = (
-        ("receives_deliveries", "yes", None),
-        ("supplier_list", "listed", [{"name": "Unlock Supply", "brings": "Main food", "arrival": "phone"}]),
-        ("stock_in_pos", "no", None),
-        ("issues_to_kitchen", "yes", None),
-        ("records_waste", "yes", None),
-        ("closes_the_day", "me", None),
-        ("knows_running_costs", "yes", None),
-    )
-    for question_id, value, suppliers in steps:
-        response = _answer(client, jack, question_id, value, suppliers)
-        assert response.status_code == 200, response.text
 
 
 def _day_photos(client, jack, phase="open"):
@@ -272,6 +246,7 @@ def test_delivery_needs_both_photos_and_ai_mismatch_stays_with_the_owner(client,
 def test_ai_failure_is_named_and_the_call_does_not_change_model(client, db_session, monkeypatch):
     tenant, _owner, restaurant = _tenant(db_session, "Eleven", "owner-ai@eleven.leviii")
     jack = _add_staff(db_session, tenant, restaurant, "jack-ai@eleven.leviii", models.StaffRole.STOCKKEEPER)
+    _unlock(client, jack)
     _answer(client, jack, "receives_deliveries", "yes")
     _answer(client, jack, "supplier_list", "listed", suppliers=[{"name": "Farm", "brings": "Alcohol", "arrival": "phone"}])
     supplier = client.get("/api/v1/store/suppliers", headers=_auth(_token(jack))).json()[0]
@@ -327,6 +302,7 @@ def test_ai_failure_is_named_and_the_call_does_not_change_model(client, db_sessi
 def test_supplier_answers_prefill_records_and_pos_status_is_visible(client, db_session):
     tenant, owner, restaurant = _tenant(db_session, "Eleven", "owner-pos@eleven.leviii")
     jack = _add_staff(db_session, tenant, restaurant, "jack-pos@eleven.leviii", models.StaffRole.STOCKKEEPER)
+    _unlock(client, jack)
     _answer(client, jack, "receives_deliveries", "yes")
     named = _answer(client, jack, "supplier_list", "listed", suppliers=[
         {"name": "Keittas", "brings": "Alcohol", "arrival": "scheduled"},

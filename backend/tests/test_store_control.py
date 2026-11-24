@@ -498,6 +498,17 @@ def test_unknown_bill_delegate_gets_needs_you_card(client, db_session):
         db_session, tenant, restaurant, "acc-unk@eleven.leviii", models.StaffRole.CONTROLLER,
     )
     _unlock(client, jack)
+    acc_progress = db_session.query(models.StaffSetupProgress).filter(
+        models.StaffSetupProgress.user_id == accountant.id
+    ).first()
+    if acc_progress is None:
+        acc_progress = models.StaffSetupProgress(user_id=accountant.id, restaurant_id=restaurant.id)
+        db_session.add(acc_progress)
+    from time_utils import utcnow
+
+    acc_progress.account_completed_at = utcnow()
+    acc_progress.questionnaire_completed_at = utcnow()
+    db_session.commit()
     added = client.post(
         "/api/v1/store/costs",
         headers=_auth(_token(jack)),

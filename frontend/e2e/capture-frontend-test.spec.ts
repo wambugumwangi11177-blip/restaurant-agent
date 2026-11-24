@@ -284,6 +284,10 @@ test("capture frontend-test screenshots", async () => {
       await page.goto(ROUTES[key], { waitUntil: "domcontentloaded" });
       await page.waitForTimeout(1200);
       await settleAppLock(page);
+      if (key === "owner-handover-timeline") {
+        await page.locator("li img").first().waitFor({ state: "visible", timeout: 10000 }).catch(() => undefined);
+        await page.waitForTimeout(400);
+      }
       await assertAuthedPage(page, key);
       await assertNoRibs(page);
       await page.screenshot({ path: path.join(ARTIFACTS, `${key}.png`), fullPage: false, timeout: 15000 });
@@ -342,6 +346,12 @@ test("capture frontend-test screenshots", async () => {
     await page.goto(ROUTES["accountant-invoice-prices"], { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1200);
     await settleAppLock(page);
+    await page
+      .getByText(/Fresh Farm|Key unit price|invoice photo/i)
+      .first()
+      .waitFor({ state: "visible", timeout: 15000 })
+      .catch(() => undefined);
+    await page.waitForTimeout(400);
     await assertAuthedPage(page, "accountant-invoice-prices");
     await assertNoRibs(page);
     await page.screenshot({ path: path.join(ARTIFACTS, "accountant-invoice-prices.png"), fullPage: false });

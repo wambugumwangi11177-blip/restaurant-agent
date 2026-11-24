@@ -635,7 +635,11 @@ async def handover_photo(
     ).first()
     if row is None or not row.photo_storage_key or row.photo_storage_key.startswith("http"):
         raise HTTPException(status_code=404, detail="Photo not found")
-    return Response(content=storage.load(row.photo_storage_key), media_type=row.photo_content_type or "image/jpeg")
+    try:
+        data = storage.load(row.photo_storage_key)
+    except (FileNotFoundError, OSError, KeyError):
+        raise HTTPException(status_code=404, detail="Photo not found") from None
+    return Response(content=data, media_type=row.photo_content_type or "image/jpeg")
 
 
 @router.post("/spoilage", status_code=201)

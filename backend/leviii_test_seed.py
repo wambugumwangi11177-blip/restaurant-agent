@@ -4,6 +4,7 @@ Set SEED_TEST_DATA=1 on test stacks only. Production leaves it unset — no-op.
 """
 from __future__ import annotations
 
+import base64
 import logging
 import os
 
@@ -17,16 +18,14 @@ from staff_audit import record_entry
 
 logger = logging.getLogger("leviii_test_seed")
 
-# Minimal valid JPEG (1×1) for demo evidence photos in test stacks.
-_DEMO_JPEG = bytes.fromhex(
-    "ffd8ffe000104a46494600010100000100010000ffdb004300080606070605080707"
-    "070909080a0c140d0c0b0b0c1912130f141d1a1f1e1d1a1c1c20242e2720222c231c"
-    "1c2837292c30313434341f27393d38323c2e333432ffdb0043010909090c0b0c180d"
-    "0d1832211c2132323232323232323232323232323232323232323232323232323232"
-    "323232323232323232ffc0001108000100010101110002110001031100ffc400150001"
-    "0100000000000000000000000000040302ffc4001411010000000000000000000000"
-    "00000000ffc400140101000000000000000000000000000000ffc400141101000000"
-    "0000000000000000000000000000ffda000c030100021003100000015402ffc4d9"
+# Minimal valid JPEG for demo evidence photos in test stacks.
+_DEMO_JPEG = base64.b64decode(
+    "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRof"
+    "Hh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwh"
+    "MjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAAR"
+    "CAAQABADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAA"
+    "AAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAgP/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMB"
+    "AAIRAxEAPwCdABmX/9k="
 )
 
 ELEVEN = "Eleven"
@@ -394,6 +393,24 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
             prog.recipes_completed_at = prog.recipes_completed_at or now
             prog.questionnaire_completed_at = None
             prog.updated_at = now
+        if not db.query(models.StaffSetupAnswer).filter(
+            models.StaffSetupAnswer.user_id == jack.id,
+            models.StaffSetupAnswer.question_id == "receives_deliveries",
+            models.StaffSetupAnswer.unlocks == "deliveries",
+        ).first():
+            db.add(
+                models.StaffSetupAnswer(
+                    user_id=jack.id,
+                    restaurant_id=restaurant.id,
+                    question_id="receives_deliveries",
+                    value="yes",
+                    label="Yes",
+                    opens="/store/deliveries",
+                    unlocks="deliveries",
+                    created_at=now,
+                )
+            )
+            log.append("[REFRESH] deliveries module unlocked for accountant demo")
     if accountant:
         prog = db.query(StaffSetupProgress).filter(StaffSetupProgress.user_id == accountant.id).first()
         if prog:
@@ -466,7 +483,11 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
             .first()
         )
         if handover is None:
-            photo_key = storage.save(_DEMO_JPEG, content_type="image/jpeg")
+            photo_key = storage.save(
+                _DEMO_JPEG,
+                key=f"handovers/{restaurant.id}/demo-handover.jpg",
+                content_type="image/jpeg",
+            )
             handover = models.KitchenHandover(
                 restaurant_id=restaurant.id,
                 created_by_user_id=jack.id,
@@ -489,8 +510,33 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
             )
             log.append("[CREATED] demo kitchen handover with photo key")
         elif handover.photo_storage_key and not storage.exists(handover.photo_storage_key):
-            handover.photo_storage_key = storage.save(_DEMO_JPEG, content_type="image/jpeg")
-            log.append("[REFRESH] demo handover photo bytes")
+            storage.save(
+                _DEMO_JPEG,
+                key=handover.photo_storage_key,
+                content_type="image/jpeg",
+            )
+            log.append("[REFRESH] demo handover photo bytes (existing key)")
+        if handover and rice:
+            demo_out = (
+                db.query(models.StockMovement)
+                .filter(
+                    models.StockMovement.inventory_item_id == rice.id,
+                    models.StockMovement.reason.contains("[DEMO] kitchen handover"),
+                )
+                .first()
+            )
+            if demo_out is None:
+                db.add(
+                    models.StockMovement(
+                        inventory_item_id=rice.id,
+                        movement_type=models.StockMovementType.OUT,
+                        quantity=3.5,
+                        reason="[DEMO] kitchen handover",
+                        performed_by_user_id=jack.id,
+                        created_at=now,
+                    )
+                )
+                log.append("[CREATED] demo kitchen OUT movement for custody alerts")
 
     if pilau:
         pilau.price = 45000

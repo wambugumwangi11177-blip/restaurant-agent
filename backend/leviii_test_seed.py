@@ -515,7 +515,7 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
             )
             db.add(po)
             log.append("[CREATED] demo pending restock PO")
-        elif po.status not in ("PENDING", "APPROVED"):
+        elif po.status != "APPROVED":
             po.status = "APPROVED"
             log.append("[REFRESH] demo restock PO approved for Jack WhatsApp")
 

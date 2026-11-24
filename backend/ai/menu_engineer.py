@@ -105,6 +105,13 @@ def get_menu_engineering(db: Session, restaurant_id: int) -> dict:
     items = db.query(models.MenuItem).filter(
         models.MenuItem.restaurant_id == restaurant_id
     ).all()
+    from services.dish_cost import dish_cost_map
+
+    recipe_costs = dish_cost_map(db, restaurant_id)
+    for item in items:
+        rc = recipe_costs.get(item.id, 0)
+        if rc > 0:
+            item.cost_price = rc
 
     if not items:
         return _empty_response()

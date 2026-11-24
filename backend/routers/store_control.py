@@ -1123,6 +1123,12 @@ async def list_approvals(
     ).all():
         item = db.query(models.InventoryItem).filter(models.InventoryItem.id == row.inventory_item_id).first()
         item_name = item.item_name if item else "stock"
+        mode = restaurant.restock_routing_mode or "owner_approves"
+        actor = "owner"
+        if mode == "staples_self":
+            actor = "stockkeeper"
+        elif mode == "flag_office":
+            actor = "controller"
         events.append({
             "id": row.id,
             "kind": "restock",
@@ -1134,6 +1140,8 @@ async def list_approvals(
             "action": f"Approve restock for {item_name}",
             "created_at": _when(row.ordered_at),
             "person_name": "Manager",
+            "actor_staff_role": actor,
+            "requester_user_id": row.requested_by_user_id,
         })
     for row in db.query(models.ScheduleChangeRequest).filter(
         models.ScheduleChangeRequest.restaurant_id == restaurant.id,
@@ -1375,10 +1383,26 @@ async def approve(
             raise HTTPException(status_code=404, detail="Not found")
         if row.status != "PENDING":
             raise HTTPException(status_code=400, detail="This one does not need approval.")
-        row.status = "SENT" if body.decision == "approve" else "DECLINED"
-        from services.approval_workflow import resolve_reminder
+        row.status = "APPROVED" if body.decision == "approve" else "DECLINED"
+        from services.approval_workflow import resolve_reminder, notify_requester_outcome
 
         resolve_reminder(db, restaurant.id, "restock", row.id)
+        if row.requested_by_user_id and body.decision == "approve":
+            notify_requester_outcome(
+                db,
+                row.requested_by_user_id,
+                title="Restock approved",
+                body=f"Approved — place the order with the supplier when ready.",
+                url="/store/restock",
+            )
+        elif row.requested_by_user_id:
+            notify_requester_outcome(
+                db,
+                row.requested_by_user_id,
+                title="Restock declined",
+                body="The owner declined this restock.",
+                url="/store/restock",
+            )
         db.commit()
         return {"id": row.id, "kind": "restock", "status": row.status}
     elif body.kind == "handover":

@@ -116,7 +116,7 @@ def _step_state(progress: models.StaffSetupProgress | None, user: models.User) -
     return {
         "must_change_password": bool(user.must_change_password),
         "has_pin": bool(user.hashed_pin),
-        "app_unlocked": bool(account_done),
+        "app_unlocked": bool(account_done and questions_done),
         "steps": [
             {
                 "id": "account",
@@ -366,10 +366,11 @@ async def answer_question(
     if user.staff_role not in (
         models.StaffRole.STOCKKEEPER,
         models.StaffRole.CONTROLLER,
+        models.StaffRole.MANAGER,
     ) and user.role not in (
         models.Role.ADMIN, models.Role.SUPERADMIN,
     ):
-        raise HTTPException(status_code=403, detail="This step is for the storekeeper.")
+        raise HTTPException(status_code=403, detail="This step is for the store team.")
     restaurant = get_or_create_restaurant(db, user)
     progress = db.query(models.StaffSetupProgress).filter(
         models.StaffSetupProgress.user_id == user.id
@@ -384,6 +385,8 @@ async def answer_question(
     answer = next((item for item in question["answers"] if item["value"] == body.value), None)
     if answer is None:
         raise HTTPException(status_code=400, detail="That is not one of the answers.")
+    if question["id"] == "ordering_method" and not answer.get("delegate"):
+        restaurant.restock_routing_mode = answer["value"]
     if question["id"] == "supplier_list" and answer["value"] == "listed":
         if not body.suppliers:
             raise HTTPException(status_code=400, detail="Name at least one supplier.")
@@ -502,6 +505,7 @@ async def setup_activity(
         named[item.id] = person_of(db, item)
     return {
         "people": people,
+        "routing_mode": restaurant.restock_routing_mode,
         "recipe_gap": _recipe_gap(db, restaurant.id),
         "entries": [
             {
@@ -515,3 +519,71 @@ async def setup_activity(
             for row in audits
         ],
     }
+
+
+class OpeningLine(StrictModel):
+    item_name: str = Field(min_length=1, max_length=120)
+    supplier_id: int | None = None
+    lead_days: float = Field(default=1.0, gt=0, le=30)
+    order_qty: float | None = Field(default=None, gt=0)
+    opening_qty: float | None = Field(default=None, ge=0)
+    unit: str = "kg"
+
+
+class OpeningProfileIn(StrictModel):
+    lines: list[OpeningLine]
+
+
+@router.post("/opening-profile")
+async def save_opening_profile(
+    body: OpeningProfileIn,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    if current_user.staff_role not in (
+        models.StaffRole.STOCKKEEPER,
+        models.StaffRole.CONTROLLER,
+        models.StaffRole.MANAGER,
+    ):
+        raise HTTPException(status_code=403, detail="This step is for the store team.")
+    restaurant = get_or_create_restaurant(db, current_user)
+    progress = _progress(db, current_user, restaurant.id)
+    from services.reorder_points import sync_item_reorder_fields
+
+    for line in body.lines:
+        name = line.item_name.strip()
+        item = (
+            db.query(models.InventoryItem)
+            .filter(
+                models.InventoryItem.restaurant_id == restaurant.id,
+                models.InventoryItem.item_name.ilike(name),
+            )
+            .first()
+        )
+        if item is None:
+            item = models.InventoryItem(
+                restaurant_id=restaurant.id,
+                item_name=name,
+                quantity=line.opening_qty or 0,
+                unit=line.unit,
+                cost_per_unit=0,
+            )
+            db.add(item)
+            db.flush()
+        elif line.opening_qty is not None:
+            item.quantity = line.opening_qty
+        if line.supplier_id:
+            item.default_supplier_id = line.supplier_id
+            supplier = db.query(models.Supplier).filter(models.Supplier.id == line.supplier_id).first()
+            if supplier and line.lead_days:
+                supplier.avg_lead_days = line.lead_days
+        sync_item_reorder_fields(db, item, lead_days=line.lead_days, order_qty=line.order_qty)
+    progress.opening_stock_completed_at = utcnow()
+    progress.updated_at = utcnow()
+    record_entry(
+        db, restaurant.id, current_user, "opening_profile_saved", "inventory_item",
+        f"{current_user.email} saved opening counts for {len(body.lines)} item(s).",
+        detail={"count": len(body.lines)},
+    )
+    db.commit()
+    return {"status": "saved", "items": len(body.lines)}

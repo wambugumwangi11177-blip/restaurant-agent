@@ -38,6 +38,12 @@ def _item_cost(item_map: dict, mid: int) -> int:
     return (item.cost_price or 0) if item else 0
 
 
+def _item_cost_from_map(cost_map: dict[int, int], item_map: dict, mid: int) -> int:
+    if mid in cost_map and cost_map[mid] > 0:
+        return cost_map[mid]
+    return _item_cost(item_map, mid)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
@@ -53,6 +59,13 @@ def get_profit_intelligence(db: Session, restaurant_id: int) -> dict:
     sixty_days_ago  = now - timedelta(days=60)
 
     items    = db.query(models.MenuItem).filter(models.MenuItem.restaurant_id == restaurant_id).all()
+    from services.dish_cost import dish_cost_map
+
+    recipe_costs = dish_cost_map(db, restaurant_id)
+    for item in items:
+        rc = recipe_costs.get(item.id, 0)
+        if rc > 0:
+            item.cost_price = rc
     item_map = {i.id: i for i in items}
 
     # joinedload eliminates the N+1 (BUG-12 — already fixed in uploaded version, kept)

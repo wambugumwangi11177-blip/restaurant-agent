@@ -206,6 +206,10 @@ class Restaurant(Base):
     # Units of spoilage or of a close difference that wait for the owner.
     # Smaller gaps are reported and do not wait. Default is 5.
     spoilage_approval_qty = Column(Float, nullable=False, default=5, server_default="5")
+    # Jack questionnaire: how restock requests route (owner_approves | staples_self | flag_office | unknown).
+    restock_routing_mode = Column(String, nullable=False, default="owner_approves", server_default="owner_approves")
+    # JSON map inventory_item_id -> max staple order quantity (no KES caps on store screens).
+    staple_caps_json = Column(Text, nullable=False, default="{}", server_default="{}")
 
     tenant = relationship("Tenant", back_populates="restaurants")
     menu_items = relationship("MenuItem", back_populates="restaurant")
@@ -1218,6 +1222,8 @@ class PurchaseOrder(Base):
     expected_at       = Column(DateTime, nullable=True)
     delivered_at      = Column(DateTime, nullable=True)
     notes             = Column(Text, default="")
+    ordered_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    requested_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     supplier       = relationship("Supplier", back_populates="purchase_orders")
     inventory_item = relationship("InventoryItem")
@@ -1765,6 +1771,7 @@ class StaffSetupProgress(Base):
     account_completed_at = Column(DateTime, nullable=True)
     recipes_completed_at = Column(DateTime, nullable=True)
     questionnaire_completed_at = Column(DateTime, nullable=True)
+    opening_stock_completed_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=utcnow, nullable=False)
 
     user = relationship("User")

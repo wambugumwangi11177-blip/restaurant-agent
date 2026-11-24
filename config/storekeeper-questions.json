@@ -1,7 +1,17 @@
 {
-  "version": 3,
-  "note": "Edit this file to change the questions. Each answer can open a page, unlock a module, or send the question to the owner. Naming suppliers creates the supplier records.",
+  "version": 4,
+  "note": "Ordering rule first, then store flow. Answers unlock modules and persist routing on the restaurant.",
   "questions": [
+    {
+      "id": "ordering_method",
+      "prompt": "How do you order stock today?",
+      "answers": [
+        {"value": "owner_approves", "label": "The owner approves, then I place the order"},
+        {"value": "staples_self", "label": "I order everyday staples myself (max quantity per item only)"},
+        {"value": "flag_office", "label": "The owner or accountant orders after I flag low stock"},
+        {"value": "unknown", "label": "I don't know", "delegate": true, "delegate_to": "owner"}
+      ]
+    },
     {
       "id": "receives_deliveries",
       "prompt": "Do you take in deliveries?",
@@ -14,7 +24,7 @@
     {
       "id": "supplier_list",
       "kind": "suppliers",
-      "prompt": "Who are the suppliers? Name the alcohol ones and the main food ones, what each brings, and how the supplies arrive.",
+      "prompt": "Who are the suppliers? Name what each brings and how the supplies arrive.",
       "brings": ["Main food", "Alcohol", "Both", "Other"],
       "arrivals": [
         {"value": "phone", "label": "Phone order"},

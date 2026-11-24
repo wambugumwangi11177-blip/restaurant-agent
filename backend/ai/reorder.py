@@ -33,7 +33,7 @@ from ai.supply_chain.intelligence import RELIABILITY_THRESHOLD
 
 # Purchase orders in either of these statuses are still "in flight" — don't
 # draft a second one for the same item while one is already outstanding.
-_OPEN_STATUSES = ("PENDING", "SENT")
+_OPEN_STATUSES = ("PENDING", "APPROVED", "SENT")
 
 
 @dataclass
@@ -119,7 +119,12 @@ def find_reorder_candidates(db: Session, restaurant_id: int, on_date: date | Non
     return candidates
 
 
-def draft_purchase_order(db: Session, restaurant_id: int, candidate: ReorderCandidate) -> models.PurchaseOrder:
+def draft_purchase_order(
+    db: Session,
+    restaurant_id: int,
+    candidate: ReorderCandidate,
+    requested_by_user_id: int | None = None,
+) -> models.PurchaseOrder:
     """
     Create a PENDING purchase order from a candidate — "PENDING" already
     means "created, not yet sent" in this model's existing status
@@ -166,6 +171,7 @@ def draft_purchase_order(db: Session, restaurant_id: int, candidate: ReorderCand
         total_cost=total_cost_cents,
         status="PENDING",
         notes=notes,
+        requested_by_user_id=requested_by_user_id,
     )
     db.add(po)
     db.commit()

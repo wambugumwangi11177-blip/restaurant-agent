@@ -17,6 +17,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from logging_config import configure_logging
 from routers import (
+    eleven_dishes,
+    eleven_money,
+    store_prep,
+    store_restock,
     health,
     webhooks,
     auth,
@@ -529,6 +533,10 @@ def _run_reorder_check_job():
         db = SessionLocal()
         try:
             for restaurant in db.query(models.Restaurant).all():
+                from services.reorder_points import sync_restaurant
+
+                sync_restaurant(db, restaurant.id)
+                db.commit()
                 candidates = find_reorder_candidates(db, restaurant.id)
                 for candidate in candidates:
                     draft_purchase_order(db, restaurant.id, candidate)
@@ -673,6 +681,10 @@ _VERSIONED_ROUTERS = [
     eleven_owner.router,
     admin_platform.router,
     team_router.router,
+    eleven_dishes.router,
+    eleven_money.router,
+    store_restock.router,
+    store_prep.router,
 ]
 
 app.include_router(auth.router)

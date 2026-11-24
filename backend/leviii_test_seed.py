@@ -201,6 +201,57 @@ def ensure_eleven_test_data(
         )
         log.append("[CREATED] sample supplier")
 
+    rice = (
+        db.query(models.InventoryItem)
+        .filter(models.InventoryItem.restaurant_id == restaurant.id, models.InventoryItem.item_name == "Rice")
+        .first()
+    )
+    supplier = db.query(models.Supplier).filter(models.Supplier.restaurant_id == restaurant.id).first()
+    if rice and supplier and rice.default_supplier_id is None:
+        rice.cost_per_unit = 120
+        rice.default_supplier_id = supplier.id
+        rice.par_level = 20
+        rice.low_stock_threshold = 5
+        restaurant.restock_routing_mode = "owner_approves"
+    pilau = (
+        db.query(models.MenuItem)
+        .filter(models.MenuItem.restaurant_id == restaurant.id, models.MenuItem.name == "Pilau (demo)")
+        .first()
+    )
+    if pilau is None and rice is not None:
+        pilau = models.MenuItem(
+            restaurant_id=restaurant.id,
+            name="Pilau (demo)",
+            category="Kitchen",
+            price=45000,
+            cost_price=0,
+        )
+        db.add(pilau)
+        db.flush()
+        db.add(
+            models.MenuIngredient(
+                menu_item_id=pilau.id,
+                inventory_item_id=rice.id,
+                quantity_per_serving=0.25,
+                recipe_unit="kg",
+                yield_fraction=1.0,
+            )
+        )
+        log.append("[CREATED] demo dish Pilau (demo)")
+    if db.query(models.Order).filter(models.Order.restaurant_id == restaurant.id).count() == 0 and pilau:
+        order = models.Order(
+            restaurant_id=restaurant.id,
+            status=models.OrderStatus.SERVED,
+            order_type=models.OrderType.DINE_IN,
+            is_paid=True,
+            total=45000,
+            notes="[DEMO] test till ticket",
+        )
+        db.add(order)
+        db.flush()
+        db.add(models.OrderItem(order_id=order.id, menu_item_id=pilau.id, quantity=12, unit_price=45000))
+        log.append("[CREATED] demo sales for dishes/money screens")
+
     db.commit()
 
     # Test Restaurant — proves the data wall (no shared stock with Eleven).

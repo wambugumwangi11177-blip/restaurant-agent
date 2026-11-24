@@ -59,7 +59,7 @@ export default function QuestionsPage() {
 
   if (!next) {
     return (
-      <section className="owner-glass-panel space-y-3 rounded-3xl p-4">
+      <section className="owner-glass-panel owner-form-clearance space-y-3 rounded-3xl p-4">
         <h2 className="font-semibold">{setup ? "Those are the questions" : "Loading…"}</h2>
         <ul className="space-y-2 text-sm text-zinc-300">
           {(setup?.answers ?? []).map((answer) => (
@@ -75,7 +75,7 @@ export default function QuestionsPage() {
   }
 
   return (
-    <section className="owner-glass-panel space-y-3 rounded-3xl p-4">
+    <section className="owner-glass-panel owner-form-clearance space-y-3 rounded-3xl p-4">
       <p className="text-xs uppercase tracking-[0.14em] text-zinc-500">
         {(setup?.answers?.length ?? 0) + 1} of {step?.questions?.length ?? 0}
       </p>

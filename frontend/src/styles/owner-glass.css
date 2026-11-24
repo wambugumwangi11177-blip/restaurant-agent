@@ -14,7 +14,7 @@
   --og-radius: 24px;
   --og-nav: 72px;
   --og-nav-inset: max(0.75rem, env(safe-area-inset-bottom, 0px));
-  --og-nav-clearance: calc(var(--og-nav) + var(--og-nav-inset) + 6.75rem);
+  --og-nav-clearance: calc(var(--og-nav) + var(--og-nav-inset) + 8.5rem);
   min-height: 100vh;
   color: var(--og-text);
   background: var(--og-bg);
@@ -283,9 +283,14 @@ html[data-leviii-apk] .owner-oat-highlight {
   gap: 1.25rem;
 }
 
+.owner-form-clearance {
+  margin-bottom: max(5.5rem, env(safe-area-inset-bottom, 0px));
+  padding-bottom: 1.25rem;
+}
+
 @media (max-width: 767px) {
   .owner-main-pad {
-    padding-bottom: calc(var(--og-nav) + var(--og-nav-inset) + 3.5rem);
+    padding-bottom: calc(var(--og-nav) + var(--og-nav-inset) + 6rem);
     padding-top: 1.25rem;
   }
 }

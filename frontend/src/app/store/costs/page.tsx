@@ -49,6 +49,7 @@ export default function CostsPage() {
   const [payCode, setPayCode] = useState<Record<number, string>>({});
   const [payPhoto, setPayPhoto] = useState<Record<number, File | null>>({});
   const otherManager = user?.staff_role === "controller" ? "storekeeper" : "accountant";
+  const stockkeeper = user?.staff_role === "stockkeeper";
 
   async function markPaid(row: Saved) {
     setError("");
@@ -122,7 +123,9 @@ export default function CostsPage() {
       <section className="owner-glass-panel rounded-3xl p-4">
         <h2 className="font-semibold">Regular bills</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-300">
-          Do you know what we pay for each one? If you know it, send the amount. You will not see a total afterwards.
+          {stockkeeper
+            ? "Say who pays each bill. Amounts are keyed by the owner or accountant — not on this screen."
+            : "Do you know what we pay for each one? If you know it, send the amount."}
         </p>
       </section>
       {BILLS.map((bill) => {
@@ -206,31 +209,45 @@ export default function CostsPage() {
               </div>
             )}
             {active && (
-              <div className="mt-3 space-y-3">
-                {bill.kind === "other" && (
-                  <label className="block text-sm">Name
-                    <input value={otherName} onChange={(event) => setOtherName(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
-                  </label>
+              <div className="mt-3 space-y-3 owner-form-clearance">
+                {stockkeeper ? (
+                  <>
+                    <button type="button" onClick={() => send(false, "accountant")} className="min-h-11 w-full leviii-btn-primary">
+                      I know who pays it
+                    </button>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <button type="button" onClick={() => send(false, "owner")} className="min-h-11 rounded-full border border-white/20 text-sm">I don&apos;t know — owner</button>
+                      <button type="button" onClick={() => send(false, "accountant")} className="min-h-11 rounded-full border border-white/20 text-sm">I don&apos;t know — accountant</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {bill.kind === "other" && (
+                      <label className="block text-sm">Name
+                        <input value={otherName} onChange={(event) => setOtherName(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
+                      </label>
+                    )}
+                    <label className="block text-sm">Amount (KES)
+                      <input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
+                    </label>
+                    <label className="block text-sm">How often
+                      <select value={cadence} onChange={(event) => setCadence(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/40 px-3">
+                        <option value="weekly">Every week</option>
+                        <option value="monthly">Every month</option>
+                        <option value="yearly">Every year</option>
+                      </select>
+                    </label>
+                    <label className="block text-sm">Due day
+                      <input inputMode="numeric" value={dueDay} onChange={(event) => setDueDay(event.target.value.replace(/\D/g, "").slice(0, 2))} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
+                    </label>
+                    <PhotoField label="Receipt" file={photo} onFile={setPhoto} optional />
+                    <button type="button" onClick={() => send(true)} className="min-h-11 w-full leviii-btn-primary">I know it</button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => send(false, "owner")} className="min-h-11 rounded-full border border-white/20 text-sm">I don&apos;t know — owner</button>
+                      <button type="button" onClick={() => send(false, otherManager)} className="min-h-11 rounded-full border border-white/20 text-sm">I don&apos;t know — {otherManager}</button>
+                    </div>
+                  </>
                 )}
-                <label className="block text-sm">Amount (KES)
-                  <input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
-                </label>
-                <label className="block text-sm">How often
-                  <select value={cadence} onChange={(event) => setCadence(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/40 px-3">
-                    <option value="weekly">Every week</option>
-                    <option value="monthly">Every month</option>
-                    <option value="yearly">Every year</option>
-                  </select>
-                </label>
-                <label className="block text-sm">Due day
-                  <input inputMode="numeric" value={dueDay} onChange={(event) => setDueDay(event.target.value.replace(/\D/g, "").slice(0, 2))} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
-                </label>
-                <PhotoField label="Receipt" file={photo} onFile={setPhoto} optional />
-                <button type="button" onClick={() => send(true)} className="min-h-11 w-full leviii-btn-primary">I know it</button>
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => send(false, "owner")} className="min-h-11 rounded-full border border-white/20 text-sm">I don&apos;t know — owner</button>
-                  <button type="button" onClick={() => send(false, otherManager)} className="min-h-11 rounded-full border border-white/20 text-sm">I don&apos;t know — {otherManager}</button>
-                </div>
               </div>
             )}
           </section>

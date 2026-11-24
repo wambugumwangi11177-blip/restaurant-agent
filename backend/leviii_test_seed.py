@@ -238,7 +238,18 @@ def ensure_eleven_test_data(
             )
         )
         log.append("[CREATED] demo dish Pilau (demo)")
-    if db.query(models.Order).filter(models.Order.restaurant_id == restaurant.id).count() == 0 and pilau:
+    jack_user = db.query(models.User).filter(models.User.email == STAFF[0][0]).first()
+    amina_user = db.query(models.User).filter(models.User.email == STAFF[1][0]).first()
+    staff_pass = os.getenv("SEED_STAFF_PASSWORD", "JackTestPass1!")
+    for user in (jack_user, amina_user):
+        if user and staff_pass and (user.must_change_password or not user.hashed_password):
+            user.hashed_password = auth.get_password_hash(staff_pass)
+            user.must_change_password = False
+            log.append(f"[SET] password for {user.email}")
+
+    if db.query(models.Order).filter(
+        models.Order.restaurant_id == restaurant.id, models.Order.notes.contains("[DEMO]")
+    ).first() is None and pilau:
         order = models.Order(
             restaurant_id=restaurant.id,
             status=models.OrderStatus.SERVED,
@@ -251,6 +262,8 @@ def ensure_eleven_test_data(
         db.flush()
         db.add(models.OrderItem(order_id=order.id, menu_item_id=pilau.id, quantity=12, unit_price=45000))
         log.append("[CREATED] demo sales for dishes/money screens")
+
+    _refresh_demo_feed(db, restaurant, owner, jack_user, amina_user, rice, supplier, pilau, log)
 
     db.commit()
 
@@ -313,6 +326,133 @@ def ensure_eleven_test_data(
 
     db.commit()
     return log
+
+
+def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, pilau, log: list[str]) -> None:
+    """Rich [DEMO] rows so owner/jack screens are not empty on backend-test."""
+    from time_utils import utcnow
+
+    now = utcnow()
+    if jack:
+        prog = db.query(StaffSetupProgress).filter(StaffSetupProgress.user_id == jack.id).first()
+        if prog:
+            prog.account_completed_at = prog.account_completed_at or now
+            prog.recipes_completed_at = prog.recipes_completed_at or now
+            prog.questionnaire_completed_at = None
+            prog.updated_at = now
+    if accountant:
+        prog = db.query(StaffSetupProgress).filter(StaffSetupProgress.user_id == accountant.id).first()
+        if prog:
+            prog.account_completed_at = now
+            prog.recipes_completed_at = now
+            prog.questionnaire_completed_at = now
+            prog.updated_at = now
+
+    if not db.query(models.RunningCost).filter(
+        models.RunningCost.restaurant_id == restaurant.id,
+        models.RunningCost.label.contains("[DEMO]")
+    ).first():
+        db.add(
+            models.RunningCost(
+                restaurant_id=restaurant.id,
+                user_id=accountant.id if accountant else owner.id,
+                kind="rent",
+                label="[DEMO] Rent — Westlands",
+                amount_cents=8500000,
+                status="approved",
+                approved_at=now,
+                approved_by_user_id=owner.id,
+                cadence="monthly",
+                due_day=1,
+            )
+        )
+        db.add(
+            models.RunningCost(
+                restaurant_id=restaurant.id,
+                user_id=jack.id if jack else owner.id,
+                kind="electricity",
+                label="[DEMO] KPLC — amount unknown",
+                amount_cents=0,
+                status="unknown",
+                delegated_to="accountant",
+                cadence="monthly",
+            )
+        )
+        log.append("[CREATED] demo bills for Money / approvals")
+
+    if rice and supplier and not db.query(models.PurchaseOrder).filter(
+        models.PurchaseOrder.restaurant_id == restaurant.id,
+        models.PurchaseOrder.notes.contains("[DEMO]")
+    ).first():
+        db.add(
+            models.PurchaseOrder(
+                restaurant_id=restaurant.id,
+                supplier_id=supplier.id,
+                inventory_item_id=rice.id,
+                quantity_ordered=8,
+                unit="kg",
+                cost_per_unit=12000,
+                total_cost=96000,
+                status="PENDING",
+                notes="[DEMO] Auto restock — Rice",
+                ordered_at=now,
+                requested_by_user_id=jack.id if jack else owner.id,
+            )
+        )
+        log.append("[CREATED] demo pending restock PO")
+
+    if jack and rice and not db.query(models.KitchenHandover).filter(
+        models.KitchenHandover.restaurant_id == restaurant.id,
+    ).first():
+        chef = db.query(models.StoreChef).filter(models.StoreChef.restaurant_id == restaurant.id).first()
+        if chef is None:
+            chef = models.StoreChef(
+                restaurant_id=restaurant.id,
+                name="Chef Mwangi",
+                hashed_pin=auth.get_pin_hash("1234"),
+                created_by_user_id=jack.id,
+            )
+            db.add(chef)
+            db.flush()
+        handover = models.KitchenHandover(
+            restaurant_id=restaurant.id,
+            created_by_user_id=jack.id,
+            chef_id=chef.id,
+            photo_storage_key=f"handovers/{restaurant.id}/demo-handover.jpg",
+            photo_content_type="image/jpeg",
+            created_at=now,
+            owner_review_status="none",
+        )
+        db.add(handover)
+        db.flush()
+        db.add(
+            models.KitchenHandoverLine(
+                handover_id=handover.id,
+                inventory_item_id=rice.id,
+                item_name=rice.item_name,
+                quantity=3.5,
+                unit="kg",
+            )
+        )
+        log.append("[CREATED] demo kitchen handover with photo key")
+
+    if pilau and db.query(models.Order).filter(
+        models.Order.restaurant_id == restaurant.id,
+        models.Order.notes.contains("[DEMO]")
+    ).count() < 2:
+        extra = models.Order(
+            restaurant_id=restaurant.id,
+            status=models.OrderStatus.SERVED,
+            order_type=models.OrderType.DINE_IN,
+            is_paid=True,
+            total=90000,
+            notes="[DEMO] lunch service",
+            created_at=now,
+        )
+        db.add(extra)
+        db.flush()
+        db.add(models.OrderItem(order_id=extra.id, menu_item_id=pilau.id, quantity=2, unit_price=45000))
+        log.append("[CREATED] extra demo order with dish lines")
 
 
 def provision_test_data_from_env() -> None:

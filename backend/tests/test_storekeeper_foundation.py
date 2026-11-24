@@ -39,7 +39,7 @@ def _unlock(client, jack):
         ("issues_to_kitchen", "yes", None),
         ("records_waste", "yes", None),
         ("closes_the_day", "me", None),
-        ("knows_running_costs", "yes", None),
+        ("knows_running_costs", "knows_payer", None),
     )
     for question_id, value, suppliers in steps:
         response = _answer(client, jack, question_id, value, suppliers)

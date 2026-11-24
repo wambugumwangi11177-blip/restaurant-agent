@@ -1,8 +1,9 @@
-import { test, expect, chromium, type BrowserContext } from "@playwright/test";
+import { test, expect, chromium } from "@playwright/test";
 import fs from "fs";
 import path from "path";
 
 const BASE_URL = "https://frontend-test-production-752b1b7c.up.railway.app";
+const API_URL = process.env.BACKEND_TEST_URL || "https://backend-test-production-05524237.up.railway.app";
 const ARTIFACTS = "/opt/cursor/artifacts";
 const STATE_DIR = path.join(ARTIFACTS, "playwright-state");
 
@@ -36,6 +37,93 @@ const ROUTES: Record<(typeof TARGETS)[number], string> = {
   "accountant-invoice-prices": "/store/invoice-prices",
 };
 
+const PAGE_MARKERS: Partial<Record<(typeof TARGETS)[number], RegExp>> = {
+  "owner-home": /needs you|Stock|Money|Eleven/i,
+  "owner-dishes": /Dish|Pilau|recipe/i,
+  "owner-money": /till|Profit|Money|Rent/i,
+  "owner-alerts": /Alert|attention|approval/i,
+  "owner-handover-timeline": /Handover|Chef|kitchen/i,
+  "jack-wizard-step-1": /who orders|restock|supplier|question/i,
+  "jack-restock-whatsapp": /restock|WhatsApp|supplier|Fresh Farm/i,
+  "store-prep-list": /Prep|ingredient|Pilau/i,
+  "accountant-invoice-prices": /invoice|price|supplier/i,
+};
+
+type SavedSession = {
+  cookies: [];
+  origins: { origin: string; localStorage: []; sessionStorage: { name: string; value: string }[] }[];
+};
+
+function stateLooksValid(statePath: string): boolean {
+  if (!fs.existsSync(statePath)) return false;
+  try {
+    const raw = JSON.parse(fs.readFileSync(statePath, "utf8")) as SavedSession;
+    return (raw.origins ?? []).some((o) =>
+      o.origin === BASE_URL && (o.sessionStorage ?? []).some((e) => e.name === "access_token" && e.value.length > 20),
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function saveSession(statePath: string, page: import("@playwright/test").Page) {
+  const token = await page.evaluate(() => window.sessionStorage.getItem("access_token") || "");
+  const payload: SavedSession = {
+    cookies: [],
+    origins: [{ origin: BASE_URL, localStorage: [], sessionStorage: [{ name: "access_token", value: token }] }],
+  };
+  fs.writeFileSync(statePath, JSON.stringify(payload, null, 2));
+  expect(stateLooksValid(statePath)).toBeTruthy();
+}
+
+function readAccessToken(statePath: string): string | null {
+  try {
+    const raw = JSON.parse(fs.readFileSync(statePath, "utf8")) as SavedSession;
+    const entry = raw.origins?.[0]?.sessionStorage?.find((e) => e.name === "access_token");
+    return entry?.value || null;
+  } catch {
+    return null;
+  }
+}
+
+async function primeSession(page: import("@playwright/test").Page, statePath: string) {
+  const token = readAccessToken(statePath);
+  if (!token) throw new Error(`missing token in ${statePath}`);
+  await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+  await page.evaluate((t) => {
+    window.sessionStorage.setItem("access_token", t);
+    window.sessionStorage.setItem("app_pin_unlocked", "1");
+    window.sessionStorage.setItem("app_last_activity", String(Date.now()));
+  }, token);
+}
+
+const OWNER_PIN = process.env.SEED_OWNER_PIN || "2468";
+const STAFF_PIN = process.env.SEED_STAFF_PIN || "1357";
+
+async function tapPin(page: import("@playwright/test").Page, digits: string) {
+  for (const digit of digits) {
+    await page.getByRole("button", { name: digit, exact: true }).click({ timeout: 5000 });
+  }
+}
+
+async function settleAppLock(page: import("@playwright/test").Page) {
+  await page.evaluate(() => {
+    window.sessionStorage.setItem("app_pin_unlocked", "1");
+    window.sessionStorage.setItem("app_last_activity", String(Date.now()));
+  });
+  const choosePin = page.getByText(/Choose a PIN/i);
+  if (await choosePin.isVisible({ timeout: 1500 }).catch(() => false)) {
+    const pin = (await page.getByRole("heading").first().innerText()).includes("Jack") ? STAFF_PIN : OWNER_PIN;
+    for (let round = 0; round < 2; round++) {
+      for (const digit of pin) {
+        await page.getByRole("button", { name: digit, exact: true }).click({ timeout: 10000 });
+        await page.waitForTimeout(120);
+      }
+      await page.waitForTimeout(500);
+    }
+  }
+}
+
 const JACK_UNLOCK: [string, string][] = [
   ["ordering_method", "owner_approves"],
   ["receives_deliveries", "yes"],
@@ -58,19 +146,70 @@ const JACK_UNLOCK: [string, string][] = [
   ["portions", "measured"],
 ];
 
+async function completeJackQuestionnaire(page: import("@playwright/test").Page) {
+  const token = await page.evaluate(() => window.sessionStorage.getItem("access_token") || "");
+  for (const [question_id, value] of JACK_UNLOCK) {
+    const body: Record<string, unknown> = { question_id, value };
+    if (question_id === "supplier_list") {
+      body.suppliers = [{ name: "Fresh Farm", brings: "produce", arrival: "phone" }];
+    }
+    const response = await page.request.post(`${API_URL}/api/v1/staff-setup/questionnaire`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: body,
+    });
+    if (!response.ok() && response.status() !== 409) {
+      throw new Error(`questionnaire ${question_id}: ${response.status()} ${await response.text()}`);
+    }
+  }
+}
+
+async function answerVisibleQuestion(page: import("@playwright/test").Page): Promise<boolean> {
+  await page.waitForTimeout(350);
+  const saveSuppliers = page.getByRole("button", { name: /Save suppliers/i });
+  if (await saveSuppliers.isVisible().catch(() => false)) {
+    await page.locator("input").first().fill("Fresh Farm");
+    await saveSuppliers.click();
+    return true;
+  }
+  const knowsPayer = page.getByRole("button", { name: /I know who pays it/i });
+  if (await knowsPayer.isVisible().catch(() => false)) {
+    await knowsPayer.click();
+    return true;
+  }
+  const primary = page
+    .getByRole("button", {
+      name: /approve|Yes|I'll name|Main store|Chef signs|Before lunch|Owner|Daily with|I'll set each|Accountant pays|Yes — I'll name|Measured|no — I use photos/i,
+    })
+    .first();
+  if (await primary.isVisible().catch(() => false)) {
+    await primary.click();
+    return true;
+  }
+  return false;
+}
+
 async function login(page: import("@playwright/test").Page, email: string, password: string) {
   await page.goto(`${BASE_URL}/login`, { waitUntil: "domcontentloaded" });
   await page.locator('input[type="email"]').fill(email);
   await page.locator('input[type="password"]').fill(password);
+  const loginResponse = page.waitForResponse(
+    (r) => r.url().includes("/api/v1/auth/login") && r.request().method() === "POST",
+    { timeout: 30000 },
+  );
   await page.locator('button[type="submit"]').click();
-  const loginError = page.getByText(/incorrect email|temporarily locked/i);
-  const left = page.waitForURL((url) => !url.pathname.includes("/login"), { timeout: 25000 });
-  const failed = loginError.waitFor({ state: "visible", timeout: 25000 }).then(() => "error" as const);
-  const outcome = await Promise.race([left.then(() => "ok" as const), failed]);
-  if (outcome === "error") {
-    const msg = (await loginError.textContent())?.trim() || "login failed";
-    throw new Error(msg);
+  const response = await loginResponse;
+  if (!response.ok()) {
+    const body = await response.text();
+    throw new Error(body.slice(0, 200) || `login HTTP ${response.status()}`);
   }
+  await page.waitForURL((url) => !url.pathname.includes("/login"), { timeout: 30000 });
+  await page.waitForFunction(() => (window.sessionStorage.getItem("access_token") || "").length > 20, {
+    timeout: 15000,
+  });
+  await page.evaluate(() => {
+    window.sessionStorage.setItem("app_pin_unlocked", "1");
+    window.sessionStorage.setItem("app_last_activity", String(Date.now()));
+  });
 }
 
 async function assertNoRibs(page: import("@playwright/test").Page) {
@@ -83,22 +222,32 @@ async function assertNoRibs(page: import("@playwright/test").Page) {
   expect(bg.toLowerCase()).not.toContain("strip");
 }
 
+async function assertAuthedPage(page: import("@playwright/test").Page, key: (typeof TARGETS)[number]) {
+  expect(page.url(), `${key} should not be login`).not.toContain("/login");
+  const token = await page.evaluate(() => window.sessionStorage.getItem("access_token"));
+  expect(token && token.length > 20, `${key} missing access_token`).toBeTruthy();
+  const marker = PAGE_MARKERS[key];
+  if (marker) {
+    await expect(page.locator("body")).toContainText(marker, { timeout: 20000 });
+  }
+}
+
 test.describe.configure({ mode: "serial" });
 
 test("capture frontend-test screenshots", async () => {
   fs.mkdirSync(STATE_DIR, { recursive: true });
+  fs.mkdirSync(ARTIFACTS, { recursive: true });
+
+  for (const f of fs.readdirSync(ARTIFACTS)) {
+    if (!f.endsWith(".png")) continue;
+    const base = f.replace(/\.png$/, "");
+    if (!(TARGETS as readonly string[]).includes(base)) {
+      fs.unlinkSync(path.join(ARTIFACTS, f));
+    }
+  }
   for (const name of TARGETS) {
     const old = path.join(ARTIFACTS, `${name}.png`);
     if (fs.existsSync(old)) fs.unlinkSync(old);
-  }
-  for (const f of fs.readdirSync(ARTIFACTS)) {
-    if (f.endsWith("-login-failed.png") || f.startsWith("owner-") && !TARGETS.includes(f.replace(".png", "") as never)) {
-      try {
-        fs.unlinkSync(path.join(ARTIFACTS, f));
-      } catch {
-        /* ignore */
-      }
-    }
   }
 
   const browser = await chromium.launch();
@@ -106,85 +255,97 @@ test("capture frontend-test screenshots", async () => {
   const jackState = path.join(STATE_DIR, "jack.json");
   const aminaState = path.join(STATE_DIR, "amina.json");
 
-  async function contextWith(blockServiceWorker: boolean, storage?: string) {
+  for (const file of [ownerState, jackState, aminaState]) {
+    if (!stateLooksValid(file) && fs.existsSync(file)) fs.unlinkSync(file);
+  }
+
+  async function contextWith(storage?: string) {
     return browser.newContext({
       baseURL: BASE_URL,
       serviceWorkers: "block",
-      storageState: storage,
+      storageState: storage && fs.existsSync(storage) ? storage : undefined,
     });
   }
 
-  if (!fs.existsSync(ownerState)) {
-    const ctx = await contextWith(true);
+  if (!stateLooksValid(ownerState)) {
+    const ctx = await contextWith();
     const page = await ctx.newPage();
     await login(page, OWNER_EMAIL, OWNER_PASSWORD);
-    await ctx.storageState({ path: ownerState });
+    await saveSession(ownerState, page);
     await ctx.close();
   }
 
   {
-    const ctx = await contextWith(true, ownerState);
+    const ctx = await contextWith(ownerState);
     const page = await ctx.newPage();
+    await primeSession(page, ownerState);
     for (const key of ["owner-home", "owner-dishes", "owner-money", "owner-alerts", "owner-handover-timeline"] as const) {
-      await page.goto(ROUTES[key], { waitUntil: "networkidle" });
+      await page.goto(ROUTES[key], { waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(1200);
+      await settleAppLock(page);
+      await assertAuthedPage(page, key);
       await assertNoRibs(page);
-      await page.screenshot({ path: path.join(ARTIFACTS, `${key}.png`), fullPage: true });
+      await page.screenshot({ path: path.join(ARTIFACTS, `${key}.png`), fullPage: false, timeout: 15000 });
     }
     await ctx.close();
   }
 
-  if (!fs.existsSync(jackState)) {
-    const ctx = await contextWith(true);
+  if (!stateLooksValid(jackState)) {
+    const ctx = await contextWith();
     const page = await ctx.newPage();
     await login(page, JACK_EMAIL, STAFF_PASSWORD);
-    await ctx.storageState({ path: jackState });
+    await saveSession(jackState, page);
     await ctx.close();
   }
 
   {
-    const ctx = await contextWith(true, jackState);
+    const ctx = await contextWith(jackState);
     const page = await ctx.newPage();
-    await page.goto(ROUTES["jack-wizard-step-1"], { waitUntil: "networkidle" });
+    await primeSession(page, jackState);
+    await page.goto(ROUTES["jack-wizard-step-1"], { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1200);
+    await settleAppLock(page);
+    await assertAuthedPage(page, "jack-wizard-step-1");
     await assertNoRibs(page);
-    await page.screenshot({ path: path.join(ARTIFACTS, "jack-wizard-step-1.png"), fullPage: true });
+    await page.screenshot({ path: path.join(ARTIFACTS, "jack-wizard-step-1.png"), fullPage: false });
 
-    for (let i = 0; i < 24; i++) {
-      await page.waitForTimeout(400);
-      const primary = page.getByRole("button", { name: /approve|Yes|I'll name|Main store|Chef signs|Before lunch|no — I use photos|Owner|Daily with|I'll set each|Accountant pays|Yes — I'll name|Measured/i }).first();
-      const saveSuppliers = page.getByRole("button", { name: /Save suppliers/i });
-      if (await saveSuppliers.isVisible()) {
-        await page.locator('input').first().fill("Fresh Farm");
-        await saveSuppliers.click();
-        continue;
-      }
-      if (await primary.isVisible()) {
-        await primary.click();
-        continue;
-      }
-      break;
+    for (let i = 0; i < 40; i++) {
+      if (!(await answerVisibleQuestion(page))) break;
     }
-    await page.goto(ROUTES["jack-restock-whatsapp"], { waitUntil: "networkidle" });
+
+    await page.goto(ROUTES["jack-restock-whatsapp"], { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1200);
+    await settleAppLock(page);
+    await assertAuthedPage(page, "jack-restock-whatsapp");
     await assertNoRibs(page);
-    await page.screenshot({ path: path.join(ARTIFACTS, "jack-restock-whatsapp.png"), fullPage: true });
-    await page.goto(ROUTES["store-prep-list"], { waitUntil: "networkidle" });
-    await page.screenshot({ path: path.join(ARTIFACTS, "store-prep-list.png"), fullPage: true });
+    await page.screenshot({ path: path.join(ARTIFACTS, "jack-restock-whatsapp.png"), fullPage: false });
+    await page.goto(ROUTES["store-prep-list"], { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1200);
+    await settleAppLock(page);
+    await assertAuthedPage(page, "store-prep-list");
+    await assertNoRibs(page);
+    await page.screenshot({ path: path.join(ARTIFACTS, "store-prep-list.png"), fullPage: false });
     await ctx.close();
   }
 
-  if (!fs.existsSync(aminaState)) {
-    const ctx = await contextWith(true);
+  if (!stateLooksValid(aminaState)) {
+    const ctx = await contextWith();
     const page = await ctx.newPage();
     await login(page, AMINA_EMAIL, STAFF_PASSWORD);
-    await ctx.storageState({ path: aminaState });
+    await saveSession(aminaState, page);
     await ctx.close();
   }
 
   {
-    const ctx = await contextWith(true, aminaState);
+    const ctx = await contextWith(aminaState);
     const page = await ctx.newPage();
-    await page.goto(ROUTES["accountant-invoice-prices"], { waitUntil: "networkidle" });
+    await primeSession(page, aminaState);
+    await page.goto(ROUTES["accountant-invoice-prices"], { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1200);
+    await settleAppLock(page);
+    await assertAuthedPage(page, "accountant-invoice-prices");
     await assertNoRibs(page);
-    await page.screenshot({ path: path.join(ARTIFACTS, "accountant-invoice-prices.png"), fullPage: true });
+    await page.screenshot({ path: path.join(ARTIFACTS, "accountant-invoice-prices.png"), fullPage: false });
     await ctx.close();
   }
 

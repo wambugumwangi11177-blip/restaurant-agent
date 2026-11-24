@@ -348,10 +348,18 @@ def sync_test_stack_credentials(db: Session) -> list[str]:
         if email == OWNER_EMAIL and owner_pass:
             user.hashed_password = auth.get_password_hash(owner_pass)
             user.must_change_password = False
+            pin = os.getenv("SEED_OWNER_PIN", "2468")
+            if not user.hashed_pin:
+                user.hashed_pin = auth.get_pin_hash(pin)
+                log.append("[SYNC] owner app PIN for test unlock")
             log.append("[SYNC] owner password from SEED_OWNER_PASSWORD")
         elif staff_pass:
             user.hashed_password = auth.get_password_hash(staff_pass)
             user.must_change_password = False
+            pin = os.getenv("SEED_STAFF_PIN", "1357")
+            if not user.hashed_pin:
+                user.hashed_pin = auth.get_pin_hash(pin)
+                log.append(f"[SYNC] app PIN for {email}")
             log.append(f"[SYNC] password for {email}")
     if log:
         db.commit()

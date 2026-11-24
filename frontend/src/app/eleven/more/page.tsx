@@ -8,7 +8,8 @@ import { posHasLiveData } from "@/lib/posLive";
 const CORE_LINKS = [
   { href: "/eleven/staff", title: "Staff", desc: "Logins and setup progress" },
   { href: "/eleven/import", title: "Import", desc: "Bring in items, suppliers, recipes, and an opening count" },
-  { href: "/eleven/deliveries", title: "Deliveries", desc: "Photos, AI mismatches, and invoice prices" },
+  { href: "/eleven/deliveries", title: "Deliveries", desc: "Photos, mismatches, and invoice prices" },
+  { href: "/eleven/handovers", title: "Handovers", desc: "Store to kitchen with photos" },
   { href: "/eleven/approvals", title: "Approvals", desc: "What is waiting, and what you already decided" },
   { href: "/eleven/activity", title: "Activity", desc: "The day, by person and type" },
   { href: "/eleven/settings", title: "Permits & Settings", desc: "Licences and your thresholds" },

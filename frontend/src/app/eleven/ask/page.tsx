@@ -107,7 +107,7 @@ export default function ElevenAskPage() {
           </button>
         ))}
       </div>
-      <p className="mt-4 text-[10px] font-bold uppercase tracking-widest text-zinc-500">Written by AI · grounded in your data</p>
+      <p className="mt-4 text-[10px] uppercase tracking-widest text-zinc-500">Grounded in your records</p>
     </OwnerShell>
   );
 }

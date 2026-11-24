@@ -17,6 +17,18 @@ _FLOOR = (
 )
 
 
+@router.get("/list")
+async def dated_prep_list(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_staff_role(*_FLOOR)),
+):
+    """Dated prep list: usual plates × recipe yield."""
+    restaurant = get_or_create_restaurant(db, current_user)
+    from services.prep_suggest import prep_list_dated
+
+    return prep_list_dated(db, restaurant.id)
+
+
 @router.get("")
 async def today_prep(
     db: Session = Depends(get_db),

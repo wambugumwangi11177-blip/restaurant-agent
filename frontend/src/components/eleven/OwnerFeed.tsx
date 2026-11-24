@@ -330,7 +330,7 @@ export default function OwnerFeed({
                     </button>
                     {event.working_alone && <p className="mt-1 text-[11px] uppercase tracking-wide text-zinc-400">Working alone</p>}
                     {event.ai?.note && (
-                      <p className="mt-1 inline-flex rounded-full border border-white/20 px-2 py-0.5 text-[11px] text-zinc-300">AI · {event.ai.note}</p>
+                      <p className="mt-1 inline-flex rounded-full border border-white/20 px-2 py-0.5 text-[11px] text-zinc-300">Photo check · {event.ai.note}</p>
                     )}
                   </div>
                   {event.photo_path && (

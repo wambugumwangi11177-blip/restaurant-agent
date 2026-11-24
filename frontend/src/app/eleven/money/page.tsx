@@ -9,7 +9,10 @@ import { useOwnerFeed } from "@/components/eleven/OwnerFeed";
 type Pnl = {
   has_sales: boolean;
   revenue_cents?: number;
-  margin_cents?: number;
+  food_cost_cents?: number;
+  bills_cents?: number;
+  labor_cents?: number;
+  net_cents?: number;
   margin_pct?: number;
   message?: string;
 };
@@ -28,15 +31,19 @@ export default function ElevenMoneyPage() {
       {data && (
         <>
           <SolidNumberCard
-            title="What you kept this month"
+            title="P&L (last 30 days)"
             body={
               pnl?.has_sales
-                ? `${((pnl.margin_cents ?? 0) / 100).toLocaleString("en-KE")} KES margin (${pnl.margin_pct ?? "—"}%)`
+                ? `Net ${((pnl.net_cents ?? 0) / 100).toLocaleString("en-KE")} KES after food, bills, pay`
                 : data.till_live
                   ? "Till is live"
                   : "Waiting for the till"
             }
-            hint={pnl?.message || money?.sentence}
+            hint={
+              pnl?.has_sales
+                ? `Sales ${((pnl.revenue_cents ?? 0) / 100).toLocaleString()} · food ${((pnl.food_cost_cents ?? 0) / 100).toLocaleString()} · bills ${((pnl.bills_cents ?? 0) / 100).toLocaleString()} · pay ${((pnl.labor_cents ?? 0) / 100).toLocaleString()}`
+                : pnl?.message || money?.sentence
+            }
           />
           <SectionLabel>Approved bills</SectionLabel>
           <GlassCard>

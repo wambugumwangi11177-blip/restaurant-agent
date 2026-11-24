@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import OwnerShell from "@/components/eleven/OwnerShell";
 import { useOwnerFeed, type FeedEvent } from "@/components/eleven/OwnerFeed";
+import api from "@/lib/api";
 
 function AlertRow({ title, detail, href }: { title: string; detail?: string; href?: string }) {
   return (
@@ -24,6 +26,11 @@ function mismatchAlerts(events: FeedEvent[]) {
 
 export default function ElevenAlertsPage() {
   const { data, error } = useOwnerFeed();
+  const [rules, setRules] = useState<{ headline?: string; rule_id?: string }[]>([]);
+
+  useEffect(() => {
+    api.get("/api/v1/eleven/outcomes/alerts").then((r) => setRules(r.data.custody_gaps ?? r.data.rules ?? [])).catch(() => undefined);
+  }, []);
   return (
     <OwnerShell title="Alerts">
       <p className="mb-3 text-xs text-zinc-400">Stock, waste, bills, and photo checks that need your attention.</p>
@@ -61,11 +68,14 @@ export default function ElevenAlertsPage() {
                 href={c.id === "money" ? "/eleven/money" : c.id === "stock" ? "/eleven/stock" : "/eleven/approvals"}
               />
             ))}
+          {rules.map((r) => (
+            <AlertRow key={r.rule_id + (r.headline || "")} title={r.headline || "Needs a look"} href="/eleven/approvals" />
+          ))}
           {mismatchAlerts(data.events).map((item) => (
             <AlertRow
               key={`ai-${item.kind}-${item.id}`}
               title={item.headline || "Photo check mismatch"}
-              detail={`AI · ${item.ai?.note}`}
+              detail={item.ai?.note || "Photo check mismatch"}
               href={item.kind === "delivery" ? "/eleven/deliveries" : "/eleven/activity"}
             />
           ))}

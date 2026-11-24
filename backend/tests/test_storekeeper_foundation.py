@@ -44,6 +44,17 @@ def _unlock(client, jack):
     for question_id, value, suppliers in steps:
         response = _answer(client, jack, question_id, value, suppliers)
         assert response.status_code == 200, response.text
+    setup = client.get("/api/v1/staff-setup", headers=_auth(_token(jack))).json()
+    answered = {a["question_id"] for a in (setup.get("answers") or [])}
+    for step in setup.get("steps") or []:
+        for q in step.get("questions") or []:
+            if q["id"] in answered:
+                continue
+            picks = q.get("answers") or []
+            if not picks:
+                continue
+            val = picks[0].get("value", "yes")
+            _answer(client, jack, q["id"], val)
 
 
 def _tenant(db, name, email, role=models.Role.ADMIN, staff_role=models.StaffRole.OWNER, password="Ownerpass1"):

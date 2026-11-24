@@ -101,6 +101,8 @@ def _redact_credentials(value: str) -> str:
 # order is a kitchen question. tests/test_os_question_routing.py pins every
 # built-in question and names the ones with more than one defensible answer.
 _ROUTING_RULES: list[tuple[str, tuple[str, ...]]] = [
+    ("records", ("bill", "bills", "handover", "delivery mismatch", "delivery photo",
+                 "mismatch", "waiting on me", "invoice photo")),
     ("stock", ("run out", "running out", "about to run out", "stock", "stock-out", "waste",
                "wastage", "wasting", "reorder", "re-order", "expir", "spoil", "inventory",
                "low stock", "shortage", "ingredient")),
@@ -418,6 +420,56 @@ def _answer_profit(db: Session, rid: int, q: str) -> dict:
             "module": "profit", "steps": steps, "data": {}}
 
 
+def _answer_records(db: Session, rid: int, q: str) -> dict:
+    bills = (
+        db.query(models.RunningCost)
+        .filter(models.RunningCost.restaurant_id == rid, models.RunningCost.status == "needs_approval")
+        .limit(8)
+        .all()
+    )
+    mismatches = (
+        db.query(models.DeliveryVisionCheck)
+        .join(models.DeliveryReceipt, models.DeliveryReceipt.id == models.DeliveryVisionCheck.receipt_id)
+        .filter(
+            models.DeliveryReceipt.restaurant_id == rid,
+            models.DeliveryVisionCheck.status == "mismatch",
+        )
+        .count()
+    )
+    handovers = (
+        db.query(models.KitchenHandover)
+        .filter(models.KitchenHandover.restaurant_id == rid)
+        .order_by(models.KitchenHandover.id.desc())
+        .limit(5)
+        .all()
+    )
+    steps = []
+    if bills:
+        finding = f"{len(bills)} bill(s) waiting for approval."
+        for b in bills[:4]:
+            steps.append({"action": b.label or b.kind, "why": "Needs approval before it counts in P&L."})
+    elif mismatches:
+        finding = f"{mismatches} delivery photo check(s) need a look."
+        steps.append({"action": "Open deliveries", "why": "Counted qty or photo did not match."})
+    elif handovers:
+        finding = f"Latest kitchen handover: {len(handovers)} on record."
+        for h in handovers[:3]:
+            steps.append({"action": f"Handover #{h.id}", "why": "Store to kitchen with photo."})
+    else:
+        finding = "No pending bills, delivery mismatches, or handover issues in the last records."
+        steps = []
+    why = "From approved bills, delivery vision checks, and kitchen handovers — not a forecast."
+    return {
+        "finding": finding,
+        "why": why,
+        "impact": "—",
+        "recommendation": "Open Approvals or Deliveries for details.",
+        "module": "records",
+        "steps": steps,
+        "data": {"narrative_allowed": False},
+    }
+
+
 def _answer_ops(db: Session, rid: int, q: str) -> dict:
     from ai.ops_manager import get_operations_dashboard
     d = get_operations_dashboard(db, rid)
@@ -437,6 +489,7 @@ def _answer_ops(db: Session, rid: int, q: str) -> dict:
 
 
 _HANDLERS = {
+    "records": _answer_records,
     "stock": _answer_stock,
     "revenue": _answer_revenue,
     "bookings": _answer_bookings,

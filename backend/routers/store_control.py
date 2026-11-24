@@ -131,7 +131,7 @@ def _feed_ai(ai) -> dict | None:
     note = str(ai.get("note") or "").strip()
     if status not in ("match", "mismatch") or not note or note.lower() == "ai check unavailable":
         return None
-    return {"label": "AI", "status": status, "note": note}
+    return {"label": "Photo check", "status": status, "note": note}
 
 
 def _action_label(item: dict) -> str:

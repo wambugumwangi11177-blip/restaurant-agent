@@ -22,8 +22,8 @@ def test_specific_terms_route_to_the_right_module(question: str, expected: str):
     assert _route(question) == expected
 
 
-def test_delivery_mismatch_question_routes_to_stock_or_ops():
-    assert _route("Any delivery photo mismatches I should know about?") in {"stock", "ops"}
+def test_delivery_mismatch_question_routes_to_records():
+    assert _route("Any delivery photo mismatches I should know about?") == "records"
 
 
 def test_an_unmatched_question_falls_back_to_general_operations():

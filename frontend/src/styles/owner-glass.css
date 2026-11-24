@@ -14,7 +14,7 @@
   --og-radius: 24px;
   --og-nav: 72px;
   --og-nav-inset: max(0.75rem, env(safe-area-inset-bottom, 0px));
-  --og-nav-clearance: calc(var(--og-nav) + var(--og-nav-inset) + 10rem);
+  --og-nav-clearance: calc(var(--og-nav) + var(--og-nav-inset) + 12rem);
   min-height: 100vh;
   color: var(--og-text);
   background: var(--og-bg);
@@ -287,7 +287,7 @@ html[data-leviii-apk] .owner-oat-highlight {
   .owner-nav.owner-glass-panel {
     backdrop-filter: blur(28px) saturate(1.35);
     -webkit-backdrop-filter: blur(28px) saturate(1.35);
-    background: color-mix(in srgb, var(--og-glass-solid) 92%, black);
+    background: color-mix(in srgb, var(--og-glass-solid) 97%, black);
   }
 }
 
@@ -304,7 +304,7 @@ html[data-leviii-apk] .owner-oat-highlight {
 
 @media (max-width: 767px) {
   .owner-main-pad {
-    padding-bottom: calc(var(--og-nav) + var(--og-nav-inset) + 9.5rem);
+    padding-bottom: calc(var(--og-nav) + var(--og-nav-inset) + 11.5rem);
     padding-top: 1.25rem;
   }
 }

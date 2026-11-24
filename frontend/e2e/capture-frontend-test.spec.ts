@@ -285,8 +285,8 @@ test("capture frontend-test screenshots", async () => {
       await page.waitForTimeout(1200);
       await settleAppLock(page);
       if (key === "owner-handover-timeline") {
-        await page.locator("li img").first().waitFor({ state: "visible", timeout: 10000 }).catch(() => undefined);
-        await page.waitForTimeout(400);
+        await page.locator("li img").first().waitFor({ state: "visible", timeout: 15000 });
+        await page.waitForTimeout(800);
       }
       await assertAuthedPage(page, key);
       await assertNoRibs(page);

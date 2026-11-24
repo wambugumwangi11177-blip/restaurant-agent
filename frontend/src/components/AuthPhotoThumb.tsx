@@ -6,7 +6,7 @@ import api from "@/lib/api";
 export default function AuthPhotoThumb({
   path,
   className = "h-16 w-16 rounded-lg object-cover ring-1 ring-white/10",
-  largeClassName = "mt-2 max-h-40 rounded-xl border border-white/10",
+  largeClassName = "mt-2 h-36 w-full max-h-48 rounded-xl border border-white/10 object-cover",
   large,
 }: {
   path: string;

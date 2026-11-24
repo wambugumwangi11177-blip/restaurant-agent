@@ -8,16 +8,27 @@ import api from "@/lib/api";
 const LOGIN_ROLES = ["manager", "stockkeeper", "controller"];
 const ROSTER_ROLES = ["waiter", "kitchen", "supervisor", "host", "runner"];
 
+type SetupAnswer = {
+  question_id: string;
+  label: string;
+  value: string;
+  delegated?: boolean;
+};
+
 type Person = {
   user_id: number;
   email: string;
   name?: string;
   staff_role: string | null;
   account: string;
+  answers?: SetupAnswer[];
+  questionnaire?: string;
+  routing_mode?: string;
 };
 
 export default function ElevenStaffPage() {
   const [people, setPeople] = useState<Person[]>([]);
+  const [routingMode, setRoutingMode] = useState<string | null>(null);
   const [roster, setRoster] = useState<{ id: number; name: string; role_title: string }[]>([]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -35,6 +46,7 @@ export default function ElevenStaffPage() {
       api.get("/api/v1/team/roster"),
     ]);
     setPeople(activity.data.people ?? []);
+    setRoutingMode(activity.data.routing_mode ?? null);
     setRoster(rosterRes.data ?? []);
   }
 
@@ -175,7 +187,12 @@ export default function ElevenStaffPage() {
         </ul>
       )}
 
-      <SectionLabel>Store setup logins</SectionLabel>
+      <SectionLabel>Store setup answers</SectionLabel>
+      {routingMode && (
+        <p className="mb-2 text-sm text-zinc-400">
+          Restock routing: <span className="text-zinc-200">{routingMode.replace(/_/g, " ")}</span>
+        </p>
+      )}
       {people.length === 0 ? (
         <GlassCard>
           <p className="text-sm text-zinc-300">No storekeeper setup record yet.</p>
@@ -185,7 +202,18 @@ export default function ElevenStaffPage() {
           {people.map((person) => (
             <li key={person.user_id} className="owner-glass-panel rounded-3xl p-4 text-sm">
               <p className="font-medium">{person.name || person.email}</p>
-              <p className="text-zinc-400">{person.staff_role}</p>
+              <p className="text-zinc-400 capitalize">{person.staff_role} · questionnaire {person.questionnaire ?? "pending"}</p>
+              {(person.answers ?? []).length > 0 && (
+                <ul className="mt-3 space-y-1 border-t border-white/10 pt-3 text-zinc-300">
+                  {person.answers!.map((answer) => (
+                    <li key={answer.question_id}>
+                      <span className="text-zinc-500">{answer.question_id.replace(/_/g, " ")}:</span>{" "}
+                      {answer.label || answer.value}
+                      {answer.delegated ? " (sent to owner)" : ""}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
         </ul>

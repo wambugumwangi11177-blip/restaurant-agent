@@ -2,11 +2,26 @@
 
 import OwnerShell from "@/components/eleven/OwnerShell";
 import { GlassCard, SectionLabel, SolidNumberCard, WaitingNotice } from "@/components/eleven/EmptyPanels";
+import { useEffect, useState } from "react";
+import api from "@/lib/api";
 import { useOwnerFeed } from "@/components/eleven/OwnerFeed";
+
+type Pnl = {
+  has_sales: boolean;
+  revenue_cents?: number;
+  margin_cents?: number;
+  margin_pct?: number;
+  message?: string;
+};
 
 export default function ElevenMoneyPage() {
   const { data, error } = useOwnerFeed();
   const money = data?.cards?.find((card) => card.id === "money");
+  const [pnl, setPnl] = useState<Pnl | null>(null);
+
+  useEffect(() => {
+    api.get("/api/v1/eleven/money/pnl").then((r) => setPnl(r.data)).catch(() => undefined);
+  }, []);
   return (
     <OwnerShell title="My Money">
       {!data && !error && <p className="text-sm text-zinc-400">Loading…</p>}
@@ -14,8 +29,14 @@ export default function ElevenMoneyPage() {
         <>
           <SolidNumberCard
             title="What you kept this month"
-            body={data.till_live ? "Till is live" : "Waiting for the till"}
-            hint={money?.sentence}
+            body={
+              pnl?.has_sales
+                ? `${((pnl.margin_cents ?? 0) / 100).toLocaleString("en-KE")} KES margin (${pnl.margin_pct ?? "—"}%)`
+                : data.till_live
+                  ? "Till is live"
+                  : "Waiting for the till"
+            }
+            hint={pnl?.message || money?.sentence}
           />
           <SectionLabel>Approved bills</SectionLabel>
           <GlassCard>

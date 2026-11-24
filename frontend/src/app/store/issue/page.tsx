@@ -25,18 +25,21 @@ export default function IssuePage() {
   const [photo, setPhoto] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
+  const [prep, setPrep] = useState<{ dish: string; ingredients?: { ingredient: string; quantity: number; unit: string }[] }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadSetup().then(async (next) => {
       setSetup(next);
       if (!hasModule(next, "store-issue")) return;
-      const [itemResponse, chefResponse] = await Promise.all([
+      const [itemResponse, chefResponse, prepResponse] = await Promise.all([
         api.get("/api/v1/store/items"),
         api.get("/api/v1/store/chefs"),
+        api.get("/api/v1/store/prep").catch(() => ({ data: { items: [] } })),
       ]);
       setItems(itemResponse.data.items ?? []);
       setChefs(chefResponse.data.chefs ?? []);
+      setPrep(prepResponse.data.items ?? []);
     }).catch(() => setError("This page could not be loaded.")).finally(() => setLoading(false));
   }, []);
 
@@ -83,6 +86,23 @@ export default function IssuePage() {
 
   return (
     <form onSubmit={save} className="owner-glass-panel space-y-3 rounded-3xl p-4">
+      {prep.length > 0 && (
+        <section className="rounded-2xl border border-white/10 bg-black/30 p-3">
+          <h2 className="text-sm font-medium text-zinc-200">Suggested prep for today</h2>
+          <ul className="mt-2 space-y-1 text-sm text-zinc-400">
+            {prep.map((row) => (
+              <li key={row.dish}>
+                <span className="text-zinc-200">{row.dish}</span>
+                {(row.ingredients ?? []).map((ing) => (
+                  <span key={ing.ingredient} className="ml-1">
+                    · {ing.quantity} {ing.unit} {ing.ingredient}
+                  </span>
+                ))}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <p className="text-sm text-zinc-300">Pick the items and quantities. The person who takes the goods types their PIN on this phone and photographs what they received.</p>
       {items.length === 0 && <p className="text-sm text-zinc-400">Nothing is in the main store yet.</p>}
       {lines.map((line) => (

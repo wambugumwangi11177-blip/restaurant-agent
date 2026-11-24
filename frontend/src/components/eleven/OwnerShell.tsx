@@ -17,7 +17,7 @@ const NAV = [
     icon: MoreHorizontal,
     match: (p: string) =>
       p.startsWith("/eleven/more") ||
-      ["/eleven/sales-dishes", "/eleven/cash-check", "/eleven/staff", "/eleven/settings", "/eleven/ask", "/eleven/reports", "/eleven/alerts", "/eleven/approvals", "/eleven/activity", "/eleven/deliveries", "/eleven/import", "/eleven/settings/team-rules"].some(
+      ["/eleven/dishes", "/eleven/sales-dishes", "/eleven/cash-check", "/eleven/staff", "/eleven/settings", "/eleven/ask", "/eleven/reports", "/eleven/alerts", "/eleven/approvals", "/eleven/activity", "/eleven/deliveries", "/eleven/import", "/eleven/settings/team-rules"].some(
         (x) => p.startsWith(x),
       ),
   },

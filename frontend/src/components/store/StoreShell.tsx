@@ -11,9 +11,19 @@ import "@/styles/owner-glass.css";
 const NAV = [
   { href: "/store", label: "Shift", icon: Home, match: (p: string) => p === "/store" || p.startsWith("/store/questions") },
   { href: "/store/deliveries", label: "In", icon: Truck, match: (p: string) => p.startsWith("/store/deliveries") || p.startsWith("/store/suppliers") || p.startsWith("/store/invoice-prices") },
-  { href: "/store/stock", label: "Stock", icon: Package, match: (p: string) => ["/store/stock", "/store/issue", "/store/waste", "/store/close", "/store/chefs"].some((prefix) => p.startsWith(prefix)) },
+  { href: "/store/stock", label: "Stock", icon: Package, match: (p: string) => ["/store/stock", "/store/issue", "/store/waste", "/store/close", "/store/chefs", "/store/restock", "/store/prep"].some((prefix) => p.startsWith(prefix)) },
   { href: "/store/team", label: "Team", icon: Users, match: (p: string) => p.startsWith("/store/team") || p.startsWith("/store/schedule") },
-  { href: "/store/account", label: "Me", icon: UserRound, match: (p: string) => p.startsWith("/store/account") || p.startsWith("/store/costs") || p.startsWith("/store/recipes") || p.startsWith("/store/requests") },
+  {
+    href: "/store/account",
+    label: "Me",
+    icon: UserRound,
+    match: (p: string) =>
+      p.startsWith("/store/account") ||
+      p.startsWith("/store/costs") ||
+      p.startsWith("/store/recipes") ||
+      p.startsWith("/store/requests") ||
+      p.startsWith("/store/invoice-prices"),
+  },
 ] as const;
 
 export default function StoreShell({

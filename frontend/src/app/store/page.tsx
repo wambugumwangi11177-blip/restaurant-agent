@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { CustodyDiagram } from "@/components/store/diagrams";
 import { hasModule, loadSetup, type SetupPayload } from "@/lib/storeSetup";
 
 export default function StoreHomePage() {
@@ -15,15 +14,12 @@ export default function StoreHomePage() {
 
   return (
     <div className="space-y-4">
-      <section className="owner-glass-panel p-5">
-        <h2 className="text-xl font-light tracking-wide text-[var(--text)]">How a delivery is kept</h2>
-        <p className="mt-2 text-sm leading-6 text-zinc-400">
-          Photograph the invoice and the goods, then key the quantities. Prices stay with the owner.
-        </p>
-        <div className="owner-glass-inner mt-4">
-          <CustodyDiagram />
-        </div>
-      </section>
+      {!setup?.app_unlocked && (
+        <section className="owner-glass-panel p-5">
+          <h2 className="text-xl font-light tracking-wide text-[var(--text)]">Before the floor</h2>
+          <p className="mt-2 text-sm leading-6 text-zinc-400">Answer the setup questions first — then today&apos;s shift checklist opens here.</p>
+        </section>
+      )}
       {setup?.stock_followup?.status === "waiting_on_pos" && (
         <section className="owner-glass-panel rounded-3xl p-4">
           <h2 className="font-semibold">Stock</h2>

@@ -96,7 +96,7 @@ export default function DeliveryPriceConfirm() {
                     className="leviii-btn-ghost min-h-11 px-3"
                     onClick={() => showPhoto(delivery.id, photo)}
                   >
-                    {photo.kind === "invoice" ? "Invoice" : "Goods"}
+                    {photo.kind === "invoice" ? "View invoice photo" : "Goods"}
                   </button>
                 ))}
               </div>

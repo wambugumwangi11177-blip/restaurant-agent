@@ -310,9 +310,7 @@ test("capture frontend-test screenshots", async () => {
     await assertNoRibs(page);
     await page.screenshot({ path: path.join(ARTIFACTS, "jack-wizard-step-1.png"), fullPage: false });
 
-    for (let i = 0; i < 40; i++) {
-      if (!(await answerVisibleQuestion(page))) break;
-    }
+    await completeJackQuestionnaire(page);
 
     await page.goto(ROUTES["jack-restock-whatsapp"], { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1200);

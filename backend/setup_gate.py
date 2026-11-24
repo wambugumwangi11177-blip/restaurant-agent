@@ -21,6 +21,7 @@ _ACCOUNT_ONLY = (
 
 _SETUP_ONLY = _ACCOUNT_ONLY + (
     ("POST", "/staff-setup/questionnaire"),
+    ("POST", "/staff-setup/questionnaire/reset-self"),
     ("POST", "/staff-setup/opening-profile"),
     ("GET", "/staff-setup/questions"),
 )

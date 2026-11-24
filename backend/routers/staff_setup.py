@@ -512,6 +512,10 @@ async def setup_activity(
             "answers": [
                 {
                     "question_id": answer.question_id,
+                    "prompt": next(
+                        (q["prompt"] for q in load_questions()["questions"] if q["id"] == answer.question_id),
+                        answer.question_id.replace("_", " "),
+                    ),
                     "value": answer.value,
                     "label": answer.label,
                     "delegated": bool(answer.delegated),

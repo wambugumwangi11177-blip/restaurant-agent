@@ -10,9 +10,11 @@ const ROSTER_ROLES = ["waiter", "kitchen", "supervisor", "host", "runner"];
 
 type SetupAnswer = {
   question_id: string;
+  prompt?: string;
   label: string;
   value: string;
   delegated?: boolean;
+  delegate_to?: string | null;
 };
 
 type Person = {
@@ -207,9 +209,13 @@ export default function ElevenStaffPage() {
                 <ul className="mt-3 space-y-1 border-t border-white/10 pt-3 text-zinc-300">
                   {person.answers!.map((answer) => (
                     <li key={answer.question_id}>
-                      <span className="text-zinc-500">{answer.question_id.replace(/_/g, " ")}:</span>{" "}
-                      {answer.label || answer.value}
-                      {answer.delegated ? " (sent to owner)" : ""}
+                      <p className="text-zinc-400">{answer.prompt ?? answer.question_id.replace(/_/g, " ")}</p>
+                      <p className="text-zinc-200">
+                        {answer.label || answer.value}
+                        {answer.delegated
+                          ? ` (sent to ${answer.delegate_to === "accountant" ? "accountant" : "owner"})`
+                          : ""}
+                      </p>
                     </li>
                   ))}
                 </ul>

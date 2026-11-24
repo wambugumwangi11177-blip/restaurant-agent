@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AuthPhotoThumb from "@/components/AuthPhotoThumb";
 import OwnerShell from "@/components/eleven/OwnerShell";
 import api from "@/lib/api";
 
 type Handover = {
   id: number;
   created_at: string;
+  when_label?: string | null;
   person_name: string;
   chef_name: string;
   has_photo: boolean;
@@ -28,13 +30,11 @@ export default function HandoverTimelinePage() {
         {rows.map((h) => (
           <li key={h.id} className="owner-glass-panel rounded-2xl p-4 text-sm">
             <p className="font-medium">{h.person_name} → {h.chef_name}</p>
-            <p className="text-zinc-500">{h.created_at}</p>
+            <p className="text-zinc-500">{h.when_label || h.created_at}</p>
             <p className="mt-1 text-zinc-300">
               {h.lines.map((l) => `${l.quantity} ${l.unit} ${l.item_name}`).join(", ")}
             </p>
-            {h.has_photo && h.photo_path && (
-              <img src={h.photo_path} alt="Handover" className="mt-2 max-h-40 rounded-xl border border-white/10" />
-            )}
+            {h.has_photo && h.photo_path && <AuthPhotoThumb path={h.photo_path} large />}
           </li>
         ))}
         {rows.length === 0 && <li className="text-zinc-400">No handovers yet.</li>}

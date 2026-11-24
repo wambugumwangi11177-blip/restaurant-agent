@@ -338,6 +338,9 @@ def _handover_public(db, handover: models.KitchenHandover, viewer: models.User) 
         .first()
     )
     who = person_of(db, creator)
+    from services.approval_workflow import format_relative_nairobi
+
+    created_at = _when(handover.created_at)
     body = {
         "id": handover.id,
         "chef_name": chef.name if chef else None,
@@ -345,7 +348,8 @@ def _handover_public(db, handover: models.KitchenHandover, viewer: models.User) 
         "person_name": who["person_name"],
         "person_email": who["person_email"],
         "initial": who["initial"],
-        "created_at": _when(handover.created_at),
+        "created_at": created_at,
+        "when_label": format_relative_nairobi(created_at),
         "photo_path": f"/api/v1/store/handovers/{handover.id}/photo" if handover.photo_storage_key else None,
         "has_photo": bool(handover.photo_storage_key),
         "lines": [
@@ -622,7 +626,8 @@ async def handover_photo(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    require_store_role(current_user)
+    if not _owner(current_user):
+        require_store_role(current_user)
     restaurant = get_or_create_restaurant(db, current_user)
     row = db.query(models.KitchenHandover).filter(
         models.KitchenHandover.id == handover_id,
@@ -1129,6 +1134,12 @@ async def list_approvals(
             actor = "stockkeeper"
         elif mode == "flag_office":
             actor = "controller"
+        requester = (
+            db.query(models.User).filter(models.User.id == row.requested_by_user_id).first()
+            if row.requested_by_user_id
+            else None
+        )
+        who_req = person_of(db, requester)
         events.append({
             "id": row.id,
             "kind": "restock",
@@ -1139,7 +1150,9 @@ async def list_approvals(
             "headline": f"Restock {row.quantity_ordered:g} {row.unit} {item_name}".strip(),
             "action": f"Approve restock for {item_name}",
             "created_at": _when(row.ordered_at),
-            "person_name": "Manager",
+            "person_name": who_req["person_name"],
+            "person_email": who_req.get("person_email"),
+            "initial": who_req.get("initial"),
             "actor_staff_role": actor,
             "requester_user_id": row.requested_by_user_id,
         })

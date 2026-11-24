@@ -17,6 +17,18 @@ from staff_audit import record_entry
 
 logger = logging.getLogger("leviii_test_seed")
 
+# Minimal valid JPEG (1×1) for demo evidence photos in test stacks.
+_DEMO_JPEG = bytes.fromhex(
+    "ffd8ffe000104a46494600010100000100010000ffdb004300080606070605080707"
+    "070909080a0c140d0c0b0b0c1912130f141d1a1f1e1d1a1c1c20242e2720222c231c"
+    "1c2837292c30313434341f27393d38323c2e333432ffdb0043010909090c0b0c180d"
+    "0d1832211c2132323232323232323232323232323232323232323232323232323232"
+    "323232323232323232ffc0001108000100010101110002110001031100ffc400150001"
+    "0100000000000000000000000000040302ffc4001411010000000000000000000000"
+    "00000000ffc400140101000000000000000000000000000000ffc400141101000000"
+    "0000000000000000000000000000ffda000c030100021003100000015402ffc4d9"
+)
+
 ELEVEN = "Eleven"
 TEST_TENANT = "Test Restaurant"
 SUPERADMIN_EMAIL = "wambugu@leviii.ai"
@@ -207,8 +219,8 @@ def ensure_eleven_test_data(
         .first()
     )
     supplier = db.query(models.Supplier).filter(models.Supplier.restaurant_id == restaurant.id).first()
-    if rice and supplier and rice.default_supplier_id is None:
-        rice.cost_per_unit = 120
+    if rice and supplier:
+        rice.cost_per_unit = 560
         rice.default_supplier_id = supplier.id
         rice.par_level = 20
         rice.low_stock_threshold = 5
@@ -224,7 +236,7 @@ def ensure_eleven_test_data(
             name="Pilau (demo)",
             category="Kitchen",
             price=45000,
-            cost_price=0,
+            cost_price=14000,
         )
         db.add(pilau)
         db.flush()
@@ -432,9 +444,11 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
             rent.next_due_on = today + timedelta(days=2)
             rent.payment_state = rent.payment_state or "unpaid"
 
-    if jack and rice and not db.query(models.KitchenHandover).filter(
-        models.KitchenHandover.restaurant_id == restaurant.id,
-    ).first():
+    import hashlib
+
+    import storage
+
+    if jack and rice:
         chef = db.query(models.StoreChef).filter(models.StoreChef.restaurant_id == restaurant.id).first()
         if chef is None:
             chef = models.StoreChef(
@@ -445,27 +459,83 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
             )
             db.add(chef)
             db.flush()
-        handover = models.KitchenHandover(
-            restaurant_id=restaurant.id,
-            created_by_user_id=jack.id,
-            chef_id=chef.id,
-            photo_storage_key=f"handovers/{restaurant.id}/demo-handover.jpg",
-            photo_content_type="image/jpeg",
-            created_at=now,
-            owner_review_status="none",
+        handover = (
+            db.query(models.KitchenHandover)
+            .filter(models.KitchenHandover.restaurant_id == restaurant.id)
+            .order_by(models.KitchenHandover.id.desc())
+            .first()
         )
-        db.add(handover)
+        if handover is None:
+            photo_key = storage.save(_DEMO_JPEG, content_type="image/jpeg")
+            handover = models.KitchenHandover(
+                restaurant_id=restaurant.id,
+                created_by_user_id=jack.id,
+                chef_id=chef.id,
+                photo_storage_key=photo_key,
+                photo_content_type="image/jpeg",
+                created_at=now,
+                owner_review_status="none",
+            )
+            db.add(handover)
+            db.flush()
+            db.add(
+                models.KitchenHandoverLine(
+                    handover_id=handover.id,
+                    inventory_item_id=rice.id,
+                    item_name=rice.item_name,
+                    quantity=3.5,
+                    unit="kg",
+                )
+            )
+            log.append("[CREATED] demo kitchen handover with photo key")
+        elif handover.photo_storage_key and not storage.exists(handover.photo_storage_key):
+            handover.photo_storage_key = storage.save(_DEMO_JPEG, content_type="image/jpeg")
+            log.append("[REFRESH] demo handover photo bytes")
+
+    if pilau:
+        pilau.price = 45000
+        pilau.cost_price = 14000
+
+    if jack and supplier and rice and not db.query(models.DeliveryReceipt).filter(
+        models.DeliveryReceipt.restaurant_id == restaurant.id,
+        models.DeliveryReceipt.notes.contains("[DEMO]"),
+    ).first():
+        receipt = models.DeliveryReceipt(
+            restaurant_id=restaurant.id,
+            supplier_id=supplier.id,
+            received_by_user_id=jack.id,
+            received_at=now,
+            notes="[DEMO] Fresh Farm delivery — invoice pending prices",
+            status="keyed",
+        )
+        db.add(receipt)
         db.flush()
+        for kind in ("invoice", "goods"):
+            key = storage.save(_DEMO_JPEG, content_type="image/jpeg")
+            db.add(
+                models.DeliveryEvidencePhoto(
+                    receipt_id=receipt.id,
+                    kind=kind,
+                    storage_key=key,
+                    content_type="image/jpeg",
+                    byte_size=len(_DEMO_JPEG),
+                    sha256=hashlib.sha256(_DEMO_JPEG).hexdigest(),
+                    uploaded_by_user_id=jack.id,
+                    uploaded_at=now,
+                )
+            )
         db.add(
-            models.KitchenHandoverLine(
-                handover_id=handover.id,
+            models.DeliveryReceiptLine(
+                receipt_id=receipt.id,
                 inventory_item_id=rice.id,
-                item_name=rice.item_name,
-                quantity=3.5,
+                item_name="[DEMO] Rice",
+                quantity=10,
                 unit="kg",
+                keyed_by_user_id=jack.id,
+                keyed_at=now,
             )
         )
-        log.append("[CREATED] demo kitchen handover with photo key")
+        log.append("[CREATED] demo delivery with invoice photo for accountant")
 
     if pilau and db.query(models.Order).filter(
         models.Order.restaurant_id == restaurant.id,

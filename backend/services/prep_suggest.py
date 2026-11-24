@@ -86,10 +86,22 @@ def prep_list_dated(db: Session, restaurant_id: int) -> dict:
                 .first()
             )
             if not item:
-                issue.append({**need, "issue_qty": need["quantity"]})
+                qty = float(need["quantity"])
+                if qty > 0.01:
+                    issue.append({**need, "issue_qty": round(qty, 2)})
                 continue
             held = kitchen_on_hand.get(item.id, 0.0)
             issue_qty = max(0.0, float(need["quantity"]) - held)
-            issue.append({**need, "issue_qty": round(issue_qty, 2), "kitchen_has": round(held, 2)})
-        rows.append({"dish": dish["dish"], "date": day, "ingredients": issue})
+            if issue_qty > 0.01:
+                issue.append(
+                    {**need, "issue_qty": round(issue_qty, 2), "kitchen_has": round(held, 2)}
+                )
+        if issue:
+            rows.append({"dish": dish["dish"], "date": day, "ingredients": issue})
+    if not rows and dishes:
+        return {
+            "date": day,
+            "rows": [],
+            "message": "Nothing to issue, the kitchen has enough.",
+        }
     return {"date": day, "rows": rows}

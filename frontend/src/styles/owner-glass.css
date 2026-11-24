@@ -277,6 +277,20 @@ html[data-leviii-apk] .owner-oat-highlight {
   border-radius: 999px;
 }
 
+.owner-nav.owner-glass-panel {
+  background: var(--og-glass-solid);
+  border-color: var(--og-border-strong);
+  box-shadow: var(--og-shadow), 0 0 0 1px rgba(10, 8, 7, 0.35);
+}
+
+@supports (backdrop-filter: blur(8px)) {
+  .owner-nav.owner-glass-panel {
+    backdrop-filter: blur(28px) saturate(1.35);
+    -webkit-backdrop-filter: blur(28px) saturate(1.35);
+    background: color-mix(in srgb, var(--og-glass-solid) 92%, black);
+  }
+}
+
 .owner-premium-stack {
   display: flex;
   flex-direction: column;
@@ -290,7 +304,7 @@ html[data-leviii-apk] .owner-oat-highlight {
 
 @media (max-width: 767px) {
   .owner-main-pad {
-    padding-bottom: calc(var(--og-nav) + var(--og-nav-inset) + 7.5rem);
+    padding-bottom: calc(var(--og-nav) + var(--og-nav-inset) + 9.5rem);
     padding-top: 1.25rem;
   }
 }

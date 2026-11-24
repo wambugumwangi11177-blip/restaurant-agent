@@ -16,7 +16,11 @@ type Dish = {
 
 export default function ElevenDishesPage() {
   const [dishes, setDishes] = useState<Dish[]>([]);
-  const [plates, setPlates] = useState<{ status: string; message?: string } | null>(null);
+  const [plates, setPlates] = useState<{
+    status: string;
+    message?: string;
+    dishes?: { dish: string; sold: number; expected_handover_units?: number | null; handover_units_recorded?: number }[];
+  } | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -34,6 +38,24 @@ export default function ElevenDishesPage() {
       {error && <p className="text-sm text-red-300">{error}</p>}
       {plates?.status === "waiting_pos" && (
         <p className="owner-glass-panel mb-3 rounded-2xl p-4 text-sm text-zinc-300">{plates.message}</p>
+      )}
+      {plates?.status !== "waiting_pos" && (plates?.dishes?.length ?? 0) > 0 && (
+        <section className="owner-glass-panel mb-3 space-y-2 rounded-2xl p-4 text-sm text-zinc-300">
+          <p className="text-xs uppercase tracking-wide text-zinc-500">Plates (last 7 days)</p>
+          {plates?.dishes?.map((row) => (
+            <p key={row.dish}>
+              <span className="text-zinc-200">{row.dish}</span>
+              {" · "}
+              {row.sold} sold
+              {row.expected_handover_units != null
+                ? ` · expected ${row.expected_handover_units} kg from recipes`
+                : ""}
+              {row.handover_units_recorded != null
+                ? ` · ${row.handover_units_recorded} kg handed to kitchen`
+                : ""}
+            </p>
+          ))}
+        </section>
       )}
       <ul className="space-y-3">
         {dishes.map((d) => (

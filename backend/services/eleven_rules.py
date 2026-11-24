@@ -20,6 +20,48 @@ def _restock_actor(restaurant: models.Restaurant) -> str:
     return "owner"
 
 
+def _custody_alert_headline(db: Session, restaurant_id: int, hit) -> str:
+    """Plain language for variance alerts — never a misleading 100% when plates did not sell."""
+    from sqlalchemy import func
+
+    from services.plate_tracking import pos_has_dish_lines
+
+    theo = float(hit.theoretical_usage or 0)
+    act = float(hit.actual_usage or 0)
+    unit = hit.unit or ""
+    name = hit.item_name
+
+    if act > 0 and theo <= 0:
+        return f"{act:g} {unit} {name} went to the kitchen, no plates sold yet."
+
+    if act > 0 and pos_has_dish_lines(db, restaurant_id):
+        sold = (
+            db.query(func.coalesce(func.sum(models.OrderItem.quantity), 0))
+            .join(models.Order, models.Order.id == models.OrderItem.order_id)
+            .join(
+                models.MenuIngredient,
+                models.MenuIngredient.menu_item_id == models.OrderItem.menu_item_id,
+            )
+            .join(models.InventoryItem, models.InventoryItem.id == models.MenuIngredient.inventory_item_id)
+            .filter(
+                models.Order.restaurant_id == restaurant_id,
+                models.InventoryItem.id == hit.inventory_item_id,
+                models.Order.status != models.OrderStatus.CANCELLED,
+            )
+            .scalar()
+        )
+        if float(sold or 0) <= 0:
+            return f"{act:g} {unit} {name} went to the kitchen, no plates sold yet."
+
+    if theo > 0:
+        pct = (hit.variance_pct or 0) * 100
+        if pct >= 99:
+            return f"{name}: about {act:g} {unit} used vs {theo:g} {unit} expected from sold plates."
+        return f"{name} use needs a look ({theo:g} {unit} expected, {act:g} {unit} recorded)."
+
+    return f"{name} stock movement needs a look."
+
+
 def run_eleven_rules(db: Session, restaurant_id: int) -> list[dict]:
     """Plain-language rule hits for owner Alerts / approvals."""
     restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
@@ -133,13 +175,12 @@ def run_eleven_rules(db: Session, restaurant_id: int) -> list[dict]:
         })
 
     for hit in flagged_items(db, restaurant_id)[:5]:
-        pct = (hit.variance_pct or 0) * 100
         out.append({
             "rule_id": "R8",
             "kind": "custody",
             "status": "needs_approval",
             "actor_staff_role": "owner",
-            "headline": f"{hit.item_name} use gap needs a look (about {pct:.0f}%).",
+            "headline": _custody_alert_headline(db, restaurant_id, hit),
             "action": "Review custody gap",
         })
 

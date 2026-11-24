@@ -58,16 +58,6 @@ export default function ElevenAlertsPage() {
               href="/eleven/money"
             />
           ))}
-          {(data.cards ?? [])
-            .filter((c) => c.overdue || (c.id === "money" && !c.quiet))
-            .map((c) => (
-              <AlertRow
-                key={c.id}
-                title={c.title}
-                detail={c.sentence}
-                href={c.id === "money" ? "/eleven/money" : c.id === "stock" ? "/eleven/stock" : "/eleven/approvals"}
-              />
-            ))}
           {rules.map((r) => (
             <AlertRow key={r.rule_id + (r.headline || "")} title={r.headline || "Needs a look"} href="/eleven/approvals" />
           ))}
@@ -82,8 +72,7 @@ export default function ElevenAlertsPage() {
           {data.pending.length === 0 &&
             (data.bill_reminders?.length ?? 0) === 0 &&
             mismatchAlerts(data.events).length === 0 &&
-            (data.attention?.count ?? 0) === 0 &&
-            !(data.cards ?? []).some((c) => c.overdue) && (
+            (data.attention?.count ?? 0) === 0 && (
               <li className="owner-glass-panel rounded-2xl p-4 text-sm text-zinc-400">No urgent alerts right now.</li>
             )}
         </ul>

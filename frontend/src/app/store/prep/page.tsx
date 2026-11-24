@@ -6,7 +6,7 @@ import api from "@/lib/api";
 type Row = { dish: string; date: string; ingredients: { ingredient: string; quantity: number; issue_qty: number; unit: string; kitchen_has?: number }[] };
 
 export default function PrepListPage() {
-  const [data, setData] = useState<{ date: string; rows: Row[] } | null>(null);
+  const [data, setData] = useState<{ date: string; rows: Row[]; message?: string } | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -20,7 +20,9 @@ export default function PrepListPage() {
     <section className="owner-glass-panel space-y-3 rounded-3xl p-4">
       <h1 className="text-lg font-semibold">Prep for {data.date}</h1>
       <p className="text-sm text-zinc-400">Usual plates from recent handovers × recipe (with yield), minus what the kitchen already has.</p>
-      {data.rows.length === 0 ? (
+      {data.message && data.rows.length === 0 ? (
+        <p className="text-sm text-zinc-300">{data.message}</p>
+      ) : data.rows.length === 0 ? (
         <p className="text-sm text-zinc-300">Add recipes and handover history to see prep quantities.</p>
       ) : (
         <ul className="space-y-3">
@@ -28,7 +30,9 @@ export default function PrepListPage() {
             <li key={row.dish} className="rounded-2xl border border-white/10 bg-black/30 p-3 text-sm">
               <p className="font-medium text-zinc-200">{row.dish}</p>
               <ul className="mt-2 space-y-1 text-zinc-400">
-                {row.ingredients.map((ing) => (
+                {row.ingredients
+                  .filter((ing) => ing.issue_qty > 0)
+                  .map((ing) => (
                   <li key={ing.ingredient}>
                     Issue {ing.issue_qty} {ing.unit} {ing.ingredient}
                     {ing.kitchen_has != null && ing.kitchen_has > 0 ? ` (kitchen has ${ing.kitchen_has})` : ""}

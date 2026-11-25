@@ -1050,6 +1050,14 @@ def reset_jack_empty_journey(db: Session) -> list[str]:
     if dish_ids:
         db.query(models.MenuIngredient).filter(models.MenuIngredient.menu_item_id.in_(dish_ids)).delete(synchronize_session=False)
         db.query(models.MenuItem).filter(models.MenuItem.id.in_(dish_ids)).delete(synchronize_session=False)
+    handover_ids = [row.id for row in db.query(models.KitchenHandover.id).filter(models.KitchenHandover.restaurant_id == rid).all()]
+    if handover_ids:
+        db.query(models.HandoverVisionCheck).filter(models.HandoverVisionCheck.handover_id.in_(handover_ids)).delete(
+            synchronize_session=False
+        )
+        db.query(models.KitchenHandoverLine).filter(models.KitchenHandoverLine.handover_id.in_(handover_ids)).delete(synchronize_session=False)
+        db.query(models.KitchenHandover).filter(models.KitchenHandover.id.in_(handover_ids)).delete(synchronize_session=False)
+    db.query(models.SpoilageRecord).filter(models.SpoilageRecord.restaurant_id == rid).delete(synchronize_session=False)
     item_ids = [row.id for row in db.query(models.InventoryItem.id).filter(models.InventoryItem.restaurant_id == rid).all()]
     if item_ids:
         db.query(models.StockBalance).filter(models.StockBalance.inventory_item_id.in_(item_ids)).delete(synchronize_session=False)
@@ -1060,14 +1068,6 @@ def reset_jack_empty_journey(db: Session) -> list[str]:
             synchronize_session=False,
         )
         db.query(models.InventoryItem).filter(models.InventoryItem.id.in_(item_ids)).delete(synchronize_session=False)
-    handover_ids = [row.id for row in db.query(models.KitchenHandover.id).filter(models.KitchenHandover.restaurant_id == rid).all()]
-    if handover_ids:
-        db.query(models.HandoverVisionCheck).filter(models.HandoverVisionCheck.handover_id.in_(handover_ids)).delete(
-            synchronize_session=False
-        )
-        db.query(models.KitchenHandoverLine).filter(models.KitchenHandoverLine.handover_id.in_(handover_ids)).delete(synchronize_session=False)
-        db.query(models.KitchenHandover).filter(models.KitchenHandover.id.in_(handover_ids)).delete(synchronize_session=False)
-    db.query(models.SpoilageRecord).filter(models.SpoilageRecord.restaurant_id == rid).delete(synchronize_session=False)
     db.query(models.StoreZoneDayPhoto).filter(models.StoreZoneDayPhoto.restaurant_id == rid).delete(synchronize_session=False)
     db.query(models.StoreChef).filter(models.StoreChef.restaurant_id == rid).delete(synchronize_session=False)
     db.query(models.Supplier).filter(models.Supplier.restaurant_id == rid).delete(synchronize_session=False)

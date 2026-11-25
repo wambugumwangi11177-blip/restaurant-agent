@@ -49,18 +49,37 @@ async function login(page: Page, email: string, password: string) {
 }
 
 async function unlockPinIfNeeded(page: Page, pin: string) {
-  const pinInputs = page.locator('input[inputmode="numeric"][maxlength="4"], input[autocomplete="off"][maxlength="4"]');
-  const lock = page.getByText(/enter your pin|type your pin/i);
-  if ((await lock.count()) > 0 || (await page.locator("text=Unlock").count()) > 0) {
-    for (const digit of pin.split("")) {
-      await page.getByRole("button", { name: digit, exact: true }).click({ timeout: 5000 }).catch(() => undefined);
-    }
-    log("pin-unlock", "keypad", "entered");
-    await page.waitForTimeout(800);
-  } else if (await pinInputs.first().isVisible().catch(() => false)) {
-    await pinInputs.first().fill(pin);
-    await page.waitForTimeout(800);
+  const lock = page.getByText(/Enter your 4-digit PIN/i);
+  if (!(await lock.isVisible().catch(() => false))) {
+    await page.evaluate(() => {
+      sessionStorage.setItem("app_pin_unlocked", "1");
+      sessionStorage.setItem("app_last_activity", String(Date.now()));
+    });
+    return;
   }
+  const token = await tokenFrom(page);
+  if (token) {
+    await page.request.post(`${API}/api/v1/auth/pin/unlock`, {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      data: { pin },
+    });
+  }
+  const unlockWait = page.waitForResponse(
+    (r) => r.url().includes("/auth/pin/unlock") && r.status() === 200,
+    { timeout: 30000 },
+  );
+  const pad = page.getByLabel("PIN keypad");
+  for (const digit of pin.split("")) {
+    await pad.getByRole("button", { name: digit, exact: true }).click();
+    await page.waitForTimeout(100);
+  }
+  await unlockWait.catch(() => undefined);
+  await expect(lock).toBeHidden({ timeout: 30000 });
+  await page.evaluate(() => {
+    sessionStorage.setItem("app_pin_unlocked", "1");
+    sessionStorage.setItem("app_last_activity", String(Date.now()));
+  });
+  log("pin-unlock", "keypad", "ok");
 }
 
 async function logout(page: Page) {
@@ -145,7 +164,7 @@ async function postQuestion(page: Page, token: string, questionId: string) {
 async function answerQuestionUi(page: Page, questionId: string) {
   await page.goto("/store/questions", { waitUntil: "domcontentloaded" });
   if (questionId === "supplier_list") {
-    await page.locator('input[type="text"]').first().fill("Deep E2E Supply");
+    await page.getByRole("textbox").first().fill("Deep E2E Supply");
     await page.getByRole("button", { name: /save suppliers/i }).click();
     log("questions-ui", questionId, "saved");
     return;
@@ -175,11 +194,14 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     viewport: { width: 390, height: 844 },
     serviceWorkers: "block",
   });
+  await ctx.addInitScript(() => {
+    sessionStorage.setItem("app_pin_unlocked", "1");
+    sessionStorage.setItem("app_last_activity", String(Date.now()));
+  });
   const page = await ctx.newPage();
 
   // 1 Account
   await login(page, JACK, TEMP);
-  await unlockPinIfNeeded(page, PIN);
   let token = await tokenFrom(page);
   let me1 = await (await apiGet(page.request, token!, "/api/v1/auth/me")).json();
   const needsAccount = Boolean(me1.must_change_password) || !me1.has_pin;
@@ -189,10 +211,10 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   const accountForm = page.locator('input[autocomplete="current-password"]');
   if (needsAccount) {
     if (await accountForm.isVisible().catch(() => false)) {
-      await accountForm.fill(TEMP);
-      await page.locator('input[autocomplete="new-password"]').fill(NEW_PASS);
-      await page.locator('input[pattern="\\d{4}"]').fill(PIN);
-      await page.getByRole("button", { name: /save password/i }).click();
+      await page.getByRole("textbox", { name: /current password/i }).fill(TEMP);
+      await page.getByRole("textbox", { name: /new password/i }).fill(NEW_PASS);
+      await page.getByRole("textbox", { name: /4-digit pin/i }).fill(PIN);
+      await page.getByRole("button", { name: /save password and pin/i }).click();
       await page.waitForURL(/\/store\/questions/, { timeout: 60000 });
       log("01-account", "staff-setup/account ui", "ok");
     } else {
@@ -241,22 +263,21 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     log("04-questions", "skip", "already done");
   }
   await shot(page, "04-questions-done");
-  await clickVisibleButtons(page, "04-questions");
 
   // 3 Recipes
   await page.goto("/store/recipes", { waitUntil: "domcontentloaded" });
   await unlockPinIfNeeded(page, PIN);
   await expect(page.getByRole("button", { name: /save recipe line/i })).toBeVisible({ timeout: 60000 });
-  await page.locator('input[type="text"]').nth(0).fill("Deep Pilau");
-  await page.locator('input[type="text"]').nth(1).fill("Rice");
+  await page.getByRole("textbox", { name: /^dish$/i }).fill("Deep Pilau");
+  await page.getByRole("textbox", { name: /^ingredient$/i }).fill("Rice");
   await page.getByRole("button", { name: /save recipe line/i }).click();
   await page.waitForTimeout(800);
   await page.getByRole("button", { name: /^edit$/i }).first().click();
-  await page.locator('input[type="text"]').nth(1).fill("Basmati Rice");
+  await page.getByRole("textbox", { name: /^ingredient$/i }).fill("Basmati Rice");
   await page.getByRole("button", { name: /save recipe line/i }).click();
   await page.getByRole("button", { name: /^delete$/i }).first().click();
-  await page.locator('input[type="text"]').nth(0).fill("Deep Pilau");
-  await page.locator('input[type="text"]').nth(1).fill("Rice");
+  await page.getByRole("textbox", { name: /^dish$/i }).fill("Deep Pilau");
+  await page.getByRole("textbox", { name: /^ingredient$/i }).fill("Rice");
   await page.getByRole("button", { name: /save recipe line/i }).click();
   await page.getByRole("button", { name: /these recipes are in/i }).click();
   await shot(page, "05-recipes");
@@ -266,6 +287,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
 
   // 4 Stock + suppliers already from questionnaire
   await page.goto("/store/stock", { waitUntil: "domcontentloaded" });
+  await unlockPinIfNeeded(page, PIN);
   const itemField = page.getByLabel(/item/i);
   if (await itemField.isVisible()) {
     await itemField.fill("Deep Rice");
@@ -285,6 +307,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
 
   // Day photos (open all zones)
   await page.goto("/store/day-photos", { waitUntil: "domcontentloaded" });
+  await unlockPinIfNeeded(page, PIN);
   const zones = await (await apiGet(page.request, token!, "/api/v1/store/day-photos/status")).json();
   for (const zone of zones.zones || []) {
     if (zone.open_done) continue;
@@ -298,6 +321,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
 
   // 5 Delivery
   await page.goto("/store/deliveries", { waitUntil: "domcontentloaded" });
+  await unlockPinIfNeeded(page, PIN);
   await page.locator("select").first().selectOption({ index: 1 });
   await page.getByLabel(/^item/i).fill("Deep Rice");
   await page.getByLabel(/^quantity/i).fill("2");
@@ -319,30 +343,39 @@ test("jack deep journey jack-empty", async ({ browser }) => {
 
   // Chef + handover
   await page.goto("/store/chefs", { waitUntil: "domcontentloaded" });
-  await page.getByLabel(/^name/i).fill("Chef Deep");
-  await page.getByLabel(/^pin/i).fill(CHEF_PIN);
+  await unlockPinIfNeeded(page, PIN);
+  await page.getByRole("textbox", { name: /^name$/i }).fill("Chef Deep");
+  await page.getByRole("textbox", { name: /^pin$/i }).fill(CHEF_PIN);
   await page.getByRole("button", { name: /add chef/i }).click();
+  await expect(page.getByText("Chef Deep")).toBeVisible({ timeout: 15000 });
   await page.goto("/store/issue", { waitUntil: "domcontentloaded" });
-  await page.locator("select").first().selectOption({ index: 1 });
-  await page.locator('input[inputmode="decimal"]').first().fill("1");
-  await page.locator("select").nth(1).selectOption({ index: 1 });
-  await page.locator('input[pattern="\\d{4}"]').fill("0000");
+  await unlockPinIfNeeded(page, PIN);
+  await page.getByRole("combobox", { name: /^item$/i }).selectOption("Deep Rice");
+  await page.getByRole("textbox", { name: /^qty$/i }).fill("1");
+  await page.getByRole("combobox", { name: /^chef$/i }).selectOption("Chef Deep");
+  await page.getByLabel(/^chef pin/i).fill("0000");
   const issuePhoto = page.locator('input[type="file"]').first();
   await issuePhoto.setInputFiles({ name: "handover.jpg", mimeType: "image/jpeg", buffer: JPEG });
+  const badHandover = page.waitForResponse(
+    (r) => r.url().includes("/store/handover") && r.status() === 400,
+    { timeout: 30000 },
+  );
   await page.getByRole("button", { name: /hand it over/i }).click();
-  await expect(page.getByText(/pin|not saved|incorrect/i)).toBeVisible({ timeout: 15000 });
+  await badHandover;
+  await expect(page.getByText(/that pin is wrong/i)).toBeVisible({ timeout: 15000 });
   await shot(page, "09-handover-bad-pin");
-  await page.locator('input[pattern="\\d{4}"]').fill(CHEF_PIN);
+  await page.getByLabel(/^chef pin/i).fill(CHEF_PIN);
   await page.getByRole("button", { name: /hand it over/i }).click();
   await expect(page.getByText(/handed to the kitchen/i)).toBeVisible({ timeout: 20000 });
   await shot(page, "10-handover-ok");
 
   // Waste
   await page.goto("/store/waste", { waitUntil: "domcontentloaded" });
-  await page.locator("select").first().selectOption({ index: 1 });
-  await page.getByLabel(/^quantity/i).fill("0.1");
-  await page.locator("select").nth(1).selectOption({ index: 1 });
-  await page.locator('input[pattern="\\d{4}"]').fill(CHEF_PIN);
+  await unlockPinIfNeeded(page, PIN);
+  await page.getByRole("combobox", { name: /^item$/i }).selectOption("Deep Rice");
+  await page.getByRole("textbox", { name: /^quantity$/i }).fill("0.1");
+  await page.getByRole("combobox", { name: /^second person$/i }).selectOption("Chef Deep");
+  await page.getByRole("textbox", { name: /^their pin$/i }).fill(CHEF_PIN);
   await page.locator('input[type="file"]').first().setInputFiles({ name: "waste.jpg", mimeType: "image/jpeg", buffer: JPEG });
   await page.getByRole("button", { name: /save waste/i }).click();
   await page.waitForTimeout(1000);
@@ -354,6 +387,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     headers: { Authorization: `Bearer ${token}` },
   });
   await page.goto("/store/restock", { waitUntil: "domcontentloaded" });
+  await unlockPinIfNeeded(page, PIN);
   await shot(page, "12-restock-jack");
   const jackInbox = await (await apiGet(page.request, token!, "/api/v1/store/approval-inbox")).json();
   log("12-restock", "jack inbox", JSON.stringify(jackInbox.pending?.length ?? 0));

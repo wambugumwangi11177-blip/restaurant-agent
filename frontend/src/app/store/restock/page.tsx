@@ -45,7 +45,9 @@ export default function StoreRestockPage() {
       {error && <p className="text-sm text-red-300">{error}</p>}
       {message && <p className="text-sm text-[var(--text)]">{message}</p>}
       {orders.length === 0 ? (
-        <p className="owner-glass-panel rounded-3xl p-4 text-sm text-zinc-400">No restock waiting.</p>
+        <p className="owner-glass-panel rounded-3xl p-4 text-sm text-zinc-300">
+          No restock waiting. Low-stock requests show here after Jack flags items and the owner approves.
+        </p>
       ) : (
         <ul className="space-y-3">
           {orders.map((row) => (

@@ -38,6 +38,10 @@ STAFF = (
     ("jack@eleven.leviii", StaffRole.STOCKKEEPER, "Jack"),
     ("amina@eleven.leviii", StaffRole.CONTROLLER, "Amina"),
 )
+EMPTY_WALL_STAFF = (
+    ("jack@test.restaurant.leviii", StaffRole.STOCKKEEPER, "Jack"),
+    ("amina@test.restaurant.leviii", StaffRole.CONTROLLER, "Amina"),
+)
 
 
 class SeedError(Exception):
@@ -313,6 +317,7 @@ def ensure_eleven_test_data(
         db.flush()
         log.append(f"[CREATED] test owner {TEST_OWNER_EMAIL} (first login)")
     test_owner.active_restaurant_id = test_restaurant.id
+    _ensure_empty_wall_stack(db, test_tenant, test_restaurant, test_owner, owner_password, log)
 
     super_user = db.query(models.User).filter(models.User.email == SUPERADMIN_EMAIL).first()
     if super_user is None:
@@ -339,6 +344,82 @@ def ensure_eleven_test_data(
     return log
 
 
+def _ensure_empty_wall_stack(
+    db: Session,
+    test_tenant: models.Tenant,
+    test_restaurant: models.Restaurant,
+    test_owner: models.User,
+    owner_password: str,
+    log: list[str],
+) -> None:
+    """Fresh tenant for EMPTY screenshots — no demo rows, Jack questionnaire incomplete."""
+    from time_utils import utcnow
+
+    now = utcnow()
+    staff_pass = os.getenv("SEED_STAFF_PASSWORD", "JackTestPass1!").strip()
+    owner_pin = os.getenv("SEED_OWNER_PIN", "2468")
+    staff_pin = os.getenv("SEED_STAFF_PIN", "1357")
+
+    if owner_password:
+        test_owner.hashed_password = auth.get_password_hash(owner_password)
+        test_owner.must_change_password = False
+        test_owner.is_active = True
+        if not test_owner.hashed_pin:
+            test_owner.hashed_pin = auth.get_pin_hash(owner_pin)
+        log.append(f"[SYNC] empty-wall owner {TEST_OWNER_EMAIL}")
+
+    for email, role, name in EMPTY_WALL_STAFF:
+        user = db.query(models.User).filter(models.User.email == email).first()
+        if user is None:
+            user = models.User(
+                email=email,
+                hashed_password=auth.get_password_hash(staff_pass) if staff_pass else None,
+                role=Role.STAFF,
+                staff_role=role,
+                tenant_id=test_tenant.id,
+                must_change_password=False,
+                is_active=True,
+                is_email_verified=True,
+            )
+            db.add(user)
+            db.flush()
+            log.append(f"[CREATED] empty-wall staff {email}")
+        user.active_restaurant_id = test_restaurant.id
+        user.tenant_id = test_tenant.id
+        if staff_pass:
+            user.hashed_password = auth.get_password_hash(staff_pass)
+            user.must_change_password = False
+        if not user.hashed_pin:
+            user.hashed_pin = auth.get_pin_hash(staff_pin)
+
+        member = (
+            db.query(models.StaffMember)
+            .filter(models.StaffMember.restaurant_id == test_restaurant.id, models.StaffMember.user_id == user.id)
+            .first()
+        )
+        if member is None:
+            db.add(
+                models.StaffMember(
+                    restaurant_id=test_restaurant.id,
+                    user_id=user.id,
+                    name=name,
+                    role_title=role.value,
+                )
+            )
+
+        db.query(models.StaffSetupAnswer).filter(models.StaffSetupAnswer.user_id == user.id).delete(synchronize_session=False)
+
+        progress = db.query(StaffSetupProgress).filter(StaffSetupProgress.user_id == user.id).first()
+        if progress is None:
+            progress = StaffSetupProgress(user_id=user.id, restaurant_id=test_restaurant.id)
+            db.add(progress)
+            db.flush()
+        progress.account_completed_at = now
+        progress.recipes_completed_at = None
+        progress.questionnaire_completed_at = None
+        progress.updated_at = now
+
+
 def sync_test_stack_credentials(db: Session) -> list[str]:
     """Re-sync known test passwords and clear login lockouts (backend-test only)."""
     if not _truthy("SEED_TEST_DATA"):
@@ -348,7 +429,8 @@ def sync_test_stack_credentials(db: Session) -> list[str]:
     log: list[str] = []
     owner_pass = os.getenv("SEED_OWNER_PASSWORD", "").strip()
     staff_pass = os.getenv("SEED_STAFF_PASSWORD", "JackTestPass1!").strip()
-    for email in (OWNER_EMAIL, *(s[0] for s in STAFF)):
+    empty_emails = [s[0] for s in EMPTY_WALL_STAFF]
+    for email in (OWNER_EMAIL, TEST_OWNER_EMAIL, *(s[0] for s in STAFF), *empty_emails):
         user = db.query(models.User).filter(models.User.email == email).first()
         if not user:
             continue
@@ -356,14 +438,14 @@ def sync_test_stack_credentials(db: Session) -> list[str]:
             user.locked_until = None
             user.failed_login_attempts = 0
             log.append(f"[UNLOCK] {email}")
-        if email == OWNER_EMAIL and owner_pass:
+        if email in (OWNER_EMAIL, TEST_OWNER_EMAIL) and owner_pass:
             user.hashed_password = auth.get_password_hash(owner_pass)
             user.must_change_password = False
             pin = os.getenv("SEED_OWNER_PIN", "2468")
             if not user.hashed_pin:
                 user.hashed_pin = auth.get_pin_hash(pin)
                 log.append("[SYNC] owner app PIN for test unlock")
-            log.append("[SYNC] owner password from SEED_OWNER_PASSWORD")
+            log.append(f"[SYNC] owner password for {email}")
         elif staff_pass:
             user.hashed_password = auth.get_password_hash(staff_pass)
             user.must_change_password = False

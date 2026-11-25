@@ -37,7 +37,11 @@ export default function HandoverTimelinePage() {
             {h.has_photo && h.photo_path && <AuthPhotoThumb path={h.photo_path} large />}
           </li>
         ))}
-        {rows.length === 0 && <li className="text-zinc-400">No handovers yet.</li>}
+        {rows.length === 0 && (
+          <li className="owner-glass-panel rounded-2xl p-4 text-sm text-zinc-300">
+            No handovers yet. They show here after Jack hands stock to the kitchen with a photo.
+          </li>
+        )}
       </ul>
     </OwnerShell>
   );

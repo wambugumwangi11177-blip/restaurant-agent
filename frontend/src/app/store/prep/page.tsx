@@ -10,7 +10,17 @@ export default function PrepListPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api.get("/api/v1/store/prep/list").then((r) => setData(r.data)).catch(() => setError("Prep list could not load."));
+    api
+      .get("/api/v1/store/prep/list")
+      .then((r) => setData(r.data))
+      .catch((err: unknown) => {
+        const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+        if (detail === "questionnaire_required") {
+          setError("Finish the setup questions first. Prep quantities appear after Jack names dishes and handovers.");
+          return;
+        }
+        setError(typeof detail === "string" ? detail : "Prep list could not load.");
+      });
   }, []);
 
   if (error) return <p className="text-sm text-red-300">{error}</p>;

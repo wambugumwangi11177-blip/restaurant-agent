@@ -57,6 +57,11 @@ export default function ElevenDishesPage() {
           ))}
         </section>
       )}
+      {dishes.length === 0 && !error && (
+        <p className="owner-glass-panel mb-3 rounded-2xl p-4 text-sm text-zinc-300">
+          No dishes yet. They appear when the storekeeper adds recipes or you import a menu.
+        </p>
+      )}
       <ul className="space-y-3">
         {dishes.map((d) => (
           <li key={d.id} className="owner-glass-panel rounded-3xl p-4 text-sm">

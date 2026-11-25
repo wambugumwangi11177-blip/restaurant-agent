@@ -60,7 +60,9 @@ export default function DeliveryPriceConfirm() {
       {error && <p className="text-sm text-red-300">{error}</p>}
       {message && <p className="text-sm text-[var(--text)]">{message}</p>}
       {rows.length === 0 ? (
-        <p className="owner-glass-panel rounded-3xl p-4 text-sm text-zinc-300">No deliveries yet.</p>
+        <p className="owner-glass-panel rounded-3xl p-4 text-sm text-zinc-300">
+          No deliveries yet. They appear here after Jack receives goods and keys the invoice photo.
+        </p>
       ) : (
         <ul className="space-y-3">
           {rows.map((delivery) => (

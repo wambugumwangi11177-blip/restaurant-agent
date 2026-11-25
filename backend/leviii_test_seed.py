@@ -355,6 +355,7 @@ def ensure_eleven_test_data(
         empty_owner.active_restaurant_id = empty_restaurant.id
         empty_owner.tenant_id = tenant.id
     _ensure_empty_wall_stack(db, tenant, empty_restaurant, empty_owner, owner_password, log)
+    _ensure_pos_source_bindings(db, restaurant.id, empty_restaurant.id, log)
 
     super_user = db.query(models.User).filter(models.User.email == SUPERADMIN_EMAIL).first()
     if super_user is None:
@@ -379,6 +380,28 @@ def ensure_eleven_test_data(
 
     db.commit()
     return log
+
+
+def _ensure_pos_source_bindings(
+    db: Session,
+    demo_restaurant_id: int,
+    empty_restaurant_id: int,
+    log: list[str],
+) -> None:
+    """Demo till stays on `quicksell`; empty-wall audit uses `quicksell-empty` (+ webhook header)."""
+    from integration.inbox_models import PosSourceBinding
+
+    for slug, restaurant_id in (
+        ("quicksell", demo_restaurant_id),
+        ("quicksell-empty", empty_restaurant_id),
+    ):
+        row = db.query(PosSourceBinding).filter_by(slug=slug).first()
+        if row is None:
+            db.add(PosSourceBinding(slug=slug, restaurant_id=restaurant_id))
+            log.append(f"[CREATED] POS binding {slug}")
+        elif row.restaurant_id != restaurant_id:
+            row.restaurant_id = restaurant_id
+            log.append(f"[SYNC] POS binding {slug}")
 
 
 def _ensure_empty_wall_stack(

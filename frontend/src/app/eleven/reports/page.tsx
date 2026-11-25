@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import api from "@/lib/api";
 import OwnerShell from "@/components/eleven/OwnerShell";
 import { dayLabel, useOwnerFeed, type FeedEvent } from "@/components/eleven/OwnerFeed";
@@ -34,14 +35,21 @@ type SalesSummary = {
 };
 
 export default function ElevenReportsPage() {
+  const pathname = usePathname() ?? "";
   const { data, error } = useOwnerFeed();
   const [sales, setSales] = useState<SalesSummary | null>(null);
   const zone = data?.timezone;
   const [now] = useState(() => Date.now());
 
   useEffect(() => {
-    api.get<SalesSummary>("/api/v1/eleven/summary?period=7d").then((r) => setSales(r.data)).catch(() => undefined);
-  }, []);
+    api
+      .get<SalesSummary>("/api/v1/eleven/summary?period=7d", {
+        headers: { "Cache-Control": "no-cache" },
+        params: { _: Date.now() },
+      })
+      .then((r) => setSales(r.data))
+      .catch(() => undefined);
+  }, [pathname]);
   const dayStart = now - 86_400_000;
   const weekStart = now - 7 * 86_400_000;
 

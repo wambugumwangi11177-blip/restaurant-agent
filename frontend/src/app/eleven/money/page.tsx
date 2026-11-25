@@ -3,6 +3,7 @@
 import OwnerShell from "@/components/eleven/OwnerShell";
 import { GlassCard, SectionLabel, SolidNumberCard, WaitingNotice } from "@/components/eleven/EmptyPanels";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import api from "@/lib/api";
 import { useOwnerFeed } from "@/components/eleven/OwnerFeed";
 
@@ -18,13 +19,17 @@ type Pnl = {
 };
 
 export default function ElevenMoneyPage() {
+  const pathname = usePathname() ?? "";
   const { data, error } = useOwnerFeed();
   const money = data?.cards?.find((card) => card.id === "money");
   const [pnl, setPnl] = useState<Pnl | null>(null);
 
   useEffect(() => {
-    api.get("/api/v1/eleven/money/pnl").then((r) => setPnl(r.data)).catch(() => undefined);
-  }, []);
+    api
+      .get("/api/v1/eleven/money/pnl", { headers: { "Cache-Control": "no-cache" }, params: { _: Date.now() } })
+      .then((r) => setPnl(r.data))
+      .catch(() => undefined);
+  }, [pathname]);
   return (
     <OwnerShell title="My Money">
       {!data && !error && <p className="text-sm text-zinc-400">Loading…</p>}

@@ -29,9 +29,21 @@ async def owner_pnl(
     costs = dish_cost_map(db, restaurant.id)
     recipe_backed = sum(1 for cid in costs.values() if cid > 0)
     summary = profit.get("summary") or {}
+    since = utcnow() - timedelta(days=30)
     revenue_cents = summary.get("revenue_cents") or summary.get("total_revenue_30d") or 0
     food_cost_cents = summary.get("food_cost_cents") or summary.get("total_food_cost_30d") or 0
-    since = utcnow() - timedelta(days=30)
+    if not revenue_cents:
+        revenue_cents = int(
+            db.query(func.coalesce(func.sum(models.Order.total), 0))
+            .filter(
+                models.Order.restaurant_id == restaurant.id,
+                models.Order.is_paid.is_(True),
+                models.Order.status != models.OrderStatus.CANCELLED,
+                models.Order.created_at >= since,
+            )
+            .scalar()
+            or 0
+        )
     bills_cents = (
         db.query(func.coalesce(func.sum(models.RunningCost.amount_cents), 0))
         .filter(

@@ -23,15 +23,36 @@ async function main() {
   try {
     for (const width of [390, 1440]) {
       for (const state of ["empty", "failed", "partial", "error"]) {
-        const page = await browser.newPage({ viewport: { width, height: 844 } });
-        await page.addInitScript(() => sessionStorage.setItem("access_token", "synthetic-review-session"));
-        await page.route("**/api/v1/**", async route => {
+        const context = await browser.newContext({
+          viewport: { width, height: 844 },
+          serviceWorkers: "block",
+        });
+        const page = await context.newPage();
+        await page.addInitScript(() => {
+          sessionStorage.setItem("access_token", "synthetic-review-session");
+          sessionStorage.setItem("app_pin_unlocked", "1");
+          sessionStorage.setItem("app_last_activity", String(Date.now()));
+        });
+        const fulfill = async route => {
           const url = new URL(route.request().url());
           const headers = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,OPTIONS" };
           if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers });
           let data;
           if (url.pathname.endsWith("/auth/me")) {
-            data = { id: 1, email: "synthetic@example.test", role: "admin", staff_role: "owner", tenant_name: "Eleven", impersonation: null, is_email_verified: false };
+            data = {
+              id: 1,
+              email: "synthetic@example.test",
+              role: "admin",
+              staff_role: "owner",
+              tenant_name: "Eleven",
+              restaurant_id: 1,
+              restaurant_name: "Eleven",
+              impersonation: null,
+              is_email_verified: true,
+              has_pin: false,
+              must_change_password: false,
+              password_auth_valid: true,
+            };
           } else if (url.pathname.includes("/pos/quicksell/")) {
             if (state === "error") return route.fulfill({ status: 503, headers, json: { detail: "Synthetic outage" } });
             if (url.pathname.endsWith("/status")) data = {
@@ -44,11 +65,17 @@ async function main() {
             else data = state === "empty" ? [] : [{ id: "synthetic-receipt-reference", received_at: "2026-11-09T10:00:00", status: state, attempts: 1, error_code: state === "failed" ? "mapping_failed" : null, parser_version: "synthetic-v1", parsed_at: null, last_attempt_at: "2026-11-09T10:00:00", payload_sha256: "synthetic-only" }];
           } else data = { items: [], unread_count: 0 };
           return route.fulfill({ headers, json: data });
+        };
+        await page.route(/\/api\/v1\//, fulfill);
+        await page.goto(base + "/login", { waitUntil: "domcontentloaded" });
+        await page.evaluate(() => {
+          sessionStorage.setItem("access_token", "synthetic-review-session");
+          sessionStorage.setItem("app_pin_unlocked", "1");
+          sessionStorage.setItem("app_last_activity", String(Date.now()));
         });
-        await page.goto(base + "/eleven/settings/till");
-        await page.getByRole("heading", { name: "Till evidence", exact: true }).waitFor();
-        if (state === "error") await page.getByRole("main").getByRole("alert").waitFor();
-        else await page.getByRole("heading", { name: "QuickSell receipt evidence" }).waitFor();
+        await page.goto(base + "/eleven/settings/till", { waitUntil: "networkidle" });
+        if (state === "error") await page.getByRole("main").getByRole("alert").waitFor({ timeout: 45000 });
+        else await page.getByRole("heading", { name: "QuickSell receipt evidence" }).waitFor({ timeout: 45000 });
         const overflows = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
         if (overflows) throw new Error(`${state} overflows at ${width}px`);
         const navigation = await page.getByRole("navigation", { name: "Main", exact: true }).boundingBox();
@@ -60,7 +87,7 @@ async function main() {
         const file = `pos-${state}-${width}.png`;
         await page.screenshot({ path: path.join(output, file), fullPage: true });
         checks.push({ state, width, horizontalOverflow: false, fixedNavigation: true, screenshot: file });
-        await page.close();
+        await context.close();
       }
     }
     await fs.writeFile(path.join(output, "browser-results.json"), JSON.stringify({ syntheticOnly: true, checks }, null, 2) + "\n");

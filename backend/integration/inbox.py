@@ -99,20 +99,20 @@ async def read_body(request: Request) -> bytes:
     return bytes(raw)
 
 
-def bind_source(db: Session, restaurant_id: int) -> PosSourceBinding:
+def bind_source(db: Session, restaurant_id: int, *, slug: str = "quicksell") -> PosSourceBinding:
     """Only called by authenticated delivery; GET never provisions anything."""
-    binding = db.query(PosSourceBinding).filter_by(slug="quicksell").first()
+    binding = db.query(PosSourceBinding).filter_by(slug=slug).first()
     if binding:
         if binding.restaurant_id != restaurant_id:
             raise HTTPException(503, "POS source binding needs operator review.")
         return binding
-    binding = PosSourceBinding(slug="quicksell", restaurant_id=restaurant_id)
+    binding = PosSourceBinding(slug=slug, restaurant_id=restaurant_id)
     db.add(binding)
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
-        binding = db.query(PosSourceBinding).filter_by(slug="quicksell").first()
+        binding = db.query(PosSourceBinding).filter_by(slug=slug).first()
         if binding is None or binding.restaurant_id != restaurant_id:
             raise HTTPException(503, "POS source binding needs operator review.")
     return binding

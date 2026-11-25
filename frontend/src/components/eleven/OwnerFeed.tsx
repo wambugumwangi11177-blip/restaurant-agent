@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ArrowRightLeft, Camera, ClipboardCheck, Receipt, Settings2, Trash2, Truck } from "lucide-react";
 import api from "@/lib/api";
 import ApprovalCard from "@/components/approvals/ApprovalCard";
@@ -131,17 +132,21 @@ function Headline({ text, emphasis, name }: { text?: string; emphasis?: string |
 }
 
 export function useOwnerFeed() {
+  const pathname = usePathname() ?? "";
   const [data, setData] = useState<FeedPayload | null>(null);
   const [error, setError] = useState("");
 
   async function refresh() {
-    const response = await api.get("/api/v1/store/approvals");
+    const response = await api.get("/api/v1/store/approvals", {
+      headers: { "Cache-Control": "no-cache" },
+      params: { _: Date.now() },
+    });
     setData(response.data);
   }
 
   useEffect(() => {
     refresh().catch(() => setError("The feed could not be loaded."));
-  }, []);
+  }, [pathname]);
 
   return { data, error, refresh, setError };
 }

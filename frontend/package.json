@@ -9,6 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:ui-sweep": "playwright test -c playwright.broken-sweep.config.ts",
+    "test:till-review": "playwright test -c playwright.till-review.config.ts",
     "test:mobile-screenshots": "NEXT_PUBLIC_API_URL=http://127.0.0.1:3456 next build && CI=1 CURSOR_ARTIFACTS=${CURSOR_ARTIFACTS:-/opt/cursor/artifacts} playwright test e2e/mobile-shell.spec.ts"
   },
   "dependencies": {

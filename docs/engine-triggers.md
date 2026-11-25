@@ -16,8 +16,8 @@ Branch: `feat/jack-storekeeper`. This table records **what starts each engine**,
 | Inventory predictor (`ai/inventory_predictor.py`) | On demand (Ask OS, specialists) | Read-only JSON | `/eleven/ask` | **On read** — needs movement history |
 | Menu engineering (`ai/menu_engineer.py`) | On demand (Ask OS) | Read-only | `/eleven/ask` | **On read** — needs paid orders + `cost_price` |
 | Revenue forecast (`ai/revenue_forecaster.py`) | On demand + learning cron 05:00 EAT | Forecast rows | `/eleven/ask` | **On read** + scheduled learning |
-| Profit / food P&L (`ai/profit/intelligence.py`) | On demand; Money P&L endpoint | Read-only rollups | `/eleven/money` (bills wired); Ask | **On read** |
-| Prep list (`services/prep_suggest.py`) | On demand GET `/store/prep` | Read-only from handover history | Store prep | **On read** — needs handovers |
+| Profit / food P&L (`ai/profit/intelligence.py`) | On demand; Money P&L endpoint (falls back to paid orders last 30d when rollup empty) | Read-only rollups | `/eleven/money` (bills wired); Ask | **On read** — UI cache-busts on navigation so new QuickSell sales show on next visit |
+| Prep list (`services/prep_suggest.py`) | On demand GET `/store/prep` | Read-only from handover history | Store prep | **On read** — cache-bust on page load after handovers |
 | Supplier price change | Invoice price confirm on lines | `InventoryItem.cost_per_unit` | Store invoice-prices, accountant flow | **Yes** (manual keying is the real entry point) |
 | Approval reminders (`services/approval_workflow.py`) | Pending approvals feed load | Reminder rows, notifications | Owner Home / Approvals / Alerts | **Yes** — `process_due_reminders` on feed GET |
 | Store vision (`store_vision.py`) | Photo on delivery / handover / stock | Vision check rows | Store screens | **Yes** — background task after photo POST |
@@ -38,14 +38,15 @@ Branch: `feat/jack-storekeeper`. This table records **what starts each engine**,
 
 - `backend/tests/test_engine_triggers.py` — POS events, auto PO draft, dish cost sync.
 - `backend/tests/test_quicksell_webhook.py` — webhook auth, dish lines, deduction.
+- `backend/tests/test_quicksell_empty_binding.py` — `X-Leviii-Pos-Binding: quicksell-empty` routes to empty stack; Money P&L reflects sale on next GET.
+- `frontend/e2e/ui-broken-sweep.spec.ts` — Playwright sweep (owner / Jack / accountant × empty + data); `npm run test:ui-sweep` against Railway test.
 - Scheduler jobs in `main.py` remain as production backstops.
 
 ## Still blocked on data
 
 | Blocker | Engines affected |
 |---|---|
-| No POS binding for **Eleven (empty)** unless `ELEVEN_RESTAURANT_NAME='Eleven (empty)'` or `PosSourceBinding` | QuickSell audit on empty stack |
-| No supplier phone | PO SMS after approve/send |
 | No drawer count capture | Cash reconciliation |
+| No supplier phone | PO SMS after approve/send |
 | No WhatsApp/Twilio | Scheduled briefings, supplier SMS fallback only where phone exists |
 | Fraud / strategist / learning | Need mature order history; screens not wired |

@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import api from "@/lib/api";
 
 type Row = { dish: string; date: string; ingredients: { ingredient: string; quantity: number; issue_qty: number; unit: string; kitchen_has?: number }[] };
 
 export default function PrepListPage() {
+  const pathname = usePathname() ?? "";
   const [data, setData] = useState<{ date: string; rows: Row[]; message?: string } | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     api
-      .get("/api/v1/store/prep/list")
+      .get("/api/v1/store/prep/list", { headers: { "Cache-Control": "no-cache" }, params: { _: Date.now() } })
       .then((r) => setData(r.data))
       .catch((err: unknown) => {
         const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -21,7 +23,7 @@ export default function PrepListPage() {
         }
         setError(typeof detail === "string" ? detail : "Prep list could not load.");
       });
-  }, []);
+  }, [pathname]);
 
   if (error) return <p className="text-sm text-red-300">{error}</p>;
   if (!data) return <p className="text-sm text-zinc-400">Loading prep list…</p>;

@@ -1032,12 +1032,12 @@ def reset_jack_empty_journey(db: Session) -> list[str]:
         raise SeedError(f"{JACK_EMPTY_EMAIL} not found")
     staff_pass = os.getenv("SEED_STAFF_PASSWORD", "JackTestPass1!").strip()
     staff_pin = os.getenv("SEED_STAFF_PIN", "1357")
-    owner_pass = os.getenv("SEED_OWNER_PASSWORD", staff_pass or "").strip()
     rid = restaurant.id
 
     empty_owner = db.query(models.User).filter(models.User.email == EMPTY_OWNER_EMAIL).first()
-    if empty_owner and owner_pass:
-        empty_owner.hashed_password = auth.get_password_hash(owner_pass)
+    empty_owner_pass = staff_pass or os.getenv("SEED_OWNER_PASSWORD", "").strip()
+    if empty_owner and empty_owner_pass:
+        empty_owner.hashed_password = auth.get_password_hash(empty_owner_pass)
         empty_owner.must_change_password = False
         empty_owner.failed_login_attempts = 0
         empty_owner.locked_until = None

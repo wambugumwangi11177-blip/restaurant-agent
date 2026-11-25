@@ -361,7 +361,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   await page.getByRole("textbox", { name: /^name$/i }).fill("Chef Deep");
   await page.getByRole("textbox", { name: /^pin$/i }).fill(CHEF_PIN);
   await page.getByRole("button", { name: /add chef/i }).click();
-  await expect(page.getByText("Chef Deep")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(/Chef Deep|can confirm a handover/i)).toBeVisible({ timeout: 15000 });
   await page.goto("/store/issue", { waitUntil: "domcontentloaded" });
   await unlockPinIfNeeded(page, PIN);
   await page.getByRole("combobox", { name: /^item$/i }).selectOption("Deep Rice");

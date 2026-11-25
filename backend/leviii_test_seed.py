@@ -1072,7 +1072,7 @@ def reset_jack_empty_journey(db: Session) -> list[str]:
     db.query(models.StoreChef).filter(models.StoreChef.restaurant_id == rid).delete(synchronize_session=False)
     db.query(models.Supplier).filter(models.Supplier.restaurant_id == rid).delete(synchronize_session=False)
     db.query(models.StaffSetupAnswer).filter(models.StaffSetupAnswer.user_id == jack.id).delete(synchronize_session=False)
-    restaurant.restock_routing_mode = None
+    restaurant.restock_routing_mode = "unknown"
     progress = db.query(StaffSetupProgress).filter(StaffSetupProgress.user_id == jack.id).first()
     now = utcnow()
     if progress is None:

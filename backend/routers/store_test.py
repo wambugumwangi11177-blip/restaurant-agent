@@ -40,6 +40,9 @@ async def reset_jack_empty(
         log = reset_jack_empty_journey(db)
     except SeedError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"reset_failed: {exc.__class__.__name__}") from exc
     return {"status": "ok", "log": log}
 
 

@@ -231,12 +231,17 @@ def ensure_eleven_test_data(
         rice.par_level = 20
         rice.low_stock_threshold = 5
         restaurant.restock_routing_mode = "owner_approves"
+    has_v12_pilau = (
+        db.query(models.MenuItem)
+        .filter(models.MenuItem.restaurant_id == restaurant.id, models.MenuItem.name == "Pilau")
+        .first()
+    )
     pilau = (
         db.query(models.MenuItem)
         .filter(models.MenuItem.restaurant_id == restaurant.id, models.MenuItem.name == "Pilau (demo)")
         .first()
     )
-    if pilau is None and rice is not None:
+    if pilau is None and rice is not None and has_v12_pilau is None:
         pilau = models.MenuItem(
             restaurant_id=restaurant.id,
             name="Pilau (demo)",

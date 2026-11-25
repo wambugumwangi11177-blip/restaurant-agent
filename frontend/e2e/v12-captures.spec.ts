@@ -5,14 +5,17 @@ import path from "node:path";
 const OUT = process.env.CURSOR_ARTIFACTS || "/opt/cursor/artifacts";
 const STORE_OUT = "/cursor/stores/self/artifacts";
 
-const PAGES = [
+const ALL_PAGES = [
   { slug: "home", path: "/eleven", ready: /Needs you|Today|Restock|Nothing needs/i },
-  { slug: "money-dishes", path: "/eleven/money/dishes", ready: /Dishes|Menu map|Pilau|plate/i },
+  { slug: "money-dishes", path: "/eleven/money/dishes", ready: /Dishes|Menu map|Plate profit|Best sellers|Pilau/i },
   { slug: "stock", path: "/eleven/stock", ready: /Stock levels|Rice|Reorder/i },
   { slug: "stock-suppliers", path: "/eleven/stock/suppliers", ready: /Suppliers|Fresh Farm|price jump/i },
   { slug: "stock-prep", path: "/eleven/stock/prep", ready: /Prep|plates|Pilau/i },
   { slug: "ask", path: "/eleven/ask", ready: /Ask|question/i },
 ] as const;
+
+const slugFilter = process.env.V12_CAPTURE_SLUGS?.split(",").map((s) => s.trim()).filter(Boolean);
+const PAGES = slugFilter?.length ? ALL_PAGES.filter((p) => slugFilter.includes(p.slug)) : ALL_PAGES;
 
 async function login(page) {
   const pass = process.env.OWNER_PASSWORD || "";
@@ -33,20 +36,28 @@ async function login(page) {
   await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 60000 });
   const pin = process.env.SEED_OWNER_PIN || "2468";
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://backend-test-production-0160.up.railway.app";
-  if (accessToken) {
-    await page.evaluate(
-      async ({ token, pinCode, base }) => {
-        await fetch(`${base}/api/v1/auth/pin/unlock`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ pin: pinCode }),
-        });
-        sessionStorage.setItem("app_pin_unlocked", "1");
-        sessionStorage.setItem("app_last_activity", String(Date.now()));
-      },
-      { token: accessToken, pinCode: pin, base: apiBase },
-    );
+  const token = accessToken;
+  if (!token) {
+    const loginResp = await page.request.post(`${apiBase}/api/v1/auth/login`, {
+      data: { email: "owner@eleven.leviii", password: pass },
+    });
+    const loginJson = await loginResp.json().catch(() => ({}));
+    if (loginJson.access_token) {
+      await page.request.post(`${apiBase}/api/v1/auth/pin/unlock`, {
+        headers: { Authorization: `Bearer ${loginJson.access_token}` },
+        data: { pin },
+      });
+    }
+  } else {
+    await page.request.post(`${apiBase}/api/v1/auth/pin/unlock`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { pin },
+    });
   }
+  await page.evaluate(() => {
+    sessionStorage.setItem("app_pin_unlocked", "1");
+    sessionStorage.setItem("app_last_activity", String(Date.now()));
+  });
   await page.goto("/eleven", { waitUntil: "networkidle" });
   await unlockPin(page);
 }
@@ -77,6 +88,7 @@ async function assertCaptureReady(page) {
   await expect(page.getByText(/Loading today/i)).toHaveCount(0);
   await expect(page.getByText(/\d+ Issues?/i)).toHaveCount(0);
   await expect(page.getByText(/Grounded in your records/i)).toHaveCount(0);
+  await expect(page.getByText(/Starts when dishes sell on the till/i)).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: /Main/i })).toBeVisible();
 }
 

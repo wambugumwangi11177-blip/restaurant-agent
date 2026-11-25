@@ -34,6 +34,7 @@ def stock_levels(db: Session = Depends(get_db), current_user=Depends(auth.get_cu
             status = "red"
         elif days is not None and days <= 7:
             status = "amber"
+        days_label = f"{days}d" if days is not None else "no use yet"
         rows.append(
             {
                 "name": p.get("name"),
@@ -41,6 +42,7 @@ def stock_levels(db: Session = Depends(get_db), current_user=Depends(auth.get_cu
                 "par": p.get("reorder_level"),
                 "unit": p.get("unit"),
                 "days_left": days,
+                "days_label": days_label,
                 "status": status,
             }
         )
@@ -236,7 +238,16 @@ def owner_prep(db: Session = Depends(get_db), current_user=Depends(auth.get_curr
     from collections import defaultdict
     from datetime import timedelta
 
-    items = prep_for_today(db, restaurant.id)
+    items = [b for b in prep_for_today(db, restaurant.id) if "(demo)" not in (b.get("dish") or "").lower()]
+    seen: set[str] = set()
+    deduped: list[dict] = []
+    for block in items:
+        key = (block.get("dish") or "").strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        deduped.append(block)
+    items = deduped
     weekday = utcnow().date().weekday()
     since = utcnow() - timedelta(days=35)
     orders = (

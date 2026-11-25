@@ -9,7 +9,11 @@ import api from "@/lib/api";
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export default function ElevenStockPage() {
-  type Rows = { rows?: { name: string; on_hand: number; days_left?: number; status: string }[]; has_data?: boolean; empty?: string };
+  type Rows = {
+    rows?: { name: string; on_hand: number; days_left?: number | null; days_label?: string; status: string }[];
+    has_data?: boolean;
+    empty?: string;
+  };
   const { data: levels } = useOwnerGet<Rows>("/api/v1/eleven/stock/levels", []);
   const { data: reorder } = useOwnerGet<{ rows?: { id: number; item: string; kes: number }[]; has_data?: boolean; empty?: string }>("/api/v1/eleven/stock/reorder", []);
   const { data: missing } = useOwnerGet<{
@@ -49,10 +53,12 @@ export default function ElevenStockPage() {
       <div className="owner-premium-stack">
         <OwnerChartCard title="Stock levels" caption="Green is OK, amber is low, red is critical." hasData={!!levels?.has_data} emptyHint={levels?.empty ?? "Starts when Jack counts stock."}>
           <ul className="max-h-40 space-y-1 overflow-y-auto text-xs">
-            {(levels?.rows ?? []).map((r: { name: string; on_hand: number; days_left?: number; status: string }) => (
+            {(levels?.rows ?? []).map((r: { name: string; on_hand: number; days_left?: number | null; days_label?: string; status: string }) => (
               <li key={r.name} className="flex justify-between">
                 <span>{r.name}</span>
-                <span className={r.status === "red" ? "text-red-300" : ""}>{r.on_hand} · {r.days_left ?? "—"}d</span>
+                <span className={r.status === "red" ? "text-red-300" : ""}>
+                  {r.on_hand} · {r.days_label ?? (r.days_left != null ? `${r.days_left}d` : "no use yet")}
+                </span>
               </li>
             ))}
           </ul>

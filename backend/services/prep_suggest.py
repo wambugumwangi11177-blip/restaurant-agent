@@ -35,6 +35,8 @@ def prep_for_today(db: Session, restaurant_id: int) -> list[dict]:
     )
     out: list[dict] = []
     for dish in dishes:
+        if "(demo)" in (dish.name or "").lower():
+            continue
         lines = db.query(models.MenuIngredient).filter(models.MenuIngredient.menu_item_id == dish.id).all()
         if not lines:
             continue

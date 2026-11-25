@@ -430,16 +430,55 @@ def dishes_summary(db: Session = Depends(get_db), current_user=Depends(auth.get_
     _require_owner(current_user)
     restaurant = get_or_create_restaurant(db, current_user)
     eng = get_menu_engineering(db, restaurant.id)
-    items = eng.get("items") or []
-    if not items:
+    matrix = eng.get("matrix") or []
+    sold = [m for m in matrix if int(m.get("qty_sold") or 0) > 0]
+    if not sold:
         return {"has_sales": False, "empty": "Starts when dishes sell on the till."}
-    quad = [{"name": i.get("name"), "x": i.get("popularity_score", 0), "y": i.get("margin_pct", 0), "class": i.get("classification")} for i in items[:20]]
+    quad = [
+        {
+            "name": i.get("name"),
+            "x": float(i.get("popularity_pct") or 0),
+            "y": float(i.get("margin_pct") or 0),
+            "class": i.get("classification"),
+        }
+        for i in sold[:24]
+    ]
+    plate_profit = sorted(sold, key=lambda m: int(m.get("contribution") or 0), reverse=True)[:8]
+    bestsellers = sorted(sold, key=lambda m: int(m.get("qty_sold") or 0), reverse=True)[:8]
+    pareto = eng.get("pareto") or {}
+    since = utcnow() - timedelta(days=30)
+    type_rows = (
+        db.query(models.Order.order_type, func.coalesce(func.sum(models.Order.total), 0))
+        .filter(
+            models.Order.restaurant_id == restaurant.id,
+            models.Order.is_paid.is_(True),
+            models.Order.status != models.OrderStatus.CANCELLED,
+            models.Order.created_at >= since,
+        )
+        .group_by(models.Order.order_type)
+        .all()
+    )
+    delivery_vs_dine = [
+        {"channel": (row[0].value if hasattr(row[0], "value") else str(row[0] or "unknown")), "kes": int(row[1]) / 100}
+        for row in type_rows
+    ]
+    suggestions = []
+    for rec in (eng.get("recommendations") or [])[:5]:
+        suggestions.append(
+            {
+                "title": f"{rec.get('action')}: {rec.get('item')}",
+                "detail": rec.get("reason") or rec.get("impact") or "",
+            }
+        )
     return {
         "has_sales": True,
+        "dish_count": len(sold),
         "quadrant": quad,
-        "pareto": eng.get("pareto") or [],
-        "suggestions": (eng.get("recommendations") or [])[:5],
-        "delivery_vs_dine": eng.get("order_type_split") or [],
+        "plate_profit": [{"name": m["name"], "kes": int(m.get("contribution") or 0) / 100} for m in plate_profit],
+        "bestsellers": [{"name": m["name"], "plates": int(m.get("qty_sold") or 0)} for m in bestsellers],
+        "pareto": pareto.get("items") or [],
+        "suggestions": suggestions,
+        "delivery_vs_dine": delivery_vs_dine,
         "empty": None,
     }
 

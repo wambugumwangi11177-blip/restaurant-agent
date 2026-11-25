@@ -171,6 +171,37 @@ def seed_v12_catalog(
         db.add(models.OrderItem(order_id=order.id, menu_item_id=dish.id, quantity=qty, unit_price=dish.price))
         db.add(models.OrderItem(order_id=order.id, menu_item_id=alt.id, quantity=qty2, unit_price=alt.price))
 
+    if jack:
+        for idx, (name, item) in enumerate(inv_by_name.items()):
+            marker_use = f"{_MARKER} weekly usage {name}"
+            if db.query(models.StockMovement).filter(
+                models.StockMovement.inventory_item_id == item.id,
+                models.StockMovement.reason == marker_use,
+            ).first():
+                continue
+            weekly = max(0.35, (item.par_level or 8) / 12)
+            for week in range(4):
+                db.add(
+                    models.StockMovement(
+                        inventory_item_id=item.id,
+                        movement_type=models.StockMovementType.OUT,
+                        quantity=round(weekly * (0.85 + (idx + week) % 3 * 0.1), 2),
+                        reason=marker_use,
+                        performed_by_user_id=jack.id,
+                        created_at=now - timedelta(days=week * 7 + 2, hours=idx),
+                    )
+                )
+
+    demo_pilau = (
+        db.query(models.MenuItem)
+        .filter(models.MenuItem.restaurant_id == restaurant.id, models.MenuItem.name == "Pilau (demo)")
+        .first()
+    )
+    if demo_pilau and pilau_item:
+        db.query(models.MenuIngredient).filter(models.MenuIngredient.menu_item_id == demo_pilau.id).delete()
+        db.delete(demo_pilau)
+        log.append("[V12] removed Pilau (demo) duplicate")
+
     rice = inv_by_name["Rice"]
     if jack:
         if not db.query(models.StockMovement).filter(

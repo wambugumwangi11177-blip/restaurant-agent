@@ -33,6 +33,7 @@ LOGIN_STAFF_ROLES = {
 }
 
 TEAM_FLOOR_MANAGERS = (
+    models.StaffRole.OWNER,
     models.StaffRole.MANAGER,
     models.StaffRole.STOCKKEEPER,
     models.StaffRole.CONTROLLER,

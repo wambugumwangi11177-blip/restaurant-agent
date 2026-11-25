@@ -24,6 +24,7 @@ from routers import (
     eleven_v11_stock,
     eleven_decisions,
     eleven_v11_settings,
+    eleven_v11_team,
     eleven_help,
     eleven_outcomes,
     store_prep,
@@ -307,12 +308,43 @@ def _start_scheduler():
             replace_existing=True,
         )
 
+        scheduler.add_job(
+            _run_owner_report_job,
+            CronTrigger(hour=18, minute=0),  # 21:00 EAT
+            kwargs={"job_kind": "daily"},
+            id="owner_daily_report",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _run_owner_report_job,
+            CronTrigger(day_of_week="mon", hour=5, minute=0),  # 08:00 EAT Monday
+            kwargs={"job_kind": "weekly"},
+            id="owner_weekly_report",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _run_owner_report_job,
+            CronTrigger(day=1, hour=3, minute=0),  # 06:00 EAT on the 1st
+            kwargs={"job_kind": "monthly"},
+            id="owner_monthly_pnl",
+            replace_existing=True,
+        )
+
         scheduler.start()
         logger.info("[OK] Scheduler started (morning briefing: 07:00 EAT)")
     except ImportError:
         logger.warning("[WARN] APScheduler not installed — scheduled jobs disabled. Run: pip install apscheduler")
     except Exception as e:
         logger.warning(f"[WARN] Scheduler failed to start: {e}")
+
+
+def _run_owner_report_job(job_kind: str = "daily"):
+    try:
+        from services.owner_reports import run_all_restaurants
+
+        run_all_restaurants(job_kind)
+    except Exception as exc:
+        logger.warning("[owner_reports] %s failed: %s", job_kind, exc)
 
 
 def _send_all_morning_briefings():
@@ -673,6 +705,7 @@ _VERSIONED_ROUTERS = [
     eleven_v11_stock.router,
     eleven_decisions.router,
     eleven_v11_settings.router,
+    eleven_v11_team.router,
     eleven_help.router,
     eleven_home.router,
     eleven_outcomes.router,

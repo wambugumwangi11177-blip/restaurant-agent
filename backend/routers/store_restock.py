@@ -29,7 +29,7 @@ class MarkOrderedIn(StrictModel):
     po_id: int
 
 
-def _po_public(db: Session, row: models.PurchaseOrder) -> dict:
+def _po_public(db: Session, row: models.PurchaseOrder, user: models.User | None = None) -> dict:
     item = db.query(models.InventoryItem).filter(models.InventoryItem.id == row.inventory_item_id).first()
     supplier = db.query(models.Supplier).filter(models.Supplier.id == row.supplier_id).first()
     phone = (supplier.contact_phone if supplier else "") or ""
@@ -42,7 +42,9 @@ def _po_public(db: Session, row: models.PurchaseOrder) -> dict:
         digits = "".join(ch for ch in phone if ch.isdigit())
         if digits:
             wa = f"https://wa.me/{digits}?text={urllib.parse.quote(msg)}"
-    return {
+    from money_visibility import hides_money, scrub_money
+
+    payload = {
         "id": row.id,
         "status": row.status,
         "item_name": item.item_name if item else "",
@@ -51,7 +53,12 @@ def _po_public(db: Session, row: models.PurchaseOrder) -> dict:
         "supplier_name": supplier.name if supplier else "",
         "whatsapp_url": wa,
         "message_draft": msg,
+        "cost_per_unit_cents": int(row.cost_per_unit or 0),
+        "total_cost": int(row.total_cost or 0),
     }
+    if user and hides_money(user, "/store/restock"):
+        payload = scrub_money(payload)
+    return payload
 
 
 @router.get("")
@@ -70,7 +77,7 @@ async def list_restock(
         .limit(40)
         .all()
     )
-    return {"orders": [_po_public(db, row) for row in rows], "routing": restaurant.restock_routing_mode}
+    return {"orders": [_po_public(db, row, current_user) for row in rows], "routing": restaurant.restock_routing_mode}
 
 
 @router.post("/ordered")
@@ -92,7 +99,8 @@ async def mark_ordered(
     row.ordered_by_user_id = current_user.id
     row.ordered_at = utcnow()
     db.commit()
-    return _po_public(db, row)
+    resolve_reminder(db, restaurant.id, "restock_place", row.id)
+    return _po_public(db, row, current_user)
 
 
 class StapleCapsIn(StrictModel):

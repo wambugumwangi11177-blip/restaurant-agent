@@ -1132,40 +1132,30 @@ async def list_approvals(
             "user_id": row.received_by_user_id,
             **who,
         })
+    from services.restock_workflow import build_invoice_draft, parse_draft_from_notes, po_for_owner_feed
+
     for row in db.query(models.PurchaseOrder).filter(
         models.PurchaseOrder.restaurant_id == restaurant.id,
-        models.PurchaseOrder.status == "PENDING",
+        models.PurchaseOrder.status.in_(("PENDING", "APPROVED")),
     ).all():
-        item = db.query(models.InventoryItem).filter(models.InventoryItem.id == row.inventory_item_id).first()
-        item_name = item.item_name if item else "stock"
-        mode = restaurant.restock_routing_mode or "owner_approves"
-        actor = "owner"
-        if mode == "staples_self":
-            actor = "stockkeeper"
-        elif mode == "flag_office":
-            actor = "controller"
+        item = po_for_owner_feed(db, row, restaurant)
         requester = (
             db.query(models.User).filter(models.User.id == row.requested_by_user_id).first()
             if row.requested_by_user_id
             else None
         )
-        who_req = person_of(db, requester)
-        events.append({
-            "id": row.id,
-            "kind": "restock",
-            "status": "needs_approval",
-            "item_name": item_name,
-            "quantity": row.quantity_ordered,
-            "unit": row.unit or "",
-            "headline": f"Restock {row.quantity_ordered:g} {row.unit} {item_name}".strip(),
-            "action": f"Approve restock for {item_name}",
+        who_req = person_of(db, requester) if requester else {"person_name": "Store", "person_email": ""}
+        item.update({
             "created_at": _when(row.ordered_at),
             "person_name": who_req["person_name"],
             "person_email": who_req.get("person_email"),
             "initial": who_req.get("initial"),
-            "actor_staff_role": actor,
             "requester_user_id": row.requested_by_user_id,
         })
+        if row.status == "APPROVED":
+            item["kind"] = "restock_place"
+            item["action"] = "Place the supplier order"
+        events.append(item)
     for row in db.query(models.ScheduleChangeRequest).filter(
         models.ScheduleChangeRequest.restaurant_id == restaurant.id,
         models.ScheduleChangeRequest.status == "needs_approval",
@@ -1410,6 +1400,18 @@ async def approve(
         from services.approval_workflow import resolve_reminder, notify_requester_outcome
 
         resolve_reminder(db, restaurant.id, "restock", row.id)
+        if body.decision == "approve":
+            from services.restock_workflow import placement_actor_role
+            from services.approval_workflow import ensure_reminder_row
+
+            ensure_reminder_row(
+                db,
+                restaurant.id,
+                "restock_place",
+                row.id,
+                row.requested_by_user_id,
+                actor_role=placement_actor_role(restaurant),
+            )
         if row.requested_by_user_id and body.decision == "approve":
             notify_requester_outcome(
                 db,

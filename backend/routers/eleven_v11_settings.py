@@ -11,7 +11,7 @@ from database import get_db
 from integration.inbox_models import PosInbox, PosSourceBinding
 from routers.deps import get_or_create_restaurant
 from routers.eleven_owner import _require_owner
-from services.owner_prefs import read_prefs, write_prefs
+from services.owner_prefs import read_prefs, read_reports_past, write_prefs
 from time_utils import utcnow
 
 router = APIRouter(prefix="/eleven/settings", tags=["eleven-settings-v11"])
@@ -70,16 +70,49 @@ def reports_list(db: Session = Depends(get_db), current_user=Depends(auth.get_cu
     restaurant = get_or_create_restaurant(db, current_user)
     now = utcnow()
     period = now.strftime("%Y-%m")
+    past = read_reports_past(restaurant)
     return {
         "schedule": {
             "daily": "21:00 EAT",
             "weekly": "Monday 08:00 EAT",
-            "monthly": "Month end after final P&L",
+            "monthly": "1st of month after P&L close",
         },
-        "past": [
-            {"id": f"daily-{now.date().isoformat()}", "kind": "daily", "title": f"Daily store report — {now.date().isoformat()}", "ready": True},
-            {"id": f"monthly-{period}", "kind": "monthly", "title": f"Monthly P&L — {period}", "href": f"/api/v1/eleven/money/export/monthly/{period}.xlsx"},
+        "past": past
+        or [
+            {
+                "id": f"daily-{now.date().isoformat()}",
+                "kind": "daily",
+                "title": f"Daily store report — {now.date().isoformat()}",
+                "ready": True,
+            },
         ],
         "notifications": True,
-        "empty": "Reports begin after the first day of sales.",
+        "empty": "Reports begin after the first scheduled run.",
+    }
+
+
+@router.get("/notifications")
+def notifications_prefs(db: Session = Depends(get_db), current_user=Depends(auth.get_current_user)):
+    _require_owner(current_user)
+    restaurant = get_or_create_restaurant(db, current_user)
+    prefs = read_prefs(restaurant)
+    return {
+        "push": True,
+        "email": False,
+        "report_daily": True,
+        "report_weekly": True,
+        "report_monthly": True,
+        "locale": prefs.get("locale") or "en",
+    }
+
+
+@router.get("/restaurant")
+def restaurant_profile(db: Session = Depends(get_db), current_user=Depends(auth.get_current_user)):
+    _require_owner(current_user)
+    restaurant = get_or_create_restaurant(db, current_user)
+    return {
+        "name": restaurant.name,
+        "timezone": "Africa/Nairobi",
+        "restock_routing_mode": restaurant.restock_routing_mode,
+        "owner_phone": restaurant.owner_phone or "",
     }

@@ -54,6 +54,17 @@ def read_month_ledger(restaurant: models.Restaurant, period: str) -> dict | None
     return led if isinstance(led, dict) else None
 
 
+def read_reports_past(restaurant: models.Restaurant) -> list[dict]:
+    raw = {}
+    try:
+        raw = json.loads(restaurant.staple_caps_json or "{}")
+    except json.JSONDecodeError:
+        return []
+    block = raw.get(_KEY) if isinstance(raw.get(_KEY), dict) else {}
+    past = block.get("reports_past")
+    return past if isinstance(past, list) else []
+
+
 def write_month_ledger(db, restaurant: models.Restaurant, period: str, payload: dict) -> dict:
     raw = {}
     try:

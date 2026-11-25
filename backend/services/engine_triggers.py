@@ -98,6 +98,19 @@ def after_restock_decision(db: Session, restaurant_id: int, po_id: int, *, appro
             "unit": po.unit or "",
         },
     )
+    restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
+    if restaurant:
+        from services.approval_workflow import ensure_reminder_row
+        from services.restock_workflow import placement_actor_role
+
+        ensure_reminder_row(
+            db,
+            restaurant_id,
+            "restock_place",
+            po.id,
+            po.requested_by_user_id,
+            actor_role=placement_actor_role(restaurant),
+        )
 
 
 def maybe_draft_reorders(db: Session, restaurant_id: int) -> int:

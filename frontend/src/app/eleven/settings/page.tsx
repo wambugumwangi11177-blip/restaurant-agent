@@ -108,6 +108,17 @@ export default function ElevenSettingsPage() {
       <GlassCard>
         <ChangePinPanel />
       </GlassCard>
+      <SectionLabel>Settings hub</SectionLabel>
+      <GlassCard>
+        <nav className="grid gap-2 text-sm">
+          <Link href="/eleven/settings/reports" className="underline">Reports</Link>
+          <Link href="/eleven/settings/notifications" className="underline">Notifications</Link>
+          <Link href="/eleven/settings/targets" className="underline">Targets</Link>
+          <Link href="/eleven/settings/restaurant" className="underline">Restaurant</Link>
+          <Link href="/eleven/settings/connections" className="underline">Connections</Link>
+          <Link href="/eleven/settings/language" className="underline">Language</Link>
+        </nav>
+      </GlassCard>
       <SectionLabel>Your till</SectionLabel>
       <GlassCard>
         <Link href="/eleven/settings/till" className="inline-flex min-h-11 items-center text-sm text-white underline">Review QuickSell receipt and parser evidence</Link>

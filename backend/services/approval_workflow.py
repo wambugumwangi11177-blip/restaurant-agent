@@ -23,6 +23,7 @@ _ACTOR_ROLE: dict[str, str] = {
     "delivery": "owner",
     "zone_photo": "owner",
     "restock": "owner",
+    "restock_place": "stockkeeper",
     "cost_unknown": "owner",
 }
 
@@ -32,6 +33,7 @@ _TYPE_LABEL: dict[str, str] = {
     "waste": "Write-off",
     "spoilage": "Write-off",
     "restock": "Restock",
+    "restock_place": "Place order",
     "handover": "Handover",
     "delivery": "Delivery",
     "close": "Day close",

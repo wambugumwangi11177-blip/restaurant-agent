@@ -542,6 +542,43 @@ def voids_by_staff(db: Session = Depends(get_db), current_user=Depends(auth.get_
 def supplier_prices(db: Session = Depends(get_db), current_user=Depends(auth.get_current_user)):
     _require_owner(current_user)
     restaurant = get_or_create_restaurant(db, current_user)
-    items = db.query(models.InventoryItem).filter(models.InventoryItem.restaurant_id == restaurant.id).limit(8).all()
-    lines = [{"name": i.item_name, "kes_per_unit": (i.cost_per_unit or 0) / 100} for i in items if i.cost_per_unit]
+    items = db.query(models.InventoryItem).filter(models.InventoryItem.restaurant_id == restaurant.id).limit(12).all()
+    lines = []
+    for i in items:
+        if not i.cost_per_unit:
+            continue
+        supplier = (
+            db.query(models.Supplier).filter(models.Supplier.id == i.default_supplier_id).first()
+            if i.default_supplier_id
+            else None
+        )
+        pos = (
+            db.query(models.PurchaseOrder)
+            .filter(
+                models.PurchaseOrder.restaurant_id == restaurant.id,
+                models.PurchaseOrder.inventory_item_id == i.id,
+                models.PurchaseOrder.cost_per_unit.isnot(None),
+            )
+            .order_by(models.PurchaseOrder.id.desc())
+            .limit(6)
+            .all()
+        )
+        trend = [
+            {
+                "at": (p.ordered_at or p.created_at).date().isoformat() if (p.ordered_at or p.created_at) else "",
+                "kes_per_unit": (p.cost_per_unit or 0) / 100,
+            }
+            for p in reversed(pos)
+        ]
+        if not trend:
+            trend = [{"at": "latest", "kes_per_unit": (i.cost_per_unit or 0)}]
+        kes = float(i.cost_per_unit or 0)
+        lines.append(
+            {
+                "name": i.item_name,
+                "supplier": supplier.name if supplier else "",
+                "kes_per_unit": kes,
+                "trend": trend,
+            }
+        )
     return {"has_sales": bool(lines), "lines": lines, "empty": "Starts when invoice prices are confirmed."}

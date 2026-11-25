@@ -175,11 +175,33 @@ Existing: `GET /api/v1/store/approvals`, `GET /api/v1/eleven/pnl`, `GET /api/v1/
 
 ---
 
+## Restock human-in-the-loop (owner + Jack)
+
+When Jack or the reorder job flags low stock, the system creates a **PENDING** purchase order and an **invoice draft** (supplier, lines, qty, last unit price) stored on the PO notes. Nothing changes stock or prices automatically.
+
+| Step | Actor | UI |
+|------|-------|-----|
+| Draft created | system (suggest only) | Owner sees **Needs you** on `restock`; Jack sees qty/supplier **without prices** |
+| Owner approves | owner | PO → `APPROVED`; **Needs you** moves to placer (`restock_place`) per `restock_routing_mode` (`owner_approves` → owner places; `staples_self` → Jack; `flag_office` → accountant) |
+| Place order | placer | `POST /store/restock/ordered`; others see **Waiting on &lt;name&gt;** |
+
+Routing is read from Jack questionnaire → `Restaurant.restock_routing_mode`. Tests: `backend/tests/test_restock_workflow.py`.
+
+## Scheduled owner reports
+
+| Job | Cron (UTC) | Local | Output |
+|-----|------------|-------|--------|
+| Daily store report | 18:00 | 21:00 EAT | `Notification` + row in Settings › Reports list (`reports_past` in owner prefs JSON) |
+| Weekly summary | Mon 05:00 | Mon 08:00 EAT | same |
+| Monthly P&L | 1st 03:00 | 1st 06:00 EAT | same + export link |
+
+Implementation: `backend/services/owner_reports.py`, registered in `main.py` APScheduler.
+
 ## Tests
 
-- Backend: pytest per new router module under `backend/tests/test_eleven_v11_*.py`.
+- Backend: pytest per new router module under `backend/tests/test_eleven_v11_*.py`, plus `test_owner_reports.py`, `test_restock_workflow.py`.
 - Frontend: vitest for formatters; Playwright `ui-broken-sweep` clicks in-page buttons (not only nav).
-- Captures: 390×844, `serviceWorkers: block`, files `v11-{empty|data}-{page}.png` for Home, Money (top, full P&L, Dishes), Stock (top, Suppliers, Prep), More, Settings›Reports, Ask OS.
+- Captures: 390×844, `serviceWorkers: block`, **PIN unlock after login** (`SEED_OWNER_PIN`), wait for page chrome before screenshot; files `v11-{empty|data}-{page}.png` for Home, Money (top, full P&L, Dishes, bills, supplier trends), Stock (top, Suppliers, Prep), More, Team (`/eleven/more/team`), Settings›Reports, Ask OS.
 
 ---
 

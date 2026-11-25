@@ -176,6 +176,10 @@ def draft_purchase_order(
     db.add(po)
     db.commit()
     db.refresh(po)
+    from services.restock_workflow import attach_draft_to_notes, build_invoice_draft
+
+    attach_draft_to_notes(po, build_invoice_draft(db, po))
+    db.commit()
 
     from events.bus import emit_async, EventType
     emit_async(EventType.PURCHASE_ORDER_CREATED, {

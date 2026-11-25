@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import OwnerShell from "@/components/eleven/OwnerShell";
 import { ForecastBlock, PieBlock, SalesLineBlock, WaterfallBlock, WeekBarsBlock } from "@/components/eleven/v11/ChartBlocks";
 import OwnerChartCard from "@/components/eleven/charts/OwnerChartCard";
@@ -87,6 +88,30 @@ export default function ElevenMoneyPage() {
           emptyHint="Starts when the till connects."
         >
           <p className="text-sm text-zinc-400">{heatCells.length} busy slots recorded</p>
+        </OwnerChartCard>
+
+        <OwnerChartCard
+          title="Bills & cash after bills"
+          caption="30-day line after approved bills."
+          detailHref="/eleven/money/bills"
+          hasData
+          emptyHint="See bills detail."
+        >
+          <Link href="/eleven/money/bills" className="text-sm text-white underline">
+            Open bills detail
+          </Link>
+        </OwnerChartCard>
+
+        <OwnerChartCard
+          title="Supplier price trends"
+          caption="Last invoice unit prices — suggest-only; humans approve."
+          detailHref="/eleven/money/supplier-prices"
+          hasData
+          emptyHint="See supplier trends."
+        >
+          <Link href="/eleven/money/supplier-prices" className="text-sm text-white underline">
+            Open supplier trends
+          </Link>
         </OwnerChartCard>
 
         <OwnerChartCard title="Last 3 months" caption="Bars are calendar months; line is the average." hasData={!!month3?.has_sales} emptyHint={month3?.empty ?? "Starts when the till connects."}>

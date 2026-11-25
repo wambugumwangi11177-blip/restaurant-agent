@@ -157,7 +157,7 @@ test("capture empty and data mobile states", async () => {
       const roleShots = SHOTS.filter((s) => s.prefix === prefix && s.role === key);
       for (const shot of roleShots) {
         await page.goto(shot.path, { waitUntil: "domcontentloaded" });
-        await page.waitForTimeout(1200);
+        await page.waitForTimeout(shot.role === "owner" ? 2500 : 1200);
         await expect(page.locator("body")).not.toContainText(RAW_PATH);
         await expect(page.locator("body")).toContainText(shot.marker, { timeout: 20000 });
         await assertNoRibs(page);

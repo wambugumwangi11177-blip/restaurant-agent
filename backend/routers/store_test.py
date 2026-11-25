@@ -106,5 +106,19 @@ async def run_reorder_draft(
     if nudged:
         db.flush()
     count = engine_triggers.maybe_draft_reorders(db, restaurant.id)
+    if count == 0 and nudged:
+        for item in (
+            db.query(models.InventoryItem)
+            .filter(
+                models.InventoryItem.restaurant_id == restaurant.id,
+                models.InventoryItem.par_level.isnot(None),
+                models.InventoryItem.default_supplier_id.isnot(None),
+            )
+            .all()
+        ):
+            threshold = item.low_stock_threshold or 1.0
+            item.quantity = min(item.quantity or 0, threshold * 0.1)
+        db.flush()
+        count = engine_triggers.maybe_draft_reorders(db, restaurant.id)
     db.commit()
     return {"drafted": count, "nudged_for_test": nudged}

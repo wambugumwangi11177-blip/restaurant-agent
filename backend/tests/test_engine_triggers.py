@@ -151,7 +151,7 @@ def test_maybe_draft_reorders_invokes_draft(db_session, empty_stack, monkeypatch
     def fake_find(*_a, **_k):
         return [cand]
 
-    def fake_draft(db, rid, candidate, commit=True):
+    def fake_draft(db, rid, candidate, requested_by_user_id=None):
         drafts.append(candidate.inventory_item_id)
         row = models.PurchaseOrder(
             restaurant_id=rid,
@@ -162,8 +162,7 @@ def test_maybe_draft_reorders_invokes_draft(db_session, empty_stack, monkeypatch
             status="PENDING",
         )
         db.add(row)
-        if commit:
-            db.commit()
+        db.commit()
 
     monkeypatch.setattr("ai.reorder.find_reorder_candidates", fake_find)
     monkeypatch.setattr("ai.reorder.draft_purchase_order", fake_draft)

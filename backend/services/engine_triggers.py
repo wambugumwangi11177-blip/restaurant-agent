@@ -123,7 +123,7 @@ def maybe_draft_reorders(db: Session, restaurant_id: int) -> int:
         db.flush()
         drafted = 0
         for candidate in find_reorder_candidates(db, restaurant_id):
-            draft_purchase_order(db, restaurant_id, candidate, commit=True)
+            draft_purchase_order(db, restaurant_id, candidate)
             drafted += 1
         return drafted
     except Exception:

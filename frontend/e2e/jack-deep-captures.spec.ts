@@ -480,10 +480,16 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     }
     await page.waitForTimeout(1000);
   }
+  const restockOrders = await (await apiGet(page.request, token!, "/api/v1/store/restock")).json();
+  expect(
+    (restockOrders.orders || []).some((o: { status?: string }) => o.status === "PENDING"),
+    `expected PENDING PO, got ${JSON.stringify(restockOrders.orders || [])}`,
+  ).toBeTruthy();
   expect(jackWaitingBefore, "Jack should see Waiting on after low-stock engine runs").toBeTruthy();
   await page.goto("/store/requests", { waitUntil: "domcontentloaded" });
   await unlockPinIfNeeded(page, PIN);
   await expect(page.getByText(/waiting on owner/i)).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator("main")).not.toBeEmpty();
   await shot(page, "12-restock-jack");
 
   if (OWNER_PASS || TEMP) {

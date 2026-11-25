@@ -754,11 +754,21 @@ def chat_llm(request: Request, body: ChatBody, db: Session = Depends(get_db),
         except Exception:
             card = _unavailable_card(module)
     else:
+        from routers.eleven_help import _PAGES as _OWNER_HELP
+
+        help_preface = ""
+        if user.staff_role == models.StaffRole.OWNER and any(
+            w in lower_question for w in ("help", "how do i", "what is", "where is", "guide")
+        ):
+            help_preface = _OWNER_HELP + "\n\n"
         card = {
-            "finding": "This question can be answered without restaurant records.",
+            "finding": help_preface + "This question can be answered without restaurant records.",
             "why": "General guidance and software explanations are not restaurant analysis.",
-            "impact": "Not applicable", "recommendation": "Answer the owner's question directly.",
-            "module": module, "steps": [], "data": {"analysis_requested": False},
+            "impact": "Not applicable",
+            "recommendation": "Answer the owner's question directly.",
+            "module": module,
+            "steps": [],
+            "data": {"analysis_requested": False, "help_corpus": bool(help_preface)},
         }
 
     from routers.overview import records_directly

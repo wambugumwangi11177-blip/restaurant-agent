@@ -44,7 +44,7 @@ async function login(page, email: string) {
   await page.locator('button[type="submit"]').click();
   await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 60000 });
   const pin = process.env.SEED_OWNER_PIN || "2468";
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://backend-test-production-0160.up.railway.app";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://backend-test-production-05524237.up.railway.app";
   if (accessToken) {
     await page.evaluate(
       async ({ token, pinCode, base }) => {

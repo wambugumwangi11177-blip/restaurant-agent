@@ -431,7 +431,11 @@ def dishes_summary(db: Session = Depends(get_db), current_user=Depends(auth.get_
     restaurant = get_or_create_restaurant(db, current_user)
     eng = get_menu_engineering(db, restaurant.id)
     matrix = eng.get("matrix") or []
-    sold = [m for m in matrix if int(m.get("qty_sold") or 0) > 0]
+    sold = [
+        m
+        for m in matrix
+        if int(m.get("qty_sold") or 0) > 0 and "(demo)" not in (m.get("name") or "").lower()
+    ]
     if not sold:
         return {"has_sales": False, "empty": "Starts when dishes sell on the till."}
     quad = [

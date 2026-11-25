@@ -173,7 +173,7 @@ def seed_v12_catalog(
 
     if jack:
         for idx, (name, item) in enumerate(inv_by_name.items()):
-            marker_use = f"{_MARKER} weekly usage {name}"
+            marker_use = f"{_MARKER} weekly usage v2 {name}"
             if db.query(models.StockMovement).filter(
                 models.StockMovement.inventory_item_id == item.id,
                 models.StockMovement.reason == marker_use,
@@ -192,15 +192,16 @@ def seed_v12_catalog(
                     )
                 )
 
-    demo_pilau = (
-        db.query(models.MenuItem)
-        .filter(models.MenuItem.restaurant_id == restaurant.id, models.MenuItem.name == "Pilau (demo)")
-        .first()
-    )
-    if demo_pilau and pilau_item:
-        db.query(models.MenuIngredient).filter(models.MenuIngredient.menu_item_id == demo_pilau.id).delete()
-        db.delete(demo_pilau)
-        log.append("[V12] removed Pilau (demo) duplicate")
+    for demo_name in ("Pilau (demo)", "Nyama Choma (demo)"):
+        demo_dish = (
+            db.query(models.MenuItem)
+            .filter(models.MenuItem.restaurant_id == restaurant.id, models.MenuItem.name == demo_name)
+            .first()
+        )
+        if demo_dish:
+            db.query(models.MenuIngredient).filter(models.MenuIngredient.menu_item_id == demo_dish.id).delete()
+            db.delete(demo_dish)
+            log.append(f"[V12] removed {demo_name}")
 
     rice = inv_by_name["Rice"]
     if jack:

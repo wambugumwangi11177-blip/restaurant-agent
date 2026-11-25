@@ -409,6 +409,9 @@ async def opening_count(
         detail={"zone": zone.name, "buying_unit": body.buying_unit, "yield_fraction": body.yield_fraction},
     )
     db.commit()
+    from services import engine_triggers
+
+    engine_triggers.after_inventory_touch(db, restaurant.id)
     return {"id": item.id, "item_name": item.item_name, "quantity": item.quantity, "unit": item.unit, "zone": zone.name}
 
 

@@ -355,6 +355,7 @@ def ensure_eleven_test_data(
         empty_owner.active_restaurant_id = empty_restaurant.id
         empty_owner.tenant_id = tenant.id
     _ensure_empty_wall_stack(db, tenant, empty_restaurant, empty_owner, owner_password, log)
+    _ensure_empty_wall_no_sales(db, empty_restaurant, log)
     _ensure_pos_source_bindings(db, restaurant.id, empty_restaurant.id, log)
 
     super_user = db.query(models.User).filter(models.User.email == SUPERADMIN_EMAIL).first()
@@ -520,16 +521,32 @@ def sync_test_stack_credentials(db: Session) -> list[str]:
 
 
 def _seed_demo_sales_month(db, restaurant, pilau, log: list[str]) -> None:
-    """Spread Pilau sales across 30 days so owner Money P&L matches bill cadence."""
+    """90 days Nairobi-shaped till sales (weekends busier, cash/M-Pesa mix)."""
     from datetime import timedelta
 
     from time_utils import utcnow
 
     if pilau is None:
         return
-    marker = "[DEMO-SALES-30D]"
+    marker = "[DEMO-SALES-90D]"
     now = utcnow()
-    for day in range(30):
+    nyama = (
+        db.query(models.MenuItem)
+        .filter(models.MenuItem.restaurant_id == restaurant.id, models.MenuItem.name.contains("Nyama"))
+        .first()
+    )
+    if nyama is None:
+        nyama = models.MenuItem(
+            restaurant_id=restaurant.id,
+            name="Nyama Choma (demo)",
+            price=65000,
+            cost_price=22000,
+            category="Grill",
+        )
+        db.add(nyama)
+        db.flush()
+        log.append("[CREATED] demo dish Nyama Choma")
+    for day in range(90):
         when = now - timedelta(days=day)
         exists = (
             db.query(models.Order.id)
@@ -541,37 +558,70 @@ def _seed_demo_sales_month(db, restaurant, pilau, log: list[str]) -> None:
         )
         if exists:
             continue
-        qty = 10 + (day % 5)
-        line_total = qty * 45000
+        weekend = when.weekday() >= 4
+        qty = (14 if weekend else 8) + (day % 6)
+        dish = nyama if day % 3 == 0 else pilau
+        unit = dish.price
+        line_total = qty * unit
+        pay = models.PaymentMethod.MPESA if day % 2 == 0 else models.PaymentMethod.CASH
+        otype = models.OrderType.DELIVERY if day % 5 == 0 else models.OrderType.DINE_IN
+        hour = 12 + (day % 8) + (2 if weekend else 0)
+        stamped = when.replace(hour=min(hour, 22), minute=(day * 7) % 60)
         order = models.Order(
             restaurant_id=restaurant.id,
             status=models.OrderStatus.SERVED,
-            order_type=models.OrderType.DINE_IN,
+            order_type=otype,
             is_paid=True,
+            payment_method=pay,
             total=line_total,
             notes=f"{marker} day-{day}",
-            created_at=when,
+            created_at=stamped,
         )
         db.add(order)
         db.flush()
         db.add(
             models.OrderItem(
                 order_id=order.id,
-                menu_item_id=pilau.id,
+                menu_item_id=dish.id,
                 quantity=qty,
-                unit_price=45000,
+                unit_price=unit,
+            )
+        )
+    if not db.query(models.Order).filter(
+        models.Order.restaurant_id == restaurant.id,
+        models.Order.notes == f"{marker} void-sample",
+    ).first():
+        db.add(
+            models.Order(
+                restaurant_id=restaurant.id,
+                status=models.OrderStatus.CANCELLED,
+                order_type=models.OrderType.DINE_IN,
+                is_paid=False,
+                total=45000,
+                notes=f"{marker} void-sample",
+                created_at=now - timedelta(days=3),
             )
         )
     created = (
         db.query(models.Order)
-        .filter(
-            models.Order.restaurant_id == restaurant.id,
-            models.Order.notes.contains(marker),
-        )
+        .filter(models.Order.restaurant_id == restaurant.id, models.Order.notes.contains(marker))
         .count()
     )
     if created:
-        log.append(f"[REFRESH] demo sales across {created} days for Money P&L")
+        log.append(f"[REFRESH] demo sales across {created} Nairobi days (90d window)")
+
+
+def _ensure_empty_wall_no_sales(db, empty_restaurant, log: list[str]) -> None:
+    removed = (
+        db.query(models.Order)
+        .filter(
+            models.Order.restaurant_id == empty_restaurant.id,
+            models.Order.notes.contains("[DEMO]"),
+        )
+        .delete(synchronize_session=False)
+    )
+    if removed:
+        log.append(f"[CLEAN] removed {removed} demo orders from empty stack")
 
 
 def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, pilau, log: list[str]) -> None:

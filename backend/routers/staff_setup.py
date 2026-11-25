@@ -102,7 +102,16 @@ def _progress(db: Session, user: models.User, restaurant_id: int) -> models.Staf
     return row
 
 
-def _step_state(progress: models.StaffSetupProgress | None, user: models.User) -> dict:
+def _has_stock_items(db: Session, restaurant_id: int) -> bool:
+    return (
+        db.query(models.InventoryItem.id)
+        .filter(models.InventoryItem.restaurant_id == restaurant_id)
+        .first()
+        is not None
+    )
+
+
+def _step_state(progress: models.StaffSetupProgress | None, user: models.User, *, has_stock_items: bool = False) -> dict:
     account_done = bool(user.hashed_pin) and not user.must_change_password and (
         progress is None or progress.account_completed_at is not None or not user.must_change_password
     )
@@ -124,7 +133,20 @@ def _step_state(progress: models.StaffSetupProgress | None, user: models.User) -
         question_reason = None
     else:
         question_state = "locked"
-        question_reason = "Change the password you were given and set your own 4-digit PIN first."
+        question_reason = "Create your password and a 4-digit PIN first."
+    if recipes_done:
+        recipe_state = "done"
+        recipe_reason = None
+    elif questions_done:
+        recipe_state = "open"
+        recipe_reason = None
+    elif account_done:
+        recipe_state = "locked"
+        recipe_reason = "Answer the setup questions first — they decide who orders and who receives."
+    else:
+        recipe_state = "locked"
+        recipe_reason = "Unlocks after your password, PIN, and the setup questions."
+    stock_state = "done" if has_stock_items else ("open" if questions_done else "locked")
     return {
         "must_change_password": bool(user.must_change_password),
         "has_pin": bool(user.hashed_pin),
@@ -134,27 +156,35 @@ def _step_state(progress: models.StaffSetupProgress | None, user: models.User) -
                 "id": "account",
                 "title": "Your login",
                 "state": "done" if account_done else "open",
-                "unlocks": "The questions, then the store",
-                "locked_reason": None if account_done else "Sign in, replace the temporary password, and choose a 4-digit PIN.",
+                "unlocks": "Setup questions, then the store",
+                "locked_reason": None if account_done else "Sign in, choose your own password, and set a 4-digit PIN.",
                 "completed_at": progress.account_completed_at.isoformat() if progress and progress.account_completed_at else None,
             },
             {
-                "id": "recipes",
-                "title": "Recipes",
-                "state": "done" if recipes_done else ("open" if account_done else "locked"),
-                "unlocks": "Optional. Fill dishes in over time.",
-                "locked_reason": None if (account_done or recipes_done) else "Unlocks after your password and PIN are saved.",
-                "completed_at": progress.recipes_completed_at.isoformat() if progress and progress.recipes_completed_at else None,
-            },
-            {
                 "id": "questionnaire",
-                "title": "A few questions",
+                "title": "How this store runs",
                 "state": question_state,
-                "unlocks": "A specific page or module for each answer",
+                "unlocks": "Who orders, who receives, and which pages open",
                 "locked_reason": question_reason,
                 "completed_at": progress.questionnaire_completed_at.isoformat() if progress and progress.questionnaire_completed_at else None,
                 "runnable": question_state in ("open", "done"),
                 "questions": questions["questions"],
+            },
+            {
+                "id": "recipes",
+                "title": "Recipes",
+                "state": recipe_state,
+                "unlocks": "Dish → ingredients for the owner menu",
+                "locked_reason": recipe_reason,
+                "completed_at": progress.recipes_completed_at.isoformat() if progress and progress.recipes_completed_at else None,
+            },
+            {
+                "id": "stock",
+                "title": "What's in the store",
+                "state": stock_state,
+                "unlocks": "Stock levels and reorder for the owner",
+                "locked_reason": None if stock_state != "locked" else "Starts after the setup questions.",
+                "href": "/store/stock" if stock_state == "open" else None,
             },
         ],
     }
@@ -238,7 +268,7 @@ async def get_setup(
     ).first()
     # Don't create a row just by looking. Creation happens when the owner
     # makes the login, or when this person finishes a step.
-    payload = _step_state(progress, current_user)
+    payload = _step_state(progress, current_user, has_stock_items=_has_stock_items(db, restaurant.id))
     payload["restaurant_id"] = restaurant.id
     answers = latest_answers(db, current_user.id)
     payload["unlocked_modules"] = sorted(unlocked_modules(db, current_user) - {"*"}) if current_user.role not in (models.Role.ADMIN, models.Role.SUPERADMIN) else sorted({
@@ -342,7 +372,7 @@ async def complete_account(
         "Store setup: login saved",
         f"{user.email} changed the temporary password and set a PIN.",
     )
-    return _step_state(progress, user)
+    return _step_state(progress, user, has_stock_items=_has_stock_items(db, restaurant.id))
 
 
 @router.post("/recipes")
@@ -388,7 +418,7 @@ async def complete_recipes(
             "Store setup: recipes saved",
             f"{user.email} finished taking in recipes ({line_count} line(s)).",
         )
-    return _step_state(progress, user)
+    return _step_state(progress, user, has_stock_items=_has_stock_items(db, restaurant.id))
 
 
 @router.post("/questionnaire")
@@ -473,7 +503,7 @@ async def answer_question(
     db.commit()
     if row.delegated:
         _notify_owners(db, user, restaurant, "Question needs an answer", summary)
-    payload = _step_state(progress, user)
+    payload = _step_state(progress, user, has_stock_items=_has_stock_items(db, restaurant.id))
     payload["opens"] = row.opens
     payload["unlocks"] = row.unlocks
     payload["delegated"] = bool(row.delegated)
@@ -496,7 +526,7 @@ async def setup_activity(
     )
     people = []
     for progress, person in rows:
-        state = _step_state(progress, person)
+        state = _step_state(progress, person, has_stock_items=_has_stock_items(db, restaurant.id))
         who = person_of(db, person)
         people.append({
             "user_id": person.id,

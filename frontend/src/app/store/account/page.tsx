@@ -37,7 +37,7 @@ export default function StoreAccountPage() {
         new_password: newPassword,
         pin,
       });
-      router.replace("/store/recipes");
+      router.replace("/store/questions");
       router.refresh();
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;

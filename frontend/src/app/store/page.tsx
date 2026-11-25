@@ -55,7 +55,16 @@ export default function StoreHomePage() {
       ) : (
         <ol className="space-y-3">
           {setup.steps.map((step) => {
-            const href = step.id === "account" ? "/store/account" : step.id === "recipes" ? "/store/recipes" : step.id === "questionnaire" ? "/store/questions" : null;
+            const href =
+              step.id === "account"
+                ? "/store/account"
+                : step.id === "questionnaire"
+                  ? "/store/questions"
+                  : step.id === "recipes"
+                    ? "/store/recipes"
+                    : step.id === "stock"
+                      ? "/store/stock"
+                      : (step as { href?: string }).href ?? null;
             const open = step.state !== "locked" && href;
             const body = (
               <>

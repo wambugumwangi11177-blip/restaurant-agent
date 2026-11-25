@@ -397,13 +397,21 @@ def test_delivery_evidence_stores_a_private_key_and_questions_are_config(client,
     from main import app
     paths = [getattr(route, "path", "") for route in app.routes]
     assert not any("delivery-evidence" in path or path.endswith("/receipts") for path in paths)
-    setup = client.get("/api/v1/staff-setup", headers=_auth(_token(owner)))
-    questions = setup.json()["steps"][2]["questions"]
+    jack = _add_staff(db_session, tenant, restaurant, "jack-evidence@eleven.leviii", models.StaffRole.STOCKKEEPER)
+    setup = client.get("/api/v1/staff-setup", headers=_auth(_token(jack)))
+    questionnaire = next(s for s in setup.json()["steps"] if s["id"] == "questionnaire")
+    questions = questionnaire["questions"]
     receives = next(q for q in questions if q["id"] == "receives_deliveries")
     assert receives["answers"][0]["opens"] == "/store/deliveries"
     assert receives["answers"][0]["unlocks"] == "deliveries"
     assert questions[0]["id"] == "ordering_method"
-    assert setup.json()["steps"][2]["runnable"] is False
+    assert questionnaire["runnable"] is True
+    jack_locked = _add_staff(
+        db_session, tenant, restaurant, "jack-locked@eleven.leviii", models.StaffRole.STOCKKEEPER, must_change=True
+    )
+    locked = client.get("/api/v1/staff-setup", headers=_auth(_token(jack_locked))).json()
+    locked_q = next(s for s in locked["steps"] if s["id"] == "questionnaire")
+    assert locked_q["runnable"] is False
     missing = client.post(
         "/api/v1/staff-setup/questionnaire",
         headers=_auth(_token(owner)),

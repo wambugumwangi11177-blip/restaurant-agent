@@ -39,8 +39,9 @@ STAFF = (
     ("amina@eleven.leviii", StaffRole.CONTROLLER, "Amina"),
 )
 EMPTY_OWNER_EMAIL = "owner-empty@eleven.leviii"
+JACK_EMPTY_EMAIL = "jack-empty@eleven.leviii"
 EMPTY_WALL_STAFF = (
-    ("jack-empty@eleven.leviii", StaffRole.STOCKKEEPER, "Jack"),
+    (JACK_EMPTY_EMAIL, StaffRole.STOCKKEEPER, "Jack"),
     ("amina-empty@eleven.leviii", StaffRole.CONTROLLER, "Amina"),
 )
 
@@ -482,7 +483,14 @@ def _ensure_empty_wall_stack(
             progress = StaffSetupProgress(user_id=user.id, restaurant_id=test_restaurant.id)
             db.add(progress)
             db.flush()
-        progress.account_completed_at = now
+        jack_first_login = email == JACK_EMPTY_EMAIL and _truthy("SEED_JACK_EMPTY_FIRST_LOGIN")
+        if jack_first_login and staff_pass:
+            user.must_change_password = True
+            user.hashed_password = auth.get_password_hash(staff_pass)
+            progress.account_completed_at = None
+            log.append(f"[SYNC] {email} first-login QA (must_change_password)")
+        else:
+            progress.account_completed_at = now
         progress.recipes_completed_at = None
         progress.questionnaire_completed_at = None
         progress.updated_at = now
@@ -515,13 +523,19 @@ def sync_test_stack_credentials(db: Session) -> list[str]:
                 log.append("[SYNC] owner app PIN for test unlock")
             log.append(f"[SYNC] owner password for {email}")
         elif staff_pass:
-            user.hashed_password = auth.get_password_hash(staff_pass)
-            user.must_change_password = False
+            if email == JACK_EMPTY_EMAIL and _truthy("SEED_JACK_EMPTY_FIRST_LOGIN"):
+                user.hashed_password = auth.get_password_hash(staff_pass)
+                user.must_change_password = True
+                log.append(f"[SYNC] {email} stays on first-login password step")
+            else:
+                user.hashed_password = auth.get_password_hash(staff_pass)
+                user.must_change_password = False
             pin = os.getenv("SEED_STAFF_PIN", "1357")
             if not user.hashed_pin:
                 user.hashed_pin = auth.get_pin_hash(pin)
                 log.append(f"[SYNC] app PIN for {email}")
-            log.append(f"[SYNC] password for {email}")
+            if not (email == JACK_EMPTY_EMAIL and _truthy("SEED_JACK_EMPTY_FIRST_LOGIN")):
+                log.append(f"[SYNC] password for {email}")
     if log:
         db.commit()
     return log

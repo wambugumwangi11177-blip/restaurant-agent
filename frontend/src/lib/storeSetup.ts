@@ -32,6 +32,7 @@ export type SetupStep = {
   completed_at: string | null;
   runnable?: boolean;
   questions?: SetupQuestion[];
+  href?: string | null;
 };
 
 export type GivenAnswer = {

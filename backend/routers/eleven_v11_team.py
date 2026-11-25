@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 import auth
 import models
 from database import get_db
-from handover import list_tenant_logins
 from people import person_of
 from routers.deps import get_or_create_restaurant
 from routers.eleven_owner import _require_owner
@@ -29,8 +28,16 @@ def team_hub(db: Session = Depends(get_db), current_user=Depends(auth.get_curren
         .order_by(models.StaffMember.name)
         .all()
     )
-    logins = list_tenant_logins(db, current_user.tenant_id)
-    jack_row = next((u for u in logins if u.staff_role == models.StaffRole.STOCKKEEPER), None)
+    jack_row = (
+        db.query(models.User)
+        .filter(
+            models.User.active_restaurant_id == restaurant.id,
+            models.User.staff_role == models.StaffRole.STOCKKEEPER,
+            models.User.is_active.is_(True),
+        )
+        .order_by(models.User.id.asc())
+        .first()
+    )
     jack_block = None
     if jack_row:
         progress = (

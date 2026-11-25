@@ -36,7 +36,14 @@ def list_logins(
 ):
     if current_user.tenant_id is None:
         raise HTTPException(status_code=400, detail="No tenant on this account.")
+    restaurant = get_or_create_restaurant(db, current_user)
     rows = handover.list_tenant_logins(db, current_user.tenant_id)
+    rows = [
+        u
+        for u in rows
+        if u.role != models.Role.SUPERADMIN
+        and u.active_restaurant_id == restaurant.id
+    ]
     return [
         LoginRow(
             id=u.id,

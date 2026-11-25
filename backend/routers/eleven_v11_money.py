@@ -73,12 +73,13 @@ def money_waterfall(db: Session = Depends(get_db), current_user=Depends(auth.get
     pnl = owner_pnl_sync(db, current_user)
     if not pnl.get("has_sales"):
         return {"has_sales": False, "steps": [], "empty": "Starts when the till connects."}
+    pay_label = "Pay" if pnl["labor_cents"] > 0 else "Pay (add in Settings)"
     steps = [
         {"label": "Sales", "kes": pnl["revenue_cents"] / 100.0},
         {"label": "Food cost", "kes": -(pnl["food_cost_cents"] / 100.0)},
         {"label": "Gross profit", "kes": pnl["gross_margin_cents"] / 100.0},
         {"label": "Bills", "kes": -(pnl["bills_cents"] / 100.0)},
-        {"label": "Pay", "kes": -(pnl["labor_cents"] / 100.0)},
+        {"label": pay_label, "kes": -(pnl["labor_cents"] / 100.0)},
         {"label": "Net", "kes": pnl["net_cents"] / 100.0},
     ]
     return {"has_sales": True, "steps": steps, "empty": None}
@@ -360,10 +361,31 @@ def money_bills(db: Session = Depends(get_db), current_user=Depends(auth.get_cur
             paid += 1
         else:
             due += 1
+    from collections import defaultdict
+
     orders = _orders(db, restaurant.id, 30)
-    sales = sum(int(o.total or 0) for o in orders)
-    bills_sum = sum(int(r.amount_cents or 0) for r in rows if r.status == "approved")
-    series = [{"day": f"-{d}d", "after_bills_kes": (sales - bills_sum) / 100 / 30} for d in range(30, 0, -3)]
+    sales_by_day: dict[str, int] = defaultdict(int)
+    for o in orders:
+        if not o.created_at:
+            continue
+        key = o.created_at.date().isoformat()
+        sales_by_day[key] += int(o.total or 0)
+    bill_by_day: dict[str, int] = defaultdict(int)
+    for r in rows:
+        if r.status != "approved" or not r.approved_at:
+            continue
+        bill_by_day[r.approved_at.date().isoformat()] += int(r.amount_cents or 0)
+    days = sorted(sales_by_day.keys())[-30:]
+    series = []
+    run_bills = 0
+    for day in days:
+        run_bills += bill_by_day.get(day, 0)
+        series.append(
+            {
+                "day": day[5:],
+                "after_bills_kes": (sales_by_day[day] - run_bills) / 100.0,
+            }
+        )
     has = bool(rows)
     return {
         "has_sales": has,
@@ -459,7 +481,12 @@ def three_month(db: Session = Depends(get_db), current_user=Depends(auth.get_cur
         )
         bars.append({"month": start.strftime("%Y-%m"), "kes": total / 100})
     avg = sum(b["kes"] for b in bars) / len(bars) if bars else 0
-    return {"has_sales": any(b["kes"] for b in bars), "bars": list(reversed(bars)), "average_kes": avg, "empty": "Starts when the till connects."}
+    now = utcnow()
+    out = list(reversed(bars))
+    if out and out[-1]["month"] == now.strftime("%Y-%m"):
+        out[-1]["partial"] = True
+        out[-1]["month"] = f"{out[-1]['month']} (partial)"
+    return {"has_sales": any(b["kes"] for b in bars), "bars": out, "average_kes": avg, "empty": "Starts when the till connects."}
 
 
 @router.get("/waste")

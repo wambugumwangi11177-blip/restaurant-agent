@@ -166,6 +166,8 @@ def ensure_eleven_test_data(
             log.append(f"[CREATED] staff login {email}")
         else:
             log.append(f"[EXISTS] staff login {email}")
+        user.active_restaurant_id = restaurant.id
+        user.tenant_id = tenant.id
         if (
             db.query(models.StaffMember)
             .filter(models.StaffMember.restaurant_id == restaurant.id, models.StaffMember.user_id == user.id)
@@ -635,11 +637,38 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
     today = business_today()
     if jack:
         prog = db.query(StaffSetupProgress).filter(StaffSetupProgress.user_id == jack.id).first()
-        if prog:
-            prog.account_completed_at = prog.account_completed_at or now
-            prog.recipes_completed_at = prog.recipes_completed_at or now
-            prog.questionnaire_completed_at = None
-            prog.updated_at = now
+        if prog is None:
+            prog = StaffSetupProgress(user_id=jack.id, restaurant_id=restaurant.id)
+            db.add(prog)
+            db.flush()
+        prog.account_completed_at = prog.account_completed_at or now
+        prog.recipes_completed_at = prog.recipes_completed_at or now
+        prog.updated_at = now
+        core_answers = (
+            ("ordering_method", "owner_approves", "Owner approves each order"),
+            ("receives_deliveries", "yes", "Yes"),
+            ("stock_in_pos", "no", "No"),
+            ("issues_to_kitchen", "yes", "Yes"),
+            ("records_waste", "yes", "Yes"),
+            ("closes_the_day", "me", "Jack closes"),
+            ("knows_running_costs", "knows_payer", "Knows who pays"),
+        )
+        for qid, value, label in core_answers:
+            if db.query(models.StaffSetupAnswer).filter_by(user_id=jack.id, question_id=qid).first():
+                continue
+            db.add(
+                models.StaffSetupAnswer(
+                    user_id=jack.id,
+                    restaurant_id=restaurant.id,
+                    question_id=qid,
+                    value=value,
+                    label=label,
+                    created_at=now,
+                )
+            )
+        prog.questionnaire_completed_at = now
+        restaurant.restock_routing_mode = "owner_approves"
+        log.append("[REFRESH] Jack questionnaire complete on data stack")
         if not db.query(models.StaffSetupAnswer).filter(
             models.StaffSetupAnswer.user_id == jack.id,
             models.StaffSetupAnswer.question_id == "receives_deliveries",
@@ -831,6 +860,65 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
         log.append("[CREATED] demo delivery with invoice photo for accountant")
 
     _seed_demo_sales_month(db, restaurant, pilau, log)
+
+    members = db.query(models.StaffMember).filter(models.StaffMember.restaurant_id == restaurant.id).all()
+    for member in members:
+        if db.query(models.LaborShift).filter_by(restaurant_id=restaurant.id, staff_member_id=member.id).first():
+            continue
+        db.add(
+            models.LaborShift(
+                restaurant_id=restaurant.id,
+                staff_member_id=member.id,
+                shift_date=today,
+                scheduled_hours=8.0,
+                actual_hours=8.0,
+                labor_cost=350000,
+            )
+        )
+    if members:
+        log.append("[REFRESH] demo labour shifts for P&L pay line")
+
+    import json
+
+    raw = {}
+    try:
+        raw = json.loads(restaurant.staple_caps_json or "{}")
+    except json.JSONDecodeError:
+        raw = {}
+    block = raw.get("__owner_v11__") if isinstance(raw.get("__owner_v11__"), dict) else {}
+    block["reports_past"] = [
+        {
+            "id": f"daily-{(today - timedelta(days=1)).isoformat()}",
+            "kind": "daily",
+            "title": f"Daily store report — {(today - timedelta(days=1)).isoformat()}",
+            "href": "/eleven/settings/reports",
+            "download": "/api/v1/eleven/settings/reports",
+        },
+        {
+            "id": f"daily-{(today - timedelta(days=2)).isoformat()}",
+            "kind": "daily",
+            "title": f"Daily store report — {(today - timedelta(days=2)).isoformat()}",
+            "href": "/eleven/settings/reports",
+            "download": "/api/v1/eleven/settings/reports",
+        },
+        {
+            "id": f"weekly-{today.isocalendar().week - 1}",
+            "kind": "weekly",
+            "title": "Weekly summary — last Monday",
+            "href": "/eleven/settings/reports",
+            "download": "/api/v1/eleven/settings/reports",
+        },
+        {
+            "id": f"monthly-{today.strftime('%Y-%m')}",
+            "kind": "monthly",
+            "title": f"Monthly P&L — {today.strftime('%Y-%m')}",
+            "href": f"/api/v1/eleven/money/export/monthly/{today.strftime('%Y-%m')}.xlsx",
+            "download": f"/api/v1/eleven/money/export/monthly/{today.strftime('%Y-%m')}.xlsx",
+        },
+    ]
+    raw["__owner_v11__"] = block
+    restaurant.staple_caps_json = json.dumps(raw)
+    log.append("[REFRESH] demo past reports list")
 
     if rice:
         rice.quantity = min(float(rice.quantity or 0), 1.5)

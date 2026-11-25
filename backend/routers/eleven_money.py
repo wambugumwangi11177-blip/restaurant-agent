@@ -33,40 +33,20 @@ def money_today_strip(
     _require_owner(current_user)
     restaurant = get_or_create_restaurant(db, current_user)
     start = _eat_day_start(utcnow())
-    revenue_cents = int(
-        db.query(func.coalesce(func.sum(models.Order.total), 0))
-        .filter(
-            models.Order.restaurant_id == restaurant.id,
-            models.Order.created_at >= start,
-            models.Order.is_paid.is_(True),
-            models.Order.status != models.OrderStatus.CANCELLED,
-        )
-        .scalar()
-        or 0
-    )
+    from services.owner_today import today_cash_breakdown
+
+    payload = today_cash_breakdown(db, restaurant.id, start)
     target_cents = int(getattr(restaurant, "monthly_sales_target_cents", 0) or 0)
     daily_target = target_cents // 30 if target_cents else None
+    revenue_cents = int(payload["sales_kes"] * 100)
     break_even_hour = None
     if daily_target and revenue_cents >= daily_target:
         break_even_hour = "passed"
     elif daily_target and revenue_cents > 0:
         break_even_hour = "before_close"
-    bills_due = int(
-        db.query(func.coalesce(func.sum(models.RunningCost.amount_cents), 0))
-        .filter(
-            models.RunningCost.restaurant_id == restaurant.id,
-            models.RunningCost.status.in_(("due", "approved")),
-        )
-        .scalar()
-        or 0
-    )
-    return {
-        "sales_kes": revenue_cents / 100.0,
-        "break_even": break_even_hour,
-        "cash_expected_kes": max(0, revenue_cents - bills_due) / 100.0,
-        "has_sales": revenue_cents > 0,
-        "empty": "Starts when the till connects.",
-    }
+    payload["break_even"] = break_even_hour
+    payload["empty"] = "Starts when the till connects."
+    return payload
 
 
 @router.get("/series/sales")

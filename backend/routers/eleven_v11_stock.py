@@ -192,5 +192,38 @@ def suppliers_summary(db: Session = Depends(get_db), current_user=Depends(auth.g
 def owner_prep(db: Session = Depends(get_db), current_user=Depends(auth.get_current_user)):
     _require_owner(current_user)
     restaurant = get_or_create_restaurant(db, current_user)
+    from collections import defaultdict
+    from datetime import timedelta
+
     items = prep_for_today(db, restaurant.id)
+    weekday = utcnow().date().weekday()
+    since = utcnow() - timedelta(days=35)
+    orders = (
+        db.query(models.Order)
+        .filter(
+            models.Order.restaurant_id == restaurant.id,
+            models.Order.created_at >= since,
+            models.Order.is_paid.is_(True),
+            models.Order.status != models.OrderStatus.CANCELLED,
+        )
+        .all()
+    )
+    qty_by_dish: dict[int, list[float]] = defaultdict(list)
+    for o in orders:
+        if not o.created_at or o.created_at.weekday() != weekday:
+            continue
+        for line in o.items:
+            qty_by_dish[line.menu_item_id].append(float(line.quantity))
+    for block in items:
+        dish_name = block.get("dish") or ""
+        dish = (
+            db.query(models.MenuItem)
+            .filter(models.MenuItem.restaurant_id == restaurant.id, models.MenuItem.name == dish_name)
+            .first()
+        )
+        if dish and qty_by_dish.get(dish.id):
+            plates = sum(qty_by_dish[dish.id]) / len(qty_by_dish[dish.id])
+        else:
+            plates = sum(float(n.get("quantity") or 0) for n in block.get("ingredients") or []) / 2
+        block["plates"] = max(1, round(plates))
     return {"has_data": bool(items), "items": items, "empty": "Starts when handovers and recipes exist."}

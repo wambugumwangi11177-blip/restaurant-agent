@@ -2,7 +2,8 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-const OUT = "/opt/cursor/artifacts";
+const OUT = process.env.CURSOR_ARTIFACTS || "/opt/cursor/artifacts";
+const STORE_OUT = "/cursor/stores/self/artifacts";
 
 const STACKS = [
   { state: "data", email: "owner@eleven.leviii" },
@@ -35,7 +36,7 @@ async function login(page, email: string) {
     if (json.access_token) accessToken = json.access_token;
     await route.fulfill({ response: resp });
   });
-  await page.goto("/login", { waitUntil: "domcontentloaded" });
+  await page.goto("/login", { waitUntil: "networkidle" });
   await expect(page.getByText(/Checking sign-in/i)).toHaveCount(0, { timeout: 90000 });
   await page.locator('input[type="email"]').waitFor({ state: "visible", timeout: 60000 });
   await page.locator('input[type="email"]').fill(email);
@@ -43,7 +44,7 @@ async function login(page, email: string) {
   await page.locator('button[type="submit"]').click();
   await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 60000 });
   const pin = process.env.SEED_OWNER_PIN || "2468";
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://backend-test-production-0160.up.railway.app";
   if (accessToken) {
     await page.evaluate(
       async ({ token, pinCode, base }) => {
@@ -58,7 +59,7 @@ async function login(page, email: string) {
       { token: accessToken, pinCode: pin, base: apiBase },
     );
   }
-  await page.goto("/eleven", { waitUntil: "domcontentloaded" });
+  await page.goto("/eleven", { waitUntil: "networkidle" });
   await unlockPin(page);
 }
 
@@ -83,14 +84,17 @@ async function unlockPin(page) {
   });
 }
 
-async function assertNotPinScreen(page) {
+async function assertCaptureReady(page) {
   await expect(page.getByText(/Enter your 4-digit PIN/i)).toHaveCount(0);
+  await expect(page.getByText(/Loading today/i)).toHaveCount(0);
+  await expect(page.getByText(/\d+ Issues?/i)).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: /Main/i })).toBeVisible();
 }
 
 test("v11 captures", async ({ browser }) => {
   test.setTimeout(600_000);
   fs.mkdirSync(OUT, { recursive: true });
+  fs.mkdirSync(STORE_OUT, { recursive: true });
   const shots: string[] = [];
   for (const stack of STACKS) {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
@@ -98,16 +102,26 @@ test("v11 captures", async ({ browser }) => {
     page.on("dialog", (d) => d.dismiss());
     await login(page, stack.email);
     for (const p of PAGES) {
-      await page.goto(p.path, { waitUntil: "domcontentloaded", timeout: 60000 });
+      await page.goto(p.path, { waitUntil: "networkidle", timeout: 90000 });
       await unlockPin(page);
-      await expect(page.getByText(p.ready).first()).toBeVisible({ timeout: 25000 });
-      await page.waitForTimeout(1500);
-      await assertNotPinScreen(page);
+      await expect(page.getByText(p.ready).first()).toBeVisible({ timeout: 30000 });
+      await page.waitForTimeout(2000);
+      await assertCaptureReady(page);
       const file = path.join(OUT, `v11-${stack.state}-${p.slug}.png`);
-      await page.screenshot({ path: file, fullPage: true });
+      const storeFile = path.join(STORE_OUT, `v11-${stack.state}-${p.slug}.png`);
+      await page.screenshot({ path: file, fullPage: false });
+      fs.copyFileSync(file, storeFile);
       shots.push(file);
+      if (p.slug === "home" || p.slug === "money") {
+        const full = path.join(OUT, `v11-${stack.state}-${p.slug}-full.png`);
+        const fullStore = path.join(STORE_OUT, `v11-${stack.state}-${p.slug}-full.png`);
+        await page.screenshot({ path: full, fullPage: true });
+        fs.copyFileSync(full, fullStore);
+        shots.push(full);
+      }
     }
     await ctx.close();
   }
   fs.writeFileSync(path.join(OUT, "v11-capture-list.json"), JSON.stringify(shots, null, 2));
+  fs.writeFileSync(path.join(STORE_OUT, "v11-capture-list.json"), JSON.stringify(shots, null, 2));
 });

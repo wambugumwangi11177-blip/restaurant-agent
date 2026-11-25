@@ -45,49 +45,14 @@ def home_today(
     now = utcnow()
     start = _eat_day_start(now)
 
-    revenue_cents = int(
-        db.query(func.coalesce(func.sum(models.Order.total), 0))
-        .filter(
-            models.Order.restaurant_id == restaurant.id,
-            models.Order.created_at >= start,
-            models.Order.is_paid.is_(True),
-            models.Order.status != models.OrderStatus.CANCELLED,
-        )
-        .scalar()
-        or 0
-    )
-    tickets = (
-        db.query(func.count(models.Order.id))
-        .filter(
-            models.Order.restaurant_id == restaurant.id,
-            models.Order.created_at >= start,
-            models.Order.is_paid.is_(True),
-            models.Order.status != models.OrderStatus.CANCELLED,
-        )
-        .scalar()
-        or 0
-    )
+    from services.owner_today import today_cash_breakdown
 
-    bills_due_cents = int(
-        db.query(func.coalesce(func.sum(models.RunningCost.amount_cents), 0))
-        .filter(
-            models.RunningCost.restaurant_id == restaurant.id,
-            models.RunningCost.status.in_(("due", "approved")),
-            models.RunningCost.amount_cents > 0,
-        )
-        .scalar()
-        or 0
-    )
-    cash_expected_cents = max(0, revenue_cents - bills_due_cents)
-
-    return {
-        "has_sales": tickets > 0,
-        "sales_kes": revenue_cents / 100.0,
-        "tickets": int(tickets),
-        "cash_expected_kes": cash_expected_cents / 100.0,
+    payload = today_cash_breakdown(db, restaurant.id, start)
+    payload.update({
         "empty_sales": "Starts when the till connects or sales are imported.",
-        "empty_cash": "Set bills and till sales — we estimate cash at close from what's recorded.",
-    }
+        "empty_cash": "Cash in the drawer is cash sales for today (M-Pesa is separate).",
+    })
+    return payload
 
 
 @router.get("/done-today")

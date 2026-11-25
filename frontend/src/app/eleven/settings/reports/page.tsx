@@ -10,9 +10,18 @@ export default function ReportsSettingsPage() {
       <div className="space-y-3 text-sm">
         <p className="text-zinc-400">Daily {data?.schedule?.daily} · Weekly {data?.schedule?.weekly}</p>
         <ul className="space-y-2">
-          {(data?.past ?? []).map((r: { id: string; title: string; href?: string }) => (
-            <li key={r.id} className="owner-glass-panel px-3 py-2">
-              {r.href ? <a href={r.href}>{r.title}</a> : r.title}
+          {(data?.past ?? []).map((r: { id: string; title: string; href?: string; download?: string }) => (
+            <li key={r.id} className="owner-glass-panel flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+              <span>{r.title}</span>
+              {r.download ? (
+                <a className="text-sm underline" href={r.download} download>
+                  Download
+                </a>
+              ) : r.href ? (
+                <a className="text-sm underline" href={r.href}>
+                  Open
+                </a>
+              ) : null}
             </li>
           ))}
         </ul>

@@ -13,6 +13,7 @@ type Today = {
   sales_kes: number;
   tickets: number;
   cash_expected_kes: number;
+  cash_expected_note?: string | null;
   empty_sales?: string;
 };
 
@@ -34,15 +35,9 @@ export default function ElevenHomePage() {
 
   useEffect(() => {
     const bust = { params: { _: Date.now() }, headers: { "Cache-Control": "no-cache" } };
-    Promise.all([
-      api.get("/api/v1/eleven/home/today", bust),
-      api.get("/api/v1/eleven/home/done-today", bust),
-      api.get("/api/v1/eleven/home/setup", bust),
-    ]).then(([t, d, s]) => {
-      setToday(t.data);
-      setDone(d.data);
-      setSetup(s.data);
-    }).catch(() => undefined);
+    api.get("/api/v1/eleven/home/today", bust).then((t) => setToday(t.data)).catch(() => setToday(null));
+    api.get("/api/v1/eleven/home/done-today", bust).then((d) => setDone(d.data)).catch(() => undefined);
+    api.get("/api/v1/eleven/home/setup", bust).then((s) => setSetup(s.data)).catch(() => undefined);
   }, []);
 
   const pending = useMemo(() => {
@@ -136,7 +131,10 @@ function TodaySummary({ today }: { today: Today | null }) {
       <p className="text-lg text-zinc-100">
         Today&apos;s sales: {formatKes(today.sales_kes)} · {today.tickets} tickets
       </p>
-      <p className="text-sm text-zinc-400">Cash expected at close: {formatKes(today.cash_expected_kes)}</p>
+      <p className="text-sm text-zinc-400">
+        Cash expected at close: {formatKes(today.cash_expected_kes)}
+        {today.cash_expected_note ? ` — ${today.cash_expected_note}` : ""}
+      </p>
     </>
   );
 }

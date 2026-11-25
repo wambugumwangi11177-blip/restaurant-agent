@@ -38,9 +38,10 @@ STAFF = (
     ("jack@eleven.leviii", StaffRole.STOCKKEEPER, "Jack"),
     ("amina@eleven.leviii", StaffRole.CONTROLLER, "Amina"),
 )
+EMPTY_OWNER_EMAIL = "owner-empty@eleven.leviii"
 EMPTY_WALL_STAFF = (
-    ("jack@test.restaurant.leviii", StaffRole.STOCKKEEPER, "Jack"),
-    ("amina@test.restaurant.leviii", StaffRole.CONTROLLER, "Amina"),
+    ("jack-empty@eleven.leviii", StaffRole.STOCKKEEPER, "Jack"),
+    ("amina-empty@eleven.leviii", StaffRole.CONTROLLER, "Amina"),
 )
 
 
@@ -317,7 +318,43 @@ def ensure_eleven_test_data(
         db.flush()
         log.append(f"[CREATED] test owner {TEST_OWNER_EMAIL} (first login)")
     test_owner.active_restaurant_id = test_restaurant.id
-    _ensure_empty_wall_stack(db, test_tenant, test_restaurant, test_owner, owner_password, log)
+
+    empty_restaurant = (
+        db.query(models.Restaurant)
+        .filter(models.Restaurant.tenant_id == tenant.id, models.Restaurant.name == "Eleven (empty)")
+        .first()
+    )
+    if empty_restaurant is None:
+        empty_restaurant = models.Restaurant(
+            tenant_id=tenant.id,
+            name="Eleven (empty)",
+            address="No demo data — screenshot empty state",
+        )
+        db.add(empty_restaurant)
+        db.flush()
+        log.append("[CREATED] empty Eleven restaurant for EMPTY captures")
+    ensure_zones(db, empty_restaurant.id)
+
+    empty_owner = db.query(models.User).filter(models.User.email == EMPTY_OWNER_EMAIL).first()
+    if empty_owner is None:
+        if owner_password:
+            empty_owner = models.User(
+                email=EMPTY_OWNER_EMAIL,
+                hashed_password=auth.get_password_hash(owner_password),
+                role=Role.ADMIN,
+                staff_role=StaffRole.OWNER,
+                tenant_id=tenant.id,
+                must_change_password=False,
+                is_active=True,
+                is_email_verified=True,
+            )
+            db.add(empty_owner)
+            db.flush()
+            log.append(f"[CREATED] empty-stack owner {EMPTY_OWNER_EMAIL}")
+    if empty_owner:
+        empty_owner.active_restaurant_id = empty_restaurant.id
+        empty_owner.tenant_id = tenant.id
+    _ensure_empty_wall_stack(db, tenant, empty_restaurant, empty_owner, owner_password, log)
 
     super_user = db.query(models.User).filter(models.User.email == SUPERADMIN_EMAIL).first()
     if super_user is None:
@@ -348,11 +385,11 @@ def _ensure_empty_wall_stack(
     db: Session,
     test_tenant: models.Tenant,
     test_restaurant: models.Restaurant,
-    test_owner: models.User,
+    test_owner: models.User | None,
     owner_password: str,
     log: list[str],
 ) -> None:
-    """Fresh tenant for EMPTY screenshots — no demo rows, Jack questionnaire incomplete."""
+    """Fresh Eleven restaurant for EMPTY screenshots — no demo rows, Jack setup incomplete."""
     from time_utils import utcnow
 
     now = utcnow()
@@ -360,13 +397,13 @@ def _ensure_empty_wall_stack(
     owner_pin = os.getenv("SEED_OWNER_PIN", "2468")
     staff_pin = os.getenv("SEED_STAFF_PIN", "1357")
 
-    if owner_password:
+    if test_owner and owner_password:
         test_owner.hashed_password = auth.get_password_hash(owner_password)
         test_owner.must_change_password = False
         test_owner.is_active = True
         if not test_owner.hashed_pin:
             test_owner.hashed_pin = auth.get_pin_hash(owner_pin)
-        log.append(f"[SYNC] empty-wall owner {TEST_OWNER_EMAIL}")
+        log.append(f"[SYNC] empty-wall owner {test_owner.email}")
 
     for email, role, name in EMPTY_WALL_STAFF:
         user = db.query(models.User).filter(models.User.email == email).first()
@@ -429,7 +466,7 @@ def sync_test_stack_credentials(db: Session) -> list[str]:
     log: list[str] = []
     owner_pass = os.getenv("SEED_OWNER_PASSWORD", "").strip()
     staff_pass = os.getenv("SEED_STAFF_PASSWORD", "JackTestPass1!").strip()
-    empty_emails = [s[0] for s in EMPTY_WALL_STAFF]
+    empty_emails = [EMPTY_OWNER_EMAIL, *(s[0] for s in EMPTY_WALL_STAFF)]
     for email in (OWNER_EMAIL, TEST_OWNER_EMAIL, *(s[0] for s in STAFF), *empty_emails):
         user = db.query(models.User).filter(models.User.email == email).first()
         if not user:
@@ -438,7 +475,7 @@ def sync_test_stack_credentials(db: Session) -> list[str]:
             user.locked_until = None
             user.failed_login_attempts = 0
             log.append(f"[UNLOCK] {email}")
-        if email in (OWNER_EMAIL, TEST_OWNER_EMAIL) and owner_pass:
+        if email in (OWNER_EMAIL, TEST_OWNER_EMAIL, EMPTY_OWNER_EMAIL) and owner_pass:
             user.hashed_password = auth.get_password_hash(owner_pass)
             user.must_change_password = False
             pin = os.getenv("SEED_OWNER_PIN", "2468")

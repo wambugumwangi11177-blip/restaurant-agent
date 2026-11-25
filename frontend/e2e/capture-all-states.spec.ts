@@ -9,11 +9,11 @@ const ARTIFACTS = "/opt/cursor/artifacts";
 const OWNER_PASSWORD = process.env.OWNER_PASSWORD || "VOpyWqNTRSnvaSS1";
 const STAFF_PASSWORD = process.env.SEED_STAFF_PASSWORD || "JackTestPass1!";
 
-const EMPTY_OWNER = "owner@test.restaurant.leviii";
+const EMPTY_OWNER = "owner-empty@eleven.leviii";
 const DATA_OWNER = "owner@eleven.leviii";
-const EMPTY_JACK = "jack@test.restaurant.leviii";
+const EMPTY_JACK = "jack-empty@eleven.leviii";
 const DATA_JACK = "jack@eleven.leviii";
-const EMPTY_AMINA = "amina@test.restaurant.leviii";
+const EMPTY_AMINA = "amina-empty@eleven.leviii";
 const DATA_AMINA = "amina@eleven.leviii";
 
 type Shot = { prefix: "empty" | "data"; role: string; page: string; path: string; marker: RegExp };

@@ -1,20 +1,44 @@
 "use client";
 
 import OwnerShell from "@/components/eleven/OwnerShell";
+import ExplainedCard from "@/components/eleven/charts/ExplainedCard";
 import { useOwnerGet } from "@/hooks/useOwnerV11";
 
+function plateLabel(n?: number) {
+  if (n == null) return "—";
+  if (n === 1) return "1 plate";
+  return `${n} plates`;
+}
+
 export default function StockPrepPage() {
-  const { data } = useOwnerGet<{ items?: { dish?: string; name?: string; plates?: number }[]; has_data?: boolean; empty?: string }>("/api/v1/eleven/stock/prep", []);
+  const { data } = useOwnerGet<{ items?: { dish?: string; name?: string; plates?: number }[]; has_data?: boolean; empty?: string }>(
+    "/api/v1/eleven/stock/prep",
+    [],
+  );
+  const items = data?.items ?? [];
+  const totalPlates = items.reduce((a, it) => a + (it.plates ?? 0), 0);
+
   return (
     <OwnerShell title="Prep">
-      <ul className="space-y-2 text-sm">
-        {(data?.items ?? []).map((it: { dish?: string; name?: string; plates?: number }, i: number) => (
-          <li key={i} className="owner-glass-panel px-3 py-2">
-            {it.dish || it.name} — {it.plates ?? "—"} plates
-          </li>
-        ))}
-        {!data?.has_data && <p className="text-zinc-400">{data?.empty}</p>}
-      </ul>
+      <ExplainedCard
+        title="Today's prep"
+        headline={items.length ? `${items.length} dishes · about ${totalPlates} plates` : undefined}
+        verdict={{ tone: "neutral", text: "Check each line before service." }}
+        what="Forecast plates from recent same-weekdays, times the recipe — today's checklist."
+        why="Expected demand from your recent sales pattern, not a promise."
+        freshness="Assumption · from recent sales"
+        hasData={!!data?.has_data}
+        emptyHint={data?.empty ?? "Starts when dishes sell."}
+      >
+        <ul className="space-y-2 text-sm">
+          {items.map((it, i) => (
+            <li key={i} className="owner-glass-inner flex justify-between gap-2 px-3 py-2">
+              <span>{it.dish || it.name}</span>
+              <span className="text-zinc-400">{plateLabel(it.plates)}</span>
+            </li>
+          ))}
+        </ul>
+      </ExplainedCard>
     </OwnerShell>
   );
 }

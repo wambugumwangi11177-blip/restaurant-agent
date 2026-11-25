@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import OwnerShell from "@/components/eleven/OwnerShell";
+import ExplainedCard from "@/components/eleven/charts/ExplainedCard";
 import api from "@/lib/api";
 
 type Hub = {
@@ -40,9 +41,19 @@ export default function ElevenMoreTeamPage() {
         {!data && !error && <p className="text-sm text-zinc-400">Loading…</p>}
         {data && (
           <>
-            <section className="owner-glass-panel p-5">
-              <h2 className="text-lg font-light text-[var(--text)]">On shift now</h2>
-              <ul className="mt-3 space-y-2 text-sm">
+            <ExplainedCard
+              title="On shift now"
+              headline={
+                data.overview.on_shift_now.length
+                  ? `${data.overview.on_shift_now.length} on shift`
+                  : "Nobody in their window"
+              }
+              what="Who is working right now and in which role."
+              freshness="Live · from the schedule"
+              hasData
+              emptyHint="Nobody is in their window right now."
+            >
+              <ul className="space-y-2 text-sm">
                 {data.overview.on_shift_now.length === 0 ? (
                   <li className="text-zinc-400">Nobody is in their window right now.</li>
                 ) : (
@@ -57,16 +68,22 @@ export default function ElevenMoreTeamPage() {
                   ))
                 )}
               </ul>
-            </section>
+            </ExplainedCard>
 
-            <section className="owner-glass-panel p-5">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-lg font-light">Roster</h2>
+            <ExplainedCard
+              title="Roster"
+              headline={`${data.roster.length} people`}
+              what="Staff names, roles, and whether they can sign in."
+              freshness="As entered · from Settings"
+              hasData
+              emptyHint="Add staff in Settings."
+            >
+              <div className="mb-3 flex justify-end">
                 <Link href="/eleven/staff" className="leviii-btn-ghost px-3 py-2 text-sm">
                   Add / remove
                 </Link>
               </div>
-              <ul className="mt-3 space-y-2 text-sm">
+              <ul className="space-y-2 text-sm">
                 {data.roster.map((m) => (
                   <li key={m.id} className="owner-glass-inner">
                     <p className="text-[var(--text)]">{m.name}</p>
@@ -78,17 +95,20 @@ export default function ElevenMoreTeamPage() {
                   </li>
                 ))}
               </ul>
-            </section>
+            </ExplainedCard>
 
             {data.jack && (
-              <section className="owner-glass-panel p-5">
-                <h2 className="text-lg font-light">Jack (store)</h2>
-                <p className="text-sm text-zinc-400 mt-1">
-                  {data.jack.on_shift ? "On shift now" : "Off shift"} · questionnaire: {data.jack.questionnaire}
-                </p>
-                <p className="text-xs text-zinc-500 mt-2">Restock routing: {data.restock_routing_mode.replace(/_/g, " ")}</p>
-                <h3 className="mt-4 text-sm text-zinc-300">Setup answers</h3>
-                <ul className="mt-2 space-y-2 text-sm">
+              <ExplainedCard
+                title="Jack (store)"
+                headline={data.jack.on_shift ? "Jack is on shift" : "Jack is off shift"}
+                sub={`Questionnaire: ${data.jack.questionnaire}`}
+                what="Storekeeper setup, routing for restock, and questionnaire answers."
+                freshness="As entered · from Jack's setup"
+                hasData
+                emptyHint="Jack is not configured yet."
+              >
+                <p className="mb-2 text-xs text-zinc-500">Restock routing: {data.restock_routing_mode.replace(/_/g, " ")}</p>
+                <ul className="space-y-2 text-sm">
                   {data.jack.answers.map((a) => (
                     <li key={a.prompt} className="owner-glass-inner">
                       <p className="text-xs text-zinc-500">{a.prompt}</p>
@@ -96,12 +116,18 @@ export default function ElevenMoreTeamPage() {
                     </li>
                   ))}
                 </ul>
-              </section>
+              </ExplainedCard>
             )}
 
-            <section className="owner-glass-panel p-5">
-              <h2 className="text-lg font-light">PIN & handover history</h2>
-              <ul className="mt-3 space-y-2 text-sm">
+            <ExplainedCard
+              title="PIN & handover history"
+              headline={data.pin_handover_history.length ? `${data.pin_handover_history.length} events` : "No resets yet"}
+              what="PIN changes and handover sign-ins, newest first."
+              freshness="As entered · from sign-ins"
+              hasData
+              emptyHint="No PIN or sign-in resets logged yet."
+            >
+              <ul className="space-y-2 text-sm">
                 {data.pin_handover_history.length === 0 ? (
                   <li className="text-zinc-400">No PIN or sign-in resets logged yet.</li>
                 ) : (
@@ -119,11 +145,17 @@ export default function ElevenMoreTeamPage() {
               <Link href="/eleven/settings" className="mt-4 inline-block text-sm text-white underline">
                 Change your PIN in Settings
               </Link>
-            </section>
+            </ExplainedCard>
 
-            <section className="owner-glass-panel p-5">
-              <h2 className="text-lg font-light">This week</h2>
-              <ul className="mt-3 space-y-3 text-sm">
+            <ExplainedCard
+              title="This week"
+              headline={`${data.overview.week_schedule.length} scheduled`}
+              what="Hours and shift lines for each person this week."
+              freshness="Live · from the schedule"
+              hasData
+              emptyHint="Add a schedule to see the week."
+            >
+              <ul className="space-y-3 text-sm">
                 {data.overview.week_schedule.map((row) => (
                   <li key={row.name} className="owner-glass-inner">
                     <p className="flex justify-between gap-2">
@@ -137,7 +169,7 @@ export default function ElevenMoreTeamPage() {
               <Link href="/eleven/schedule" className="leviii-btn-ghost mt-4 inline-flex px-4 py-2 text-sm">
                 Edit schedule
               </Link>
-            </section>
+            </ExplainedCard>
           </>
         )}
       </div>

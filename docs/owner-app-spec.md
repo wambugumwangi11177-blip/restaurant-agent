@@ -25,6 +25,21 @@
 
 ---
 
+## How we present data
+
+Every owner chart and summary uses **ExplainedCard**: plain **headline**, **verdict** with a word (Healthy / Watch / Check / Note), the picture, **What this shows**, collapsible **Why?**, and **freshness** (Live · from your till / As entered / Assumption / Stale). Section questions stay in owner words (“Is money coming in?”).
+
+- **No standalone pies** for cash vs M-Pesa, delivery mix, where-the-money-goes, or waste reasons — use **100% stacked bars** or **ranked bars** with KES and % on the legend.
+- **Menu engineering** leads with a **four-group dish list** (sells well & pays well / thin profit / slow sellers / slow and thin), plus a compact labelled scatter.
+- **Week vs last** includes **seven paired weekday bars** on Money detail.
+- **Supplier prices** are **per-item sparklines** with jump flags.
+- **Ask OS** numeric answers may show a **mini chart** and freshness; incomplete P&L or stale counts force verdict **Watch**.
+- **Jack** payloads are **kg and days only** server-side (no KES, prices, or margins on store APIs).
+
+Empty vs partial vs stale: empty states name the one action to fill data; partial cards call out missing costs; stale counts downgrade trust.
+
+---
+
 ## Home (`/eleven`)
 
 ### Top line (always visible)

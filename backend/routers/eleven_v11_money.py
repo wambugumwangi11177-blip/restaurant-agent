@@ -466,6 +466,19 @@ def dishes_summary(db: Session = Depends(get_db), current_user=Depends(auth.get_
         {"channel": (row[0].value if hasattr(row[0], "value") else str(row[0] or "unknown")), "kes": int(row[1]) / 100}
         for row in type_rows
     ]
+    group_labels = {
+        "Star": "Sells well and pays well",
+        "Plowhorse": "Sells well, thin profit",
+        "Puzzle": "Pays well, sells slowly",
+        "Dog": "Slow and thin",
+    }
+    menu_groups: list[dict] = []
+    for key, label in group_labels.items():
+        names = [m["name"] for m in sold if m.get("classification") == key]
+        if names:
+            menu_groups.append({"id": key, "label": label, "dishes": names[:12]})
+    stars = sum(1 for m in sold if m.get("classification") == "Star")
+    workhorses = sum(1 for m in sold if m.get("classification") == "Plowhorse")
     suggestions = []
     for rec in (eng.get("recommendations") or [])[:5]:
         suggestions.append(
@@ -477,12 +490,16 @@ def dishes_summary(db: Session = Depends(get_db), current_user=Depends(auth.get_
     return {
         "has_sales": True,
         "dish_count": len(sold),
+        "stars_count": stars,
+        "workhorses_count": workhorses,
+        "menu_groups": menu_groups,
         "quadrant": quad,
         "plate_profit": [{"name": m["name"], "kes": int(m.get("contribution") or 0) / 100} for m in plate_profit],
         "bestsellers": [{"name": m["name"], "plates": int(m.get("qty_sold") or 0)} for m in bestsellers],
         "pareto": pareto.get("items") or [],
         "suggestions": suggestions,
         "delivery_vs_dine": delivery_vs_dine,
+        "freshness": "Live · from your till",
         "empty": None,
     }
 

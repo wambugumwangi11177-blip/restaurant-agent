@@ -38,4 +38,5 @@ def test_dishes_summary_returns_sold_dishes(client, db_session):
     assert body["dish_count"] > 0
     assert len(body["quadrant"]) > 0
     assert len(body["bestsellers"]) > 0
+    assert len(body.get("menu_groups") or []) >= 1
     assert body["empty"] is None

@@ -8,8 +8,6 @@ import {
   LabelList,
   Line,
   LineChart,
-  Pie,
-  PieChart,
   ReferenceDot,
   ResponsiveContainer,
   Tooltip,
@@ -201,37 +199,74 @@ export function WaterfallBlock({ data, hrefDetail = true }: { data: { steps?: St
   );
 }
 
-export function PieBlock({ title, caption, slices, has, empty, href, headline }: { title: string; caption: string; slices: { name: string; kes: number }[]; has: boolean; empty: string; href?: string; headline?: string }) {
-  const total = slices.reduce((a, x) => a + Math.max(x.kes, 0), 0);
-  const top = [...slices].sort((a, b) => b.kes - a.kes)[0];
+export function ShareStackedBlock({
+  title,
+  caption,
+  slices,
+  has,
+  empty,
+  href,
+  headline,
+  what,
+  why,
+  freshness,
+  verdict,
+}: {
+  title: string;
+  caption: string;
+  slices: { name: string; kes: number }[];
+  has: boolean;
+  empty: string;
+  href?: string;
+  headline?: string;
+  what?: string;
+  why?: string;
+  freshness?: string;
+  verdict?: Verdict;
+}) {
+  const cleaned = slices.filter((x) => x.kes > 0);
+  const total = cleaned.reduce((a, x) => a + x.kes, 0);
+  const top = [...cleaned].sort((a, b) => b.kes - a.kes)[0];
+  const row: Record<string, number | string> = { id: "mix" };
+  cleaned.forEach((x, i) => {
+    row[`s${i}`] = x.kes;
+  });
+  const data = total ? [row] : [];
   return (
     <ExplainedCard
       title={title}
-      headline={headline ?? (top && total ? `${top.name} is the biggest: ${Math.round((top.kes / total) * 100)}%` : undefined)}
+      headline={headline ?? (top && total ? `${plainLine(top.name)} takes the largest share (${Math.round((top.kes / total) * 100)}%)` : undefined)}
       sub={total ? `${formatKes(total)} in total` : undefined}
-      what={caption}
+      verdict={verdict}
+      what={what ?? caption}
+      why={why}
+      freshness={freshness}
       detailHref={href}
       hasData={has && total > 0}
       emptyHint={empty}
     >
-      <div className="flex items-center gap-3">
-        <div className="h-[130px] w-[130px] shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={slices} dataKey="kes" nameKey="name" innerRadius={34} outerRadius={58} stroke="none">
-                {slices.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(v) => formatKes(Number(v))} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-        <ul className="min-w-0 flex-1 space-y-1.5 text-sm">
-          {slices.map((x, i) => (
+      <div className="space-y-3">
+        <ResponsiveContainer width="100%" height={36}>
+          <BarChart layout="vertical" data={data} stackOffset="expand" margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+            <XAxis type="number" hide domain={[0, 1]} />
+            <YAxis type="category" dataKey="id" hide width={0} />
+            <Tooltip
+              formatter={(v, _n, item) => {
+                const i = Number(String(item?.dataKey ?? "").replace("s", ""));
+                const label = cleaned[i]?.name ?? "";
+                return [formatKes(Number(v)), plainLine(label)];
+              }}
+            />
+            {cleaned.map((x, i) => (
+              <Bar key={x.name} dataKey={`s${i}`} stackId="share" fill={COLORS[i % COLORS.length]} radius={i === 0 ? [4, 0, 0, 4] : i === cleaned.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+        <ul className="min-w-0 space-y-1.5 text-sm">
+          {cleaned.map((x, i) => (
             <li key={x.name} className="flex items-center justify-between gap-2">
               <span className="flex min-w-0 items-center gap-2 text-zinc-300">
-                <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: COLORS[i % COLORS.length] }} />
+                <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: COLORS[i % COLORS.length] }} aria-hidden />
                 <span className="truncate">{plainLine(x.name)}</span>
               </span>
               <span className="shrink-0 text-zinc-100">
@@ -241,6 +276,60 @@ export function PieBlock({ title, caption, slices, has, empty, href, headline }:
           ))}
         </ul>
       </div>
+    </ExplainedCard>
+  );
+}
+
+type DayPoint = { day: string; revenue_kes: number };
+
+function pairWeekdays(points: DayPoint[]) {
+  const sorted = [...points].sort((a, b) => a.day.localeCompare(b.day));
+  const last14 = sorted.slice(-14);
+  const prevWeek = last14.length > 7 ? last14.slice(0, last14.length - 7) : [];
+  const thisWeek = last14.slice(-7);
+  return thisWeek.map((p) => {
+    const wd = new Date(`${p.day}T12:00:00`).getDay();
+    const prev = prevWeek.find((q) => new Date(`${q.day}T12:00:00`).getDay() === wd);
+    return { day: fmtWeekday(p.day), this_kes: p.revenue_kes, last_kes: prev?.revenue_kes ?? 0 };
+  });
+}
+
+export function WeekPairedDetailBlock({
+  data,
+}: {
+  data: { points?: DayPoint[]; has_sales?: boolean; empty?: string } | null;
+}) {
+  const pts = data?.points ?? [];
+  const paired = pairWeekdays(pts);
+  const has = !!data?.has_sales && paired.length > 0;
+  const thisSum = paired.reduce((a, p) => a + p.this_kes, 0);
+  const lastSum = paired.reduce((a, p) => a + p.last_kes, 0);
+  const best = paired.reduce((m, p) => (p.this_kes > (m?.this_kes ?? -1) ? p : m), paired[0]);
+  const worst = paired.reduce((m, p) => (p.this_kes < (m?.this_kes ?? Infinity) ? p : m), paired[0]);
+  const change = pctChange(thisSum, lastSum);
+  return (
+    <ExplainedCard
+      title="Day by day · this week vs last"
+      headline={best ? `Strongest ${best.day}: ${formatKes(best.this_kes)}` : undefined}
+      sub={change != null ? `${change > 0 ? "+" : ""}${change}% across these seven days` : undefined}
+      verdict={weekVerdict(change, "the same days last week")}
+      what={`Each pair is the same weekday: this week against last. Weakest day ${worst?.day ?? "—"} (${formatKes(worst?.this_kes ?? 0)}).`}
+      why="Shows which day moved the week verdict, not only the two weekly totals."
+      freshness="Live · from your till"
+      hasData={has}
+      emptyHint={data?.empty ?? "Starts when the till connects."}
+    >
+      <ResponsiveContainer width="100%" height={180}>
+        <BarChart data={paired} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <XAxis dataKey="day" tick={TICK} axisLine={false} tickLine={false} />
+          <YAxis width={36} tickFormatter={fmtK} tick={TICK} axisLine={false} tickLine={false} tickCount={4} />
+          <Tooltip formatter={(v) => formatKes(Number(v))} />
+          <Bar dataKey="last_kes" name="Last week" fill="#6b5e55" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="this_kes" name="This week" fill="#c4b5a8" radius={[4, 4, 0, 0]}>
+            <LabelList dataKey="this_kes" position="top" formatter={(v: unknown) => fmtK(Number(v))} fill="#e4e4e7" fontSize={9} />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
     </ExplainedCard>
   );
 }

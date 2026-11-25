@@ -208,6 +208,26 @@ def _answer_stock(db: Session, rid: int, q: str) -> dict:
                      "narrative_allowed": bool(soon)}}
 
 
+def _mini_sales_chart(db: Session, rid: int, days: int = 7) -> list[dict]:
+    since = utcnow() - timedelta(days=days)
+    rows = (
+        db.query(models.Order)
+        .filter(
+            models.Order.restaurant_id == rid,
+            models.Order.created_at >= since,
+            models.Order.is_paid.is_(True),
+            models.Order.status != models.OrderStatus.CANCELLED,
+        )
+        .all()
+    )
+    by_day: dict[str, float] = {}
+    for o in rows:
+        if o.created_at:
+            key = o.created_at.date().isoformat()
+            by_day[key] = by_day.get(key, 0) + int(o.total or 0) / 100.0
+    return [{"day": d, "kes": by_day[d]} for d in sorted(by_day.keys())[-days:]]
+
+
 def _answer_revenue(db: Session, rid: int, q: str) -> dict:
     from ai.revenue_forecaster import get_revenue_forecast
     from routers.overview import _summarize, _eat_range  # EAT-day truth
@@ -963,9 +983,16 @@ def chat_llm(request: Request, body: ChatBody, db: Session = Depends(get_db),
             required = _MODULE_DATA_NEEDS.get(module, _MODULE_DATA_NEEDS["ops"])
             fallback_text = f"I can’t verify this from restaurant records yet. This question needs {required}. If you tell me what you already know, I can help prepare a useful checklist while {'those records are entered' if direct_source else 'the data connection is set up'}."
 
+    mini_chart: list[dict] = []
+    freshness_line = None
+    if answer_type == "restaurant_analysis" and data_available and module in ("revenue", "profit", "ops"):
+        mini_chart = _mini_sales_chart(db, rid)
+        freshness_line = "Live · from your till"
     result = {
         "module": module, "grounded": card, "llm_reply": llm_reply,
         "answer_text": llm_reply or fallback_text,
+        "mini_chart": mini_chart,
+        "freshness_line": freshness_line,
         "llm_used": llm_reply is not None, "answer_type": answer_type,
         "data_availability": "planned_feature" if planned_analysis or planned_capability else "not_required" if answer_type != "restaurant_analysis" else "available" if data_available else "needs_source_verification" if needs_verification else "needs_connected_data",
         "follow_up_prompts": ["What would you want this page to help you decide?", "What information does your team already record for this area?"] if planned_analysis or planned_capability else [

@@ -1,7 +1,7 @@
 "use client";
 
 import OwnerShell from "@/components/eleven/OwnerShell";
-import { ForecastBlock, PieBlock, SalesLineBlock, WaterfallBlock, WeekBarsBlock } from "@/components/eleven/v11/ChartBlocks";
+import { ForecastBlock, SalesLineBlock, ShareStackedBlock, WaterfallBlock, WeekBarsBlock, WeekPairedDetailBlock } from "@/components/eleven/v11/ChartBlocks";
 import ExplainedCard from "@/components/eleven/charts/ExplainedCard";
 import { fmtK } from "@/lib/chartFormat";
 import { useOwnerGet } from "@/hooks/useOwnerV11";
@@ -64,6 +64,7 @@ export default function ElevenMoneyPage() {
         <SectionHead q="Is money coming in?" hint="Sales over time, and how this week compares." />
         <SalesLineBlock data={series as never} />
         <WeekBarsBlock data={series as never} />
+        <WeekPairedDetailBlock data={series as never} />
         <ExplainedCard
           title="Last 3 months"
           headline={month3?.average_kes ? `About ${formatKes(month3.average_kes)} a month` : undefined}
@@ -93,12 +94,14 @@ export default function ElevenMoneyPage() {
 
         <SectionHead q="Where does it go?" hint="From each sale down to what you keep." />
         <WaterfallBlock data={waterfall as never} />
-        <PieBlock
+        <ShareStackedBlock
           title="Where the money went · 30 days"
           caption="Your sales split into ingredients, running costs, wages and what is left."
           slices={where?.slices ?? []}
           has={!!where?.has_sales}
           empty={where?.empty ?? "Starts when the till connects."}
+          freshness="As entered · includes costs entered so far"
+          why="Every slice is a share of sales. Missing cost lines make profit look bigger than it is."
         />
         <ExplainedCard
           title="Ingredients as a share of sales"
@@ -124,12 +127,14 @@ export default function ElevenMoneyPage() {
             </BarChart>
           </ResponsiveContainer>
         </ExplainedCard>
-        <PieBlock
+        <ShareStackedBlock
           title="How customers paid · 30 days"
           caption="Cash goes in the drawer today; M-Pesa and card reach the business separately. The cash slice is what your drawer should hold."
           slices={pay?.slices ?? []}
           has={!!pay?.has_sales}
           empty={pay?.empty ?? "Starts when payment type is recorded."}
+          freshness="Live · from your till"
+          why="Cash is what should be in the till at close; other methods reach the business separately."
         />
         <ExplainedCard
           title="Supplier prices"

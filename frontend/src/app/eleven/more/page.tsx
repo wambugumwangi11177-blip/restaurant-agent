@@ -7,6 +7,7 @@ import { posHasLiveData } from "@/lib/posLive";
 
 const CORE_LINKS = [
   { href: "/eleven/team", title: "Team", desc: "Who is on shift, PINs, handovers, Jack setup answers" },
+  { href: "/eleven/more/help", title: "Help", desc: "Plain guide to every screen" },
   { href: "/eleven/staff", title: "Staff", desc: "Logins and setup progress" },
   { href: "/eleven/import", title: "Import", desc: "Bring in items, suppliers, recipes, and an opening count" },
   { href: "/eleven/deliveries", title: "Deliveries", desc: "Photos, mismatches, and invoice prices" },

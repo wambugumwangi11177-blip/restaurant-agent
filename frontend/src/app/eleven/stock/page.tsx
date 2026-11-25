@@ -1,49 +1,75 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
 import OwnerShell from "@/components/eleven/OwnerShell";
-import { GlassCard, SectionLabel, WaitingNotice } from "@/components/eleven/EmptyPanels";
-import { useOwnerFeed } from "@/components/eleven/OwnerFeed";
-import api from "@/lib/api";
+import OwnerChartCard from "@/components/eleven/charts/OwnerChartCard";
+import { useOwnerGet } from "@/hooks/useOwnerV11";
+import { Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export default function ElevenStockPage() {
-  const { data, error } = useOwnerFeed();
-  const [runout, setRunout] = useState<{ name?: string; days_left?: number; unit?: string }[]>([]);
-
-  useEffect(() => {
-    api.get("/api/v1/eleven/outcomes/stock").then((r) => setRunout(r.data.runout_within_two_weeks ?? [])).catch(() => undefined);
-  }, []);
-  const close = data?.events?.find((event) => event.kind === "close");
-  const gap = close?.headline?.includes("off the books") ? close.headline : "";
+  type Rows = { rows?: { name: string; on_hand: number; days_left?: number; status: string }[]; has_data?: boolean; empty?: string };
+  const { data: levels } = useOwnerGet<Rows>("/api/v1/eleven/stock/levels", []);
+  const { data: reorder } = useOwnerGet<{ rows?: { id: number; item: string; kes: number }[]; has_data?: boolean; empty?: string }>("/api/v1/eleven/stock/reorder", []);
+  const { data: missing } = useOwnerGet<{ issued_kg?: number; used_kg?: number; has_data?: boolean; empty?: string }>("/api/v1/eleven/stock/missing", []);
+  const { data: trend } = useOwnerGet<{ points?: { day: string; qty: number }[]; has_data?: boolean; empty?: string }>("/api/v1/eleven/stock/use-trend", []);
+  const { data: waste } = useOwnerGet<{ bars?: { reason: string; kes: number }[]; has_data?: boolean; empty?: string }>("/api/v1/eleven/stock/waste", []);
 
   return (
     <OwnerShell title="Stock">
-      {!data && !error && <p className="text-sm text-zinc-400">Loading…</p>}
-      {data && (
-        <>
-          <SectionLabel>May run out (14 days)</SectionLabel>
-          <GlassCard>
-            {runout.length === 0 ? (
-              <WaitingNotice>No items projected to run out from recorded usage.</WaitingNotice>
-            ) : (
-              <ul className="space-y-1 text-sm text-zinc-300">
-                {runout.map((row) => (
-                  <li key={row.name}>{row.name} — about {row.days_left} days ({row.unit})</li>
-                ))}
-              </ul>
-            )}
-            <p className="mt-3 text-xs text-zinc-500">
-              A gap is something to check.
-            </p>
-          </GlassCard>
-          <SectionLabel>Missing stock</SectionLabel>
-          <GlassCard>
-            <WaitingNotice>
-              {gap || "No count is in yet, so there is no gap to check."}
-            </WaitingNotice>
-          </GlassCard>
-        </>
-      )}
+      <div className="owner-premium-stack">
+        <OwnerChartCard title="Stock levels" caption="Green is OK, amber is low, red is critical." hasData={!!levels?.has_data} emptyHint={levels?.empty ?? "Starts when Jack counts stock."}>
+          <ul className="max-h-40 space-y-1 overflow-y-auto text-xs">
+            {(levels?.rows ?? []).map((r: { name: string; on_hand: number; days_left?: number; status: string }) => (
+              <li key={r.name} className="flex justify-between">
+                <span>{r.name}</span>
+                <span className={r.status === "red" ? "text-red-300" : ""}>{r.on_hand} · {r.days_left ?? "—"}d</span>
+              </li>
+            ))}
+          </ul>
+        </OwnerChartCard>
+
+        <OwnerChartCard title="Reorder list" caption="Uses per day × supplier lead time." hasData={!!reorder?.has_data} emptyHint={reorder?.empty ?? "Starts when stock runs low."}>
+          <ul className="text-xs text-zinc-300">
+            {(reorder?.rows ?? []).map((r: { id: number; item: string; kes: number }) => (
+              <li key={r.id}>{r.item} — {r.kes.toLocaleString()} KES</li>
+            ))}
+          </ul>
+        </OwnerChartCard>
+
+        <OwnerChartCard title="Missing stock" caption="Issued to kitchen vs used from sales." hasData={!!missing?.has_data} emptyHint={missing?.empty ?? "Starts when kitchen issues and sales move stock."}>
+          <p className="text-sm">Issued {missing?.issued_kg} kg · Used {missing?.used_kg} kg</p>
+        </OwnerChartCard>
+
+        <OwnerChartCard title="Use trend" caption="Kitchen issues over the last month." hasData={!!trend?.has_data} emptyHint={trend?.empty ?? "Starts when kitchen uses stock."}>
+          <ResponsiveContainer width="100%" height={120}>
+            <LineChart data={trend?.points ?? []}>
+              <XAxis dataKey="day" hide />
+              <YAxis hide />
+              <Tooltip />
+              <Line type="monotone" dataKey="qty" stroke="#c4b5a8" dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </OwnerChartCard>
+
+        <OwnerChartCard title="Waste" caption="Reasons logged by the store." hasData={!!waste?.has_data} emptyHint={waste?.empty ?? "Starts when waste is logged."}>
+          <ResponsiveContainer width="100%" height={120}>
+            <BarChart data={waste?.bars ?? []}>
+              <XAxis dataKey="reason" tick={{ fontSize: 10 }} />
+              <YAxis hide />
+              <Bar dataKey="kes" fill="#8b7d72" />
+            </BarChart>
+          </ResponsiveContainer>
+        </OwnerChartCard>
+
+        <div className="flex gap-2">
+          <Link href="/eleven/stock/suppliers" className="owner-oat-highlight flex-1 px-3 py-3 text-center text-sm">
+            Suppliers
+          </Link>
+          <Link href="/eleven/stock/prep" className="owner-oat-highlight flex-1 px-3 py-3 text-center text-sm">
+            Prep
+          </Link>
+        </div>
+      </div>
     </OwnerShell>
   );
 }

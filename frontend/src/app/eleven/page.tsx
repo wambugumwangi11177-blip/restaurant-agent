@@ -73,7 +73,7 @@ export default function ElevenHomePage() {
             <ul className="space-y-3">
               {pending.map((item: FeedEvent) => (
                 <li key={`${item.kind}-${item.id}`}>
-                  <Link href={`/eleven/approvals#${item.kind}-${item.id}`} className="block">
+                  <Link href={`/eleven/decisions/${item.kind}/${item.id}`} className="block">
                     {item.approval_card_title ? (
                       <ApprovalCard item={item} />
                     ) : (

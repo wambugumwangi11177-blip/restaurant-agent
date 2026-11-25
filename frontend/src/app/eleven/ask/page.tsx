@@ -107,7 +107,6 @@ export default function ElevenAskPage() {
           </button>
         ))}
       </div>
-      <p className="mt-4 text-[10px] uppercase tracking-widest text-zinc-500">Grounded in your records</p>
     </OwnerShell>
   );
 }

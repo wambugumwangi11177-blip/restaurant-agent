@@ -3,11 +3,13 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 import auth
 import models
+import storage
 from ai.inventory_predictor import get_inventory_predictions
 from database import get_db
 from routers.deps import get_or_create_restaurant
@@ -56,16 +58,23 @@ def stock_reorder(db: Session = Depends(get_db), current_user=Depends(auth.get_c
         .limit(20)
         .all()
     )
-    rows = [
-        {
-            "id": p.id,
-            "item": p.notes or "Restock",
-            "qty": p.quantity_ordered,
-            "unit": p.unit,
-            "kes": (p.total_cost or 0) / 100,
-        }
-        for p in pos
-    ]
+    rows = []
+    for p in pos:
+        item = (
+            db.query(models.InventoryItem).filter(models.InventoryItem.id == p.inventory_item_id).first()
+            if p.inventory_item_id
+            else None
+        )
+        name = item.item_name if item else "Stock"
+        rows.append(
+            {
+                "id": p.id,
+                "item": f"{name} — {p.quantity_ordered:g} {p.unit or ''}".strip(),
+                "qty": p.quantity_ordered,
+                "unit": p.unit,
+                "kes": (p.total_cost or 0) / 100,
+            }
+        )
     return {"has_data": bool(rows), "rows": rows, "empty": "Starts when stock runs low."}
 
 
@@ -73,27 +82,52 @@ def stock_reorder(db: Session = Depends(get_db), current_user=Depends(auth.get_c
 def stock_missing(db: Session = Depends(get_db), current_user=Depends(auth.get_current_user)):
     _require_owner(current_user)
     restaurant = get_or_create_restaurant(db, current_user)
+    since = utcnow() - timedelta(days=14)
     moves = (
         db.query(models.StockMovement)
         .join(models.InventoryItem)
-        .filter(models.InventoryItem.restaurant_id == restaurant.id)
+        .filter(
+            models.InventoryItem.restaurant_id == restaurant.id,
+            models.StockMovement.created_at >= since,
+        )
         .order_by(models.StockMovement.id.desc())
-        .limit(40)
+        .limit(80)
         .all()
     )
-    issued = used = 0
+    issued = used = 0.0
+    focus_item = None
     for m in moves:
         if m.movement_type == models.StockMovementType.OUT:
-            used += m.quantity or 0
-        else:
-            issued += m.quantity or 0
+            reason = (m.reason or "").lower()
+            if "kitchen" in reason or "issue" in reason:
+                issued += float(m.quantity or 0)
+            else:
+                used += float(m.quantity or 0)
+            if focus_item is None:
+                focus_item = db.query(models.InventoryItem).filter(models.InventoryItem.id == m.inventory_item_id).first()
+    gap = max(0.0, used - issued)
+    unit_cost = float((focus_item.cost_per_unit if focus_item else 120) or 120)
+    photo = "/api/v1/eleven/stock/missing/photo"
     return {
         "has_data": issued + used > 0,
-        "issued_kg": issued,
-        "used_kg": used,
-        "kes_risk": abs(issued - used) * 120,
+        "item_name": focus_item.item_name if focus_item else "Stock",
+        "issued_kg": round(issued, 2),
+        "used_kg": round(used, 2),
+        "gap_kg": round(gap, 2),
+        "kes_risk": round(gap * unit_cost, 0),
+        "photo_url": photo if gap > 0 else None,
         "empty": "Starts when kitchen issues and sales move stock.",
     }
+
+
+@router.get("/missing/photo")
+def stock_missing_photo(db: Session = Depends(get_db), current_user=Depends(auth.get_current_user)):
+    _require_owner(current_user)
+    restaurant = get_or_create_restaurant(db, current_user)
+    key = f"stock-variance/{restaurant.id}/rice-gap.jpg"
+    if not storage.exists(key):
+        raise HTTPException(status_code=404, detail="No photo")
+    return Response(content=storage.load(key), media_type="image/jpeg")
 
 
 @router.get("/spoilage")
@@ -181,10 +215,17 @@ def suppliers_summary(db: Session = Depends(get_db), current_user=Depends(auth.g
     _require_owner(current_user)
     restaurant = get_or_create_restaurant(db, current_user)
     suppliers = db.query(models.Supplier).filter(models.Supplier.restaurant_id == restaurant.id).all()
-    rows = [
-        {"name": s.name, "lead_days": getattr(s, "lead_time_days", None) or 2, "on_time_pct": 92, "price_jump": False}
-        for s in suppliers
-    ]
+    rows = []
+    for s in suppliers:
+        jump = "[DEMO-PRICE-JUMP]" in (s.notes or "") or "[PRICE-JUMP]" in (s.notes or "")
+        rows.append(
+            {
+                "name": s.name,
+                "lead_days": float(s.avg_lead_days or 2),
+                "on_time_pct": int(s.reliability_score or 90),
+                "price_jump": jump,
+            }
+        )
     return {"has_data": bool(rows), "rows": rows, "empty": "Starts when Jack adds suppliers."}
 
 

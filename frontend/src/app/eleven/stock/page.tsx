@@ -1,18 +1,48 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import OwnerShell from "@/components/eleven/OwnerShell";
 import OwnerChartCard from "@/components/eleven/charts/OwnerChartCard";
 import { useOwnerGet } from "@/hooks/useOwnerV11";
+import api from "@/lib/api";
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export default function ElevenStockPage() {
   type Rows = { rows?: { name: string; on_hand: number; days_left?: number; status: string }[]; has_data?: boolean; empty?: string };
   const { data: levels } = useOwnerGet<Rows>("/api/v1/eleven/stock/levels", []);
   const { data: reorder } = useOwnerGet<{ rows?: { id: number; item: string; kes: number }[]; has_data?: boolean; empty?: string }>("/api/v1/eleven/stock/reorder", []);
-  const { data: missing } = useOwnerGet<{ issued_kg?: number; used_kg?: number; has_data?: boolean; empty?: string }>("/api/v1/eleven/stock/missing", []);
+  const { data: missing } = useOwnerGet<{
+    issued_kg?: number;
+    used_kg?: number;
+    gap_kg?: number;
+    kes_risk?: number;
+    item_name?: string;
+    photo_url?: string;
+    has_data?: boolean;
+    empty?: string;
+  }>("/api/v1/eleven/stock/missing", []);
   const { data: trend } = useOwnerGet<{ points?: { day: string; qty: number }[]; has_data?: boolean; empty?: string }>("/api/v1/eleven/stock/use-trend", []);
   const { data: waste } = useOwnerGet<{ bars?: { reason: string; kes: number }[]; has_data?: boolean; empty?: string }>("/api/v1/eleven/stock/waste", []);
+  const [missingPhoto, setMissingPhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!missing?.photo_url) {
+      setMissingPhoto(null);
+      return;
+    }
+    let active = true;
+    api
+      .get(missing.photo_url, { responseType: "blob" })
+      .then((r) => {
+        if (!active) return;
+        setMissingPhoto(URL.createObjectURL(r.data));
+      })
+      .catch(() => active && setMissingPhoto(null));
+    return () => {
+      active = false;
+    };
+  }, [missing?.photo_url]);
 
   return (
     <OwnerShell title="Stock">
@@ -37,7 +67,14 @@ export default function ElevenStockPage() {
         </OwnerChartCard>
 
         <OwnerChartCard title="Missing stock" caption="Issued to kitchen vs used from sales." hasData={!!missing?.has_data} emptyHint={missing?.empty ?? "Starts when kitchen issues and sales move stock."}>
-          <p className="text-sm">Issued {missing?.issued_kg} kg · Used {missing?.used_kg} kg</p>
+          <p className="text-sm">
+            {missing?.item_name ?? "Rice"}: issued {missing?.issued_kg} kg · used {missing?.used_kg} kg
+            {missing?.gap_kg ? ` · gap ${missing.gap_kg} kg (~${missing.kes_risk?.toLocaleString()} KES)` : ""}
+          </p>
+          {missingPhoto && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={missingPhoto} alt="Stock count evidence" className="mt-2 max-h-28 rounded-xl border border-white/10" />
+          )}
         </OwnerChartCard>
 
         <OwnerChartCard title="Use trend" caption="Kitchen issues over the last month." hasData={!!trend?.has_data} emptyHint={trend?.empty ?? "Starts when kitchen uses stock."}>

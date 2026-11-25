@@ -859,7 +859,11 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
         )
         log.append("[CREATED] demo delivery with invoice photo for accountant")
 
-    _seed_demo_sales_month(db, restaurant, pilau, log)
+    from services.eleven_v12_seed import seed_v12_catalog
+
+    seeded_pilau = seed_v12_catalog(db, restaurant, jack, log, _DEMO_JPEG)
+    if seeded_pilau:
+        pilau = seeded_pilau
 
     members = db.query(models.StaffMember).filter(models.StaffMember.restaurant_id == restaurant.id).all()
     for member in members:
@@ -950,9 +954,9 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
             )
             db.add(po)
             log.append("[CREATED] demo pending restock PO")
-        elif po.status != "APPROVED":
-            po.status = "APPROVED"
-            log.append("[REFRESH] demo restock PO approved for Jack WhatsApp")
+        elif "[V12-DEMO]" not in (po.notes or ""):
+            po.status = "PENDING"
+            log.append("[REFRESH] demo restock PO left pending for owner approve")
 
 
 def provision_test_data_from_env() -> None:

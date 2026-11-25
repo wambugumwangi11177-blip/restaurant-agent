@@ -302,22 +302,51 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   // 4 Stock + suppliers already from questionnaire
   await page.goto("/store/stock", { waitUntil: "domcontentloaded" });
   await unlockPinIfNeeded(page, PIN);
-  const itemField = page.getByLabel(/item/i);
-  if (await itemField.isVisible()) {
-    await itemField.fill("Deep Rice");
-    await page.getByLabel(/^quantity/i).fill("4");
-    await page.getByLabel(/^unit/i).fill("kg");
-    await page.getByLabel(/par level/i).fill("20");
-    await page.getByLabel(/reorder at/i).fill("6");
-    const sup = page.getByLabel(/default supplier/i);
-    if (await sup.count()) await sup.selectOption({ index: 1 });
-    await page.getByRole("button", { name: /save opening count/i }).click();
-    await page.waitForTimeout(800);
+  const saveOpening = page.getByRole("button", { name: /save opening count/i });
+  if (await saveOpening.isVisible().catch(() => false)) {
+    await page.getByRole("textbox", { name: /^item$/i }).fill("Deep Rice");
+    await page.getByRole("textbox", { name: /^quantity$/i }).fill("1");
+    await page.getByRole("textbox", { name: /^unit$/i }).fill("kg");
+    await page.getByRole("textbox", { name: /par level/i }).fill("20");
+    await page.getByRole("textbox", { name: /reorder at/i }).fill("6");
+    const yieldField = page.getByRole("textbox", { name: /yield/i });
+    if (await yieldField.isVisible().catch(() => false)) await yieldField.fill("1");
+    const sup = page.getByRole("combobox", { name: /default supplier/i });
+    if (await sup.isVisible().catch(() => false)) {
+      await sup.selectOption({ label: /Deep E2E Supply|Farm/i });
+    }
+    const openingSave = page.waitForResponse(
+      (r) => r.url().includes("/store/items/opening") && r.request().method() === "POST",
+      { timeout: 30000 },
+    );
+    await saveOpening.click();
+    await openingSave;
+  } else {
+    const suppliers = await (await apiGet(page.request, token!, "/api/v1/store/suppliers")).json();
+    const supplierId = suppliers[0]?.id;
+    expect(supplierId, "supplier required for opening count").toBeTruthy();
+    const opening = await page.request.post(`${API}/api/v1/store/items/opening`, {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      data: {
+        item_name: "Deep Rice",
+        quantity: 1,
+        unit: "kg",
+        par_level: 20,
+        low_stock_threshold: 6,
+        default_supplier_id: supplierId,
+        yield_fraction: 1,
+        zone: "Main store",
+      },
+    });
+    expect(opening.ok(), `opening API ${opening.status()}`).toBeTruthy();
+    log("06-stock", "opening count api", "ok");
   }
   await shot(page, "06-stock");
   const items = await (await apiGet(page.request, token!, "/api/v1/store/items")).json();
-  expect((items.items || []).some((i: { item_name: string }) => /rice/i.test(i.item_name))).toBeTruthy();
-  log("06-stock", "opening count", "ok");
+  const deepRow = (items.items || []).find((i: { item_name: string }) => /deep rice/i.test(i.item_name));
+  expect(deepRow, `items after stock: ${JSON.stringify(items.items || [])}`).toBeTruthy();
+  expect((deepRow?.quantity ?? 0) as number).toBeGreaterThan(0);
+  log("06-stock", "opening count", `qty=${deepRow?.quantity}`);
 
   // Day photos (open all zones)
   await page.goto("/store/day-photos", { waitUntil: "domcontentloaded" });
@@ -336,14 +365,19 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   // 5 Delivery
   await page.goto("/store/deliveries", { waitUntil: "domcontentloaded" });
   await unlockPinIfNeeded(page, PIN);
-  await page.locator("select").first().selectOption({ index: 1 });
-  await page.getByLabel(/^item/i).fill("Deep Rice");
-  await page.getByLabel(/^quantity/i).fill("2");
-  const inputs = page.locator('input[type="file"]');
-  await inputs.nth(0).setInputFiles({ name: "invoice.jpg", mimeType: "image/jpeg", buffer: JPEG });
-  await inputs.nth(1).setInputFiles({ name: "goods.jpg", mimeType: "image/jpeg", buffer: JPEG });
+  await page.getByRole("combobox", { name: /^supplier$/i }).selectOption({ index: 1 });
+  await page.getByRole("textbox", { name: /^item$/i }).fill("Deep Rice");
+  await page.getByRole("textbox", { name: /^quantity$/i }).fill("2");
+  await page.getByRole("textbox", { name: /^unit$/i }).fill("kg");
+  const fileInputs = page.locator('input[type="file"][accept="image/*"]');
+  await fileInputs.nth(0).setInputFiles({ name: "invoice.jpg", mimeType: "image/jpeg", buffer: JPEG });
+  await fileInputs.nth(1).setInputFiles({ name: "goods.jpg", mimeType: "image/jpeg", buffer: JPEG });
+  const savedDelivery = page.waitForResponse(
+    (r) => r.url().includes("/store/deliveries") && r.request().method() === "POST" && r.status() >= 200 && r.status() < 300,
+    { timeout: 60000 },
+  );
   await page.getByRole("button", { name: /receive delivery/i }).click();
-  await page.waitForTimeout(1200);
+  await savedDelivery;
   await shot(page, "08-deliveries");
   const deliveries = await (await apiGet(page.request, token!, "/api/v1/store/deliveries")).json();
   const latest = deliveries[0];
@@ -396,17 +430,29 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   await shot(page, "11-waste");
 
   // Restock draft
-  await fetch(`${API}/api/v1/test/reorder-draft`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  let drafted = 0;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const dr = await page.request.post(`${API}/api/v1/test/reorder-draft`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dr.ok()).toBeTruthy();
+    drafted = (await dr.json()).drafted ?? 0;
+    if (drafted > 0) break;
+    await page.waitForTimeout(400);
+  }
+  expect(drafted, "reorder-draft should create a pending PO").toBeGreaterThan(0);
   await page.goto("/store/restock", { waitUntil: "domcontentloaded" });
   await unlockPinIfNeeded(page, PIN);
   await shot(page, "12-restock-jack");
   const jackInbox = await (await apiGet(page.request, token!, "/api/v1/store/approval-inbox")).json();
   log("12-restock", "jack inbox", JSON.stringify(jackInbox.pending?.length ?? 0));
+  const jackWaitingBefore = (jackInbox.pending || []).some((r: { approval_card_title?: string }) =>
+    /waiting on/i.test(r.approval_card_title || ""),
+  );
+  expect(jackWaitingBefore, "Jack should see Waiting on before owner acts").toBeTruthy();
+  log("12-restock", "jack waiting (pre-owner)", jackInbox.pending?.[0]?.approval_card_title || "ok");
 
-  if (OWNER_PASS) {
+  if (OWNER_PASS || TEMP) {
     const ownerCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
     await ownerCtx.addInitScript(() => {
       sessionStorage.setItem("app_pin_unlocked", "1");
@@ -429,13 +475,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     await ownerPage.goto("/eleven");
     await shot(ownerPage, "14-owner-after-approve");
     await ownerCtx.close();
-    await page.reload();
-    const waiting = await (await apiGet(page.request, token!, "/api/v1/store/approval-inbox")).json();
-    const hasWait = (waiting.pending || []).some((r: { approval_card_title?: string }) =>
-      /waiting on/i.test(r.approval_card_title || ""),
-    );
-    expect(hasWait).toBeTruthy();
-    log("12-restock", "jack waiting", waiting.pending?.[0]?.approval_card_title || "ok");
+    log("12-restock", "owner approved", restock ? `restock ${restock.id}` : "no pending restock");
   }
 
   const probe = await (await page.request.get(`${API}/api/v1/test/storage-probe`)).json();

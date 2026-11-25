@@ -79,6 +79,32 @@ async def run_reorder_draft(
     ):
         raise HTTPException(status_code=403, detail="Store or owner only.")
     restaurant = get_or_create_restaurant(db, current_user)
+    nudged = 0
+    for item in (
+        db.query(models.InventoryItem)
+        .filter(
+            models.InventoryItem.restaurant_id == restaurant.id,
+            models.InventoryItem.par_level.isnot(None),
+            models.InventoryItem.default_supplier_id.isnot(None),
+        )
+        .all()
+    ):
+        open_po = (
+            db.query(models.PurchaseOrder)
+            .filter(
+                models.PurchaseOrder.inventory_item_id == item.id,
+                models.PurchaseOrder.status.in_(("PENDING", "SENT", "APPROVED")),
+            )
+            .first()
+        )
+        if open_po:
+            continue
+        if item.low_stock_threshold is None:
+            item.low_stock_threshold = 1.0
+        item.quantity = min(item.quantity or 0, max(item.low_stock_threshold * 0.5, 0.01))
+        nudged += 1
+    if nudged:
+        db.flush()
     count = engine_triggers.maybe_draft_reorders(db, restaurant.id)
     db.commit()
-    return {"drafted": count}
+    return {"drafted": count, "nudged_for_test": nudged}

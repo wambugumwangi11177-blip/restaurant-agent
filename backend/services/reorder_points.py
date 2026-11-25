@@ -12,6 +12,18 @@ from time_utils import utcnow
 SAFETY_DAYS = 1.0
 
 
+def _has_opening_count(db: Session, item_id: int) -> bool:
+    return (
+        db.query(models.StockMovement.id)
+        .filter(
+            models.StockMovement.inventory_item_id == item_id,
+            models.StockMovement.reason == "opening",
+        )
+        .first()
+        is not None
+    )
+
+
 def _daily_usage(db: Session, item_id: int, days: int = 14) -> float:
     since = utcnow() - timedelta(days=days)
     total = (
@@ -34,6 +46,19 @@ def sync_item_reorder_fields(
     order_qty: float | None = None,
 ) -> dict:
     """Update low_stock_threshold (ROP) and par_level on the item. Returns snapshot."""
+    if _has_opening_count(db, item.id):
+        if item.low_stock_threshold is None:
+            item.low_stock_threshold = round(max((item.quantity or 0) * 0.25, 0.5), 2)
+        if item.par_level is None:
+            item.par_level = round(max(item.low_stock_threshold * 3, item.quantity or 0, 1.0), 2)
+        return {
+            "daily_usage": None,
+            "lead_days": lead_days,
+            "reorder_point": item.low_stock_threshold,
+            "par_level": item.par_level,
+            "order_qty": None,
+            "opening_preserved": True,
+        }
     lead = lead_days
     if lead is None and item.default_supplier_id:
         supplier = db.query(models.Supplier).filter(models.Supplier.id == item.default_supplier_id).first()

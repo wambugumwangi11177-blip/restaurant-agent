@@ -1,4 +1,5 @@
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -30,10 +31,55 @@ function log(step: string, action: string, result: string, pass = true) {
   LOG.push({ step, action, result, pass });
 }
 
-async function shot(page: Page, name: string) {
+const MIN_SCREEN_STD = 8;
+
+function pngStddev(file: string): number {
+  return Number(
+    execFileSync(
+      "python3",
+      [
+        "-c",
+        "from PIL import Image; import numpy as np, sys; a=np.array(Image.open(sys.argv[1]).convert('RGB')); print(float(a.std()))",
+        file,
+      ],
+      { encoding: "utf8" },
+    ).trim(),
+  );
+}
+
+async function waitForStoreShell(page: Page) {
+  await page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => undefined);
+  await expect(page.getByRole("navigation", { name: /store/i })).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText(/checking account access/i)).toHaveCount(0);
+  await page.waitForFunction(
+    () => {
+      const main = document.querySelector("main");
+      return (main?.textContent?.replace(/\s+/g, " ").trim().length ?? 0) > 24;
+    },
+    { timeout: 45_000 },
+  );
+}
+
+async function waitForOwnerShell(page: Page) {
+  await page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => undefined);
+  await expect(page.getByRole("navigation", { name: /main/i })).toBeVisible({ timeout: 45_000 });
+  await page.waitForFunction(
+    () => {
+      const main = document.querySelector("main");
+      return (main?.textContent?.replace(/\s+/g, " ").trim().length ?? 0) > 24;
+    },
+    { timeout: 45_000 },
+  );
+}
+
+async function shot(page: Page, name: string, opts?: { owner?: boolean }) {
+  if (opts?.owner) await waitForOwnerShell(page);
+  else await waitForStoreShell(page);
   const file = path.join(OUT, `jack-deep-${name}.png`);
-  await page.screenshot({ path: file, fullPage: true });
-  log(name, "screenshot", file);
+  await page.screenshot({ path: file, fullPage: true, animations: "disabled" });
+  const std = pngStddev(file);
+  expect(std, `${name} screenshot is blank (std=${std})`).toBeGreaterThan(MIN_SCREEN_STD);
+  log(name, "screenshot", `${file} std=${std.toFixed(1)}`);
 }
 
 async function tokenFrom(page: Page) {
@@ -221,6 +267,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   const needsAccount = Boolean(me1.must_change_password) || !me1.has_pin;
   let activePassword = TEMP;
   await page.goto("/store/account", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("textbox", { name: /current password/i })).toBeVisible({ timeout: 45_000 });
   await shot(page, "01-account-form");
   const accountForm = page.locator('input[autocomplete="current-password"]');
   if (needsAccount) {
@@ -248,6 +295,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   } else {
     log("01-account", "skip", "already set (set TEST_STACK_RESET_KEY + redeploy for fresh first-login)");
   }
+  await page.goto("/store", { waitUntil: "domcontentloaded" });
   await shot(page, "02-after-relogin");
   token = await tokenFrom(page);
 
@@ -259,7 +307,8 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     const keys = Object.keys(QUESTION_VALUES);
     for (const qid of keys.slice(0, Math.ceil(keys.length / 2))) await postQuestion(page, token!, qid);
     await page.goto("/store/questions", { waitUntil: "domcontentloaded" });
-    await page.reload();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.locator("main")).toContainText(/how this store|supplier|delivery|order/i, { timeout: 45_000 });
     await shot(page, "03-questions-resume");
     for (const qid of keys.slice(Math.ceil(keys.length / 2))) await postQuestion(page, token!, qid);
     setupDone = await (await apiGet(page.request, token!, "/api/v1/staff-setup")).json();
@@ -276,6 +325,8 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   } else {
     log("04-questions", "skip", "already done");
   }
+  await page.goto("/store/questions", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("main")).toContainText(/summary|change|done|saved/i, { timeout: 45_000 });
   await shot(page, "04-questions-done");
 
   // 3 Recipes
@@ -299,49 +350,29 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   expect((recipes.dishes || []).length).toBeGreaterThan(0);
   log("05-recipes", "add edit delete finish", "ok");
 
-  // 4 Stock + suppliers already from questionnaire
+  // 4 Stock — opening count must go through the UI (Jack’s real flow)
   await page.goto("/store/stock", { waitUntil: "domcontentloaded" });
   await unlockPinIfNeeded(page, PIN);
+  await expect(page.getByRole("heading", { name: /^opening count$/i })).toBeVisible({ timeout: 60_000 });
   const saveOpening = page.getByRole("button", { name: /save opening count/i });
-  if (await saveOpening.isVisible().catch(() => false)) {
-    await page.getByRole("textbox", { name: /^item$/i }).fill("Deep Rice");
-    await page.getByRole("textbox", { name: /^quantity$/i }).fill("1");
-    await page.getByRole("textbox", { name: /^unit$/i }).fill("kg");
-    await page.getByRole("textbox", { name: /par level/i }).fill("20");
-    await page.getByRole("textbox", { name: /reorder at/i }).fill("6");
-    const yieldField = page.getByRole("textbox", { name: /yield/i });
-    if (await yieldField.isVisible().catch(() => false)) await yieldField.fill("1");
-    const sup = page.getByRole("combobox", { name: /default supplier/i });
-    if (await sup.isVisible().catch(() => false)) {
-      await sup.selectOption({ label: /Deep E2E Supply|Farm/i });
-    }
-    const openingSave = page.waitForResponse(
-      (r) => r.url().includes("/store/items/opening") && r.request().method() === "POST",
-      { timeout: 30000 },
-    );
-    await saveOpening.click();
-    await openingSave;
-  } else {
-    const suppliers = await (await apiGet(page.request, token!, "/api/v1/store/suppliers")).json();
-    const supplierList = Array.isArray(suppliers) ? suppliers : suppliers.suppliers || [];
-    const supplierId = supplierList[0]?.id;
-    expect(supplierId, "supplier required for opening count").toBeTruthy();
-    const opening = await page.request.post(`${API}/api/v1/store/items/opening`, {
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      data: {
-        item_name: "Deep Rice",
-        quantity: 1,
-        unit: "kg",
-        par_level: 20,
-        low_stock_threshold: 6,
-        default_supplier_id: supplierId,
-        yield_fraction: 1,
-        zone: "Main store",
-      },
-    });
-    expect(opening.ok(), `opening API ${opening.status()}`).toBeTruthy();
-    log("06-stock", "opening count api", "ok");
-  }
+  await expect(saveOpening).toBeVisible();
+  await page.getByRole("textbox", { name: /^item$/i }).fill("Deep Rice");
+  await page.getByRole("textbox", { name: /^quantity$/i }).fill("2");
+  await page.getByRole("textbox", { name: /^unit$/i }).fill("kg");
+  await page.getByRole("textbox", { name: /par level/i }).fill("20");
+  await page.getByRole("textbox", { name: /reorder at/i }).fill("6");
+  const yieldField = page.getByRole("textbox", { name: /yield/i });
+  if (await yieldField.isVisible().catch(() => false)) await yieldField.fill("1");
+  const sup = page.getByRole("combobox", { name: /default supplier/i });
+  await expect(sup).toBeVisible({ timeout: 15_000 });
+  await sup.selectOption({ index: 1 });
+  const openingSave = page.waitForResponse(
+    (r) => r.url().includes("/store/items/opening") && r.request().method() === "POST",
+    { timeout: 30_000 },
+  );
+  await saveOpening.click();
+  await openingSave;
+  log("06-stock", "opening count ui", "ok");
   await shot(page, "06-stock");
   const items = await (await apiGet(page.request, token!, "/api/v1/store/items")).json();
   const deepRow = (items.items || []).find((i: { item_name: string }) => /deep rice/i.test(i.item_name));
@@ -400,7 +431,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   await page.goto("/store/issue", { waitUntil: "domcontentloaded" });
   await unlockPinIfNeeded(page, PIN);
   await page.getByRole("combobox", { name: /^item$/i }).selectOption("Deep Rice");
-  await page.getByRole("textbox", { name: /^qty$/i }).fill("1");
+  await page.getByRole("textbox", { name: /^qty$/i }).fill("2");
   await page.getByRole("combobox", { name: /^chef$/i }).selectOption("Chef Deep");
   await page.getByLabel(/^chef pin/i).fill("0000");
   const issuePhoto = page.locator('input[type="file"]').first();
@@ -430,30 +461,24 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   await page.waitForTimeout(1000);
   await shot(page, "11-waste");
 
-  // Restock draft
-  let drafted = 0;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const dr = await page.request.post(`${API}/api/v1/test/reorder-draft`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    expect(dr.ok()).toBeTruthy();
-    const draftBody = await dr.json();
-    drafted = draftBody.drafted ?? 0;
-    log("12-restock", "reorder-draft", JSON.stringify({ drafted, nudged: draftBody.nudged_for_test }));
-    if (drafted > 0) break;
-    await page.waitForTimeout(400);
+  // Restock — auto-draft after inventory touch (no test endpoints)
+  let jackWaitingBefore = false;
+  for (let attempt = 0; attempt < 45; attempt++) {
+    const jackInbox = await (await apiGet(page.request, token!, "/api/v1/store/approval-inbox")).json();
+    jackWaitingBefore = (jackInbox.pending || []).some((r: { approval_card_title?: string }) =>
+      /waiting on/i.test(r.approval_card_title || ""),
+    );
+    if (jackWaitingBefore) {
+      log("12-restock", "jack waiting (pre-owner)", jackInbox.pending?.[0]?.approval_card_title || "ok");
+      break;
+    }
+    await page.waitForTimeout(1000);
   }
-  expect(drafted, "reorder-draft should create a pending PO").toBeGreaterThan(0);
-  await page.goto("/store/restock", { waitUntil: "domcontentloaded" });
+  expect(jackWaitingBefore, "Jack should see Waiting on after low-stock engine runs").toBeTruthy();
+  await page.goto("/store/requests", { waitUntil: "domcontentloaded" });
   await unlockPinIfNeeded(page, PIN);
+  await expect(page.getByText(/waiting on owner/i)).toBeVisible({ timeout: 15_000 });
   await shot(page, "12-restock-jack");
-  const jackInbox = await (await apiGet(page.request, token!, "/api/v1/store/approval-inbox")).json();
-  log("12-restock", "jack inbox", JSON.stringify(jackInbox.pending?.length ?? 0));
-  const jackWaitingBefore = (jackInbox.pending || []).some((r: { approval_card_title?: string }) =>
-    /waiting on/i.test(r.approval_card_title || ""),
-  );
-  expect(jackWaitingBefore, "Jack should see Waiting on before owner acts").toBeTruthy();
-  log("12-restock", "jack waiting (pre-owner)", jackInbox.pending?.[0]?.approval_card_title || "ok");
 
   if (OWNER_PASS || TEMP) {
     const ownerCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
@@ -465,20 +490,21 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     await loginWithApi(ownerPage, OWNER, OWNER_PASS || TEMP);
     await ownerPage.goto("/eleven", { waitUntil: "domcontentloaded" });
     await expect(ownerPage.getByRole("heading", { name: /needs you/i })).toBeVisible({ timeout: 45000 });
-    await shot(ownerPage, "13-owner-needs-you");
-    const approvals = await (await apiGet(ownerPage.request, await tokenFrom(ownerPage)!, "/api/v1/store/approvals")).json();
-    const restock = (approvals.pending || []).find((p: { kind: string }) => p.kind === "restock");
-    if (restock) {
-      await ownerPage.request.post(`${API}/api/v1/store/approvals`, {
-        headers: { Authorization: `Bearer ${await tokenFrom(ownerPage)}`, "Content-Type": "application/json" },
-        data: { kind: "restock", id: restock.id, decision: "approve" },
-      });
-    }
-    await ownerPage.goto("/store/requests");
-    await ownerPage.goto("/eleven");
-    await shot(ownerPage, "14-owner-after-approve");
+    await shot(ownerPage, "13-owner-needs-you", { owner: true });
+    await ownerPage.goto("/eleven/approvals", { waitUntil: "domcontentloaded" });
+    const approve = ownerPage.getByRole("button", { name: /^approve$/i }).first();
+    await expect(approve).toBeVisible({ timeout: 30_000 });
+    const approveWait = ownerPage.waitForResponse(
+      (r) => r.url().includes("/store/approvals") && r.request().method() === "POST",
+      { timeout: 30_000 },
+    );
+    await approve.click();
+    await approveWait;
+    await ownerPage.goto("/eleven", { waitUntil: "domcontentloaded" });
+    await expect(ownerPage.getByText(/nothing needs you right now/i)).toBeVisible({ timeout: 30_000 });
+    await shot(ownerPage, "14-owner-after-approve", { owner: true });
     await ownerCtx.close();
-    log("12-restock", "owner approved", restock ? `restock ${restock.id}` : "no pending restock");
+    log("12-restock", "owner approved", "ok");
   }
 
   const probe = await (await page.request.get(`${API}/api/v1/test/storage-probe`)).json();

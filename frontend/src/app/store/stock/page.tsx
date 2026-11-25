@@ -37,7 +37,7 @@ export default function StoreStockPage() {
   async function refresh() {
     const next = await loadSetup();
     setSetup(next);
-    if (!next.app_unlocked) return;
+    if (!next.app_unlocked && !hasModule(next, "opening-count")) return;
     const [itemResponse, supplierResponse] = await Promise.all([
       api.get("/api/v1/store/items"),
       api.get("/api/v1/store/suppliers").catch(() => ({ data: [] })),
@@ -80,7 +80,7 @@ export default function StoreStockPage() {
 
   const recipes = stepById(setup, "recipes");
   if (!setup && !error) return <p className="text-sm text-zinc-400">Loading stock…</p>;
-  if (setup && !setup.app_unlocked) {
+  if (setup && !setup.app_unlocked && !hasModule(setup, "opening-count")) {
     return (
       <section className="owner-glass-panel rounded-3xl p-4">
         <h2 className="font-semibold">Stock is locked</h2>

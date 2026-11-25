@@ -372,28 +372,13 @@ def _run_variance_check_job():
     real signal instead of a daily no-op ping."""
     try:
         from database import SessionLocal
-        from events.bus import emit_async, EventType
-        from ai.stock_custody import flagged_items
+        from services import engine_triggers
         import models
 
         db = SessionLocal()
         try:
             for restaurant in db.query(models.Restaurant).all():
-                items = flagged_items(db, restaurant.id, hours=24)
-                if not items:
-                    continue
-                emit_async(EventType.STOCK_VARIANCE_FLAGGED, {
-                    "restaurant_id": restaurant.id,
-                    "items": [
-                        {
-                            "item_name": i.item_name,
-                            "variance_pct": i.variance_pct,
-                            "theoretical": i.theoretical_usage,
-                            "actual": i.actual_usage,
-                        }
-                        for i in items
-                    ],
-                })
+                engine_triggers.maybe_variance_alert(db, restaurant.id)
         finally:
             db.close()
     except Exception as exc:
@@ -528,19 +513,13 @@ def _run_reorder_check_job():
     level or a supplier nobody configured."""
     try:
         from database import SessionLocal
-        from ai.reorder import find_reorder_candidates, draft_purchase_order
+        from services import engine_triggers
         import models
 
         db = SessionLocal()
         try:
             for restaurant in db.query(models.Restaurant).all():
-                from services.reorder_points import sync_restaurant
-
-                sync_restaurant(db, restaurant.id)
-                db.commit()
-                candidates = find_reorder_candidates(db, restaurant.id)
-                for candidate in candidates:
-                    draft_purchase_order(db, restaurant.id, candidate)
+                engine_triggers.maybe_draft_reorders(db, restaurant.id)
         finally:
             db.close()
     except Exception as exc:

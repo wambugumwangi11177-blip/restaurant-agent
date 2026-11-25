@@ -44,3 +44,19 @@ def effective_dish_cost_cents(db: Session, restaurant_id: int, menu_item: models
 def dish_cost_map(db: Session, restaurant_id: int) -> dict[int, int]:
     items = db.query(models.MenuItem).filter(models.MenuItem.restaurant_id == restaurant_id).all()
     return {item.id: effective_dish_cost_cents(db, restaurant_id, item) for item in items}
+
+
+def sync_menu_cost_prices(db: Session, restaurant_id: int) -> int:
+    """Persist recipe rollup onto MenuItem.cost_price when a recipe exists."""
+    updated = 0
+    dishes = db.query(models.MenuItem).filter(models.MenuItem.restaurant_id == restaurant_id).all()
+    for dish in dishes:
+        cents = dish_cost_cents(db, restaurant_id, dish.id)
+        if cents is None:
+            continue
+        if int(dish.cost_price or 0) != cents:
+            dish.cost_price = cents
+            updated += 1
+    if updated:
+        db.flush()
+    return updated

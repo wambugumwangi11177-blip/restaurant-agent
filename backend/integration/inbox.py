@@ -224,14 +224,25 @@ def parse_receipt(db: Session, receipt_id: str, *, restaurant_id: int,
                 mapping_action = action
                 if action == "skipped" and existing_order is None:
                     mapping_action = "inserted"
-                order_action = qs.maybe_apply_sale(db, restaurant_id=restaurant_id, entity=ent,
-                                source_id=sid, ingest_action=mapping_action, record=record, occurred_at=occurred)
+                order_action, order_id = qs.maybe_apply_sale(
+                    db,
+                    restaurant_id=restaurant_id,
+                    entity=ent,
+                    source_id=sid,
+                    ingest_action=mapping_action,
+                    record=record,
+                    occurred_at=occurred,
+                )
                 db.add(PosAppliedRecord(binding_id=row.binding_id, inbox_id=row.id,
                                         entity="sale", source_id=sid, source_version=version))
                 if order_action == "order_inserted":
                     result["orders_inserted"] += 1
                 elif order_action == "order_updated":
                     result["orders_updated"] += 1
+                if order_id is not None:
+                    result.setdefault("_sale_hooks", []).append(
+                        (restaurant_id, order_id, order_action == "order_inserted")
+                    )
                 db.flush()
             result["nairobi_business_days"] = sorted(days)
         row.status = ("unrecognized" if result["unmapped_records"] == len(records)
@@ -246,5 +257,13 @@ def parse_receipt(db: Session, receipt_id: str, *, restaurant_id: int,
         row.result = _empty_result("unknown", 0)
     db.add(PosParseAttempt(inbox_id=row.id, actor_id=actor_id,
                           parser_version=PARSER_VERSION, outcome=row.status, error_code=row.error_code))
+    sale_hooks = []
+    if isinstance(row.result, dict):
+        sale_hooks = row.result.pop("_sale_hooks", []) or []
     db.commit()
+    if sale_hooks:
+        from services import engine_triggers
+
+        for rid, oid, inserted in sale_hooks:
+            engine_triggers.after_pos_sale(db, rid, oid, inserted=inserted)
     return dict(row.result, receipt_id=row.id, parse_status=row.status)

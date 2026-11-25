@@ -271,13 +271,13 @@ def maybe_apply_sale(
     ingest_action: str,
     record: dict,
     occurred_at: datetime,
-) -> str:
+) -> tuple[str, int | None]:
     if ingest_action == "skipped" or not is_mappable_sale(record, entity):
-        return "order_unchanged"
+        return "order_unchanged", None
 
     cents = total_cents_optional(record)
     if cents is None:
-        return "order_unchanged"
+        return "order_unchanged", None
 
     existing = _find_order(db, restaurant_id, source_id)
 
@@ -287,7 +287,7 @@ def maybe_apply_sale(
         existing.is_paid = True
         if _lines_raw(record):
             _sync_order_lines(db, restaurant_id, existing, record)
-        return "order_updated"
+        return "order_updated", existing.id
 
     if ingest_action in ("inserted", "superseded"):
         order = models.Order(
@@ -303,9 +303,9 @@ def maybe_apply_sale(
         db.flush()
         if _lines_raw(record):
             _sync_order_lines(db, restaurant_id, order, record)
-        return "order_inserted"
+        return "order_inserted", order.id
 
-    return "order_unchanged"
+    return "order_unchanged", None
 
 
 def normalize_payload(payload: Any) -> tuple[str, list[dict]]:

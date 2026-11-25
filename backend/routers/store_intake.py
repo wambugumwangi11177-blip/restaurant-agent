@@ -747,6 +747,9 @@ async def receive_delivery(
         for key in saved_keys:
             storage.delete(key)
         raise
+    from services import engine_triggers
+
+    engine_triggers.after_delivery_received(db, restaurant.id, receipt.id)
     background.add_task(run_check_safe, receipt.id)
     from ai.notify import notify_users
     owners = db.query(models.User).filter(
@@ -828,6 +831,9 @@ async def confirm_prices(
         detail={"lines": updated},
     )
     db.commit()
+    from services import engine_triggers
+
+    engine_triggers.after_prices_confirmed(db, restaurant.id)
     return {"updated": updated}
 
 

@@ -25,7 +25,11 @@ def test_seed_creates_owner_jack_and_sample_once(client, db_session, monkeypatch
     assert auth.verify_password("JackTestPass1!", jack.hashed_password)
     amina = db_session.query(models.User).filter_by(email="amina@eleven.leviii").one()
     assert auth.verify_password("JackTestPass1!", amina.hashed_password)
-    restaurant = db_session.query(models.Restaurant).filter_by(tenant_id=owner.tenant_id).one()
+    restaurant = (
+        db_session.query(models.Restaurant)
+        .filter_by(tenant_id=owner.tenant_id, name="Eleven")
+        .one()
+    )
     assert db_session.query(models.StockZone).filter_by(restaurant_id=restaurant.id).count() == 4
     assert db_session.query(models.InventoryItem).filter_by(restaurant_id=restaurant.id, item_name="Rice").one()
 

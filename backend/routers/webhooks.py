@@ -240,7 +240,8 @@ async def receive_macsoft_data(
 # ─────────────────────────────────────────────────────────────────────────────
 
 QUICKSELL_SOURCE_SLUG = "quicksell"
-ELEVEN_RESTAURANT_NAME = os.getenv("ELEVEN_RESTAURANT_NAME", "Eleven").strip() or "Eleven"
+def _eleven_restaurant_name() -> str:
+    return os.getenv("ELEVEN_RESTAURANT_NAME", "Eleven").strip() or "Eleven"
 
 
 def _verify_quicksell_key(supplied: str | None) -> None:
@@ -280,14 +281,14 @@ def _eleven_restaurant_id(db: Session) -> int:
     rows = (
         db.query(models.Restaurant.id)
         .join(models.Tenant, models.Tenant.id == models.Restaurant.tenant_id)
-        .filter(models.Restaurant.name == ELEVEN_RESTAURANT_NAME)
+        .filter(models.Restaurant.name == _eleven_restaurant_name())
         .order_by(models.Restaurant.id)
         .limit(2).all()
     )
     if not rows:
         raise HTTPException(
             status_code=503,
-            detail=f"Eleven restaurant {ELEVEN_RESTAURANT_NAME!r} is not configured on this server.",
+            detail=f"Eleven restaurant {_eleven_restaurant_name()!r} is not configured on this server.",
         )
     if len(rows) != 1:
         raise HTTPException(503, "Ambiguous POS restaurant — configure an explicit source binding.")
@@ -334,6 +335,7 @@ async def receive_quicksell_data(
     source_system_id = _quicksell_source_system(db)
     counts = {"inserted": 0, "superseded": 0, "skipped": 0}
     order_counts = {"order_inserted": 0, "order_updated": 0, "order_unchanged": 0}
+    sale_hooks: list[tuple[int, int, bool]] = []
     business_days: list[str] = []
     received_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -356,7 +358,7 @@ async def receive_quicksell_data(
                 commit=False,
             )
             counts[action] = counts.get(action, 0) + 1
-            oc = qs.maybe_apply_sale(
+            oc, order_id = qs.maybe_apply_sale(
                 db,
                 restaurant_id=restaurant_id,
                 entity=rec_entity,
@@ -366,7 +368,14 @@ async def receive_quicksell_data(
                 occurred_at=occurred_at,
             )
             order_counts[oc] = order_counts.get(oc, 0) + 1
+            if order_id is not None:
+                sale_hooks.append((restaurant_id, order_id, oc == "order_inserted"))
         db.commit()
+        if sale_hooks:
+            from services import engine_triggers
+
+            for rid, oid, inserted in sale_hooks:
+                engine_triggers.after_pos_sale(db, rid, oid, inserted=inserted)
     except HTTPException:
         db.rollback()
         raise

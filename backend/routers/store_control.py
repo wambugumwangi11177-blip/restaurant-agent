@@ -595,6 +595,9 @@ async def hand_to_kitchen(
         for key in saved_keys:
             storage.delete(key)
         raise
+    from services import engine_triggers
+
+    engine_triggers.after_handover(db, restaurant.id, handover.id)
     if picture:
         background.add_task(run_handover_check_safe, handover.id)
     body = _handover_public(db, handover, user)
@@ -837,6 +840,9 @@ async def close_day(
         detail={"working_alone": body.working_alone, "status": close.status, "lines": len(body.lines)},
     )
     db.commit()
+    from services import engine_triggers
+
+    engine_triggers.after_day_close(db, restaurant.id)
     payload = _close_public(db, close)
     payload["message"] = "The owner will look at the difference." if differs else "Saved."
     if differs:
@@ -1421,6 +1427,11 @@ async def approve(
                 url="/store/restock",
             )
         db.commit()
+        from services import engine_triggers
+
+        engine_triggers.after_restock_decision(
+            db, restaurant.id, row.id, approved=body.decision == "approve"
+        )
         return {"id": row.id, "kind": "restock", "status": row.status}
     elif body.kind == "handover":
         row = db.query(models.KitchenHandover).filter(

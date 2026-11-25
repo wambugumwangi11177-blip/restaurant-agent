@@ -164,6 +164,9 @@ def _analyze_single_item(item, movements, now, thirty_days_ago, seven_days_ago):
 
     # Use trend-adjusted daily usage for forward projections
     adjusted_daily = daily_usage_recent if daily_usage_recent > 0 else daily_usage
+    if adjusted_daily <= 0 and item.quantity and (item.par_level or item.low_stock_threshold):
+        par = float(item.par_level or item.low_stock_threshold or 1)
+        adjusted_daily = max(par / 14.0, 0.05)
 
     # ── Depletion Forecast ──
     if adjusted_daily > 0:

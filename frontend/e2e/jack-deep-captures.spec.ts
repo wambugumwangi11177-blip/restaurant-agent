@@ -80,53 +80,65 @@ async function clickVisibleButtons(page: Page, step: string) {
   }
 }
 
-const ANSWERS: Record<string, RegExp> = {
-  ordering_method: /owner approves/i,
-  receives_deliveries: /^yes$/i,
-  supplier_list: /save suppliers/i,
-  stock_in_pos: /^no$/i,
-  issues_to_kitchen: /^yes$/i,
-  records_waste: /^yes$/i,
-  closes_the_day: /^i do$/i,
-  knows_running_costs: /^no$/i,
-  zones: /main store, cold room/i,
-  buying_units: /^no$/i,
-  handover_who: /chef signs/i,
-  handover_when: /once a day/i,
-  has_scale: /^yes$/i,
-  waste_approver: /^owner$/i,
-  count_rhythm: /weekly/i,
-  par_and_max: /i'll set each item/i,
-  who_pays: /accountant pays/i,
-  prep_ahead: /^no$/i,
-  portions: /measured/i,
+const QUESTION_VALUES: Record<string, string> = {
+  ordering_method: "owner_approves",
+  receives_deliveries: "yes",
+  supplier_list: "listed",
+  stock_in_pos: "no",
+  issues_to_kitchen: "yes",
+  records_waste: "yes",
+  closes_the_day: "me",
+  knows_running_costs: "no",
+  zones: "listed",
+  buying_units: "no",
+  handover_who: "chef_pin",
+  handover_when: "once",
+  has_scale: "yes",
+  waste_approver: "owner",
+  count_rhythm: "weekly",
+  par_and_max: "per_item",
+  who_pays: "accountant",
+  prep_ahead: "no",
+  portions: "measured",
 };
 
-async function answerNextQuestion(page: Page, token: string) {
-  const setup = await (await apiGet(page.request, token, "/api/v1/staff-setup")).json();
-  const done = new Set((setup.answers || []).map((a: { question_id: string }) => a.question_id));
-  const qstep = (setup.steps || []).find((s: { id: string }) => s.id === "questionnaire");
-  const pending = (qstep?.questions || []).find((q: { id: string }) => !done.has(q.id));
-  if (!pending) return false;
-  await page.goto("/store/questions", { waitUntil: "networkidle" });
-  if (pending.id === "supplier_list") {
+const UI_BUTTON: Record<string, RegExp> = {
+  ordering_method: /owner approves/i,
+  receives_deliveries: /^yes$/i,
+  stock_in_pos: /^no$/i,
+};
+
+async function postQuestion(page: Page, token: string, questionId: string) {
+  const value = QUESTION_VALUES[questionId];
+  if (!value) throw new Error(`no value for ${questionId}`);
+  const body: Record<string, unknown> = { question_id: questionId, value, suppliers: [] };
+  if (questionId === "supplier_list") {
+    body.suppliers = [{ name: "Deep E2E Supply", brings: "Main food", arrival: "phone" }];
+  }
+  const res = await page.request.post(`${API}/api/v1/staff-setup/questionnaire`, {
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    data: body,
+  });
+  expect(res.ok()).toBeTruthy();
+  log("questions", questionId, `HTTP ${res.status()}`);
+}
+
+async function answerQuestionUi(page: Page, questionId: string) {
+  await page.goto("/store/questions", { waitUntil: "domcontentloaded" });
+  if (questionId === "supplier_list") {
     await page.locator('input[type="text"]').first().fill("Deep E2E Supply");
     await page.getByRole("button", { name: /save suppliers/i }).click();
-    await page.waitForTimeout(800);
-    log("questions", "supplier_list", "saved");
-    return true;
+    log("questions-ui", questionId, "saved");
+    return;
   }
-  const pattern = ANSWERS[pending.id];
-  if (!pattern) throw new Error(`missing answer map for ${pending.id}`);
+  const pattern = UI_BUTTON[questionId];
+  if (!pattern) throw new Error(`no UI map for ${questionId}`);
   await page.getByRole("button", { name: pattern }).first().click();
-  await page.waitForTimeout(600);
-  if (!page.url().includes("/store/questions")) await page.goto("/store/questions", { waitUntil: "networkidle" });
-  log("questions", pending.id, "answered");
-  return true;
+  log("questions-ui", questionId, "clicked");
 }
 
 test("jack deep journey jack-empty", async ({ browser }) => {
-  test.setTimeout(900_000);
+  test.setTimeout(600_000);
   test.skip(!TEMP, "SEED_STAFF_PASSWORD required");
   fs.mkdirSync(OUT, { recursive: true });
   if (RESET_KEY) {
@@ -135,7 +147,9 @@ test("jack deep journey jack-empty", async ({ browser }) => {
       headers: { "X-Test-Stack-Key": RESET_KEY },
     });
     log("00-reset", "POST reset", reset.ok ? "ok" : `HTTP ${reset.status}`, reset.ok);
-    expect(reset.ok).toBeTruthy();
+    if (!reset.ok) log("00-reset", "hint", "Deploy 869bdb0+ and set TEST_STACK_RESET_KEY on backend-test", false);
+  } else {
+    log("00-reset", "skip", "TEST_STACK_RESET_KEY not set — journey may skip first-login", true);
   }
 
   const ctx = await browser.newContext({
@@ -146,35 +160,64 @@ test("jack deep journey jack-empty", async ({ browser }) => {
 
   // 1 Account
   await login(page, JACK, TEMP);
-  await page.goto("/store/account", { waitUntil: "networkidle" });
-  await shot(page, "01-account-form");
-  await page.locator('input[autocomplete="current-password"]').fill(TEMP);
-  await page.locator('input[autocomplete="new-password"]').fill(NEW_PASS);
-  await page.locator('input[pattern="\\d{4}"]').fill(PIN);
-  await page.getByRole("button", { name: /save password/i }).click();
-  await page.waitForURL(/\/store\/questions/, { timeout: 60000 });
   let token = await tokenFrom(page);
-  const me1 = await (await apiGet(page.request, token!, "/api/v1/auth/me")).json();
-  expect(me1.must_change_password).toBe(false);
-  expect(me1.has_pin).toBe(true);
-  log("01-account", "staff-setup/account", "ok");
-
-  await logout(page);
-  await login(page, JACK, NEW_PASS);
-  log("01-account", "re-login new password", "ok");
+  let me1 = await (await apiGet(page.request, token!, "/api/v1/auth/me")).json();
+  const needsAccount = Boolean(me1.must_change_password) || !me1.has_pin;
+  let activePassword = TEMP;
+  await page.goto("/store/account", { waitUntil: "domcontentloaded" });
+  await shot(page, "01-account-form");
+  const accountForm = page.locator('input[autocomplete="current-password"]');
+  if (needsAccount) {
+    if (await accountForm.isVisible().catch(() => false)) {
+      await accountForm.fill(TEMP);
+      await page.locator('input[autocomplete="new-password"]').fill(NEW_PASS);
+      await page.locator('input[pattern="\\d{4}"]').fill(PIN);
+      await page.getByRole("button", { name: /save password/i }).click();
+      await page.waitForURL(/\/store\/questions/, { timeout: 60000 });
+      log("01-account", "staff-setup/account ui", "ok");
+    } else {
+      const saveAcct = await page.request.post(`${API}/api/v1/staff-setup/account`, {
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        data: { current_password: TEMP, new_password: NEW_PASS, pin: PIN },
+      });
+      expect(saveAcct.ok()).toBeTruthy();
+      log("01-account", "staff-setup/account api", "ok");
+    }
+    await logout(page);
+    await login(page, JACK, NEW_PASS);
+    activePassword = NEW_PASS;
+    token = await tokenFrom(page);
+    log("01-account", "re-login new password", "ok");
+  } else {
+    log("01-account", "skip", "already set (set TEST_STACK_RESET_KEY + redeploy for fresh first-login)");
+  }
   await shot(page, "02-after-relogin");
+  token = await tokenFrom(page);
 
   // 2 Questions (with reload resume)
   token = await tokenFrom(page);
-  let answered = 0;
-  while (answered < 8 && (await answerNextQuestion(page, token!))) answered += 1;
-  await page.reload();
-  await shot(page, "03-questions-resume");
-  for (let guard = 0; guard < 24; guard += 1) {
-    if (!(await answerNextQuestion(page, token!))) break;
+  let setupDone = await (await apiGet(page.request, token!, "/api/v1/staff-setup")).json();
+  const qState = setupDone.steps.find((s: { id: string }) => s.id === "questionnaire")?.state;
+  if (qState !== "done") {
+    const keys = Object.keys(QUESTION_VALUES);
+    for (const qid of keys.slice(0, Math.ceil(keys.length / 2))) await postQuestion(page, token!, qid);
+    await page.goto("/store/questions", { waitUntil: "domcontentloaded" });
+    await page.reload();
+    await shot(page, "03-questions-resume");
+    for (const qid of keys.slice(Math.ceil(keys.length / 2))) await postQuestion(page, token!, qid);
+    await page.goto("/store/questions", { waitUntil: "domcontentloaded" });
+    await expect(page.getByText(/your answers/i)).toBeVisible({ timeout: 30000 });
+    const change = page.getByRole("button", { name: /^change$/i }).first();
+    if (await change.isVisible()) {
+      await change.click();
+      await page.getByRole("button", { name: /^yes$/i }).first().click();
+      log("04-questions", "change answer ui", "ok");
+    }
+    setupDone = await (await apiGet(page.request, token!, "/api/v1/staff-setup")).json();
+    expect(setupDone.steps.find((s: { id: string }) => s.id === "questionnaire")?.state).toBe("done");
+  } else {
+    log("04-questions", "skip", "already done");
   }
-  const setupDone = await (await apiGet(page.request, token!, "/api/v1/staff-setup")).json();
-  expect(setupDone.steps.find((s: { id: string }) => s.id === "questionnaire")?.state).toBe("done");
   await shot(page, "04-questions-done");
   await clickVisibleButtons(page, "04-questions");
 

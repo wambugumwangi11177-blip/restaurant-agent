@@ -1034,6 +1034,9 @@ def reset_jack_empty_journey(db: Session) -> list[str]:
     staff_pin = os.getenv("SEED_STAFF_PIN", "1357")
     rid = restaurant.id
 
+    db.query(models.ApprovalReminder).filter(models.ApprovalReminder.restaurant_id == rid).delete(synchronize_session=False)
+    db.query(models.RunningCost).filter(models.RunningCost.restaurant_id == rid).delete(synchronize_session=False)
+
     po_ids = [row.id for row in db.query(models.PurchaseOrder.id).filter(models.PurchaseOrder.restaurant_id == rid).all()]
     if po_ids:
         db.query(models.PurchaseOrder).filter(models.PurchaseOrder.id.in_(po_ids)).delete(synchronize_session=False)
@@ -1043,18 +1046,25 @@ def reset_jack_empty_journey(db: Session) -> list[str]:
         db.query(models.DeliveryReceiptLine).filter(models.DeliveryReceiptLine.receipt_id.in_(receipt_ids)).delete(synchronize_session=False)
         db.query(models.DeliveryVisionCheck).filter(models.DeliveryVisionCheck.receipt_id.in_(receipt_ids)).delete(synchronize_session=False)
         db.query(models.DeliveryReceipt).filter(models.DeliveryReceipt.id.in_(receipt_ids)).delete(synchronize_session=False)
+    dish_ids = [row.id for row in db.query(models.MenuItem.id).filter(models.MenuItem.restaurant_id == rid).all()]
+    if dish_ids:
+        db.query(models.MenuIngredient).filter(models.MenuIngredient.menu_item_id.in_(dish_ids)).delete(synchronize_session=False)
+        db.query(models.MenuItem).filter(models.MenuItem.id.in_(dish_ids)).delete(synchronize_session=False)
     item_ids = [row.id for row in db.query(models.InventoryItem.id).filter(models.InventoryItem.restaurant_id == rid).all()]
     if item_ids:
         db.query(models.StockBalance).filter(models.StockBalance.inventory_item_id.in_(item_ids)).delete(synchronize_session=False)
         db.query(models.StockMovement).filter(models.StockMovement.inventory_item_id.in_(item_ids)).delete(synchronize_session=False)
         db.query(models.MenuIngredient).filter(models.MenuIngredient.inventory_item_id.in_(item_ids)).delete(synchronize_session=False)
+        db.query(models.InventoryItem).filter(models.InventoryItem.id.in_(item_ids)).update(
+            {models.InventoryItem.default_supplier_id: None, models.InventoryItem.zone_id: None},
+            synchronize_session=False,
+        )
         db.query(models.InventoryItem).filter(models.InventoryItem.id.in_(item_ids)).delete(synchronize_session=False)
-    dish_ids = [row.id for row in db.query(models.MenuItem.id).filter(models.MenuItem.restaurant_id == rid).all()]
-    if dish_ids:
-        db.query(models.MenuIngredient).filter(models.MenuIngredient.menu_item_id.in_(dish_ids)).delete(synchronize_session=False)
-        db.query(models.MenuItem).filter(models.MenuItem.id.in_(dish_ids)).delete(synchronize_session=False)
     handover_ids = [row.id for row in db.query(models.KitchenHandover.id).filter(models.KitchenHandover.restaurant_id == rid).all()]
     if handover_ids:
+        db.query(models.HandoverVisionCheck).filter(models.HandoverVisionCheck.handover_id.in_(handover_ids)).delete(
+            synchronize_session=False
+        )
         db.query(models.KitchenHandoverLine).filter(models.KitchenHandoverLine.handover_id.in_(handover_ids)).delete(synchronize_session=False)
         db.query(models.KitchenHandover).filter(models.KitchenHandover.id.in_(handover_ids)).delete(synchronize_session=False)
     db.query(models.SpoilageRecord).filter(models.SpoilageRecord.restaurant_id == rid).delete(synchronize_session=False)

@@ -42,7 +42,7 @@ async def reset_jack_empty(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=400, detail=f"reset_failed: {exc.__class__.__name__}") from exc
+        raise HTTPException(status_code=400, detail=f"reset_failed: {exc.__class__.__name__}: {exc}") from exc
     return {"status": "ok", "log": log}
 
 

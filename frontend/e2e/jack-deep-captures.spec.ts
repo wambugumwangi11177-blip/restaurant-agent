@@ -48,6 +48,20 @@ async function login(page: Page, email: string, password: string) {
   await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 90000 });
 }
 
+async function loginWithApi(page: Page, email: string, password: string, landing = "/eleven") {
+  const res = await page.request.post(`${API}/api/v1/auth/login`, { data: { email, password } });
+  expect(res.ok(), `login ${email} HTTP ${res.status()}`).toBeTruthy();
+  const { access_token } = await res.json();
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
+  await page.evaluate((token) => {
+    localStorage.setItem("token", token);
+    sessionStorage.setItem("access_token", token);
+    sessionStorage.setItem("app_pin_unlocked", "1");
+    sessionStorage.setItem("app_last_activity", String(Date.now()));
+  }, access_token);
+  await page.goto(landing, { waitUntil: "domcontentloaded" });
+}
+
 async function unlockPinIfNeeded(page: Page, pin: string) {
   const lock = page.getByText(/Enter your 4-digit PIN/i);
   if (!(await lock.isVisible().catch(() => false))) {
@@ -393,9 +407,13 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   log("12-restock", "jack inbox", JSON.stringify(jackInbox.pending?.length ?? 0));
 
   if (OWNER_PASS) {
-    const ownerCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const ownerCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+    await ownerCtx.addInitScript(() => {
+      sessionStorage.setItem("app_pin_unlocked", "1");
+      sessionStorage.setItem("app_last_activity", String(Date.now()));
+    });
     const ownerPage = await ownerCtx.newPage();
-    await login(ownerPage, OWNER, OWNER_PASS);
+    await loginWithApi(ownerPage, OWNER, OWNER_PASS || TEMP);
     await ownerPage.goto("/eleven", { waitUntil: "domcontentloaded" });
     await expect(ownerPage.getByRole("heading", { name: /needs you/i })).toBeVisible({ timeout: 45000 });
     await shot(ownerPage, "13-owner-needs-you");

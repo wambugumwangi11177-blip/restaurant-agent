@@ -120,5 +120,56 @@ async def run_reorder_draft(
             item.quantity = min(item.quantity or 0, threshold * 0.1)
         db.flush()
         count = engine_triggers.maybe_draft_reorders(db, restaurant.id)
+    if count == 0:
+        from ai.reorder import ReorderCandidate, draft_purchase_order
+
+        for item in (
+            db.query(models.InventoryItem)
+            .filter(
+                models.InventoryItem.restaurant_id == restaurant.id,
+                models.InventoryItem.default_supplier_id.isnot(None),
+            )
+            .order_by(models.InventoryItem.id.asc())
+            .all()
+        ):
+            supplier = db.query(models.Supplier).filter(models.Supplier.id == item.default_supplier_id).first()
+            if not supplier:
+                continue
+            par = item.par_level or 10.0
+            item.par_level = par
+            if item.low_stock_threshold is None:
+                item.low_stock_threshold = 1.0
+            item.quantity = min(item.quantity or 0, item.low_stock_threshold * 0.1)
+            open_po = (
+                db.query(models.PurchaseOrder)
+                .filter(
+                    models.PurchaseOrder.inventory_item_id == item.id,
+                    models.PurchaseOrder.status.in_(("PENDING", "SENT", "APPROVED")),
+                )
+                .first()
+            )
+            if open_po:
+                continue
+            draft_purchase_order(
+                db,
+                restaurant.id,
+                ReorderCandidate(
+                    inventory_item_id=item.id,
+                    item_name=item.item_name,
+                    unit=item.unit or "kg",
+                    on_hand=item.quantity or 0,
+                    par_level=par,
+                    base_quantity=max(par - (item.quantity or 0), 1.0),
+                    demand_factor=1.0,
+                    demand_reasons=[],
+                    adjusted_quantity=max(par - (item.quantity or 0), 1.0),
+                    supplier_id=supplier.id,
+                    supplier_name=supplier.name,
+                    cost_per_unit=item.cost_per_unit or 0.0,
+                ),
+                requested_by_user_id=current_user.id,
+            )
+            count = 1
+            break
     db.commit()
     return {"drafted": count, "nudged_for_test": nudged}

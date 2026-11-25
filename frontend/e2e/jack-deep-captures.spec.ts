@@ -323,7 +323,8 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     await openingSave;
   } else {
     const suppliers = await (await apiGet(page.request, token!, "/api/v1/store/suppliers")).json();
-    const supplierId = suppliers[0]?.id;
+    const supplierList = Array.isArray(suppliers) ? suppliers : suppliers.suppliers || [];
+    const supplierId = supplierList[0]?.id;
     expect(supplierId, "supplier required for opening count").toBeTruthy();
     const opening = await page.request.post(`${API}/api/v1/store/items/opening`, {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -436,7 +437,9 @@ test("jack deep journey jack-empty", async ({ browser }) => {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(dr.ok()).toBeTruthy();
-    drafted = (await dr.json()).drafted ?? 0;
+    const draftBody = await dr.json();
+    drafted = draftBody.drafted ?? 0;
+    log("12-restock", "reorder-draft", JSON.stringify({ drafted, nudged: draftBody.nudged_for_test }));
     if (drafted > 0) break;
     await page.waitForTimeout(400);
   }

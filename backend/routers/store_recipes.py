@@ -180,3 +180,48 @@ async def save_recipe_line(
     )
     db.commit()
     return {"dishes": _dishes(db, restaurant.id)}
+
+
+@router.delete("/lines/{line_id}")
+async def delete_recipe_line(
+    line_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_staff_role(*_CAN_WRITE)),
+):
+    restaurant = get_or_create_restaurant(db, current_user)
+    line = (
+        db.query(models.MenuIngredient)
+        .join(models.MenuItem, models.MenuItem.id == models.MenuIngredient.menu_item_id)
+        .filter(
+            models.MenuIngredient.id == line_id,
+            models.MenuItem.restaurant_id == restaurant.id,
+        )
+        .first()
+    )
+    if line is None:
+        raise HTTPException(status_code=404, detail="Recipe line not found")
+    dish_id = line.menu_item_id
+    db.delete(line)
+    db.flush()
+    empty = (
+        db.query(models.MenuIngredient)
+        .filter(models.MenuIngredient.menu_item_id == dish_id)
+        .first()
+        is None
+    )
+    if empty:
+        dish = db.query(models.MenuItem).filter(models.MenuItem.id == dish_id).first()
+        if dish:
+            db.delete(dish)
+    record_entry(
+        db,
+        restaurant.id,
+        current_user,
+        "recipe_line_removed",
+        "menu_ingredient",
+        f"{current_user.email} removed a recipe line.",
+        entity_id=line_id,
+        detail={},
+    )
+    db.commit()
+    return {"dishes": _dishes(db, restaurant.id)}

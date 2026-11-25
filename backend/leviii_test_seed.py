@@ -1013,6 +1013,84 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
             log.append("[REFRESH] demo restock PO left pending for owner approve")
 
 
+def reset_jack_empty_journey(db: Session) -> list[str]:
+    """Test stacks only: wipe Eleven (empty) data and return jack-empty to first-login onboarding."""
+    from time_utils import utcnow
+
+    log: list[str] = []
+    if not _truthy("SEED_TEST_DATA"):
+        raise SeedError("SEED_TEST_DATA is not enabled")
+    restaurant = (
+        db.query(models.Restaurant)
+        .filter(models.Restaurant.name == "Eleven (empty)")
+        .first()
+    )
+    if restaurant is None:
+        raise SeedError("Eleven (empty) restaurant not found")
+    jack = db.query(models.User).filter(models.User.email == JACK_EMPTY_EMAIL).first()
+    if jack is None:
+        raise SeedError(f"{JACK_EMPTY_EMAIL} not found")
+    staff_pass = os.getenv("SEED_STAFF_PASSWORD", "JackTestPass1!").strip()
+    staff_pin = os.getenv("SEED_STAFF_PIN", "1357")
+    rid = restaurant.id
+
+    po_ids = [row.id for row in db.query(models.PurchaseOrder.id).filter(models.PurchaseOrder.restaurant_id == rid).all()]
+    if po_ids:
+        db.query(models.PurchaseOrder).filter(models.PurchaseOrder.id.in_(po_ids)).delete(synchronize_session=False)
+    receipt_ids = [row.id for row in db.query(models.DeliveryReceipt.id).filter(models.DeliveryReceipt.restaurant_id == rid).all()]
+    if receipt_ids:
+        db.query(models.DeliveryEvidencePhoto).filter(models.DeliveryEvidencePhoto.receipt_id.in_(receipt_ids)).delete(synchronize_session=False)
+        db.query(models.DeliveryReceiptLine).filter(models.DeliveryReceiptLine.receipt_id.in_(receipt_ids)).delete(synchronize_session=False)
+        db.query(models.DeliveryVisionCheck).filter(models.DeliveryVisionCheck.receipt_id.in_(receipt_ids)).delete(synchronize_session=False)
+        db.query(models.DeliveryReceipt).filter(models.DeliveryReceipt.id.in_(receipt_ids)).delete(synchronize_session=False)
+    item_ids = [row.id for row in db.query(models.InventoryItem.id).filter(models.InventoryItem.restaurant_id == rid).all()]
+    if item_ids:
+        db.query(models.StockBalance).filter(models.StockBalance.inventory_item_id.in_(item_ids)).delete(synchronize_session=False)
+        db.query(models.StockMovement).filter(models.StockMovement.inventory_item_id.in_(item_ids)).delete(synchronize_session=False)
+        db.query(models.MenuIngredient).filter(models.MenuIngredient.inventory_item_id.in_(item_ids)).delete(synchronize_session=False)
+        db.query(models.InventoryItem).filter(models.InventoryItem.id.in_(item_ids)).delete(synchronize_session=False)
+    dish_ids = [row.id for row in db.query(models.MenuItem.id).filter(models.MenuItem.restaurant_id == rid).all()]
+    if dish_ids:
+        db.query(models.MenuIngredient).filter(models.MenuIngredient.menu_item_id.in_(dish_ids)).delete(synchronize_session=False)
+        db.query(models.MenuItem).filter(models.MenuItem.id.in_(dish_ids)).delete(synchronize_session=False)
+    handover_ids = [row.id for row in db.query(models.KitchenHandover.id).filter(models.KitchenHandover.restaurant_id == rid).all()]
+    if handover_ids:
+        db.query(models.KitchenHandoverLine).filter(models.KitchenHandoverLine.handover_id.in_(handover_ids)).delete(synchronize_session=False)
+        db.query(models.KitchenHandover).filter(models.KitchenHandover.id.in_(handover_ids)).delete(synchronize_session=False)
+    db.query(models.SpoilageRecord).filter(models.SpoilageRecord.restaurant_id == rid).delete(synchronize_session=False)
+    db.query(models.StoreZoneDayPhoto).filter(models.StoreZoneDayPhoto.restaurant_id == rid).delete(synchronize_session=False)
+    db.query(models.StoreChef).filter(models.StoreChef.restaurant_id == rid).delete(synchronize_session=False)
+    db.query(models.Supplier).filter(models.Supplier.restaurant_id == rid).delete(synchronize_session=False)
+    db.query(models.StaffSetupAnswer).filter(models.StaffSetupAnswer.user_id == jack.id).delete(synchronize_session=False)
+    db.query(models.StaffEntryAudit).filter(
+        models.StaffEntryAudit.restaurant_id == rid,
+        models.StaffEntryAudit.user_id == jack.id,
+    ).delete(synchronize_session=False)
+    restaurant.restock_routing_mode = None
+    progress = db.query(StaffSetupProgress).filter(StaffSetupProgress.user_id == jack.id).first()
+    now = utcnow()
+    if progress is None:
+        progress = StaffSetupProgress(user_id=jack.id, restaurant_id=rid)
+        db.add(progress)
+        db.flush()
+    progress.account_completed_at = None
+    progress.questionnaire_completed_at = None
+    progress.recipes_completed_at = None
+    progress.updated_at = now
+    if staff_pass:
+        jack.hashed_password = auth.get_password_hash(staff_pass)
+    jack.must_change_password = True
+    jack.hashed_pin = None
+    jack.failed_login_attempts = 0
+    jack.locked_until = None
+    jack.pin_failed_attempts = 0
+    jack.pin_locked_until = None
+    jack.active_restaurant_id = rid
+    db.commit()
+    log.append(f"[RESET] {JACK_EMPTY_EMAIL} journey cleared on Eleven (empty)")
+    return log
+
+
 def provision_test_data_from_env() -> None:
     if not _truthy("SEED_TEST_DATA"):
         return

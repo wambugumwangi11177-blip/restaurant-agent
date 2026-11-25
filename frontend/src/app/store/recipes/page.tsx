@@ -73,6 +73,25 @@ export default function StoreRecipesPage() {
     }
   }
 
+  async function removeLine(lineId: number) {
+    setError("");
+    try {
+      const response = await api.delete(`/api/v1/store/recipes/lines/${lineId}`);
+      setDishes(response.data.dishes ?? []);
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(typeof detail === "string" ? detail : "That line was not removed.");
+    }
+  }
+
+  function beginEdit(line: Line, dishName: string) {
+    setDishName(dishName);
+    setIngredientName(line.ingredient_name);
+    setQuantity(String(line.quantity));
+    setUnit(line.unit);
+    setYieldFraction(String(line.yield_fraction));
+  }
+
   async function finishStep() {
     setError("");
     try {
@@ -130,8 +149,16 @@ export default function StoreRecipesPage() {
             <h2 className="font-semibold">{dish.name}</h2>
             <ul className="mt-2 space-y-1 text-sm text-zinc-300">
               {dish.lines.map((line) => (
-                <li key={line.id}>
-                  {line.quantity} {line.unit} {line.ingredient_name} · yield {line.yield_fraction}
+                <li key={line.id} className="flex flex-wrap items-center justify-between gap-2">
+                  <span>{line.quantity} {line.unit} {line.ingredient_name} · yield {line.yield_fraction}</span>
+                  <span className="flex gap-2">
+                    <button type="button" className="text-xs font-semibold text-[var(--accent)] underline" onClick={() => beginEdit(line, dish.name)}>
+                      Edit
+                    </button>
+                    <button type="button" className="text-xs font-semibold text-red-300 underline" onClick={() => removeLine(line.id)}>
+                      Delete
+                    </button>
+                  </span>
                 </li>
               ))}
             </ul>

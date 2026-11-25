@@ -28,15 +28,25 @@ export default function StoreStockPage() {
   const [buyingUnit, setBuyingUnit] = useState("");
   const [unitsPerBuy, setUnitsPerBuy] = useState("");
   const [yieldFraction, setYieldFraction] = useState("1");
+  const [parLevel, setParLevel] = useState("20");
+  const [reorderAt, setReorderAt] = useState("5");
+  const [supplierId, setSupplierId] = useState("");
+  const [suppliers, setSuppliers] = useState<{ id: number; name: string }[]>([]);
   const [error, setError] = useState("");
 
   async function refresh() {
     const next = await loadSetup();
     setSetup(next);
     if (!next.app_unlocked) return;
-    const response = await api.get("/api/v1/store/items");
-    setItems(response.data.items ?? []);
-    setZones(response.data.zones ?? []);
+    const [itemResponse, supplierResponse] = await Promise.all([
+      api.get("/api/v1/store/items"),
+      api.get("/api/v1/store/suppliers").catch(() => ({ data: [] })),
+    ]);
+    setItems(itemResponse.data.items ?? []);
+    setZones(itemResponse.data.zones ?? []);
+    const sup = supplierResponse.data ?? [];
+    setSuppliers(sup);
+    if (!supplierId && sup[0]) setSupplierId(String(sup[0].id));
   }
 
   useEffect(() => {
@@ -55,6 +65,9 @@ export default function StoreStockPage() {
         buying_unit: buyingUnit || null,
         units_per_buy: unitsPerBuy ? Number(unitsPerBuy) : null,
         yield_fraction: Number(yieldFraction),
+        par_level: parLevel ? Number(parLevel) : null,
+        low_stock_threshold: reorderAt ? Number(reorderAt) : null,
+        default_supplier_id: supplierId ? Number(supplierId) : null,
       });
       setItemName("");
       setQuantity("");
@@ -122,6 +135,22 @@ export default function StoreStockPage() {
           <label className="block text-sm">Yield (0 to 1)
             <input required inputMode="decimal" value={yieldFraction} onChange={(event) => setYieldFraction(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
           </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm">Par level
+              <input inputMode="decimal" value={parLevel} onChange={(event) => setParLevel(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
+            </label>
+            <label className="block text-sm">Reorder at
+              <input inputMode="decimal" value={reorderAt} onChange={(event) => setReorderAt(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/30 px-3" />
+            </label>
+          </div>
+          {suppliers.length > 0 && (
+            <label className="block text-sm">Default supplier
+              <select value={supplierId} onChange={(event) => setSupplierId(event.target.value)} className="mt-1 min-h-11 w-full rounded-2xl border border-white/15 bg-black/40 px-3">
+                <option value="">None</option>
+                {suppliers.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+              </select>
+            </label>
+          )}
           {error && <p className="text-sm text-red-300">{error}</p>}
           <button type="submit" className="min-h-11 w-full leviii-btn-primary">Save opening count</button>
         </form>

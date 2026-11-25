@@ -29,6 +29,7 @@ from routers import (
     eleven_outcomes,
     store_prep,
     store_restock,
+    store_test,
     health,
     webhooks,
     auth,
@@ -711,6 +712,7 @@ _VERSIONED_ROUTERS = [
     eleven_outcomes.router,
     store_restock.router,
     store_prep.router,
+    store_test.router,
 ]
 
 app.include_router(auth.router)

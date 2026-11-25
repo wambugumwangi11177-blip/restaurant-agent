@@ -57,6 +57,9 @@ class OpeningIn(StrictModel):
     buying_unit: str | None = None
     units_per_buy: float | None = Field(default=None, gt=0)
     yield_fraction: float = Field(default=1, gt=0, le=1)
+    par_level: float | None = Field(default=None, ge=0)
+    low_stock_threshold: float | None = Field(default=None, ge=0)
+    default_supplier_id: int | None = None
 
 
 class MoveIn(StrictModel):
@@ -376,6 +379,18 @@ async def opening_count(
     item.units_per_buy = body.units_per_buy
     item.yield_fraction = body.yield_fraction
     item.zone_id = zone.id
+    if body.par_level is not None:
+        item.par_level = body.par_level
+    if body.low_stock_threshold is not None:
+        item.low_stock_threshold = body.low_stock_threshold
+    if body.default_supplier_id is not None:
+        supplier = db.query(models.Supplier).filter(
+            models.Supplier.id == body.default_supplier_id,
+            models.Supplier.restaurant_id == restaurant.id,
+        ).first()
+        if supplier is None:
+            raise HTTPException(status_code=404, detail="Supplier not found")
+        item.default_supplier_id = supplier.id
     bal = _balance(db, restaurant.id, item.id, zone.id)
     bal.quantity = body.quantity
     _sync_total(db, item)

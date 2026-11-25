@@ -67,7 +67,7 @@ if (fs.existsSync(manifestPath)) {
   if (!manifest.includes("android.permission.CAMERA")) {
     manifest = manifest.replace(
       "</manifest>",
-      '    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />\n</manifest>',
+      '    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />\n</manifest>',
     );
   }
   fs.writeFileSync(manifestPath, manifest);

@@ -308,7 +308,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     for (const qid of keys.slice(0, Math.ceil(keys.length / 2))) await postQuestion(page, token!, qid);
     await page.goto("/store/questions", { waitUntil: "domcontentloaded" });
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.locator("main")).toContainText(/how this store|supplier|delivery|order/i, { timeout: 45_000 });
+    await expect(page.locator("main")).toContainText(/\d+ of \d+|who takes it|supplier|delivery|order/i, { timeout: 45_000 });
     await shot(page, "03-questions-resume");
     for (const qid of keys.slice(Math.ceil(keys.length / 2))) await postQuestion(page, token!, qid);
     setupDone = await (await apiGet(page.request, token!, "/api/v1/staff-setup")).json();
@@ -326,7 +326,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     log("04-questions", "skip", "already done");
   }
   await page.goto("/store/questions", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("main")).toContainText(/summary|change|done|saved/i, { timeout: 45_000 });
+  await expect(page.locator("main")).toContainText(/summary|change|done|saved|\d+ of \d+/i, { timeout: 45_000 });
   await shot(page, "04-questions-done");
 
   // 3 Recipes

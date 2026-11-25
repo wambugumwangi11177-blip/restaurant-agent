@@ -704,6 +704,9 @@ async def record_spoilage(
             detail={"reason_code": reason_code, "status": status, "chef_name": chef.name},
         )
         db.commit()
+        from services import engine_triggers
+
+        engine_triggers.after_inventory_touch(db, restaurant.id)
     except Exception:
         db.rollback()
         storage.delete(key)

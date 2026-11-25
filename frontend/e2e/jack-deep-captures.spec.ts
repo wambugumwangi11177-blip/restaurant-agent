@@ -386,12 +386,18 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   const zones = await (await apiGet(page.request, token!, "/api/v1/store/day-photos/status")).json();
   for (const zone of zones.zones || []) {
     if (zone.open_done) continue;
-    await page.locator("select").selectOption(String(zone.id));
+    await page.getByRole("combobox").selectOption({ label: zone.name });
     const fileInput = page.locator('input[type="file"]').first();
-    await fileInput.setInputFiles({ name: "zone.jpg", mimeType: "image/jpeg", buffer: JPEG });
+    await fileInput.setInputFiles({ name: `zone-${zone.id}.jpg`, mimeType: "image/jpeg", buffer: JPEG });
+    const savedZone = page.waitForResponse(
+      (r) => r.url().includes("/day-photos") && r.request().method() === "POST" && r.status() >= 200 && r.status() < 300,
+      { timeout: 45_000 },
+    );
     await page.getByRole("button", { name: /save open photo/i }).click();
-    await page.waitForTimeout(500);
+    await savedZone;
   }
+  const zonesAfter = await (await apiGet(page.request, token!, "/api/v1/store/day-photos/status")).json();
+  expect(zonesAfter.open_complete, `zones missing open: ${JSON.stringify(zonesAfter.zones)}`).toBeTruthy();
   await shot(page, "07-day-photos");
 
   // 5 Delivery

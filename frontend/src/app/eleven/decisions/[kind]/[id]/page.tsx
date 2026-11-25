@@ -58,8 +58,8 @@ export default function DecisionPage() {
         <ExplainedCard
           title={kind.replace(/_/g, " ")}
           headline={data?.headline}
+          sub={data?.why}
           what="What we saw, the numbers, and a photo when one was taken."
-          why={data?.why}
           freshness={data?.freshness ?? "Live · from your records"}
           hasData={!!data?.headline}
           emptyHint="Loading decision…"

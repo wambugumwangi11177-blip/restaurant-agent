@@ -66,7 +66,14 @@ async def build_decision_detail(
         "kind": kind,
         "headline": owner_facing_text(match.get("headline") or match.get("approval_card_title") or ""),
         "freshness": "Live · from your records",
-        "can_act": bool(match.get("approval_viewer_is_actor") and match.get("status") == "needs_approval"),
+        "can_act": bool(
+            match.get("status") == "needs_approval"
+            and (
+                match.get("approval_needs_you")
+                or match.get("approval_viewer_is_actor")
+                or kind in ("restock", "cost", "cost_unknown", "waste", "spoilage", "close", "handover", "delivery", "schedule", "zone_photo")
+            )
+        ),
         "photo_url": match.get("photo_path"),
     }
     if kind in ("restock", "restock_place"):

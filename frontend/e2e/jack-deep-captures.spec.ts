@@ -504,16 +504,31 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     await expect(ownerPage.getByRole("heading", { name: /needs you/i })).toBeVisible({ timeout: 45000 });
     await shot(ownerPage, "13-owner-needs-you", { owner: true });
     await ownerPage.goto("/eleven/approvals", { waitUntil: "domcontentloaded" });
-    const approve = ownerPage.getByRole("button", { name: /^approve$/i }).first();
-    await expect(approve).toBeVisible({ timeout: 30_000 });
+    const restockApprove = ownerPage
+      .locator("article, li")
+      .filter({ hasText: /restock|deep rice/i })
+      .getByRole("button", { name: /^approve$/i })
+      .first();
+    await expect(restockApprove).toBeVisible({ timeout: 30_000 });
     const approveWait = ownerPage.waitForResponse(
       (r) => r.url().includes("/store/approvals") && r.request().method() === "POST",
       { timeout: 30_000 },
     );
-    await approve.click();
+    await restockApprove.click();
     await approveWait;
+    let ownerTok = await tokenFrom(ownerPage);
+    let approvedPo = false;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const orders = await (await apiGet(ownerPage.request, ownerTok!, "/api/v1/store/restock")).json();
+      approvedPo = (orders.orders || []).some((o: { status?: string }) => o.status === "APPROVED");
+      if (approvedPo) break;
+      await ownerPage.waitForTimeout(500);
+    }
+    expect(approvedPo, "owner approve should move PO to APPROVED").toBeTruthy();
     await ownerPage.goto("/eleven", { waitUntil: "domcontentloaded" });
-    await expect(ownerPage.getByText(/nothing needs you right now/i)).toBeVisible({ timeout: 30_000 });
+    await expect(ownerPage.locator("main")).toContainText(/place|supplier order|approved|needs you/i, {
+      timeout: 30_000,
+    });
     await shot(ownerPage, "14-owner-after-approve", { owner: true });
     await ownerCtx.close();
     log("12-restock", "owner approved", "ok");
@@ -537,6 +552,20 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     });
     log("99-reset", "POST reset end", resetEnd.ok ? "ok" : `HTTP ${resetEnd.status}`, resetEnd.ok);
     expect(resetEnd.ok).toBeTruthy();
+    if (OWNER_PASS || TEMP) {
+      const ownRes = await page.request.post(`${API}/api/v1/auth/login`, {
+        data: { email: OWNER, password: OWNER_PASS || TEMP },
+      });
+      expect(ownRes.ok()).toBeTruthy();
+      const ownTok = (await ownRes.json()).access_token as string;
+      const demoPattern = /deep e2e|chef deep|deep pilau|deep rice/i;
+      for (const route of ["/api/v1/store/suppliers", "/api/v1/store/recipes", "/api/v1/store/chefs"]) {
+        const body = await (await apiGet(page.request, ownTok, route)).json();
+        const blob = JSON.stringify(body);
+        expect(blob, `E2E demo labels must not linger after reset (${route})`).not.toMatch(demoPattern);
+      }
+      log("99-reset", "eleven-empty clean", "ok");
+    }
   }
 
   fs.writeFileSync(path.join(OUT, "jack-deep-click-log.json"), JSON.stringify(LOG, null, 2));

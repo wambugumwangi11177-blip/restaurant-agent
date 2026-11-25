@@ -11,6 +11,9 @@ import models
 from database import get_db
 from leviii_test_seed import SeedError, reset_jack_empty_journey
 from routers.deps import get_or_create_restaurant
+from urllib.parse import urlparse
+
+import storage
 from services import engine_triggers
 
 router = APIRouter(prefix="/test", tags=["test-stack"])
@@ -38,6 +41,27 @@ async def reset_jack_empty(
     except SeedError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"status": "ok", "log": log}
+
+
+@router.get("/storage-probe")
+async def storage_probe(_: None = Depends(_require_test_stack)):
+    """Round-trip object storage without returning secrets."""
+    import os as _os
+
+    key = storage.save(b"leviii-probe", content_type="text/plain")
+    ok = storage.exists(key)
+    payload = storage.load(key) if ok else b""
+    storage.delete(key)
+    endpoint = _os.getenv("STORAGE_S3_ENDPOINT_URL", "").strip()
+    bucket = _os.getenv("STORAGE_S3_BUCKET", "").strip()
+    backend = _os.getenv("STORAGE_BACKEND", "local").lower()
+    using_s3 = bool(bucket) and (backend == "s3" or _os.getenv("STORAGE_PREFER_S3", "").strip().lower() in ("1", "true", "yes"))
+    return {
+        "backend": "s3" if using_s3 else "local",
+        "round_trip_ok": ok and payload == b"leviii-probe",
+        "bucket_set": bool(bucket),
+        "endpoint_host": urlparse(endpoint).hostname if endpoint else None,
+    }
 
 
 @router.post("/reorder-draft")

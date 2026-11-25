@@ -9,7 +9,11 @@ const JACK = "jack-empty@eleven.leviii";
 const OWNER = "owner-empty@eleven.leviii";
 const TEMP = process.env.SEED_STAFF_PASSWORD || "";
 const OWNER_PASS = process.env.SEED_OWNER_PASSWORD || process.env.OWNER_PASSWORD || "";
-const RESET_KEY = process.env.TEST_STACK_RESET_KEY || "";
+const RESET_KEY =
+  process.env.TEST_STACK_RESET_KEY ||
+  (fs.existsSync("/cursor/stores/self/test-stack-reset-key.txt")
+    ? fs.readFileSync("/cursor/stores/self/test-stack-reset-key.txt", "utf8").trim()
+    : "");
 const NEW_PASS = `JackDeepE2E!${Date.now().toString(36)}`;
 const PIN = "8642";
 const CHEF_PIN = "2468";
@@ -42,6 +46,21 @@ async function login(page: Page, email: string, password: string) {
   await page.locator('input[type="password"]').fill(password);
   await page.locator('button[type="submit"]').click();
   await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 90000 });
+}
+
+async function unlockPinIfNeeded(page: Page, pin: string) {
+  const pinInputs = page.locator('input[inputmode="numeric"][maxlength="4"], input[autocomplete="off"][maxlength="4"]');
+  const lock = page.getByText(/enter your pin|type your pin/i);
+  if ((await lock.count()) > 0 || (await page.locator("text=Unlock").count()) > 0) {
+    for (const digit of pin.split("")) {
+      await page.getByRole("button", { name: digit, exact: true }).click({ timeout: 5000 }).catch(() => undefined);
+    }
+    log("pin-unlock", "keypad", "entered");
+    await page.waitForTimeout(800);
+  } else if (await pinInputs.first().isVisible().catch(() => false)) {
+    await pinInputs.first().fill(pin);
+    await page.waitForTimeout(800);
+  }
 }
 
 async function logout(page: Page) {
@@ -147,7 +166,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
       headers: { "X-Test-Stack-Key": RESET_KEY },
     });
     log("00-reset", "POST reset", reset.ok ? "ok" : `HTTP ${reset.status}`, reset.ok);
-    if (!reset.ok) log("00-reset", "hint", "Deploy 869bdb0+ and set TEST_STACK_RESET_KEY on backend-test", false);
+    expect(reset.ok, `reset HTTP ${reset.status}`).toBeTruthy();
   } else {
     log("00-reset", "skip", "TEST_STACK_RESET_KEY not set — journey may skip first-login", true);
   }
@@ -160,6 +179,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
 
   // 1 Account
   await login(page, JACK, TEMP);
+  await unlockPinIfNeeded(page, PIN);
   let token = await tokenFrom(page);
   let me1 = await (await apiGet(page.request, token!, "/api/v1/auth/me")).json();
   const needsAccount = Boolean(me1.must_change_password) || !me1.has_pin;
@@ -185,6 +205,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     }
     await logout(page);
     await login(page, JACK, NEW_PASS);
+    await unlockPinIfNeeded(page, PIN);
     activePassword = NEW_PASS;
     token = await tokenFrom(page);
     log("01-account", "re-login new password", "ok");
@@ -224,6 +245,8 @@ test("jack deep journey jack-empty", async ({ browser }) => {
 
   // 3 Recipes
   await page.goto("/store/recipes", { waitUntil: "domcontentloaded" });
+  await unlockPinIfNeeded(page, PIN);
+  await expect(page.getByRole("button", { name: /save recipe line/i })).toBeVisible({ timeout: 60000 });
   await page.locator('input[type="text"]').nth(0).fill("Deep Pilau");
   await page.locator('input[type="text"]').nth(1).fill("Rice");
   await page.getByRole("button", { name: /save recipe line/i }).click();
@@ -359,8 +382,14 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     const hasWait = (waiting.pending || []).some((r: { approval_card_title?: string }) =>
       /waiting on/i.test(r.approval_card_title || ""),
     );
-    log("12-restock", "jack waiting", hasWait ? "Waiting on …" : String(waiting.pending?.[0]?.approval_card_title || "none"));
+    expect(hasWait).toBeTruthy();
+    log("12-restock", "jack waiting", waiting.pending?.[0]?.approval_card_title || "ok");
   }
+
+  const probe = await (await page.request.get(`${API}/api/v1/test/storage-probe`)).json();
+  expect(probe.round_trip_ok).toBe(true);
+  expect(probe.backend).toBe("s3");
+  log("storage", "probe", `backend=${probe.backend} host=${probe.endpoint_host || "n/a"}`);
 
   // Sweep store nav buttons
   for (const route of ["/store", "/store/requests", "/store/suppliers", "/store/prep", "/store/close"]) {

@@ -17,13 +17,7 @@ from time_utils import utcnow
 
 router = APIRouter(prefix="/eleven/home", tags=["eleven-home"])
 
-_EAT = timedelta(hours=3)
-
-
-def _eat_day_start(now):
-    local = now + _EAT
-    midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)
-    return midnight - _EAT
+from services.owner_today import eat_day_start, today_sales_snapshot
 
 
 def _pending_kes(item: dict) -> int:
@@ -42,12 +36,7 @@ def home_today(
 ):
     _require_owner(current_user)
     restaurant = get_or_create_restaurant(db, current_user)
-    now = utcnow()
-    start = _eat_day_start(now)
-
-    from services.owner_today import today_cash_breakdown
-
-    payload = today_cash_breakdown(db, restaurant.id, start)
+    payload = today_sales_snapshot(db, restaurant.id)
     payload.update({
         "empty_sales": "Starts when the till connects or sales are imported.",
         "empty_cash": "Cash in the drawer is cash sales for today (M-Pesa is separate).",

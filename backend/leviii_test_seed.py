@@ -704,6 +704,9 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
         models.RunningCost.restaurant_id == restaurant.id,
         models.RunningCost.label.contains("[DEMO]")
     ).first():
+        rent_due = today.replace(day=1) + timedelta(days=14)
+        if rent_due < today:
+            rent_due = today + timedelta(days=7)
         db.add(
             models.RunningCost(
                 restaurant_id=restaurant.id,
@@ -712,12 +715,28 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
                 label="[DEMO] Rent — Westlands",
                 amount_cents=8500000,
                 status="approved",
-                approved_at=now,
+                approved_at=now - timedelta(days=10),
                 approved_by_user_id=owner.id,
                 cadence="monthly",
-                due_day=today.day,
-                next_due_on=today + timedelta(days=2),
+                due_day=rent_due.day,
+                next_due_on=rent_due,
                 payment_state="unpaid",
+            )
+        )
+        water_due = today - timedelta(days=12)
+        db.add(
+            models.RunningCost(
+                restaurant_id=restaurant.id,
+                user_id=accountant.id if accountant else owner.id,
+                kind="water",
+                label="[DEMO] Nairobi Water",
+                amount_cents=185000,
+                status="approved",
+                approved_at=now - timedelta(days=20),
+                approved_by_user_id=owner.id,
+                cadence="monthly",
+                next_due_on=water_due,
+                payment_state="paid",
             )
         )
         db.add(
@@ -739,7 +758,11 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
             models.RunningCost.label.contains("[DEMO] Rent"),
         ).first()
         if rent:
-            rent.next_due_on = today + timedelta(days=2)
+            rent_due = today.replace(day=1) + timedelta(days=14)
+            if rent_due < today:
+                rent_due = today + timedelta(days=7)
+            rent.next_due_on = rent_due
+            rent.approved_at = rent.approved_at or (now - timedelta(days=10))
             rent.payment_state = rent.payment_state or "unpaid"
 
     import hashlib

@@ -230,9 +230,7 @@ def _mini_sales_chart(db: Session, rid: int, days: int = 7) -> list[dict]:
 
 def _answer_revenue(db: Session, rid: int, q: str) -> dict:
     from ai.revenue_forecaster import get_revenue_forecast
-    from routers.overview import _summarize, _eat_range  # EAT-day truth
-    start, end = _eat_range("today")
-    core = _summarize(db, rid, start, end)
+    from services.owner_today import today_sales_owner_sentence
     try:
         fc = get_revenue_forecast(db, rid)
         forecast = fc.get("forecast") or fc.get("predictions") or {}
@@ -262,19 +260,27 @@ def _answer_revenue(db: Session, rid: int, q: str) -> dict:
                 "recommendation": "Compare the recorded pattern with your operating hours before changing staffing or promotions.",
                 "module": "revenue", "steps": steps,
                 "data": {"narrative_allowed": False, "weekly_pattern": ranking}}
-    finding = f"Revenue today is {_money(core['revenue'] * 100)} across {core['orders']} paid orders."
-    why = "Paid, non-cancelled orders created during the Nairobi calendar day so far. This is not payment cash flow."
-    # core["revenue"] is already KES (overview's _summarize converts cents→KES);
-    # avg_order must stay in KES — multiplying by 100 again showed absurd figures
-    # (verified in browser 2026-09-12: "KSh 199,467" instead of KSh 1,995).
-    impact = f"Average order {_money(core['revenue'] * 100 / core['orders'])} per order" if core["orders"] else "Average order — no orders yet today"
-    rec = trend_txt if isinstance(trend_txt, str) and trend_txt else "Compare against the 7-day trend on Home to see if today is ahead or behind."
+    today = today_sales_owner_sentence(db, rid)
+    finding = today["finding"]
+    why = today["why"]
+    tickets = today["tickets"]
+    sales = today["sales_kes"]
+    impact = f"About KES {int(round(sales / tickets)):,} per ticket" if tickets else "No tickets yet today"
+    rec = trend_txt if isinstance(trend_txt, str) and trend_txt else "Open Home or Money for the week trend."
     steps = []
     if isinstance(forecast, dict):
         for k, v in list(forecast.items())[:3]:
             steps.append({"action": f"{k}: {v}" if not isinstance(v, (int, float)) else f"{k}: {v}"})
-    return {"finding": finding, "why": why, "impact": impact, "recommendation": rec,
-            "module": "revenue", "steps": steps, "data": {"today": core}}
+    core = {"revenue": sales, "orders": tickets}
+    return {
+        "finding": finding,
+        "why": why,
+        "impact": impact,
+        "recommendation": rec,
+        "module": "revenue",
+        "steps": steps,
+        "data": {"today": core, "sales_kes": sales, "tickets": tickets},
+    }
 
 
 def _answer_bookings(db: Session, rid: int, q: str) -> dict:

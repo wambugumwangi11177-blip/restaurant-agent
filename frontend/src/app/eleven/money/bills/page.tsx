@@ -14,14 +14,16 @@ export default function MoneyBillsPage() {
     due?: number;
     unknown?: number;
     cash_after_bills?: { day: string; after_bills_kes: number }[];
+    lowest_after_bills_kes?: number;
+    lowest_day?: string;
+    lowest_bill_label?: string;
     empty?: string;
   }>("/api/v1/eleven/money/bills", []);
 
   const series = data?.cash_after_bills ?? [];
-  const lowest = series.reduce<{ day: string; after_bills_kes: number } | null>(
-    (m, p) => (m == null || p.after_bills_kes < m.after_bills_kes ? p : m),
-    null,
-  );
+  const lowestKes = data?.lowest_after_bills_kes;
+  const lowestDay = data?.lowest_day;
+  const lowestBill = data?.lowest_bill_label;
 
   return (
     <OwnerShell title="Bills & cash">
@@ -39,11 +41,15 @@ export default function MoneyBillsPage() {
 
         <ExplainedCard
           title="Cash after bills"
-          headline={lowest ? `Lowest point: ${formatKes(lowest.after_bills_kes)}` : undefined}
-          sub={lowest ? `On ${fmtDay(lowest.day)}` : undefined}
+          headline={
+            lowestKes != null
+              ? `Lowest point: ${formatKes(lowestKes)}${lowestBill ? ` after ${lowestBill}` : ""}`
+              : undefined
+          }
+          sub={lowestDay ? `Running total dipped on ${fmtDay(lowestDay)}` : undefined}
           verdict={
-            lowest && lowest.after_bills_kes < 0
-              ? { tone: "bad", text: "Cash went below zero on at least one day." }
+            lowestKes != null && lowestKes < 0
+              ? { tone: "bad", text: lowestBill ? `${lowestBill} pushed the running total below zero.` : "Bills pushed the running total below zero." }
               : series.length
                 ? { tone: "good", text: "Cash stays above zero in this window." }
                 : undefined

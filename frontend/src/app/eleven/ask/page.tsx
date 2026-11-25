@@ -13,7 +13,7 @@ type ChatResponse = {
   llm_reply?: string | null;
   mini_chart?: { day: string; kes: number }[];
   freshness_line?: string;
-  grounded?: { finding?: string; why?: string; recommendation?: string };
+  grounded?: { finding?: string; why?: string; recommendation?: string; data?: { sales_kes?: number } };
   data_availability?: string;
 };
 
@@ -24,6 +24,8 @@ const STARTERS = [
 ];
 
 function replyText(answer: ChatResponse): string {
+  const grounded = answer.grounded?.finding;
+  if (grounded && /KES|sold|tickets/i.test(grounded)) return grounded;
   return (
     answer.answer_text ||
     answer.llm_reply ||
@@ -92,7 +94,8 @@ export default function ElevenAskPage() {
         <ExplainedCard
           title="Answer"
           headline={text.slice(0, 120) + (text.length > 120 ? "…" : "")}
-          what={answer.grounded?.why || "A direct read from your connected records."}
+          why={answer.grounded?.why}
+          what="A short read from your till and store records."
           freshness={answer.freshness_line || (answer.data_availability === "available" ? "Live · from your till" : "As entered")}
           hasData={!!text}
           emptyHint="Ask a specific question about sales, stock or bills."

@@ -34,7 +34,7 @@ def stock_levels(db: Session = Depends(get_db), current_user=Depends(auth.get_cu
             status = "red"
         elif days is not None and days <= 7:
             status = "amber"
-        days_label = f"{days}d" if days is not None else "no use yet"
+        days_label = f"{days} days left" if days is not None else "no use yet"
         rows.append(
             {
                 "name": p.get("name"),

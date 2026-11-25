@@ -371,21 +371,42 @@ def money_bills(db: Session = Depends(get_db), current_user=Depends(auth.get_cur
         key = o.created_at.date().isoformat()
         sales_by_day[key] += int(o.total or 0)
     bill_by_day: dict[str, int] = defaultdict(int)
+    bill_labels: dict[str, str] = {}
+    largest_on_day: dict[str, int] = {}
     for r in rows:
-        if r.status != "approved" or not r.approved_at:
+        if r.status != "approved" or not int(r.amount_cents or 0):
             continue
-        bill_by_day[r.approved_at.date().isoformat()] += int(r.amount_cents or 0)
-    days = sorted(sales_by_day.keys())[-30:]
+        due = r.next_due_on
+        if due is None and r.approved_at:
+            due = r.approved_at.date()
+        if due is None:
+            continue
+        key = due.isoformat()
+        amt = int(r.amount_cents or 0)
+        bill_by_day[key] += amt
+        if amt >= largest_on_day.get(key, 0):
+            largest_on_day[key] = amt
+            bill_labels[key] = (r.label or r.kind or "Bill").replace("[DEMO] ", "")
+
+    days = sorted(set(sales_by_day.keys()) | set(bill_by_day.keys()))[-30:]
+    if not days:
+        days = sorted(sales_by_day.keys())[-30:]
     series = []
-    run_bills = 0
+    running = 0
+    lowest_kes = None
+    lowest_day = None
+    lowest_bill = None
     for day in days:
-        run_bills += bill_by_day.get(day, 0)
-        series.append(
-            {
-                "day": day[5:],
-                "after_bills_kes": (sales_by_day[day] - run_bills) / 100.0,
-            }
-        )
+        sales = sales_by_day.get(day, 0)
+        bills = bill_by_day.get(day, 0)
+        running += sales - bills
+        after = running / 100.0
+        series.append({"day": day, "after_bills_kes": after, "bills_kes": bills / 100.0})
+        if lowest_kes is None or after < lowest_kes:
+            lowest_kes = after
+            lowest_day = day
+            if bills > 0:
+                lowest_bill = bill_labels.get(day)
     has = bool(rows)
     return {
         "has_sales": has,
@@ -393,6 +414,9 @@ def money_bills(db: Session = Depends(get_db), current_user=Depends(auth.get_cur
         "due": due,
         "unknown": unknown,
         "cash_after_bills": series,
+        "lowest_after_bills_kes": lowest_kes,
+        "lowest_day": lowest_day,
+        "lowest_bill_label": lowest_bill,
         "empty": "Starts when bills are added in Settings.",
     }
 

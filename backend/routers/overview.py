@@ -68,18 +68,20 @@ def _restaurant_id(db: Session, user) -> int:
 
 
 def _eat_range(period: str):
+    from services.owner_today import eat_day_start
+
+    now = utcnow()
     now_eat = _eat_now()
     if period == "today":
-        start_eat = now_eat.replace(hour=0, minute=0, second=0, microsecond=0)
-    else:
-        start_eat = now_eat - _PERIODS[period]
+        return eat_day_start(now), now
+    start_eat = now_eat - _PERIODS[period]
     return start_eat - _EAT_OFFSET, now_eat - _EAT_OFFSET  # naive UTC for column compare
 
 
 def _summarize(db: Session, rid: int, start, end) -> dict:
     """Paid, non-cancelled order value by creation time; not payment cash flow."""
     base = lambda q, col: q.filter(
-        models.Order.restaurant_id == rid, col >= start, col < end,
+        models.Order.restaurant_id == rid, col >= start, col <= end,
         models.Order.is_paid.is_(True),
         models.Order.status != models.OrderStatus.CANCELLED,
     )

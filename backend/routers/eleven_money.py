@@ -16,13 +16,7 @@ from datetime import timedelta
 
 router = APIRouter(prefix="/eleven/money", tags=["eleven-money"])
 
-_EAT = timedelta(hours=3)
-
-
-def _eat_day_start(now):
-    local = now + _EAT
-    midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)
-    return midnight - _EAT
+from services.owner_today import today_sales_snapshot
 
 
 @router.get("/today")
@@ -32,10 +26,7 @@ def money_today_strip(
 ):
     _require_owner(current_user)
     restaurant = get_or_create_restaurant(db, current_user)
-    start = _eat_day_start(utcnow())
-    from services.owner_today import today_cash_breakdown
-
-    payload = today_cash_breakdown(db, restaurant.id, start)
+    payload = today_sales_snapshot(db, restaurant.id)
     target_cents = int(getattr(restaurant, "monthly_sales_target_cents", 0) or 0)
     daily_target = target_cents // 30 if target_cents else None
     revenue_cents = int(payload["sales_kes"] * 100)

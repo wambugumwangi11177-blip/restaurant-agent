@@ -37,7 +37,7 @@ async function tokenFrom(page: Page) {
 }
 
 async function login(page: Page, email: string, password: string) {
-  await page.goto("/login", { waitUntil: "networkidle" });
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
   await page.locator('input[type="email"]').fill(email);
   await page.locator('input[type="password"]').fill(password);
   await page.locator('button[type="submit"]').click();
@@ -45,7 +45,7 @@ async function login(page: Page, email: string, password: string) {
 }
 
 async function logout(page: Page) {
-  await page.goto("/store/account", { waitUntil: "networkidle" });
+  await page.goto("/store/account", { waitUntil: "domcontentloaded" });
   const out = page.getByRole("button", { name: /sign out|log out|different account/i });
   if (await out.count()) {
     await out.first().click();
@@ -205,8 +205,9 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     await page.reload();
     await shot(page, "03-questions-resume");
     for (const qid of keys.slice(Math.ceil(keys.length / 2))) await postQuestion(page, token!, qid);
+    setupDone = await (await apiGet(page.request, token!, "/api/v1/staff-setup")).json();
+    expect(setupDone.steps.find((s: { id: string }) => s.id === "questionnaire")?.state).toBe("done");
     await page.goto("/store/questions", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText(/your answers/i)).toBeVisible({ timeout: 30000 });
     const change = page.getByRole("button", { name: /^change$/i }).first();
     if (await change.isVisible()) {
       await change.click();
@@ -222,7 +223,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   await clickVisibleButtons(page, "04-questions");
 
   // 3 Recipes
-  await page.goto("/store/recipes", { waitUntil: "networkidle" });
+  await page.goto("/store/recipes", { waitUntil: "domcontentloaded" });
   await page.locator('input[type="text"]').nth(0).fill("Deep Pilau");
   await page.locator('input[type="text"]').nth(1).fill("Rice");
   await page.getByRole("button", { name: /save recipe line/i }).click();
@@ -241,7 +242,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   log("05-recipes", "add edit delete finish", "ok");
 
   // 4 Stock + suppliers already from questionnaire
-  await page.goto("/store/stock", { waitUntil: "networkidle" });
+  await page.goto("/store/stock", { waitUntil: "domcontentloaded" });
   const itemField = page.getByLabel(/item/i);
   if (await itemField.isVisible()) {
     await itemField.fill("Deep Rice");
@@ -260,7 +261,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   log("06-stock", "opening count", "ok");
 
   // Day photos (open all zones)
-  await page.goto("/store/day-photos", { waitUntil: "networkidle" });
+  await page.goto("/store/day-photos", { waitUntil: "domcontentloaded" });
   const zones = await (await apiGet(page.request, token!, "/api/v1/store/day-photos/status")).json();
   for (const zone of zones.zones || []) {
     if (zone.open_done) continue;
@@ -273,7 +274,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   await shot(page, "07-day-photos");
 
   // 5 Delivery
-  await page.goto("/store/deliveries", { waitUntil: "networkidle" });
+  await page.goto("/store/deliveries", { waitUntil: "domcontentloaded" });
   await page.locator("select").first().selectOption({ index: 1 });
   await page.getByLabel(/^item/i).fill("Deep Rice");
   await page.getByLabel(/^quantity/i).fill("2");
@@ -294,11 +295,11 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   }
 
   // Chef + handover
-  await page.goto("/store/chefs", { waitUntil: "networkidle" });
+  await page.goto("/store/chefs", { waitUntil: "domcontentloaded" });
   await page.getByLabel(/^name/i).fill("Chef Deep");
   await page.getByLabel(/^pin/i).fill(CHEF_PIN);
   await page.getByRole("button", { name: /add chef/i }).click();
-  await page.goto("/store/issue", { waitUntil: "networkidle" });
+  await page.goto("/store/issue", { waitUntil: "domcontentloaded" });
   await page.locator("select").first().selectOption({ index: 1 });
   await page.locator('input[inputmode="decimal"]').first().fill("1");
   await page.locator("select").nth(1).selectOption({ index: 1 });
@@ -314,7 +315,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
   await shot(page, "10-handover-ok");
 
   // Waste
-  await page.goto("/store/waste", { waitUntil: "networkidle" });
+  await page.goto("/store/waste", { waitUntil: "domcontentloaded" });
   await page.locator("select").first().selectOption({ index: 1 });
   await page.getByLabel(/^quantity/i).fill("0.1");
   await page.locator("select").nth(1).selectOption({ index: 1 });
@@ -329,7 +330,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
   });
-  await page.goto("/store/restock", { waitUntil: "networkidle" });
+  await page.goto("/store/restock", { waitUntil: "domcontentloaded" });
   await shot(page, "12-restock-jack");
   const jackInbox = await (await apiGet(page.request, token!, "/api/v1/store/approval-inbox")).json();
   log("12-restock", "jack inbox", JSON.stringify(jackInbox.pending?.length ?? 0));
@@ -338,7 +339,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
     const ownerCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const ownerPage = await ownerCtx.newPage();
     await login(ownerPage, OWNER, OWNER_PASS);
-    await ownerPage.goto("/eleven", { waitUntil: "networkidle" });
+    await ownerPage.goto("/eleven", { waitUntil: "domcontentloaded" });
     await expect(ownerPage.getByRole("heading", { name: /needs you/i })).toBeVisible({ timeout: 45000 });
     await shot(ownerPage, "13-owner-needs-you");
     const approvals = await (await apiGet(ownerPage.request, await tokenFrom(ownerPage)!, "/api/v1/store/approvals")).json();
@@ -363,7 +364,7 @@ test("jack deep journey jack-empty", async ({ browser }) => {
 
   // Sweep store nav buttons
   for (const route of ["/store", "/store/requests", "/store/suppliers", "/store/prep", "/store/close"]) {
-    await page.goto(route, { waitUntil: "networkidle" });
+    await page.goto(route, { waitUntil: "domcontentloaded" });
     await clickVisibleButtons(page, route);
   }
 

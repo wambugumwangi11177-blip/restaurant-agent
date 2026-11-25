@@ -4,10 +4,11 @@ import OwnerShell from "@/components/eleven/OwnerShell";
 import ExplainedCard from "@/components/eleven/charts/ExplainedCard";
 import { useOwnerGet } from "@/hooks/useOwnerV11";
 
+import { plural } from "@/lib/pluralize";
+
 function plateLabel(n?: number) {
   if (n == null) return "—";
-  if (n === 1) return "1 plate";
-  return `${n} plates`;
+  return plural(n, "plate");
 }
 
 export default function StockPrepPage() {
@@ -22,7 +23,7 @@ export default function StockPrepPage() {
     <OwnerShell title="Prep">
       <ExplainedCard
         title="Today's prep"
-        headline={items.length ? `${items.length} dishes · about ${totalPlates} plates` : undefined}
+        headline={items.length ? `${plural(items.length, "dish")} · about ${plural(totalPlates, "plate")}` : undefined}
         verdict={{ tone: "neutral", text: "Check each line before service." }}
         what="Forecast plates from recent same-weekdays, times the recipe — today's checklist."
         why="Expected demand from your recent sales pattern, not a promise."

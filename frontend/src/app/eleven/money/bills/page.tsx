@@ -10,6 +10,7 @@ import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "rec
 export default function MoneyBillsPage() {
   const { data } = useOwnerGet<{
     has_sales?: boolean;
+    has_data?: boolean;
     paid?: number;
     due?: number;
     unknown?: number;
@@ -33,7 +34,7 @@ export default function MoneyBillsPage() {
           headline={`${data?.due ?? 0} due · ${data?.paid ?? 0} paid · ${data?.unknown ?? 0} unknown`}
           what="Running costs your team entered. You approve each payment — nothing is auto-paid."
           freshness="As entered"
-          hasData={(data?.due ?? 0) + (data?.paid ?? 0) + (data?.unknown ?? 0) > 0}
+          hasData={Boolean(data?.has_sales || (data?.due ?? 0) + (data?.paid ?? 0) + (data?.unknown ?? 0) > 0)}
           emptyHint={data?.empty ?? "Starts when bills are in Settings."}
         >
           <p className="text-sm text-zinc-300">Open Money for the cash-after-bills trend on the main page.</p>

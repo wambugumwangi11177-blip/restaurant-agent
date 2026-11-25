@@ -7,7 +7,7 @@ const baseURL =
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /ui-broken-sweep|v11-captures|v12-captures|v13-captures|v14-captures/,
+  testMatch: /ui-broken-sweep|v11-captures|v12-captures|v13-captures|v14-captures|v15-captures/,
   timeout: 180_000,
   expect: { timeout: 25_000 },
   reporter: [["list"]],

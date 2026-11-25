@@ -8,6 +8,7 @@ import { useOwnerGet } from "@/hooks/useOwnerV11";
 import api from "@/lib/api";
 import { fmtDay, fmtK } from "@/lib/chartFormat";
 import { formatKes } from "@/lib/formatKes";
+import { plural } from "@/lib/pluralize";
 import { Bar, BarChart, CartesianGrid, LabelList, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 const TICK = { fill: "#a1a1aa", fontSize: 10 };
@@ -127,7 +128,7 @@ export default function ElevenStockPage() {
 
         <ExplainedCard
           title="Reorder list"
-          headline={reorderRows.length ? `${reorderRows.length} items to reorder` : undefined}
+          headline={reorderRows.length ? `${plural(reorderRows.length, "item")} to reorder` : undefined}
           verdict={
             reorderRows.length
               ? { tone: "watch", text: "Approve before any line hits lead time." }

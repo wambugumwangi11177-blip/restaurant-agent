@@ -744,7 +744,7 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
                 restaurant_id=restaurant.id,
                 user_id=jack.id if jack else owner.id,
                 kind="electricity",
-                label="[DEMO] KPLC — amount unknown",
+                label="KPLC electricity bill",
                 amount_cents=0,
                 status="unknown",
                 delegated_to="accountant",
@@ -764,6 +764,18 @@ def _refresh_demo_feed(db, restaurant, owner, jack, accountant, rice, supplier, 
             rent.next_due_on = rent_due
             rent.approved_at = rent.approved_at or (now - timedelta(days=10))
             rent.payment_state = rent.payment_state or "unpaid"
+        kplc = db.query(models.RunningCost).filter(
+            models.RunningCost.restaurant_id == restaurant.id,
+            models.RunningCost.kind == "electricity",
+        ).first()
+        if kplc:
+            kplc.label = "KPLC electricity bill, amount needed"
+            kplc.status = "unknown"
+            kplc.payment_state = "unpaid"
+            kplc.delegated_to = "accountant"
+        for row in db.query(models.RunningCost).filter(models.RunningCost.restaurant_id == restaurant.id).all():
+            if row.label and "[DEMO]" in row.label:
+                row.label = row.label.replace("[DEMO] ", "").strip()
 
     import hashlib
 

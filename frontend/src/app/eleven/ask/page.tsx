@@ -13,7 +13,7 @@ type ChatResponse = {
   llm_reply?: string | null;
   mini_chart?: { day: string; kes: number }[];
   freshness_line?: string;
-  grounded?: { finding?: string; why?: string; recommendation?: string; data?: { sales_kes?: number } };
+  grounded?: { finding?: string; why?: string; impact?: string; recommendation?: string; data?: { sales_kes?: number } };
   data_availability?: string;
 };
 
@@ -59,7 +59,10 @@ export default function ElevenAskPage() {
     }
   }
 
-  const text = answer ? replyText(answer) : "";
+  const finding = answer?.grounded?.finding || "";
+  const headline = finding || (answer ? replyText(answer) : "");
+  const bodyExtra =
+    answer?.grounded?.impact && answer.grounded.impact !== finding ? answer.grounded.impact : "";
   const chart = answer?.mini_chart ?? [];
   const numeric = chart.length > 0;
 
@@ -93,14 +96,14 @@ export default function ElevenAskPage() {
       {answer && (
         <ExplainedCard
           title="Answer"
-          headline={text.slice(0, 120) + (text.length > 120 ? "…" : "")}
+          headline={headline.slice(0, 140) + (headline.length > 140 ? "…" : "")}
           why={answer.grounded?.why}
           what="A short read from your till and store records."
           freshness={answer.freshness_line || (answer.data_availability === "available" ? "Live · from your till" : "As entered")}
-          hasData={!!text}
+          hasData={!!headline}
           emptyHint="Ask a specific question about sales, stock or bills."
         >
-          <p className="text-sm leading-6 text-zinc-200">{text}</p>
+          {bodyExtra ? <p className="text-sm leading-6 text-zinc-300">{bodyExtra}</p> : null}
           {numeric && (
             <ResponsiveContainer width="100%" height={72} className="mt-3">
               <BarChart data={chart}>

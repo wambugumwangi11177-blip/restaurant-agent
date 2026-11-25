@@ -40,7 +40,7 @@ _TYPE_LABEL: dict[str, str] = {
     "cost": "New cost",
     "schedule": "Schedule change",
     "zone_photo": "Zone photo",
-    "cost_unknown": "Unknown bill",
+    "cost_unknown": "Bill amount needed",
 }
 
 
@@ -166,7 +166,15 @@ def _actor_role_for_item(item: dict) -> str:
 
 
 def enrich_approval_item(item: dict, viewer: models.User) -> dict:
+    from services.owner_display import owner_facing_label, owner_facing_text
+
     kind = item.get("kind") or ""
+    if item.get("label"):
+        item = {**item, "label": owner_facing_label(item["label"])}
+    if item.get("headline"):
+        item = {**item, "headline": owner_facing_text(item["headline"])}
+    if item.get("emphasis"):
+        item = {**item, "emphasis": owner_facing_label(item["emphasis"])}
     actor_role = _actor_role_for_item(item)
     is_actor = viewer_is_actor(viewer, actor_role)
     waiting = _actor_label(actor_role)

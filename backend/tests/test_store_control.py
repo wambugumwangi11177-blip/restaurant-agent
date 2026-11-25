@@ -526,7 +526,7 @@ def test_unknown_bill_delegate_gets_needs_you_card(client, db_session):
     match = next((p for p in pending if p.get("kind") == "cost_unknown"), None)
     assert match is not None
     assert match.get("approval_needs_you") is True
-    assert match.get("approval_card_title") == "Unknown bill"
+    assert match.get("approval_card_title") == "Bill amount needed"
     notifs = db_session.query(models.Notification).filter(models.Notification.user_id == accountant.id).all()
     assert any("KPLC" in (n.title or "") for n in notifs)
 

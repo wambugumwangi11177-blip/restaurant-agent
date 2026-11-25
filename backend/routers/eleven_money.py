@@ -16,6 +16,98 @@ from datetime import timedelta
 
 router = APIRouter(prefix="/eleven/money", tags=["eleven-money"])
 
+_EAT = timedelta(hours=3)
+
+
+def _eat_day_start(now):
+    local = now + _EAT
+    midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    return midnight - _EAT
+
+
+@router.get("/today")
+def money_today_strip(
+    db: Session = Depends(get_db),
+    current_user=Depends(auth.get_current_user),
+):
+    _require_owner(current_user)
+    restaurant = get_or_create_restaurant(db, current_user)
+    start = _eat_day_start(utcnow())
+    revenue_cents = int(
+        db.query(func.coalesce(func.sum(models.Order.total), 0))
+        .filter(
+            models.Order.restaurant_id == restaurant.id,
+            models.Order.created_at >= start,
+            models.Order.is_paid.is_(True),
+            models.Order.status != models.OrderStatus.CANCELLED,
+        )
+        .scalar()
+        or 0
+    )
+    target_cents = int(getattr(restaurant, "monthly_sales_target_cents", 0) or 0)
+    daily_target = target_cents // 30 if target_cents else None
+    break_even_hour = None
+    if daily_target and revenue_cents >= daily_target:
+        break_even_hour = "passed"
+    elif daily_target and revenue_cents > 0:
+        break_even_hour = "before_close"
+    bills_due = int(
+        db.query(func.coalesce(func.sum(models.RunningCost.amount_cents), 0))
+        .filter(
+            models.RunningCost.restaurant_id == restaurant.id,
+            models.RunningCost.status.in_(("due", "approved")),
+        )
+        .scalar()
+        or 0
+    )
+    return {
+        "sales_kes": revenue_cents / 100.0,
+        "break_even": break_even_hour,
+        "cash_expected_kes": max(0, revenue_cents - bills_due) / 100.0,
+        "has_sales": revenue_cents > 0,
+        "empty": "Starts when the till connects.",
+    }
+
+
+@router.get("/series/sales")
+def money_sales_series(
+    days: int = 30,
+    db: Session = Depends(get_db),
+    current_user=Depends(auth.get_current_user),
+):
+    _require_owner(current_user)
+    restaurant = get_or_create_restaurant(db, current_user)
+    days = max(7, min(days, 90))
+    since = utcnow() - timedelta(days=days)
+    orders = (
+        db.query(models.Order)
+        .filter(
+            models.Order.restaurant_id == restaurant.id,
+            models.Order.created_at >= since,
+            models.Order.is_paid.is_(True),
+            models.Order.status != models.OrderStatus.CANCELLED,
+        )
+        .all()
+    )
+    by_day: dict[str, int] = {}
+    for o in orders:
+        if o.created_at:
+            key = o.created_at.date().isoformat()
+            by_day[key] = by_day.get(key, 0) + int(o.total or 0)
+    points = [{"day": d, "revenue_kes": c / 100.0} for d, c in sorted(by_day.items())]
+    this_week = sum(c for d, c in by_day.items() if d >= (utcnow() - timedelta(days=7)).date().isoformat())
+    last_week_start = (utcnow() - timedelta(days=14)).date().isoformat()
+    last_week_end = (utcnow() - timedelta(days=7)).date().isoformat()
+    last_week = sum(c for d, c in by_day.items() if last_week_start <= d < last_week_end)
+    return {
+        "days": days,
+        "points": points,
+        "has_sales": bool(points),
+        "this_week_kes": this_week / 100.0,
+        "last_week_kes": last_week / 100.0,
+        "empty": "Starts when the till connects.",
+    }
+
 
 @router.get("/pnl")
 async def owner_pnl(

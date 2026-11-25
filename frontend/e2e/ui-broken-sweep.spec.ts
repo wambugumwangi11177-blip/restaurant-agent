@@ -136,6 +136,21 @@ async function visitAndProbe(page: Page, path: string, issues: Issue[], meta: { 
     if (page.isClosed()) return;
     await page.waitForTimeout(400);
   }
+  const pageButtons = page.locator(
+    'main button:visible, main a.owner-oat-highlight:visible, main a.owner-glass-panel:visible',
+  );
+  const btnMax = Math.min(await pageButtons.count(), 4);
+  for (let j = 0; j < btnMax; j++) {
+    const el = pageButtons.nth(j);
+    const href = await el.getAttribute("href").catch(() => null);
+    if (href && (href.startsWith("http") || href.includes("/logout"))) continue;
+    await el.click({ timeout: 3000 }).catch(() => undefined);
+    if (page.isClosed()) return;
+    await page.waitForTimeout(300);
+    if (page.url() !== path && !page.url().endsWith(path)) {
+      await page.goto(path, { waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => undefined);
+    }
+  }
 }
 
 test.describe("UI broken sweep", () => {

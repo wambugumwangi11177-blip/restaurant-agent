@@ -2,24 +2,26 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Wallet, Package, Users, MoreHorizontal } from "lucide-react";
+import { Home, Wallet, Package, MoreHorizontal, MessageCircle } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import "@/styles/owner-glass.css";
 
 const NAV = [
-  { href: "/eleven", label: "Home", icon: Home, match: (p: string) => p === "/eleven" },
-  { href: "/eleven/money", label: "Money", icon: Wallet, match: (p: string) => p.startsWith("/eleven/money") },
-  { href: "/eleven/stock", label: "Stock", icon: Package, match: (p: string) => p.startsWith("/eleven/stock") },
-  { href: "/eleven/team", label: "Team", icon: Users, match: (p: string) => p.startsWith("/eleven/team") || p.startsWith("/eleven/schedule") },
+  { href: "/eleven", label: "Home", icon: Home, match: (p: string) => p === "/eleven", center: false },
+  { href: "/eleven/money", label: "Money", icon: Wallet, match: (p: string) => p.startsWith("/eleven/money"), center: false },
+  { href: "/eleven/ask", label: "Ask OS", icon: MessageCircle, match: (p: string) => p.startsWith("/eleven/ask"), center: true },
+  { href: "/eleven/stock", label: "Stock", icon: Package, match: (p: string) => p.startsWith("/eleven/stock"), center: false },
   {
     href: "/eleven/more",
     label: "More",
     icon: MoreHorizontal,
     match: (p: string) =>
       p.startsWith("/eleven/more") ||
-      ["/eleven/dishes", "/eleven/sales-dishes", "/eleven/cash-check", "/eleven/staff", "/eleven/settings", "/eleven/ask", "/eleven/reports", "/eleven/alerts", "/eleven/approvals", "/eleven/activity", "/eleven/deliveries", "/eleven/import", "/eleven/settings/team-rules"].some(
+      p.startsWith("/eleven/team") ||
+      ["/eleven/dishes", "/eleven/sales-dishes", "/eleven/cash-check", "/eleven/staff", "/eleven/settings", "/eleven/reports", "/eleven/alerts", "/eleven/approvals", "/eleven/activity", "/eleven/deliveries", "/eleven/import", "/eleven/settings/team-rules"].some(
         (x) => p.startsWith(x),
       ),
+    center: false,
   },
 ] as const;
 
@@ -53,22 +55,24 @@ export default function OwnerShell({
         aria-label="Main"
         className="owner-glass-panel owner-nav owner-nav-desktop fixed left-1/2 z-50 flex h-[72px] w-[calc(100%-24px)] max-w-[420px] -translate-x-1/2 items-center justify-around rounded-full px-2 md:left-4 md:h-auto md:w-[88px] md:max-w-none md:translate-x-0 md:flex-col md:gap-2 md:py-4"
       >
-        {NAV.map(({ href, label, icon: Icon, match }) => {
+        {NAV.map(({ href, label, icon: Icon, match, center }) => {
           const active = match(pathname);
           return (
             <Link
               key={href}
               href={href}
-              className={`flex min-h-11 min-w-[56px] flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-medium md:min-w-0 md:w-full ${
+              className={`flex min-h-11 min-w-[52px] flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-medium md:min-w-0 md:w-full ${
                 active ? "text-[var(--text)]" : "text-zinc-400"
-              }`}
+              } ${center ? "-mt-5 md:mt-0" : ""}`}
             >
               <span
-                className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                  active ? "nav-pill-active" : ""
+                className={`flex items-center justify-center rounded-full ${
+                  center
+                    ? `h-14 w-14 border border-[var(--border)] bg-[var(--accent)] text-[var(--bg)] shadow-lg ${active ? "ring-2 ring-zinc-200/30" : ""}`
+                    : `h-10 w-10 ${active ? "nav-pill-active" : ""}`
                 }`}
               >
-                <Icon size={22} strokeWidth={1.75} />
+                <Icon size={center ? 26 : 22} strokeWidth={1.75} />
               </span>
               <span className="md:hidden">{label}</span>
             </Link>

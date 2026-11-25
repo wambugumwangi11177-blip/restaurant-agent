@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from logging_config import configure_logging
 from routers import (
     eleven_dishes,
+    eleven_home,
     eleven_money,
     eleven_outcomes,
     store_prep,
@@ -663,6 +664,7 @@ _VERSIONED_ROUTERS = [
     team_router.router,
     eleven_dishes.router,
     eleven_money.router,
+    eleven_home.router,
     eleven_outcomes.router,
     store_restock.router,
     store_prep.router,

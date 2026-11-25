@@ -1,48 +1,58 @@
 "use client";
 
 import Link from "next/link";
-import { Package, Trash2, Wallet } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import OwnerShell from "@/components/eleven/OwnerShell";
 import ApprovalCard from "@/components/approvals/ApprovalCard";
-import OwnerFeed, { feedEventLine, useOwnerFeed, type FeedCard, type FeedEvent } from "@/components/eleven/OwnerFeed";
+import { feedEventLine, useOwnerFeed, type FeedEvent } from "@/components/eleven/OwnerFeed";
+import api from "@/lib/api";
+import { formatKes } from "@/lib/formatKes";
 
-const ICONS = {
-  stock: Package,
-  waste: Trash2,
-  money: Wallet,
-} as const;
+type Today = {
+  has_sales: boolean;
+  sales_kes: number;
+  tickets: number;
+  cash_expected_kes: number;
+  empty_sales?: string;
+};
 
-function recipeLine(count: number) {
-  if (count === 1) return "1 dish still has no recipe.";
-  return `${count} dishes still have no recipe.`;
-}
+type DoneToday = { summary: string | null; empty: string };
 
-function Tile({ card }: { card: FeedCard }) {
-  const Icon = ICONS[card.id as keyof typeof ICONS] ?? Package;
-  const figure = card.figure != null ? String(card.figure).trim() : "";
-  const sentence = (card.sentence || "").trim();
-  if (card.quiet || !figure) {
-    const line = [card.title, sentence].filter(Boolean).join(". ");
-    if (!line) return null;
-    const tone = card.id === "money" && card.overdue ? "text-red-300" : "text-zinc-400";
-    return <p className={`owner-quiet ${tone}`}>{line}</p>;
-  }
-  if (!sentence && !figure) return null;
-  return (
-    <article className={`owner-glass-panel owner-tile ${card.id === "money" && card.overdue ? "ring-1 ring-red-400/40" : ""}`}>
-      <p className="owner-glass-tag">
-        <Icon size={14} strokeWidth={1.75} aria-hidden />
-        {card.title}
-      </p>
-      <p className="owner-figure">{card.figure}</p>
-      <p className="text-[0.9375rem] leading-6 text-zinc-200">{card.sentence}</p>
-    </article>
-  );
+type Setup = { steps: { id: string; done: boolean; label: string; href: string }[]; all_done: boolean };
+
+function kesStake(item: FeedEvent): number {
+  const cents = (item as { amount_cents?: number }).amount_cents;
+  if (typeof cents === "number") return cents;
+  return 0;
 }
 
 export default function ElevenHomePage() {
   const { data, error, refresh } = useOwnerFeed();
-  const pendingVisible = (data?.pending ?? []).filter((item) => feedEventLine(item));
+  const [today, setToday] = useState<Today | null>(null);
+  const [done, setDone] = useState<DoneToday | null>(null);
+  const [setup, setSetup] = useState<Setup | null>(null);
+
+  useEffect(() => {
+    const bust = { params: { _: Date.now() }, headers: { "Cache-Control": "no-cache" } };
+    Promise.all([
+      api.get("/api/v1/eleven/home/today", bust),
+      api.get("/api/v1/eleven/home/done-today", bust),
+      api.get("/api/v1/eleven/home/setup", bust),
+    ]).then(([t, d, s]) => {
+      setToday(t.data);
+      setDone(d.data);
+      setSetup(s.data);
+    }).catch(() => undefined);
+  }, []);
+
+  const pending = useMemo(() => {
+    const items = (data?.pending ?? []).filter((item) => feedEventLine(item));
+    return [...items].sort((a, b) => kesStake(b) - kesStake(a));
+  }, [data?.pending]);
+
+  const waiting = (data?.events ?? []).filter((e) => e.approval_card_title?.toLowerCase().includes("waiting"));
+
+  const showSetup = setup && !setup.all_done && (!today?.has_sales || pending.length === 0);
 
   return (
     <OwnerShell title="Home">
@@ -50,51 +60,91 @@ export default function ElevenHomePage() {
       {error && <p className="text-sm text-red-300">{error}</p>}
       {data && (
         <div className="owner-premium-stack">
+          <div className="owner-glass-panel flex flex-wrap items-baseline justify-between gap-2 px-4 py-3">
+            <TodaySummary today={today} />
+          </div>
+
           <h2 className="owner-label">Needs you</h2>
-          {pendingVisible.length === 0 ? (
-            <div className="owner-oat-highlight mb-3">
-              <p className="text-[0.9375rem] leading-6 text-[var(--text)]">
-                {data.attention?.count === 0
-                  ? "Nothing needs you right now."
-                  : data.attention?.sentence || "Nothing needs you right now."}
-              </p>
-            </div>
+          {pending.length === 0 ? (
+            <p className="text-sm text-zinc-400">
+              {data.attention?.sentence || "Nothing needs you right now."}
+            </p>
           ) : (
-            <ul className="mb-3 space-y-3">
-              {pendingVisible.map((item: FeedEvent) => (
+            <ul className="space-y-3">
+              {pending.map((item: FeedEvent) => (
                 <li key={`${item.kind}-${item.id}`}>
                   <Link href={`/eleven/approvals#${item.kind}-${item.id}`} className="block">
                     {item.approval_card_title ? (
                       <ApprovalCard item={item} />
                     ) : (
-                      <div className="owner-oat-highlight flex min-h-11 items-center px-3 text-[0.9375rem] text-[var(--text)]">
-                        {feedEventLine(item)}
-                      </div>
+                      <DecisionButton item={item} />
                     )}
                   </Link>
                 </li>
               ))}
             </ul>
           )}
-          <div className="space-y-3">
-            {data.cards?.filter((card) => card.id !== "approvals").map((card) => (
-              <Tile key={card.id} card={card} />
-            ))}
-          </div>
-          {(data.unknown_costs ?? []).length > 0 && (
-            <p className="owner-quiet">
-              {(data.unknown_costs?.length ?? 0) === 1
-                ? `${data.unknown_costs?.[0]} has no amount yet.`
-                : `${data.unknown_costs?.join(", ")} have no amount yet.`}
-            </p>
+
+          {waiting.length > 0 && (
+            <>
+              <h2 className="owner-label mt-4">Waiting on others</h2>
+              <ul className="space-y-2 text-sm text-zinc-300">
+                {waiting.slice(0, 8).map((item) => (
+                  <li key={`wait-${item.kind}-${item.id}`} className="owner-glass-panel px-3 py-2">
+                    {feedEventLine(item)}
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
-          {(data.recipes_missing ?? 0) > 0 && <p className="owner-quiet">{recipeLine(data.recipes_missing ?? 0)}</p>}
-          <div className="pt-2">
-            <Link href="/eleven/activity" className="owner-label inline-block">Activity</Link>
-            <OwnerFeed data={data} onChanged={refresh} mode="feed" />
-          </div>
+
+          <h2 className="owner-label mt-4">Done today</h2>
+          <p className="text-sm text-zinc-300">{done?.summary ?? done?.empty ?? "—"}</p>
+
+          {showSetup && (
+            <>
+              <h2 className="owner-label mt-4">Get started</h2>
+              <ul className="space-y-2">
+                {setup.steps.filter((s) => !s.done).map((step) => (
+                  <li key={step.id}>
+                    <Link href={step.href} className="owner-oat-highlight block px-3 py-3 text-sm">
+                      {step.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
       )}
     </OwnerShell>
+  );
+}
+
+function TodaySummary({ today }: { today: Today | null }) {
+  if (!today) return <p className="text-sm text-zinc-400">Loading today…</p>;
+  if (!today.has_sales) {
+    return (
+      <>
+        <p className="text-lg text-zinc-100">Today&apos;s sales: 0 KES</p>
+        <p className="text-xs text-zinc-400">{today.empty_sales}</p>
+      </>
+    );
+  }
+  return (
+    <>
+      <p className="text-lg text-zinc-100">
+        Today&apos;s sales: {formatKes(today.sales_kes)} · {today.tickets} tickets
+      </p>
+      <p className="text-sm text-zinc-400">Cash expected at close: {formatKes(today.cash_expected_kes)}</p>
+    </>
+  );
+}
+
+function DecisionButton({ item }: { item: FeedEvent }) {
+  return (
+    <div className="owner-oat-highlight flex min-h-11 items-center px-3 text-[0.9375rem] text-[var(--text)]">
+      {feedEventLine(item)}
+    </div>
   );
 }

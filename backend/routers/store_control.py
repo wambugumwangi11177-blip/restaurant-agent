@@ -1137,6 +1137,13 @@ async def list_approvals(
         })
     from services.restock_workflow import build_invoice_draft, parse_draft_from_notes, po_for_owner_feed
 
+    # Drafted restocks have no requester; name the storekeeper who keeps the store.
+    store_keeper = db.query(models.User).filter(
+        models.User.tenant_id == restaurant.tenant_id,
+        models.User.staff_role == models.StaffRole.STOCKKEEPER,
+        models.User.is_active.is_(True),
+    ).order_by(models.User.id.asc()).first()
+
     for row in db.query(models.PurchaseOrder).filter(
         models.PurchaseOrder.restaurant_id == restaurant.id,
         models.PurchaseOrder.status.in_(("PENDING", "APPROVED")),
@@ -1145,7 +1152,7 @@ async def list_approvals(
         requester = (
             db.query(models.User).filter(models.User.id == row.requested_by_user_id).first()
             if row.requested_by_user_id
-            else None
+            else store_keeper
         )
         who_req = person_of(db, requester) if requester else {"person_name": "Store", "person_email": ""}
         item.update({

@@ -22,6 +22,7 @@ scheduler — same posture as ai/stock_custody.py, for the same reason: the
 math should be unit-testable without spinning up the app.
 """
 
+import math
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -98,7 +99,8 @@ def find_reorder_candidates(db: Session, restaurant_id: int, on_date: date | Non
         if base_quantity <= 0:
             continue
 
-        adjusted_quantity = round(base_quantity * factor, 2)
+        # Suppliers sell whole units; round up so the order covers par.
+        adjusted_quantity = float(math.ceil(round(base_quantity * factor, 2)))
 
         candidates.append(ReorderCandidate(
             inventory_item_id=item.id,

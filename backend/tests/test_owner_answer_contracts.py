@@ -155,7 +155,7 @@ def test_ordinary_revenue_question_is_unaffected_by_the_slow_day_branch(monkeypa
         "weekly_pattern": [_weekly_row("Monday", 12000, 2.0, 4, 2)],
     })
     answer = _answer_revenue(db_session, r.id, "How are my sales today?")
-    assert answer["finding"].startswith("Revenue today is")
+    assert answer["finding"].startswith("You've sold")
 
 
 def test_slow_days_answer_runs_against_the_real_forecaster(db_session, restaurant):

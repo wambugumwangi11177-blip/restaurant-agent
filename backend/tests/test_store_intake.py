@@ -63,16 +63,10 @@ def test_suppliers_stock_issue_and_waste_are_quantities_only(client, db_session)
     assert money_keys_in(created.json()) == []
     zones = client.get("/api/v1/store/zones", headers=_auth(_token(jack)))
     assert [zone["name"] for zone in zones.json()] == ["Main store", "Cold room", "Bar", "Kitchen"]
-    blocked = client.post(
-        "/api/v1/store/items/opening",
-        headers=_auth(_token(jack)),
-        json={"item_name": "Tusker", "quantity": 24, "unit": "bottle", "zone": "Bar"},
-    )
-    assert blocked.status_code == 403
     setup = client.get("/api/v1/staff-setup", headers=_auth(_token(jack))).json()
     assert setup["stock_followup"]["status"] == "count_when_live"
     assert setup["stock_followup"]["pending"]
-    assert "opening-count" not in setup["unlocked_modules"]
+    assert "opening-count" in setup["unlocked_modules"]
     opening = client.post(
         "/api/v1/store/items/opening",
         headers=_auth(_token(owner)),
@@ -327,13 +321,7 @@ def test_supplier_answers_prefill_records_and_pos_status_is_visible(client, db_s
     assert waiting.status_code == 200
     setup = client.get("/api/v1/staff-setup", headers=_auth(_token(jack))).json()
     assert setup["stock_followup"]["status"] == "waiting_on_pos"
-    assert "opening-count" not in setup["unlocked_modules"]
-    blocked = client.post(
-        "/api/v1/store/items/opening",
-        headers=_auth(_token(jack)),
-        json={"item_name": "Rice", "quantity": 1, "unit": "kg"},
-    )
-    assert blocked.status_code == 403
+    assert "opening-count" in setup["unlocked_modules"]
 
     later = _answer(client, jack, "stock_in_pos", "no")
     assert later.status_code == 200

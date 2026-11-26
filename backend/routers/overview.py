@@ -81,7 +81,7 @@ def _eat_range(period: str):
 def _summarize(db: Session, rid: int, start, end) -> dict:
     """Paid, non-cancelled order value by creation time; not payment cash flow."""
     base = lambda q, col: q.filter(
-        models.Order.restaurant_id == rid, col >= start, col <= end,
+        models.Order.restaurant_id == rid, col >= start, col < end,
         models.Order.is_paid.is_(True),
         models.Order.status != models.OrderStatus.CANCELLED,
     )

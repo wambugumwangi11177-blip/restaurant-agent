@@ -16,7 +16,39 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from logging_config import configure_logging
-from routers import orders, inventory, health, webhooks, auth, menu, analytics, reservations, ai, export, flags, events, billing, enterprise, staff, stock_custody, suppliers, purchase_orders, notifications, support, tables, attendance, fraud, cash_reconciliation, restaurants, overview, reports, ai_ask, creative, observer
+from routers import (
+    eleven_dishes,
+    eleven_home,
+    eleven_money,
+    eleven_v11_money,
+    eleven_v11_stock,
+    eleven_decisions,
+    eleven_v11_settings,
+    eleven_v11_team,
+    eleven_help,
+    eleven_outcomes,
+    store_prep,
+    store_restock,
+    store_test,
+    health,
+    webhooks,
+    auth,
+    staff,
+    notifications,
+    overview,
+    ai_ask,
+    staff_setup,
+    store_recipes,
+    eleven_import,
+    store_intake,
+    store_control,
+    store_day,
+    pos_evidence,
+    eleven_handover,
+    eleven_owner,
+    admin_platform,
+    team as team_router,
+)
 from middleware.timing import TimingMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
@@ -97,6 +129,9 @@ def on_startup():
     #     when DEMO_RESTAURANT_OWNER_EMAIL/_PASSWORD are set. No-op otherwise.
     from tenant_provisioning import provision_demo_from_env
     provision_demo_from_env()
+
+    from leviii_test_seed import provision_test_data_from_env
+    provision_test_data_from_env()
 
     from observer_mode import observer_mode_enabled
     if observer_mode_enabled():
@@ -256,6 +291,13 @@ def _start_scheduler():
             replace_existing=True,
         )
 
+        scheduler.add_job(
+            _run_approval_reminders_job,
+            IntervalTrigger(minutes=5),
+            id="approval_reminders",
+            replace_existing=True,
+        )
+
         # Audit remediation, Tier 2 item 6 — purge AgentAuditLog rows older
         # than 90 days, closing the gap docs/compliance-matrix.md flagged as
         # open ("Append-only (no auto-purge today) — reconcile vs DPA
@@ -267,12 +309,43 @@ def _start_scheduler():
             replace_existing=True,
         )
 
+        scheduler.add_job(
+            _run_owner_report_job,
+            CronTrigger(hour=18, minute=0),  # 21:00 EAT
+            kwargs={"job_kind": "daily"},
+            id="owner_daily_report",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _run_owner_report_job,
+            CronTrigger(day_of_week="mon", hour=5, minute=0),  # 08:00 EAT Monday
+            kwargs={"job_kind": "weekly"},
+            id="owner_weekly_report",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _run_owner_report_job,
+            CronTrigger(day=1, hour=3, minute=0),  # 06:00 EAT on the 1st
+            kwargs={"job_kind": "monthly"},
+            id="owner_monthly_pnl",
+            replace_existing=True,
+        )
+
         scheduler.start()
         logger.info("[OK] Scheduler started (morning briefing: 07:00 EAT)")
     except ImportError:
         logger.warning("[WARN] APScheduler not installed — scheduled jobs disabled. Run: pip install apscheduler")
     except Exception as e:
         logger.warning(f"[WARN] Scheduler failed to start: {e}")
+
+
+def _run_owner_report_job(job_kind: str = "daily"):
+    try:
+        from services.owner_reports import run_all_restaurants
+
+        run_all_restaurants(job_kind)
+    except Exception as exc:
+        logger.warning("[owner_reports] %s failed: %s", job_kind, exc)
 
 
 def _send_all_morning_briefings():
@@ -338,28 +411,13 @@ def _run_variance_check_job():
     real signal instead of a daily no-op ping."""
     try:
         from database import SessionLocal
-        from events.bus import emit_async, EventType
-        from ai.stock_custody import flagged_items
+        from services import engine_triggers
         import models
 
         db = SessionLocal()
         try:
             for restaurant in db.query(models.Restaurant).all():
-                items = flagged_items(db, restaurant.id, hours=24)
-                if not items:
-                    continue
-                emit_async(EventType.STOCK_VARIANCE_FLAGGED, {
-                    "restaurant_id": restaurant.id,
-                    "items": [
-                        {
-                            "item_name": i.item_name,
-                            "variance_pct": i.variance_pct,
-                            "theoretical": i.theoretical_usage,
-                            "actual": i.actual_usage,
-                        }
-                        for i in items
-                    ],
-                })
+                engine_triggers.maybe_variance_alert(db, restaurant.id)
         finally:
             db.close()
     except Exception as exc:
@@ -402,6 +460,20 @@ def _run_fraud_check_job():
             db.close()
     except Exception as exc:
         logger.error(f"[Fraud Check] Scheduler job failed: {exc}")
+
+
+def _run_approval_reminders_job():
+    try:
+        from database import SessionLocal
+        from services.approval_workflow import process_all_due_reminders
+
+        db = SessionLocal()
+        try:
+            process_all_due_reminders(db)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"[Approval Reminders] Scheduler job failed: {exc}")
 
 
 def _run_escalation_sweep_job():
@@ -480,15 +552,13 @@ def _run_reorder_check_job():
     level or a supplier nobody configured."""
     try:
         from database import SessionLocal
-        from ai.reorder import find_reorder_candidates, draft_purchase_order
+        from services import engine_triggers
         import models
 
         db = SessionLocal()
         try:
             for restaurant in db.query(models.Restaurant).all():
-                candidates = find_reorder_candidates(db, restaurant.id)
-                for candidate in candidates:
-                    draft_purchase_order(db, restaurant.id, candidate)
+                engine_triggers.maybe_draft_reorders(db, restaurant.id)
         finally:
             db.close()
     except Exception as exc:
@@ -596,6 +666,8 @@ app.add_middleware(BodySizeLimitMiddleware)
 app.add_middleware(CorrelationIdMiddleware)
 from observer_mode import ObserverModeMiddleware
 app.add_middleware(ObserverModeMiddleware)
+from middleware.money_redaction import MoneyRedactionMiddleware
+app.add_middleware(MoneyRedactionMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 #
@@ -611,23 +683,43 @@ app.add_middleware(ObserverModeMiddleware)
 #   • webhooks — MacSoft POSTs to a fixed, externally-registered URL; versioning
 #     it would break the push endpoint they have already been given.
 #   • health — conventionally unversioned (probes/uptime checks hit /health).
-from routers import demo
-
+# LEVIII Eleven owner + store surfaces only (webhooks + scheduler use DB/ai directly).
 _VERSIONED_ROUTERS = [
-    menu.router, orders.router, inventory.router, analytics.router,
-    reservations.router, ai.router, export.router, flags.router, events.router,
-    billing.router, enterprise.router, staff.router, stock_custody.router,
-    suppliers.router, purchase_orders.router, notifications.router, support.router,
-    tables.router, attendance.router, fraud.router, cash_reconciliation.router,
-    restaurants.router, overview.router, reports.router, ai_ask.router, creative.router, observer.router, demo.router,
-    ]
+    staff.router,
+    overview.router,
+    notifications.router,
+    ai_ask.router,
+    staff_setup.router,
+    store_recipes.router,
+    eleven_import.router,
+    store_intake.router,
+    store_control.router,
+    store_day.router,
+    pos_evidence.router,
+    eleven_handover.router,
+    eleven_owner.router,
+    admin_platform.router,
+    team_router.router,
+    eleven_dishes.router,
+    eleven_money.router,
+    eleven_v11_money.router,
+    eleven_v11_stock.router,
+    eleven_decisions.router,
+    eleven_v11_settings.router,
+    eleven_v11_team.router,
+    eleven_help.router,
+    eleven_home.router,
+    eleven_outcomes.router,
+    store_restock.router,
+    store_prep.router,
+    store_test.router,
+]
 
 app.include_router(auth.router)
 app.include_router(health.router)
 app.include_router(webhooks.router)
 for _r in _VERSIONED_ROUTERS:
-    app.include_router(_r, prefix="/api/v1")          # canonical, documented
-    app.include_router(_r, include_in_schema=False)   # legacy path, still works
+    app.include_router(_r, prefix="/api/v1")
 
 
 @app.get("/")

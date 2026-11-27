@@ -30,14 +30,20 @@ api.interceptors.response.use(
       // Don't redirect when we're already on /login or registering/logging in —
       // the login page fires unauthenticated API calls (trust-stats) and a
       // redirect here used to loop the page into itself forever.
-      const isAuthPath =
-        window.location.pathname === "/login" ||
-        window.location.pathname === "/register" ||
-        window.location.pathname === "/order" ||
-        (error.config?.url ?? "").includes("/auth/");
-      if (!isAuthPath) {
+      const path = window.location.pathname;
+      const isAuthFlow =
+        path === "/login" ||
+        path.startsWith("/reset-password") ||
+        path.startsWith("/verify-email") ||
+        path.startsWith("/forgot-password");
+      const isAuthRequest = (error.config?.url ?? "").includes("/auth/");
+      if (!isAuthFlow) {
         clearAccessToken();
-        window.location.href = "/login";
+        if (path !== "/login") {
+          window.location.href = "/login";
+        }
+      } else if (isAuthRequest && path === "/login") {
+        clearAccessToken();
       }
     }
     return Promise.reject(error);

@@ -122,24 +122,20 @@ def test_a_failed_mirror_read_leaves_the_session_usable(db_session):
     assert db_session.query(models.Restaurant).filter_by(name="Still writable").one()
 
 
-def test_overview_today_carries_the_state_and_a_matching_notice(mirror_tables, client):
+def test_overview_today_carries_the_state_and_a_matching_notice(mirror_tables, client, db_session):
     import secrets
+    from tests.factories import seed_owner
 
-    resp = client.post("/api/v1/auth/register", json={
-        "email": f"src{secrets.token_hex(4)}@example.com",
-        "password": "CorrectHorseBattery1!", "tenant_name": "Vibanda Village",
-    })
-    assert resp.status_code == 201, resp.text
-    headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    email = f"src{secrets.token_hex(4)}@example.com"
+    _, _, headers = seed_owner(db_session, email=email, tenant_name="Eleven")
 
     r = client.get("/api/v1/overview/today", headers=headers)
     assert r.status_code == 200, r.text
     body = r.json()
 
     provenance = body["data_provenance"]
-    assert provenance["source_connection"]["state"] == "awaiting_first_delivery"
-    assert provenance["integration_verified"] is False
-    assert "Macsoft has delivered nothing yet" in provenance["notice"]
-    assert body["source_status"]["integration"]["state"] == "awaiting_first_delivery"
+    assert provenance["source_connection"]["state"] == "direct"
+    assert provenance["integration_verified"] is True
+    assert body["source_status"]["integration"]["state"] == "direct"
     # The old copy asserted a fact about the integration that no deploy kept true.
     assert "prototype" not in provenance["notice"].lower()

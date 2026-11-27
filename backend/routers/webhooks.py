@@ -240,7 +240,16 @@ async def receive_macsoft_data(
 # ─────────────────────────────────────────────────────────────────────────────
 
 QUICKSELL_SOURCE_SLUG = "quicksell"
-ELEVEN_RESTAURANT_NAME = os.getenv("ELEVEN_RESTAURANT_NAME", "Eleven").strip() or "Eleven"
+POS_BINDING_HEADER = "x-leviii-pos-binding"
+
+
+def _eleven_restaurant_name() -> str:
+    return os.getenv("ELEVEN_RESTAURANT_NAME", "Eleven").strip() or "Eleven"
+
+
+def _binding_slug(header: str | None) -> str:
+    raw = (header or os.getenv("QUICKSELL_DEFAULT_BINDING", "quicksell")).strip().lower()
+    return raw or QUICKSELL_SOURCE_SLUG
 
 
 def _verify_quicksell_key(supplied: str | None) -> None:
@@ -270,20 +279,32 @@ def _quicksell_source_system(db: Session) -> int:
     return row.id
 
 
-def _eleven_restaurant_id(db: Session) -> int:
-    row = (
-        db.query(models.Restaurant.id)
-        .join(models.Tenant, models.Tenant.id == models.Restaurant.tenant_id)
-        .filter(models.Restaurant.name == ELEVEN_RESTAURANT_NAME)
-        .order_by(models.Restaurant.id)
-        .first()
-    )
-    if row is None:
+def _eleven_restaurant_id(db: Session, binding_slug: str = QUICKSELL_SOURCE_SLUG) -> int:
+    from integration.inbox_models import PosSourceBinding
+
+    binding = db.query(PosSourceBinding).filter_by(slug=binding_slug).first()
+    if binding:
+        return binding.restaurant_id
+    if binding_slug != QUICKSELL_SOURCE_SLUG:
         raise HTTPException(
             status_code=503,
-            detail=f"Eleven restaurant {ELEVEN_RESTAURANT_NAME!r} is not configured on this server.",
+            detail=f"POS source binding {binding_slug!r} is not configured on this server.",
         )
-    return row[0]
+    rows = (
+        db.query(models.Restaurant.id)
+        .join(models.Tenant, models.Tenant.id == models.Restaurant.tenant_id)
+        .filter(models.Restaurant.name == _eleven_restaurant_name())
+        .order_by(models.Restaurant.id)
+        .limit(2).all()
+    )
+    if not rows:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Eleven restaurant {_eleven_restaurant_name()!r} is not configured on this server.",
+        )
+    if len(rows) != 1:
+        raise HTTPException(503, "Ambiguous POS restaurant — configure an explicit source binding.")
+    return rows[0][0]
 
 
 @router.post("/quicksell/data")
@@ -291,10 +312,29 @@ def _eleven_restaurant_id(db: Session) -> int:
 async def receive_quicksell_data(
     request: Request,
     x_api_key: str | None = Header(default=None),
+    x_leviii_pos_binding: str | None = Header(default=None, alias="X-Leviii-Pos-Binding"),
     db: Session = Depends(get_db),
 ):
     """One-way POS push for Eleven. Raw JSON is mirrored, then mapped to orders."""
     _verify_quicksell_key(x_api_key)
+    binding_slug = _binding_slug(x_leviii_pos_binding)
+
+    from integration import inbox
+    if inbox.enabled():
+        raw = await inbox.read_body(request)
+        try:
+            restaurant_id = _eleven_restaurant_id(db, binding_slug)
+            binding = inbox.bind_source(db, restaurant_id, slug=binding_slug)
+            receipt_id = inbox.store_receipt(db, binding=binding, raw=raw)
+            source_id = _quicksell_source_system(db)
+            return inbox.parse_receipt(db, receipt_id, restaurant_id=restaurant_id,
+                                       source_system_id=source_id)
+        except HTTPException:
+            raise
+        except Exception:
+            db.rollback()
+            # Do not log SQL exceptions: they may contain raw bound parameters.
+            raise HTTPException(503, "Processing unavailable — please retry.")
 
     try:
         payload = await request.json()
@@ -305,10 +345,11 @@ async def receive_quicksell_data(
     if len(records) > 500:
         raise HTTPException(status_code=413, detail="Batch too large — send at most 500 records.")
 
-    restaurant_id = _eleven_restaurant_id(db)
+    restaurant_id = _eleven_restaurant_id(db, binding_slug)
     source_system_id = _quicksell_source_system(db)
     counts = {"inserted": 0, "superseded": 0, "skipped": 0}
     order_counts = {"order_inserted": 0, "order_updated": 0, "order_unchanged": 0}
+    sale_hooks: list[tuple[int, int, bool]] = []
     business_days: list[str] = []
     received_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -331,7 +372,7 @@ async def receive_quicksell_data(
                 commit=False,
             )
             counts[action] = counts.get(action, 0) + 1
-            oc = qs.maybe_apply_sale(
+            oc, order_id = qs.maybe_apply_sale(
                 db,
                 restaurant_id=restaurant_id,
                 entity=rec_entity,
@@ -341,7 +382,14 @@ async def receive_quicksell_data(
                 occurred_at=occurred_at,
             )
             order_counts[oc] = order_counts.get(oc, 0) + 1
+            if order_id is not None:
+                sale_hooks.append((restaurant_id, order_id, oc == "order_inserted"))
         db.commit()
+        if sale_hooks:
+            from services import engine_triggers
+
+            for rid, oid, inserted in sale_hooks:
+                engine_triggers.after_pos_sale(db, rid, oid, inserted=inserted)
     except HTTPException:
         db.rollback()
         raise

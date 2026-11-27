@@ -41,7 +41,7 @@ export default function ImpersonationBanner() {
         setEnding(true);
         try {
             await endImpersonation();
-            router.push("/dashboard");
+            router.push("/eleven");
         } finally {
             setEnding(false);
         }

@@ -316,6 +316,7 @@ class StaffMemberCreate(StrictModel):
     name: str
     role_title: str = ""
     hourly_rate: int = Field(default=0, ge=0)
+    daily_pay_rate_cents: Optional[int] = Field(default=None, ge=0)
     phone: Optional[str] = None
     # If set, a User account is created and linked. staff_role is required
     # whenever a login is granted — no default that silently grants more
@@ -339,9 +340,11 @@ class StaffMemberOut(StrictModel):
     name: str
     role_title: str
     hourly_rate: int
+    daily_pay_rate_cents: Optional[int] = None
     phone: Optional[str]
     is_active: bool
     staff_role: Optional[str] = None   # from the linked User, if any
+    has_login: bool = False
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
@@ -473,10 +476,14 @@ class MenuIngredientCreate(StrictModel):
     inventory_item_id: int
     quantity_per_serving: float = Field(gt=0)
     is_critical: bool = True
+    yield_fraction: float = Field(default=1.0, gt=0, le=1)
+    recipe_unit: Optional[str] = None
 
 class MenuIngredientUpdate(StrictModel):
     quantity_per_serving: Optional[float] = Field(default=None, gt=0)
     is_critical: Optional[bool] = None
+    yield_fraction: Optional[float] = Field(default=None, gt=0, le=1)
+    recipe_unit: Optional[str] = None
 
 class MenuIngredientOut(StrictModel):
     id: int
@@ -484,6 +491,8 @@ class MenuIngredientOut(StrictModel):
     inventory_item_id: int
     quantity_per_serving: float
     is_critical: bool
+    yield_fraction: float = 1.0
+    recipe_unit: Optional[str] = None
     # Denormalized for the editor UI so it doesn't need a second round-trip
     # per ingredient just to show a name/unit next to the quantity.
     item_name: Optional[str] = None

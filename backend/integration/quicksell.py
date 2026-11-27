@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -28,6 +29,12 @@ _NON_SALE_ENTITIES = frozenset({
 
 EAT = timezone(timedelta(hours=3))
 NOTES_PREFIX = "quicksell:"
+
+_LINE_KEYS = ("lines", "items", "line_items", "products", "order_lines")
+_QTY_KEYS = ("quantity", "qty", "count")
+_PRICE_KEYS = ("unit_price_cents", "price_cents", "unit_price", "price")
+_ID_KEYS_LINE = ("menu_item_id", "product_id", "dish_id", "item_id", "sku")
+_NAME_KEYS = ("name", "dish_name", "product_name", "item_name", "title")
 
 
 def first_present(record: dict, keys: tuple[str, ...]) -> str | None:
@@ -82,9 +89,21 @@ def total_cents_optional(record: dict) -> int | None:
         v = record[k]
         if v is None:
             continue
-        if k.endswith("_cents") or k in ("amount_cents",):
-            return int(v)
-        return int(round(float(v) * 100))
+        if isinstance(v, bool):
+            raise ValueError("Invalid sale total")
+        try:
+            amount = Decimal(str(v))
+            if not amount.is_finite():
+                raise ValueError("Invalid sale total")
+            cents = amount if k.endswith("_cents") else amount * 100
+            if k.endswith("_cents") and cents != cents.to_integral_value():
+                raise ValueError("Fractional cents are not supported")
+            result = int(cents.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            if result < 0 or result > 2_147_483_647:
+                raise ValueError("Sale total needs review")
+            return result
+        except (InvalidOperation, OverflowError):
+            raise ValueError("Invalid sale total")
     return None
 
 
@@ -97,6 +116,140 @@ def is_mappable_sale(record: dict, entity: str) -> bool:
     if ent in _SALE_ENTITIES:
         return True
     return ent in ("unknown", "envelope")
+
+
+def _actor_user_id(db: Session, restaurant_id: int) -> int:
+    restaurant = db.query(models.Restaurant).filter(models.Restaurant.id == restaurant_id).first()
+    if not restaurant:
+        return 1
+    owner = (
+        db.query(models.User)
+        .filter(
+            models.User.tenant_id == restaurant.tenant_id,
+            models.User.role == models.Role.ADMIN,
+        )
+        .order_by(models.User.id.asc())
+        .first()
+    )
+    return owner.id if owner else 1
+
+
+def _lines_raw(record: dict) -> list[dict] | None:
+    for key in _LINE_KEYS:
+        value = record.get(key)
+        if isinstance(value, list) and value:
+            return [row for row in value if isinstance(row, dict)]
+    return None
+
+
+def _quantity_of(line: dict) -> float | None:
+    for key in _QTY_KEYS:
+        if key not in line:
+            continue
+        try:
+            qty = float(line[key])
+            if qty > 0:
+                return qty
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _unit_price_cents(line: dict, menu_item: models.MenuItem | None) -> int:
+    for key in _PRICE_KEYS:
+        if key not in line or line[key] is None:
+            continue
+        try:
+            amount = Decimal(str(line[key]))
+            if key.endswith("_cents"):
+                return int(amount)
+            return int((amount * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+        except (InvalidOperation, ValueError):
+            continue
+    return int(menu_item.price) if menu_item and menu_item.price else 0
+
+
+def _resolve_menu_item(db: Session, restaurant_id: int, line: dict) -> models.MenuItem | None:
+    for key in _ID_KEYS_LINE:
+        if key not in line or line[key] is None:
+            continue
+        try:
+            mid = int(line[key])
+        except (TypeError, ValueError):
+            if key == "sku":
+                name = str(line[key]).strip()
+                if name:
+                    return (
+                        db.query(models.MenuItem)
+                        .filter(
+                            models.MenuItem.restaurant_id == restaurant_id,
+                            models.MenuItem.name.ilike(name),
+                        )
+                        .first()
+                    )
+            continue
+        hit = (
+            db.query(models.MenuItem)
+            .filter(models.MenuItem.restaurant_id == restaurant_id, models.MenuItem.id == mid)
+            .first()
+        )
+        if hit:
+            return hit
+    for key in _NAME_KEYS:
+        name = line.get(key)
+        if not name or not str(name).strip():
+            continue
+        hit = (
+            db.query(models.MenuItem)
+            .filter(
+                models.MenuItem.restaurant_id == restaurant_id,
+                models.MenuItem.name.ilike(str(name).strip()),
+            )
+            .first()
+        )
+        if hit:
+            return hit
+    return None
+
+
+def _parsed_order_lines(db: Session, restaurant_id: int, record: dict) -> list[tuple[models.MenuItem, float, int]]:
+    raw = _lines_raw(record)
+    if not raw:
+        return []
+    out: list[tuple[models.MenuItem, float, int]] = []
+    for line in raw:
+        qty = _quantity_of(line)
+        if qty is None:
+            continue
+        menu_item = _resolve_menu_item(db, restaurant_id, line)
+        if not menu_item:
+            continue
+        out.append((menu_item, qty, _unit_price_cents(line, menu_item)))
+    return out
+
+
+def _sync_order_lines(db: Session, restaurant_id: int, order: models.Order, record: dict) -> None:
+    parsed = _parsed_order_lines(db, restaurant_id, record)
+    if not parsed:
+        return
+    from ai.order_stock import deduct_ingredients_for_order, reverse_ingredients_for_order
+
+    actor = _actor_user_id(db, restaurant_id)
+    if order.id and order.items:
+        reverse_ingredients_for_order(db, order, actor)
+    db.query(models.OrderItem).filter(models.OrderItem.order_id == order.id).delete(synchronize_session=False)
+    for menu_item, qty, unit_price in parsed:
+        db.add(
+            models.OrderItem(
+                order_id=order.id,
+                menu_item_id=menu_item.id,
+                quantity=max(1, int(round(qty))),
+                unit_price=unit_price,
+            )
+        )
+    db.flush()
+    db.refresh(order)
+    deduct_ingredients_for_order(db, order, actor)
 
 
 def _find_order(db: Session, restaurant_id: int, source_id: str) -> models.Order | None:
@@ -118,13 +271,13 @@ def maybe_apply_sale(
     ingest_action: str,
     record: dict,
     occurred_at: datetime,
-) -> str:
+) -> tuple[str, int | None]:
     if ingest_action == "skipped" or not is_mappable_sale(record, entity):
-        return "order_unchanged"
+        return "order_unchanged", None
 
     cents = total_cents_optional(record)
     if cents is None:
-        return "order_unchanged"
+        return "order_unchanged", None
 
     existing = _find_order(db, restaurant_id, source_id)
 
@@ -132,7 +285,9 @@ def maybe_apply_sale(
         existing.total = cents
         existing.created_at = occurred_at
         existing.is_paid = True
-        return "order_updated"
+        if _lines_raw(record):
+            _sync_order_lines(db, restaurant_id, existing, record)
+        return "order_updated", existing.id
 
     if ingest_action in ("inserted", "superseded"):
         order = models.Order(
@@ -145,16 +300,29 @@ def maybe_apply_sale(
             created_at=occurred_at,
         )
         db.add(order)
-        return "order_inserted"
+        db.flush()
+        if _lines_raw(record):
+            _sync_order_lines(db, restaurant_id, order, record)
+        return "order_inserted", order.id
 
-    return "order_unchanged"
+    return "order_unchanged", None
 
 
 def normalize_payload(payload: Any) -> tuple[str, list[dict]]:
     """Turn any JSON value into (entity, list of dict records) for mirroring."""
-    from integration.payload_parse import records_from
-
-    entity, records = records_from(payload if isinstance(payload, (dict, list)) else {"_value": payload})
+    entity = "unknown"
+    records = []
+    if isinstance(payload, list):
+        records = payload
+    elif isinstance(payload, dict):
+        entity = str(payload.get("entity") or payload.get("type") or "unknown").strip() or "unknown"
+        records = [payload]
+        for key in ("records", "data", "items", "rows", "transactions", "sales"):
+            if isinstance(payload.get(key), list):
+                records = payload[key]
+                break
+    else:
+        records = [{"_value": payload}]
     out: list[dict] = []
     for r in records:
         if isinstance(r, dict):

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Outfit, DM_Sans, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import "@/styles/owner-glass.css";
 import { Providers } from "./providers";
 
 const outfit = Outfit({
@@ -20,18 +21,18 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Chakula — Restaurant Manager",
-  description: "Simple restaurant management for Kenyan restaurants",
+  title: "LEVIII",
+  description: "Owner and store operations for Eleven",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
-    title: "Chakula",
+    statusBarStyle: "default",
+    title: "LEVIII",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: "#2B1D16",
   width: "device-width",
   initialScale: 1,
 };
@@ -46,19 +47,8 @@ export default function RootLayout({
       <head>
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
-      <body className={`${outfit.variable} ${dmSans.variable} ${spaceGrotesk.variable} font-sans antialiased bg-[#0a0a0a] text-[#e5e5e5]`}>
+      <body className={`${outfit.variable} ${dmSans.variable} ${spaceGrotesk.variable} font-sans antialiased bg-[var(--bg)] text-[var(--text)]`}>
         <Providers>{children}</Providers>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                  navigator.serviceWorker.register('/sw.js').catch(() => {});
-                });
-              }
-            `,
-          }}
-        />
       </body>
     </html>
   );

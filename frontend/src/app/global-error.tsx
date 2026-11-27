@@ -24,8 +24,8 @@ export default function GlobalError({
         <html lang="en">
             <body
                 style={{
-                    background: "#0a0a0a",
-                    color: "#e5e5e5",
+                    background: "#2B1D16",
+                    color: "#E9DFCF",
                     fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
                     minHeight: "100vh",
                     display: "flex",
@@ -36,17 +36,17 @@ export default function GlobalError({
             >
                 <div style={{ maxWidth: 380, textAlign: "center" }}>
                     <h1 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
-                        Chakula hit a problem
+                        LEVIII hit a problem
                     </h1>
-                    <p style={{ fontSize: 14, color: "#a3a3a3", marginBottom: 20 }}>
+                    <p style={{ fontSize: 14, color: "#B8A99A", marginBottom: 20 }}>
                         Something went wrong loading the app. Try reloading — if it
                         keeps happening, contact support.
                     </p>
                     <button
                         onClick={reset}
                         style={{
-                            background: "#d4a853",
-                            color: "#0a0a0a",
+                            background: "#9CAF88",
+                            color: "#2B1D16",
                             fontWeight: 600,
                             border: "none",
                             borderRadius: 8,

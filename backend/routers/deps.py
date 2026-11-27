@@ -15,48 +15,14 @@ failing loud for what should be an impossible case.
 
 from sqlalchemy.orm import Session
 import models
+from restaurant_scope import get_or_create_restaurant, get_restaurant_or_none
 
-
-def get_or_create_restaurant(db: Session, user: models.User) -> models.Restaurant:
-    """Get the restaurant for the current user's tenant, creating one if missing."""
-    restaurant = get_restaurant_or_none(db, user)
-    if not restaurant:
-        restaurant = models.Restaurant(
-            name=f"{user.tenant.name}'s Restaurant",
-            tenant_id=user.tenant_id,
-        )
-        db.add(restaurant)
-        db.commit()
-        db.refresh(restaurant)
-    return restaurant
-
-
-def get_restaurant_or_none(db: Session, user: models.User) -> models.Restaurant | None:
-    """
-    Read-only lookup — never creates. For GET endpoints where auto-creating
-    a restaurant as a side effect would violate command-query separation
-    (e.g. GET /me should never write data just by being called).
-
-    Multi-restaurant tenants (audit remediation, Tier 5 item 11 — this
-    function used to always return the tenant's first restaurant with no way
-    for a chain owner to pick a different one, tracked as tech-debt D4): if
-    `user.active_restaurant_id` is set via POST /restaurants/select AND still
-    belongs to this user's own tenant, that restaurant is returned. Otherwise
-    falls back to the tenant's first restaurant by id — the exact behavior
-    this function always had for every single-restaurant tenant (the
-    overwhelming majority), now an explicit, deterministic default rather
-    than an accidental one.
-    """
-    if user.active_restaurant_id is not None:
-        selected = db.query(models.Restaurant).filter(
-            models.Restaurant.id == user.active_restaurant_id,
-            models.Restaurant.tenant_id == user.tenant_id,
-        ).first()
-        if selected:
-            return selected
-    return db.query(models.Restaurant).filter(
-        models.Restaurant.tenant_id == user.tenant_id
-    ).order_by(models.Restaurant.id).first()
+__all__ = [
+    "get_or_create_restaurant",
+    "get_restaurant_or_none",
+    "list_restaurants_for_tenant",
+    "get_staff_users_for_restaurant",
+]
 
 
 def list_restaurants_for_tenant(db: Session, user: models.User) -> "list[models.Restaurant]":

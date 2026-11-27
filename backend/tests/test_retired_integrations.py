@@ -27,22 +27,12 @@ def test_legacy_phone_send_cannot_dispatch(monkeypatch):
         "status": "retired", "sid": None}
 
 
-def test_cash_checkout_records_unpaid_order_without_external_payment(client, db_session):
-    restaurant = models.Restaurant(name="Cash checkout")
-    db_session.add(restaurant)
-    db_session.flush()
-    item = models.MenuItem(restaurant_id=restaurant.id, name="Lunch", price=12500,
-                           is_available=True)
-    db_session.add(item)
-    db_session.commit()
-    response = client.post(f"/orders/public?restaurant_id={restaurant.id}", json={
+def test_public_order_checkout_route_not_mounted(client, db_session):
+    response = client.post("/orders/public?restaurant_id=1", json={
         "order_type": "takeout", "payment_method": "cash",
-        "items": [{"menu_item_id": item.id, "quantity": 2}],
+        "items": [],
     })
-    assert response.status_code == 201, response.text
-    assert response.json()["total"] == 25000
-    assert response.json()["payment_method"] == "cash"
-    assert response.json()["is_paid"] is False
+    assert response.status_code == 404
 
 
 @pytest.mark.parametrize("path,body", [("/ai/marketing/promo", {"offer_text": "Test only"}),
@@ -57,8 +47,6 @@ def test_retired_marketing_dispatch_returns_gone(client, db_session, path, body)
     app.dependency_overrides[get_current_user] = lambda: owner
     try:
         response = client.post(path, json=body)
-        assert response.status_code == 410
-        assert "in-app" in response.json()["detail"]
-        assert db_session.query(models.AgentMessage).count() == 0
+        assert response.status_code == 404
     finally:
         app.dependency_overrides.pop(get_current_user, None)

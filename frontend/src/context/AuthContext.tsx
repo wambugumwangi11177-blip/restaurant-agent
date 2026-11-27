@@ -4,7 +4,6 @@
  * AuthContext.tsx — Authentication state management
  *
  * Fixes vs original:
- *   BUG 1 — register was posting to /auth/register (404). Fixed to /api/v1/auth/register.
  *   BUG 6 — login was pointlessly building URLSearchParams then pulling values back out.
  *            Cleaned to send {email, password} JSON directly.
  */
@@ -22,6 +21,7 @@ interface User {
   email: string;
   role: string;
   restaurant_name?: string;
+  restaurant_id?: number | null;
   // Tenant fork (Vibanda dedicated shell) — read fresh from /auth/me.
   tenant_name?: string | null;
   // Directive 015 — fine-grained tier (owner/manager/supervisor/controller/
@@ -38,19 +38,23 @@ interface User {
   // models.User.is_email_verified docstring). Drives the dashboard's
   // dismissible "verify your email" banner.
   is_email_verified: boolean;
+  must_change_password?: boolean;
+  has_pin?: boolean;
+  display_name?: string | null;
+  password_auth_valid?: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<User | null>;
-  loginWithRestaurant: (restaurantName: string, password: string) => Promise<User | null>;
-  register: (email: string, password: string, tenantName: string) => Promise<User | null>;
+  setInitialPassword: (email: string, password: string, handoverCode?: string) => Promise<User | null>;
   logout: () => void;
   isLoading: boolean;
   startImpersonation: (staffId: number) => Promise<string>;
   endImpersonation: () => Promise<void>;
   loginWithPin: (userId: number, pin: string) => Promise<void>;
+  refreshUser: () => Promise<User | null>;
 }
 
 // FE-101: the bearer token lives in the in-memory tokenStore (with a
@@ -61,6 +65,7 @@ import {
   setAccessToken,
   clearAccessToken,
 } from "@/lib/tokenStore";
+import { clearPinUnlock } from "@/lib/appLock";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -82,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Returns the freshly-fetched user (or null on failure) as well as setting
-  // it. Callers that need to route on the result — login/register — must use
+  // it. Callers that need to route on the result — login — must use
   // the RETURN value: `user` state is not committed until React re-renders, so
   // reading it in the same handler yields the PREVIOUS value (null on a first
   // login), which is what sent every Vibanda owner to /dashboard first and only
@@ -97,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       clearAccessToken();
       setToken(null);
+      setUser(null);
       return null;
     } finally {
       setIsLoading(false);
@@ -107,33 +113,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const res = await api.post("/api/v1/auth/login", { email, password });
     const accessToken = res.data.access_token;
+    clearPinUnlock();
     setAccessToken(accessToken);
     setToken(accessToken);
     return await fetchUser(accessToken);
   };
 
-  const loginWithRestaurant = async (restaurantName: string, password: string) => {
-    const res = await api.post("/api/v1/auth/login/restaurant", {
-      restaurant_name: restaurantName,
-      password,
-    });
-    const accessToken = res.data.access_token;
-    setAccessToken(accessToken);
-    setToken(accessToken);
-    return await fetchUser(accessToken);
-  };
 
-  // BUG 1 FIX: was /auth/register (404) — corrected to /api/v1/auth/register
-  const register = async (email: string, password: string, tenantName: string) => {
-    const res = await api.post("/api/v1/auth/register", {
+  const setInitialPassword = async (email: string, password: string, handoverCode?: string) => {
+    const res = await api.post("/api/v1/auth/set-initial-password", {
       email,
-      password,
-      tenant_name: tenantName,
+      new_password: password,
+      handover_code: handoverCode || undefined,
     });
     const accessToken = res.data.access_token;
+    clearPinUnlock();
     setAccessToken(accessToken);
     setToken(accessToken);
     return await fetchUser(accessToken);
+  };
+
+  const refreshUser = async () => {
+    const accessToken = getAccessToken();
+    if (!accessToken) return null;
+    return fetchUser(accessToken);
   };
 
   // Shared-device quick-switch (audit remediation, Tier 5 item 12) — mirrors
@@ -151,14 +154,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     clearAccessToken();
+    clearPinUnlock();
     setToken(null);
     setUser(null);
-    // Shared-device hygiene: the offline order queue carries customer
-    // PII, and the service worker holds cached pages — neither may survive
-    // into the next user's session on this device.
-    import("@/lib/offlineOrderOutbox")
-      .then(({ clearPendingOrders }) => clearPendingOrders())
-      .catch(() => undefined);
     if (typeof navigator !== "undefined" && navigator.serviceWorker?.controller) {
       navigator.serviceWorker.controller.postMessage({ type: "PURGE_CACHES" });
     }
@@ -178,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const currentToken = getAccessToken();
     if (currentToken) setAccessToken(currentToken); // setAccessToken writes both slots; stash then overwrite below
 
-    const res = await api.post(`/staff/${staffId}/impersonate`);
+    const res = await api.post(`/api/v1/staff/${staffId}/impersonate`);
     const impToken = res.data.access_token;
     setAccessToken(impToken);
     setToken(impToken);
@@ -192,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // network hiccup shouldn't be able to strand them in the target's account.
   const endImpersonation = async (): Promise<void> => {
     try {
-      await api.post("/staff/end-impersonation");
+      await api.post("/api/v1/staff/end-impersonation");
     } catch {
       // Session may have already expired server-side — restoring the
       // Owner's own token below is what actually matters here.
@@ -212,7 +210,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, login, loginWithRestaurant, register, logout, isLoading, startImpersonation, endImpersonation, loginWithPin }}
+      value={{
+        user,
+        token,
+        login,
+        setInitialPassword,
+        logout,
+        isLoading,
+        startImpersonation,
+        endImpersonation,
+        loginWithPin,
+        refreshUser,
+      }}
     >
       {children}
     </AuthContext.Provider>

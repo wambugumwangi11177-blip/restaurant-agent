@@ -46,4 +46,4 @@ EXPOSE 8000
 # worker indefinitely. It sits above the app-level client timeouts (LLM 30s,
 # Twilio 10s) so those fire first and degrade gracefully; the gunicorn timeout
 # is the last-resort backstop. Tunable via GUNICORN_TIMEOUT.
-CMD ["sh", "-c", "python -c 'from database import init_db; init_db()' && alembic upgrade head && gunicorn main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --timeout ${GUNICORN_TIMEOUT:-60} --bind 0.0.0.0:$PORT"]
+CMD ["sh", "-c", "python -c 'from database import init_db; init_db()' && alembic upgrade head && python -c 'from leviii_test_seed import provision_test_data_from_env; provision_test_data_from_env()' && gunicorn main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --timeout ${GUNICORN_TIMEOUT:-60} --bind 0.0.0.0:$PORT"]

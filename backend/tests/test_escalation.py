@@ -205,7 +205,7 @@ def test_acknowledge_endpoint_stops_future_escalation(client, db_session):
     timeout = LEVEL_1_TIMEOUT_MINUTES["critical"]
     notif = _backdated_notification(db_session, owner, "critical", minutes_ago=timeout + 1)
 
-    r = client.post(f"/notifications/{notif.id}/acknowledge", headers={"Authorization": f"Bearer {token}"})
+    r = client.post(f"/api/v1/notifications/{notif.id}/acknowledge", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
     assert r.json()["acknowledged_at"] is not None
 

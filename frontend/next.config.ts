@@ -28,6 +28,9 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    agentUpgrade: "security",
+  },
   poweredByHeader: false,
   async headers() {
     return [
@@ -44,6 +47,10 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/manifest.json",
+        headers: [{ key: "Cache-Control", value: "no-cache" }],
+      },
+      {
+        source: "/store-manifest.json",
         headers: [{ key: "Cache-Control", value: "no-cache" }],
       },
     ];

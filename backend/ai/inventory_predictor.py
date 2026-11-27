@@ -32,9 +32,14 @@ from ai.analysis_clock import analysis_anchor
 # ─────────────────────────────────────────────────────────────────────────────
 def get_inventory_predictions(db: Session, restaurant_id: int) -> dict:
     """Complete inventory intelligence — exhaustive analysis."""
-    items = db.query(models.InventoryItem).filter(
-        models.InventoryItem.restaurant_id == restaurant_id
-    ).all()
+    from sqlalchemy.orm import joinedload
+
+    items = (
+        db.query(models.InventoryItem)
+        .options(joinedload(models.InventoryItem.default_supplier))
+        .filter(models.InventoryItem.restaurant_id == restaurant_id)
+        .all()
+    )
 
     if not items:
         return _empty_response()
@@ -159,6 +164,9 @@ def _analyze_single_item(item, movements, now, thirty_days_ago, seven_days_ago):
 
     # Use trend-adjusted daily usage for forward projections
     adjusted_daily = daily_usage_recent if daily_usage_recent > 0 else daily_usage
+    if adjusted_daily <= 0 and item.quantity and (item.par_level or item.low_stock_threshold):
+        par = float(item.par_level or item.low_stock_threshold or 1)
+        adjusted_daily = max(par / 14.0, 0.05)
 
     # ── Depletion Forecast ──
     if adjusted_daily > 0:
@@ -182,7 +190,10 @@ def _analyze_single_item(item, movements, now, thirty_days_ago, seven_days_ago):
         spoilage_window = f"Use within {item.expiry_days} days or risk waste"
 
     # ── Reorder Intelligence ──
-    lead_time_days = 2  # Assume 2-day delivery lead time
+    lead_time_days = 1.0
+    supplier = getattr(item, "default_supplier", None)
+    if supplier and supplier.avg_lead_days:
+        lead_time_days = float(supplier.avg_lead_days)
     safety_stock_days = 3
     reorder_point = adjusted_daily * (lead_time_days + safety_stock_days)
     needs_reorder = item.quantity <= reorder_point
@@ -306,6 +317,8 @@ def _analyze_single_item(item, movements, now, thirty_days_ago, seven_days_ago):
 
         # Depletion forecast
         "days_until_depletion": days_until_depletion,
+        "days_until_stockout": days_until_depletion,
+        "item_name": item.item_name,
         "depletion_date": depletion_date,
 
         # Reorder intelligence

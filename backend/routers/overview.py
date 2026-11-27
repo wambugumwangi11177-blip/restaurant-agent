@@ -46,22 +46,35 @@ def _eat_now():
 
 def _restaurant_id(db: Session, user) -> int:
     """Resolve the selected restaurant inside the authenticated tenant."""
-    query = db.query(models.Restaurant.id).filter(
-        models.Restaurant.tenant_id == user.tenant_id)
+    from routers.deps import get_restaurant_or_none
+
+    restaurant = get_restaurant_or_none(db, user)
+    if restaurant is None:
+        if user.active_restaurant_id is not None:
+            raise HTTPException(status_code=404, detail="Restaurant not found")
+        return 0
     if user.active_restaurant_id is not None:
-        query = query.filter(models.Restaurant.id == user.active_restaurant_id)
-    row = query.order_by(models.Restaurant.id).first()
-    if row is None and user.active_restaurant_id is not None:
-        raise HTTPException(404, "Restaurant not found")
-    return row[0] if row else 0
+        foreign = (
+            db.query(models.Restaurant)
+            .filter(
+                models.Restaurant.id == user.active_restaurant_id,
+                models.Restaurant.tenant_id != user.tenant_id,
+            )
+            .first()
+        )
+        if foreign:
+            raise HTTPException(status_code=404, detail="Restaurant not found")
+    return restaurant.id
 
 
 def _eat_range(period: str):
+    from services.owner_today import eat_day_start
+
+    now = utcnow()
     now_eat = _eat_now()
     if period == "today":
-        start_eat = now_eat.replace(hour=0, minute=0, second=0, microsecond=0)
-    else:
-        start_eat = now_eat - _PERIODS[period]
+        return eat_day_start(now), now
+    start_eat = now_eat - _PERIODS[period]
     return start_eat - _EAT_OFFSET, now_eat - _EAT_OFFSET  # naive UTC for column compare
 
 
@@ -371,7 +384,7 @@ def _performance(db: Session, rid: int) -> dict:
 # MacSoft delivery or any other API push: what is recorded here IS the data, so
 # there is no external source to reconcile against. Keyed on tenant name, the
 # same way the frontend forks its owner shells (frontend/src/lib/tenantHome.ts).
-DIRECT_SOURCE_TENANTS = frozenset({"demo restaurant"})
+DIRECT_SOURCE_TENANTS = frozenset({"demo restaurant", "eleven"})
 
 
 def records_directly(db: Session, tenant_id: int | None) -> bool:

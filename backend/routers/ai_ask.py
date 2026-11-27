@@ -33,10 +33,19 @@ from time_utils import utcnow
 import models
 from database import get_db
 from auth import require_staff_role
-from routers.reports import _grounded_reply
 from routers.overview import _restaurant_id, _eat_now
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+
+def _grounded_reply(text: str, evidence: str) -> str | None:
+    """Keep deterministic output when an optional narrative invents figures."""
+    from ai.reasoning.grounding import verify
+    from ai.owner_narrative import strip_reasoning_leak
+
+    cleaned = strip_reasoning_leak(text)
+    checked = verify({"headline": cleaned}, evidence)
+    return cleaned if cleaned and checked["verified"] else None
 
 from rate_limit import limiter
 from ai.owner_narrative import narrate as narrate_owner
@@ -92,6 +101,8 @@ def _redact_credentials(value: str) -> str:
 # order is a kitchen question. tests/test_os_question_routing.py pins every
 # built-in question and names the ones with more than one defensible answer.
 _ROUTING_RULES: list[tuple[str, tuple[str, ...]]] = [
+    ("records", ("bill", "bills", "handover", "delivery mismatch", "delivery photo",
+                 "mismatch", "waiting on me", "invoice photo")),
     ("stock", ("run out", "running out", "about to run out", "stock", "stock-out", "waste",
                "wastage", "wasting", "reorder", "re-order", "expir", "spoil", "inventory",
                "low stock", "shortage", "ingredient")),
@@ -197,11 +208,29 @@ def _answer_stock(db: Session, rid: int, q: str) -> dict:
                      "narrative_allowed": bool(soon)}}
 
 
+def _mini_sales_chart(db: Session, rid: int, days: int = 7) -> list[dict]:
+    since = utcnow() - timedelta(days=days)
+    rows = (
+        db.query(models.Order)
+        .filter(
+            models.Order.restaurant_id == rid,
+            models.Order.created_at >= since,
+            models.Order.is_paid.is_(True),
+            models.Order.status != models.OrderStatus.CANCELLED,
+        )
+        .all()
+    )
+    by_day: dict[str, float] = {}
+    for o in rows:
+        if o.created_at:
+            key = o.created_at.date().isoformat()
+            by_day[key] = by_day.get(key, 0) + int(o.total or 0) / 100.0
+    return [{"day": d, "kes": by_day[d]} for d in sorted(by_day.keys())[-days:]]
+
+
 def _answer_revenue(db: Session, rid: int, q: str) -> dict:
     from ai.revenue_forecaster import get_revenue_forecast
-    from routers.overview import _summarize, _eat_range  # EAT-day truth
-    start, end = _eat_range("today")
-    core = _summarize(db, rid, start, end)
+    from services.owner_today import today_sales_owner_sentence
     try:
         fc = get_revenue_forecast(db, rid)
         forecast = fc.get("forecast") or fc.get("predictions") or {}
@@ -231,19 +260,27 @@ def _answer_revenue(db: Session, rid: int, q: str) -> dict:
                 "recommendation": "Compare the recorded pattern with your operating hours before changing staffing or promotions.",
                 "module": "revenue", "steps": steps,
                 "data": {"narrative_allowed": False, "weekly_pattern": ranking}}
-    finding = f"Revenue today is {_money(core['revenue'] * 100)} across {core['orders']} paid orders."
-    why = "Paid, non-cancelled orders created during the Nairobi calendar day so far. This is not payment cash flow."
-    # core["revenue"] is already KES (overview's _summarize converts cents→KES);
-    # avg_order must stay in KES — multiplying by 100 again showed absurd figures
-    # (verified in browser 2026-09-12: "KSh 199,467" instead of KSh 1,995).
-    impact = f"Average order {_money(core['revenue'] * 100 / core['orders'])} per order" if core["orders"] else "Average order — no orders yet today"
-    rec = trend_txt if isinstance(trend_txt, str) and trend_txt else "Compare against the 7-day trend on Home to see if today is ahead or behind."
+    today = today_sales_owner_sentence(db, rid)
+    finding = today["finding"]
+    why = today["why"]
+    tickets = today["tickets"]
+    sales = today["sales_kes"]
+    impact = f"About KES {int(round(sales / tickets)):,} per ticket" if tickets else "No tickets yet today"
+    rec = trend_txt if isinstance(trend_txt, str) and trend_txt else "Open Home or Money for the week trend."
     steps = []
     if isinstance(forecast, dict):
         for k, v in list(forecast.items())[:3]:
             steps.append({"action": f"{k}: {v}" if not isinstance(v, (int, float)) else f"{k}: {v}"})
-    return {"finding": finding, "why": why, "impact": impact, "recommendation": rec,
-            "module": "revenue", "steps": steps, "data": {"today": core}}
+    core = {"revenue": sales, "orders": tickets}
+    return {
+        "finding": finding,
+        "why": why,
+        "impact": impact,
+        "recommendation": rec,
+        "module": "revenue",
+        "steps": steps,
+        "data": {"today": core, "sales_kes": sales, "tickets": tickets},
+    }
 
 
 def _answer_bookings(db: Session, rid: int, q: str) -> dict:
@@ -409,6 +446,56 @@ def _answer_profit(db: Session, rid: int, q: str) -> dict:
             "module": "profit", "steps": steps, "data": {}}
 
 
+def _answer_records(db: Session, rid: int, q: str) -> dict:
+    bills = (
+        db.query(models.RunningCost)
+        .filter(models.RunningCost.restaurant_id == rid, models.RunningCost.status == "needs_approval")
+        .limit(8)
+        .all()
+    )
+    mismatches = (
+        db.query(models.DeliveryVisionCheck)
+        .join(models.DeliveryReceipt, models.DeliveryReceipt.id == models.DeliveryVisionCheck.receipt_id)
+        .filter(
+            models.DeliveryReceipt.restaurant_id == rid,
+            models.DeliveryVisionCheck.status == "mismatch",
+        )
+        .count()
+    )
+    handovers = (
+        db.query(models.KitchenHandover)
+        .filter(models.KitchenHandover.restaurant_id == rid)
+        .order_by(models.KitchenHandover.id.desc())
+        .limit(5)
+        .all()
+    )
+    steps = []
+    if bills:
+        finding = f"{len(bills)} bill(s) waiting for approval."
+        for b in bills[:4]:
+            steps.append({"action": b.label or b.kind, "why": "Needs approval before it counts in P&L."})
+    elif mismatches:
+        finding = f"{mismatches} delivery photo check(s) need a look."
+        steps.append({"action": "Open deliveries", "why": "Counted qty or photo did not match."})
+    elif handovers:
+        finding = f"Latest kitchen handover: {len(handovers)} on record."
+        for h in handovers[:3]:
+            steps.append({"action": f"Handover #{h.id}", "why": "Store to kitchen with photo."})
+    else:
+        finding = "No pending bills, delivery mismatches, or handover issues in the last records."
+        steps = []
+    why = "From approved bills, delivery vision checks, and kitchen handovers — not a forecast."
+    return {
+        "finding": finding,
+        "why": why,
+        "impact": "—",
+        "recommendation": "Open Approvals or Deliveries for details.",
+        "module": "records",
+        "steps": steps,
+        "data": {"narrative_allowed": False},
+    }
+
+
 def _answer_ops(db: Session, rid: int, q: str) -> dict:
     from ai.ops_manager import get_operations_dashboard
     d = get_operations_dashboard(db, rid)
@@ -428,6 +515,7 @@ def _answer_ops(db: Session, rid: int, q: str) -> dict:
 
 
 _HANDLERS = {
+    "records": _answer_records,
     "stock": _answer_stock,
     "revenue": _answer_revenue,
     "bookings": _answer_bookings,
@@ -692,11 +780,21 @@ def chat_llm(request: Request, body: ChatBody, db: Session = Depends(get_db),
         except Exception:
             card = _unavailable_card(module)
     else:
+        from routers.eleven_help import _PAGES as _OWNER_HELP
+
+        help_preface = ""
+        if user.staff_role == models.StaffRole.OWNER and any(
+            w in lower_question for w in ("help", "how do i", "what is", "where is", "guide")
+        ):
+            help_preface = _OWNER_HELP + "\n\n"
         card = {
-            "finding": "This question can be answered without restaurant records.",
+            "finding": help_preface + "This question can be answered without restaurant records.",
             "why": "General guidance and software explanations are not restaurant analysis.",
-            "impact": "Not applicable", "recommendation": "Answer the owner's question directly.",
-            "module": module, "steps": [], "data": {"analysis_requested": False},
+            "impact": "Not applicable",
+            "recommendation": "Answer the owner's question directly.",
+            "module": module,
+            "steps": [],
+            "data": {"analysis_requested": False, "help_corpus": bool(help_preface)},
         }
 
     from routers.overview import records_directly
@@ -891,9 +989,16 @@ def chat_llm(request: Request, body: ChatBody, db: Session = Depends(get_db),
             required = _MODULE_DATA_NEEDS.get(module, _MODULE_DATA_NEEDS["ops"])
             fallback_text = f"I can’t verify this from restaurant records yet. This question needs {required}. If you tell me what you already know, I can help prepare a useful checklist while {'those records are entered' if direct_source else 'the data connection is set up'}."
 
+    mini_chart: list[dict] = []
+    freshness_line = None
+    if answer_type == "restaurant_analysis" and data_available and module in ("revenue", "profit", "ops"):
+        mini_chart = _mini_sales_chart(db, rid)
+        freshness_line = "Live · from your till"
     result = {
         "module": module, "grounded": card, "llm_reply": llm_reply,
         "answer_text": llm_reply or fallback_text,
+        "mini_chart": mini_chart,
+        "freshness_line": freshness_line,
         "llm_used": llm_reply is not None, "answer_type": answer_type,
         "data_availability": "planned_feature" if planned_analysis or planned_capability else "not_required" if answer_type != "restaurant_analysis" else "available" if data_available else "needs_source_verification" if needs_verification else "needs_connected_data",
         "follow_up_prompts": ["What would you want this page to help you decide?", "What information does your team already record for this area?"] if planned_analysis or planned_capability else [

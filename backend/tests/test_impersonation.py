@@ -70,20 +70,20 @@ def test_impersonated_token_behaves_as_the_target_tier(client, db_session):
     owner_token, owner, staff_user, member, restaurant, tenant = _owner_with_staff(
         db_session, "waiter1", models.StaffRole.WAITER
     )
-    r = client.post(f"/staff/{member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
+    r = client.post(f"/api/v1/staff/{member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
     assert r.status_code == 200, r.text
     imp_token = r.json()["access_token"]
 
-    # Waiter is in orders._CAN_READ (directive 015) — should succeed.
-    r2 = client.get("/orders/", headers={"Authorization": f"Bearer {imp_token}"})
-    assert r2.status_code == 200, r2.text
+    # Waiter must not reach owner-only logins settings while impersonated.
+    r2 = client.get("/api/v1/eleven/logins", headers={"Authorization": f"Bearer {imp_token}"})
+    assert r2.status_code == 403, r2.text
 
 
 def test_me_under_impersonation_shows_target_identity_and_impersonator(client, db_session):
     owner_token, owner, staff_user, member, restaurant, tenant = _owner_with_staff(
         db_session, "waiter2", models.StaffRole.WAITER
     )
-    r = client.post(f"/staff/{member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
+    r = client.post(f"/api/v1/staff/{member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
     imp_token = r.json()["access_token"]
 
     me = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {imp_token}"})
@@ -105,7 +105,7 @@ def test_cannot_impersonate_staff_member_with_no_login(client, db_session):
     db_session.add(orphan)
     db_session.commit()
 
-    r = client.post(f"/staff/{orphan.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
+    r = client.post(f"/api/v1/staff/{orphan.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
     assert r.status_code == 400
 
 
@@ -124,7 +124,7 @@ def test_cannot_impersonate_an_owner_or_admin(client, db_session):
     db_session.add(other_member)
     db_session.commit()
 
-    r = client.post(f"/staff/{other_member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
+    r = client.post(f"/api/v1/staff/{other_member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
     assert r.status_code == 403
 
 
@@ -136,7 +136,7 @@ def test_cannot_impersonate_staff_member_in_another_tenant(client, db_session):
         db_session, "tenantB", models.StaffRole.WAITER
     )
 
-    r = client.post(f"/staff/{other_member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
+    r = client.post(f"/api/v1/staff/{other_member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
     assert r.status_code == 404
 
 
@@ -146,10 +146,10 @@ def test_end_impersonation_invalidates_the_token(client, db_session):
     owner_token, owner, staff_user, member, restaurant, tenant = _owner_with_staff(
         db_session, "waiter3", models.StaffRole.WAITER
     )
-    r = client.post(f"/staff/{member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
+    r = client.post(f"/api/v1/staff/{member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
     imp_token = r.json()["access_token"]
 
-    end = client.post("/staff/end-impersonation", headers={"Authorization": f"Bearer {imp_token}"})
+    end = client.post("/api/v1/staff/end-impersonation", headers={"Authorization": f"Bearer {imp_token}"})
     assert end.status_code == 200
 
     after = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {imp_token}"})
@@ -160,7 +160,7 @@ def test_end_impersonation_with_normal_token_is_400(client, db_session):
     owner_token, owner, staff_user, member, restaurant, tenant = _owner_with_staff(
         db_session, "waiter4", models.StaffRole.WAITER
     )
-    r = client.post("/staff/end-impersonation", headers={"Authorization": f"Bearer {owner_token}"})
+    r = client.post("/api/v1/staff/end-impersonation", headers={"Authorization": f"Bearer {owner_token}"})
     assert r.status_code == 400
 
 
@@ -189,11 +189,11 @@ def test_target_deactivated_mid_session_is_401(client, db_session):
     owner_token, owner, staff_user, member, restaurant, tenant = _owner_with_staff(
         db_session, "waiter6", models.StaffRole.WAITER
     )
-    r = client.post(f"/staff/{member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
+    r = client.post(f"/api/v1/staff/{member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
     imp_token = r.json()["access_token"]
 
     deact = client.put(
-        f"/staff/{member.id}", json={"is_active": False},
+        f"/api/v1/staff/{member.id}", json={"is_active": False},
         headers={"Authorization": f"Bearer {owner_token}"},
     )
     assert deact.status_code == 200
@@ -206,7 +206,7 @@ def test_impersonator_deactivated_mid_session_is_401(client, db_session):
     owner_token, owner, staff_user, member, restaurant, tenant = _owner_with_staff(
         db_session, "waiter7", models.StaffRole.WAITER
     )
-    r = client.post(f"/staff/{member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
+    r = client.post(f"/api/v1/staff/{member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
     imp_token = r.json()["access_token"]
 
     owner.is_active = False
@@ -229,10 +229,10 @@ def test_impersonation_token_cannot_itself_impersonate(client, db_session):
     db_session.add(other_member)
     db_session.commit()
 
-    r = client.post(f"/staff/{member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
+    r = client.post(f"/api/v1/staff/{member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
     imp_token = r.json()["access_token"]
 
-    r2 = client.post(f"/staff/{other_member.id}/impersonate", headers={"Authorization": f"Bearer {imp_token}"})
+    r2 = client.post(f"/api/v1/staff/{other_member.id}/impersonate", headers={"Authorization": f"Bearer {imp_token}"})
     assert r2.status_code == 403
 
 
@@ -242,75 +242,26 @@ def test_impersonation_log_shows_status_transitions(client, db_session):
     owner_token, owner, staff_user, member, restaurant, tenant = _owner_with_staff(
         db_session, "waiter9", models.StaffRole.WAITER
     )
-    r = client.post(f"/staff/{member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
+    r = client.post(f"/api/v1/staff/{member.id}/impersonate", headers={"Authorization": f"Bearer {owner_token}"})
     imp_token = r.json()["access_token"]
 
-    log_active = client.get("/staff/impersonation-log", headers={"Authorization": f"Bearer {owner_token}"})
+    log_active = client.get("/api/v1/staff/impersonation-log", headers={"Authorization": f"Bearer {owner_token}"})
     assert log_active.status_code == 200
     entry = log_active.json()[0]
     assert entry["status"] == "active"
     assert entry["target_email"] == staff_user.email
     assert entry["impersonator_email"] == owner.email
 
-    client.post("/staff/end-impersonation", headers={"Authorization": f"Bearer {imp_token}"})
+    client.post("/api/v1/staff/end-impersonation", headers={"Authorization": f"Bearer {imp_token}"})
 
-    log_ended = client.get("/staff/impersonation-log", headers={"Authorization": f"Bearer {owner_token}"})
+    log_ended = client.get("/api/v1/staff/impersonation-log", headers={"Authorization": f"Bearer {owner_token}"})
     assert log_ended.json()[0]["status"] == "ended"
 
 
-# ── orders.py / reservations.py newly-gated RBAC (directive 015 gap closure) ───
-
-def test_controller_can_read_but_not_write_orders(client, db_session):
-    token, _, _ = _user_with_staff_role(db_session, "ctrl_orders", staff_role=models.StaffRole.CONTROLLER)
-    r_read = client.get("/orders/", headers={"Authorization": f"Bearer {token}"})
-    assert r_read.status_code == 200
-    r_write = client.post(
-        "/orders/", json={"items": [], "order_type": "dine_in", "delivery_channel": "walk_in", "payment_method": "cash"},
-        headers={"Authorization": f"Bearer {token}"},
+def test_owner_can_list_logins_stockkeeper_cannot(client, db_session):
+    owner_token, owner, staff_user, _member, _restaurant, _tenant = _owner_with_staff(
+        db_session, "rbaclogins", models.StaffRole.STOCKKEEPER
     )
-    assert r_write.status_code == 403
-
-
-def test_stockkeeper_forbidden_on_orders_read_and_write(client, db_session):
-    """Matrix says '-' for Stockkeeper on `orders` — no read, no write."""
-    token, _, _ = _user_with_staff_role(db_session, "sk_orders", staff_role=models.StaffRole.STOCKKEEPER)
-    r_read = client.get("/orders/", headers={"Authorization": f"Bearer {token}"})
-    assert r_read.status_code == 403
-    r_write = client.post(
-        "/orders/", json={"items": [], "order_type": "dine_in", "delivery_channel": "walk_in", "payment_method": "cash"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert r_write.status_code == 403
-
-
-def test_kitchen_can_advance_order_status(client, db_session):
-    """Kitchen is R-only on the `orders` route per the matrix, but must still
-    be able to write PATCH /orders/{id}/status — that's the KDS action, which
-    the `kitchen` page/route grants Kitchen RW on (see orders.py's
-    _CAN_UPDATE_STATUS comment)."""
-    token, user, tenant = _user_with_staff_role(db_session, "kitchen_status", staff_role=models.StaffRole.KITCHEN)
-    restaurant = models.Restaurant(tenant_id=tenant.id, name="RK", address="x")
-    db_session.add(restaurant)
-    db_session.commit()
-    order = models.Order(restaurant_id=restaurant.id, status=models.OrderStatus.PENDING, total=0)
-    db_session.add(order)
-    db_session.commit()
-
-    r = client.post(
-        f"/orders/{order.id}/status", json={"status": "prep"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert r.status_code == 200, r.text
-
-
-def test_owner_bypass_still_works_on_orders_and_reservations(client, db_session):
-    token, _, _ = _user_with_staff_role(db_session, "owner_bypass", role=models.Role.ADMIN, staff_role=None)
-    assert client.get("/orders/", headers={"Authorization": f"Bearer {token}"}).status_code == 200
-    assert client.get("/reservations/", headers={"Authorization": f"Bearer {token}"}).status_code == 200
-
-
-def test_kitchen_forbidden_on_reservations(client, db_session):
-    """Matrix has no read-only tier for `reservations` — Kitchen gets nothing."""
-    token, _, _ = _user_with_staff_role(db_session, "kitchen_res", staff_role=models.StaffRole.KITCHEN)
-    r = client.get("/reservations/", headers={"Authorization": f"Bearer {token}"})
-    assert r.status_code == 403
+    sk_token = auth.create_access_token({"sub": staff_user.email, "ver": 0})
+    assert client.get("/api/v1/eleven/logins", headers={"Authorization": f"Bearer {owner_token}"}).status_code == 200
+    assert client.get("/api/v1/eleven/logins", headers={"Authorization": f"Bearer {sk_token}"}).status_code == 403

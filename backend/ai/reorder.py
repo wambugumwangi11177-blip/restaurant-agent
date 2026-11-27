@@ -22,6 +22,7 @@ scheduler — same posture as ai/stock_custody.py, for the same reason: the
 math should be unit-testable without spinning up the app.
 """
 
+import math
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -33,7 +34,7 @@ from ai.supply_chain.intelligence import RELIABILITY_THRESHOLD
 
 # Purchase orders in either of these statuses are still "in flight" — don't
 # draft a second one for the same item while one is already outstanding.
-_OPEN_STATUSES = ("PENDING", "SENT")
+_OPEN_STATUSES = ("PENDING", "APPROVED", "SENT")
 
 
 @dataclass
@@ -98,7 +99,8 @@ def find_reorder_candidates(db: Session, restaurant_id: int, on_date: date | Non
         if base_quantity <= 0:
             continue
 
-        adjusted_quantity = round(base_quantity * factor, 2)
+        # Suppliers sell whole units; round up so the order covers par.
+        adjusted_quantity = float(math.ceil(round(base_quantity * factor, 2)))
 
         candidates.append(ReorderCandidate(
             inventory_item_id=item.id,
@@ -119,7 +121,12 @@ def find_reorder_candidates(db: Session, restaurant_id: int, on_date: date | Non
     return candidates
 
 
-def draft_purchase_order(db: Session, restaurant_id: int, candidate: ReorderCandidate) -> models.PurchaseOrder:
+def draft_purchase_order(
+    db: Session,
+    restaurant_id: int,
+    candidate: ReorderCandidate,
+    requested_by_user_id: int | None = None,
+) -> models.PurchaseOrder:
     """
     Create a PENDING purchase order from a candidate — "PENDING" already
     means "created, not yet sent" in this model's existing status
@@ -166,10 +173,15 @@ def draft_purchase_order(db: Session, restaurant_id: int, candidate: ReorderCand
         total_cost=total_cost_cents,
         status="PENDING",
         notes=notes,
+        requested_by_user_id=requested_by_user_id,
     )
     db.add(po)
     db.commit()
     db.refresh(po)
+    from services.restock_workflow import attach_draft_to_notes, build_invoice_draft
+
+    attach_draft_to_notes(po, build_invoice_draft(db, po))
+    db.commit()
 
     from events.bus import emit_async, EventType
     emit_async(EventType.PURCHASE_ORDER_CREATED, {

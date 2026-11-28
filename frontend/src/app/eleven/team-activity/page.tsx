@@ -17,7 +17,7 @@ type TeamEvent = Stamp & {
 };
 type Problem = Stamp & { kind: "script" | "request"; screen: string; message: string; status_code: number | null };
 type Activity = {
-  people: { id: number; name: string }[];
+  people: { id: number; name: string; email: string }[];
   events: TeamEvent[];
   problems: Problem[];
   has_more: boolean;
@@ -126,7 +126,7 @@ export default function TeamActivityPage() {
               <option value="all">Everyone</option>
               {data.people.map((entry) => (
                 <option key={entry.id} value={String(entry.id)}>
-                  {entry.name}
+                  {data.people.filter((other) => other.name === entry.name).length > 1 ? `${entry.name} (${entry.email})` : entry.name}
                 </option>
               ))}
             </select>

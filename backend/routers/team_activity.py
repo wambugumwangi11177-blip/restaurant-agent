@@ -123,6 +123,9 @@ def _describe(row: models.StaffEntryAudit, user: models.User) -> tuple[str, str]
     if user.email and summary.startswith(user.email):
         summary = summary[len(user.email):].strip()
         summary = summary[:1].upper() + summary[1:]
+    if summary.lower().startswith(label.lower()):
+        summary = summary[len(label):].strip(" .")
+        summary = summary[:1].upper() + summary[1:]
     return label, summary
 
 
@@ -186,7 +189,7 @@ def team_activity(
         .all()
     )
     people = sorted(
-        ({"id": user.id, "name": person_of(db, user)["person_name"]} for user in staff),
+        ({"id": user.id, "name": person_of(db, user)["person_name"], "email": user.email} for user in staff),
         key=lambda item: item["name"].lower(),
     )
     staff_ids = {user.id for user in staff}
@@ -195,6 +198,7 @@ def team_activity(
     query = db.query(models.StaffEntryAudit).filter(
         models.StaffEntryAudit.restaurant_id == restaurant.id,
         models.StaffEntryAudit.user_id.in_(scope),
+        models.StaffEntryAudit.action.notlike("%\\_ai\\_unavailable", escape="\\"),
     )
     if before is not None:
         query = query.filter(models.StaffEntryAudit.id < before)

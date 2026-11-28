@@ -76,12 +76,16 @@ def test_feed_filters_by_person_and_hides_model_wording(client, db_session):
         summary="AI: Rice on delivery 1 do not match the photos. Qwen wrote the note after DeepSeek failed.",
         detail_json="{}",
     ))
+    db_session.add(models.StaffEntryAudit(
+        restaurant_id=_restaurant.id, user_id=jack.id, action="delivery_ai_unavailable", entity_type="delivery_receipt",
+        summary="AI check unavailable for delivery 1.", detail_json="{}",
+    ))
     db_session.commit()
 
     everyone = client.get("/api/v1/eleven/team-activity", headers=_auth(_token(owner))).json()
     assert {p["name"] for p in everyone["people"]} == {"jack-who", "amina-who"}
     only = client.get(f"/api/v1/eleven/team-activity?person={amina.id}", headers=_auth(_token(owner))).json()
-    assert [e["label"] for e in only["events"]] == ["Signed in"]
+    assert [(e["label"], e["summary"]) for e in only["events"]] == [("Signed in", "")]
     assert {e["person_name"] for e in only["events"]} == {"amina-who"}
     text = json.dumps(everyone)
     for word in ("AI:", "Qwen", "DeepSeek"):
@@ -89,6 +93,7 @@ def test_feed_filters_by_person_and_hides_model_wording(client, db_session):
     check = next(e for e in everyone["events"] if e["label"] == "Photo check")
     assert check["summary"] == "Delivery does not match the photos."
     assert check["needs_attention"] is True
+    assert [e["label"] for e in everyone["events"]].count("Photo check") == 1
 
 
 def test_feed_pages_back_with_before(client, db_session):

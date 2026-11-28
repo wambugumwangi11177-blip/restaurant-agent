@@ -13,7 +13,7 @@ type Delivery = {
   supplier: string | null;
   lines: { item_name: string; quantity: number; unit: string }[];
   photos: { kind: string }[];
-  check_label?: string;
+  ai_label?: string;
 };
 
 type LineDraft =
@@ -174,7 +174,7 @@ export default function DeliveriesPage() {
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-xs text-zinc-500">{row.photos.length} photos{row.check_label ? ` · ${row.check_label}` : ""}</p>
+            <p className="mt-2 text-xs text-zinc-500">{row.photos.length} photos{row.ai_label ? ` · ${row.ai_label}` : ""}</p>
           </li>
         ))}
       </ul>

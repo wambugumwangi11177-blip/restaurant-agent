@@ -240,6 +240,11 @@ html[data-leviii-apk] .owner-oat-highlight {
   border-radius: 999px;
 }
 
+/* Above the page panels (which sit at z-index 1) so the bell dropdown is not covered. */
+.owner-glass-theme > .owner-shell-header {
+  z-index: 30;
+}
+
 .owner-shell-header h1 {
   font-weight: 300;
   letter-spacing: 0.04em;

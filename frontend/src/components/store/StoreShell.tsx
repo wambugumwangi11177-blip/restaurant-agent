@@ -6,6 +6,8 @@ import { useEffect } from "react";
 import { Home, Package, Truck, UserRound, Users } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/context/AuthContext";
+import api from "@/lib/api";
+import { installErrorCapture } from "@/lib/clientErrors";
 import { homeFor } from "@/lib/tenantHome";
 import "@/styles/owner-glass.css";
 
@@ -43,6 +45,11 @@ export default function StoreShell({
     user?.staff_role === "manager" ||
     user?.role === "admin" ||
     user?.role === "superadmin";
+
+  useEffect(
+    () => installErrorCapture((report) => api.post("/api/v1/client-errors", report, { skipErrorReport: true })),
+    [],
+  );
 
   useEffect(() => {
     const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');

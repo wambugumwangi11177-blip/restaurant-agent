@@ -1,7 +1,7 @@
 """22:00 EAT (configurable) reminders for stock + cash day close."""
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, time, timezone
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 import models
 from ai.notify import notify_user
 from bill_schedule import business_today
-from time_utils import utcnow
 
 NAIROBI = ZoneInfo("Africa/Nairobi")
 _REPEAT_MINUTES = (0, 30, 60, 90)
@@ -89,9 +88,7 @@ def process_day_close_reminders(db: Session, restaurant_id: int) -> int:
     if local_now < start_local:
         return 0
     elapsed_min = int((local_now - start_local).total_seconds() // 60)
-    stage = next((s for s in _REPEAT_MINUTES if elapsed_min >= s), None)
-    if stage is None:
-        return 0
+    stage = max(s for s in _REPEAT_MINUTES if elapsed_min >= s)
     sent = 0
     stock_done = _today_stock_closed(db, restaurant_id, day)
     cash_done = _today_cash_closed(db, restaurant_id, day)

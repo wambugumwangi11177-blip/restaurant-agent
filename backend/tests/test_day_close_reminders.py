@@ -3,6 +3,7 @@ from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 import models
+from bill_schedule import business_today
 from services.day_close_reminders import duty_cards_for_viewer, process_day_close_reminders
 from tests.test_storekeeper_foundation import _tenant
 
@@ -51,3 +52,50 @@ def test_reminder_notify_stockkeeper(db_session):
     assert sent >= 1
     rows = db_session.query(models.Notification).filter_by(user_id=jack.id, event_type="day_close_reminder").all()
     assert rows
+
+def test_reminders_repeat_every_thirty_minutes_until_closed(db_session):
+    _, _, restaurant = _tenant(db_session, "Eleven", "owner-rep@eleven.leviii")
+    jack = models.User(
+        tenant_id=restaurant.tenant_id,
+        email="jack-rep@eleven.leviii",
+        hashed_password="x",
+        role=models.Role.STAFF,
+        staff_role=models.StaffRole.STOCKKEEPER,
+        is_active=True,
+    )
+    db_session.add(jack)
+    db_session.commit()
+    day = business_today()
+    nairobi = ZoneInfo("Africa/Nairobi")
+
+    def run_at(hour: int, minute: int) -> int:
+        with patch("services.day_close_reminders.datetime") as mock_dt:
+            mock_dt.now.return_value = datetime.combine(day, time(hour, minute), tzinfo=nairobi)
+            mock_dt.combine = datetime.combine
+            return process_day_close_reminders(db_session, restaurant.id)
+
+    assert run_at(21, 59) == 0
+    assert run_at(22, 0) == 1
+    assert run_at(22, 10) == 0
+    assert run_at(22, 30) == 1
+    assert run_at(22, 45) == 0
+    assert run_at(23, 0) == 1
+    assert run_at(23, 30) == 1
+    assert run_at(23, 59) == 0
+
+
+def test_test_stack_hook_moves_the_close_time_and_fires_reminders(client, db_session, monkeypatch):
+    from tests.test_storekeeper_foundation import _add_staff, _auth, _token
+
+    monkeypatch.setenv("SEED_TEST_DATA", "1")
+    tenant, owner, restaurant = _tenant(db_session, "Eleven", "owner-hook@eleven.leviii")
+    jack = _add_staff(db_session, tenant, restaurant, "jack-hook@eleven.leviii", models.StaffRole.STOCKKEEPER)
+    denied = client.post("/api/v1/test/day-close-reminders", headers=_auth(_token(jack)), json={"reminder_time": "00:00"})
+    assert denied.status_code == 403
+    fired = client.post("/api/v1/test/day-close-reminders", headers=_auth(_token(owner)), json={"reminder_time": "00:00"})
+    assert fired.status_code == 200
+    assert fired.json()["sent"] >= 1
+    db_session.refresh(restaurant)
+    assert restaurant.day_close_reminder_time == "00:00"
+    bad = client.post("/api/v1/test/day-close-reminders", headers=_auth(_token(owner)), json={"reminder_time": "25:99"})
+    assert bad.status_code == 422

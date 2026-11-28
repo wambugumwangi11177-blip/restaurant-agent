@@ -294,13 +294,8 @@ def _public_delivery(db, receipt: models.DeliveryReceipt, viewer: models.User) -
         if status == "mismatch":
             payload["mismatches"] = result.get("mismatches") or []
     else:
-        _labels = {
-            "pending": "Photo check pending",
-            "ok": "Photos matched",
-            "mismatch": "Needs owner review",
-            "unavailable": "Photo check off",
-        }
-        payload["check_label"] = _labels.get(status, status or "Photo check pending")
+        payload["ai_label"] = "AI check unavailable" if status == "unavailable" else "AI"
+        payload["ai"] = "unavailable" if status == "unavailable" else ("pending" if status == "pending" else "checked")
     return payload
 
 

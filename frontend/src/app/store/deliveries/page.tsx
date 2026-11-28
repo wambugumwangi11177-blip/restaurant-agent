@@ -142,7 +142,7 @@ export default function DeliveriesPage() {
         <div className="space-y-3">
           <p className="text-sm font-medium">Lines</p>
           {lines.map((row, index) => (
-            <motion
+            <DeliveryLineRow
               key={index}
               row={row}
               index={index}
@@ -182,7 +182,7 @@ export default function DeliveriesPage() {
   );
 }
 
-function motion({
+function DeliveryLineRow({
   row,
   index,
   stockItems,

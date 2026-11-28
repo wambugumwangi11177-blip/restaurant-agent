@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Home, Package, Truck, UserRound, Users } from "lucide-react";
+import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/context/AuthContext";
 import { homeFor } from "@/lib/tenantHome";
 import "@/styles/owner-glass.css";
@@ -76,6 +77,7 @@ export default function StoreShell({
           <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-400">LEVIII Store</p>
           <h1 className="truncate text-lg text-[var(--text)]">{title}</h1>
         </div>
+        <NotificationBell />
       </header>
       <main className="owner-main-pad mx-auto max-w-md px-4 py-4">{children}</main>
       <nav

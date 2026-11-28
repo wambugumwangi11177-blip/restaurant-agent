@@ -204,6 +204,7 @@ test("close reminder reaches the bell and Needs you / Waiting on, repeats at +30
   };
   const feed = async (tok: string) =>
     (await (await request.get(`${API}/api/v1/notifications/`, { headers: auth(tok), params: { limit: 50 } })).json()).items as { title: string; body: string }[];
+  const cashClosed = (await (await request.get(`${API}/api/v1/store/cash-close/status`, { headers: auth(aminaToken) })).json()).cash_closed as boolean;
   try {
     await fire(1);
     const jackFeed = await feed(jackToken);
@@ -229,7 +230,8 @@ test("close reminder reaches the bell and Needs you / Waiting on, repeats at +30
     await expect(amina.getByText("Close the day — cash").first()).toBeVisible({ timeout: 30_000 });
     await shot(amina, "22-accountant-bell-close-reminder");
     await amina.goto("/store/requests", { waitUntil: "domcontentloaded" });
-    await settle(amina, /Record cash and M-Pesa for today/);
+    await settle(amina, cashClosed ? /Waiting on/ : /Record cash and M-Pesa for today/);
+    if (cashClosed) await expect(amina.locator("main")).not.toContainText(/Record cash and M-Pesa for today/);
     await shot(amina, "23-accountant-needs-you");
     await amina.context().close();
 

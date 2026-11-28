@@ -24,6 +24,7 @@ type Activity = {
 };
 
 const PAGE = 60;
+const PROBLEMS_SHOWN = 5;
 
 function Thumb({ photo, src, onOpen }: { photo: Photo; src?: string; onOpen: (url: string) => void }) {
   return (
@@ -48,6 +49,7 @@ export default function TeamActivityPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<string | null>(null);
+  const [allProblems, setAllProblems] = useState(false);
 
   const load = useCallback(async (who: string) => {
     setError("");
@@ -142,7 +144,7 @@ export default function TeamActivityPage() {
                 <p className="mt-2 text-sm text-zinc-400">No screen problems reported.</p>
               ) : (
                 <ul className="mt-3 space-y-2 text-sm">
-                  {data.problems.map((problem) => (
+                  {(allProblems ? data.problems : data.problems.slice(0, PROBLEMS_SHOWN)).map((problem) => (
                     <li key={problem.id} className="owner-glass-inner">
                       <div className="flex justify-between gap-2">
                         <strong className="font-medium text-[var(--text)]">{problem.person_name}</strong>
@@ -157,6 +159,11 @@ export default function TeamActivityPage() {
                     </li>
                   ))}
                 </ul>
+              )}
+              {data.problems.length > PROBLEMS_SHOWN && (
+                <button type="button" className="leviii-btn-ghost mt-3 px-4 py-2 text-sm" onClick={() => setAllProblems(!allProblems)}>
+                  {allProblems ? "Show fewer" : `Show all ${data.problems.length}`}
+                </button>
               )}
             </section>
             {events.length === 0 && <p className="text-sm text-zinc-400">Nothing yet. Entries appear as your team signs in and works.</p>}

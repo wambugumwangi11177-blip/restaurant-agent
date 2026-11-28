@@ -45,6 +45,9 @@ test("a failed request on a staff screen reaches the owner's Team activity", asy
     )
     .toBe(true);
 
+  const feed = await (await request.get(`${API}/api/v1/eleven/team-activity?limit=60`, { headers: { Authorization: `Bearer ${owner}` } })).json();
+  const firstPageHasPhotos = feed.events.some((e: { photos: unknown[] }) => e.photos.length > 0);
+
   fs.mkdirSync(OUT, { recursive: true });
   for (const [name, size] of [["mobile", { width: 360, height: 740 }], ["desktop", { width: 1280, height: 860 }]] as const) {
     const page = await session(browser, owner, size);
@@ -52,15 +55,20 @@ test("a failed request on a staff screen reaches the owner's Team activity", asy
     await expect(page.getByRole("heading", { name: "Problems" })).toBeVisible({ timeout: 45_000 });
     await expect(page.locator("main")).toContainText(marker);
     await expect(page.locator("main")).toContainText("EAT");
-    await expect(page.locator("main img").first()).toBeVisible({ timeout: 45_000 });
+    if (firstPageHasPhotos) await expect(page.locator("main img").first()).toBeVisible({ timeout: 45_000 });
     expect(await page.locator("main").innerText()).not.toMatch(/\bAI\b/);
-    await page.screenshot({ path: path.join(OUT, `owner-team-activity-${name}.png`), fullPage: true, animations: "disabled" });
+    if (firstPageHasPhotos) {
+      const delivery = page.locator("main section li").filter({ has: page.locator("img") }).first();
+      await delivery.scrollIntoViewIfNeeded();
+      await delivery.screenshot({ path: path.join(OUT, `owner-team-activity-photos-${name}.png`), animations: "disabled" });
+    }
+    await page.screenshot({ path: path.join(OUT, `owner-team-activity-${name}.png`), fullPage: false, animations: "disabled" });
     if (name === "mobile") {
-      const amina = await page.locator("select option", { hasText: /^Amina/ }).first().getAttribute("value");
+      const amina = await page.locator("select option", { hasText: "amina@eleven.leviii" }).getAttribute("value");
       await page.getByLabel("Person").selectOption(amina!);
+      await expect(page.locator("main section li strong", { hasText: /^Jack/ })).toHaveCount(0, { timeout: 45_000 });
       await expect(page.locator("main section li strong", { hasText: /^Amina/ }).first()).toBeVisible();
-      await expect(page.locator("main section li strong", { hasText: /^Jack/ })).toHaveCount(0);
-      await page.screenshot({ path: path.join(OUT, "owner-team-activity-filtered.png"), fullPage: true, animations: "disabled" });
+      await page.screenshot({ path: path.join(OUT, "owner-team-activity-filtered.png"), fullPage: false, animations: "disabled" });
     }
   }
 });

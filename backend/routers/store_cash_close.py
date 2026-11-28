@@ -11,11 +11,10 @@ import auth
 import models
 from bill_schedule import business_today
 from database import get_db
-from money_visibility import hides_money
 from routers.deps import get_or_create_restaurant
 from schemas import StrictModel
 from staff_audit import record_entry
-from store_access import require_module
+from store_access import unlocked_modules
 from time_utils import utcnow
 
 router = APIRouter(prefix="/store", tags=["store"])
@@ -31,6 +30,14 @@ def _cash_roles(user: models.User) -> bool:
     if user.role in (models.Role.ADMIN, models.Role.SUPERADMIN):
         return True
     return user.staff_role in (models.StaffRole.CONTROLLER, models.StaffRole.MANAGER)
+
+
+def _require_cash_access(db: Session, user: models.User) -> None:
+    if not _cash_roles(user):
+        raise HTTPException(status_code=403, detail="Only the accountant or floor manager records cash.")
+    modules = unlocked_modules(db, user)
+    if "*" not in modules and "day-close" not in modules:
+        raise HTTPException(status_code=403, detail="Answer the questions first. This part is still locked.")
 
 
 def _expected_cash_cents(db: Session, restaurant_id: int, day) -> tuple[int | None, bool]:
@@ -54,10 +61,8 @@ async def cash_close_status(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    require_module(db, current_user, "day-close")
+    _require_cash_access(db, current_user)
     restaurant = get_or_create_restaurant(db, current_user)
-    if hides_money(current_user, "/store/cash-close"):
-        raise HTTPException(status_code=403, detail="The storekeeper does not count cash here.")
     day = business_today()
     row = (
         db.query(models.DayCashClose)
@@ -95,9 +100,7 @@ async def save_cash_close(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    require_module(db, current_user, "day-close")
-    if not _cash_roles(current_user):
-        raise HTTPException(status_code=403, detail="Only the accountant or floor manager records cash.")
+    _require_cash_access(db, current_user)
     restaurant = get_or_create_restaurant(db, current_user)
     day = business_today()
     existing = (

@@ -28,6 +28,7 @@ export default function CashClosePage() {
   const [mpesa, setMpesa] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
+  const [blocked, setBlocked] = useState("");
   const [saved, setSaved] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -39,7 +40,10 @@ export default function CashClosePage() {
         const res = await api.get("/api/v1/store/cash-close/status");
         setStatus(res.data);
       })
-      .catch(() => setError("Could not load cash close."))
+      .catch((err: unknown) => {
+        if ((err as { response?: { status?: number } })?.response?.status === 403) setBlocked(detailOf(err, "Not for your role."));
+        else setError("Could not load cash close.");
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -62,6 +66,14 @@ export default function CashClosePage() {
   }
 
   if (loading) return <p className="text-sm text-zinc-400">Loading…</p>;
+  if (blocked) {
+    return (
+      <section className="owner-glass-panel rounded-3xl p-4">
+        <h2 className="font-semibold">Not your screen</h2>
+        <p className="mt-2 text-sm text-zinc-300">{blocked}</p>
+      </section>
+    );
+  }
   if (setup && !hasModule(setup, "day-close")) {
     return (
       <section className="owner-glass-panel rounded-3xl p-4">

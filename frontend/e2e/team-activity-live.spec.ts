@@ -55,7 +55,10 @@ test("a failed request on a staff screen reaches the owner's Team activity", asy
     await expect(page.getByRole("heading", { name: "Problems" })).toBeVisible({ timeout: 45_000 });
     await expect(page.locator("main")).toContainText(marker);
     await expect(page.locator("main")).toContainText("EAT");
-    if (firstPageHasPhotos) await expect(page.locator("main img").first()).toBeVisible({ timeout: 45_000 });
+    if (firstPageHasPhotos) {
+      await page.getByRole("button", { name: /^Open .* photo$/ }).first().scrollIntoViewIfNeeded();
+      await expect(page.locator("main img").first()).toBeVisible({ timeout: 45_000 });
+    }
     expect(await page.locator("main").innerText()).not.toMatch(/\bAI\b/);
     if (firstPageHasPhotos) {
       const delivery = page.locator("main section li").filter({ has: page.locator("img") }).first();

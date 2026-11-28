@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import OwnerShell from "@/components/eleven/OwnerShell";
 import api from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
@@ -26,9 +26,39 @@ type Activity = {
 const PAGE = 60;
 const PROBLEMS_SHOWN = 5;
 
-function Thumb({ photo, src, onOpen }: { photo: Photo; src?: string; onOpen: (url: string) => void }) {
+/** Fetches its picture (with the owner's sign-in) only once it scrolls into view. */
+function Thumb({ photo, onOpen }: { photo: Photo; onOpen: (url: string) => void }) {
+  const box = useRef<HTMLButtonElement>(null);
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    const node = box.current;
+    if (!node) return;
+    let cancel = false;
+    let url: string | null = null;
+    const watcher = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      watcher.disconnect();
+      api
+        .get(photo.path, { responseType: "blob" })
+        .then((response) => {
+          if (cancel) return;
+          url = URL.createObjectURL(response.data);
+          setSrc(url);
+        })
+        .catch(() => undefined);
+    });
+    watcher.observe(node);
+    return () => {
+      cancel = true;
+      watcher.disconnect();
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [photo.path]);
+
   return (
     <button
+      ref={box}
       type="button"
       className="flex flex-col items-center gap-1 text-[11px] text-zinc-400"
       aria-label={`Open ${photo.label} photo`}
@@ -47,7 +77,6 @@ export default function TeamActivityPage() {
   const [person, setPerson] = useState("all");
   const [error, setError] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
-  const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<string | null>(null);
   const [allProblems, setAllProblems] = useState(false);
 
@@ -85,24 +114,6 @@ export default function TeamActivityPage() {
       setLoadingMore(false);
     }
   }
-
-  const paths = events.flatMap((event) => event.photos.map((photo) => photo.path)).join("|");
-  useEffect(() => {
-    let cancel = false;
-    for (const path of paths.split("|").filter(Boolean)) {
-      api
-        .get(path, { responseType: "blob" })
-        .then((response) => {
-          if (cancel) return;
-          const url = URL.createObjectURL(response.data);
-          setThumbs((current) => (current[path] ? current : { ...current, [path]: url }));
-        })
-        .catch(() => undefined);
-    }
-    return () => {
-      cancel = true;
-    };
-  }, [paths]);
 
   const days: { day: string; items: TeamEvent[] }[] = [];
   for (const event of events) {
@@ -191,7 +202,7 @@ export default function TeamActivityPage() {
                       {event.photos.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-2">
                           {event.photos.map((photo) => (
-                            <Thumb key={photo.path} photo={photo} src={thumbs[photo.path]} onOpen={setOpen} />
+                            <Thumb key={photo.path} photo={photo} onOpen={setOpen} />
                           ))}
                         </div>
                       )}

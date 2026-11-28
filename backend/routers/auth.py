@@ -22,6 +22,7 @@ import email_utils
 from schemas import StrictModel
 from pydantic import EmailStr
 from routers.deps import get_restaurant_or_none
+from staff_audit import record_entry
 from rate_limit import limiter
 from time_utils import utcnow
 
@@ -321,6 +322,10 @@ def _authenticate_password_user(
     user.failed_login_attempts = 0
     user.locked_until = None
     user.last_login_at = utcnow()
+    if user.role == models.Role.STAFF:
+        restaurant = get_restaurant_or_none(db, user)
+        if restaurant:
+            record_entry(db, restaurant.id, user, "signed_in", "user", f"{user.email} signed in.", entity_id=user.id)
     _mark_password_authenticated(user, db)
     db.commit()
 

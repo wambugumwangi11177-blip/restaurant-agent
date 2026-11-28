@@ -1901,6 +1901,27 @@ class StaffEntryAudit(Base):
     )
 
 
+class ClientError(Base):
+    """A screen problem reported from a staff device: a script error, or a
+    request the server refused or failed. The owner reads these in Team activity."""
+    __tablename__ = "client_errors"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    kind = Column(String, nullable=False)  # script | request
+    screen = Column(String, nullable=False)
+    message = Column(Text, nullable=False)
+    status_code = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    user = relationship("User")
+
+    __table_args__ = (
+        Index("ix_client_errors_restaurant_created", "restaurant_id", "created_at"),
+    )
+
+
 class ImportAppliedKey(Base):
     """Natural key of a row the Eleven import has already inserted. A second
     confirm of the same file skips these instead of duplicating them."""

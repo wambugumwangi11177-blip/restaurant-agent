@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getAccessToken, clearAccessToken } from "./tokenStore";
+import { reportRequestFailure } from "./clientErrors";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -26,6 +27,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    reportRequestFailure(error);
     if (error.response?.status === 401 && typeof window !== "undefined") {
       // Don't redirect when we're already on /login or registering/logging in —
       // the login page fires unauthenticated API calls (trust-stats) and a

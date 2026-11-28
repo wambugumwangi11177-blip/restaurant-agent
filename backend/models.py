@@ -208,6 +208,8 @@ class Restaurant(Base):
     spoilage_approval_qty = Column(Float, nullable=False, default=5, server_default="5")
     # Jack questionnaire: how restock requests route (owner_approves | staples_self | flag_office | unknown).
     restock_routing_mode = Column(String, nullable=False, default="owner_approves", server_default="owner_approves")
+    # Local time (Africa/Nairobi) when store + cash close reminders start, e.g. 22:00.
+    day_close_reminder_time = Column(String, nullable=False, default="22:00", server_default="22:00")
     # JSON map inventory_item_id -> max staple order quantity (no KES caps on store screens).
     staple_caps_json = Column(Text, nullable=False, default="{}", server_default="{}")
 
@@ -1899,6 +1901,27 @@ class StaffEntryAudit(Base):
     )
 
 
+class ClientError(Base):
+    """A screen problem reported from a staff device: a script error, or a
+    request the server refused or failed. The owner reads these in Team activity."""
+    __tablename__ = "client_errors"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    kind = Column(String, nullable=False)  # script | request
+    screen = Column(String, nullable=False)
+    message = Column(Text, nullable=False)
+    status_code = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    user = relationship("User")
+
+    __table_args__ = (
+        Index("ix_client_errors_restaurant_created", "restaurant_id", "created_at"),
+    )
+
+
 class ImportAppliedKey(Base):
     """Natural key of a row the Eleven import has already inserted. A second
     confirm of the same file skips these instead of duplicating them."""
@@ -2131,6 +2154,25 @@ class DayCloseLine(Base):
     counted_qty = Column(Float, nullable=False)
 
     close = relationship("DayClose", back_populates="lines")
+
+
+class DayCashClose(Base):
+    """End-of-day cash + M-Pesa counts (controllers/managers only — not storekeepers)."""
+    __tablename__ = "day_cash_closes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    restaurant_id = Column(Integer, ForeignKey("restaurants.id"), nullable=False, index=True)
+    business_date = Column(Date, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    cash_counted_cents = Column(Integer, nullable=False, default=0)
+    mpesa_counted_cents = Column(Integer, nullable=False, default=0)
+  # null = till not connected / unknown expected
+    expected_cash_cents = Column(Integer, nullable=True)
+    expected_mpesa_cents = Column(Integer, nullable=True)
+    expected_pending = Column(Boolean, nullable=False, default=False, server_default="0")
+    status = Column(String, nullable=False, default="reported")
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    notes = Column(Text, nullable=False, default="", server_default="")
 
 
 def _immutable_change(target, allowed: set[str]) -> None:

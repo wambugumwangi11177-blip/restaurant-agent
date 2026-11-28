@@ -744,7 +744,8 @@ async def spoilage_photo(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    require_store_role(current_user)
+    if not _owner(current_user):
+        require_store_role(current_user)
     restaurant = get_or_create_restaurant(db, current_user)
     row = db.query(models.SpoilageRecord).filter(
         models.SpoilageRecord.id == spoilage_id,
@@ -1182,6 +1183,9 @@ async def list_approvals(
             "created_at": _when(row.created_at),
             **who,
         })
+    from services.day_close_reminders import duty_cards_for_viewer
+
+    events.extend(duty_cards_for_viewer(db, restaurant, current_user))
     events.sort(key=lambda item: item.get("created_at") or "", reverse=True)
     pending = [item for item in events if item.get("status") == "needs_approval"]
     from services.approval_workflow import (
@@ -1194,14 +1198,16 @@ async def list_approvals(
     process_due_reminders(db, restaurant.id)
     for item in pending:
         requester = item.get("requester_user_id") or item.get("user_id")
-        ensure_reminder_row(
-            db,
-            restaurant.id,
-            item.get("kind") or "waste",
-            int(item["id"]),
-            requester,
-            actor_role=_actor_role_for_item(item),
-        )
+        if not str(item.get("kind") or "").startswith("day_close"):
+            # Day close has its own 22:00 reminder cadence; no second set here.
+            ensure_reminder_row(
+                db,
+                restaurant.id,
+                item.get("kind") or "waste",
+                int(item["id"]),
+                requester,
+                actor_role=_actor_role_for_item(item),
+            )
         item.update(enrich_approval_item(item, current_user))
     from bill_schedule import business_today, reminder_bucket
 

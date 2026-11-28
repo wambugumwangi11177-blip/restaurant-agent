@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import Field
 from sqlalchemy.orm import Session
 
 import auth
@@ -11,10 +12,12 @@ import models
 from database import get_db
 from leviii_test_seed import SeedError, reset_jack_empty_journey
 from routers.deps import get_or_create_restaurant
+from schemas import StrictModel
 from urllib.parse import urlparse
 
 import storage
 from services import engine_triggers
+from services.day_close_reminders import process_day_close_reminders
 
 router = APIRouter(prefix="/test", tags=["test-stack"])
 
@@ -82,3 +85,23 @@ async def run_reorder_draft(
     count = engine_triggers.maybe_draft_reorders(db, restaurant.id)
     db.commit()
     return {"drafted": count}
+
+
+class DayCloseReminderIn(StrictModel):
+    reminder_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+@router.post("/day-close-reminders")
+async def run_day_close_reminders(
+    body: DayCloseReminderIn,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+    _: None = Depends(_require_test_stack),
+):
+    """Move the close reminder time (HH:MM EAT) and fire the reminders due now."""
+    if current_user.role not in (models.Role.ADMIN, models.Role.SUPERADMIN):
+        raise HTTPException(status_code=403, detail="Owner only.")
+    restaurant = get_or_create_restaurant(db, current_user)
+    restaurant.day_close_reminder_time = body.reminder_time
+    db.commit()
+    return {"sent": process_day_close_reminders(db, restaurant.id)}

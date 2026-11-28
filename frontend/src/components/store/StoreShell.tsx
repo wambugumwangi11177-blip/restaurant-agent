@@ -4,14 +4,17 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Home, Package, Truck, UserRound, Users } from "lucide-react";
+import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/context/AuthContext";
+import api from "@/lib/api";
+import { installErrorCapture } from "@/lib/clientErrors";
 import { homeFor } from "@/lib/tenantHome";
 import "@/styles/owner-glass.css";
 
 const NAV = [
   { href: "/store", label: "Shift", icon: Home, match: (p: string) => p === "/store" || p.startsWith("/store/questions") },
   { href: "/store/deliveries", label: "In", icon: Truck, match: (p: string) => p.startsWith("/store/deliveries") || p.startsWith("/store/suppliers") || p.startsWith("/store/invoice-prices") },
-  { href: "/store/stock", label: "Stock", icon: Package, match: (p: string) => ["/store/stock", "/store/issue", "/store/waste", "/store/close", "/store/chefs", "/store/restock", "/store/prep"].some((prefix) => p.startsWith(prefix)) },
+  { href: "/store/stock", label: "Stock", icon: Package, match: (p: string) => ["/store/stock", "/store/issue", "/store/waste", "/store/close", "/store/cash-close", "/store/chefs", "/store/restock", "/store/prep"].some((prefix) => p.startsWith(prefix)) },
   { href: "/store/team", label: "Team", icon: Users, match: (p: string) => p.startsWith("/store/team") || p.startsWith("/store/schedule") },
   {
     href: "/store/account",
@@ -42,6 +45,11 @@ export default function StoreShell({
     user?.staff_role === "manager" ||
     user?.role === "admin" ||
     user?.role === "superadmin";
+
+  useEffect(
+    () => installErrorCapture((report) => api.post("/api/v1/client-errors", report, { skipErrorReport: true })),
+    [],
+  );
 
   useEffect(() => {
     const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
@@ -76,6 +84,7 @@ export default function StoreShell({
           <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-400">LEVIII Store</p>
           <h1 className="truncate text-lg text-[var(--text)]">{title}</h1>
         </div>
+        <NotificationBell />
       </header>
       <main className="owner-main-pad mx-auto max-w-md px-4 py-4">{children}</main>
       <nav

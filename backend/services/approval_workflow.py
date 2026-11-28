@@ -25,6 +25,8 @@ _ACTOR_ROLE: dict[str, str] = {
     "restock": "owner",
     "restock_place": "stockkeeper",
     "cost_unknown": "owner",
+    "day_close_stock": "stockkeeper",
+    "day_close_cash": "controller",
 }
 
 _REMINDER_STAGE_COUNT = 4  # immediate, +30m, +2h, next day 09:00 Nairobi
@@ -41,6 +43,8 @@ _TYPE_LABEL: dict[str, str] = {
     "schedule": "Schedule change",
     "zone_photo": "Zone photo",
     "cost_unknown": "Bill amount needed",
+    "day_close_stock": "Stock close",
+    "day_close_cash": "Cash close",
 }
 
 

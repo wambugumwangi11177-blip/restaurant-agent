@@ -6,7 +6,7 @@ import path from "node:path";
 const OUT = "/cursor/stores/self/artifacts";
 const API = process.env.NEXT_PUBLIC_API_URL || "https://backend-test-production-05524237.up.railway.app";
 const JACK = "jack-empty@eleven.leviii";
-const CONTROLLER = "controller-empty@eleven.leviii";
+const CONTROLLER = "amina-empty@eleven.leviii";
 const TEMP = process.env.SEED_STAFF_PASSWORD || "";
 const MIN_STD = 8;
 

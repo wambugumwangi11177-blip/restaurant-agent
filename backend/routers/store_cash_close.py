@@ -144,9 +144,9 @@ async def save_cash_close(
         notify_users(
             db,
             [o.id for o in owners],
-            title="Cash close recorded",
-            body="Today's cash and M-Pesa counts were keyed.",
+            "Cash close recorded",
+            "Today's cash and M-Pesa counts were keyed.",
+            "day_cash_close",
             url="/eleven",
-            event_type="day_cash_close",
         )
     return {"status": "reported", "expected_pending": pending}

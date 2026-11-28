@@ -72,7 +72,7 @@ export default function StoreShell({
 
   return (
     <div className="owner-glass-theme">
-      <header className="owner-glass-panel owner-shell-header flex items-center justify-between gap-3 rounded-full px-5 py-3">
+      <header className="owner-glass-panel owner-shell-header relative z-30 flex items-center justify-between gap-3 rounded-full px-5 py-3">
         <div className="min-w-0 flex-1 pl-0.5">
           <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-400">LEVIII Store</p>
           <h1 className="truncate text-lg text-[var(--text)]">{title}</h1>

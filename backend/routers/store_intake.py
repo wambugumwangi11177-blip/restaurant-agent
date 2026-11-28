@@ -138,11 +138,15 @@ def _balance(db, restaurant_id, item_id, zone_id) -> models.StockBalance:
         .first()
     )
     if row is None:
+        # Stock that exists only as the item total (no zone rows yet) moves into
+        # the first zone row, so the next total is old stock plus the change.
+        has_zone_rows = db.query(models.StockBalance.id).filter(models.StockBalance.inventory_item_id == item_id).first()
+        item = None if has_zone_rows else db.query(models.InventoryItem).filter(models.InventoryItem.id == item_id).first()
         row = models.StockBalance(
             restaurant_id=restaurant_id,
             inventory_item_id=item_id,
             zone_id=zone_id,
-            quantity=0,
+            quantity=max(item.quantity or 0, 0) if item else 0,
         )
         db.add(row)
         db.flush()

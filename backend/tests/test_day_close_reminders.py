@@ -99,3 +99,28 @@ def test_test_stack_hook_moves_the_close_time_and_fires_reminders(client, db_ses
     assert restaurant.day_close_reminder_time == "00:00"
     bad = client.post("/api/v1/test/day-close-reminders", headers=_auth(_token(owner)), json={"reminder_time": "25:99"})
     assert bad.status_code == 422
+
+
+def test_day_close_has_one_reminder_set_not_two(client, db_session):
+    from tests.test_storekeeper_foundation import _add_staff, _auth, _token
+
+    tenant, owner, restaurant = _tenant(db_session, "Eleven", "owner-one@eleven.leviii")
+    restaurant.day_close_reminder_time = "00:00"
+    db_session.commit()
+    amina = _add_staff(db_session, tenant, restaurant, "amina-one@eleven.leviii", models.StaffRole.CONTROLLER)
+    db_session.add(models.StaffSetupProgress(
+        user_id=amina.id, restaurant_id=restaurant.id, updated_at=datetime.utcnow(),
+        account_completed_at=datetime.utcnow(), questionnaire_completed_at=datetime.utcnow(), recipes_completed_at=datetime.utcnow(),
+    ))
+    db_session.commit()
+    nairobi = datetime.now(ZoneInfo("Africa/Nairobi"))
+    with patch("services.day_close_reminders.datetime") as mock_dt:
+        mock_dt.now.return_value = nairobi
+        mock_dt.combine = datetime.combine
+        process_day_close_reminders(db_session, restaurant.id)
+        inbox = client.get("/api/v1/store/approval-inbox", headers=_auth(_token(amina)))
+    assert inbox.status_code == 200, inbox.text
+    assert any(card["kind"] == "day_close_cash" for card in inbox.json()["pending"])
+    assert db_session.query(models.ApprovalReminder).filter(models.ApprovalReminder.kind.like("day_close%")).count() == 0
+    titles = [n.title for n in db_session.query(models.Notification).filter_by(user_id=amina.id).all()]
+    assert titles == ["Close the day — cash"]

@@ -1182,6 +1182,9 @@ async def list_approvals(
             "created_at": _when(row.created_at),
             **who,
         })
+    from services.day_close_reminders import duty_cards_for_viewer
+
+    events.extend(duty_cards_for_viewer(db, restaurant, current_user))
     events.sort(key=lambda item: item.get("created_at") or "", reverse=True)
     pending = [item for item in events if item.get("status") == "needs_approval"]
     from services.approval_workflow import (

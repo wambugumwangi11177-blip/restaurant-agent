@@ -25,6 +25,16 @@ from time_utils import utcnow
 
 router = APIRouter(prefix="/store", tags=["store"])
 
+
+@router.get("/inventory-units")
+async def list_inventory_units(
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    require_store_role(current_user)
+    from services.inventory_units import ALLOWED_UNITS
+
+    return {"units": list(ALLOWED_UNITS)}
+
 _ZONES = (
     ("Main store", "store"),
     ("Cold room", "cold"),
@@ -158,6 +168,11 @@ def _photo_bytes(upload: UploadFile) -> tuple[bytes, str]:
 
 
 def _item_by_name(db, restaurant_id, name, unit) -> models.InventoryItem:
+    from services.inventory_units import is_allowed_unit, normalize_unit
+
+    unit = normalize_unit(unit)
+    if not is_allowed_unit(unit):
+        raise HTTPException(status_code=400, detail="Pick a unit from the list.")
     found = (
         db.query(models.InventoryItem)
         .filter(
@@ -167,6 +182,8 @@ def _item_by_name(db, restaurant_id, name, unit) -> models.InventoryItem:
         .first()
     )
     if found:
+        if normalize_unit(found.unit) != unit and found.quantity <= 0:
+            found.unit = unit
         return found
     found = models.InventoryItem(
         restaurant_id=restaurant_id,
@@ -181,6 +198,32 @@ def _item_by_name(db, restaurant_id, name, unit) -> models.InventoryItem:
     db.add(found)
     db.flush()
     return found
+
+
+def _item_for_delivery_line(db, restaurant_id: int, raw: dict, zone_id: int) -> models.InventoryItem:
+    from services.inventory_units import is_allowed_unit, normalize_unit
+
+    item_id = raw.get("item_id")
+    if item_id is not None:
+        item = (
+            db.query(models.InventoryItem)
+            .filter(
+                models.InventoryItem.id == int(item_id),
+                models.InventoryItem.restaurant_id == restaurant_id,
+            )
+            .first()
+        )
+        if item is None:
+            raise HTTPException(status_code=404, detail="Stock item not found.")
+        item.zone_id = item.zone_id or zone_id
+        return item
+    name = str(raw.get("item_name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Each line needs a stock item or a new item name.")
+    unit = normalize_unit(str(raw.get("unit") or ""))
+    if not is_allowed_unit(unit):
+        raise HTTPException(status_code=400, detail="Pick a unit from the list for new items.")
+    return _item_by_name(db, restaurant_id, name, unit)
 
 
 def _supplier_out(row: models.Supplier) -> dict:
@@ -221,7 +264,13 @@ def _public_delivery(db, receipt: models.DeliveryReceipt, viewer: models.User) -
         "received_at": receipt.received_at.isoformat() if receipt.received_at else None,
         "status": receipt.status,
         "lines": [
-            {"id": line.id, "item_name": line.item_name, "quantity": line.quantity, "unit": line.unit}
+            {
+                "id": line.id,
+                "item_id": line.inventory_item_id,
+                "item_name": line.item_name,
+                "quantity": line.quantity,
+                "unit": line.unit,
+            }
             for line in lines
         ],
         "photos": [{"id": photo.id, "kind": photo.kind} for photo in photos],
@@ -245,8 +294,13 @@ def _public_delivery(db, receipt: models.DeliveryReceipt, viewer: models.User) -
         if status == "mismatch":
             payload["mismatches"] = result.get("mismatches") or []
     else:
-        payload["ai_label"] = "AI check unavailable" if status == "unavailable" else "AI"
-        payload["ai"] = "unavailable" if status == "unavailable" else ("pending" if status == "pending" else "checked")
+        _labels = {
+            "pending": "Photo check pending",
+            "ok": "Photos matched",
+            "mismatch": "Needs owner review",
+            "unavailable": "Photo check off",
+        }
+        payload["check_label"] = _labels.get(status, status or "Photo check pending")
     return payload
 
 
@@ -720,18 +774,17 @@ async def receive_delivery(
                 uploaded_at=utcnow(),
             ))
         for raw in parsed:
-            name = str(raw.get("item_name") or "").strip()
-            unit = str(raw.get("unit") or "").strip()
             try:
                 quantity = float(raw.get("quantity"))
             except (TypeError, ValueError):
                 quantity = 0
-            if not name or not unit or quantity <= 0:
-                raise HTTPException(status_code=400, detail="Each line needs a name, a unit, and a quantity.")
+            if quantity <= 0:
+                raise HTTPException(status_code=400, detail="Each line needs a quantity greater than zero.")
             if "cost" in raw or "price" in raw:
                 raise HTTPException(status_code=422, detail="Prices are not entered by this role.")
-            item = _item_by_name(db, restaurant.id, name, unit)
-            item.zone_id = item.zone_id or zone.id
+            item = _item_for_delivery_line(db, restaurant.id, raw, zone.id)
+            unit = item.unit
+            name = item.item_name
             bal = _balance(db, restaurant.id, item.id, zone.id)
             bal.quantity += quantity
             _sync_total(db, item)

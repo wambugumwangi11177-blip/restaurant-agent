@@ -42,6 +42,7 @@ from routers import (
     eleven_import,
     store_intake,
     store_control,
+    store_cash_close,
     store_day,
     pos_evidence,
     eleven_handover,
@@ -466,10 +467,12 @@ def _run_approval_reminders_job():
     try:
         from database import SessionLocal
         from services.approval_workflow import process_all_due_reminders
+        from services.day_close_reminders import process_all_day_close_reminders
 
         db = SessionLocal()
         try:
             process_all_due_reminders(db)
+            process_all_day_close_reminders(db)
         finally:
             db.close()
     except Exception as exc:
@@ -694,6 +697,7 @@ _VERSIONED_ROUTERS = [
     eleven_import.router,
     store_intake.router,
     store_control.router,
+    store_cash_close.router,
     store_day.router,
     pos_evidence.router,
     eleven_handover.router,

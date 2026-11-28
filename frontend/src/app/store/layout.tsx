@@ -14,6 +14,7 @@ const TITLES: Record<string, string> = {
   "/store/issue": "To the kitchen",
   "/store/waste": "Thrown away",
   "/store/close": "Close the day",
+  "/store/cash-close": "Cash close",
   "/store/chefs": "Chefs",
   "/store/costs": "Bills",
   "/store/day-photos": "Zone photos",
